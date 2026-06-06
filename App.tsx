@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, 
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
-  Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle
+  Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
+  Plus, Key
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -885,6 +886,213 @@ const App: React.FC = () => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral'>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral'>('gemini');
+
+  const [geminiKeysList, setGeminiKeysList] = useState<string[]>([]);
+  const [groqKeysList, setGroqKeysList] = useState<string[]>([]);
+  const [mistralKeysList, setMistralKeysList] = useState<string[]>([]);
+
+  const [newGeminiKey, setNewGeminiKey] = useState('');
+  const [newGroqKey, setNewGroqKey] = useState('');
+  const [newMistralKey, setNewMistralKey] = useState('');
+
+  const [keyTestingIndex, setKeyTestingIndex] = useState<number | null>(null);
+  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | null>(null);
+  const [keyTestResults, setKeyTestResults] = useState<Record<string, { type: 'success' | 'error' | 'quota'; message: string }>>({}); // "provider-index"
+  const [hasCustomKeySaved, setHasCustomKeySaved] = useState(false);
+
+  useEffect(() => {
+    if (showSettingsModal) {
+      const gSaved = localStorage.getItem('gemini_api_key') || '';
+      const grSaved = localStorage.getItem('groq_api_key') || '';
+      const mSaved = localStorage.getItem('mistral_api_key') || '';
+      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral';
+
+      const gParsed = gSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const grParsed = grSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const mParsed = mSaved.split(',').map(k => k.trim()).filter(Boolean);
+
+      setGeminiKeysList(gParsed);
+      setGroqKeysList(grParsed);
+      setMistralKeysList(mParsed);
+      
+      setNewGeminiKey('');
+      setNewGroqKey('');
+      setNewMistralKey('');
+
+      setSelectedProvider(pSaved);
+      setHasCustomKeySaved(gParsed.length > 0 || grParsed.length > 0 || mParsed.length > 0);
+      setKeyTestingIndex(null);
+      setKeyTestProvider(null);
+      setKeyTestResults({});
+    }
+  }, [showSettingsModal]);
+
+  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral', index: number, keyValue: string) => {
+    if (!keyValue.trim()) return;
+    setKeyTestingIndex(index);
+    setKeyTestProvider(provider);
+
+    const compoundKey = `${provider}-${index}`;
+    setKeyTestResults(prev => {
+      const copy = { ...prev };
+      delete copy[compoundKey];
+      return copy;
+    });
+
+    let endpoint = '/api/test-gemini-key';
+    if (provider === 'groq') endpoint = '/api/test-groq-key';
+    if (provider === 'mistral') endpoint = '/api/test-mistral-key';
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: keyValue.trim() })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        if (data.quotaExceeded) {
+          setKeyTestResults(prev => ({
+            ...prev,
+            [compoundKey]: { type: 'quota', message: 'Quota habis (RESOURCE_EXHAUSTED)' }
+          }));
+        } else {
+          setKeyTestResults(prev => ({
+            ...prev,
+            [compoundKey]: { type: 'success', message: 'Key valid & terkoneksi!' }
+          }));
+        }
+      } else {
+        setKeyTestResults(prev => ({
+          ...prev,
+          [compoundKey]: { type: 'error', message: data.error || 'Key salah atau tidak valid.' }
+        }));
+      }
+    } catch (e: any) {
+      setKeyTestResults(prev => ({
+        ...prev,
+        [compoundKey]: { type: 'error', message: e.message || 'Koneksi error.' }
+      }));
+    } finally {
+      setKeyTestingIndex(null);
+      setKeyTestProvider(null);
+    }
+  };
+
+  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral') => {
+    let key = '';
+    let currentList: string[] = [];
+    
+    if (provider === 'gemini') {
+      key = newGeminiKey.trim();
+      currentList = geminiKeysList;
+    } else if (provider === 'groq') {
+      key = newGroqKey.trim();
+      currentList = groqKeysList;
+    } else if (provider === 'mistral') {
+      key = newMistralKey.trim();
+      currentList = mistralKeysList;
+    }
+
+    if (!key) return;
+    if (currentList.some(k => k === key)) {
+      alert("API Key ini sudah ada dalam daftar!");
+      return;
+    }
+
+    if (provider === 'gemini') {
+      setGeminiKeysList(prev => [...prev, key]);
+      setNewGeminiKey('');
+    } else if (provider === 'groq') {
+      setGroqKeysList(prev => [...prev, key]);
+      setNewGroqKey('');
+    } else if (provider === 'mistral') {
+      setMistralKeysList(prev => [...prev, key]);
+      setNewMistralKey('');
+    }
+  };
+
+  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral', index: number) => {
+    let listSetter: any;
+    let list: string[] = [];
+
+    if (provider === 'gemini') {
+      listSetter = setGeminiKeysList;
+      list = geminiKeysList;
+    } else if (provider === 'groq') {
+      listSetter = setGroqKeysList;
+      list = groqKeysList;
+    } else if (provider === 'mistral') {
+      listSetter = setMistralKeysList;
+      list = mistralKeysList;
+    }
+
+    listSetter((prev: string[]) => prev.filter((_, i) => i !== index));
+
+    setKeyTestResults(prev => {
+      const updated = { ...prev };
+      list.forEach((_, i) => {
+        delete updated[`${provider}-${i}`];
+      });
+
+      const filtered = list.filter((_, i) => i !== index);
+      filtered.forEach((kValue, i) => {
+        const oldIndex = i < index ? i : i + 1;
+        const oldRes = prev[`${provider}-${oldIndex}`];
+        if (oldRes) {
+          updated[`${provider}-${i}`] = oldRes;
+        }
+      });
+
+      return updated;
+    });
+  };
+
+  const handleSaveKey = () => {
+    const cleanGemini = geminiKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanGroq = groqKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanMistral = mistralKeysList.map(k => k.trim()).filter(Boolean);
+
+    if (cleanGemini.length > 0) {
+      localStorage.setItem('gemini_api_key', cleanGemini.join(','));
+    } else {
+      localStorage.removeItem('gemini_api_key');
+    }
+
+    if (cleanGroq.length > 0) {
+      localStorage.setItem('groq_api_key', cleanGroq.join(','));
+    } else {
+      localStorage.removeItem('groq_api_key');
+    }
+
+    if (cleanMistral.length > 0) {
+      localStorage.setItem('mistral_api_key', cleanMistral.join(','));
+    } else {
+      localStorage.removeItem('mistral_api_key');
+    }
+
+    localStorage.setItem('ai_provider', selectedProvider);
+    setHasCustomKeySaved(cleanGemini.length > 0 || cleanGroq.length > 0 || cleanMistral.length > 0);
+    setShowSettingsModal(false);
+  };
+
+  const handleResetKey = () => {
+    localStorage.removeItem('gemini_api_key');
+    localStorage.removeItem('groq_api_key');
+    localStorage.removeItem('mistral_api_key');
+    localStorage.removeItem('ai_provider');
+    
+    setGeminiKeysList([]);
+    setGroqKeysList([]);
+    setMistralKeysList([]);
+    setSelectedProvider('gemini');
+    setHasCustomKeySaved(false);
+    setKeyTestResults({});
+  };
+
   const handleCloseWelcome = () => {
       sessionStorage.setItem('vixer_welcomed', 'true');
       setShowWelcomeScreen(false);
@@ -1717,6 +1925,7 @@ const App: React.FC = () => {
           sidebarOpen={sidebarOpen} 
           setSidebarOpen={setSidebarOpen} 
           setShowInfoModal={setShowInfoModal} 
+          setShowSettingsModal={setShowSettingsModal}
           t={t} 
         />
 
@@ -1969,6 +2178,364 @@ const App: React.FC = () => {
             </div>
             
             <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full py-2 bg-[#4e73df] text-white font-bold rounded-lg text-xs uppercase">Tutup Petunjuk</button>
+          </div>
+        </div>
+      )}
+
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150" onClick={() => setShowSettingsModal(false)}>
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowSettingsModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
+            
+            <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5 shrink-0">
+              <Settings size={16} className="text-[#4e73df] animate-spin-slow" />
+              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Pengaturan Provider Model AI</h2>
+            </div>
+            
+            {/* Pemilihan Provider Utama */}
+            <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shrink-0">
+              <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Provider AI Utama Yang Digunakan</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'gemini', name: 'Gemini', desc: 'Google AI' },
+                  { id: 'groq', name: 'Groq', desc: 'Llama 3 / Mixtral' },
+                  { id: 'mistral', name: 'Mistral', desc: 'Mistral Large' }
+                ].map(prov => {
+                  const isActive = selectedProvider === prov.id;
+                  return (
+                    <button
+                      key={prov.id}
+                      type="button"
+                      onClick={() => setSelectedProvider(prov.id as any)}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
+                        isActive
+                          ? 'bg-[#4e73df]/10 border-[#4e73df] text-[#4e73df]'
+                          : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black">{prov.name}</span>
+                      <span className="text-[8px] font-medium opacity-80 mt-0.5">{prov.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* TAB Tombol */}
+            <div className="flex border-b border-slate-200 dark:border-white/5 mb-4 shrink-0">
+              {(['gemini', 'groq', 'mistral'] as const).map(tab => {
+                const isActive = activeSettingsTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveSettingsTab(tab)}
+                    className={`flex-1 py-2 font-bold uppercase text-[10px] tracking-wider border-b-2 text-center transition-all ${
+                      isActive
+                        ? 'border-[#4e73df] text-[#4e73df]'
+                        : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Keys {tab}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab Content */}
+            <div className="space-y-4 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
+              {activeSettingsTab === 'gemini' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Anda dapat menyimpan beberapa API Key Gemini pribadi. Sistem secara cerdas melakukan rotasi otomatis demi menghindari hambatan kuota (*rate limit / RESOURCE_EXHAUSTED*).
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Gemini ({geminiKeysList.length})</label>
+                    
+                    {geminiKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Menggunakan Gemini Key default server global.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {geminiKeysList.map((key, index) => {
+                          const testResult = keyTestResults[`gemini-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'gemini';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : testResult.type === 'quota'
+                                      ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-305'
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : testResult.type === 'quota' ? 'QUOTA LIMIT' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('gemini', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('gemini', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Gemini</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="API Key Gemini (AIzaSy...)"
+                        value={newGeminiKey}
+                        onChange={(e) => setNewGeminiKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('gemini')}
+                        disabled={!newGeminiKey.trim()}
+                        className="py-2 px-3 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
+                      >
+                        <Plus size={12} />
+                        <span>Tambah</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'groq' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Masukkan API Key Groq Anda. Model Groq (<code className="font-mono text-[10px]">llama-3.3-70b-specdec</code> dan <code className="font-mono text-[10px]">llama-3.2-11b-vision-preview</code>) sangat cepat untuk memproses teks, visual, dan pembuatan prompt yang sangat responsif.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Groq ({groqKeysList.length})</label>
+                    
+                    {groqKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Groq ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {groqKeysList.map((key, index) => {
+                          const testResult = keyTestResults[`groq-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'groq';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('groq', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('groq', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Groq</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="API Key Groq (gsk_...)"
+                        value={newGroqKey}
+                        onChange={(e) => setNewGroqKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('groq')}
+                        disabled={!newGroqKey.trim()}
+                        className="py-2 px-3 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
+                      >
+                        <Plus size={12} />
+                        <span>Tambah</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'mistral' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Masukkan API Key Mistral Anda. Model-model Mistral (<code className="font-mono text-[10px]">mistral-large-latest</code> dan <code className="font-mono text-[10px]">pixtral-12b</code>) memiliki akurasi kosa kata yang luar biasa, puitis, dan didesain khusus untuk optimasi metadata kelas atas.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Mistral ({mistralKeysList.length})</label>
+                    
+                    {mistralKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Mistral ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {mistralKeysList.map((key, index) => {
+                          const testResult = keyTestResults[`mistral-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'mistral';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('mistral', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('mistral', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Mistral</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="API Key Mistral (mX...)"
+                        value={newMistralKey}
+                        onChange={(e) => setNewMistralKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('mistral')}
+                        disabled={!newMistralKey.trim()}
+                        className="py-2 px-3 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
+                      >
+                        <Plus size={12} />
+                        <span>Tambah</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Status Penggunaan info footer */}
+              <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-250 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Status Provider Aktif</span>
+                <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-black text-[9px] uppercase tracking-wider">
+                  {selectedProvider.toUpperCase()} PROVIDER
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex gap-2.5 mt-6 shrink-0 pt-3 border-t border-slate-200 dark:border-white/5">
+              {(geminiKeysList.length > 0 || groqKeysList.length > 0 || mistralKeysList.length > 0) && (
+                <button
+                  type="button"
+                  onClick={handleResetKey}
+                  className="px-4 py-2 bg-red-50 dark:bg-red-500/5 hover:bg-red-100 text-red-600 dark:text-red-450 font-semibold rounded-xl text-xs transition-colors border border-red-200/50 dark:border-red-500/10"
+                >
+                  Hapus Semua
+                </button>
+              )}
+              <button 
+                onClick={handleSaveKey} 
+                className="flex-1 py-1.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-xl text-xs uppercase shadow transition-colors"
+              >
+                Simpan & Pasang
+              </button>
+            </div>
           </div>
         </div>
       )}

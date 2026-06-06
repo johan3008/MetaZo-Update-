@@ -1,26 +1,231 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
+
+// Thread-safe dynamic API Key storage
+export const apiKeyStorage = new AsyncLocalStorage<any>();
 
 // Initialize lazy backend Google GenAI SDK.
 let aiClient: GoogleGenAI | null = null;
 
-function getAIClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
+async function callOpenAICompatibleWithRetry(params: {
+  systemInstruction?: string;
+  contents: any;
+  responseMimeType?: string;
+}): Promise<string> {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
+  if (provider !== 'groq' && provider !== 'mistral') {
+    throw new Error(`Unsupported provider: ${provider}`);
+  }
+
+  const providerState = store?.[provider];
+  const keysList = (providerState && providerState.keys) || [];
+  const maxRotationAttempts = keysList.length > 0 ? keysList.length : 1;
+  let lastErr: any;
+
+  for (let rot = 0; rot < maxRotationAttempts; rot++) {
+    let apiKey = '';
+    
+    if (keysList.length > 0) {
+      const activeIdx = providerState.activeIndex || 0;
+      apiKey = keysList[activeIdx];
+    } else {
+      apiKey = provider === 'groq' ? (process.env.GROQ_API_KEY || '') : (process.env.MISTRAL_API_KEY || '');
     }
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
+
+    if (!apiKey) {
+      throw new Error(`API Key untuk ${provider.toUpperCase()} belum dikonfigurasi. Silakan tambahkan Key Anda di pengaturan.`);
+    }
+
+    const messages: any[] = [];
+    if (params.systemInstruction) {
+      messages.push({ role: 'system', content: params.systemInstruction });
+    }
+
+    let hasImages = false;
+    const contentParts: any[] = [];
+
+    const addPart = (part: any) => {
+      if (!part) return;
+      if (typeof part === 'string') {
+        contentParts.push({ type: 'text', text: part });
+      } else if (part.text) {
+        contentParts.push({ type: 'text', text: part.text });
+      } else if (part.inlineData) {
+        hasImages = true;
+        contentParts.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+          }
+        });
+      }
+    };
+
+    if (typeof params.contents === 'string') {
+      contentParts.push({ type: 'text', text: params.contents });
+    } else if (Array.isArray(params.contents)) {
+      params.contents.forEach(addPart);
+    } else if (params.contents && typeof params.contents === 'object') {
+      if (Array.isArray(params.contents.parts)) {
+        params.contents.parts.forEach(addPart);
+      } else {
+        addPart(params.contents);
+      }
+    }
+
+    messages.push({
+      role: 'user',
+      content: contentParts.length === 1 && contentParts[0].type === 'text' ? contentParts[0].text : contentParts
+    });
+
+    let model = '';
+    let endpoint = '';
+    if (provider === 'groq') {
+      endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+      model = hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-specdec';
+    } else {
+      endpoint = 'https://api.mistral.ai/v1/chat/completions';
+      model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
+    }
+
+    const payload: any = {
+      model,
+      messages,
+    };
+
+    if (params.responseMimeType === 'application/json') {
+      payload.response_format = { type: 'json_object' };
+    }
+
+    try {
+      console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
+      const response = await fetch(endpoint, {
+        method: 'POST',
         headers: {
-          'User-Agent': 'aistudio-build',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errText}`);
+      }
+
+      const responseData = await response.json();
+      const answer = responseData.choices?.[0]?.message?.content;
+      if (!answer) {
+        throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
+      }
+      return answer;
+    } catch (err: any) {
+      console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
+      lastErr = err;
+      const errorMsg = String(err.message || "").toLowerCase();
+
+      if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit')) {
+        if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
+          const prevIdx = providerState.activeIndex;
+          providerState.activeIndex++;
+          console.warn(`[Key Rotation - ${provider.toUpperCase()}] Rotating from Key index ${prevIdx} to ${providerState.activeIndex}`);
+          continue;
         }
       }
-    });
+      throw err;
+    }
   }
-  return aiClient;
+  throw lastErr;
+}
+
+function getAIClient(): any {
+  return {
+    models: {
+      generateContent: async (params: any) => {
+        const store = apiKeyStorage.getStore();
+        const provider = (store && store.provider) || 'gemini';
+
+        if (provider === 'groq' || provider === 'mistral') {
+          const text = await callOpenAICompatibleWithRetry({
+            systemInstruction: params.config?.systemInstruction,
+            contents: params.contents,
+            responseMimeType: params.config?.responseMimeType
+          });
+          return { text };
+        }
+
+        let key = process.env.GEMINI_API_KEY;
+        let activeIndex = 0;
+        let keysList: string[] = [];
+
+        if (store) {
+          if (store.gemini && Array.isArray(store.gemini.keys)) {
+            keysList = store.gemini.keys;
+            activeIndex = store.gemini.activeIndex || 0;
+            if (keysList.length > 0) {
+              key = keysList[activeIndex];
+            }
+          } else if (typeof store === 'string') {
+            key = store;
+          } else if (store && Array.isArray(store.keys) && store.keys.length > 0) {
+            keysList = store.keys;
+            activeIndex = store.activeIndex || 0;
+            if (keysList.length > 0) {
+              key = keysList[activeIndex];
+            }
+          }
+        }
+
+        const runGemini = async (keyToUse: string | undefined) => {
+          if (!keyToUse) {
+            throw new Error('GEMINI_API_KEY environment variable is required');
+          }
+          const client = new GoogleGenAI({
+            apiKey: keyToUse,
+            httpOptions: {
+              headers: {
+                'User-Agent': 'aistudio-build',
+              }
+            }
+          });
+          return await client.models.generateContent(params);
+        };
+
+        if (keysList.length > 1) {
+          let lastErr: any;
+          for (let rot = activeIndex; rot < keysList.length; rot++) {
+            try {
+              return await runGemini(keysList[rot]);
+            } catch (err: any) {
+              lastErr = err;
+              const statusCode = err.status || err.code;
+              const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
+              
+              if (statusCode === 429 || statusCode === 403 || errorMsg.includes("quota") || errorMsg.includes("exceeded") || errorMsg.includes("resource_exhausted") || errorMsg.includes("limit") || errorMsg.includes("api key")) {
+                if (store && store.gemini && store.gemini.activeIndex < keysList.length - 1) {
+                  store.gemini.activeIndex++;
+                  console.warn(`[Key Rotation - GEMINI] Rotating key in generateContent to index ${store.gemini.activeIndex}`);
+                  continue;
+                } else if (store && !store.gemini && store.activeIndex < keysList.length - 1) {
+                  store.activeIndex++;
+                  console.warn(`[Key Rotation] Rotating key in generateContent to index ${store.activeIndex}`);
+                  continue;
+                }
+              }
+              throw err;
+            }
+          }
+          throw lastErr;
+        } else {
+          return await runGemini(key);
+        }
+      }
+    }
+  };
 }
 
 // Helper for robust API calls with retry
@@ -193,7 +398,7 @@ User preference: ${customPrompt || "Follow standard best practices."}`;
 
   const imageParts = frames.map(frame => processFrameServer(frame));
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -347,7 +552,7 @@ User preference: ${customPrompt || "Follow standard best practices."}`;
 
   parts.push({ text: `\n\nAnalyze the ${items.length} visual inputs above and generate the JSON array with exactly ${items.length} metadata objects.` });
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -533,7 +738,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
   let lastError: any = null;
 
   for (const modelName of modelsToTry) {
@@ -1031,7 +1236,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -1111,7 +1316,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -1177,7 +1382,7 @@ export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysi
   Gunakan Bahasa Indonesia profesional yang sangat jujur.`;
 
   const response = await getAIClient().models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.1-flash-lite',
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -1226,7 +1431,7 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
   Return exactly 50 prompts in JSON array format.`;
 
   const response = await getAIClient().models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.1-flash-lite',
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -1355,7 +1560,7 @@ Always provide honest and professional reviews in Bahasa Indonesia (or English i
 
   const imagePart = processFrameServer(image);
   
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 

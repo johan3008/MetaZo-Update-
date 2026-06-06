@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert } from 'lucide-react';
+import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings } from 'lucide-react';
 
 interface TopbarProps {
   searchQuery: string;
@@ -9,6 +9,7 @@ interface TopbarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (o: boolean) => void;
   setShowInfoModal: (s: boolean) => void;
+  setShowSettingsModal: (s: boolean) => void;
   t: any;
 }
 
@@ -20,6 +21,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   sidebarOpen,
   setSidebarOpen,
   setShowInfoModal,
+  setShowSettingsModal,
   t
 }) => {
   return (
@@ -77,6 +79,15 @@ export const Topbar: React.FC<TopbarProps> = ({
           title="Information Manual"
         >
           <Info size={17} />
+        </button>
+
+        {/* Settings Dialogue Trigger */}
+        <button 
+          onClick={() => setShowSettingsModal(true)}
+          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none flex items-center space-x-1"
+          title="Settings & API Key"
+        >
+          <Settings size={17} className="animate-hover-spin" />
         </button>
 
       </div>

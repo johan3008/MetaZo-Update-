@@ -6,7 +6,8 @@ import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage } from './server/gemini.ts';
+import { GoogleGenAI } from '@google/genai';
 
 // TRICK: Strict Queue to prevent Server OOM.
 // Ghostscript is extremely memory hungry. If 5 requests come at once, 5 GS processes will spawn,
@@ -124,6 +125,35 @@ async function startServer() {
     app.use(express.json({ limit: '100mb' }));
     app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
+    // Custom Multi-Provider API Key Context Middleware (Thread safe via AsyncLocalStorage with auto-rotation)
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+        const customGeminiKey = req.headers['x-gemini-key'];
+        const customGroqKey = req.headers['x-groq-key'];
+        const customMistralKey = req.headers['x-mistral-key'];
+        const provider = req.headers['x-ai-provider'] || 'gemini';
+
+        const geminiKeys = customGeminiKey && typeof customGeminiKey === 'string'
+            ? customGeminiKey.split(',').map(k => k.trim()).filter(Boolean)
+            : [];
+            
+        const groqKeys = customGroqKey && typeof customGroqKey === 'string'
+            ? customGroqKey.split(',').map(k => k.trim()).filter(Boolean)
+            : [];
+            
+        const mistralKeys = customMistralKey && typeof customMistralKey === 'string'
+            ? customMistralKey.split(',').map(k => k.trim()).filter(Boolean)
+            : [];
+
+        apiKeyStorage.run({
+            provider: String(provider),
+            gemini: { keys: geminiKeys, activeIndex: 0 },
+            groq: { keys: groqKeys, activeIndex: 0 },
+            mistral: { keys: mistralKeys, activeIndex: 0 }
+        }, () => {
+            next();
+        });
+    });
+
     // Global Error Handler to ensure JSON responses on errors
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
         if (err) {
@@ -196,6 +226,107 @@ async function startServer() {
             res.json({ count: files.length, totalSizeMB: totalSize / (1024 * 1024), files: fileStats, activeConversions: activeEpsConversions });
         } catch (e: any) {
             res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/test-gemini-key', async (req, res) => {
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const testClient = new GoogleGenAI({
+                apiKey: apiKey.trim(),
+                httpOptions: {
+                    headers: {
+                        'User-Agent': 'aistudio-build-test',
+                    }
+                }
+            });
+            const response = await testClient.models.generateContent({
+                model: 'gemini-3.1-flash-lite',
+                contents: 'Respond with exactly the word "VALID"',
+            });
+            if (response && response.text) {
+                return res.json({ success: true, message: 'API Key valid!' });
+            } else {
+                return res.status(400).json({ error: 'Gagal mendapatkan respon dari AI. Silakan periksa kembali key Anda.' });
+            }
+        } catch (e: any) {
+            console.error('Test API Key error:', e);
+            const errStr = String(e.message || e);
+            if (errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('quota') || errStr.includes('Quota exceeded')) {
+                return res.json({
+                    success: true,
+                    quotaExceeded: true,
+                    message: 'API Key valid & sukses terotentikasi! Namun kuota gratis / kredit akun Google AI Studio Anda habis (Quota Exceeded / RESOURCE_EXHAUSTED). Anda tetap bisa menyimpannya, namun pastikan untuk menambah limit/tagihan di Google AI Studio Anda agar bisa digunakan.'
+                });
+            }
+            res.status(500).json({ error: e.message || 'Error testing API Key' });
+        }
+    });
+    
+    app.post('/api/test-groq-key', async (req, res) => {
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey.trim()}`
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.1-8b-instant',
+                    messages: [{ role: 'user', content: 'Respond with exactly the word "VALID"' }]
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.choices?.[0]?.message?.content) {
+                    return res.json({ success: true, message: 'Groq API Key valid!' });
+                }
+            }
+            const errText = await response.text();
+            return res.status(400).json({ error: `Gagal verifikasi Groq: ${errText}` });
+        } catch (e: any) {
+            console.error('Test Groq API Key error:', e);
+            res.status(500).json({ error: e.message || 'Error testing Groq API Key' });
+        }
+    });
+
+    app.post('/api/test-mistral-key', async (req, res) => {
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey.trim()}`
+                },
+                body: JSON.stringify({
+                    model: 'open-mixtral-8x22b',
+                    messages: [{ role: 'user', content: 'Respond with exactly the word "VALID"' }]
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.choices?.[0]?.message?.content) {
+                    return res.json({ success: true, message: 'Mistral API Key valid!' });
+                }
+            }
+            const errText = await response.text();
+            return res.status(400).json({ error: `Gagal verifikasi Mistral: ${errText}` });
+        } catch (e: any) {
+            console.error('Test Mistral API Key error:', e);
+            res.status(500).json({ error: e.message || 'Error testing Mistral API Key' });
         }
     });
 
