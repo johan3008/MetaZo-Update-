@@ -1,0 +1,534 @@
+import React, { useState } from 'react';
+import { 
+  Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
+  ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle
+} from 'lucide-react';
+import { ToolType, GenerationMode } from '../../types';
+
+interface SidebarProps {
+  activeTool: ToolType;
+  setActiveTool: (tool: ToolType) => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (c: boolean) => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (o: boolean) => void;
+  generationMode: GenerationMode;
+  setGenerationMode: (mode: GenerationMode) => void;
+  t: any;
+  filesLength: number;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTool,
+  setActiveTool,
+  sidebarCollapsed,
+  setSidebarCollapsed,
+  sidebarOpen,
+  setSidebarOpen,
+  generationMode,
+  setGenerationMode,
+  t,
+  filesLength
+}) => {
+  const [metadataGenOpen, setMetadataGenOpen] = useState(true);
+  const [promptGenOpen, setPromptGenOpen] = useState(true);
+
+  const handleNavClick = (tool: ToolType) => {
+    setActiveTool(tool);
+    setSidebarOpen(false); // Close mobile drawer if open
+  };
+
+  const navItemClass = (tool: ToolType) => {
+    const isActive = activeTool === tool;
+    let base = "flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-extrabold transition-all ";
+    if (isActive) {
+      base += "bg-white/15 border-l-4 border-white text-white shadow-inner scale-[1.02]";
+    } else {
+      base += "text-slate-100/75 hover:bg-white/10 hover:text-white";
+    }
+    return base;
+  };
+
+  const isMetadataGenActive = activeTool === ToolType.IMAGE || activeTool === ToolType.VIDEO || activeTool === ToolType.VECTOR;
+
+  const isPromptGenActive = activeTool === ToolType.PROMPT_GEN || activeTool === ToolType.PROMPT_IMAGE || activeTool === ToolType.PROMPT_VIDEO;
+
+  const SidebarContent = (
+    <>
+      {/* Brand Header */}
+      <div className="flex items-center space-x-3 px-4 py-5 border-b border-white/10">
+        <div className="w-9 h-9 bg-white text-[#4e73df] rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 transition-all">
+          <Zap className="fill-current text-[#4e73df] animate-pulse" size={18} />
+        </div>
+        {!sidebarCollapsed && (
+          <div className="flex flex-col select-none">
+            <span className="font-black text-base tracking-tight text-white leading-none">MetaZo <span className="text-emerald-400">PRO</span></span>
+            <span className="text-[9px] font-extrabold text-[#e3e6f0]/75 uppercase tracking-widest mt-1">STOCK ASSISTANT</span>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation List */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
+        {/* Step Header */}
+        <div>
+          {!sidebarCollapsed && (
+            <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] px-2.5 mb-2.5">
+              Core Generators
+            </p>
+          )}
+          <nav className="space-y-1">
+            {/* Dashboard Button */}
+            <button 
+              onClick={() => handleNavClick(ToolType.DASHBOARD)}
+              className={`w-full text-left ${navItemClass(ToolType.DASHBOARD)} mb-1.5`}
+            >
+              <LayoutDashboard size={16} className={activeTool === ToolType.DASHBOARD ? "text-white" : "text-slate-300"} />
+              {!sidebarCollapsed && <span>Dashboard</span>}
+            </button>
+
+            {/* Metadata Gen tab and dropdown */}
+            <div className="space-y-1">
+              <button 
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setSidebarCollapsed(false);
+                    setMetadataGenOpen(true);
+                  } else {
+                    setMetadataGenOpen(!metadataGenOpen);
+                  }
+                }}
+                className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-lg text-sm font-extrabold transition-all duration-200 ${
+                  isMetadataGenActive 
+                    ? "bg-white/15 text-white active:scale-95" 
+                    : "text-slate-100/75 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Sparkles size={16} className={isMetadataGenActive ? "text-emerald-300 animate-pulse" : "text-slate-300"} />
+                  {!sidebarCollapsed && <span>Metadata Gen</span>}
+                </div>
+                {!sidebarCollapsed && (
+                  <ChevronDown 
+                    size={14} 
+                    className={`text-slate-300 transition-transform duration-300 ${metadataGenOpen ? 'rotate-180' : ''}`} 
+                  />
+                )}
+              </button>
+
+              {/* Sub-items list */}
+              {metadataGenOpen && !sidebarCollapsed && (
+                <div className="pl-3.5 pr-1 py-1 space-y-1 bg-black/10 rounded-lg border border-white/5 mt-1 animate-in slide-in-from-top-1 duration-200">
+                  <button 
+                    onClick={() => handleNavClick(ToolType.IMAGE)}
+                    className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                      activeTool === ToolType.IMAGE 
+                        ? "bg-white/15 text-white shadow-sm font-black border-l-2 border-emerald-400 pl-2.5" 
+                        : "text-slate-250 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <ImageIcon size={14} className={activeTool === ToolType.IMAGE ? "text-emerald-400" : "text-slate-400"} />
+                    <span>{t.image_tool} Editor</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleNavClick(ToolType.VIDEO)}
+                    className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                      activeTool === ToolType.VIDEO 
+                        ? "bg-white/15 text-white shadow-sm font-black border-l-2 border-emerald-400 pl-2.5" 
+                        : "text-slate-250 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <Film size={14} className={activeTool === ToolType.VIDEO ? "text-purple-400" : "text-slate-400"} />
+                    <span>{t.video_tool} Editor</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleNavClick(ToolType.VECTOR)}
+                    className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                      activeTool === ToolType.VECTOR 
+                        ? "bg-white/15 text-white shadow-sm font-black border-l-2 border-emerald-400 pl-2.5" 
+                        : "text-slate-250 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <FileCode size={14} className={activeTool === ToolType.VECTOR ? "text-amber-400" : "text-slate-400"} />
+                    <span>{t.vector_tool} Editor</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Prompt Gen Button/Dropdown */}
+            <div className="space-y-1">
+              <button 
+                onClick={() => {
+                  if (sidebarCollapsed) {
+                    setSidebarCollapsed(false);
+                    setPromptGenOpen(true);
+                  } else {
+                    setPromptGenOpen(!promptGenOpen);
+                  }
+                }}
+                className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-lg text-sm font-extrabold transition-all duration-200 ${
+                  isPromptGenActive 
+                    ? "bg-white/15 text-white active:scale-95" 
+                    : "text-slate-100/75 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Wand2 size={16} className={isPromptGenActive ? "text-white rotate-12 transition-transform" : "text-slate-300"} />
+                  {!sidebarCollapsed && <span>Prompt Gen</span>}
+                </div>
+                {!sidebarCollapsed && (
+                  <ChevronDown 
+                    size={14} 
+                    className={`text-slate-300 transition-transform duration-300 ${promptGenOpen ? 'rotate-180' : ''}`} 
+                  />
+                )}
+              </button>
+
+              {/* Sub-items list for Prompt Gen */}
+              {promptGenOpen && !sidebarCollapsed && (
+                <div className="pl-3.5 pr-1 py-1 space-y-1 bg-black/10 rounded-lg border border-white/5 mt-1 animate-in slide-in-from-top-1 duration-200">
+                  <button 
+                    onClick={() => handleNavClick(ToolType.PROMPT_GEN)}
+                    className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                      activeTool === ToolType.PROMPT_GEN 
+                        ? "bg-white/15 text-white shadow-sm font-black border-l-2 border-emerald-400 pl-2.5" 
+                        : "text-slate-200/80 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <Type size={14} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
+                    <span>Prompt Teks</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleNavClick(ToolType.PROMPT_IMAGE)}
+                    className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                      activeTool === ToolType.PROMPT_IMAGE 
+                        ? "bg-white/15 text-white shadow-sm font-black border-l-2 border-emerald-400 pl-2.5" 
+                        : "text-slate-200/80 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <ImageIcon size={14} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
+                    <span>Prompt Image</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleNavClick(ToolType.PROMPT_VIDEO)}
+                    className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                      activeTool === ToolType.PROMPT_VIDEO 
+                        ? "bg-white/15 text-white shadow-sm font-black border-l-2 border-emerald-400 pl-2.5" 
+                        : "text-slate-200/80 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <Film size={14} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
+                    <span>Prompt Video</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={() => handleNavClick(ToolType.PROMPT_IMAGE_CHECK)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.PROMPT_IMAGE_CHECK 
+                  ? "bg-white/15 text-white active:scale-95 border-l-4 border-emerald-400" 
+                  : "text-slate-100/75 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <CheckCircle size={16} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-300"} />
+              {!sidebarCollapsed && <span>Image Check</span>}
+            </button>
+          </nav>
+        </div>
+
+        {/* AI System Tuning */}
+        <div>
+          {!sidebarCollapsed && (
+            <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] px-2.5 mb-3">
+              Processing Mode
+            </p>
+          )}
+          <div className={`space-y-1 ${sidebarCollapsed ? 'items-center flex flex-col' : ''}`}>
+            <button
+              onClick={() => setGenerationMode(GenerationMode.STANDARD)}
+              className={`w-full text-left flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                generationMode === GenerationMode.STANDARD
+                  ? 'bg-amber-500 text-white shadow'
+                  : 'text-slate-200/80 hover:bg-white/5'
+              }`}
+            >
+              <Clock size={14} />
+              {!sidebarCollapsed && <span>{t.generation_mode_standard} Mode</span>}
+            </button>
+            <button
+              onClick={() => setGenerationMode(GenerationMode.BATCH)}
+              className={`w-full text-left flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                generationMode === GenerationMode.BATCH
+                  ? 'bg-emerald-500 text-white shadow'
+                  : 'text-slate-200/80 hover:bg-white/5'
+              }`}
+            >
+              <Zap size={14} className="animate-pulse" />
+              {!sidebarCollapsed && <span>{t.generation_mode_batch} Mode</span>}
+            </button>
+          </div>
+        </div>
+
+        {/* Support Section */}
+        <div>
+          {!sidebarCollapsed && (
+            <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] px-2.5 mb-2.5">
+              Resources
+            </p>
+          )}
+          <nav className="space-y-1">
+            <a 
+              href={t.whatsapp_link} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-bold text-slate-100/75 hover:bg-white/10 hover:text-white transition-all"
+            >
+              <MessageCircle size={14} className="text-emerald-400 animate-pulse" />
+              {!sidebarCollapsed && <span>{t.help_button}</span>}
+            </a>
+          </nav>
+        </div>
+      </div>
+
+      {/* Sidebar Footer / Toggle */}
+      <div className="p-3 bg-black/10 border-t border-white/5 flex items-center justify-center">
+        <button 
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
+          title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* DESKTOP SIDEBAR */}
+      <aside 
+        className={`sticky top-0 h-screen shrink-0 border-r border-[#e3e6f0]/40 dark:border-white/5 transition-all duration-300 ${
+          sidebarCollapsed ? 'w-20' : 'w-64'
+        } bg-gradient-to-b from-[#4e73df] via-[#3a5ec5] to-[#224abe] text-slate-100 hidden md:flex flex-col z-30`}
+      >
+        {SidebarContent}
+      </aside>
+
+      {/* MOBILE SLIDE-OUT DRAWER */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden animate-in fade-in duration-300">
+          {/* Overlay mask */}
+          <div 
+            onClick={() => setSidebarOpen(false)} 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm" 
+          />
+          {/* Drawer main panel */}
+          <div className="relative w-64 h-full bg-gradient-to-b from-[#4e73df] via-[#3a5ec5] to-[#224abe] text-slate-100 flex flex-col p-4 z-10 shadow-2xl justify-between">
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-4 right-4 p-1.5 bg-black/10 text-white rounded-full hover:bg-black/20"
+            >
+              <X size={16} />
+            </button>
+            <div className="flex-1 flex flex-col h-full select-none">
+              <div className="flex items-center space-x-3 px-1 py-5 border-b border-white/10">
+                <div className="w-9 h-9 bg-white text-[#4e73df] rounded-xl flex items-center justify-center shadow">
+                  <Zap className="fill-current text-[#4e73df] animate-pulse" size={18} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-extrabold text-sm tracking-tight text-white leading-none">MetaZo PRO</span>
+                  <span className="text-[8px] font-extrabold text-[#e3e6f0]/75 uppercase tracking-widest mt-1">STOCK ASSISTANT</span>
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto pt-6 space-y-6">
+                <div>
+                  <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] mb-3 px-1">
+                    Core Tools
+                  </p>
+                  <nav className="space-y-1.5">
+                    {/* Dashboard Button for Mobile */}
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.DASHBOARD); setSidebarOpen(false); }} 
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                        activeTool === ToolType.DASHBOARD 
+                          ? 'bg-white/20 text-white' 
+                          : 'text-slate-100/75 hover:bg-white/5'
+                      } mb-1.5`}
+                    >
+                      <LayoutDashboard size={14} className={activeTool === ToolType.DASHBOARD ? "text-white animate-pulse" : "text-slate-300"} />
+                      <span>Dashboard</span>
+                    </button>
+
+                    {/* Metadata Gen Dropdown for Mobile */}
+                    <div className="space-y-1">
+                      <button 
+                        onClick={() => setMetadataGenOpen(!metadataGenOpen)}
+                        className={`w-full text-left flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                          isMetadataGenActive 
+                            ? "bg-white/20 text-white" 
+                            : "text-slate-100/75 hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Sparkles size={14} className={isMetadataGenActive ? "text-emerald-300 animate-pulse" : "text-slate-300"} />
+                          <span>Metadata Gen</span>
+                        </div>
+                        <ChevronDown 
+                          size={12} 
+                          className={`text-slate-300 transition-transform duration-300 ${metadataGenOpen ? 'rotate-180' : ''}`} 
+                        />
+                      </button>
+
+                      {/* Sub-items list */}
+                      {metadataGenOpen && (
+                        <div className="pl-3.5 pr-1 py-1 space-y-1 bg-black/10 rounded-lg border border-white/5 mt-1 animate-in slide-in-from-top-1 duration-200">
+                          <button 
+                            onClick={() => { setActiveTool(ToolType.IMAGE); setSidebarOpen(false); }}
+                            className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                              activeTool === ToolType.IMAGE 
+                                ? "bg-white/15 text-white font-black border-l-2 border-emerald-400 pl-2.5" 
+                                : "text-slate-200/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <ImageIcon size={12} className={activeTool === ToolType.IMAGE ? "text-emerald-400" : "text-slate-400"} />
+                            <span>{t.image_tool} Editor</span>
+                          </button>
+
+                          <button 
+                            onClick={() => { setActiveTool(ToolType.VIDEO); setSidebarOpen(false); }}
+                            className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                              activeTool === ToolType.VIDEO 
+                                ? "bg-white/15 text-white font-black border-l-2 border-emerald-400 pl-2.5" 
+                                : "text-slate-200/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <Film size={12} className={activeTool === ToolType.VIDEO ? "text-purple-400" : "text-slate-400"} />
+                            <span>{t.video_tool} Editor</span>
+                          </button>
+
+                          <button 
+                            onClick={() => { setActiveTool(ToolType.VECTOR); setSidebarOpen(false); }}
+                            className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                              activeTool === ToolType.VECTOR 
+                                ? "bg-white/15 text-white font-black border-l-2 border-emerald-400 pl-2.5" 
+                                : "text-slate-200/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <FileCode size={12} className={activeTool === ToolType.VECTOR ? "text-amber-400" : "text-slate-400"} />
+                            <span>{t.vector_tool} Editor</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prompt Gen Dropdown for Mobile */}
+                    <div className="space-y-1">
+                      <button 
+                        onClick={() => setPromptGenOpen(!promptGenOpen)}
+                        className={`w-full text-left flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                          isPromptGenActive 
+                            ? "bg-white/20 text-white" 
+                            : "text-slate-100/75 hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Wand2 size={14} className={isPromptGenActive ? "text-white" : "text-slate-300"} />
+                          <span>Prompt Gen</span>
+                        </div>
+                        <ChevronDown 
+                          size={12} 
+                          className={`text-slate-300 transition-transform duration-300 ${promptGenOpen ? 'rotate-180' : ''}`} 
+                        />
+                      </button>
+
+                      {/* Sub-items list for Mobile */}
+                      {promptGenOpen && (
+                        <div className="pl-3.5 pr-1 py-1 space-y-1 bg-black/10 rounded-lg border border-white/5 mt-1 animate-in slide-in-from-top-1 duration-200">
+                          <button 
+                            onClick={() => { setActiveTool(ToolType.PROMPT_GEN); setSidebarOpen(false); }}
+                            className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                              activeTool === ToolType.PROMPT_GEN 
+                                ? "bg-white/15 text-white font-black border-l-2 border-emerald-400 pl-2.5" 
+                                : "text-slate-200/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <Type size={12} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
+                            <span>Prompt Teks</span>
+                          </button>
+
+                          <button 
+                            onClick={() => { setActiveTool(ToolType.PROMPT_IMAGE); setSidebarOpen(false); }}
+                            className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                              activeTool === ToolType.PROMPT_IMAGE 
+                                ? "bg-white/15 text-white font-black border-l-2 border-emerald-400 pl-2.5" 
+                                : "text-slate-200/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <ImageIcon size={12} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
+                            <span>Prompt Image</span>
+                          </button>
+
+                          <button 
+                            onClick={() => { setActiveTool(ToolType.PROMPT_VIDEO); setSidebarOpen(false); }}
+                            className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-md text-xs font-bold transition-all ${
+                              activeTool === ToolType.PROMPT_VIDEO 
+                                ? "bg-white/15 text-white font-black border-l-2 border-emerald-400 pl-2.5" 
+                                : "text-slate-200/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <Film size={12} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
+                            <span>Prompt Video</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.PROMPT_IMAGE_CHECK); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                        activeTool === ToolType.PROMPT_IMAGE_CHECK 
+                          ? "bg-white/20 text-white border-l-4 border-emerald-400" 
+                          : "text-slate-100/75 hover:bg-white/5"
+                      }`}
+                    >
+                      <CheckCircle size={14} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-300"} />
+                      <span>Image Check</span>
+                    </button>
+                  </nav>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] mb-3 px-1">
+                    Tuning
+                  </p>
+                  <div className="space-y-1.5">
+                    <button onClick={() => { setGenerationMode(GenerationMode.STANDARD); setSidebarOpen(false); }} className={`w-full text-left flex items-center space-x-3 px-4 py-2 rounded-lg text-xs font-bold ${generationMode === GenerationMode.STANDARD ? 'bg-amber-500 text-white' : 'text-slate-200/80 hover:bg-white/5'}`}>
+                      <Clock size={13} />
+                      <span>{t.generation_mode_standard} Mode</span>
+                    </button>
+                    <button onClick={() => { setGenerationMode(GenerationMode.BATCH); setSidebarOpen(false); }} className={`w-full text-left flex items-center space-x-3 px-4 py-2 rounded-lg text-xs font-bold ${generationMode === GenerationMode.BATCH ? 'bg-emerald-500 text-white' : 'text-slate-200/80 hover:bg-white/5'}`}>
+                      <Zap size={13} />
+                      <span>{t.generation_mode_batch} Mode</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <a href={t.whatsapp_link} target="_blank" rel="noopener noreferrer" className="w-full text-center py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl">
+              {t.help_button}
+            </a>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};

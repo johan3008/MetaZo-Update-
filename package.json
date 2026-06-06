@@ -1,0 +1,39 @@
+{
+  "name": "metazo---adobe-stock-ai-assistant",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/download-gs.js",
+    "dev": "tsx --expose-gc server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "start": "node --expose-gc dist/server.cjs"
+  },
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
+    "@google/genai": "^1.41.0",
+    "express": "^5.2.1",
+    "lucide-react": "^0.574.0",
+    "motion": "^12.40.0",
+    "mp4box": "^2.3.0",
+    "multer": "^2.1.1",
+    "pdfjs-dist": "^5.5.207",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "utif": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

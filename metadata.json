@@ -1,0 +1,10 @@
+{
+  "name": "MetaZo PRO",
+  "description": "Professional tool for Adobe Stock contributors to generate optimized titles, descriptions, and keywords using Gemini 3.5 Flash AI analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,1979 @@
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { 
+  Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, 
+  AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
+  Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle
+} from 'lucide-react';
+import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
+import { Sidebar } from './src/components/Sidebar';
+import { Topbar } from './src/components/Topbar';
+import { MetricsRow } from './src/components/MetricsRow';
+import { UploadPanel } from './src/components/UploadPanel';
+import { AiConfigPanel } from './src/components/AiConfigPanel';
+import { ExportPanel } from './src/components/ExportPanel';
+import { ReviewQueue } from './src/components/ReviewQueue';
+import { DashboardView } from './src/components/DashboardView';
+import { PromptGenView } from './src/components/PromptGenView';
+import { PromptImageView } from './src/components/PromptImageView';
+import { PromptVideoView } from './src/components/PromptVideoView';
+import { ImageCheckView } from './src/components/ImageCheckView';
+import { TRANSLATIONS, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
+import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
+import UTIF from 'utif';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
+
+// --- IndexedDB Helper for Auto-Resume ---
+const DB_NAME = 'EPS_Batch_DB';
+const STORE_NAME = 'app_state_store';
+
+const initDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains(STORE_NAME)) {
+                request.result.createObjectStore(STORE_NAME);
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+const saveStateToDB = async (state: any) => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put(state, 'current_batch');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+};
+
+const loadStateFromDB = async (): Promise<any> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get('current_batch');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+const clearStateFromDB = async () => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete('current_batch');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+};
+// ----------------------------------------
+
+// --- BACKGROUND THROTTLING BYPASS TRICKS ---
+// 1. Web Worker based timeout to bypass browser's 1000ms clamp on setTimeout in background tabs
+const backgroundSafeTimeout = (ms: number): Promise<void> => {
+    return new Promise(resolve => {
+        try {
+            const blob = new Blob([`setTimeout(() => postMessage('tick'), ${ms});`], { type: 'application/javascript' });
+            const url = URL.createObjectURL(blob);
+            const worker = new Worker(url);
+            worker.onmessage = () => {
+                resolve();
+                worker.terminate();
+                URL.revokeObjectURL(url);
+            };
+        } catch (e) {
+            setTimeout(resolve, ms);
+        }
+    });
+};
+
+// 2. Silent AudioContext & Ghost Audio Loop to keep the tab's media pipeline and timers active
+const SILENT_WAV_BASE64 = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAwADAA==";
+let keepAliveAudioEl: HTMLAudioElement | null = null;
+let keepAliveAudioCtx: AudioContext | null = null;
+let keepAliveOscillator: OscillatorNode | null = null;
+let keepAliveVideoEl: HTMLVideoElement | null = null; // Trik Licik 2: Silent Video (PiP hack without PiP)
+let keepAliveCanvas: HTMLCanvasElement | null = null;
+
+const startTabKeepAlive = () => {
+    try {
+        // --- TRIK LICIK 1 & 2: GHOST AUDIO LOOP + CANVAS STREAM 1x1 ---
+        if (!keepAliveCanvas) {
+            keepAliveCanvas = document.createElement('canvas');
+            keepAliveCanvas.width = 1;
+            keepAliveCanvas.height = 1;
+            const ctx = keepAliveCanvas.getContext('2d');
+            if (ctx) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, 1, 1);
+            }
+        }
+        
+        // Buat stream 1 fps dari canvas (super enteng)
+        const canvasStream = keepAliveCanvas.captureStream(1) as any;
+
+        // Web Audio API Keep-Alive untuk disambungkan ke canvas Stream
+        if (!keepAliveAudioCtx) {
+            keepAliveAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        if (keepAliveAudioCtx.state === 'suspended') {
+            keepAliveAudioCtx.resume();
+        }
+        if (!keepAliveOscillator) {
+            keepAliveOscillator = keepAliveAudioCtx.createOscillator();
+            const gainNode = keepAliveAudioCtx.createGain();
+            gainNode.gain.value = 0; // mutlak silent
+            
+            // Connect ke stream destination
+            const dest = keepAliveAudioCtx.createMediaStreamDestination();
+            keepAliveOscillator.connect(gainNode);
+            gainNode.connect(dest);
+            gainNode.connect(keepAliveAudioCtx.destination);
+            keepAliveOscillator.start();
+            
+            // Gabungkan video track (hitam) dengan audio track (silent)
+            if (dest.stream.getAudioTracks().length > 0 && canvasStream.getVideoTracks().length > 0) {
+                canvasStream.addTrack(dest.stream.getAudioTracks()[0]);
+            }
+        }
+
+        if (!keepAliveVideoEl) {
+            keepAliveVideoEl = document.createElement('video');
+            keepAliveVideoEl.setAttribute('playsinline', '');
+            keepAliveVideoEl.setAttribute('muted', '');
+            keepAliveVideoEl.setAttribute('loop', '');
+            keepAliveVideoEl.style.display = 'none';
+            document.body.appendChild(keepAliveVideoEl);
+        }
+        
+        keepAliveVideoEl.srcObject = canvasStream;
+        keepAliveVideoEl.play().then(() => {
+            // --- TRIK LICIK 5: PICTURE-IN-PICTURE (PiP) PHANTOM ---
+            if (document.pictureInPictureEnabled && !document.pictureInPictureElement) {
+                keepAliveVideoEl?.requestPictureInPicture().catch(() => {});
+            }
+        }).catch(() => {});
+
+        // --- OS LEVEL WAKE LOCK ---
+        if ('wakeLock' in navigator) {
+            (navigator as any).wakeLock.request('screen').catch(() => {});
+        }
+    } catch (e) {
+        console.error("Keep-alive audio/video failed", e);
+    }
+};
+
+const stopTabKeepAlive = () => {
+    try {
+        if (keepAliveAudioEl) {
+            keepAliveAudioEl.pause();
+        }
+        if (keepAliveVideoEl) {
+            keepAliveVideoEl.pause();
+            if (document.pictureInPictureElement === keepAliveVideoEl) {
+                document.exitPictureInPicture().catch(() => {});
+            }
+        }
+        if (keepAliveOscillator) {
+            keepAliveOscillator.stop();
+            keepAliveOscillator.disconnect();
+            keepAliveOscillator = null;
+        }
+        if (keepAliveAudioCtx && keepAliveAudioCtx.state === 'running') {
+            keepAliveAudioCtx.suspend();
+        }
+    } catch (e) {
+        console.error("Stop keep-alive failed", e);
+    }
+};
+// -------------------------------------------
+
+// Setup PDF.js worker (now handled in pdfWorker.ts)
+
+const extractEPSClientSide = async (file: File): Promise<string | null> => {
+    try {
+        // TRICK: Disposable Web Worker to prevent memory leaks
+        // The worker handles reading the file, searching for PDF/TIFF/JPEG, and rendering.
+        return new Promise<string | null>((resolve) => {
+            const worker = new Worker(new URL('./src/workers/epsWorker.ts', import.meta.url), { type: 'module' });
+            
+            // Timeout to kill worker if it hangs (15 seconds)
+            const timeoutId = setTimeout(() => {
+                worker.terminate();
+                console.warn("EPS Worker timed out");
+                resolve(null);
+            }, document.hidden ? 120000 : 15000); // ADAPTIVE TIME BOMB
+
+            worker.onmessage = (e) => {
+                clearTimeout(timeoutId);
+                if (e.data.success) {
+                    const objectUrl = URL.createObjectURL(e.data.blob);
+                    resolve(objectUrl);
+                } else {
+                    console.warn("Worker failed to extract EPS preview:", e.data.error);
+                    resolve(null);
+                }
+                // Kill worker immediately after it's done to free memory (Burn and Replace)
+                worker.terminate();
+            };
+
+            worker.onerror = (err) => {
+                clearTimeout(timeoutId);
+                console.warn("EPS Worker error:", err);
+                worker.terminate();
+                resolve(null);
+            };
+
+            // Pass the File object directly to the worker
+            worker.postMessage({ file });
+        });
+    } catch (e) {
+        console.error("Client-side EPS extraction failed", e);
+        return null;
+    }
+};
+
+const CardBase: React.FC<{ children: React.ReactNode, className?: string, themeColor?: 'blue' | 'purple' | 'emerald' }> = ({ children, className = "", themeColor }) => {
+    let topIndicatorClass = "from-transparent via-blue-500/20 to-transparent";
+    if (themeColor === 'purple') topIndicatorClass = "from-transparent via-purple-500/20 to-transparent";
+    if (themeColor === 'emerald') topIndicatorClass = "from-transparent via-emerald-500/20 to-transparent";
+
+    return (
+        <div className={`bg-white/80 dark:bg-slate-900/85 backdrop-blur-xl rounded-[2.25rem] border border-slate-200/80 dark:border-white/5 p-8 shadow-xl flex flex-col transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/5 hover:-translate-y-1 relative overflow-hidden group ${className}`}>
+            <div className={`absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r ${topIndicatorClass} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
+            {children}
+        </div>
+    );
+};
+
+const CopyBox: React.FC<{ 
+    label: string, 
+    value: string, 
+    onChange: (val: string) => void, 
+    isTextArea?: boolean,
+    themeColor?: 'blue' | 'purple' | 'emerald',
+    showLengthRating?: boolean 
+}> = ({ label, value, onChange, isTextArea = false, themeColor = 'blue', showLengthRating = false }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        if (!value) return;
+        navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const focusRingClass = themeColor === 'purple' 
+        ? 'focus:ring-purple-500/10 focus:border-purple-500/80 dark:focus:border-purple-400/80' 
+        : themeColor === 'emerald' 
+            ? 'focus:ring-emerald-500/10 focus:border-emerald-500/80 dark:focus:border-emerald-400/80' 
+            : 'focus:ring-blue-500/10 focus:border-blue-500/80 dark:focus:border-blue-400/80';
+
+    const count = value ? value.length : 0;
+    let ratingColor = "bg-slate-300 dark:bg-slate-700";
+    let ratingText = "";
+    let ratingTextColor = "text-slate-400 dark:text-slate-500";
+    let percentage = Math.min(100, (count / 150) * 100);
+
+    if (count > 0) {
+        if (count >= 70 && count <= 120) {
+            ratingColor = "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]";
+            ratingText = "Ideal: 70-120 chars for optimal SEO indexing";
+            ratingTextColor = "text-emerald-500 dark:text-emerald-400";
+        } else if (count > 150) {
+            ratingColor = "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]";
+            ratingText = "Too long! Exceeds 150 characters maximum";
+            ratingTextColor = "text-red-500 dark:text-red-400";
+        } else if (count > 120) {
+            ratingColor = "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]";
+            ratingText = "Acceptable range (within 70-150 character limit)";
+            ratingTextColor = "text-amber-500 dark:text-amber-400";
+        } else {
+            ratingColor = "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)]";
+            ratingText = "Short: consider 70+ chars to boost search index";
+            ratingTextColor = "text-amber-500 dark:text-amber-450";
+        }
+    }
+
+    return (
+        <div className="space-y-1.5 group/box relative">
+            <div className="flex justify-between items-center px-1">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">{label}</label>
+                <button onClick={handleCopy} className="p-2 sm:p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-blue-500/12 hover:text-blue-500 dark:hover:text-blue-400 transition-all text-slate-400 dark:text-slate-300 hover:scale-105 active:scale-95 min-w-[32px] min-h-[32px] flex items-center justify-center">
+                    {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                </button>
+            </div>
+            {isTextArea ? (
+                <textarea 
+                    className={`w-full p-4 bg-slate-50/60 dark:bg-black/20 border border-slate-200/80 dark:border-white/5 rounded-2xl text-[12px] leading-relaxed outline-none focus:ring-4 ${focusRingClass} transition-all min-h-[90px] resize-none font-medium text-slate-700 dark:text-slate-200`} 
+                    value={value} 
+                    onChange={(e) => onChange(e.target.value)} 
+                />
+            ) : (
+                <input 
+                    type="text" 
+                    className={`w-full p-4 bg-slate-50/60 dark:bg-black/20 border border-slate-200/80 dark:border-white/5 rounded-2xl text-[12px] outline-none focus:ring-4 ${focusRingClass} transition-all font-semibold text-slate-700 dark:text-slate-200`} 
+                    value={value} 
+                    onChange={(e) => onChange(e.target.value)} 
+                />
+            )}
+            {showLengthRating && value && (
+                <div className="mt-1 px-1 space-y-1 animate-in fade-in duration-300">
+                    <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-wider">
+                        <span className={ratingTextColor}>{ratingText}</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">{count} / 150 chars</span>
+                    </div>
+                    <div className="w-full h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div className={`h-full ${ratingColor} transition-all duration-300`} style={{ width: `${percentage}%` }}></div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const KeywordList: React.FC<{ 
+    keywords: string[], 
+    onChange: (keywords: string[]) => void, 
+    label: string,
+    themeColor?: 'blue' | 'purple' | 'emerald' 
+}> = ({ keywords, onChange, label, themeColor = 'blue' }) => {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newKeywords = [...keywords];
+    const draggedKeyword = newKeywords[draggedIndex];
+    
+    newKeywords.splice(draggedIndex, 1);
+    newKeywords.splice(index, 0, draggedKeyword);
+    
+    onChange(newKeywords);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const handleCopy = () => {
+    if (!keywords.length) return;
+    navigator.clipboard.writeText(keywords.join(', '));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRemove = (index: number) => {
+    const newKeywords = [...keywords];
+    newKeywords.splice(index, 1);
+    onChange(newKeywords);
+  };
+
+  const handleAdd = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+      const newKeywords = [...keywords, ...e.currentTarget.value.split(',').map(k => k.trim()).filter(k => k)];
+      onChange(newKeywords);
+      e.currentTarget.value = '';
+    }
+  };
+
+  const focusRingClass = themeColor === 'purple' 
+      ? 'focus-within:ring-purple-500/10 focus-within:border-purple-500/80 dark:focus-within:border-purple-400/80' 
+      : themeColor === 'emerald' 
+          ? 'focus-within:ring-emerald-500/10 focus-within:border-emerald-500/80 dark:focus-within:border-emerald-400/80' 
+          : 'focus-within:ring-blue-500/10 focus-within:border-blue-500/80 dark:focus-within:border-blue-400/80';
+
+  let borderActiveAccent = themeColor === 'purple' ? 'hover:border-purple-500/60' : themeColor === 'emerald' ? 'hover:border-emerald-500/60' : 'hover:border-blue-500/60';
+
+  const count = keywords.length;
+  let ratingText = "Ideal keyword volume range is 25-45. Standard: 10-49.";
+  let ratingTextColor = "text-slate-400 dark:text-slate-500";
+  let ratingBg = "bg-slate-50 dark:bg-white/5 border-slate-200/80 dark:border-white/5 text-slate-500 dark:text-slate-400";
+
+  if (count > 0) {
+      if (count >= 25 && count <= 45) {
+          ratingText = "Perfect: 25-45 keywords boosts findability and matches stock algorithms";
+          ratingTextColor = "text-emerald-600 dark:text-emerald-400";
+          ratingBg = "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/15";
+      } else if (count > 49) {
+          ratingText = "Critical: Max 49 keywords. Adobe/Shutterstock will REJECT upload if >= 50!";
+          ratingTextColor = "text-red-500 dark:text-red-400";
+          ratingBg = "bg-red-500/5 dark:bg-red-500/10 border-red-500/15";
+      } else if (count < 10) {
+          ratingText = "Suggest at least 15 keywords for optimal stock search indexing";
+          ratingTextColor = "text-amber-600 dark:text-amber-400";
+          ratingBg = "bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/15";
+      } else {
+          ratingText = "Good depth of keywords. Range from 10 to 49 is generally accepted.";
+          ratingTextColor = "text-indigo-600 dark:text-indigo-400";
+          ratingBg = "bg-indigo-500/5 dark:bg-indigo-500/10 border-indigo-550/15";
+      }
+  }
+
+  return (
+    <div className="space-y-1.5 group/box relative">
+      <div className="flex justify-between items-center px-1">
+          <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">{label} ({keywords.length})</label>
+          <button onClick={handleCopy} className="p-2 sm:p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-blue-500/12 hover:text-blue-500 dark:hover:text-blue-400 transition-all text-slate-400 dark:text-slate-300 hover:scale-105 active:scale-95 min-w-[32px] min-h-[32px] flex items-center justify-center">
+              {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+          </button>
+      </div>
+      <div className={`w-full p-4 bg-slate-50/60 dark:bg-black/20 border border-slate-200/80 dark:border-white/5 rounded-2xl min-h-[90px] flex flex-wrap gap-2 items-start focus-within:ring-4 ${focusRingClass} transition-all`}>
+        {keywords.map((keyword, index) => (
+          <div
+            key={`${keyword}-${index}`}
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragEnd={handleDragEnd}
+            className={`flex items-center space-x-1 px-3 py-1 bg-white/95 dark:bg-slate-800/90 border border-slate-200/60 dark:border-white/5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-grab active:cursor-grabbing transition-all ${draggedIndex === index ? 'opacity-50 scale-95 shadow-lg' : `hover:shadow-md hover:bg-blue-50/10 dark:hover:bg-slate-800 ${borderActiveAccent}`}`}
+          >
+            <span>{keyword}</span>
+            <button 
+              onClick={() => handleRemove(index)}
+              className="text-slate-400/80 hover:text-red-500 dark:hover:text-red-400 transition-colors ml-1 focus:outline-none"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        <input 
+          type="text" 
+          placeholder="Add keyword (press Enter)..." 
+          onKeyDown={handleAdd}
+          className="flex-grow min-w-[140px] bg-transparent outline-none text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400/80 py-1 font-medium"
+        />
+      </div>
+      {count > 0 && (
+          <div className={`mt-1.5 px-3 py-1.5 rounded-xl border text-[9px] font-bold uppercase tracking-wider flex items-center justify-between transition-colors ${ratingBg}`}>
+              <span className={ratingTextColor}>{ratingText}</span>
+              <span className={`font-mono px-1.5 py-0.5 rounded-md ${count > 49 ? 'bg-red-500 text-white' : count >= 25 && count <= 45 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-100/50 dark:bg-white/5 text-slate-500 dark:text-slate-400'}`}>{count} / 49 tags</span>
+          </div>
+      )}
+    </div>
+  );
+};
+
+const FilePreview: React.FC<{ 
+  fileItem: FileItem, 
+  onClose: () => void,
+  setFiles: React.Dispatch<React.SetStateAction<FileItem[]>>,
+  setPreviewFile: React.Dispatch<React.SetStateAction<FileItem | null>>
+}> = ({ fileItem, onClose, setFiles, setPreviewFile }) => {
+  const [url, setUrl] = useState<string>('');
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(fileItem.file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [fileItem]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={onClose}>
+      <div className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+        <button 
+          onClick={onClose}
+          className="absolute -top-12 right-0 p-2 text-white hover:text-blue-400 transition-colors bg-black/50 rounded-full"
+        >
+          <X size={24} />
+        </button>
+        
+        {fileItem.file.type.startsWith('video/') ? (
+          <video 
+            src={url || undefined} 
+            controls 
+            autoPlay 
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl"
+          />
+        ) : fileItem.file.type.startsWith('image/') ? (
+          <img 
+            src={url || undefined} 
+            alt="Preview" 
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
+          />
+        ) : (
+          <div className="w-full max-w-md h-64 bg-slate-800 rounded-2xl flex flex-col items-center justify-center text-white shadow-2xl">
+            <FileCode size={64} className="mb-4 text-slate-400" />
+            <p className="font-bold text-center px-4 truncate w-full">{fileItem.customFileName || fileItem.file.name}</p>
+            <p className="text-sm text-slate-400 mt-2">Preview not available</p>
+          </div>
+        )}
+        <div className="mt-4 text-white font-bold tracking-wide text-sm bg-black/80 px-4 py-2 rounded-full flex items-center max-w-[90%]">
+          <input
+            type="text"
+            value={fileItem.customFileName ?? fileItem.file.name}
+            onChange={(e) => {
+              const newName = e.target.value;
+              setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, customFileName: newName } : f));
+              setPreviewFile(prev => prev ? { ...prev, customFileName: newName } : null);
+            }}
+            className="bg-transparent border-b border-transparent hover:border-slate-500 focus:border-white outline-none w-full truncate cursor-text transition-colors pb-0 text-center"
+            title="Edit Filename"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- VIDEO EXTRACTION (HYBRID APPROACH) ---
+let sharedVideoWorker: Worker | null = null;
+let videoWorkerJobId = 0;
+
+// Queue mechanism for worker to prevent concurrent execution and handle crashes
+let workerQueue: (() => void)[] = [];
+let isWorkerBusy = false;
+
+const acquireWorker = (): Promise<void> => {
+    return new Promise(resolve => {
+        if (!isWorkerBusy) {
+            isWorkerBusy = true;
+            resolve();
+        } else {
+            workerQueue.push(resolve);
+        }
+    });
+};
+
+const releaseWorker = () => {
+    if (workerQueue.length > 0) {
+        const next = workerQueue.shift();
+        next?.();
+    } else {
+        isWorkerBusy = false;
+    }
+};
+
+let workerUseCount = 0;
+const MAX_WORKER_USES = 5;
+
+let cachedFfmpegCoreUrl = '';
+let cachedFfmpegWasmUrl = '';
+
+const getFfmpegUrls = async () => {
+    if (cachedFfmpegCoreUrl && cachedFfmpegWasmUrl) {
+        return { coreURL: cachedFfmpegCoreUrl, wasmURL: cachedFfmpegWasmUrl };
+    }
+    try {
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        cachedFfmpegCoreUrl = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
+        cachedFfmpegWasmUrl = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
+        return { coreURL: cachedFfmpegCoreUrl, wasmURL: cachedFfmpegWasmUrl };
+    } catch (e) {
+        console.warn("Failed to pre-fetch FFmpeg URLs", e);
+        return null;
+    }
+};
+
+const extractVideoWithWorker = async (file: File): Promise<string[]> => {
+    await acquireWorker();
+    
+    return new Promise<string[]>(async (resolve, reject) => {
+        if (!sharedVideoWorker) {
+            sharedVideoWorker = new Worker(new URL('./src/workers/videoWorker.ts', import.meta.url), { type: 'module' });
+            const urls = await getFfmpegUrls();
+            sharedVideoWorker.postMessage({ type: 'init', urls });
+            workerUseCount = 0;
+        }
+        
+        const currentId = ++videoWorkerJobId;
+        
+        // Timeout to kill worker if it hangs (5 minutes for video)
+        let timeoutId = setTimeout(() => {
+            if (sharedVideoWorker) {
+                sharedVideoWorker.terminate();
+                sharedVideoWorker = null; // Force recreate next time
+            }
+            releaseWorker();
+            reject(new Error("Video Worker timed out (Initial)"));
+        }, 300000);
+
+        const messageHandler = (e: MessageEvent) => {
+            if (e.data.id !== currentId) return; // Ignore messages from other jobs
+            
+            if (e.data.type === 'progress') {
+                // Reset timeout on progress.
+                // Saat background tab, proses FFmpeg bisa lebih lambat,
+                // tapi selama masih ada progress, kita beri waktu tambahan 5 menit per progress.
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    if (sharedVideoWorker) {
+                        sharedVideoWorker.terminate();
+                        sharedVideoWorker = null;
+                    }
+                    releaseWorker();
+                    reject(new Error("Video Worker timed out (No progress)"));
+                }, 300000);
+                return;
+            }
+            
+            sharedVideoWorker?.removeEventListener('message', messageHandler);
+            sharedVideoWorker?.removeEventListener('error', errorHandler);
+            clearTimeout(timeoutId);
+            
+            if (e.data.success) {
+                const frameUrls = e.data.framesBlobs.map((blob: Blob) => URL.createObjectURL(blob));
+                
+                workerUseCount++;
+                if (workerUseCount >= MAX_WORKER_USES) {
+                    sharedVideoWorker?.terminate();
+                    sharedVideoWorker = null;
+                    workerUseCount = 0;
+                }
+                
+                releaseWorker();
+                resolve(frameUrls);
+            } else {
+                // KILL WORKER ON ERROR TO PREVENT POISONING NEXT JOBS
+                if (sharedVideoWorker) {
+                    sharedVideoWorker.terminate();
+                    sharedVideoWorker = null;
+                    workerUseCount = 0;
+                }
+                releaseWorker();
+                reject(new Error(e.data.error || "Worker failed to extract video frames"));
+            }
+        };
+        
+        const errorHandler = (err: ErrorEvent) => {
+            clearTimeout(timeoutId);
+            sharedVideoWorker?.removeEventListener('message', messageHandler);
+            sharedVideoWorker?.removeEventListener('error', errorHandler);
+            sharedVideoWorker?.terminate();
+            sharedVideoWorker = null;
+            workerUseCount = 0;
+            releaseWorker();
+            reject(new Error(`Worker crashed: ${err.message || 'Unknown error'}`));
+        };
+
+        sharedVideoWorker.addEventListener('message', messageHandler);
+        sharedVideoWorker.addEventListener('error', errorHandler);
+        sharedVideoWorker.postMessage({ file, id: currentId });
+    });
+};
+
+const extractVideoNative = async (file: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        video.preload = 'auto'; // Help it load faster
+        
+        // --- TRIK LICIK 2: ATTACH KE DOM (TERSEMBUNYI) ---
+        // Browser sering men-throttle video yang tidak ada di DOM.
+        // Kita tempelkan ke body tapi sembunyikan sepenuhnya.
+        video.style.position = 'fixed';
+        video.style.top = '-9999px';
+        video.style.opacity = '0';
+        document.body.appendChild(video);
+        
+        // --- TRIK LICIK: ANTI-THROTTLING BACKGROUND TAB ---
+        // Hubungkan video ke Web Audio API dengan volume 0.
+        // Tambahkan juga Oscillator (suara buatan) agar browser mengira tab ini
+        // sedang memutar musik secara aktif, sehingga proses decoding video
+        // tidak akan pernah dibekukan meskipun video aslinya tidak bersuara (bisu).
+        let audioCtx: AudioContext | null = null;
+        let audioSource: MediaElementAudioSourceNode | null = null;
+        let gainNode: GainNode | null = null;
+        let oscillator: OscillatorNode | null = null;
+        
+        try {
+            audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            
+            // 1. Hubungkan video ke audio context
+            audioSource = audioCtx.createMediaElementSource(video);
+            
+            // 2. Buat suara buatan (nada beep)
+            oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 440;
+            
+            // 3. Mute total keduanya
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0; 
+            
+            audioSource.connect(gainNode);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+        } catch (e) {
+            console.warn("AudioContext trick failed", e);
+        }
+        // --------------------------------------------------
+        
+        let isResolved = false;
+        const cleanup = () => {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            
+            // Hapus dari DOM
+            if (video.parentNode) {
+                video.parentNode.removeChild(video);
+            }
+            
+            // Bersihkan AudioContext
+            if (oscillator) {
+                try { oscillator.stop(); } catch(e){}
+                oscillator.disconnect();
+            }
+            if (audioSource) audioSource.disconnect();
+            if (gainNode) gainNode.disconnect();
+            if (audioCtx && audioCtx.state !== 'closed') {
+                audioCtx.close().catch(() => {});
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            if (!isResolved) {
+                isResolved = true;
+                cleanup();
+                reject(new Error("Native video extraction timed out"));
+            }
+        }, document.hidden ? 120000 : 15000); // ADAPTIVE TIME BOMB
+
+        video.onloadedmetadata = async () => {
+            try {
+                const duration = video.duration;
+                if (!duration || duration === Infinity) throw new Error("Invalid duration");
+                
+                const frameWidth = 320;
+                const frameHeight = Math.floor(frameWidth * (video.videoHeight / video.videoWidth));
+
+                const seekTimes = [
+                    duration * 0.1, // Start (10%)
+                    duration * 0.5, // Middle (50%)
+                    duration * 0.9  // End (90%)
+                ];
+                const extractedFrames: string[] = [];
+
+                for (let i = 0; i < seekTimes.length; i++) {
+                    const time = seekTimes[i];
+                    video.currentTime = time;
+                    
+                    await new Promise<void>((res, rej) => {
+                        const onSeeked = () => {
+                            video.removeEventListener('seeked', onSeeked);
+                            res();
+                        };
+                        video.addEventListener('seeked', onSeeked);
+                        setTimeout(() => {
+                            video.removeEventListener('seeked', onSeeked);
+                            rej(new Error("Seek timeout"));
+                        }, document.hidden ? 60000 : 10000); // ADAPTIVE TIME BOMB FOR SEEK
+                    });
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = frameWidth;
+                    canvas.height = frameHeight;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(video, 0, 0, frameWidth, frameHeight);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                        extractedFrames.push(dataUrl);
+                    }
+                }
+                
+                isResolved = true;
+                clearTimeout(timeoutId);
+                cleanup();
+                resolve(extractedFrames);
+            } catch (err) {
+                if (!isResolved) {
+                    isResolved = true;
+                    clearTimeout(timeoutId);
+                    cleanup();
+                    reject(err);
+                }
+            }
+        };
+
+        video.onerror = () => {
+            if (!isResolved) {
+                isResolved = true;
+                clearTimeout(timeoutId);
+                cleanup();
+                reject(new Error("Video load error"));
+            }
+        };
+
+        video.src = URL.createObjectURL(file);
+    });
+};
+
+const extractVideoHybrid = async (file: File): Promise<string[]> => {
+    try {
+        console.log(`[${file.name}] Trying native hardware-accelerated extraction...`);
+        const frames = await extractVideoNative(file);
+        console.log(`[${file.name}] Native extraction successful.`);
+        return frames;
+    } catch (err) {
+        console.warn(`[${file.name}] Native extraction failed or timed out. Falling back to FFmpeg Worker as secondary solution...`, err);
+        return await extractVideoWithWorker(file);
+    }
+};
+
+const toSentenceCase = (text: string) => {
+    if (!text) return text;
+    const trimmed = text.trim();
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
+const App: React.FC = () => {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+    } catch (e) {}
+    return 'light';
+  });
+  const [activeTool, setActiveTool] = useState<ToolType>(ToolType.DASHBOARD);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const filesRef = useRef<FileItem[]>([]);
+  
+  // --- TRIK LICIK 4: SYNCHRONOUS STATE UPDATE ---
+  // Di background tab, React 18 sering menunda (batch) atau bahkan menghentikan
+  // eksekusi useEffect. Jika kita hanya mengandalkan useEffect untuk mengupdate filesRef,
+  // loop background kita akan membaca data basi (stale data) dan macet/mengulang file yang sama.
+  // Fungsi ini memastikan filesRef diupdate secara sinkron (detik itu juga) sebelum React re-render.
+  const updateFiles = useCallback((updater: (prev: FileItem[]) => FileItem[]) => {
+      filesRef.current = updater(filesRef.current);
+      setFiles(filesRef.current);
+  }, []);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [keywordCount, setKeywordCount] = useState<number | string>('');
+  const [generationMode, setGenerationMode] = useState<GenerationMode>(GenerationMode.STANDARD);
+  const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [exportAdobe, setExportAdobe] = useState(true);
+  const [exportShutterstock, setExportShutterstock] = useState(false);
+  const [exportVecteezy, setExportVecteezy] = useState(false);
+  const [exportCanva, setExportCanva] = useState(false);
+  const [exportFreepik, setExportFreepik] = useState(false);
+  const [shutterstockDescMode, setShutterstockDescMode] = useState<'desc' | 'title_desc'>('desc');
+  const [triggerAutoDownload, setTriggerAutoDownload] = useState(0);
+  
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(() => {
+      return !sessionStorage.getItem('vixer_welcomed');
+  });
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
+
+  const handleCloseWelcome = () => {
+      sessionStorage.setItem('vixer_welcomed', 'true');
+      setShowWelcomeScreen(false);
+  };
+  
+  const [autoDownloadCSV, setAutoDownloadCSVState] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'upload' | 'ai' | 'review'>('upload');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const autoDownloadCSVRef = useRef(false);
+  const setAutoDownloadCSV = (val: boolean) => {
+      setAutoDownloadCSVState(val);
+      autoDownloadCSVRef.current = val;
+      if (val) {
+          setExportAdobe(true);
+          setExportShutterstock(true);
+          setExportVecteezy(true);
+          setExportCanva(true);
+          setExportFreepik(true);
+      } else {
+          setExportAdobe(false);
+          setExportShutterstock(false);
+          setExportVecteezy(false);
+          setExportCanva(false);
+          setExportFreepik(false);
+      }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const stopGenerationRef = useRef(false);
+
+  // Auto-Resume from IndexedDB
+  useEffect(() => {
+      // Preload video worker to avoid slow initialization later
+      if (!sharedVideoWorker) {
+          sharedVideoWorker = new Worker(new URL('./src/workers/videoWorker.ts', import.meta.url), { type: 'module' });
+          sharedVideoWorker.postMessage({ type: 'init' });
+      }
+
+      const checkResume = async () => {
+          try {
+              const state = await loadStateFromDB();
+              if (state && state.files && state.files.length > 0) {
+                  console.log("Resuming batch from IndexedDB...");
+                  
+                  // Reset stuck states. If a file was extracting/generating during the crash, mark it as failed
+                  // so it doesn't hang the UI forever.
+                  const cleanedFiles = state.files.map((f: any) => {
+                      if (f.isExtracting || f.isGenerating) {
+                          return { 
+                              ...f, 
+                              isExtracting: false, 
+                              isGenerating: false, 
+                              error: f.error || "Gagal diproses karena server kehabisan memori. Silakan coba lagi." 
+                          };
+                      }
+                      return f;
+                  });
+                  
+                  updateFiles(() => cleanedFiles);
+                  setKeywordCount(state.keywordCount);
+                  setCustomPrompt(state.customPrompt);
+                  setActiveTool(state.activeTool);
+                  setGenerationMode(state.generationMode);
+                  
+                  // Clear the DB so we don't resume again on next normal refresh
+                  await clearStateFromDB();
+                  
+                  // Wait a tiny bit for state to settle, then auto-start
+                  setTimeout(() => {
+                      // Don't use isRetry=true here, because we want to process files that haven't been processed yet.
+                      // The ones that crashed now have an error, so they won't be auto-retried (preventing infinite crash loops).
+                      // The user can manually click "Retry Failed" later if they want.
+                      handleGenerateAll(false);
+                  }, 1000);
+              }
+          } catch (e) {
+              console.error("Failed to load state from DB:", e);
+          }
+      };
+      checkResume();
+  }, []);
+
+  useEffect(() => {
+      if (triggerAutoDownload > 0 && autoDownloadCSVRef.current) {
+          handleExport();
+      }
+  }, [triggerAutoDownload]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      try { localStorage.setItem('theme', 'dark'); } catch (e) {}
+    } else {
+      root.classList.remove('dark');
+      try { localStorage.setItem('theme', 'light'); } catch (e) {}
+    }
+  }, [theme]);
+
+  const extractFramesForFile = async (file: File, ext: string): Promise<string[]> => {
+      if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+          return new Promise<string[]>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                  const img = new Image();
+                  img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      // Reduce MAX_SIZE to 768px. AI doesn't need high res, and this makes base64 7x smaller!
+                      const MAX_SIZE = 768;
+                      let width = img.width;
+                      let height = img.height;
+                      
+                      if (width > MAX_SIZE || height > MAX_SIZE) {
+                          const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+                          width *= ratio;
+                          height *= ratio;
+                      }
+                      
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                          ctx.fillStyle = '#FFFFFF';
+                          ctx.fillRect(0, 0, width, height);
+                          ctx.drawImage(img, 0, 0, width, height);
+                          // Lower quality to 0.6 for massive speedup in network transfer
+                          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                          canvas.width = 0;
+                          canvas.height = 0;
+                          resolve([dataUrl]);
+                      } else {
+                          resolve([e.target?.result as string]);
+                      }
+                  };
+                  img.onerror = () => resolve([e.target?.result as string]);
+                  img.src = e.target?.result as string;
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+          });
+      } else if (['mp4', 'mov', 'webm'].includes(ext)) {
+          const frames = await extractVideoHybrid(file);
+          if (frames && frames.length >= 3) {
+              return [frames[0], frames[1], frames[2]];
+          } else if (frames && frames.length > 0) {
+              return [frames[0]];
+          } else {
+              throw new Error("Failed to extract video frames. Format might be unsupported or corrupted.");
+          }
+      } else if (ext === 'svg') {
+          return new Promise<string[]>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                  let svgData = e.target?.result as string;
+                  const img = new Image();
+                  img.crossOrigin = "Anonymous";
+                  img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const originalWidth = img.width || 1024;
+                      const originalHeight = img.height || 1024;
+                      
+                      // Scale down to max 768px
+                      const scale = Math.min(768 / originalWidth, 768 / originalHeight);
+                      canvas.width = originalWidth * scale;
+                      canvas.height = originalHeight * scale;
+                      
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                          ctx.fillStyle = '#FFFFFF';
+                          ctx.fillRect(0, 0, canvas.width, canvas.height);
+                          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                          canvas.width = 0;
+                          canvas.height = 0;
+                          resolve([dataUrl]);
+                      } else {
+                          resolve([svgData]);
+                      }
+                  };
+                  img.onerror = () => resolve([svgData]);
+                  img.src = svgData;
+              };
+              reader.readAsDataURL(file);
+          });
+      } else if (ext === 'eps' || ext === 'ai') {
+          const clientSidePreview = await extractEPSClientSide(file);
+          if (clientSidePreview) {
+              return [clientSidePreview];
+          } else {
+              let retryCount = 0;
+              const maxRetries = 15; // Increased to 15 retries (total ~5 minutes) to handle slow container restarts
+              while (retryCount < maxRetries) {
+                  if (stopGenerationRef.current) throw new Error("Cancelled by user");
+                  
+                  try {
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      
+                      // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
+                      // if the server restarts and Vite middleware intercepts the request.
+                      const response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
+                          method: 'POST',
+                          body: formData
+                      });
+                      
+                      const contentType = response.headers.get("content-type");
+                      
+                      // TRICK: If the server restarted, Vite might intercept the POST request and return index.html (Status 200).
+                      // We must detect this and throw a specific error to trigger a retry.
+                      if (contentType && contentType.includes("text/html")) {
+                          throw new Error("CONTAINER_RESTARTING: Server returned HTML instead of image");
+                      }
+                      
+                      if (!response.ok) {
+                          // If it's a 500 error, Ghostscript failed (e.g., memory limit). Don't retry, it will just fail again.
+                          if (response.status === 500) {
+                              const data = await response.json().catch(() => ({}));
+                              throw new Error(`Ghostscript Error: ${data.error || 'Failed to convert'}`);
+                          }
+                          throw new Error(`Server error (${response.status})`);
+                      }
+                      
+                      if (contentType && contentType.indexOf("image/jpeg") !== -1) {
+                          const blob = await response.blob();
+                          // TRICK: Use Object URL instead of Data URL (base64) to save massive amounts of browser RAM.
+                          // A 1MB JPEG becomes a 1.3MB base64 string. 100 files = 130MB of strings in React state!
+                          // Object URLs are just pointers to the blob in memory, much more efficient.
+                          const objectUrl = URL.createObjectURL(blob);
+                          return [objectUrl];
+                      } else if (contentType && contentType.indexOf("application/json") !== -1) {
+                          // Fallback in case server returns JSON error
+                          const data = await response.json();
+                          if (data.error) throw new Error(data.error);
+                      }
+                      
+                      const text = await response.text().catch(() => 'no text');
+                      throw new Error(`CONTAINER_RESTARTING_DEBUG: status=${response.status}, type=${contentType}, body=${text.substring(0, 100)}`);
+                  } catch (err: any) {
+                      // Only retry on actual network errors or 502/503/504 (container restarting/timeout)
+                      const isNetworkOrRestart = err.message.includes('CONTAINER_RESTARTING') || 
+                                                 err.message.includes('Server error (502)') || 
+                                                 err.message.includes('Server error (503)') || 
+                                                 err.message.includes('Server error (504)') || 
+                                                 err.message.includes('Failed to fetch') ||
+                                                 err.message.includes('network');
+                                                 
+                      const isCapacityLimit = err.message.includes('429') ||
+                                              err.message.includes('capacity') ||
+                                              err.message.includes('maximum');
+                                                 
+                      if (isNetworkOrRestart || isCapacityLimit) {
+                          retryCount++;
+                          if (retryCount < maxRetries) {
+                              console.warn(`EPS conversion failed (${err.message}), retrying ${retryCount}/${maxRetries}...`);
+                              // TRICK: If rate limited, wait 5 seconds. If restarting, wait 20s.
+                              const delay = isCapacityLimit ? 5000 : 20000;
+                              await new Promise(resolve => setTimeout(resolve, delay));
+                              continue;
+                          } else {
+                              // TRICK: If we exhausted all retries and it's still restarting, the server is truly stuck or memory is completely fragmented.
+                              // We will save the state to IndexedDB and force a hard browser refresh to completely clear all memory and resume.
+                              console.error("Max retries reached. Forcing hard refresh to clear memory and resume...");
+                              throw new Error("FORCE_HARD_REFRESH");
+                          }
+                      }
+                      throw new Error(`Failed to convert Vector (EPS/AI): ${err.message}`);
+                  }
+              }
+              throw new Error("Failed to convert Vector (EPS/AI) after multiple attempts.");
+          }
+      }
+      throw new Error("Unsupported file format.");
+  };
+
+  const handleFileChange = async (event: any) => {
+    const selectedFiles = Array.from(event.target.files as FileList || []);
+    if (!selectedFiles.length) return;
+
+    const initialFiles: FileItem[] = [];
+
+    const allowedImageExts = ['jpg', 'jpeg', 'png', 'webp'];
+    const allowedVideoExts = ['mp4', 'mov', 'webm'];
+    const allowedVectorExts = ['svg', 'eps', 'ai'];
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        const id = Math.random().toString(36).substring(7);
+
+        let errorMsg: string | null = null;
+        
+        let isValid = false;
+        if (activeTool === ToolType.IMAGE && allowedImageExts.includes(ext)) isValid = true;
+        else if (activeTool === ToolType.VIDEO && allowedVideoExts.includes(ext)) isValid = true;
+        else if (activeTool === ToolType.VECTOR && allowedVectorExts.includes(ext)) isValid = true;
+
+        if (!isValid) continue; // Skip unsupported files silently or handle validation but since it's forced * we skip.
+
+        let thumbnail = null;
+        if (!errorMsg) {
+            if (['jpg', 'jpeg', 'png', 'webp', 'svg', 'mp4', 'mov', 'webm'].includes(ext)) {
+                thumbnail = URL.createObjectURL(file);
+            }
+        }
+
+        initialFiles.push({
+            id,
+            file,
+            title: '',
+            description: '',
+            keywords: [],
+            adobeCategoryId: '',
+            shutterstockCategory1: '',
+            shutterstockCategory2: '',
+            isGenerating: false,
+            isExtracting: false,
+            error: errorMsg,
+            thumbnail: thumbnail,
+            analysisFrames: []
+        });
+    }
+
+    updateFiles(prev => [...prev, ...initialFiles]);
+    
+    if (initialFiles.length > 0) {
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate(50); } catch (e) {}
+      }
+      setMobileTab('ai');
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const processOneFile = async (fileItem: FileItem): Promise<boolean> => {
+    if (stopGenerationRef.current) return false;
+
+    try {
+        updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isGenerating: true, error: null } : f));
+        
+        let analysisFrames = fileItem.analysisFrames;
+        
+        if (!analysisFrames || analysisFrames.length === 0) {
+            updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: true } : f));
+            const ext = fileItem.file.name.split('.').pop()?.toLowerCase() || '';
+            analysisFrames = await extractFramesForFile(fileItem.file, ext);
+            updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, analysisFrames } : f));
+        }
+
+        if (!analysisFrames || analysisFrames.length === 0) {
+            throw new Error("Tidak ada data visual untuk dianalisis.");
+        }
+        
+        let retryCount = 0;
+        const maxRetries = 10; // Allow multiple retries for rate limits
+
+        while (retryCount < maxRetries) {
+            if (stopGenerationRef.current) return false;
+
+            try {
+              const kCount = keywordCount || 25;
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool);
+              
+              updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
+                ...f,
+                title: toSentenceCase(metadata.title),
+                description: metadata.description,
+                keywords: metadata.keywords,
+                adobeCategoryId: metadata.category_id,
+                shutterstockCategory1: metadata.shutterstock_category_1,
+                shutterstockCategory2: metadata.shutterstock_category_2,
+                isGenerating: false,
+                error: null
+              } : f));
+              
+              return true; // Success
+            } catch (err: any) {
+              const errorMessage = err.message || "Failed to contact AI";
+              
+              // Check for rate limit error (429)
+              if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('quota')) {
+                  setIsPaused(true);
+                  updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
+                    ...f, 
+                    error: "API Limit reached. Waiting to try again..." 
+                  } : f));
+                  
+                  // Wait for 30 seconds before retrying
+                  await backgroundSafeTimeout(30000);
+                  setIsPaused(false);
+                  retryCount++;
+                  continue; // Try again
+              }
+
+              throw new Error(errorMessage);
+            }
+        }
+        
+        throw new Error("Processing failed after multiple attempts due to API limit.");
+    } catch (err: any) {
+        if (err.message === "FORCE_HARD_REFRESH") throw err;
+        const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to process file.");
+        updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
+            ...f, 
+            isGenerating: false, 
+            isExtracting: false,
+            error: errMsg 
+        } : f));
+        return true;
+    }
+  };
+
+  const processBatchFiles = async (chunk: FileItem[]): Promise<boolean> => {
+    if (stopGenerationRef.current) return false;
+
+    try {
+        // 1. Mark as extracting/generating
+        updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: true, error: null } : f));
+
+        // 2. Extract frames for those that need it
+        const itemsToProcess: { id: string, frames: string[] }[] = [];
+        for (const fileItem of chunk) {
+            let frames = fileItem.analysisFrames;
+            if (!frames || frames.length === 0) {
+                updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: true } : f));
+                const ext = fileItem.file.name.split('.').pop()?.toLowerCase() || '';
+                try {
+                    frames = await extractFramesForFile(fileItem.file, ext);
+                    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, analysisFrames: frames } : f));
+                } catch (err: any) {
+                    if (err.message === "FORCE_HARD_REFRESH") throw err;
+                    const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to extract file.");
+                    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, isGenerating: false, error: errMsg } : f));
+                    continue;
+                }
+            }
+            if (frames && frames.length > 0) {
+                itemsToProcess.push({ id: fileItem.id, frames });
+            }
+        }
+
+        if (itemsToProcess.length === 0) return true;
+
+        // 3. Call API
+        let retryCount = 0;
+        const maxRetries = 10;
+        while (retryCount < maxRetries) {
+            if (stopGenerationRef.current) return false;
+            try {
+                const kCount = keywordCount || 25;
+                const batchResults = await generateBatchStockMetadata(itemsToProcess, kCount, customPrompt, activeTool);
+
+                // 4. Update state
+                updateFiles(prev => prev.map(f => {
+                    const result = batchResults.find(r => r.id === f.id);
+                    if (result) {
+                        return {
+                            ...f,
+                            title: toSentenceCase(result.metadata.title),
+                            description: result.metadata.description,
+                            keywords: result.metadata.keywords,
+                            adobeCategoryId: result.metadata.category_id,
+                            shutterstockCategory1: result.metadata.shutterstock_category_1,
+                            shutterstockCategory2: result.metadata.shutterstock_category_2,
+                            isGenerating: false,
+                            error: null
+                        };
+                    }
+                    return f;
+                }));
+                return true;
+            } catch (err: any) {
+                const errorMessage = err.message || "Failed to contact AI";
+                if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('quota')) {
+                    setIsPaused(true);
+                    updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, error: "API Limit reached. Waiting..." } : f));
+                    await backgroundSafeTimeout(30000);
+                    setIsPaused(false);
+                    retryCount++;
+                    continue;
+                }
+                throw new Error(errorMessage);
+            }
+        }
+        throw new Error("Processing failed after multiple attempts.");
+    } catch (err: any) {
+         if (err.message === "FORCE_HARD_REFRESH") throw err;
+         const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to process file.");
+         updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: false, isExtracting: false, error: errMsg } : f));
+         return true;
+    }
+  };
+
+  const handleGenerateAll = async (isRetry = false) => {
+    // Initial check to see if there's anything to do at all
+    const currentFilesForCheck = filesRef.current;
+    const initialPending = isRetry 
+        ? currentFilesForCheck.filter(f => f.error) 
+        : currentFilesForCheck.filter(f => !f.title && !f.error);
+        
+    if (!initialPending.length) return;
+
+    setIsLoading(true);
+    setMobileTab('review');
+    startTabKeepAlive();
+    stopGenerationRef.current = false;
+    const startTime = Date.now();
+    
+    // Extracted loop so we can wrap it in Web Locks API
+    const processingLoop = async () => {
+        let processedInThisRun = 0;
+
+        while (!stopGenerationRef.current) {
+            const currentFiles = filesRef.current;
+            
+            // What needs processing?
+            const pending = isRetry
+                ? currentFiles.filter(f => f.error && !f.isExtracting) // If retry, only retry failed ones that aren't extracting // If retry, only retry failed ones that aren't extracting // If retry, only retry failed ones that aren't extracting
+                : currentFiles.filter(f => !f.title && !f.error); // If normal, process un-generated, un-errored ones // If normal, process un-generated, un-errored ones // If normal, process un-generated, un-errored ones
+                
+            if (pending.length === 0) {
+                break; // All done!
+            }
+
+            // Which ones are ready right now?
+            const ready = pending.filter(f => !f.isExtracting && !f.isGenerating);
+            
+            if (ready.length === 0) {
+                // Some files are still extracting or generating. Wait and poll.
+                await backgroundSafeTimeout(500);
+                continue;
+            }
+
+            // Process a chunk
+            // Increase batch size to 10 for images to save massive amounts of API calls!
+            let maxBatch = 10;
+            if (activeTool === ToolType.VIDEO) maxBatch = 3;
+            else if (activeTool === ToolType.VECTOR) maxBatch = 5;
+            
+            const chunkSize = generationMode === GenerationMode.BATCH ? maxBatch : 1;
+            const chunk = ready.slice(0, chunkSize);
+            
+            try {
+                if (generationMode === GenerationMode.BATCH) {
+                    await processBatchFiles(chunk);
+                    processedInThisRun += chunk.length;
+                } else {
+                    for (const file of chunk) {
+                        if (stopGenerationRef.current) break;
+                        await processOneFile(file);
+                        processedInThisRun++;
+                    }
+                }
+            } catch (err: any) {
+                if (err.message === "FORCE_HARD_REFRESH") {
+                    console.log("Saving state to IndexedDB and reloading...");
+                    await saveStateToDB({
+                        files: filesRef.current,
+                        keywordCount,
+                        customPrompt,
+                        activeTool,
+                        generationMode
+                    });
+                    window.location.reload();
+                    return; // Stop execution
+                }
+            }
+            
+            // Update progress info
+            const latestFiles = filesRef.current;
+            const totalToProcess = isRetry 
+                ? latestFiles.filter(f => f.error).length + processedInThisRun
+                : latestFiles.filter(f => !f.title && !f.error).length + processedInThisRun;
+                
+            setProgressInfo({
+                current: processedInThisRun,
+                total: totalToProcess,
+                duration: Math.floor((Date.now() - startTime) / 1000)
+            });
+        }
+
+        if (!stopGenerationRef.current && processedInThisRun > 0) {
+            setTriggerAutoDownload(Date.now());
+        }
+
+        setIsLoading(false);
+        setIsPaused(false);
+        stopTabKeepAlive();
+        stopGenerationRef.current = false;
+        setTimeout(() => setProgressInfo(null), 5000);
+    };
+
+    // --- TRICK 3: WEB LOCKS API ---
+    // Requests an official "Lock" from the browser/OS, signaling that there is a critical 
+    // process running so this CPU thread should not be throttled in the background.
+    if ('locks' in navigator) {
+        navigator.locks.request('vixer-hard-processing', async () => {
+            await processingLoop();
+        }).catch(err => {
+            console.warn("Web Locks API failed, falling back to normal loop.", err);
+            processingLoop();
+        });
+    } else {
+        await processingLoop();
+    }
+  };
+
+  const handleStopGeneration = () => {
+      stopGenerationRef.current = true;
+      setIsLoading(false);
+      setIsPaused(false);
+      stopTabKeepAlive();
+      // Clean up any files that were stuck in "generating" state
+      updateFiles(prev => prev.map(f => f.isGenerating ? { ...f, isGenerating: false, error: "Cancelled by user" } : f));
+  };
+
+  const handleExport = () => {
+    const validFiles = files.filter(f => f.title);
+    if (!validFiles.length) return;
+
+    const getExportFilename = (originalName: string) => {
+        return originalName;
+    };
+
+    if (exportAdobe) {
+      // Adobe Stock CSV Format: Filename,Title,Keywords,Category
+      const headers = ['Filename', 'Title', 'Keywords', 'Category'];
+      const rows = validFiles.map(f => [
+          getExportFilename(f.customFileName || f.file.name), 
+          `"${f.title.replace(/"/g, '""')}"`, 
+          `"${f.keywords.join(', ').replace(/"/g, '""')}"`, 
+          f.adobeCategoryId
+      ]);
+      const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_AdobeStock_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (exportShutterstock) {
+      // Shutterstock CSV Format: Filename,Description,Keywords,Categories,Editorial,Mature content,illustration
+      const headers = ['Filename', 'Description', 'Keywords', 'Categories', 'Editorial', 'Mature content', 'illustration'];
+      const rows = validFiles.map(f => {
+          const categoryName = ADOBE_CATEGORIES.find(c => c.id === f.adobeCategoryId)?.name || '';
+          
+          let combinedDescription = f.description || f.title;
+          if (shutterstockDescMode === 'title_desc' && f.description && f.title !== f.description) {
+              // Ensure title doesn't already end with a dot before adding one
+              const cleanTitle = f.title.trim().replace(/\.$/, '');
+              combinedDescription = `${cleanTitle}. ${f.description.trim()}`;
+          }
+
+          return [
+              getExportFilename(f.customFileName || f.file.name),
+              `"${combinedDescription.replace(/"/g, '""')}"`,
+              `"${f.keywords.join(',').replace(/"/g, '""')}"`,
+              `"${[f.shutterstockCategory1, f.shutterstockCategory2].filter(Boolean).filter(c => c.toLowerCase() !== 'arts').map(c => c.toLowerCase()).join(', ')}"`,
+              'no',
+              'no',
+              activeTool === ToolType.VECTOR ? 'yes' : 'no'
+          ];
+      });
+      const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_Shutterstock_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (exportVecteezy) {
+      // Vecteezy CSV Format: Filename,Title,Description,Keywords,License,Id
+      const headers = ['Filename', 'Title', 'Description', 'Keywords', 'License', 'Id'];
+      const rows = validFiles.map(f => {
+          const escapeCsv = (str: string) => {
+              if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                  return `"${str.replace(/"/g, '""')}"`;
+              }
+              return str;
+          };
+          
+          const removeSpecialChars = (str: string) => {
+              // 1. Normalize and remove accents/diacritics (e.g., é -> e)
+              let cleaned = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              // 2. Remove any character that is NOT a letter (a-z, A-Z), number (0-9), space, or common punctuation (.,-)
+              // This strictly strips out non-ASCII characters (like Cyrillic, Chinese, Emoji etc)
+              cleaned = cleaned.replace(/[^a-zA-Z0-9\s.,-]/g, "");
+              // 3. Remove excess whitespace
+              return cleaned.replace(/\s+/g, ' ').trim();
+          };
+          
+          const cleanTitle = removeSpecialChars(f.title);
+          const titleField = escapeCsv(cleanTitle);
+          
+          // Filter out forbidden keywords and remove special characters for Vecteezy
+          const forbiddenKeywords = ['photo', 'vector', 'video'];
+          const filteredKeywords = f.keywords
+              .map(k => removeSpecialChars(k))
+              .filter(k => k.length > 0 && !forbiddenKeywords.includes(k.toLowerCase().trim()));
+          const keywordsField = `"${filteredKeywords.join(', ').replace(/"/g, '""')}"`;
+          
+          // Sanitize filename for Vecteezy: replace spaces, '(', and ')' with '_'
+          // Example: "nama (1).mp4" -> "nama__1_.mp4"
+          const originalFilename = getExportFilename(f.customFileName || f.file.name);
+          const vecteezyFilename = originalFilename.split(' ').join('_').split('(').join('_').split(')').join('_');
+          
+          return [
+              escapeCsv(vecteezyFilename),
+              titleField,
+              titleField, // Description matches Title
+              keywordsField,
+              'Free', // License automatically set to Free
+              '' // Id left empty
+          ];
+      });
+      // Do NOT use BOM (\ufeff) for Vecteezy, their parser fails to read "Filename" if BOM is present
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_Vecteezy_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (exportCanva) {
+      // Canva CSV Format: filename,title,keywords,description
+      const headers = ['filename', 'title', 'keywords', 'description'];
+      const rows = validFiles.map(f => {
+          const escapeCsv = (str: string) => {
+              if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                  return `"${str.replace(/"/g, '""')}"`;
+              }
+              return str;
+          };
+          
+          return [
+              escapeCsv(getExportFilename(f.customFileName || f.file.name)),
+              escapeCsv(f.title),
+              `"${f.keywords.slice(0, 20).join(',').replace(/"/g, '""')}"`, // Canva uses comma without space, max 20 keywords
+              escapeCsv(f.description || f.title)
+          ];
+      });
+      // No BOM for Canva to be safe
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_Canva_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (exportFreepik) {
+      // Freepik CSV Format: File name;Title;Keywords;Prompt;Model
+      const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
+      const rows = validFiles.map(f => {
+          const escapeCsv = (str: string) => {
+              if (str.includes(';') || str.includes('"') || str.includes('\n')) {
+                  return `"${str.replace(/"/g, '""')}"`;
+              }
+              return str;
+          };
+          
+          return [
+              escapeCsv(getExportFilename(f.customFileName || f.file.name)),
+              escapeCsv(f.title),
+              escapeCsv(f.keywords.join(',')), // Freepik keywords comma separated
+              '', // Prompt
+              ''  // Model
+          ];
+      });
+      // Freepik uses semicolon separator
+      const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_Freepik_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+  };
+
+  const handleDeleteFile = (id: string) => {
+    const fileItem = files.find(f => f.id === id);
+    if (fileItem && fileItem.analysisFrames) {
+        fileItem.analysisFrames.forEach(frame => {
+            if (frame.startsWith('blob:')) {
+                URL.revokeObjectURL(frame);
+            }
+        });
+    }
+    updateFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  const t = TRANSLATIONS;
+  const hasFiles = files.length > 0;
+  const filesToGenerateCount = files.filter(f => !f.title && !f.error && !f.isExtracting).length;
+  const filesWithErrorCount = files.filter(f => f.error).length;
+  const isAnythingGenerating = files.some(f => f.isGenerating || f.isExtracting);
+  const canDownload = hasFiles && files.some(f => f.title);
+  const successfulFilesCount = files.filter(f => f.title).length;
+  const isAllFinished = hasFiles && !isAnythingGenerating && files.every(f => f.title || f.error);
+
+  return (
+    <div className={`min-h-screen flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
+      {/* Sidebar Navigation */}
+      <Sidebar 
+        activeTool={activeTool} 
+        setActiveTool={setActiveTool} 
+        sidebarCollapsed={sidebarCollapsed} 
+        setSidebarCollapsed={setSidebarCollapsed} 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        generationMode={generationMode} 
+        setGenerationMode={setGenerationMode} 
+        t={t} 
+        filesLength={files.length} 
+      />
+
+      {/* Main Content Area Container */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+        {/* Topbar Header */}
+        <Topbar 
+          searchQuery={searchQuery} 
+          setSearchQuery={setSearchQuery} 
+          theme={theme} 
+          setTheme={setTheme} 
+          sidebarOpen={sidebarOpen} 
+          setSidebarOpen={setSidebarOpen} 
+          setShowInfoModal={setShowInfoModal} 
+          t={t} 
+        />
+
+        {/* Core Dashboard Stage */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+          {activeTool === ToolType.DASHBOARD ? (
+            <DashboardView 
+              files={files}
+              setActiveTool={setActiveTool}
+              setShowInfoModal={setShowInfoModal}
+              successfulFilesCount={successfulFilesCount}
+              filesToGenerateCount={filesToGenerateCount}
+              filesWithErrorCount={filesWithErrorCount}
+              unprocessedFilesCount={filesToGenerateCount}
+              generationMode={generationMode}
+            />
+          ) : activeTool === ToolType.PROMPT_GEN ? (
+            <PromptGenView t={t} />
+          ) : activeTool === ToolType.PROMPT_IMAGE ? (
+            <PromptImageView t={t} />
+          ) : activeTool === ToolType.PROMPT_VIDEO ? (
+            <PromptVideoView />
+          ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
+            <ImageCheckView />
+          ) : (
+            <>
+              {/* Welcome Intro Row */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-1">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                    {activeTool === ToolType.IMAGE ? "Image AI Workspace" : activeTool === ToolType.VIDEO ? "Video AI Workspace" : "Vector AI Workspace"}
+                  </h2>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
+                    {activeTool === ToolType.IMAGE && "JPG, PNG & WEBP metadata optimizer"}
+                    {activeTool === ToolType.VIDEO && "Frame sequential MP4/MOV metadata assistant"}
+                    {activeTool === ToolType.VECTOR && "EPS, SVG & AI graphic indexing assistant"}
+                  </p>
+                </div>
+                {/* Live active form formats overlay */}
+                <div className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl font-bold text-xs flex items-center space-x-2 text-slate-500 dark:text-slate-400 shadow-sm">
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-blue-500`} />
+                  <span>
+                    {activeTool === ToolType.IMAGE && "Supports: JPEG, PNG, WEBP"}
+                    {activeTool === ToolType.VIDEO && "Supports: MP4, MOV, WEBM"}
+                    {activeTool === ToolType.VECTOR && "Supports: SVG, EPS, AI"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Core Analytics Cards Block */}
+              <MetricsRow 
+                filesLength={files.length} 
+                successfulFilesCount={successfulFilesCount} 
+                filesToGenerateCount={filesToGenerateCount} 
+                filesWithErrorCount={filesWithErrorCount} 
+              />
+
+              {/* Handheld Segment Switches (Hidden on Desktop) */}
+              <div className="flex lg:hidden w-full bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-white/5">
+                {['upload', 'ai', 'review'].map((tab) => {
+                  const label = tab === 'upload' ? '1. Upload' : tab === 'ai' ? '2. AI Config' : '3. Queue';
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setMobileTab(tab as any)}
+                      className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                        mobileTab === tab 
+                          ? 'bg-[#4e73df] text-white shadow-sm' 
+                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Section Row 1: Upload Panel (Left Component) and Gemini Automation Panel (Right Component) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <UploadPanel 
+                  activeTool={activeTool} 
+                  isDragging={isDragging} 
+                  setIsDragging={setIsDragging} 
+                  handleFileChange={handleFileChange} 
+                  fileInputRef={fileInputRef} 
+                  files={files} 
+                  setPreviewFile={setPreviewFile} 
+                  updateFiles={updateFiles} 
+                  mobileTab={mobileTab} 
+                  setMobileTab={setMobileTab} 
+                  t={t} 
+                />
+
+                <AiConfigPanel 
+                  activeTool={activeTool} 
+                  customPrompt={customPrompt} 
+                  setCustomPrompt={setCustomPrompt} 
+                  keywordCount={keywordCount} 
+                  setKeywordCount={setKeywordCount} 
+                  isLoading={isLoading} 
+                  progressInfo={progressInfo} 
+                  isPaused={isPaused} 
+                  filesToGenerateCount={filesToGenerateCount} 
+                  filesWithErrorCount={filesWithErrorCount} 
+                  handleGenerateAll={handleGenerateAll} 
+                  handleStopGeneration={handleStopGeneration} 
+                  mobileTab={mobileTab} 
+                  setMobileTab={setMobileTab} 
+                  t={t} 
+                  hasFiles={files.length > 0} 
+                />
+              </div>
+
+              {/* Section Row 2: Queue Review & Editor Component */}
+              <ReviewQueue 
+                files={files} 
+                activeTool={activeTool} 
+                searchQuery={searchQuery} 
+                setSearchQuery={setSearchQuery} 
+                setPreviewFile={setPreviewFile} 
+                updateFiles={updateFiles} 
+                handleDeleteFile={handleDeleteFile} 
+                mobileTab={mobileTab} 
+                setMobileTab={setMobileTab} 
+                t={t} 
+                isAllFinished={isAllFinished} 
+                successfulFilesCount={successfulFilesCount} 
+                canDownload={canDownload} 
+              />
+
+              {/* Section Row 3: Bulk Export Integration Panels */}
+              {hasFiles && (
+                <ExportPanel 
+                  exportAdobe={exportAdobe} 
+                  setExportAdobe={setExportAdobe} 
+                  exportShutterstock={exportShutterstock} 
+                  setExportShutterstock={setExportShutterstock} 
+                  exportVecteezy={exportVecteezy} 
+                  setExportVecteezy={setExportVecteezy} 
+                  exportCanva={exportCanva} 
+                  setExportCanva={setExportCanva} 
+                  exportFreepik={exportFreepik} 
+                  setExportFreepik={setExportFreepik} 
+                  shutterstockDescMode={shutterstockDescMode} 
+                  setShutterstockDescMode={setShutterstockDescMode} 
+                  autoDownloadCSV={autoDownloadCSV} 
+                  setAutoDownloadCSV={setAutoDownloadCSV} 
+                  canDownload={canDownload} 
+                  handleExport={handleExport} 
+                  t={t} 
+                />
+              )}
+            </>
+          )}
+        </main>
+
+        <footer className="text-center py-6 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest border-t border-slate-200 dark:border-white/5 bg-white dark:bg-[#090d16] mt-auto">
+          <p>{t.footer_text} | v1.0.0 PRO</p>
+        </footer>
+      </div>
+
+      {previewFile && (
+        <FilePreview 
+          fileItem={previewFile} 
+          onClose={() => setPreviewFile(null)} 
+          setFiles={setFiles}
+          setPreviewFile={setPreviewFile}
+        />
+      )}
+
+      {showWelcomeScreen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/5 text-center flex flex-col items-center">
+            <div className="w-12 h-12 mb-4 bg-[#4e73df] rounded-xl flex items-center justify-center shadow animate-pulse">
+              <Zap className="text-white fill-white" size={24} />
+            </div>
+            <h2 className="text-sm font-black text-[#4e73df] mb-2 uppercase">Welcome to MetaZo PRO v1.0.0</h2>
+            <p className="text-xs text-slate-500 mb-6 font-semibold bg-emerald-500/5 px-2 py-1 rounded">Stock Asset Optimizer</p>
+            <button onClick={handleCloseWelcome} className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-lg text-xs uppercase">Get Started</button>
+          </div>
+        </div>
+      )}
+
+      {showInfoModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150" onClick={() => setShowInfoModal(false)}>
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowInfoModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
+            <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5">
+              <Info size={16} className="text-[#4e73df]" />
+              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">MetaZo PRO Handbook & Petunjuk Penggunaan</h2>
+            </div>
+            
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 text-xs text-slate-600 dark:text-slate-300 font-semibold leading-relaxed scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
+              <div>
+                <h3 className="font-extrabold text-[#4e73df] dark:text-blue-400 uppercase tracking-wider mb-2 text-[11px]">✨ Panduan Operasional MetaZo PRO</h3>
+                <ol className="space-y-2.5 list-decimal pl-4">
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Workspace Selection</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Pilih mode <strong className="text-[#4e73df]">Image</strong>, <strong className="text-purple-500">Video</strong>, atau <strong className="text-emerald-500">Vector</strong> pada Dashboard utama. Unggah file Anda melalui fitur drag-and-drop atau klik area unggah.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">AI Analysis & Metadata Generation</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Setelah diunggah, klik <strong className="text-slate-700 dark:text-slate-300">Process Metadata</strong>. Mesin AI Vision kami akan menganalisis konten visual untuk menghasilkan Judul, Deskripsi, dan Kategori secara otomatis.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Review & Penataan Keyword (New!)</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Pada segmen peninjauan, Anda dapat <strong>seret-dan-letakkan (drag & drop) keyword</strong> Anda untuk mengatur ulang prioritas tag agar lebih relevan dengan hasil pencarian (SEO).</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Export & Download</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Verifikasi hasil akhir pada tabel Review. Setelah sesuai, gunakan fitur Export untuk mengunduh metadata dalam format CSV yang kompatibel dengan Adobe Stock, Shutterstock, dll.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Ekspor Massal (Bulk Export)</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan platform tujuan (Adobe Stock, Shutterstock, Freepik, Vecteezy, Canva) di panel ekspor, lalu unduh CSV kompilasi yang siap sedia diunggah ke portal kontributor Anda.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Prompt Gen & Image AI</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Gunakan fitur <strong className="text-pink-500">Prompt Gen</strong> untuk menghasilkan deskripsi visual yang mendalam untuk AI Art. Pilih kategori gaya seperti <strong className="text-blue-500">3D CGI</strong> atau <strong className="text-emerald-500">Cinematic</strong> untuk hasil maksimal pada Midjourney, DALL-E, atau Stable Diffusion.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Bantuan & Komunitas</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Butuh bantuan? Bergabunglah dengan <strong className="text-emerald-500">Grup WhatsApp</strong> kami melalui tombol di sidebar untuk berdiskusi dan mendapatkan update terbaru langsung dari pengembang.</p>
+                  </li>
+                </ol>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-white/5">
+                <h3 className="font-extrabold text-amber-500 uppercase tracking-wider mb-2 text-[11px]">⚡ Tips Mode Pemrosesan</h3>
+                <div className="grid grid-cols-1 gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
+                    <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">Standard Mode</span>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Memproses file satu per satu secara berurutan. Sangat aman dan stabil untuk menghindari kendala batasan API (rate limit).</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
+                    <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">Batch Mode</span>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Memproses banyak file sekaligus secara simultan. Disarankan untuk memproses asset dalam jumlah besar jika waktu menjadi prioritas utama Anda.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-white/5">
+                <h3 className="font-extrabold text-blue-500 uppercase tracking-wider mb-2 text-[11px]">📁 Format File yang Didukung</h3>
+                <ul className="grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase">
+                  <li className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20">JPEG, PNG, WEBP</li>
+                  <li className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20">MP4, MOV, WEBM</li>
+                  <li className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">SVG, EPS, AI</li>
+                </ul>
+              </div>
+            </div>
+            
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full py-2 bg-[#4e73df] text-white font-bold rounded-lg text-xs uppercase">Tutup Petunjuk</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;

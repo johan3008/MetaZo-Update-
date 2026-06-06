@@ -1,0 +1,83 @@
+
+export enum ToolType {
+  DASHBOARD = 'dashboard',
+  IMAGE = 'image',
+  VIDEO = 'video',
+  VECTOR = 'vector',
+  PROMPT_GEN = 'prompt_gen',
+  PROMPT_IMAGE = 'prompt_image',
+  PROMPT_VIDEO = 'prompt_video',
+  PROMPT_IMAGE_CHECK = 'prompt_image_check',
+  VECTOR_EPS = 'vector_eps'
+}
+
+export enum GenerationMode {
+  STANDARD = 'standard',
+  BATCH = 'batch'
+}
+
+export interface AdobeCategory {
+  id: number;
+  name: string;
+}
+
+export interface StockMetadata {
+  title: string;
+  description: string;
+  keywords: string[];
+  category_id: number;
+  shutterstock_category_1: string;
+  shutterstock_category_2: string;
+}
+
+export interface FileItem {
+  id: string;
+  file: File;
+  customFileName?: string;
+  thumbnail: string | null;
+  analysisFrames: string[];
+  title: string;
+  description: string;
+  keywords: string[];
+  adobeCategoryId: number | '';
+  shutterstockCategory1: string;
+  shutterstockCategory2: string;
+  isGenerating: boolean;
+  isExtracting?: boolean;
+  error: string | null;
+}
+
+export interface ProgressInfo {
+  current: number;
+  total: number;
+  duration: number;
+}
+
+export interface VideoAnalysisResult {
+  keyword: string;
+  demandPotential: 'Tinggi' | 'Menengah' | 'Rendah';
+  demandType: 'Evergreen' | 'Seasonal' | 'Trend-fading';
+  marketInsight: string;
+  targetBuyer: string;
+  useCase: string;
+  recommendedFormat: string;
+  formatReason: string;
+  competitionLevel: 'Sangat Tinggi' | 'Tinggi' | 'Menengah' | 'Rendah';
+  competitionNotes: string;
+  cinematicPotential: 'YA' | 'TIDAK';
+  cinematicReason: string;
+  status: 'LAYAK PRODUKSI' | 'TIDAK LAYAK';
+  conclusion: string;
+  solution: string;
+}
+
+export interface VideoPrompt {
+  id: string;
+  subject: string;
+  movement: string;
+  environment: string;
+  lighting: string;
+  camera_angle: string;
+  camera_movement: string;
+  style: 'cinematic' | 'documentary';
+}
