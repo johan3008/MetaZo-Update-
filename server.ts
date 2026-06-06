@@ -94,9 +94,16 @@ const spawnAsync = (command: string, args: string[], options: any): Promise<void
     });
 };
 
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+const uploadDir = process.env.VERCEL 
+    ? '/tmp' 
+    : path.join(process.cwd(), 'uploads');
+
+try {
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+} catch (err) {
+    console.warn('[WARNING] Cannot create uploadDir on Vercel, using default fallback /tmp:', err);
 }
 
 const localGsPath = path.join(__dirname, 'bin', 'gs');
