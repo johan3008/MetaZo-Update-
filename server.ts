@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import multer from 'multer';
 import { exec, spawn } from 'child_process';
 import util from 'util';
@@ -213,8 +212,9 @@ async function startServer() {
     } catch (err) {
         console.error('Failed to clear uploads directory:', err);
     }
+}
 
-    app.get('/api/debug-uploads', (req, res) => {
+app.get('/api/debug-uploads', (req, res) => {
         try {
             const files = fs.readdirSync(uploadDir);
             let totalSize = 0;
@@ -632,8 +632,10 @@ async function startServer() {
         }
     });
 
+async function startHosting() {
     // Vite middleware for development
     if (process.env.NODE_ENV !== 'production') {
+        const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
             server: { middlewareMode: true },
             appType: 'spa',
@@ -654,7 +656,7 @@ async function startServer() {
 }
 
 if (!process.env.VERCEL) {
-    startServer();
+    startServer().then(() => startHosting());
 }
 
 export { app };
