@@ -105,10 +105,102 @@ const gsExecutable = fs.existsSync(localGsPath) ? localGsPath : 'gs';
 
 const upload = multer({ dest: uploadDir });
 
-async function startServer() {
-    const app = express();
-    const PORT = 3000;
+const app = express();
+const PORT = 3000;
 
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+// Custom Multi-Provider API Key Context Middleware (Thread safe via AsyncLocalStorage with auto-rotation)
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const customGeminiKey = req.headers['x-gemini-key'];
+    const customGroqKey = req.headers['x-groq-key'];
+    const customMistralKey = req.headers['x-mistral-key'];
+    const provider = req.headers['x-ai-provider'] || 'gemini';
+
+    const geminiKeys = customGeminiKey && typeof customGeminiKey === 'string'
+        ? customGeminiKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
+        
+    const groqKeys = customGroqKey && typeof customGroqKey === 'string'
+        ? customGroqKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
+        
+    const mistralKeys = customMistralKey && typeof customMistralKey === 'string'
+        ? customMistralKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
+
+    apiKeyStorage.run({
+        provider: String(provider),
+        gemini: { keys: geminiKeys, activeIndex: 0 },
+        groq: { keys: groqKeys, activeIndex: 0 },
+        mistral: { keys: mistralKeys, activeIndex: 0 }
+    }, () => {
+        next();
+    });
+});
+
+// Global Error Handler to ensure JSON responses on errors
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err) {
+        console.error('[GLOBAL ERROR]', err);
+        if (err.status === 413) {
+            return res.status(413).json({ error: 'Paylod too large. Gambar terlalu besar untuk diproses.' });
+        }
+        if (!res.headersSent) {
+            return res.status(500).json({ error: err.message || 'Internal Server Error' });
+        }
+    }
+    next();
+});
+
+// TRICK: Throttle Quota / Concurrency Limit Middleware
+// We place this BEFORE multer upload.single() so that we reject the request
+// instantly and gracefully before Node.js even starts buffering the massive file to disk/RAM.
+let activeEpsConversions = 0;
+const MAX_CONCURRENT_EPS = 5; // Reduced to 5 to prevent Multer from buffering too many large files on disk.
+
+const throttleMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (activeEpsConversions >= MAX_CONCURRENT_EPS) {
+        return res.status(429).json({ error: 'Server is currently at maximum capacity. Please wait to prevent memory crash.' });
+    }
+    
+    activeEpsConversions++;
+    let isCleanedUp = false;
+    
+    // TRICK: Attach the uploaded file info to req when it becomes available
+    // so we can delete it if the connection aborts abruptly!
+    
+    const cleanup = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
+        activeEpsConversions--;
+        console.log(`[THROTTLE CLEANUP] 1 request finished. Active EPS conversions now: ${activeEpsConversions}`);
+        
+        // Failsafe: if req.file exists but res finished abnormally, clean it up
+        if (req.file && fs.existsSync(req.file.path)) {
+            try {
+                fs.unlinkSync(req.file.path);
+                console.log(`[MULTER FAILSAFE] Deleted stray upload: ${req.file.path}`);
+            } catch(e) {}
+        }
+
+        res.removeListener('finish', cleanup);
+        res.removeListener('close', cleanup);
+        req.removeListener('aborted', cleanup);
+        req.removeListener('close', cleanup);
+    };
+    
+    console.log(`[THROTTLE INCOMING] Active EPS conversions: ${activeEpsConversions}`);
+    res.on('finish', cleanup);
+    res.on('close', cleanup);
+    req.on('aborted', cleanup);
+    req.on('close', cleanup);
+    
+    next();
+};
+
+async function startServer() {
     // Clear uploads directory on startup to prevent disk space exhaustion
     try {
         if (fs.existsSync(uploadDir)) {
@@ -121,98 +213,6 @@ async function startServer() {
     } catch (err) {
         console.error('Failed to clear uploads directory:', err);
     }
-
-    app.use(express.json({ limit: '100mb' }));
-    app.use(express.urlencoded({ limit: '100mb', extended: true }));
-
-    // Custom Multi-Provider API Key Context Middleware (Thread safe via AsyncLocalStorage with auto-rotation)
-    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-        const customGeminiKey = req.headers['x-gemini-key'];
-        const customGroqKey = req.headers['x-groq-key'];
-        const customMistralKey = req.headers['x-mistral-key'];
-        const provider = req.headers['x-ai-provider'] || 'gemini';
-
-        const geminiKeys = customGeminiKey && typeof customGeminiKey === 'string'
-            ? customGeminiKey.split(',').map(k => k.trim()).filter(Boolean)
-            : [];
-            
-        const groqKeys = customGroqKey && typeof customGroqKey === 'string'
-            ? customGroqKey.split(',').map(k => k.trim()).filter(Boolean)
-            : [];
-            
-        const mistralKeys = customMistralKey && typeof customMistralKey === 'string'
-            ? customMistralKey.split(',').map(k => k.trim()).filter(Boolean)
-            : [];
-
-        apiKeyStorage.run({
-            provider: String(provider),
-            gemini: { keys: geminiKeys, activeIndex: 0 },
-            groq: { keys: groqKeys, activeIndex: 0 },
-            mistral: { keys: mistralKeys, activeIndex: 0 }
-        }, () => {
-            next();
-        });
-    });
-
-    // Global Error Handler to ensure JSON responses on errors
-    app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-        if (err) {
-            console.error('[GLOBAL ERROR]', err);
-            if (err.status === 413) {
-                return res.status(413).json({ error: 'Paylod too large. Gambar terlalu besar untuk diproses.' });
-            }
-            if (!res.headersSent) {
-                return res.status(500).json({ error: err.message || 'Internal Server Error' });
-            }
-        }
-        next();
-    });
-
-    // TRICK: Throttle Quota / Concurrency Limit Middleware
-    // We place this BEFORE multer upload.single() so that we reject the request
-    // instantly and gracefully before Node.js even starts buffering the massive file to disk/RAM.
-    let activeEpsConversions = 0;
-    const MAX_CONCURRENT_EPS = 5; // Reduced to 5 to prevent Multer from buffering too many large files on disk.
-
-    const throttleMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-        if (activeEpsConversions >= MAX_CONCURRENT_EPS) {
-            return res.status(429).json({ error: 'Server is currently at maximum capacity. Please wait to prevent memory crash.' });
-        }
-        
-        activeEpsConversions++;
-        let isCleanedUp = false;
-        
-        // TRICK: Attach the uploaded file info to req when it becomes available
-        // so we can delete it if the connection aborts abruptly!
-        
-        const cleanup = () => {
-            if (isCleanedUp) return;
-            isCleanedUp = true;
-            activeEpsConversions--;
-            console.log(`[THROTTLE CLEANUP] 1 request finished. Active EPS conversions now: ${activeEpsConversions}`);
-            
-            // Failsafe: if req.file exists but res finished abnormally, clean it up
-            if (req.file && fs.existsSync(req.file.path)) {
-                try {
-                    fs.unlinkSync(req.file.path);
-                    console.log(`[MULTER FAILSAFE] Deleted stray upload: ${req.file.path}`);
-                } catch(e) {}
-            }
-
-            res.removeListener('finish', cleanup);
-            res.removeListener('close', cleanup);
-            req.removeListener('aborted', cleanup);
-            req.removeListener('close', cleanup);
-        };
-        
-        console.log(`[THROTTLE INCOMING] Active EPS conversions: ${activeEpsConversions}`);
-        res.on('finish', cleanup);
-        res.on('close', cleanup);
-        req.on('aborted', cleanup);
-        req.on('close', cleanup);
-        
-        next();
-    };
 
     app.get('/api/debug-uploads', (req, res) => {
         try {
@@ -653,4 +653,8 @@ async function startServer() {
     });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+    startServer();
+}
+
+export { app };
