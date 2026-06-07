@@ -88,7 +88,7 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = hasImages ? 'llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+      model = hasImages ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
@@ -104,11 +104,21 @@ async function callOpenAICompatibleWithRetry(params: {
       if (provider === 'groq' && !hasImages) {
         payload.response_format = { type: 'json_object' };
       }
-      let schemaInstruction = 'IMPORTANT: You MUST return ONLY valid JSON. No conversational text.';
+      let schemaInstruction = '\\n\\nIMPORTANT: You MUST return ONLY valid JSON. No conversational text.';
       if (params.responseSchema) {
         schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
       }
-      messages.push({ role: 'user', content: schemaInstruction });
+      
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'user') {
+        if (typeof lastMessage.content === 'string') {
+          lastMessage.content += schemaInstruction;
+        } else if (Array.isArray(lastMessage.content)) {
+          lastMessage.content.push({ type: 'text', text: schemaInstruction });
+        }
+      } else {
+        messages.push({ role: 'user', content: schemaInstruction });
+      }
     }
 
     try {
