@@ -146,6 +146,20 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     });
 });
 
+// Global Error Handler to ensure JSON responses on errors
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err) {
+        console.error('[GLOBAL ERROR]', err);
+        if (err.status === 413) {
+            return res.status(413).json({ error: 'Paylod too large. Gambar terlalu besar untuk diproses.' });
+        }
+        if (!res.headersSent) {
+            return res.status(500).json({ error: err.message || 'Internal Server Error' });
+        }
+    }
+    next();
+});
+
 // TRICK: Throttle Quota / Concurrency Limit Middleware
 // We place this BEFORE multer upload.single() so that we reject the request
 // instantly and gracefully before Node.js even starts buffering the massive file to disk/RAM.
@@ -651,20 +665,5 @@ async function startHosting() {
 if (!process.env.VERCEL) {
     startServer().then(() => startHosting());
 }
-
-// FIX: Global Error Handler MUST be registered AFTER all routes so Express
-// can forward errors from route handlers here via next(err) or auto-catch (Express 5).
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (err) {
-        console.error('[GLOBAL ERROR]', err);
-        if (err.status === 413) {
-            return res.status(413).json({ error: 'Payload too large. Gambar terlalu besar untuk diproses.' });
-        }
-        if (!res.headersSent) {
-            return res.status(500).json({ error: err.message || 'Internal Server Error' });
-        }
-    }
-    next();
-});
 
 export { app };

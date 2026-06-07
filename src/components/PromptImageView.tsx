@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { getApiHeaders } from '../../services/apiHeaders';
 import { 
   ImageIcon, Upload, Wand2, Copy, Check, AlertCircle, RefreshCw, X, Sliders, Sparkles, Trash2, Layers, Grid
 } from 'lucide-react';
@@ -155,7 +154,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
     try {
       const response = await fetch('/api/analyze-batch-image-to-prompt', {
         method: 'POST',
-        headers: getApiHeaders(), // FIX: include provider + API key headers
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           images: pendingImages,
           styleCategory

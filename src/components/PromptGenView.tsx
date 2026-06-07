@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getApiHeaders } from '../../services/apiHeaders';
 import { 
   Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X
 } from 'lucide-react';
@@ -168,7 +167,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t }) => {
     try {
       const response = await fetch('/api/generate-prompt', {
         method: 'POST',
-        headers: getApiHeaders(), // FIX: include provider + API key headers
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: subject.trim(),
           styleCategory,

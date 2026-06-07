@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { getApiHeaders } from '../../services/apiHeaders';
 import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface QualityReport {
@@ -131,7 +130,7 @@ export const ImageQualityCheck: React.FC = () => {
 
         const response = await fetch('/api/check-image-quality', {
           method: 'POST',
-          headers: getApiHeaders(), // FIX: include provider + API key headers
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Image }),
         });
         if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);
