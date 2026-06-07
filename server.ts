@@ -287,19 +287,41 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!apiKey) {
                 return res.status(400).json({ error: 'API Key tidak boleh kosong' });
             }
-            const response = await fetch('https://api.groq.com/openai/v1/models', {
+            // Test if the API key is valid using models endpoint first
+            const modelsResponse = await fetch('https://api.groq.com/openai/v1/models', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${apiKey.trim()}`
                 }
             });
 
-            if (response.ok) {
-                return res.json({ success: true, message: 'Groq API Key valid!' });
+            if (!modelsResponse.ok) {
+                const errText = await modelsResponse.text();
+                return res.status(400).json({ error: `Gagal verifikasi Groq: ${errText}` });
             }
-            const errText = await response.text();
-            console.error('Groq test HTTP error status:', response.status, 'text:', errText);
-            return res.status(400).json({ error: `Gagal verifikasi Groq: ${errText}` });
+
+            // Test completion with the specified model
+            const testResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    messages: [{role: 'user', content: 'test'}]
+                })
+            });
+
+            if (testResponse.ok) {
+                return res.json({ success: true, message: 'Groq API Key valid! (llama-3.3-70b-versatile model available and working)' });
+            } else {
+                const errText = await testResponse.text();
+                if (errText.includes('model_not_found')) {
+                   return res.status(400).json({ error: `Groq verified but model llama-4-scout-17b is unavailable: ${errText}` });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi Groq (completion): ${errText}` });
+            }
         } catch (e: any) {
             console.error('Test Groq API Key error exception:', e);
             res.status(500).json({ error: e.message || 'Error testing Groq API Key' });

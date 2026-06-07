@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LogoImage from '../assets/images/metazo_pro_white_logo_1780846443986.png';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle
@@ -57,8 +58,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Brand Header */}
       <div className="flex items-center space-x-3 px-4 py-5 border-b border-white/10">
-        <div className="w-9 h-9 bg-white text-[#4e73df] rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 transition-all">
-          <Zap className="fill-current text-[#4e73df] animate-pulse" size={18} />
+        <div className="w-9 h-9 bg-gradient-to-br from-[#4e73df] to-[#224abe] rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 transition-all overflow-hidden border border-white/20">
+          <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover" />
         </div>
         {!sidebarCollapsed && (
           <div className="flex flex-col select-none">
@@ -339,8 +340,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
             <div className="flex-1 flex flex-col h-full select-none">
               <div className="flex items-center space-x-3 px-1 py-5 border-b border-white/10">
-                <div className="w-9 h-9 bg-white text-[#4e73df] rounded-xl flex items-center justify-center shadow">
-                  <Zap className="fill-current text-[#4e73df] animate-pulse" size={18} />
+                <div className="w-9 h-9 bg-gradient-to-br from-[#4e73df] to-[#224abe] rounded-xl flex items-center justify-center shadow overflow-hidden border border-white/20">
+                  <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-extrabold text-sm tracking-tight text-white leading-none">MetaZo PRO</span>

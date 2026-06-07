@@ -88,7 +88,7 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = hasImages ? 'llama-3.2-11b-vision-preview' : 'meta-llama/llama-4-scout-17b-16e-instruct';
+      model = 'llama-3.3-70b-versatile';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
@@ -155,8 +155,8 @@ async function callOpenAICompatibleWithRetry(params: {
         // Fallback for Llama 4 Scout if model doesn't exist
         const errorMsg = String(err.message || "").toLowerCase();
         if (tryCount === 0 && provider === 'groq' && errorMsg.includes('model_not_found')) {
-          console.warn(`[callOpenAICompatibleWithRetry] Model ${model} not found, falling back to Llama 3.`);
-          model = hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+          console.warn(`[callOpenAICompatibleWithRetry] Model ${model} not found, falling back to Llama 3.3.`);
+          model = 'llama-3.3-70b-versatile';
           payload.model = model;
           tryCount++;
           continue;
@@ -230,7 +230,14 @@ function getAIClient(): any {
               }
             }
           });
-          return await client.models.generateContent(params);
+          const result = await client.models.generateContent(params);
+          if (params.config?.responseMimeType === 'application/json' && result.text) {
+            return {
+              ...result,
+              text: result.text.replace(/^```json\s*/, '').replace(/```$/, '').trim()
+            };
+          }
+          return result;
         };
 
         if (keysList.length > 1) {
@@ -776,7 +783,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
   for (const modelName of modelsToTry) {
@@ -1016,16 +1023,16 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "vintage hand-painted portrait oil technique, rich pigments, weathered fine-art appeal"
     ],
     "Abstract": [
-      "contemporary abstract art, bold geometric shapes, expressive non-representational layouts, vivid color palettes",
-      "modern abstract expressionism, fluid acrylic paint pours, stylized structural concepts, multi-layered visually",
-      "minimalist abstract geometry, clean lines, high-contrast flat layout elements, balanced design",
-      "surreal high-concept abstract composition, organic forms, floating objects, dreamlike colors",
-      "bold brutalist abstract poster design, heavily textured paper background, rough hand-drawn structures",
-      "textured mixed-media abstract collage, earthy colors, creative design layout, gold leaf highlights",
-      "modern fluid digital abstract artwork, clean glossy gradients, flowing chromatic shapes",
-      "minimalist abstract painting, neutral earth tones, sweeping lines, subtle atmospheric textures",
-      "avant-garde abstract conceptual illustration, striking contrast, artistic creative layout",
-      "dynamic abstract wave patterns, high contrast visual, futuristic modern art exhibition style"
+      "Dynamic abstract light trails on dark background, energetic flowing waves, vivid neon accents, sharp geometric glass shards",
+      "High-contrast abstract energy, glowing sphere amidst swirling light ribbons, mysterious dark void, futuristic abstract art",
+      "Radiant abstract light pulses, ethereal dark atmosphere, vibrant accent streaks, complex motion and light play",
+      "Abstract digital light art, deep dark void background, sharp crystalline motion, vibrant glowing focal point",
+      "Energetic abstract composition, fluid white light waves, sharp angular glass fragments, intense vibrant spotlight, dark noir atmosphere",
+      "Minimalist abstract composition, large color fields, harmonious gradients, plenty of negative copy space",
+      "Fluid abstract liquid motion, soft blended colors, ethereal light pathways, smooth composition",
+      "Abstract geometric pattern, subtle overlapping shapes, clean minimalist lines, soft textured background",
+      "Abstract light refraction effect, prismatic color diffusion, graceful sweeping motion, calm atmospheric mood",
+      "Abstract ethereal smoke patterns, graceful soft swirls, subtle light gradients, minimalist background"
     ],
     "Vintage Photography": [
       "authentic vintage analog photograph, film grain texture, classic 1970s warm color grading, nostalgic light leaks",

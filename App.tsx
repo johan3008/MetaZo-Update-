@@ -2344,7 +2344,7 @@ const App: React.FC = () => {
               {activeSettingsTab === 'groq' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
-                    Masukkan API Key Groq Anda. Model Groq (<code className="font-mono text-[10px]">meta-llama/llama-4-scout-17b-16e-instruct</code>) digunakan untuk memproses teks, visual, dan pembuatan prompt yang sangat cepat dan akurat.
+                    Masukkan API Key Groq Anda. Model Groq (<code className="font-mono text-[10px]">llama-3.3-70b-versatile</code>) digunakan untuk memproses teks, visual, dan pembuatan prompt yang sangat cepat dan akurat.
                   </p>
 
                   <div className="space-y-2">
