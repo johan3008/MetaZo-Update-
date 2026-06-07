@@ -14,6 +14,7 @@ async function callOpenAICompatibleWithRetry(params: {
   contents: any;
   responseMimeType?: string;
   responseSchema?: any;
+  config?: any;
 }): Promise<string> {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -87,7 +88,7 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = 'llama-4-scout-17b-16e-instruct';
+      model = hasImages ? 'llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
@@ -96,6 +97,7 @@ async function callOpenAICompatibleWithRetry(params: {
     const payload: any = {
       model,
       messages,
+      temperature: params.config?.temperature ?? 0.85,
     };
 
     if (params.responseMimeType === 'application/json') {
@@ -165,7 +167,8 @@ function getAIClient(): any {
             systemInstruction: params.config?.systemInstruction,
             contents: params.contents,
             responseMimeType: params.config?.responseMimeType,
-            responseSchema: params.config?.responseSchema
+            responseSchema: params.config?.responseSchema,
+            config: params.config
           });
           return { text };
         }
@@ -765,7 +768,8 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           config: {
             systemInstruction,
             responseMimeType: "application/json",
-            responseSchema
+            responseSchema,
+            temperature: 0.95
           }
         });
 
