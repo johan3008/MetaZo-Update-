@@ -86,7 +86,7 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-4-scout-17b-16e-instruct';
+      model = 'llama-4-scout-17b-16e-instruct';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
