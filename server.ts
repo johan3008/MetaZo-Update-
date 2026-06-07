@@ -287,24 +287,15 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!apiKey) {
                 return res.status(400).json({ error: 'API Key tidak boleh kosong' });
             }
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                method: 'POST',
+            const response = await fetch('https://api.groq.com/openai/v1/models', {
+                method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey.trim()}`
-                },
-                body: JSON.stringify({
-                    model: 'llama3-8b-8192',
-                    messages: [{ role: 'user', content: 'Respond with exactly the word "VALID"' }]
-                })
+                }
             });
 
             if (response.ok) {
-                const data = await response.json();
-                if (data.choices?.[0]?.message?.content) {
-                    return res.json({ success: true, message: 'Groq API Key valid!' });
-                }
-                return res.status(500).json({ error: 'Format JSON dari Groq tidak valid' });
+                return res.json({ success: true, message: 'Groq API Key valid!' });
             }
             const errText = await response.text();
             console.error('Groq test HTTP error status:', response.status, 'text:', errText);
@@ -321,23 +312,15 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!apiKey) {
                 return res.status(400).json({ error: 'API Key tidak boleh kosong' });
             }
-            const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-                method: 'POST',
+            const response = await fetch('https://api.mistral.ai/v1/models', {
+                method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey.trim()}`
-                },
-                body: JSON.stringify({
-                    model: 'open-mixtral-8x22b',
-                    messages: [{ role: 'user', content: 'Respond with exactly the word "VALID"' }]
-                })
+                }
             });
 
             if (response.ok) {
-                const data = await response.json();
-                if (data.choices?.[0]?.message?.content) {
-                    return res.json({ success: true, message: 'Mistral API Key valid!' });
-                }
+                return res.json({ success: true, message: 'Mistral API Key valid!' });
             }
             const errText = await response.text();
             return res.status(400).json({ error: `Gagal verifikasi Mistral: ${errText}` });
