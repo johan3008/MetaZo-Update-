@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getApiHeaders } from '../../services/apiHeaders';
 import { 
   Video, 
   Search, 
@@ -62,7 +63,7 @@ export const PromptVideoView: React.FC = () => {
     try {
       const response = await fetch('/api/analyze-video-keyword', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getApiHeaders(), // FIX: include provider + API key headers
         body: JSON.stringify({ keyword: keyword.trim() }),
       });
 
@@ -119,7 +120,7 @@ export const PromptVideoView: React.FC = () => {
     try {
       const response = await fetch('/api/generate-hollywood-prompts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getApiHeaders(), // FIX: include provider + API key headers
         body: JSON.stringify({ keyword: keyword.trim() }),
       });
 

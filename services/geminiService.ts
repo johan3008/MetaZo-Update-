@@ -1,4 +1,5 @@
 import { StockMetadata, ToolType } from "../types";
+import { getApiHeaders } from "./apiHeaders";
 
 const ensureBase64 = async (frame: string): Promise<string> => {
   if (frame.startsWith('blob:')) {
@@ -25,7 +26,7 @@ export const generateStockMetadata = async (
 
   const response = await fetch('/api/generate-metadata', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getApiHeaders(), // FIX: include provider + API key headers
     body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType })
   });
   
@@ -50,7 +51,7 @@ export const generateBatchStockMetadata = async (
 
   const response = await fetch('/api/generate-batch-metadata', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getApiHeaders(), // FIX: include provider + API key headers
     body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType })
   });
 
