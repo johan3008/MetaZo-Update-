@@ -1531,10 +1531,15 @@ Perform evaluation strictly across these rules:
 - Jika kontributor mengunggah banyak gambar sekaligus, deteksi apakah gambar ini hanya sekadar ganti warna (recolor) atau hanya geser sudut kamera sedikit (perubahan sudut minimal). Adobe Stock melarang "spamming" konten yang hampir identik.
 - Jika dicurigai spam -> set "similar_content_and_spam" to "FAILED".
 
+6. GENERATIVE AI STRICT RULES:
+- Ilustrasi Realistis: Gambar yang dibuat menyerupai foto asli (fotorealistis) WAJIB dikategorikan sebagai "Illustrations", bukan "Photos". Tolak jika AI mendeteksi gambar tersebut mencoba meniru foto asli tetapi detailnya masih terlihat artifisial.
+- Judul & Tagging: Tolak jika kontributor tidak menyertakan kata kunci wajib seperti "Generative AI", "AI Generated", atau "Illustration" pada data asetnya. Adobe Stock mewajibkan transparansi penuh untuk konten AI.
+- Jika melanggar salah satu aturan ini -> set "generative_ai_policies" to "FAILED".
+
 DECISION TREE / SISTEM GUGUR LOGIC:
 - Jika salah satu saja dari checklist audit di atas bernilai "FAILED":
   * final_judgment.status MUST be "REJECTED"
-  * final_judgment.official_reason MUST be "Technical Quality", "Intellectual Property", or "Spam". If multiple exist, choose the most severe.
+  * final_judgment.official_reason MUST be "Technical Quality", "Intellectual Property", "Spam", or "Generative AI Policy". If multiple exist, choose the most severe.
 
 - Jika semuanya "PASSED":
   * final_judgment.status MUST be "APPROVED"
@@ -1542,16 +1547,21 @@ DECISION TREE / SISTEM GUGUR LOGIC:
 
 Analyze the image and return exactly this JSON structure (and no other format):
 {
+  "asset_type_detection": {
+    "is_ai_generated": boolean,
+    "correct_category": "Photos" | "Illustrations" | "Vectors"
+  },
   "technical_audit": {
     "artifacts_and_noise": "PASSED" | "FAILED",
     "intellectual_property_and_logos": "PASSED" | "FAILED",
     "broken_text_and_oil_paint": "PASSED" | "FAILED",
     "bad_framing_and_clipping": "PASSED" | "FAILED",
-    "similar_content_and_spam": "PASSED" | "FAILED"
+    "similar_content_and_spam": "PASSED" | "FAILED",
+    "generative_ai_policies": "PASSED" | "FAILED"
   },
   "final_judgment": {
     "status": "APPROVED" | "REJECTED",
-    "official_reason": "Technical Quality" | "Intellectual Property" | "Spam" | null,
+    "official_reason": "Technical Quality" | "Intellectual Property" | "Spam" | "Generative AI Policy" | null,
     "fixed_confidence": "HIGH" | "LOW"
   }
 }
@@ -1560,6 +1570,14 @@ Analyze the image and return exactly this JSON structure (and no other format):
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
+      asset_type_detection: {
+        type: Type.OBJECT,
+        properties: {
+          is_ai_generated: { type: Type.BOOLEAN },
+          correct_category: { type: Type.STRING, enum: ["Photos", "Illustrations", "Vectors"] }
+        },
+        required: ["is_ai_generated", "correct_category"]
+      },
       technical_audit: {
         type: Type.OBJECT,
         properties: {
@@ -1567,9 +1585,10 @@ Analyze the image and return exactly this JSON structure (and no other format):
           intellectual_property_and_logos: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
           broken_text_and_oil_paint: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
           bad_framing_and_clipping: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
-          similar_content_and_spam: { type: Type.STRING, enum: ["PASSED", "FAILED"] }
+          similar_content_and_spam: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
+          generative_ai_policies: { type: Type.STRING, enum: ["PASSED", "FAILED"] }
         },
-        required: ["artifacts_and_noise", "intellectual_property_and_logos", "broken_text_and_oil_paint", "bad_framing_and_clipping", "similar_content_and_spam"]
+        required: ["artifacts_and_noise", "intellectual_property_and_logos", "broken_text_and_oil_paint", "bad_framing_and_clipping", "similar_content_and_spam", "generative_ai_policies"]
       },
       final_judgment: {
         type: Type.OBJECT,
@@ -1581,7 +1600,7 @@ Analyze the image and return exactly this JSON structure (and no other format):
         required: ["status", "official_reason", "fixed_confidence"]
       }
     },
-    required: ["technical_audit", "final_judgment"]
+    required: ["asset_type_detection", "technical_audit", "final_judgment"]
   };
 
   const imagePart = processFrameServer(image);

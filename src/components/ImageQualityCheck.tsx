@@ -2,12 +2,17 @@ import React, { useState } from 'react';
 import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 interface QualityReport {
+  asset_type_detection?: {
+    is_ai_generated: boolean;
+    correct_category: "Photos" | "Illustrations" | "Vectors";
+  };
   technical_audit?: {
     artifacts_and_noise: "PASSED" | "FAILED";
     intellectual_property_and_logos: "PASSED" | "FAILED";
     broken_text_and_oil_paint: "PASSED" | "FAILED";
     bad_framing_and_clipping: "PASSED" | "FAILED";
     similar_content_and_spam: "PASSED" | "FAILED";
+    generative_ai_policies: "PASSED" | "FAILED";
   };
   final_judgment?: {
     status: "APPROVED" | "REJECTED";
@@ -241,6 +246,7 @@ export const ImageQualityCheck: React.FC = () => {
               {Object.entries(reports).map(([fileName, report]) => {
                 const r = report as QualityReport;
                 const audit = r.technical_audit;
+                const assetType = r.asset_type_detection;
                 const judgment = r.final_judgment;
                 const status = (judgment?.status || "REJECTED").toUpperCase();
                 const isApproved = status === "APPROVED";
@@ -253,6 +259,7 @@ export const ImageQualityCheck: React.FC = () => {
                 const hasBrokenText = audit?.broken_text_and_oil_paint === "FAILED";
                 const hasBadFraming = audit?.bad_framing_and_clipping === "FAILED";
                 const hasSpam = audit?.similar_content_and_spam === "FAILED";
+                const hasAiPolicyViolations = audit?.generative_ai_policies === "FAILED";
 
                 return (
                   <div key={fileName} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-5 space-y-4 border border-slate-100 dark:border-white/10">
@@ -344,8 +351,32 @@ export const ImageQualityCheck: React.FC = () => {
                             {hasSpam ? 'FAILED' : 'PASSED'}
                           </span>
                         </div>
+
+                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
+                          hasAiPolicyViolations 
+                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
+                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
+                        }`}>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Generative AI Policies</span>
+                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasAiPolicyViolations ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {hasAiPolicyViolations ? 'FAILED' : 'PASSED'}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    
+                    {assetType && (
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="bg-white dark:bg-slate-900 rounded-lg p-2 shadow-sm border border-slate-100 dark:border-transparent">
+                          <p className="text-slate-400 uppercase">AI Generated</p>
+                          <p className="font-black text-slate-800 dark:text-slate-200 text-sm tracking-tight">{assetType.is_ai_generated ? "Yes" : "No"}</p>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-lg p-2 shadow-sm border border-slate-100 dark:border-transparent">
+                          <p className="text-slate-400 uppercase">Category</p>
+                          <p className="font-black text-slate-800 dark:text-slate-200 text-sm tracking-tight uppercase">{assetType.correct_category}</p>
+                        </div>
+                      </div>
+                    )}
                     
                     {displayStatus === 'REJECTED' && rReason && (
                       <div className="p-2.5 bg-red-50/50 dark:bg-red-500/5 rounded-lg border border-red-100/50 dark:border-red-500/10">
