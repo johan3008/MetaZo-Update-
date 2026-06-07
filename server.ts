@@ -44,8 +44,16 @@ class AsyncQueue {
 
 const gsQueue = new AsyncQueue();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// ESM to CJS compatibility for paths
+const __filename_safe = typeof __filename !== 'undefined' 
+    ? __filename 
+    : (typeof import.meta !== 'undefined' && import.meta.url 
+        ? fileURLToPath(import.meta.url) 
+        : '');
+
+const __dirname_safe = typeof __dirname !== 'undefined' 
+    ? __dirname 
+    : (__filename_safe ? path.dirname(__filename_safe) : process.cwd());
 
 // TRICK: Implement "Mandor" to forcefully kill Ghostscript worker and free memory if it gets stuck.
 const spawnAsync = (command: string, args: string[], options: any): Promise<void> => {
@@ -106,7 +114,7 @@ try {
     console.warn('[WARNING] Cannot create uploadDir on Vercel, using default fallback /tmp:', err);
 }
 
-const localGsPath = path.join(__dirname, 'bin', 'gs');
+const localGsPath = path.join(__dirname_safe, 'bin', 'gs');
 const gsExecutable = fs.existsSync(localGsPath) ? localGsPath : 'gs';
 
 const upload = multer({ dest: uploadDir });
