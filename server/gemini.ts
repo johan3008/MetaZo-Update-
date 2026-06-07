@@ -1509,92 +1509,79 @@ You must be extremely strict, objective, and follow a knockout (sistem gugur) va
 *** SISTEM GUGUR (KNOCKOUT VALIDATION) RULES ***
 Perform evaluation strictly across these rules:
 
-1. ARTIFACT & AI GENERATION ERROR (has_artifacts_or_ai_errors):
+1. ARTIFACT & AI GENERATION ERROR:
 - Deteksi adanya: 'wavy lines' (garis bergelombang aneh), distorsi anatomi (jari tangan/kaki/anggota tubuh abnormal), sensasi 'plastik/lilin' yang berlebihan, atau noise kasar di area shadow.
-- Jika ditemukan salah satu saja -> set "has_artifacts_or_ai_errors" to true.
+- Jika ditemukan salah satu saja -> set "artifacts_and_noise" to "FAILED".
 
-2. INTELLECTUAL PROPERTY (IP) (has_ip_or_logo_violations):
+2. INTELLECTUAL PROPERTY (IP):
 - Deteksi adanya: Logo (meski kecil/samar), pola pakaian bermerek, desain produk ikonik (seperti kamera, mobil, smartphone yang khas), atau wajah orang yang terlihat jelas tanpa model release.
-- Jika ditemukan salah satu saja -> set "has_ip_or_logo_violations" to true.
+- Jika ditemukan salah satu saja -> set "intellectual_property_and_logos" to "FAILED".
 
-3. TEXT & METADATA INTEGRITY (has_broken_text_or_oil_paint_effect):
+3. TEXT & METADATA INTEGRITY:
 - Deteksi Teks di Gambar: Tolak jika ada teks buatan AI yang bentuknya rusak, terbalik, atau tidak memiliki arti (gibberish text). Adobe Stock melarang teks yang tidak fungsional pada gambar komersial.
 - Upscaling Artifacts: Periksa apakah gambar dipaksa diperbesar (upscaled) hingga teksturnya menjadi blur, pecah, atau seperti lukisan cat minyak yang kehilangan detail asli (oil-paint effect).
-- Jika ditemukan salah satu saja -> set "has_broken_text_or_oil_paint_effect" to true.
+- Jika ditemukan salah satu saja -> set "broken_text_and_oil_paint" to "FAILED".
+
+4. ISOLATION & FRAMING ERROR:
+- Tolak jika subjek utama terpotong secara tidak sengaja di bagian pinggir frame (misal: ujung kepala atau ujung produk terpotong sedikit tanpa alasan estetis).
+- Tolak jika gambar memiliki "border" atau bingkai hitam/putih buatan di pinggirnya.
+- Jika ditemukan salah satu saja -> set "bad_framing_and_clipping" to "FAILED".
+
+5. SIMILAR CONTENT (SPAM FILTER):
+- Jika kontributor mengunggah banyak gambar sekaligus, deteksi apakah gambar ini hanya sekadar ganti warna (recolor) atau hanya geser sudut kamera sedikit (perubahan sudut minimal). Adobe Stock melarang "spamming" konten yang hampir identik.
+- Jika dicurigai spam -> set "similar_content_and_spam" to "FAILED".
 
 DECISION TREE / SISTEM GUGUR LOGIC:
-- Jika salah satu saja dari checklist ("has_artifacts_or_ai_errors", "has_ip_or_logo_violations", atau "has_broken_text_or_oil_paint_effect") bernilai TRUE:
-  * decision.status MUST be "REJECTED"
-  * decision.rejection_reason MUST be "Technical Quality" (for Artifacts or Broken Text/Oil paint) or "Intellectual Property" (for IP violations). If multiple exist, choose the most severe.
-  * technical_score and commercial_score MUST be set to 0. (Do not evaluate commercial quality!)
-  * analysis.commercial_value must be left as a simple summary stating "Tidak dievaluasi karena tidak lolos tahap verifikasi dasar (sistem gugur)."
-  * improvement_suggestions must contain actionable advice on how to avoid these specific failures.
-- Jika ketiganya FALSE:
-  * decision.status MUST be "APPROVED"
-  * decision.rejection_reason MUST be null.
-  * Evaluate technical_score and commercial_score as normal (1-10 scale), and write comprehensive technical and commercial value reviews.
+- Jika salah satu saja dari checklist audit di atas bernilai "FAILED":
+  * final_judgment.status MUST be "REJECTED"
+  * final_judgment.official_reason MUST be "Technical Quality", "Intellectual Property", or "Spam". If multiple exist, choose the most severe.
 
-Evaluate "confidence_score" as a percentage representation (e.g., "95%") of how confident you are in this decision.
+- Jika semuanya "PASSED":
+  * final_judgment.status MUST be "APPROVED"
+  * final_judgment.official_reason MUST be null.
 
 Analyze the image and return exactly this JSON structure (and no other format):
 {
-  "check_list": {
-    "has_artifacts_or_ai_errors": boolean,
-    "has_ip_or_logo_violations": boolean,
-    "has_broken_text_or_oil_paint_effect": boolean
+  "technical_audit": {
+    "artifacts_and_noise": "PASSED" | "FAILED",
+    "intellectual_property_and_logos": "PASSED" | "FAILED",
+    "broken_text_and_oil_paint": "PASSED" | "FAILED",
+    "bad_framing_and_clipping": "PASSED" | "FAILED",
+    "similar_content_and_spam": "PASSED" | "FAILED"
   },
-  "decision": {
-    "status": "APPROVED" or "REJECTED",
-    "rejection_reason": "Technical Quality" or "Intellectual Property" or null,
-    "confidence_score": "1-100%"
-  },
-  "technical_score": number between 0 and 10,
-  "commercial_score": number between 0 and 10,
-  "analysis": {
-    "technical": "Review of technical compliance and quality.",
-    "intellectual_property": "Review of copyright/trademark compliance.",
-    "commercial_value": "Detailed commercial potential evaluation or notice of skipping due to knockout failure."
-  },
-  "improvement_suggestions": "Actionable feedback for the contributor."
+  "final_judgment": {
+    "status": "APPROVED" | "REJECTED",
+    "official_reason": "Technical Quality" | "Intellectual Property" | "Spam" | null,
+    "fixed_confidence": "HIGH" | "LOW"
+  }
 }
-
-Always provide honest and professional reviews in Bahasa Indonesia (or English if technical validation details require it), but prioritize the knockout rules.`;
+`;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      check_list: {
+      technical_audit: {
         type: Type.OBJECT,
         properties: {
-          has_artifacts_or_ai_errors: { type: Type.BOOLEAN },
-          has_ip_or_logo_violations: { type: Type.BOOLEAN },
-          has_broken_text_or_oil_paint_effect: { type: Type.BOOLEAN }
+          artifacts_and_noise: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
+          intellectual_property_and_logos: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
+          broken_text_and_oil_paint: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
+          bad_framing_and_clipping: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
+          similar_content_and_spam: { type: Type.STRING, enum: ["PASSED", "FAILED"] }
         },
-        required: ["has_artifacts_or_ai_errors", "has_ip_or_logo_violations", "has_broken_text_or_oil_paint_effect"]
+        required: ["artifacts_and_noise", "intellectual_property_and_logos", "broken_text_and_oil_paint", "bad_framing_and_clipping", "similar_content_and_spam"]
       },
-      decision: {
+      final_judgment: {
         type: Type.OBJECT,
         properties: {
           status: { type: Type.STRING, enum: ["APPROVED", "REJECTED"] },
-          rejection_reason: { type: Type.STRING, nullable: true },
-          confidence_score: { type: Type.STRING }
+          official_reason: { type: Type.STRING, nullable: true },
+          fixed_confidence: { type: Type.STRING, enum: ["HIGH", "LOW"] }
         },
-        required: ["status", "rejection_reason", "confidence_score"]
-      },
-      technical_score: { type: Type.NUMBER },
-      commercial_score: { type: Type.NUMBER },
-      analysis: {
-        type: Type.OBJECT,
-        properties: {
-          technical: { type: Type.STRING },
-          intellectual_property: { type: Type.STRING },
-          commercial_value: { type: Type.STRING },
-        },
-        required: ["technical", "intellectual_property", "commercial_value"]
-      },
-      improvement_suggestions: { type: Type.STRING }
+        required: ["status", "official_reason", "fixed_confidence"]
+      }
     },
-    required: ["check_list", "decision", "technical_score", "commercial_score", "analysis", "improvement_suggestions"]
+    required: ["technical_audit", "final_judgment"]
   };
 
   const imagePart = processFrameServer(image);

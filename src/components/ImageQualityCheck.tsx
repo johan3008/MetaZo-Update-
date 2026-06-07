@@ -2,30 +2,18 @@ import React, { useState } from 'react';
 import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 interface QualityReport {
-  check_list?: {
-    has_artifacts_or_ai_errors: boolean;
-    has_ip_or_logo_violations: boolean;
-    has_broken_text_or_oil_paint_effect: boolean;
+  technical_audit?: {
+    artifacts_and_noise: "PASSED" | "FAILED";
+    intellectual_property_and_logos: "PASSED" | "FAILED";
+    broken_text_and_oil_paint: "PASSED" | "FAILED";
+    bad_framing_and_clipping: "PASSED" | "FAILED";
+    similar_content_and_spam: "PASSED" | "FAILED";
   };
-  decision?: {
+  final_judgment?: {
     status: "APPROVED" | "REJECTED";
-    rejection_reason: string | null;
-    confidence_score: string;
+    official_reason: string | null;
+    fixed_confidence: "HIGH" | "LOW";
   };
-  // Fallbacks for older report versions or simple compatibility
-  status?: "Approved" | "Rejected";
-  rejection_reason?: string | null;
-  artifact_detected?: boolean;
-  ip_violation_detected?: boolean;
-
-  technical_score: number;
-  commercial_score: number;
-  analysis: {
-    technical: string;
-    intellectual_property: string;
-    commercial_value: string;
-  };
-  improvement_suggestions: string;
 }
 
 export const ImageQualityCheck: React.FC = () => {
@@ -252,15 +240,19 @@ export const ImageQualityCheck: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.entries(reports).map(([fileName, report]) => {
                 const r = report as QualityReport;
-                const status = (r.decision?.status || r.status || "REJECTED").toUpperCase();
-                const isApproved = status === "APPROVED" || status === "APPROVED" || status === "APPROVED";
+                const audit = r.technical_audit;
+                const judgment = r.final_judgment;
+                const status = (judgment?.status || "REJECTED").toUpperCase();
+                const isApproved = status === "APPROVED";
                 const displayStatus = isApproved ? "APPROVED" : "REJECTED";
-                const rReason = r.decision?.rejection_reason || r.rejection_reason;
-                const confidence = r.decision?.confidence_score;
+                const rReason = judgment?.official_reason;
+                const confidence = judgment?.fixed_confidence;
 
-                const hasArtifacts = r.check_list ? r.check_list.has_artifacts_or_ai_errors : !!r.artifact_detected;
-                const hasIpViolations = r.check_list ? r.check_list.has_ip_or_logo_violations : !!r.ip_violation_detected;
-                const hasBrokenText = r.check_list ? r.check_list.has_broken_text_or_oil_paint_effect : false;
+                const hasArtifacts = audit?.artifacts_and_noise === "FAILED";
+                const hasIpViolations = audit?.intellectual_property_and_logos === "FAILED";
+                const hasBrokenText = audit?.broken_text_and_oil_paint === "FAILED";
+                const hasBadFraming = audit?.bad_framing_and_clipping === "FAILED";
+                const hasSpam = audit?.similar_content_and_spam === "FAILED";
 
                 return (
                   <div key={fileName} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-5 space-y-4 border border-slate-100 dark:border-white/10">
@@ -296,16 +288,16 @@ export const ImageQualityCheck: React.FC = () => {
 
                     {/* Knockout Validation Status Indicators */}
                     <div className="space-y-1.5">
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">KNOCKOUT INTEGRITY CHECKLIST</p>
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">TECHNICAL AUDIT</p>
                       <div className="grid grid-cols-1 gap-1.5 text-[10px]">
                         <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
                           hasArtifacts 
                             ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
                             : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
                         }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Tahap 1: Artifact & AI Error</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Artifacts & Noise</span>
                           <span className={`font-black uppercase tracking-wider text-[10px] ${hasArtifacts ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasArtifacts ? 'TERDETEKSI (K.O.)' : 'PASSED'}
+                            {hasArtifacts ? 'FAILED' : 'PASSED'}
                           </span>
                         </div>
                         
@@ -314,9 +306,9 @@ export const ImageQualityCheck: React.FC = () => {
                             ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
                             : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
                         }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Tahap 2: Intellectual Property (IP)</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Intellectual Property & Logos</span>
                           <span className={`font-black uppercase tracking-wider text-[10px] ${hasIpViolations ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasIpViolations ? 'TERDETEKSI (K.O.)' : 'PASSED'}
+                            {hasIpViolations ? 'FAILED' : 'PASSED'}
                           </span>
                         </div>
 
@@ -325,72 +317,42 @@ export const ImageQualityCheck: React.FC = () => {
                             ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
                             : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
                         }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Tahap 3: Text & Upscale Integrity</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Broken Text & Oil Paint</span>
                           <span className={`font-black uppercase tracking-wider text-[10px] ${hasBrokenText ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasBrokenText ? 'TERDETEKSI (K.O.)' : 'PASSED'}
+                            {hasBrokenText ? 'FAILED' : 'PASSED'}
+                          </span>
+                        </div>
+
+                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
+                          hasBadFraming 
+                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
+                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
+                        }`}>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Bad Framing & Clipping</span>
+                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasBadFraming ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {hasBadFraming ? 'FAILED' : 'PASSED'}
+                          </span>
+                        </div>
+
+                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
+                          hasSpam 
+                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
+                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
+                        }`}>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Similar Content & Spam</span>
+                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasSpam ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {hasSpam ? 'FAILED' : 'PASSED'}
                           </span>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
-                      <div className="bg-white dark:bg-slate-900 rounded-lg p-2 shadow-sm border border-slate-100 dark:border-transparent">
-                        <p className="text-slate-400 uppercase">Technical</p>
-                        <p className="font-black text-slate-800 dark:text-slate-200 text-sm">{isApproved ? `${r.technical_score}/10` : "0/10"}</p>
+                    {displayStatus === 'REJECTED' && rReason && (
+                      <div className="p-2.5 bg-red-50/50 dark:bg-red-500/5 rounded-lg border border-red-100/50 dark:border-red-500/10">
+                        <p className="text-[9px] font-black uppercase text-red-600 dark:text-red-400 mb-1">Rejection Reason</p>
+                        <p className="text-[10px] font-bold text-red-700 dark:text-red-300 uppercase">{rReason}</p>
                       </div>
-                      <div className="bg-white dark:bg-slate-900 rounded-lg p-2 shadow-sm border border-slate-100 dark:border-transparent">
-                        <p className="text-slate-400 uppercase">Commercial</p>
-                        <p className="font-black text-slate-800 dark:text-slate-200 text-sm">{isApproved ? `${r.commercial_score}/10` : "0/10"}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => toggleReportExpand(fileName)}
-                        className="w-full flex items-center justify-between py-2 px-3 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100/10 dark:hover:bg-slate-950 font-bold rounded-lg border border-slate-200/60 dark:border-white/5 transition-all cursor-pointer text-[10px]"
-                      >
-                        <span className="uppercase tracking-wider">
-                          {expandedReports[fileName] ? "Sembunyikan Detail" : "Lihat Detail Analisis"}
-                        </span>
-                        {expandedReports[fileName] ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                      </button>
-
-                      {expandedReports[fileName] && (
-                        <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-white/5">
-                          {displayStatus === 'REJECTED' && rReason && (
-                            <div className="p-2.5 bg-red-50/50 dark:bg-red-500/5 rounded-lg border border-red-100/50 dark:border-red-500/10">
-                              <p className="text-[9px] font-black uppercase text-red-600 dark:text-red-400 mb-1">Rejection Reason</p>
-                              <p className="text-[10px] font-bold text-red-700 dark:text-red-300 uppercase">{rReason}</p>
-                            </div>
-                          )}
-
-                          <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-white/5">
-                            <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Technical Analysis</p>
-                            <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
-                              "{r.analysis?.technical || 'Tidak ada data teknis.'}"
-                            </p>
-                          </div>
-                          
-                          <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-white/5">
-                            <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Commercial Value</p>
-                            <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                              {r.analysis?.commercial_value || 'Tidak ada data komersial.'}
-                            </p>
-                          </div>
-
-                          {r.improvement_suggestions && (
-                            <div className="p-2.5 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-lg border border-emerald-100/50 dark:border-emerald-500/10">
-                              <p className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 mb-1 flex items-center gap-1">
-                                <Sparkles size={10} strokeWidth={2.5} /> Suggestions
-                              </p>
-                              <p className="text-[10px] text-emerald-700 dark:text-emerald-300">
-                                {r.improvement_suggestions}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}
