@@ -88,10 +88,7 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      // User specifically requested Llama 4 Scout 17B, but since it's giving a 404
-      // for some API keys, we will use the exact HuggingFace-style ID that Groq uses
-      // in their docs, and if it fails with 404, we'll implement a fallback below.
-      model = hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-4-scout-17b-16e-instruct-preview';
+      model = 'meta-llama/llama-4-scout-17b-16e-instruct';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
