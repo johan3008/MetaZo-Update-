@@ -294,7 +294,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     'Authorization': `Bearer ${apiKey.trim()}`
                 },
                 body: JSON.stringify({
-                    model: 'llama-3.1-8b-instant',
+                    model: 'llama-4-scout-17b-16e-instruct',
                     messages: [{ role: 'user', content: 'Respond with exactly the word "VALID"' }]
                 })
             });

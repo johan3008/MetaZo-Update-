@@ -2203,7 +2203,7 @@ const App: React.FC = () => {
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'gemini', name: 'Gemini', desc: 'Google AI' },
-                  { id: 'groq', name: 'Groq', desc: 'Llama 3 / Mixtral' },
+                  { id: 'groq', name: 'Groq', desc: 'Llama 4 Scout / Vision' },
                   { id: 'mistral', name: 'Mistral', desc: 'Mistral Large' }
                 ].map(prov => {
                   const isActive = selectedProvider === prov.id;
