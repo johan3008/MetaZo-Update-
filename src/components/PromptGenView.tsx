@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { copyToClipboard as robustCopy } from '../utils';
+import { 
+  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X
+} from 'lucide-react';
 
 interface PromptGenViewProps {
   t: any;
