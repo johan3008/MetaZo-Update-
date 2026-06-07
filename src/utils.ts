@@ -8,6 +8,16 @@ import copy from 'copy-to-clipboard';
 export const copyToClipboard = async (text: string): Promise<boolean> => {
     if (!text) return false;
 
+    // 1. Primordial Attempt: Navigator Clipboard API (Secure Context only)
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch(e) {
+        console.warn('Navigator clipboard failed, falling back to copy-to-clipboard', e);
+    }
+
     try {
         const success = copy(text, {
             debug: process.env.NODE_ENV !== 'production',
@@ -16,11 +26,6 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
         
         if (success) return true;
         
-        // If copy-to-clipboard fails to return true, try navigator directly as extreme fallback
-        if (navigator.clipboard) {
-            await navigator.clipboard.writeText(text);
-            return true;
-        }
         return false;
     } catch (err) {
         console.error('[Clipboard] Robust copy failed:', err);

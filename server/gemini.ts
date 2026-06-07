@@ -98,7 +98,10 @@ async function callOpenAICompatibleWithRetry(params: {
     };
 
     if (params.responseMimeType === 'application/json') {
-      payload.response_format = { type: 'json_object' };
+      // payload.response_format = { type: 'json_object' };
+      // Most vision models (Groq's Llama 3.2 Vision, Pixtral) don't support JSON mode parameter.
+      // So we append the JSON instruction manually.
+      messages.push({ role: 'user', content: 'IMPORTANT: You MUST return ONLY valid JSON matching the requested schema. No conversational text.' });
     }
 
     try {
@@ -118,9 +121,12 @@ async function callOpenAICompatibleWithRetry(params: {
       }
 
       const responseData = await response.json();
-      const answer = responseData.choices?.[0]?.message?.content;
+      let answer = responseData.choices?.[0]?.message?.content;
       if (!answer) {
         throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
+      }
+      if (params.responseMimeType === 'application/json') {
+        answer = answer.replace(/^```json\s*/, '').replace(/```$/, '').trim();
       }
       return answer;
     } catch (err: any) {
