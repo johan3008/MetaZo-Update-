@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VideoAnalysisResult, VideoPrompt } from '../../types';
+import { copyToClipboard as robustCopy } from '../utils';
 
 interface HistoryItem {
   id: string;
@@ -140,8 +141,11 @@ export const PromptVideoView: React.FC = () => {
     return `${p.subject}. ${p.movement}. ${p.environment}. ${p.lighting}. ${p.camera_angle}, ${p.camera_movement}. Style: ${p.style}.`;
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string) => {
+    const success = await robustCopy(text);
+    if (!success) {
+      console.error("Clipboard copy failed");
+    }
   };
 
   const downloadPrompts = () => {
@@ -419,7 +423,7 @@ export const PromptVideoView: React.FC = () => {
                           <span className="px-3 py-1 bg-emerald-500/10 text-[10px] font-black text-emerald-400 uppercase tracking-widest rounded-full">{prompt.style} shot</span>
                         </div>
                         <button 
-                          onClick={() => copyToClipboard(getCombinedPrompt(prompt))}
+                          onClick={() => handleCopy(getCombinedPrompt(prompt))}
                           className="px-3 py-1 opacity-0 group-hover:opacity-100 bg-white/5 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 rounded-full transition-all flex items-center space-x-2"
                         >
                           <Copy size={12} />

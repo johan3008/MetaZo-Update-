@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from '../../constants';
+import { copyToClipboard } from '../utils';
 
 // Since we have helper subcomponents like CopyBox and KeywordList in the project,
 // we will declare props for them or import them if needed. 
@@ -27,10 +28,12 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
   const [copied, setCopied] = React.useState(false);
   const colorClass = themeColor === 'blue' ? 'border-[#4e73df] hover:border-blue-600' : themeColor === 'purple' ? 'border-purple-500 hover:border-purple-650' : 'border-emerald-500 hover:border-emerald-650';
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    const success = await copyToClipboard(value);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const len = value.length;

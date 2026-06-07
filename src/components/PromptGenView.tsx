@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X
-} from 'lucide-react';
+import { copyToClipboard as robustCopy } from '../utils';
 
 interface PromptGenViewProps {
   t: any;
@@ -221,27 +219,33 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t }) => {
     }
   };
 
-  const copySinglePrompt = (text: string, index: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndices(prev => ({ ...prev, [index]: true }));
-    setTimeout(() => {
-      setCopiedIndices(prev => ({ ...prev, [index]: false }));
-    }, 2000);
+  const copySinglePrompt = async (text: string, index: number) => {
+    const success = await robustCopy(text);
+    if (success) {
+      setCopiedIndices(prev => ({ ...prev, [index]: true }));
+      setTimeout(() => {
+        setCopiedIndices(prev => ({ ...prev, [index]: false }));
+      }, 2000);
+    }
   };
 
-  const copyAllPromptsText = () => {
+  const copyAllPromptsText = async () => {
     if (!result || !result.prompts || result.prompts.length === 0) return;
     const allText = result.prompts.join('\n\n');
-    navigator.clipboard.writeText(allText);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
+    const success = await robustCopy(allText);
+    if (success) {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    }
   };
 
-  const copyNegativeText = () => {
+  const copyNegativeText = async () => {
     if (!result || !result.negativePrompt) return;
-    navigator.clipboard.writeText(result.negativePrompt);
-    setCopiedNegative(true);
-    setTimeout(() => setCopiedNegative(false), 2500);
+    const success = await robustCopy(result.negativePrompt);
+    if (success) {
+      setCopiedNegative(true);
+      setTimeout(() => setCopiedNegative(false), 2500);
+    }
   };
 
   const downloadAsTxt = () => {

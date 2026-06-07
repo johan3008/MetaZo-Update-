@@ -21,6 +21,7 @@ import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { TRANSLATIONS, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
+import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
@@ -264,11 +265,13 @@ const CopyBox: React.FC<{
 }> = ({ label, value, onChange, isTextArea = false, themeColor = 'blue', showLengthRating = false }) => {
     const [copied, setCopied] = useState(false);
 
-    const handleCopy = () => {
+    const handleCopy = async () => {
         if (!value) return;
-        navigator.clipboard.writeText(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        const success = await copyToClipboard(value);
+        if (success) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
     const focusRingClass = themeColor === 'purple' 
@@ -373,11 +376,13 @@ const KeywordList: React.FC<{
     setDraggedIndex(null);
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!keywords.length) return;
-    navigator.clipboard.writeText(keywords.join(', '));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(keywords.join(', '));
+    if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleRemove = (index: number) => {

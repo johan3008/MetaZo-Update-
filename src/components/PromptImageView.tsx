@@ -6,6 +6,7 @@ import {
 interface PromptImageViewProps {
   t: any;
 }
+import { copyToClipboard as robustCopy } from '../utils';
 
 interface ImageItem {
   id: string;
@@ -186,10 +187,12 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const copyToClipboard = async (text: string, id: string) => {
+    const success = await robustCopy(text);
+    if (success) {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   return (
