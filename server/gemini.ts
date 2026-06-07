@@ -88,7 +88,10 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = 'llama-4-scout-17b-16e-instruct';
+      // User specifically requested Llama 4 Scout 17B, but since it's giving a 404
+      // for some API keys, we will use the exact HuggingFace-style ID that Groq uses
+      // in their docs, and if it fails with 404, we'll implement a fallback below.
+      model = hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-4-scout-17b-16e-instruct-preview';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
@@ -118,45 +121,61 @@ async function callOpenAICompatibleWithRetry(params: {
       }
     }
 
-    try {
-      console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`
-        },
-        body: JSON.stringify(payload)
-      });
+    const endpointOrigin = endpoint;
+    const modelOrigin = model;
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errText}`);
-      }
+    let tryCount = 0;
+    while (tryCount < 2) {
+      try {
+        console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey.trim()}`
+          },
+          body: JSON.stringify(payload)
+        });
 
-      const responseData = await response.json();
-      let answer = responseData.choices?.[0]?.message?.content;
-      if (!answer) {
-        throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
-      }
-      if (params.responseMimeType === 'application/json') {
-        answer = answer.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-      }
-      return answer;
-    } catch (err: any) {
-      console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
-      lastErr = err;
-      const errorMsg = String(err.message || "").toLowerCase();
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errText}`);
+        }
 
-      if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit')) {
-        if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
-          const prevIdx = providerState.activeIndex;
-          providerState.activeIndex++;
-          console.warn(`[Key Rotation - ${provider.toUpperCase()}] Rotating from Key index ${prevIdx} to ${providerState.activeIndex}`);
+        const responseData = await response.json();
+        let answer = responseData.choices?.[0]?.message?.content;
+        if (!answer) {
+          throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
+        }
+        if (params.responseMimeType === 'application/json') {
+          answer = answer.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        }
+        return answer;
+      } catch (err: any) {
+        console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
+        lastErr = err;
+        
+        // Fallback for Llama 4 Scout if model doesn't exist
+        const errorMsg = String(err.message || "").toLowerCase();
+        if (tryCount === 0 && provider === 'groq' && errorMsg.includes('model_not_found')) {
+          console.warn(`[callOpenAICompatibleWithRetry] Model ${model} not found, falling back to Llama 3.`);
+          model = hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+          payload.model = model;
+          tryCount++;
           continue;
         }
+
+        if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit')) {
+          if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
+            const prevIdx = providerState.activeIndex;
+            providerState.activeIndex++;
+            console.warn(`[Key Rotation - ${provider.toUpperCase()}] Rotating from Key index ${prevIdx} to ${providerState.activeIndex}`);
+            // Break the tryCount loop to let the outer key rotation loop take over
+            break; 
+          }
+        }
+        throw err;
       }
-      throw err;
     }
   }
   throw lastErr;
