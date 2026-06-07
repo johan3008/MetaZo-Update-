@@ -13,6 +13,7 @@ async function callOpenAICompatibleWithRetry(params: {
   systemInstruction?: string;
   contents: any;
   responseMimeType?: string;
+  responseSchema?: any;
 }): Promise<string> {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -98,10 +99,14 @@ async function callOpenAICompatibleWithRetry(params: {
     };
 
     if (params.responseMimeType === 'application/json') {
-      // payload.response_format = { type: 'json_object' };
-      // Most vision models (Groq's Llama 3.2 Vision, Pixtral) don't support JSON mode parameter.
-      // So we append the JSON instruction manually.
-      messages.push({ role: 'user', content: 'IMPORTANT: You MUST return ONLY valid JSON matching the requested schema. No conversational text.' });
+      if (provider === 'groq' && !hasImages) {
+        payload.response_format = { type: 'json_object' };
+      }
+      let schemaInstruction = 'IMPORTANT: You MUST return ONLY valid JSON. No conversational text.';
+      if (params.responseSchema) {
+        schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
+      }
+      messages.push({ role: 'user', content: schemaInstruction });
     }
 
     try {
@@ -159,7 +164,8 @@ function getAIClient(): any {
           const text = await callOpenAICompatibleWithRetry({
             systemInstruction: params.config?.systemInstruction,
             contents: params.contents,
-            responseMimeType: params.config?.responseMimeType
+            responseMimeType: params.config?.responseMimeType,
+            responseSchema: params.config?.responseSchema
           });
           return { text };
         }
