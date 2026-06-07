@@ -330,6 +330,14 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    const getProviderName = (): string => {
+        const store = apiKeyStorage.getStore();
+        const provider = (store && store.provider) || 'gemini';
+        if (provider === 'groq') return 'Groq';
+        if (provider === 'mistral') return 'Mistral';
+        return 'Gemini';
+    };
+
     app.post('/api/generate-metadata', async (req, res) => {
         try {
             const { frames, keywordCount, customPrompt, toolType } = req.body;
@@ -341,7 +349,7 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (e: any) {
             console.error('Server generate-metadata error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
-                res.status(429).json({ error: 'Kuota Gemini API terbatas. Silakan coba lagi nanti.' });
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating metadata' });
             }
@@ -359,7 +367,7 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (e: any) {
             console.error('Server generate-batch-metadata error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
-                res.status(429).json({ error: 'Kuota Gemini API terbatas. Silakan coba lagi nanti.' });
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating batch metadata' });
             }
@@ -386,7 +394,7 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (e: any) {
             console.error('Server generate-prompt error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
-                res.status(429).json({ error: 'Kuota Gemini API terbatas. Silakan coba lagi nanti.' });
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating optimized prompt' });
             }
@@ -432,7 +440,7 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (e: any) {
             console.error('Server analyze-video-keyword error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
-                res.status(429).json({ error: 'Kuota Gemini API terbatas. Silakan coba lagi nanti.' });
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error analyzing video keyword' });
             }
@@ -467,7 +475,7 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (e: any) {
             console.error('Server generate-hollywood-prompts error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
-                res.status(429).json({ error: 'Kuota Gemini API terbatas. Silakan coba lagi nanti.' });
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating Hollywood prompts' });
             }

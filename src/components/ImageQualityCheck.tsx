@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 interface QualityReport {
   check_list?: {
@@ -39,6 +39,15 @@ export const ImageQualityCheck: React.FC = () => {
 
   const toggleReportExpand = (fileName: string) => {
     setExpandedReports(prev => ({ ...prev, [fileName]: !prev[fileName] }));
+  };
+
+  const handleClearAll = () => {
+    Object.keys(previews).forEach(key => URL.revokeObjectURL(previews[key]));
+    setFiles([]);
+    setPreviews({});
+    setReports({});
+    setExpandedReports({});
+    setError(null);
   };
 
   const resizeAndProcess = (file: File): Promise<string> => {
@@ -158,14 +167,26 @@ export const ImageQualityCheck: React.FC = () => {
           </p>
         </div>
         
-        <button
-          onClick={handleAnalyze}
-          disabled={files.length === 0 || loading}
-          className="mt-3 md:mt-0 flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
-        >
-          {loading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
-          {loading ? 'Menganalisis...' : 'Analisis Kualitas (Batch)'}
-        </button>
+        <div className="mt-3 md:mt-0 flex items-center gap-3">
+          {(files.length > 0 || Object.keys(reports).length > 0) && (
+            <button
+              onClick={handleClearAll}
+              disabled={loading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-full text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all cursor-pointer border border-rose-500/10"
+            >
+              <Trash2 size={13} />
+              Clear All
+            </button>
+          )}
+          <button
+            onClick={handleAnalyze}
+            disabled={files.length === 0 || loading}
+            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+          >
+            {loading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+            {loading ? 'Menganalisis...' : 'Analisis Kualitas (Batch)'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
@@ -190,7 +211,17 @@ export const ImageQualityCheck: React.FC = () => {
 
             {files.length > 0 && (
               <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-4 space-y-2 border border-slate-100 dark:border-white/5">
-                <h4 className="font-black text-[10px] uppercase text-slate-500">File Dalam Antrian ({files.length})</h4>
+                <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-white/5 pb-1.5">
+                  <h4 className="font-black text-[10px] uppercase text-slate-500">File Dalam Antrian ({files.length})</h4>
+                  <button
+                    onClick={handleClearAll}
+                    disabled={loading}
+                    className="text-[10px] text-rose-500 hover:text-rose-650 font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Trash2 size={10} />
+                    Clear All
+                  </button>
+                </div>
                 <div className="max-h-[250px] overflow-y-auto space-y-2 custom-scrollbar">
                   {files.map((file) => (
                     <div key={file.name} className="flex items-center gap-2.5 text-[10px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 p-1.5 rounded-xl">
