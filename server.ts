@@ -304,11 +304,13 @@ app.get('/api/debug-uploads', (req, res) => {
                 if (data.choices?.[0]?.message?.content) {
                     return res.json({ success: true, message: 'Groq API Key valid!' });
                 }
+                return res.status(500).json({ error: 'Format JSON dari Groq tidak valid' });
             }
             const errText = await response.text();
+            console.error('Groq test HTTP error status:', response.status, 'text:', errText);
             return res.status(400).json({ error: `Gagal verifikasi Groq: ${errText}` });
         } catch (e: any) {
-            console.error('Test Groq API Key error:', e);
+            console.error('Test Groq API Key error exception:', e);
             res.status(500).json({ error: e.message || 'Error testing Groq API Key' });
         }
     });

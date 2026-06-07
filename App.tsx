@@ -2277,7 +2277,9 @@ const App: React.FC = () => {
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
                                 
                                 {testResult && (
-                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
                                     testResult.type === 'success' 
                                       ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
                                       : testResult.type === 'quota'
@@ -2367,7 +2369,9 @@ const App: React.FC = () => {
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
                                 
                                 {testResult && (
-                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
                                     testResult.type === 'success' 
                                       ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
                                       : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
@@ -2455,7 +2459,9 @@ const App: React.FC = () => {
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
                                 
                                 {testResult && (
-                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
                                     testResult.type === 'success' 
                                       ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
                                       : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
