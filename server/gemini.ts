@@ -88,7 +88,7 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = hasImages ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
+      model = 'llama-4-scout-17b-16e-instruct';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
@@ -101,9 +101,6 @@ async function callOpenAICompatibleWithRetry(params: {
     };
 
     if (params.responseMimeType === 'application/json') {
-      if (provider === 'groq' && !hasImages) {
-        payload.response_format = { type: 'json_object' };
-      }
       let schemaInstruction = '\\n\\nIMPORTANT: You MUST return ONLY valid JSON. No conversational text.';
       if (params.responseSchema) {
         schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
@@ -774,12 +771,12 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attempts + 1}/${maxAttempts})...`);
         const response = await getAIClient().models.generateContent({
           model: modelName,
-          contents: { parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".` }] },
+          contents: { parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }] },
           config: {
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.95
+            temperature: 0.85
           }
         });
 
