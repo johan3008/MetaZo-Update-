@@ -16,6 +16,7 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@google/genai": "^1.41.0",
+    "copy-to-clipboard": "^4.0.2",
     "express": "^5.2.1",
     "lucide-react": "^0.574.0",
     "motion": "^12.40.0",
