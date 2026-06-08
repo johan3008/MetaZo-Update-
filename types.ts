@@ -81,3 +81,12 @@ export interface VideoPrompt {
   camera_movement: string;
   style: 'cinematic' | 'documentary';
 }
+
+export interface MarketTrend {
+  keyword: string;
+  searchVolumeLevel: 'Very High' | 'High' | 'Medium' | 'Low';
+  searchVolumeScore: number;
+  totalSupply: number;
+  opportunityScore: number;
+  statusBadge: 'Excellent' | 'High Potential' | 'Moderate' | 'Oversaturated';
+}

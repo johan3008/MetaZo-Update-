@@ -5,7 +5,6 @@ import {
   AlertTriangle, Clock, HelpCircle
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
-import { SyncGitHubPanel } from './SyncGitHubPanel';
 
 interface DashboardViewProps {
   files: FileItem[];
@@ -240,13 +239,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase text-center mt-6">
-            Dikelola secara dinamis berbasis data runtime
-          </p>
-          
-          <div className="mt-4">
-             <SyncGitHubPanel filesLength={totalFiles} />
-          </div>
         </div>
 
         {/* FILE DISTRIBUTION GRID */}

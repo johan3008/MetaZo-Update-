@@ -1734,8 +1734,11 @@ Perform evaluation strictly across these rules:
 
 3. TEXT, DETAIL & Upscaling INTEGRITY:
 - Deteksi Teks di Gambar: Tolak jika ada teks buatan AI yang tidak fungsional, rusak, terbalik, atau tidak memiliki arti (gibberish text). Adobe Stock melarang teks yang tidak fungsional pada gambar komersial.
-- Detail Tekstur: Periksa apakah gambar dipaksa diperbesar (upscaled) hingga tekstur menjadi blur, pecah, atau kehilangan detail aslinya (oil-paint look). Detail krusial seperti pori kulit, serat kain, atau detail subjek harus tajam, bukan hasil 'faking' dari scaling.
-- Jika ditemukan salah satu saja -> set "broken_text_and_oil_paint" to "FAILED".
+- Detail Tekstur & Upscaling: Periksa apakah gambar dipaksa diperbesar (upscaled) hingga tekstur menjadi blur, pecah, atau kehilangan detail aslinya (smeared lines / unnatural clay-like look). 
+  * CATATAN: Bedakan antara "Artistic Oil Painting Style" (yang memang sengaja memiliki tekstur kuas) dengan "Low Quality Upscaling Artifacts" (yang terlihat kotor, blur, dan tidak tajam). 
+  * Jika gambar adalah foto asli atau 3D render yang seharusnya tajam tapi terlihat 'smeary' atau 'waxy' karena upscaling buruk -> set "FAILED". 
+  * Jika gambar memuat teks AI yang tidak terbaca -> set "FAILED".
+- Jika ditemukan salah satu saja kegagalan teknis di atas -> set "broken_text_and_oil_paint" to "FAILED".
 
 4. ISOLATION, FRAMING & COMPOSITION:
 - Framing: Tolak jika subjek utama terpotong secara tidak sengaja di bagian pinggir frame (clipping) tanpa alasan estetis yang jelas.
