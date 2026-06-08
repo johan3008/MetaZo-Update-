@@ -294,94 +294,48 @@ export const ImageQualityCheck: React.FC = () => {
                     )}
 
                     {/* Knockout Validation Status Indicators */}
-                    <div className="space-y-1.5">
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">TECHNICAL AUDIT</p>
-                      <div className="grid grid-cols-1 gap-1.5 text-[10px]">
-                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
-                          hasArtifacts 
-                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
-                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
-                        }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Artifacts & Noise</span>
-                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasArtifacts ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasArtifacts ? 'FAILED' : 'PASSED'}
-                          </span>
-                        </div>
-                        
-                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
-                          hasIpViolations 
-                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
-                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
-                        }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Intellectual Property & Logos</span>
-                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasIpViolations ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasIpViolations ? 'FAILED' : 'PASSED'}
-                          </span>
-                        </div>
-
-                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
-                          hasBrokenText 
-                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
-                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
-                        }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Broken Text & Oil Paint</span>
-                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasBrokenText ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasBrokenText ? 'FAILED' : 'PASSED'}
-                          </span>
-                        </div>
-
-                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
-                          hasBadFraming 
-                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
-                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
-                        }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Bad Framing & Clipping</span>
-                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasBadFraming ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasBadFraming ? 'FAILED' : 'PASSED'}
-                          </span>
-                        </div>
-
-                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
-                          hasSpam 
-                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
-                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
-                        }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Similar Content & Spam</span>
-                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasSpam ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasSpam ? 'FAILED' : 'PASSED'}
-                          </span>
-                        </div>
-
-                        <div className={`p-2 rounded-lg border flex items-center justify-between transition-all ${
-                          hasAiPolicyViolations 
-                            ? 'bg-red-50/60 dark:bg-red-500/5 border-red-100 dark:border-red-500/10' 
-                            : 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10'
-                        }`}>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Generative AI Policies</span>
-                          <span className={`font-black uppercase tracking-wider text-[10px] ${hasAiPolicyViolations ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {hasAiPolicyViolations ? 'FAILED' : 'PASSED'}
-                          </span>
-                        </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">TECHNICAL AUDIT</p>
+                      <div className="grid grid-cols-1 gap-2 text-[11px]">
+                        {[
+                          { label: 'Artifacts & Noise', failed: hasArtifacts },
+                          { label: 'Intellectual Property', failed: hasIpViolations },
+                          { label: 'Broken Text & Oil Paint', failed: hasBrokenText },
+                          { label: 'Framing & Clipping', failed: hasBadFraming },
+                          { label: 'Spam/Duplicate', failed: hasSpam },
+                          { label: 'AI Policies', failed: hasAiPolicyViolations },
+                        ].map((item) => (
+                          <div key={item.label} className={`px-3 py-2 rounded-lg flex items-center justify-between border ${
+                            item.failed 
+                              ? 'bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30' 
+                              : 'bg-slate-50 border-slate-100 dark:bg-slate-800 dark:border-slate-700/50'
+                          }`}>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">{item.label}</span>
+                            <span className={`font-black uppercase text-[9px] ${item.failed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                              {item.failed ? 'FAIL' : 'PASS'}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                     
                     {assetType && (
                       <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <div className="bg-white dark:bg-slate-900 rounded-lg p-2 shadow-sm border border-slate-100 dark:border-transparent">
-                          <p className="text-slate-400 uppercase">AI Generated</p>
-                          <p className="font-black text-slate-800 dark:text-slate-200 text-sm tracking-tight">{assetType.is_ai_generated ? "Yes" : "No"}</p>
+                        <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-2.5">
+                          <p className="text-slate-400 font-semibold uppercase mb-0.5">AI Generated</p>
+                          <p className="font-black text-slate-800 dark:text-slate-200 text-xs">{assetType.is_ai_generated ? "Yes" : "No"}</p>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-lg p-2 shadow-sm border border-slate-100 dark:border-transparent">
-                          <p className="text-slate-400 uppercase">Category</p>
-                          <p className="font-black text-slate-800 dark:text-slate-200 text-sm tracking-tight uppercase">{assetType.correct_category}</p>
+                        <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-2.5">
+                          <p className="text-slate-400 font-semibold uppercase mb-0.5">Category</p>
+                          <p className="font-black text-slate-800 dark:text-slate-200 text-xs uppercase">{assetType.correct_category}</p>
                         </div>
                       </div>
                     )}
                     
                     {displayStatus === 'REJECTED' && rReason && (
-                      <div className="p-2.5 bg-red-50/50 dark:bg-red-500/5 rounded-lg border border-red-100/50 dark:border-red-500/10">
-                        <p className="text-[9px] font-black uppercase text-red-600 dark:text-red-400 mb-1">Rejection Reason</p>
-                        <p className="text-[10px] font-bold text-red-700 dark:text-red-300 uppercase">{rReason}</p>
+                      <div className="p-3 bg-rose-50/70 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 rounded-lg">
+                        <p className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 mb-1">Rejection Reason</p>
+                        <p className="text-[10px] font-medium text-rose-800 dark:text-rose-300">{rReason}</p>
                       </div>
                     )}
                   </div>

@@ -1517,31 +1517,34 @@ You must be extremely strict, objective, and follow a knockout (sistem gugur) va
 *** SISTEM GUGUR (KNOCKOUT VALIDATION) RULES ***
 Perform evaluation strictly across these rules:
 
-1. ARTIFACT & AI GENERATION ERROR:
-- Deteksi adanya: 'wavy lines' (garis bergelombang aneh), distorsi anatomi (jari tangan/kaki/anggota tubuh abnormal), sensasi 'plastik/lilin' yang berlebihan, atau noise kasar di area shadow.
+1. ARTIFACT, AI ERRORS & TECHNICAL QUALITY:
+- Deteksi adanya posterisasi banding (terutama di area gradasi seperti langit), chromatic aberration (fringing pada objek kontras tinggi), artefak kompresi, dan digital noise kasar pada area shadow.
+- Deteksi sensasi 'plastik/lilin' yang berlebihan, distorsi anatomi abnormal (jari tangan, sendi), dan inkonsistensi struktur fisik.
 - Jika ditemukan salah satu saja -> set "artifacts_and_noise" to "FAILED".
 
-2. INTELLECTUAL PROPERTY (IP):
-- Deteksi adanya: Logo (meski kecil/samar), pola pakaian bermerek, desain produk ikonik (seperti kamera, mobil, smartphone yang khas), atau wajah orang yang terlihat jelas tanpa model release.
+2. INTELLECTUAL PROPERTY (IP) & COMMERCIAL FEASIBILITY:
+- Deteksi adanya: Logo (meski kecil/samar), pola pakaian bermerek, desain produk ikonik (seperti kamera, mobil, jam tangan, smartphone yang spesifik), atau wajah orang yang terlihat jelas tanpa model release yang valid.
+- Adobe Stock mengutamakan aset yang siap jual (ready-to-use). Tolak jika gambar penuh dengan elemen yang memerlukan penghapusan mahal (retouching intensive).
 - Jika ditemukan salah satu saja -> set "intellectual_property_and_logos" to "FAILED".
 
-3. TEXT & METADATA INTEGRITY:
-- Deteksi Teks di Gambar: Tolak jika ada teks buatan AI yang bentuknya rusak, terbalik, atau tidak memiliki arti (gibberish text). Adobe Stock melarang teks yang tidak fungsional pada gambar komersial.
-- Upscaling Artifacts: Periksa apakah gambar dipaksa diperbesar (upscaled) hingga teksturnya menjadi blur, pecah, atau seperti lukisan cat minyak yang kehilangan detail asli (oil-paint effect).
+3. TEXT, DETAIL & Upscaling INTEGRITY:
+- Deteksi Teks di Gambar: Tolak jika ada teks buatan AI yang tidak fungsional, rusak, terbalik, atau tidak memiliki arti (gibberish text). Adobe Stock melarang teks yang tidak fungsional pada gambar komersial.
+- Detail Tekstur: Periksa apakah gambar dipaksa diperbesar (upscaled) hingga tekstur menjadi blur, pecah, atau kehilangan detail aslinya (oil-paint look). Detail krusial seperti pori kulit, serat kain, atau detail subjek harus tajam, bukan hasil 'faking' dari scaling.
 - Jika ditemukan salah satu saja -> set "broken_text_and_oil_paint" to "FAILED".
 
-4. ISOLATION & FRAMING ERROR:
-- Tolak jika subjek utama terpotong secara tidak sengaja di bagian pinggir frame (misal: ujung kepala atau ujung produk terpotong sedikit tanpa alasan estetis).
-- Tolak jika gambar memiliki "border" atau bingkai hitam/putih buatan di pinggirnya.
+4. ISOLATION, FRAMING & COMPOSITION:
+- Framing: Tolak jika subjek utama terpotong secara tidak sengaja di bagian pinggir frame (clipping) tanpa alasan estetis yang jelas.
+- Artefak Bingkai: Tolak jika gambar memiliki "border", bingkai hitam/putih, atau garis buatan di pinggirnya.
+- Composition: Pastikan komposisi memiliki titik fokus yang jelas dan proporsional.
 - Jika ditemukan salah satu saja -> set "bad_framing_and_clipping" to "FAILED".
 
 5. SIMILAR CONTENT (SPAM FILTER):
-- Jika kontributor mengunggah banyak gambar sekaligus, deteksi apakah gambar ini hanya sekadar ganti warna (recolor) atau hanya geser sudut kamera sedikit (perubahan sudut minimal). Adobe Stock melarang "spamming" konten yang hampir identik.
+- Jika kontributor mengunggah banyak gambar sekaligus, deteksi apakah gambar ini hanya sekadar ganti warna (recolor), atau hanya geser sudut kamera sedikit (perubahan sudut minimal). Adobe Stock melarang "spamming" konten yang hampir identik atau variasi yang tidak bernilai tambah.
 - Jika dicurigai spam -> set "similar_content_and_spam" to "FAILED".
 
-6. GENERATIVE AI STRICT RULES:
-- Ilustrasi Realistis: Gambar yang dibuat menyerupai foto asli (fotorealistis) WAJIB dikategorikan sebagai "Illustrations", bukan "Photos". Tolak jika AI mendeteksi gambar tersebut mencoba meniru foto asli tetapi detailnya masih terlihat artifisial.
-- Judul & Tagging: Tolak jika kontributor tidak menyertakan kata kunci wajib seperti "Generative AI", "AI Generated", atau "Illustration" pada data asetnya. Adobe Stock mewajibkan transparansi penuh untuk konten AI.
+6. GENERATIVE AI STRICT POLICIES:
+- Categorization: AI-generated images menyerupai foto asli (fotorealistis) WAJIB dikategorikan sebagai "Illustrations", bukan "Photos". Tolak jika gambar mencoba meniru foto asli tetapi detailnya masih terlihat artifisial atau cacat.
+- AI Labeling: Tolak jika gambar tidak mengusung estetika yang sesuai untuk penggunaan komersial AI (misal: cacat anatomis parah). Transparansi adalah kewajiban.
 - Jika melanggar salah satu aturan ini -> set "generative_ai_policies" to "FAILED".
 
 DECISION TREE / SISTEM GUGUR LOGIC:

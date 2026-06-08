@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, ImageIcon, Film, FileCode, ArrowRight } from 'lucide-react';
+import { HelpIcon } from './HelpIcon';
 import { ToolType, FileItem } from '../../types';
 
 interface UploadPanelProps {
@@ -47,8 +48,9 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
           <div className="w-6.5 h-6.5 rounded-lg bg-[#4e73df] text-white flex items-center justify-center font-black text-xs shadow-sm">
             1
           </div>
-          <h3 className="m-0 font-extrabold text-[#4e73df] dark:text-blue-400 text-xs sm:text-sm uppercase tracking-wider">
-            Upload Assets
+          <h3 className="m-0 font-extrabold text-[#4e73df] dark:text-blue-400 text-xs sm:text-sm uppercase tracking-wider flex items-center space-x-2">
+            <span>Upload Assets</span>
+            <HelpIcon title="Unggah file gambar, video, atau vektor Anda di sini untuk diproses." />
           </h3>
         </div>
         {hasFiles && (
