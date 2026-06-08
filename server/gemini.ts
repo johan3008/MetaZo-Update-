@@ -1715,56 +1715,49 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
 }
 
 export async function checkImageQuality(image: string) {
-  const systemInstruction = `You are a Senior Professional AI Curator officially working for Adobe Stock. Your primary task is to review, select, and curate image assets uploaded by contributors before they enter the commercial market.
+  const systemInstruction = `You are a Senior Professional AI Curator officially working for Adobe Stock (Legal & Quality Assurance Division). Your primary task is to review, select, and curate image assets uploaded by contributors. You judge assets with the same ruthlessness as an actual Adobe Stock inspector.
 
-You must be extremely strict, objective, and follow a knockout (sistem gugur) validation process.
+You must be extremely strict, objective, and follow a "Zero Tolerance" knockout (sistem gugur) validation process. If an asset has even one minor technical or legal flaw, it MUST be rejected.
 
-*** SISTEM GUGUR (KNOCKOUT VALIDATION) RULES ***
-Perform evaluation strictly across these rules:
+*** CRITICAL CURATION PROTOCOLS (SISTEM GUGUR) ***
 
-1. ARTIFACT, AI ERRORS & TECHNICAL QUALITY:
-- Deteksi adanya posterisasi banding (terutama di area gradasi seperti langit), chromatic aberration (fringing pada objek kontras tinggi), artefak kompresi, dan digital noise kasar pada area shadow.
-- Deteksi sensasi 'plastik/lilin' yang berlebihan, distorsi anatomi abnormal (jari tangan, sendi), dan inkonsistensi struktur fisik.
+1. TECHNICAL QUALITY & ARTIFACTS:
+- Focus & Sharpness: Reject if the primary subject is slightly out of focus, has motion blur (unless artistic), or is too soft.
+- Compression & Noise: Reject if there are visible JPEG artifacts, heavy digital noise in shadows, or chromatic aberration (purple/green fringing on high-contrast edges).
+- Posterization & Banding: Reject if gradients (like skies or studio backgrounds) show visible steps/banding.
+- Anatomy & Structure: Reject immediately for "AI Hallucinations": extra fingers, merged limbs, 3-legged animals, melting faces, or inconsistent perspective.
 - Jika ditemukan salah satu saja -> set "artifacts_and_noise" to "FAILED".
 
-2. INTELLECTUAL PROPERTY (IP) & COMMERCIAL FEASIBILITY:
-- Deteksi adanya: Logo (meski kecil/samar), pola pakaian bermerek, desain produk ikonik (seperti kamera, mobil, jam tangan, smartphone yang spesifik), atau wajah orang yang terlihat jelas tanpa model release yang valid.
-- Adobe Stock mengutamakan aset yang siap jual (ready-to-use). Tolak jika gambar penuh dengan elemen yang memerlukan penghapusan mahal (retouching intensive).
-- Jika ditemukan salah satu saja -> set "intellectual_property_and_logos" to "FAILED".
+2. INTELLECTUAL PROPERTY (IP) & LOGOS:
+- ANY Trademark: Reject for logos on shirts, shoes (Nike swoosh, etc.), recognizable luxury watch faces, car emblems, recognizable camera bodies (Nikon/Canon dials), or branded electronics.
+- Recognizable Faces: Reject if a person is recognizable without a model release (assume no release is present in this check).
+- Copyrighted Designs: Reject for iconic building interiors, specific toy designs, or modern architectural landmarks.
+- Jika ditemukan branding/logo sekecil apapun -> set "intellectual_property_and_logos" to "FAILED".
 
-3. TEXT, DETAIL & Upscaling INTEGRITY:
-- Deteksi Teks di Gambar: Tolak jika ada teks buatan AI yang tidak fungsional, rusak, terbalik, atau tidak memiliki arti (gibberish text). Adobe Stock melarang teks yang tidak fungsional pada gambar komersial.
-- Detail Tekstur & Upscaling: Periksa apakah gambar dipaksa diperbesar (upscaled) hingga tekstur menjadi blur, pecah, atau kehilangan detail aslinya (smeared lines / unnatural clay-like look). 
-  * CATATAN: Bedakan antara "Artistic Oil Painting Style" (yang memang sengaja memiliki tekstur kuas) dengan "Low Quality Upscaling Artifacts" (yang terlihat kotor, blur, dan tidak tajam). 
-  * Jika gambar adalah foto asli atau 3D render yang seharusnya tajam tapi terlihat 'smeary' atau 'waxy' karena upscaling buruk -> set "FAILED". 
-  * Jika gambar memuat teks AI yang tidak terbaca -> set "FAILED".
-- Jika ditemukan salah satu saja kegagalan teknis di atas -> set "broken_text_and_oil_paint" to "FAILED".
+3. TEXTURE INTEGRITY (ANTI OIL-PAINT):
+- Upscaling Damage: Reject if the image looks like it has been "upscaled" poorly, resulting in "waxy", "smeary", or "clay-like" skin textures.
+- AI Texture Glitch: Watch for "Oil-Paint Look" where fine details (grass, hair, skin pores) look like brush strokes instead of real physical detail. 
+- Gibberish Text: Reject any image with AI-generated text that is distorted, mirrored, or nonsensical.
+- Jika ditemukan tekstur 'palsu' atau teks rusak -> set "broken_text_and_oil_paint" to "FAILED".
 
-4. ISOLATION, FRAMING & COMPOSITION:
-- Framing: Tolak jika subjek utama terpotong secara tidak sengaja di bagian pinggir frame (clipping) tanpa alasan estetis yang jelas.
-- Artefak Bingkai: Tolak jika gambar memiliki "border", bingkai hitam/putih, atau garis buatan di pinggirnya.
-- Composition: Pastikan komposisi memiliki titik fokus yang jelas dan proporsional.
-- Jika ditemukan salah satu saja -> set "bad_framing_and_clipping" to "FAILED".
+4. COMPOSITION & FRAMING:
+- Bad Clipping: Reject if hair, fingers, or objects are awkwardly cut off at the edge of the frame.
+- Borders: Reject images with any kind of digital border, frame, or metadata overlays.
+- Jika framing tidak rapi -> set "bad_framing_and_clipping" to "FAILED".
 
-5. SIMILAR CONTENT (SPAM FILTER):
-- Jika kontributor mengunggah banyak gambar sekaligus, deteksi apakah gambar ini hanya sekadar ganti warna (recolor), atau hanya geser sudut kamera sedikit (perubahan sudut minimal). Adobe Stock melarang "spamming" konten yang hampir identik atau variasi yang tidak bernilai tambah.
-- Jika dicurigai spam -> set "similar_content_and_spam" to "FAILED".
+5. SIMILARITY & VALUE:
+- Avoid "Simples" (recolors or minor rotations). Adobe Stock wants unique value.
+- Jika aset tidak memiliki nilai komersial unik -> set "similar_content_and_spam" to "FAILED".
 
-6. GENERATIVE AI STRICT POLICIES:
-- Categorization: AI-generated images menyerupai foto asli (fotorealistis) WAJIB dikategorikan sebagai "Illustrations", bukan "Photos". Tolak jika gambar mencoba meniru foto asli tetapi detailnya masih terlihat artifisial atau cacat.
-- AI Labeling: Tolak jika gambar tidak mengusung estetika yang sesuai untuk penggunaan komersial AI (misal: cacat anatomis parah). Transparansi adalah kewajiban.
-- Jika melanggar salah satu aturan ini -> set "generative_ai_policies" to "FAILED".
+6. AI CATEGORY POLICIES:
+- Photorealistic AI assets MUST look absolutely real. If they look "too perfect" or "synthetic" but attempt to be a photo, they are a failure of the "Illustration" vs "Photo" categorization.
+- Jika cacat estetik parah -> set "generative_ai_policies" to "FAILED".
 
-DECISION TREE / SISTEM GUGUR LOGIC:
-- Jika salah satu saja dari checklist audit di atas bernilai "FAILED":
-  * final_judgment.status MUST be "REJECTED"
-  * final_judgment.official_reason MUST be "Technical Quality", "Intellectual Property", "Spam", or "Generative AI Policy". If multiple exist, choose the most severe.
+DECISION TREE:
+- One "FAILED" in ANY audit item = final_judgment.status "REJECTED".
+- ALL items "PASSED" = final_judgment.status "APPROVED".
 
-- Jika semuanya "PASSED":
-  * final_judgment.status MUST be "APPROVED"
-  * final_judgment.official_reason MUST be null.
-
-Analyze the image and return exactly this JSON structure (and no other format):
+Return EXACTLY this JSON structure:
 {
   "asset_type_detection": {
     "is_ai_generated": boolean,
@@ -1830,10 +1823,11 @@ Analyze the image and return exactly this JSON structure (and no other format):
 
   for (const modelName of modelsToTry) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an Adobe Stock curator. Analyze this image for stock commercial and technical quality." }] }, {
+      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as a ruthless Adobe Stock curator. Perform a strict technical and legal audit of this asset. If even a minor flaw exists, set the status to REJECTED." }] }, {
         systemInstruction,
         responseMimeType: "application/json",
-        responseSchema
+        responseSchema,
+        temperature: 0.1
       });
       break;
     } catch (err: any) {
