@@ -8,7 +8,8 @@ export enum ToolType {
   PROMPT_IMAGE = 'prompt_image',
   PROMPT_VIDEO = 'prompt_video',
   PROMPT_IMAGE_CHECK = 'prompt_image_check',
-  VECTOR_EPS = 'vector_eps'
+  VECTOR_EPS = 'vector_eps',
+  CALENDAR_GEN = 'calendar_gen'
 }
 
 export enum GenerationMode {

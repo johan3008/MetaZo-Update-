@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import LogoImage from '../assets/images/metazo_new_logo_1780881376762.png';
+import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
-  ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle
+  ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
+  Calendar
 } from 'lucide-react';
 import { ToolType, GenerationMode } from '../../types';
 
@@ -240,6 +241,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <CheckCircle size={16} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-300"} />
               {!sidebarCollapsed && <span>Image Check</span>}
+            </button>
+
+            <button 
+              onClick={() => handleNavClick(ToolType.CALENDAR_GEN)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.CALENDAR_GEN 
+                  ? "bg-white/15 text-white active:scale-95 border-l-4 border-emerald-400" 
+                  : "text-slate-100/75 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Calendar size={16} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-300"} />
+              {!sidebarCollapsed && <span>Calendar Gen</span>}
             </button>
           </nav>
         </div>
@@ -503,6 +516,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <CheckCircle size={14} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-300"} />
                       <span>Image Check</span>
                     </button>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.CALENDAR_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                        activeTool === ToolType.CALENDAR_GEN 
+                          ? "bg-white/20 text-white border-l-4 border-emerald-400" 
+                          : "text-slate-100/75 hover:bg-white/5"
+                      }`}
+                    >
+                      <Calendar size={14} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-300"} />
+                      <span>Calendar Gen</span>
+                    </button>
                   </nav>
                 </div>
 
@@ -524,9 +549,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
             
-            <a href={t.whatsapp_link} target="_blank" rel="noopener noreferrer" className="w-full text-center py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl">
-              {t.help_button}
-            </a>
+            <div className="space-y-2 mt-4">
+              <a href={t.whatsapp_link} target="_blank" rel="noopener noreferrer" className="w-full text-center py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl flex items-center justify-center space-x-2">
+                <MessageCircle size={14} />
+                <span>{t.help_button}</span>
+              </a>
+            </div>
           </div>
         </div>
       )}

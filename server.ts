@@ -5,7 +5,7 @@ import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords } from './server/gemini.ts';
 import { GoogleGenAI } from '@google/genai';
 
 // TRICK: Strict Queue to prevent Server OOM.
@@ -500,6 +500,42 @@ app.get('/api/debug-uploads', (req, res) => {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating Hollywood prompts' });
+            }
+        }
+    });
+
+    app.post('/api/generate-calendar-events', async (req, res) => {
+        try {
+            const { month } = req.body;
+            if (!month) {
+                return res.status(400).json({ error: 'Missing month field' });
+            }
+            const events = await generateCalendarEvents(month);
+            res.json(events);
+        } catch (e: any) {
+            console.error('Server generate-calendar-events error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error generating calendar events' });
+            }
+        }
+    });
+
+    app.post('/api/generate-event-keywords', async (req, res) => {
+        try {
+            const { eventName, eventDetails } = req.body;
+            if (!eventName) {
+                return res.status(400).json({ error: 'Missing eventName field' });
+            }
+            const data = await generateEventKeywords(eventName, eventDetails || '');
+            res.json(data);
+        } catch (e: any) {
+            console.error('Server generate-event-keywords error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error generating keywords' });
             }
         }
     });

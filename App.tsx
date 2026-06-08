@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, 
+  Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
   Plus, Key
@@ -19,6 +19,7 @@ import { PromptGenView } from './src/components/PromptGenView';
 import { PromptImageView } from './src/components/PromptImageView';
 import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
+import { CalendarGenView } from './src/components/CalendarGenView';
 import { TRANSLATIONS, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
@@ -856,6 +857,7 @@ const App: React.FC = () => {
     return 'light';
   });
   const [activeTool, setActiveTool] = useState<ToolType>(ToolType.DASHBOARD);
+  const [prefilledSubject, setPrefilledSubject] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const filesRef = useRef<FileItem[]>([]);
   
@@ -1949,13 +1951,20 @@ const App: React.FC = () => {
               generationMode={generationMode}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
-            <PromptGenView t={t} />
+            <PromptGenView t={t} prefilledSubject={prefilledSubject} onPrefillConsumed={() => setPrefilledSubject('')} />
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
             <PromptImageView t={t} />
           ) : activeTool === ToolType.PROMPT_VIDEO ? (
             <PromptVideoView />
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
             <ImageCheckView />
+          ) : activeTool === ToolType.CALENDAR_GEN ? (
+            <CalendarGenView 
+              onSendToPrompt={(text) => {
+                setPrefilledSubject(text);
+                setActiveTool(ToolType.PROMPT_GEN);
+              }} 
+            />
           ) : (
             <>
               {/* Welcome Intro Row */}
@@ -2146,24 +2155,21 @@ const App: React.FC = () => {
                     <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Setelah diunggah, klik <strong className="text-slate-700 dark:text-slate-300">Process Metadata</strong>. Mesin AI Vision kami akan menganalisis konten visual untuk menghasilkan Judul, Deskripsi, dan Kategori secara otomatis.</p>
                   </li>
                   <li>
-                    <strong className="text-slate-800 dark:text-white">Review & Penataan Keyword (New!)</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Pada segmen peninjauan, Anda dapat <strong>seret-dan-letakkan (drag & drop) keyword</strong> Anda untuk mengatur ulang prioritas tag agar lebih relevan dengan hasil pencarian (SEO).</p>
+                    <strong className="text-slate-800 dark:text-white">Prompt Gen & Image AI (Terintegrasi!)</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-bold italic text-blue-500 bg-blue-500/5 p-1 rounded">Fitur Prompt Gen kini terintegrasi dengan Calendar Gen untuk memudahkan pembuatan konten stok berdasarkan event terpopuler.</p>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-1">Gunakan fitur <strong className="text-pink-500">Prompt Gen</strong> untuk menghasilkan deskripsi visual yang mendalam untuk AI Art.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Image Check (QC)</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Pastikan aset Anda bebas dari pelanggaran IP, logo, dan noise berlebih dengan fitur <strong className="text-emerald-500">Image Check</strong> sebelum diunggah ke agency.</p>
+                  </li>
+                  <li>
+                    <strong className="text-slate-800 dark:text-white">Calendar Gen (Niche Hunter)</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Temukan event-event penting di masa depan secara global untuk membantu Anda menentukan tema produksi konten stok yang sedang dicari buyer.</p>
                   </li>
                   <li>
                     <strong className="text-slate-800 dark:text-white">Export & Download</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Verifikasi hasil akhir pada tabel Review. Setelah sesuai, gunakan fitur Export untuk mengunduh metadata dalam format CSV yang kompatibel dengan Adobe Stock, Shutterstock, dll.</p>
-                  </li>
-                  <li>
-                    <strong className="text-slate-800 dark:text-white">Ekspor Massal (Bulk Export)</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan platform tujuan (Adobe Stock, Shutterstock, Freepik, Vecteezy, Canva) di panel ekspor, lalu unduh CSV kompilasi yang siap sedia diunggah ke portal kontributor Anda.</p>
-                  </li>
-                  <li>
-                    <strong className="text-slate-800 dark:text-white">Prompt Gen & Image AI</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Gunakan fitur <strong className="text-pink-500">Prompt Gen</strong> untuk menghasilkan deskripsi visual yang mendalam untuk AI Art. Pilih kategori gaya seperti <strong className="text-blue-500">3D CGI</strong> atau <strong className="text-emerald-500">Cinematic</strong> untuk hasil maksimal pada Midjourney, DALL-E, atau Stable Diffusion.</p>
-                  </li>
-                  <li>
-                    <strong className="text-slate-800 dark:text-white">Bantuan & Komunitas</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Butuh bantuan? Bergabunglah dengan <strong className="text-emerald-500">Grup WhatsApp</strong> kami melalui tombol di sidebar untuk berdiskusi dan mendapatkan update terbaru langsung dari pengembang.</p>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Setelah sesuai, gunakan fitur Export untuk mengunduh metadata dalam format CSV yang kompatibel dengan Adobe Stock, Shutterstock, dll.</p>
                   </li>
                 </ol>
               </div>

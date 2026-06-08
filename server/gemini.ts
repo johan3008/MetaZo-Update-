@@ -885,6 +885,16 @@ export const generateOptimizedPrompt = async (options: {
 
   const count = Math.min(Math.max(variation, 10), 150);
 
+  // ELEMEN KEJUTAN (Surprise Element) - Random Salt Injection
+  const daftarCuaca = ["hujan deras", "kabut tebal", "matahari terbenam", "badai petir", "salju", "sinar fajar", "gerimis tipis", "pelangi muncul", "kilat di kejauhan", "embun pagi"];
+  const daftarSuasana = ["sinematik", "dramatis", "tenang", "penuh aksi", "misterius", "epik", "nostalgia", "futuristik", "melankolis", "ceria"];
+  
+  const cuacaAcak = daftarCuaca[Math.floor(Math.random() * daftarCuaca.length)];
+  const suasanaAcak = daftarSuasana[Math.floor(Math.random() * daftarSuasana.length)];
+  const angkaAcak = Math.floor(Math.random() * 10000);
+  
+  const randomSaltInjection = `[Suntikan Variasi Acak: ${cuacaAcak}, suasana ${suasanaAcak}, ID Unik: ${angkaAcak}]`;
+
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
@@ -945,11 +955,13 @@ Make sure your generated prompts do not contain these elements or depict them in
   }
 
   const systemInstruction = `You are an elite AI Image Prompt Designer specializing in text-to-image generators like Midjourney, DALL-E 3, Adobe Firefly, and Stable Diffusion.
+Anda adalah AI Prompt Generator ahli yang bertugas membuat prompt gambar unik dan bervariasi.
 Your job is to translate a raw idea and specific style choices into exactly ${count} highly unique, descriptive, and professional-grade generation prompt variations in English.
 
 Input parameters:
 - Base Subject/Idea: "${subject}"
 - Selected Style Context: ${styleCategory}
+- Theme Context & Salt Variabilitas: ${randomSaltInjection}
 - Requested Number of Prompt Variations: ${count}
 - Requested Word Count Range: ${minWords} to ${maxWords} words per prompt
 - Focus Mode: ${promptMode.toUpperCase()}${userNegInstruction}
@@ -976,7 +988,15 @@ Rules for the Generated Prompts:
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
 8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney). Each prompt variation must read like a gorgeous, professional image description, not a database search query.
 9. CRITICAL: Conform exactly to the requested JSON schema.
-10. CRITICAL CREATIVE DIVERSITY: Do not regenerate previous ideas. Treat every generation as a completely new creative session and assume all previous scenes are exhausted. Invent new occupations, activities, stories, environments, and situations. Avoid minor variations of existing concepts. Never regenerate concepts that are semantically similar to previous outputs. Similarity includes: same profession, same activity, same commercial message, same visual story, and same buyer intent.
+10. ATURAN KETAT ANTI-KEMIRIPAN (ANTI-SIMILARITY RULE):
+    Setiap kali user melakukan generate ulang pada tema atau style yang sama, Anda WAJIB merombak total elemen-elemen berikut agar hasil gambar berikutnya tidak mirip (completely distinct):
+    1. Rombak Pose & Aksi Subjek: Jika sebelumnya subjek sedang diam/menghadap kamera, ubah menjadi sedang beraksi, berbalik badan, atau melihat ke arah lain.
+    2. Rombak Komposisi & Sudut Kamera: Acak secara ekstrem (misal: dari close-up fokus detail, ubah total menjadi wide-shot yang memperlihatkan seluruh lingkungan).
+    3. Rombak Latar Belakang (Background): Ganti suasana lingkungan. Jika sebelumnya di dalam ruangan (indoor), ubah menjadi di luar ruangan (outdoor), atau ganti elemen interiornya secara total.
+    4. Rombak Pencahayaan & Warna: Ubah palet warna dominan dan waktu (misal: dari terang benderang siang hari menjadi siluet malam hari dengan kontras tinggi).
+    5. Tambahkan Detail Konseptual Baru: Masukkan satu elemen atau properti unik yang tidak ada di prompt sebelumnya untuk membedakan cerita di dalam gambar.
+    6. Elemen Kejutan: Setiap kali membuat prompt, tambahkan satu detail kecil atau objek pendukung secara acak yang relevan dengan tema, namun sering terabaikan (misalnya: menambahkan efek cuaca, partikel debu yang melayang, pantulan cermin, embun pagi, atau interaksi unik dengan benda di sekitar). Manfaatkan "Suntikan Variasi Acak" yang diberikan sebagai pemicu kreativitas untuk detail ini.
+    Dilarang keras mengulang pola kalimat atau struktur prompt yang mirip dari iterasi sebelumnya. Hasil akhir harus berupa deskripsi visual yang segar dan unik.
 11. ADOBE STOCK CONTENT STRATEGY (MUST FOLLOW STRICTLY):
 You are an Adobe Stock content strategist. Before generating prompts, avoid concepts that are already heavily saturated on Adobe Stock.
 - Avoid concepts that belong to the top 20% most common Adobe Stock categories.
@@ -1846,4 +1866,90 @@ Return EXACTLY this JSON structure:
     console.error("Gemini Parse Error:", response?.text);
     throw e;
   }
+}
+
+export async function generateCalendarEvents(month: string) {
+  const systemInstruction = `You are an expert Content Strategist for Adobe Stock and Shutterstock. 
+Your task is to identify upcoming festivals, holidays, seasonal changes, and cultural events for the specified month. 
+These events help contributors know what kind of photos, videos, or vectors they should produce to be ready for buyer demand.
+
+Rules:
+1. Provide a mix of global holidays (e.g., Christmas, New Year) and specific regional/cultural events.
+2. Focus on events with high commercial value for stock assets.
+3. For each event, provide:
+   - name: The name of the holiday/event.
+   - date: The date (or date range) in that month.
+   - commercial_potential: Why it's important for stock buyers.
+   - suggested_topics: Keywords or subjects to focus on (e.g., "Family dinner", "Winter sports").
+
+Output strictly in JSON format.`;
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      events: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            date: { type: Type.STRING },
+            commercial_potential: { type: Type.STRING },
+            suggested_topics: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["name", "date", "commercial_potential", "suggested_topics"]
+        }
+      }
+    },
+    required: ["events"]
+  };
+
+  const response = await getAIClient().models.generateContent({
+    model: 'gemini-3.1-flash-lite',
+    contents: `List essential commercial events, holidays, and seasonal trends for the month of ${month} that are relevant for stock content creators.`,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.7
+    }
+  });
+
+  return JSON.parse(response.text);
+}
+
+export async function generateEventKeywords(eventName: string, eventDetails: string) {
+  const systemInstruction = `You are an expert AI Stock Photographer and Keyword Specialist. 
+Your job is to generate a list of highly commercial, descriptive, and specific keywords/subjects for a given event.
+These keywords should be optimized for AI Image Generation prompts.
+
+Rules:
+1. Provide 15-20 varied keywords or short phrases.
+2. Mix subjects, settings, lighting, and mood related to the event.
+3. Focus on what stock buyers are actually looking for.
+4. Return the result as a JSON array of strings called "keywords".`;
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      keywords: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      }
+    },
+    required: ["keywords"]
+  };
+
+  const response = await getAIClient().models.generateContent({
+    model: 'gemini-3.1-flash-lite',
+    contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}`,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.8
+    }
+  });
+
+  return JSON.parse(response.text);
 }

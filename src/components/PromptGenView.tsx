@@ -6,6 +6,8 @@ import {
 
 interface PromptGenViewProps {
   t: any;
+  prefilledSubject?: string;
+  onPrefillConsumed?: () => void;
 }
 
 interface PromptHistoryItem {
@@ -53,8 +55,16 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' }
 ];
 
-export const PromptGenView: React.FC<PromptGenViewProps> = ({ t }) => {
+export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubject, onPrefillConsumed }) => {
   const [subject, setSubject] = useState('');
+
+  useEffect(() => {
+    if (prefilledSubject) {
+      setSubject(prefilledSubject);
+      if (onPrefillConsumed) onPrefillConsumed();
+    }
+  }, [prefilledSubject, onPrefillConsumed]);
+
   const [styleCategory, setStyleCategory] = useState('Cinematic');
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
   const [minWords, setMinWords] = useState<number>(15);

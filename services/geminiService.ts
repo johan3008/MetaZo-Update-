@@ -60,3 +60,31 @@ export const generateBatchStockMetadata = async (
   }
   return response.json();
 };
+
+export const fetchCalendarEvents = async (month: string): Promise<{ events: any[] }> => {
+  const response = await fetch('/api/generate-calendar-events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ month })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to fetch calendar events");
+  }
+  return response.json();
+};
+
+export const fetchEventKeywords = async (eventName: string, eventDetails: string): Promise<{ keywords: string[] }> => {
+  const response = await fetch('/api/generate-event-keywords', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventName, eventDetails })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to fetch event keywords");
+  }
+  return response.json();
+};
