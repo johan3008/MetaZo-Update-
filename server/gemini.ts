@@ -347,6 +347,11 @@ export const generateStockMetadata = async (
 
   const imageParts = frames.map(frame => processFrameServer(frame));
 
+  // --- PRE-CALCULATION TARGET KEYWORDS ---
+  const targetCount = parseInt(String(keywordCount), 10) || 40;
+  // Berikan buffer +5 ke AI agar kita tidak pernah kekurangan keyword setelah proses deduplikasi
+  const aiRequestCount = targetCount + 5; 
+
   // --- TAHAP 1: EKSTRAKSI VISUAL JIKA MENGGUNAKAN PROVIDER TEXT-ONLY (GROQ) ---
   let visualDescriptionText = "";
   
@@ -389,7 +394,7 @@ DO NOT generate metadata, DO NOT write a title, DO NOT create a keyword list, an
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${keywordCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
+        description: `List of exactly ${aiRequestCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -492,12 +497,7 @@ ${shutterstockCategoriesText}
 
 User custom preference: ${customPrompt || "Follow standard best practices."}`;
 
-  // --- TAHAP 5: HITUNG TARGET DAN EKSEKUSI PANGGILAN API ---
-  const targetCount = parseInt(String(keywordCount), 10) || 40;
-  
-  // Berikan buffer +5 ke AI agar kita tidak pernah kekurangan keyword setelah proses deduplikasi
-  const aiRequestCount = targetCount + 5; 
-
+  // --- TAHAP 5: EKSEKUSI PANGGILAN API ---
   let response;
   let lastError;
 
@@ -524,12 +524,12 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
       try {
         response = await getAIClient().models.generateContent({
           model: modelName,
-          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with approximately ${aiRequestCount} keywords.` }] },
+          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} keywords.` }] },
           config: {
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.3
+            temperature: 0.35
           }
         });
         break;
@@ -622,6 +622,11 @@ export const generateBatchStockMetadata = async (
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
+  // --- PRE-CALCULATION TARGET KEYWORDS ---
+  const targetCount = parseInt(String(keywordCount), 10) || 40;
+  // Berikan buffer +5 ke AI agar kita tidak pernah kekurangan keyword setelah proses deduplikasi
+  const aiRequestCount = targetCount + 5; 
+
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
@@ -664,7 +669,7 @@ Describe this specific visual asset (Asset #${i + 1}) in absolute complete detai
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${keywordCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
+        description: `List of exactly ${aiRequestCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -753,10 +758,7 @@ ${shutterstockCategoriesText}
 
 User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}`;
 
-  // --- TAHAP 5: HITUNG TARGET DAN EKSEKUSI PANGGILAN API ---
-  const targetCount = parseInt(String(keywordCount), 10) || 40;
-  const aiRequestCount = targetCount + 5;
-
+  // --- TAHAP 5: EKSEKUSI PANGGILAN API ---
   let response;
   let lastError;
 
@@ -781,7 +783,7 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
         parts.push({ text: `\n\n--- ITEM ${index + 1} ---\n` });
         item.frames.forEach(f => parts.push(processFrameServer(f)));
     }
-    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with approximately ${aiRequestCount} keywords.` });
+    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} keywords.` });
 
     const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
     for (const modelName of modelsToTry) {
@@ -793,7 +795,7 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.3
+            temperature: 0.35
           }
         });
         break;
