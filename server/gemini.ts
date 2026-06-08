@@ -341,35 +341,36 @@ export const generateStockMetadata = async (
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
   
-  // 1. Ambil state provider aktif dari AsyncLocalStorage thread-safe Anda
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
   const imageParts = frames.map(frame => processFrameServer(frame));
 
-  // --- PRE-CALCULATION TARGET KEYWORDS ---
+  // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 40;
-  // Berikan buffer +5 ke AI agar kita tidak pernah kekurangan keyword setelah proses deduplikasi
-  const aiRequestCount = targetCount + 5; 
+  const aiRequestCount = targetCount + 5; // Buffer +5 agar array tetap gemuk setelah deduplikasi
 
-  // --- TAHAP 1: EKSTRAKSI VISUAL JIKA MENGGUNAKAN PROVIDER TEXT-ONLY (GROQ) ---
+  // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION ---
   let visualDescriptionText = "";
   
   if (provider === 'groq' || provider === 'mistral') {
-    console.log(`[JohMeta Pipeline] Running Gemini Vision to extract literal details for ${provider.toUpperCase()}...`);
+    console.log(`[JohMeta Pipeline] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
     
-    const visionSystemInstruction = `You are an objective computer vision engine.
-Your SOLE task is to look at the provided image(s) and convert them into an exhaustive, highly detailed literal text description.
-Describe all visible subjects, their actions, explicit colors, composition layouts, framing, lighting, textures, background elements, and shapes.
-DO NOT generate metadata, DO NOT write a title, DO NOT create a keyword list, and DO NOT format as JSON. Output raw descriptive text paragraphs only.`;
+    // UPGRADE: Menyuruh Gemini mengekstrak data fisik SEKALIGUS esensi abstrak/mood
+    const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+Your task is to look at the provided image(s) and write an exhaustive, two-part analysis for a stock metadata specialist:
+
+1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements.
+2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, and specific commercial industries or business use-cases this asset target.
+
+DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly.`;
 
     try {
-      // Menggunakan Gemini 3.1 Flash Lite untuk interogasi mata visual yang cepat & hemat biaya
       const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-        parts: [...imageParts, { text: "Describe this visual asset in absolute complete detail for a stock metadata specialist." }] 
+        parts: [...imageParts, { text: "Analyze this visual asset in absolute literal and conceptual detail for a stock metadata specialist." }] 
       }, {
         systemInstruction: visionSystemInstruction,
-        temperature: 0.3
+        temperature: 0.35
       });
       
       visualDescriptionText = visionResponse.text || "";
@@ -379,22 +380,22 @@ DO NOT generate metadata, DO NOT write a title, DO NOT create a keyword list, an
     }
   }
 
-  // --- TAHAP 2: DEFINISI SKEMA OUTPUT METADATA ---
+  // --- TAHAP 2: DEFINISI SKEMA OUTPUT METADATA (MENGGUNAKAN BUFFER) ---
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
       title: { 
         type: Type.STRING, 
-        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). It MUST naturally combine: Subject, Action/Flow, and Core Concept.' 
+        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). It MUST naturally combine the core subject, action, and commercial concept.' 
       },
       description: { 
         type: Type.STRING, 
-        description: 'Detailed visual description followed by a sentence starting with "Ideal for..." or "Perfect for..." suggesting commercial uses, max 200 chars.' 
+        description: 'Detailed visual and conceptual description followed by a sentence starting with "Ideal for..." suggesting commercial uses, max 200 chars.' 
       },
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${aiRequestCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
+        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a single word.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -406,7 +407,7 @@ DO NOT generate metadata, DO NOT write a title, DO NOT create a keyword list, an
       },
       shutterstock_category_2: { 
         type: Type.STRING, 
-        description: 'The secondary Shutterstock category. Must be strictly DIFFERENT from shutterstock_category_1.' 
+        description: 'The secondary Shutterstock category. MUST be strictly DIFFERENT from shutterstock_category_1.' 
       }
     },
     required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2"],
@@ -415,51 +416,25 @@ DO NOT generate metadata, DO NOT write a title, DO NOT create a keyword list, an
   // --- TAHAP 3: KONDISIONAL MEDIA CONTEXT ---
   let mediaContext = "";
   if (provider === 'groq' || provider === 'mistral') {
-    mediaContext = `The visual content has been pre-analyzed. Build your metadata strictly based on this factual text description:
-=== BEGIN VISUAL DESCRIPTION ===
+    mediaContext = `The asset has been thoroughly analyzed. Build your metadata strictly by blending the physical facts and abstract ideas from this text:
+=== BEGIN VISUAL & CONCEPTUAL DESCRIPTION ===
 ${visualDescriptionText}
-=== END VISUAL DESCRIPTION ===`;
+=== END VISUAL & CONCEPTUAL DESCRIPTION ===`;
   } else {
     if (toolType === ToolType.VIDEO) {
-      mediaContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. Describe the overall continuous motion and flow as one cohesive video clip.";
+      mediaContext = "CRITICAL: The provided images are sequential frames from a single VIDEO. Capture the overall continuous motion, flow, and thematic mood.";
     } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-      mediaContext = "The provided image is a VECTOR illustration preview. Focus on the main subject. Note that previews have flat backgrounds; do not describe the background unless it is an integral part of the composition.";
+      mediaContext = "The provided image is a VECTOR illustration preview. Focus on the main subject, clean lines, and its commercial design concept.";
     } else {
       mediaContext = "The provided image is a photograph or digital artwork.";
     }
   }
 
-  // --- TAHAP 4: PERAKITAN SYSTEM INSTRUCTION DENGAN ATURAN ADOBE COMPLIANCE & GROQ OPTIMIZATION ---
+  // --- TAHAP 4: PERAKITAN SYSTEM INSTRUCTION DENGAN ATURAN KONSEP BARU ---
   const groqOptimizationRules = provider === 'groq' ? `
 [CRITICAL GROQ SPEED OPTIMIZATION]
 - DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
-- Start your response directly with '{' and end exactly with '}'. Break the execution instantly after the closing brace.
-
-[CRITICAL GROQ ADOBE STOCK COMPLIANCE RULES]
-1. TITLE FORMAT (NATURAL SENTENCE CASE):
-   - The title must be a single, natural, readable sentence.
-   - Strictly use Sentence case (e.g., "A golden retriever playing with a red ball in the park"). Capitalize ONLY the first letter of the entire title and proper nouns.
-   - NEVER separate words with commas in the title. Do not make the title look like a list of keywords.
-   - Maximum length is 100 characters. Keep it punchy and commercial.
-   - DO NOT use generic or lazy prefixes like "Isolated shot of...", "Close up of...", "Vector of...", or "Illustration of...". Start directly with the main subject.
-
-2. TOTAL BAN ON AI BUZZWORDS:
-   - Adobe Stock will REJECT assets with technical AI terms in the title or keywords.
-   - CRITICAL: NEVER use words like "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "4k", "8k", "unreal engine", or "render".
-   - Describe the visual style purely through artistic mediums (e.g., "oil painting", "watercolor", "minimalist graphic icon", "3d digital art").
-
-3. ADOBE SEARCH ALGORITHM KEYWORD WEIGHTING:
-   - Adobe Stock weights the FIRST 10 KEYWORDS highest. The most critical information must come first.
-   - Strictly follow this priority order for the first 10 keywords: 
-     Subject (1-3) → Main Action (4-5) → Primary Context/Environment (6-7) → Core Concept/Emotion (8-10).
-
-4. NO SYNONYM STACKING & REPETITION:
-   - Do not spam synonyms to inflate keyword count. Adobe penalties keyword stuffing.
-   - Pick the term with the highest commercial search volume (e.g., "dog").
-   - Maximum 50 keywords.
-
-5. STRICT SINGLE-WORD ENFORCEMENT FOR GROQ:
-   - Every single keyword item MUST be exactly ONE word. Split "white background" into two separate tags: "white" and "background".` : '';
+- Start your response directly with '{' and end exactly with '}'.` : '';
 
   const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
 Your goal is to maximize the search discoverability of visual assets for premium buyers.
@@ -469,24 +444,19 @@ ${mediaContext}
 
 [STRICT ADOBE STOCK COMPLIANCE RULES]
 1. TITLE RULES:
-   - Formatted strictly in Sentence case (Capitalize only the first letter).
-   - Must be a natural, flowing sentence. NEVER use commas. Max 100 chars.
+   - Formatted strictly in Sentence case. Max 100 chars. NO commas.
    - CRITICAL: DO NOT start titles with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "Isolated shot of", or "A minimalist...". 
-   - START DIRECTLY with the main subject and action (e.g., "Seated dog silhouette with elegant decorative swirls...").
+   - START DIRECTLY with the main subject and its emotional/commercial concept (e.g., "Seated dog silhouette symbolizing loyalty for modern pet branding").
 
-2. KEYWORD EXPANSION RULES (HIT THE TARGET COUNT):
-   - You MUST generate exactly ${keywordCount} unique keywords. Do not stop early.
-   - To hit the requested count safely without synonym stacking, systematically brainstorm across these 5 categories:
-     1. Direct Subjects: dog, canine, pup, paw, print, animal, pet.
-     2. Art Style & Medium: silhouette, line, stroke, swirl, flourish, curl, minimalist, calligraphic, graphic, ink.
-     3. Technical/Visual Traits: black, yellow, gold, background, texture, paper, grain, isolated, clean, shape, icon, logo, emblem, symbol.
-     4. Mood & Concept: elegant, modern, creative, calm, simple, abstract, decorative, ornate.
-     5. Commercial Use-cases & Industries: design, branding, merchandise, tattoo, craft, printing, card, cover, element, asset.
-   - Every keyword MUST be a single word. No spaces, no hyphens. Split "line art" into "line" and "art".
+2. CONCEPTUAL KEYWORD EXPANSION:
+   - You MUST generate exactly ${aiRequestCount} unique keywords. Do not stop early.
+   - Do not just focus on literal objects. You MUST extract abstract concepts, metaphors, emotions, and target industries based on the provided analysis text.
+   - Maintain a balanced mix: 50% literal terms (subjects, actions, textures) and 50% conceptual terms (emotions, business niches, design styles).
+   - Every keyword MUST be a single word. No spaces, no hyphens. Split terms like "white background" into "white" and "background".
+   - No synonym stacking (do not use "dog", "canine", "hound" together; pick the highest search-volume term).
 
-3. TOTAL AI BAN:
-   - NEVER use: "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "4k", "8k", "unreal engine", or "render".
-4. NO INTELLECTUAL PROPERTY:
+3. TOTAL AI BAN & IP RULES:
+   - NEVER use AI terms like "generative ai", "midjourney", "stable diffusion", "photorealistic", "render", etc.
    - Absolutely no brand names or trademarks.
 
 Adobe Stock Categories:
@@ -497,20 +467,18 @@ ${shutterstockCategoriesText}
 
 User custom preference: ${customPrompt || "Follow standard best practices."}`;
 
-  // --- TAHAP 5: EKSEKUSI PANGGILAN API ---
+  // --- TAHAP 5: EKSEKUSI PANGGILAN API DENGAN SUHU OPTIMAL ---
   let response;
   let lastError;
 
   if (provider === 'groq' || provider === 'mistral') {
-    // Jalur Sinkronisasi Groq / Mistral (Text-Only, memanfaatkan data interogasi teks Gemini)
     try {
       const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        // Kita perintahkan AI untuk menghasilkan jumlah buffer agar array-nya gemuk
-        contents: `Analyze the provided visual description text data and generate the requested compliant stock metadata JSON containing approximately ${aiRequestCount} single-word keywords.`,
+        contents: `Analyze the provided visual and conceptual text data and generate the required stock metadata JSON containing exactly ${aiRequestCount} single-word keywords.`,
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.35 } // Sedikit dinaikkan ke 0.35 agar variasi kata kunci melimpah
+        config: { temperature: 0.35 } // Menaikkan sedikit ke 0.35 agar Llama lebih berani memilih kosakata konsep
       });
       response = { text: answerText };
     } catch (err) {
@@ -518,7 +486,7 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
       console.warn(`[generateStockMetadata] Hybrid pipeline failed with ${provider.toUpperCase()}:`, err);
     }
   } else {
-    // Jalur Sinkronisasi Gemini Tradisional (Multimodal - Kirim Gambar Langsung)
+    // Jalur Sinkronisasi Gemini Tradisional (Multimodal)
     const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
     for (const modelName of modelsToTry) {
       try {
@@ -529,7 +497,7 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.35
+            temperature: 0.35 // Disamakan agar Gemini juga kaya akan variasi kata kunci konsep
           }
         });
         break;
@@ -542,24 +510,20 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
 
   if (!response) throw lastError;
 
-  // --- TAHAP 6: PARSING, SANITASI TOTAL, DAN PENGUNCIAN JUMLAH KEYWORD ---
+  // --- TAHAP 6: PARSING, HARD-SLICING KEYWORD, DAN FILTER KATEGORI JALUR AMAN ---
   try {
     const text = response.text || "{}";
     const data = JSON.parse(text);
     
+    // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (data.keywords && Array.isArray(data.keywords)) {
       let strictSingleWords: string[] = [];
       
       data.keywords.forEach((k: any) => {
         if (typeof k === 'string') {
-          // 1. Ubah tanda hubung atau underscore menjadi spasi
-          // 2. Pecah berdasarkan spasi untuk mengantisipasi jika AI bandel mengeluarkan multi-word (misal: "white background")
           const pieces = k.replace(/[-_]/g, ' ').split(/\s+/);
-          
           pieces.forEach(word => {
-            // Bersihkan dari karakter non-alfabet (angka/simbol) dan ubah ke huruf kecil
             const cleanWord = word.toLowerCase().trim().replace(/[^a-z]/g, '');
-            // Hanya masukkan kata yang valid (bukan sisa huruf typo satu karakter)
             if (cleanWord.length > 1) {
               strictSingleWords.push(cleanWord);
             }
@@ -567,29 +531,22 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
         }
       });
       
-      // 3. Hilangkan duplikat kata kunci menggunakan Set
       const uniqueKeywords = Array.from(new Set(strictSingleWords));
-      
-      // 4. KUNCI PAKSA: Potong array secara presisi dari indeks 0 hingga targetCount (misal: 40)
-      data.keywords = uniqueKeywords.slice(0, targetCount);
+      data.keywords = uniqueKeywords.slice(0, targetCount); // Selalu pas sesuai targetCount pengguna (misal: 40)
     }
-    
-    // --- LAKUKAN VALIDASI & SANITASI KATEGORI SHUTTERSTOCK DI SINI ---
+
+    // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock 2 (Anti-Kosong)
     const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
-    // 1. Amankan Kategori 1: Jika kosong atau melenceng dari array, beri default aman
     if (!data.shutterstock_category_1 || !validShutterstockCats.includes(data.shutterstock_category_1)) {
       data.shutterstock_category_1 = validShutterstockCats[0] || "Animals/Wildlife";
     }
 
-    // 2. Amankan Kategori 2: Jika kosong, tidak ada di daftar, atau sama dengan Kategori 1
     if (
       !data.shutterstock_category_2 || 
       !validShutterstockCats.includes(data.shutterstock_category_2) || 
       data.shutterstock_category_2 === data.shutterstock_category_1
     ) {
-      console.warn(`[JohMeta Guard] Category 2 invalid or duplicate ("${data.shutterstock_category_2}"). Applying smart fallback.`);
-      
       const smartFallbackMap: Record<string, string> = {
         "Animals/Wildlife": "Backgrounds/Textures",
         "Backgrounds/Textures": "Abstract",
@@ -598,7 +555,6 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
       };
 
       const customFallback = smartFallbackMap[data.shutterstock_category_1];
-      
       if (customFallback && validShutterstockCats.includes(customFallback)) {
         data.shutterstock_category_2 = customFallback;
       } else {
@@ -622,35 +578,39 @@ export const generateBatchStockMetadata = async (
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
-  // --- PRE-CALCULATION TARGET KEYWORDS ---
+  // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 40;
-  // Berikan buffer +5 ke AI agar kita tidak pernah kekurangan keyword setelah proses deduplikasi
   const aiRequestCount = targetCount + 5; 
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
-  // --- TAHAP 1: HYBRID VISION UNTUK BATCH JIKA GROQ/MISTRAL ---
+  // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   if (provider === 'groq' || provider === 'mistral') {
-    console.log(`[JohMeta Pipeline - Batch] Running Gemini Vision to extract literal details for ${provider.toUpperCase()}...`);
+    console.log(`[JohMeta Pipeline - Batch] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
     
     for (let i = 0; i < items.length; i++) {
         const imageParts = items[i].frames.map(frame => processFrameServer(frame));
-        const visionSystemInstruction = `You are an objective computer vision engine.
-Describe this specific visual asset (Asset #${i + 1}) in absolute complete detail. Focus on subjects, actions, colors, environment, textures, and composition. NO metadata or titles.`;
+        const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+Your task is to look at the provided image(s) (Asset #${i + 1}) and write an exhaustive, two-part analysis for a metadata specialist:
+
+1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements.
+2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, and specific commercial industries or business use-cases this asset target.
+
+DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly.`;
         
         try {
             const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-              parts: [...imageParts, { text: "Provide an exhaustive literal description of this asset for stock metadata generation." }] 
+              parts: [...imageParts, { text: "Analyze this visual asset in absolute literal and conceptual detail for stock metadata generation." }] 
             }, {
               systemInstruction: visionSystemInstruction,
-              temperature: 0.3
+              temperature: 0.35
             });
             visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${visionResponse.text || ""}`);
         } catch (err) {
             console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err);
-            visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION: [Factual visual analysis failed for this asset]`);
+            visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION: [Factual literal and conceptual analysis failed for this asset]`);
         }
     }
   }
@@ -660,28 +620,28 @@ Describe this specific visual asset (Asset #${i + 1}) in absolute complete detai
     properties: {
       title: { 
         type: Type.STRING, 
-        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). MUST naturally combine: Subject, Action/Flow, and Core Concept.' 
+        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). It MUST naturally combine the core subject, action, and commercial concept.' 
       },
       description: { 
         type: Type.STRING, 
-        description: 'Detailed visual description followed by a sentence starting with "Ideal for..." or "Perfect for..." suggesting commercial uses, max 200 chars.' 
+        description: 'Detailed visual and conceptual description followed by a sentence starting with "Ideal for..." suggesting commercial uses, max 200 chars.' 
       },
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${aiRequestCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
+        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a single word.` 
       },
       category_id: { 
         type: Type.INTEGER, 
-        description: 'The most accurate Adobe Stock category ID.' 
+        description: 'The most accurate Adobe Stock category ID from the provided list.' 
       },
       shutterstock_category_1: { 
         type: Type.STRING, 
-        description: 'Primary Shutterstock category. Must strictly match the provided list.' 
+        description: 'The primary Shutterstock category. Must strictly match the provided list.' 
       },
       shutterstock_category_2: { 
         type: Type.STRING, 
-        description: 'Secondary (different) Shutterstock category. Must strictly match the provided list.' 
+        description: 'The secondary Shutterstock category. MUST be strictly DIFFERENT from shutterstock_category_1.' 
       }
     },
     required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2"],
@@ -695,32 +655,17 @@ Describe this specific visual asset (Asset #${i + 1}) in absolute complete detai
 
   let mediaContext = "";
   if (provider === 'groq' || provider === 'mistral') {
-    mediaContext = `Factual text descriptions for ${items.length} visual assets are provided below. Build your metadata strictly based on these descriptions:\n\n${visualDescriptions.join('\n\n')}`;
+    mediaContext = `The assets have been thoroughly analyzed. Build your metadata strictly by blending the physical facts and abstract ideas from these descriptions:\n\n${visualDescriptions.join('\n\n')}`;
   } else {
     mediaContext = toolType === ToolType.VIDEO 
-      ? `Sequential storyboard frames for ${items.length} separate video items are provided.` 
+      ? `Sequential storyboard frames for ${items.length} separate video items are provided. Capture flow and thematic mood.` 
       : `Photographs or digital artworks for ${items.length} separate items are provided.`;
   }
 
   const groqOptimizationRules = provider === 'groq' ? `
 [CRITICAL GROQ SPEED OPTIMIZATION]
 - DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
-- Start your response directly with '[' and end exactly with ']'. Break the execution instantly after the closing bracket.
-
-[CRITICAL GROQ ADOBE STOCK COMPLIANCE RULES]
-1. TITLE FORMAT (NATURAL SENTENCE CASE):
-   - The title must be a single, natural, readable sentence.
-   - Strictly use Sentence case. Capitalize ONLY the first letter of the entire title.
-   - NO commas in the title. NO keyword lists in the title.
-   - Max length 100 chars.
-2. TOTAL BAN ON AI BUZZWORDS:
-   - NEVER use "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "render".
-3. ADOBE SEARCH ALGORITHM KEYWORD WEIGHTING:
-   - Order: Subject (1-3) → Main Action (4-5) → Environment (6-7) → Core Concept (8-10).
-4. NO SYNONYM STACKING:
-   - Pick the most commercially relevant term. Max 50 keywords.
-5. STRICT SINGLE-WORD ENFORCEMENT:
-   - Every keyword MUST be exactly ONE word. Split multi-word concepts.` : '';
+- Start your response directly with '[' and end exactly with ']'.` : '';
 
   const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
 Your goal is to maximize discoverability for premium buyers.
@@ -730,24 +675,18 @@ ${mediaContext}
 
 [STRICT ADOBE STOCK COMPLIANCE RULES]
 1. TITLE RULES:
-   - Formatted strictly in Sentence case (Capitalize only the first letter).
-   - Must be a natural, flowing sentence. NEVER use commas. Max 100 chars.
+   - Formatted strictly in Sentence case. Max 100 chars. NO commas.
    - CRITICAL: DO NOT start titles with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "Isolated shot of", or "A minimalist...". 
-   - START DIRECTLY with the main subject and action (e.g., "Seated dog silhouette with elegant decorative swirls...").
+   - START DIRECTLY with the main subject and its emotional/commercial concept.
 
-2. KEYWORD EXPANSION RULES (HIT THE TARGET COUNT):
-   - You MUST generate exactly ${keywordCount} unique keywords for each item. Do not stop early.
-   - To hit the requested count safely without synonym stacking, systematically brainstorm across these 5 categories:
-     1. Direct Subjects: dog, canine, pup, paw, print, animal, pet.
-     2. Art Style & Medium: silhouette, line, stroke, swirl, flourish, curl, minimalist, calligraphic, graphic, ink.
-     3. Technical/Visual Traits: black, yellow, gold, background, texture, paper, grain, isolated, clean, shape, icon, logo, emblem, symbol.
-     4. Mood & Concept: elegant, modern, creative, calm, simple, abstract, decorative, ornate.
-     5. Commercial Use-cases & Industries: design, branding, merchandise, tattoo, craft, printing, card, cover, element, asset.
-   - Every keyword MUST be a single word. No spaces, no hyphens. Split "line art" into "line" and "art".
+2. CONCEPTUAL KEYWORD EXPANSION:
+   - You MUST generate exactly ${aiRequestCount} unique keywords for each item. Do not stop early.
+   - Extract abstract concepts, metaphors, emotions, and target industries based on the provided analysis text.
+   - Maintain a balanced mix: 50% literal terms and 50% conceptual terms.
+   - Every keyword MUST be a single word. No spaces, no hyphens.
 
-3. TOTAL AI BAN:
-   - NEVER use: "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "4k", "8k", "unreal engine", or "render".
-4. NO INTELLECTUAL PROPERTY:
+3. TOTAL AI BAN & IP RULES:
+   - NEVER use AI terms like "generative ai", "midjourney", "stable diffusion", "photorealistic", "render", etc.
    - Absolutely no brand names or trademarks.
 
 Adobe Stock Categories:
@@ -766,7 +705,7 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
     try {
       const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Generate a JSON array of exactly ${items.length} metadata objects for the assets described, ensuring each has approximately ${aiRequestCount} single-word keywords.`,
+        contents: `Generate a JSON array of exactly ${items.length} metadata objects for the assets described, ensuring each has approximately ${aiRequestCount} single-word keywords based on visual and conceptual analysis.`,
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.35 }
@@ -813,6 +752,7 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
     const dataArray = JSON.parse(text) as StockMetadata[];
 
     return dataArray.map((metadata, index) => {
+        // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (metadata.keywords && Array.isArray(metadata.keywords)) {
             let strictSingleWords: string[] = [];
             metadata.keywords.forEach((k: any) => {
@@ -830,15 +770,13 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
             metadata.keywords = uniqueKeywords.slice(0, targetCount);
         }
 
-        // --- LAKUKAN VALIDASI & SANITASI KATEGORI SHUTTERSTOCK DI SINI ---
+        // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
         const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
-        // 1. Amankan Kategori 1: Jika kosong atau melenceng dari array, beri default aman
         if (!metadata.shutterstock_category_1 || !validShutterstockCats.includes(metadata.shutterstock_category_1)) {
             metadata.shutterstock_category_1 = validShutterstockCats[0] || "Animals/Wildlife";
         }
 
-        // 2. Amankan Kategori 2 (BIANG KEROK FIX): Jika kosong, tidak ada di daftar, atau sama dengan Kategori 1
         if (
           !metadata.shutterstock_category_2 || 
           !validShutterstockCats.includes(metadata.shutterstock_category_2) || 
