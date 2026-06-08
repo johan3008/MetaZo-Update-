@@ -88,7 +88,8 @@ async function callOpenAICompatibleWithRetry(params: {
     let endpoint = '';
     if (provider === 'groq') {
       endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      model = 'llama-3.3-70b-versatile';
+      // FIX: Set Llama 4 Scout as the primary model
+      model = 'meta-llama/llama-4-scout-17b-16e-instruct';
     } else {
       endpoint = 'https://api.mistral.ai/v1/chat/completions';
       model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
@@ -100,8 +101,13 @@ async function callOpenAICompatibleWithRetry(params: {
       temperature: params.config?.temperature ?? 0.85,
     };
 
+    if (provider === 'groq') {
+      payload.response_format = { type: "json_object" };
+      payload.max_tokens = 8192;
+    }
+
     if (params.responseMimeType === 'application/json') {
-      let schemaInstruction = '\\n\\nIMPORTANT: You MUST return ONLY valid JSON. No conversational text.';
+      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" and end exactly with the closing curly brace "}". DO NOT write any introductory or concluding text.';
       if (params.responseSchema) {
         schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
       }
@@ -185,7 +191,9 @@ function getAIClient(): any {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
 
-        if (provider === 'groq' || provider === 'mistral') {
+        // ONLY redirect to Groq/Mistral if the model name is NOT explicitly a Gemini model.
+        // This allows hybrid vision tasks (which explicitly request gemini-3.1-flash-lite) to work.
+        if ((provider === 'groq' || provider === 'mistral') && !params.model?.startsWith('gemini-')) {
           const text = await callOpenAICompatibleWithRetry({
             systemInstruction: params.config?.systemInstruction,
             contents: params.contents,
@@ -333,105 +341,148 @@ export const generateStockMetadata = async (
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
   
+  // 1. Ambil state provider aktif dari AsyncLocalStorage thread-safe Anda
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
+  const imageParts = frames.map(frame => processFrameServer(frame));
+
+  // --- TAHAP 1: EKSTRAKSI VISUAL JIKA MENGGUNAKAN PROVIDER TEXT-ONLY (GROQ) ---
+  let visualDescriptionText = "";
+  
+  if (provider === 'groq' || provider === 'mistral') {
+    console.log(`[JohMeta Pipeline] Running Gemini Vision to extract literal details for ${provider.toUpperCase()}...`);
+    
+    const visionSystemInstruction = `You are an objective computer vision engine.
+Your SOLE task is to look at the provided image(s) and convert them into an exhaustive, highly detailed literal text description.
+Describe all visible subjects, their actions, explicit colors, composition layouts, framing, lighting, textures, background elements, and shapes.
+DO NOT generate metadata, DO NOT write a title, DO NOT create a keyword list, and DO NOT format as JSON. Output raw descriptive text paragraphs only.`;
+
+    try {
+      // Menggunakan Gemini 3.1 Flash Lite untuk interogasi mata visual yang cepat & hemat biaya
+      const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
+        parts: [...imageParts, { text: "Describe this visual asset in absolute complete detail for a stock metadata specialist." }] 
+      }, {
+        systemInstruction: visionSystemInstruction,
+        temperature: 0.3
+      });
+      
+      visualDescriptionText = visionResponse.text || "";
+    } catch (err) {
+      console.error("[JohMeta Pipeline] Gemini Vision Extraction Failed:", err);
+      throw new Error("Gagal melakukan analisis gambar awal menggunakan Gemini Vision.");
+    }
+  }
+
+  // --- TAHAP 2: DEFINISI SKEMA OUTPUT METADATA ---
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      title: {
-        type: Type.STRING,
-        description: 'Impactful title in Sentence case (max 150 chars, no commas). It MUST combine 3 aspects: what is in the asset (subject/objects), the action/flow (movement/progression), and the concept (theme/mood).',
+      title: { 
+        type: Type.STRING, 
+        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). It MUST naturally combine: Subject, Action/Flow, and Core Concept.' 
       },
-      description: {
-        type: Type.STRING,
-        description: 'Detailed visual description (colors, elements, mood) followed by a sentence starting with "Ideal for..." suggesting potential uses, max 200 chars.',
+      description: { 
+        type: Type.STRING, 
+        description: 'Detailed visual description followed by a sentence starting with "Ideal for..." or "Perfect for..." suggesting commercial uses, max 200 chars.' 
       },
-      keywords: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-        description: `List of exactly ${keywordCount} conceptual and descriptive keywords in English, ordered by relevance. CRITICAL: Use only single words; no multi-word phrases.`,
+      keywords: { 
+        type: Type.ARRAY, 
+        items: { type: Type.STRING }, 
+        description: `List of exactly ${keywordCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
       },
-      category_id: {
-        type: Type.INTEGER,
-        description: 'The most accurate Adobe Stock category ID.',
+      category_id: { 
+        type: Type.INTEGER, 
+        description: 'The most accurate Adobe Stock category ID from the provided list.' 
       },
-      shutterstock_category_1: {
-        type: Type.STRING,
-        description: 'The primary Shutterstock category. Must be exactly one of the provided Shutterstock categories.',
+      shutterstock_category_1: { 
+        type: Type.STRING, 
+        description: 'The primary Shutterstock category. Must strictly match the provided list.' 
       },
-      shutterstock_category_2: {
-        type: Type.STRING,
-        description: 'The secondary Shutterstock category. Must be exactly one of the provided Shutterstock categories, and MUST BE DIFFERENT from shutterstock_category_1.',
+      shutterstock_category_2: { 
+        type: Type.STRING, 
+        description: 'The secondary Shutterstock category. Must be strictly DIFFERENT from shutterstock_category_1.' 
       }
     },
     required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2"],
   };
 
-  let mediaContext = "The provided image is a photograph or digital image.";
-  if (toolType === ToolType.VIDEO) {
-      mediaContext = "CRITICAL: The provided images are sequential frames (Start, Middle, and End) extracted from a single VIDEO or ANIMATION. You MUST describe the overall motion, action, flow, and subject of the video as a single continuous scene based on these three sequential frames. Treat it as one cohesive video clip.";
-  } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-      mediaContext = "The provided image is a preview of a VECTOR graphic or illustration. CRITICAL: DO NOT start titles with 'Vector of', 'Illustration of', 'Drawing of', or 'Continuous line drawing of'. Focus entirely on describing the main subject or object directly. Note: Previews are generated with a flat background. Do not mention or describe the background explicitly unless it is clearly an integral part of the composition.";
+  // --- TAHAP 3: KONDISIONAL MEDIA CONTEXT ---
+  let mediaContext = "";
+  if (provider === 'groq' || provider === 'mistral') {
+    mediaContext = `The visual content has been pre-analyzed. Build your metadata strictly based on this factual text description:
+=== BEGIN VISUAL DESCRIPTION ===
+${visualDescriptionText}
+=== END VISUAL DESCRIPTION ===`;
+  } else {
+    if (toolType === ToolType.VIDEO) {
+      mediaContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. Describe the overall continuous motion and flow as one cohesive video clip.";
+    } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
+      mediaContext = "The provided image is a VECTOR illustration preview. Focus on the main subject. Note that previews have flat backgrounds; do not describe the background unless it is an integral part of the composition.";
+    } else {
+      mediaContext = "The provided image is a photograph or digital artwork.";
+    }
   }
 
-  const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
-Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords.
+  // --- TAHAP 4: PERAKITAN SYSTEM INSTRUCTION DENGAN ATURAN ADOBE COMPLIANCE & GROQ OPTIMIZATION ---
+  const groqOptimizationRules = provider === 'groq' ? `
+[CRITICAL GROQ SPEED OPTIMIZATION]
+- DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
+- Start your response directly with '{' and end exactly with '}'. Break the execution instantly after the closing brace.
+
+[CRITICAL GROQ ADOBE STOCK COMPLIANCE RULES]
+1. TITLE FORMAT (NATURAL SENTENCE CASE):
+   - The title must be a single, natural, readable sentence.
+   - Strictly use Sentence case (e.g., "A golden retriever playing with a red ball in the park"). Capitalize ONLY the first letter of the entire title and proper nouns.
+   - NEVER separate words with commas in the title. Do not make the title look like a list of keywords.
+   - Maximum length is 100 characters. Keep it punchy and commercial.
+   - DO NOT use generic or lazy prefixes like "Isolated shot of...", "Close up of...", "Vector of...", or "Illustration of...". Start directly with the main subject.
+
+2. TOTAL BAN ON AI BUZZWORDS:
+   - Adobe Stock will REJECT assets with technical AI terms in the title or keywords.
+   - CRITICAL: NEVER use words like "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "4k", "8k", "unreal engine", or "render".
+   - Describe the visual style purely through artistic mediums (e.g., "oil painting", "watercolor", "minimalist graphic icon", "3d digital art").
+
+3. ADOBE SEARCH ALGORITHM KEYWORD WEIGHTING:
+   - Adobe Stock weights the FIRST 10 KEYWORDS highest. The most critical information must come first.
+   - Strictly follow this priority order for the first 10 keywords: 
+     Subject (1-3) → Main Action (4-5) → Primary Context/Environment (6-7) → Core Concept/Emotion (8-10).
+
+4. NO SYNONYM STACKING & REPETITION:
+   - Do not spam synonyms to inflate keyword count. Adobe penalties keyword stuffing.
+   - Pick the term with the highest commercial search volume (e.g., "dog").
+   - Maximum 50 keywords.
+
+5. STRICT SINGLE-WORD ENFORCEMENT FOR GROQ:
+   - Every single keyword item MUST be exactly ONE word. Split "white background" into two separate tags: "white" and "background".` : '';
+
+  const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
+Your goal is to maximize the search discoverability of visual assets for premium buyers.
+OUTPUT MUST BE 100% IN ENGLISH for titles and keywords.${groqOptimizationRules}
 
 ${mediaContext}
 
-CRITICAL CREATIVE DIVERSITY RULES (MUST FOLLOW STRICTLY):
-1. Do not regenerate previous ideas.
-2. Treat every generation as a completely new creative session and assume all previous scenes are exhausted.
-3. Invent new occupations, activities, stories, environments, and situations for every request.
-4. Avoid minor variations of existing concepts.
-5. Never regenerate concepts that are semantically similar to previous outputs. Similarity includes: same profession, same activity, same commercial message, same visual story, and same buyer intent.
-6. Avoid concepts that belong to the top 20% most common Adobe Stock categories.
+[STRICT ADOBE STOCK COMPLIANCE RULES]
+1. TITLE RULES:
+   - Formatted strictly in Sentence case (Capitalize only the first letter).
+   - Must be a natural, flowing sentence. NEVER use commas. Max 100 chars.
+   - CRITICAL: DO NOT start titles with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "Isolated shot of", or "A minimalist...". 
+   - START DIRECTLY with the main subject and action (e.g., "Seated dog silhouette with elegant decorative swirls...").
 
-CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
-3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
-5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
+2. KEYWORD EXPANSION RULES (HIT THE TARGET COUNT):
+   - You MUST generate exactly ${keywordCount} unique keywords. Do not stop early.
+   - To hit the requested count safely without synonym stacking, systematically brainstorm across these 5 categories:
+     1. Direct Subjects: dog, canine, pup, paw, print, animal, pet.
+     2. Art Style & Medium: silhouette, line, stroke, swirl, flourish, curl, minimalist, calligraphic, graphic, ink.
+     3. Technical/Visual Traits: black, yellow, gold, background, texture, paper, grain, isolated, clean, shape, icon, logo, emblem, symbol.
+     4. Mood & Concept: elegant, modern, creative, calm, simple, abstract, decorative, ornate.
+     5. Commercial Use-cases & Industries: design, branding, merchandise, tattoo, craft, printing, card, cover, element, asset.
+   - Every keyword MUST be a single word. No spaces, no hyphens. Split "line art" into "line" and "art".
 
-Rules for Titles:
-1. The title MUST incorporate three key aspects:
-   - **Apa yang ada di aset (What is in the asset)**: Clear identification of the main subject, elements, or objects.
-   - **Alur (Flow/Action)**: The action, movement, process, or progression taking place.
-   - **Konsep (Concept)**: The underlying theme, mood, environment, or conceptual meaning (e.g., modern technology, teamwork, peaceful loneliness, premium product).
-2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-3. Limit title to 100 characters. Use impactful, searchable terms.
-4. Use easy-to-read phrases, NOT formal sentence structures.
-5. DO NOT start titles with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-6. DO NOT treat the title like a list of keywords. No commas separating words.
-7. Prioritize the main subject at the beginning of the title.
-8. Avoid keyword stuffing, repetition, and synonym stacking.
-9. Do not include file type, AI-generated terms, camera details, or technical information.
-10. Use natural, search-friendly phrases that accurately describe visible content only.
-11. Avoid subjective promotional words such as best, amazing, perfect, or stunning unless clearly justified by the visual.
-12. Analyze what is in the assets properly, don't draw your own conclusions, be accurate and correct.
-
-Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
-
-Rules for Keywords:
-1. Start with the most important descriptors. Use conceptual terms (e.g., 'concept', 'success', 'nature').
-2. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
-3. Ensure no IP, brands, or names are included.
-4. Order keywords by priority (Adobe Stock weights first keywords highest):
-   Subject → Concept → Emotion → Category → Activity → Environment → Commercial → Technical
-5. Only describe elements visually present in the image.
-   Never infer, assume, or add context beyond what is seen.
-6.  No synonym stacking. Maximum 2 keywords with overlapping meaning
-   per category. Choose the highest-search-volume term.
-7. Maximum 50 keywords. Hard limit per Adobe Stock contributor policy.
-    Quality over quantity — irrelevant keywords reduce search ranking
-
-
-Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+3. TOTAL AI BAN:
+   - NEVER use: "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "4k", "8k", "unreal engine", or "render".
+4. NO INTELLECTUAL PROPERTY:
+   - Absolutely no brand names or trademarks.
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -439,41 +490,126 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-User preference: ${customPrompt || "Follow standard best practices."}`;
+User custom preference: ${customPrompt || "Follow standard best practices."}`;
 
-  const imageParts = frames.map(frame => processFrameServer(frame));
+  // --- TAHAP 5: HITUNG TARGET DAN EKSEKUSI PANGGILAN API ---
+  const targetCount = parseInt(String(keywordCount), 10) || 40;
+  
+  // Berikan buffer +5 ke AI agar kita tidak pernah kekurangan keyword setelah proses deduplikasi
+  const aiRequestCount = targetCount + 5; 
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
-  for (const modelName of modelsToTry) {
+  if (provider === 'groq' || provider === 'mistral') {
+    // Jalur Sinkronisasi Groq / Mistral (Text-Only, memanfaatkan data interogasi teks Gemini)
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Analyze the provided visual content and generate the requested metadata with exactly ${keywordCount} keywords.` }] }, {
+      const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        // Kita perintahkan AI untuk menghasilkan jumlah buffer agar array-nya gemuk
+        contents: `Analyze the provided visual description text data and generate the requested compliant stock metadata JSON containing approximately ${aiRequestCount} single-word keywords.`,
         responseMimeType: "application/json",
-        responseSchema
+        responseSchema,
+        config: { temperature: 0.35 } // Sedikit dinaikkan ke 0.35 agar variasi kata kunci melimpah
       });
-      break;
-    } catch (err: any) {
+      response = { text: answerText };
+    } catch (err) {
       lastError = err;
-      console.warn(`[generateStockMetadata] Failed with ${modelName}:`, err.message || err);
+      console.warn(`[generateStockMetadata] Hybrid pipeline failed with ${provider.toUpperCase()}:`, err);
+    }
+  } else {
+    // Jalur Sinkronisasi Gemini Tradisional (Multimodal - Kirim Gambar Langsung)
+    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    for (const modelName of modelsToTry) {
+      try {
+        response = await getAIClient().models.generateContent({
+          model: modelName,
+          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with approximately ${aiRequestCount} keywords.` }] },
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema,
+            temperature: 0.3
+          }
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[generateStockMetadata] Gemini direct failed with ${modelName}:`, err.message || err);
+      }
     }
   }
+
   if (!response) throw lastError;
 
+  // --- TAHAP 6: PARSING, SANITASI TOTAL, DAN PENGUNCIAN JUMLAH KEYWORD ---
   try {
     const text = response.text || "{}";
     const data = JSON.parse(text);
     
     if (data.keywords && Array.isArray(data.keywords)) {
-      data.keywords = data.keywords.map((k: string) => k.replace(/-/g, ' '));
+      let strictSingleWords: string[] = [];
+      
+      data.keywords.forEach((k: any) => {
+        if (typeof k === 'string') {
+          // 1. Ubah tanda hubung atau underscore menjadi spasi
+          // 2. Pecah berdasarkan spasi untuk mengantisipasi jika AI bandel mengeluarkan multi-word (misal: "white background")
+          const pieces = k.replace(/[-_]/g, ' ').split(/\s+/);
+          
+          pieces.forEach(word => {
+            // Bersihkan dari karakter non-alfabet (angka/simbol) dan ubah ke huruf kecil
+            const cleanWord = word.toLowerCase().trim().replace(/[^a-z]/g, '');
+            // Hanya masukkan kata yang valid (bukan sisa huruf typo satu karakter)
+            if (cleanWord.length > 1) {
+              strictSingleWords.push(cleanWord);
+            }
+          });
+        }
+      });
+      
+      // 3. Hilangkan duplikat kata kunci menggunakan Set
+      const uniqueKeywords = Array.from(new Set(strictSingleWords));
+      
+      // 4. KUNCI PAKSA: Potong array secara presisi dari indeks 0 hingga targetCount (misal: 40)
+      data.keywords = uniqueKeywords.slice(0, targetCount);
+    }
+    
+    // --- LAKUKAN VALIDASI & SANITASI KATEGORI SHUTTERSTOCK DI SINI ---
+    const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
+
+    // 1. Amankan Kategori 1: Jika kosong atau melenceng dari array, beri default aman
+    if (!data.shutterstock_category_1 || !validShutterstockCats.includes(data.shutterstock_category_1)) {
+      data.shutterstock_category_1 = validShutterstockCats[0] || "Animals/Wildlife";
+    }
+
+    // 2. Amankan Kategori 2: Jika kosong, tidak ada di daftar, atau sama dengan Kategori 1
+    if (
+      !data.shutterstock_category_2 || 
+      !validShutterstockCats.includes(data.shutterstock_category_2) || 
+      data.shutterstock_category_2 === data.shutterstock_category_1
+    ) {
+      console.warn(`[JohMeta Guard] Category 2 invalid or duplicate ("${data.shutterstock_category_2}"). Applying smart fallback.`);
+      
+      const smartFallbackMap: Record<string, string> = {
+        "Animals/Wildlife": "Backgrounds/Textures",
+        "Backgrounds/Textures": "Abstract",
+        "Abstract": "Art",
+        "Illustrations": "Graphic Art"
+      };
+
+      const customFallback = smartFallbackMap[data.shutterstock_category_1];
+      
+      if (customFallback && validShutterstockCats.includes(customFallback)) {
+        data.shutterstock_category_2 = customFallback;
+      } else {
+        data.shutterstock_category_2 = validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Abstract";
+      }
     }
     
     return data as StockMetadata;
   } catch (error) {
-    console.error("Gemini Parse Error:", error, response.text);
-    throw new Error("Failed to parse AI response. Please try again.");
+    console.error("[JohMeta Parse Error] Failed to handle output format:", error, response.text);
+    throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
   }
 };
 
@@ -486,15 +622,62 @@ export const generateBatchStockMetadata = async (
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
+  // --- TAHAP 1: HYBRID VISION UNTUK BATCH JIKA GROQ/MISTRAL ---
+  let visualDescriptions: string[] = [];
+  if (provider === 'groq' || provider === 'mistral') {
+    console.log(`[JohMeta Pipeline - Batch] Running Gemini Vision to extract literal details for ${provider.toUpperCase()}...`);
+    
+    for (let i = 0; i < items.length; i++) {
+        const imageParts = items[i].frames.map(frame => processFrameServer(frame));
+        const visionSystemInstruction = `You are an objective computer vision engine.
+Describe this specific visual asset (Asset #${i + 1}) in absolute complete detail. Focus on subjects, actions, colors, environment, textures, and composition. NO metadata or titles.`;
+        
+        try {
+            const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
+              parts: [...imageParts, { text: "Provide an exhaustive literal description of this asset for stock metadata generation." }] 
+            }, {
+              systemInstruction: visionSystemInstruction,
+              temperature: 0.3
+            });
+            visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${visionResponse.text || ""}`);
+        } catch (err) {
+            console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err);
+            visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION: [Factual visual analysis failed for this asset]`);
+        }
+    }
+  }
+
   const itemSchema = {
     type: Type.OBJECT,
     properties: {
-      title: { type: Type.STRING, description: 'Impactful title in Sentence case (max 150 chars, no commas). It MUST combine 3 aspects: what is in the asset (subject/objects), the action/flow (movement/progression), and the concept (theme/mood).' },
-      description: { type: Type.STRING, description: 'Detailed visual description followed by a sentence starting with "Ideal for..." suggesting potential uses, max 200 chars.' },
-      keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: `List of exactly ${keywordCount} conceptual and descriptive keywords in English, ordered by relevance. CRITICAL: Use only single words; no multi-word phrases.` },
-      category_id: { type: Type.INTEGER, description: 'The most accurate Adobe Stock category ID.' },
-      shutterstock_category_1: { type: Type.STRING, description: 'The primary Shutterstock category. Must be exactly one of the provided Shutterstock categories.' },
-      shutterstock_category_2: { type: Type.STRING, description: 'The secondary Shutterstock category. Must be exactly one of the provided Shutterstock categories, and MUST BE DIFFERENT from shutterstock_category_1.' }
+      title: { 
+        type: Type.STRING, 
+        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). MUST naturally combine: Subject, Action/Flow, and Core Concept.' 
+      },
+      description: { 
+        type: Type.STRING, 
+        description: 'Detailed visual description followed by a sentence starting with "Ideal for..." or "Perfect for..." suggesting commercial uses, max 200 chars.' 
+      },
+      keywords: { 
+        type: Type.ARRAY, 
+        items: { type: Type.STRING }, 
+        description: `List of exactly ${keywordCount} high-volume keywords in English. CRITICAL: Every keyword MUST be exactly a single word; no multi-word phrases.` 
+      },
+      category_id: { 
+        type: Type.INTEGER, 
+        description: 'The most accurate Adobe Stock category ID.' 
+      },
+      shutterstock_category_1: { 
+        type: Type.STRING, 
+        description: 'Primary Shutterstock category. Must strictly match the provided list.' 
+      },
+      shutterstock_category_2: { 
+        type: Type.STRING, 
+        description: 'Secondary (different) Shutterstock category. Must strictly match the provided list.' 
+      }
     },
     required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2"],
   };
@@ -502,80 +685,65 @@ export const generateBatchStockMetadata = async (
   const responseSchema = {
     type: Type.ARRAY,
     items: itemSchema,
-    description: `An array containing exactly ${items.length} metadata objects, corresponding to the ${items.length} provided visual inputs in the exact same order.`
+    description: `An array of exactly ${items.length} metadata objects corresponding to each visual asset.`
   };
 
-  let mediaContext = "The provided images are photographs or digital images.";
-  if (toolType === ToolType.VIDEO) {
-      mediaContext = "CRITICAL: Each provided input is a STORYBOARD (a grid of sequential frames) extracted from a single VIDEO or ANIMATION. Describe the overall motion, action, and subject of each video as a single continuous scene.";
-  } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-      mediaContext = "The provided images are previews of VECTOR graphics or illustrations. CRITICAL: DO NOT start titles with 'Vector of', 'Illustration of', 'Drawing of', or 'Continuous line drawing of'. Focus entirely on describing the main subject or object directly. Note: Previews are generated with a flat background. Do not mention or describe the background explicitly unless it is clearly an integral part of the composition.";
+  let mediaContext = "";
+  if (provider === 'groq' || provider === 'mistral') {
+    mediaContext = `Factual text descriptions for ${items.length} visual assets are provided below. Build your metadata strictly based on these descriptions:\n\n${visualDescriptions.join('\n\n')}`;
+  } else {
+    mediaContext = toolType === ToolType.VIDEO 
+      ? `Sequential storyboard frames for ${items.length} separate video items are provided.` 
+      : `Photographs or digital artworks for ${items.length} separate items are provided.`;
   }
 
+  const groqOptimizationRules = provider === 'groq' ? `
+[CRITICAL GROQ SPEED OPTIMIZATION]
+- DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
+- Start your response directly with '[' and end exactly with ']'. Break the execution instantly after the closing bracket.
+
+[CRITICAL GROQ ADOBE STOCK COMPLIANCE RULES]
+1. TITLE FORMAT (NATURAL SENTENCE CASE):
+   - The title must be a single, natural, readable sentence.
+   - Strictly use Sentence case. Capitalize ONLY the first letter of the entire title.
+   - NO commas in the title. NO keyword lists in the title.
+   - Max length 100 chars.
+2. TOTAL BAN ON AI BUZZWORDS:
+   - NEVER use "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "render".
+3. ADOBE SEARCH ALGORITHM KEYWORD WEIGHTING:
+   - Order: Subject (1-3) → Main Action (4-5) → Environment (6-7) → Core Concept (8-10).
+4. NO SYNONYM STACKING:
+   - Pick the most commercially relevant term. Max 50 keywords.
+5. STRICT SINGLE-WORD ENFORCEMENT:
+   - Every keyword MUST be exactly ONE word. Split multi-word concepts.` : '';
+
   const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
-Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords.
+Your goal is to maximize discoverability for premium buyers.
+OUTPUT MUST BE 100% IN ENGLISH.${groqOptimizationRules}
 
 ${mediaContext}
 
-CRITICAL BATCH INSTRUCTION:
-You are receiving ${items.length} distinct visual inputs.
-You MUST return a JSON array containing EXACTLY ${items.length} objects.
-The first object in the array must correspond to VISUAL INPUT 1, the second to VISUAL INPUT 2, and so on.
+[STRICT ADOBE STOCK COMPLIANCE RULES]
+1. TITLE RULES:
+   - Formatted strictly in Sentence case (Capitalize only the first letter).
+   - Must be a natural, flowing sentence. NEVER use commas. Max 100 chars.
+   - CRITICAL: DO NOT start titles with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "Isolated shot of", or "A minimalist...". 
+   - START DIRECTLY with the main subject and action (e.g., "Seated dog silhouette with elegant decorative swirls...").
 
-CRITICAL CREATIVE DIVERSITY RULES (MUST FOLLOW STRICTLY):
-1. Do not regenerate previous ideas.
-2. Treat every generation as a completely new creative session and assume all previous scenes are exhausted.
-3. Invent new occupations, activities, stories, environments, and situations for every request.
-4. Avoid minor variations of existing concepts.
-5. Never regenerate concepts that are semantically similar to previous outputs. Similarity includes: same profession, same activity, same commercial message, same visual story, and same buyer intent.
-6. Avoid concepts that belong to the top 20% most common Adobe Stock categories.
+2. KEYWORD EXPANSION RULES (HIT THE TARGET COUNT):
+   - You MUST generate exactly ${keywordCount} unique keywords for each item. Do not stop early.
+   - To hit the requested count safely without synonym stacking, systematically brainstorm across these 5 categories:
+     1. Direct Subjects: dog, canine, pup, paw, print, animal, pet.
+     2. Art Style & Medium: silhouette, line, stroke, swirl, flourish, curl, minimalist, calligraphic, graphic, ink.
+     3. Technical/Visual Traits: black, yellow, gold, background, texture, paper, grain, isolated, clean, shape, icon, logo, emblem, symbol.
+     4. Mood & Concept: elegant, modern, creative, calm, simple, abstract, decorative, ornate.
+     5. Commercial Use-cases & Industries: design, branding, merchandise, tattoo, craft, printing, card, cover, element, asset.
+   - Every keyword MUST be a single word. No spaces, no hyphens. Split "line art" into "line" and "art".
 
-CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
-3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
-5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-
-Rules for Titles:
-1. The title MUST incorporate three key aspects:
-   - **Apa yang ada di aset (What is in the asset)**: Clear identification of the main subject, elements, or objects.
-   - **Alur (Flow/Action)**: The action, movement, process, or progression taking place.
-   - **Konsep (Concept)**: The underlying theme, mood, environment, or conceptual meaning (e.g., modern technology, teamwork, peaceful loneliness, premium product).
-2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-3. Limit title to 100 characters. Use impactful, searchable terms.
-4. Use easy-to-read phrases, NOT formal sentence structures.
-5. DO NOT start titles with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-6. DO NOT treat the title like a list of keywords. No commas separating words.
-7. Prioritize the main subject at the beginning of the title.
-8. Avoid keyword stuffing, repetition, and synonym stacking.
-9. Do not include file type, AI-generated terms, camera details, or technical information.
-10. Use natural, search-friendly phrases that accurately describe visible content only.
-11. Avoid subjective promotional words such as best, amazing, perfect, or stunning unless clearly justified by the visual.
-12. Analyze what is in the assets properly, don't draw your own conclusions, be accurate and correct.
-
-Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset.
-3. Limit to 200 characters.
-
-Rules for Keywords:
-1. Start with the most important descriptors. Use conceptual terms (e.g., 'concept', 'success', 'nature').
-2. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
-3. Ensure no IP, brands, or names are included.
-4. Order keywords by priority (Adobe Stock weights first keywords highest):
-   Subject → Concept → Emotion → Category → Activity → Environment → Commercial → Technical
-5. Only describe elements visually present in the image.
-   Never infer, assume, or add context beyond what is seen.
-6.  No synonym stacking. Maximum 2 keywords with overlapping meaning
-   per category. Choose the highest-search-volume term.
-7. Maximum 50 keywords. Hard limit per Adobe Stock contributor policy.
-    Quality over quantity — irrelevant keywords reduce search ranking
-
-Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+3. TOTAL AI BAN:
+   - NEVER use: "generative ai", "midjourney", "stable diffusion", "dall-e", "prompt", "photorealistic", "hyperrealistic", "4k", "8k", "unreal engine", or "render".
+4. NO INTELLECTUAL PROPERTY:
+   - Absolutely no brand names or trademarks.
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -583,59 +751,176 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-User preference: ${customPrompt || "Follow standard best practices."}`;
+User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}`;
 
-  const parts: any[] = [];
-  for (let index = 0; index < items.length; index++) {
-    const item = items[index];
-    parts.push({ text: `\n\n--- VISUAL INPUT ${index + 1} ---\n` });
-    for (const frame of item.frames) {
-      const processedFrame = processFrameServer(frame);
-      parts.push(processedFrame);
-    }
-  }
+  // --- TAHAP 5: HITUNG TARGET DAN EKSEKUSI PANGGILAN API ---
+  const targetCount = parseInt(String(keywordCount), 10) || 40;
+  const aiRequestCount = targetCount + 5;
 
-  parts.push({ text: `\n\nAnalyze the ${items.length} visual inputs above and generate the JSON array with exactly ${items.length} metadata objects.` });
-
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
-  for (const modelName of modelsToTry) {
+  if (provider === 'groq' || provider === 'mistral') {
     try {
-      response = await callGeminiWithRetry(modelName, { parts }, {
+      const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        contents: `Generate a JSON array of exactly ${items.length} metadata objects for the assets described, ensuring each has approximately ${aiRequestCount} single-word keywords.`,
         responseMimeType: "application/json",
-        responseSchema
+        responseSchema,
+        config: { temperature: 0.35 }
       });
-      break;
-    } catch (err: any) {
+      response = { text: answerText };
+    } catch (err) {
       lastError = err;
-      console.warn(`[generateBatchStockMetadata] Failed with ${modelName}:`, err.message || err);
+      console.warn(`[JohMeta Pipeline - Batch] Hybrid pipeline failed with ${provider.toUpperCase()}:`, err);
+    }
+  } else {
+    const parts: any[] = [];
+    for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        parts.push({ text: `\n\n--- ITEM ${index + 1} ---\n` });
+        item.frames.forEach(f => parts.push(processFrameServer(f)));
+    }
+    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with approximately ${aiRequestCount} keywords.` });
+
+    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    for (const modelName of modelsToTry) {
+      try {
+        response = await getAIClient().models.generateContent({
+          model: modelName,
+          contents: { parts },
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema,
+            temperature: 0.3
+          }
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[JohMeta Pipeline - Batch] Gemini direct batch failed with ${modelName}:`, err.message || err);
+      }
     }
   }
+
   if (!response) throw lastError;
 
   try {
     const text = response.text || "[]";
     const dataArray = JSON.parse(text) as StockMetadata[];
 
-    if (!Array.isArray(dataArray)) {
-        throw new Error("AI did not return an array.");
-    }
-
     return dataArray.map((metadata, index) => {
         if (metadata.keywords && Array.isArray(metadata.keywords)) {
-            metadata.keywords = metadata.keywords.map((k: string) => k.replace(/-/g, ' '));
+            let strictSingleWords: string[] = [];
+            metadata.keywords.forEach((k: any) => {
+                if (typeof k === 'string') {
+                    const pieces = k.replace(/[-_]/g, ' ').split(/\s+/);
+                    pieces.forEach(word => {
+                        const cleanWord = word.toLowerCase().trim().replace(/[^a-z]/g, '');
+                        if (cleanWord.length > 1) {
+                            strictSingleWords.push(cleanWord);
+                        }
+                    });
+                }
+            });
+            const uniqueKeywords = Array.from(new Set(strictSingleWords));
+            metadata.keywords = uniqueKeywords.slice(0, targetCount);
         }
-        const targetId = items[index] ? items[index].id : items[items.length - 1].id;
+
+        // --- LAKUKAN VALIDASI & SANITASI KATEGORI SHUTTERSTOCK DI SINI ---
+        const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
+
+        // 1. Amankan Kategori 1: Jika kosong atau melenceng dari array, beri default aman
+        if (!metadata.shutterstock_category_1 || !validShutterstockCats.includes(metadata.shutterstock_category_1)) {
+            metadata.shutterstock_category_1 = validShutterstockCats[0] || "Animals/Wildlife";
+        }
+
+        // 2. Amankan Kategori 2 (BIANG KEROK FIX): Jika kosong, tidak ada di daftar, atau sama dengan Kategori 1
+        if (
+          !metadata.shutterstock_category_2 || 
+          !validShutterstockCats.includes(metadata.shutterstock_category_2) || 
+          metadata.shutterstock_category_2 === metadata.shutterstock_category_1
+        ) {
+          const smartFallbackMap: Record<string, string> = {
+            "Animals/Wildlife": "Backgrounds/Textures",
+            "Backgrounds/Textures": "Abstract",
+            "Abstract": "Art",
+            "Illustrations": "Graphic Art"
+          };
+
+          const customFallback = smartFallbackMap[metadata.shutterstock_category_1];
+          if (customFallback && validShutterstockCats.includes(customFallback)) {
+            metadata.shutterstock_category_2 = customFallback;
+          } else {
+            metadata.shutterstock_category_2 = validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Abstract";
+          }
+        }
+
+        const targetId = items[index] ? items[index].id : (items[0]?.id || 'unknown');
         return { id: targetId, metadata };
     });
   } catch (error) {
-    console.error("Gemini Parse Error:", error, response.text);
-    throw new Error("Failed to parse AI response. Please try again.");
+    console.error("[JohMeta Pipeline - Batch] Parse Error:", error, response.text);
+    throw new Error("Gagal memproses respons batch metadata. Silakan coba kembali.");
   }
 };
+
+function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
+  let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
+  
+  if (validatedPrompts.length === 0) {
+    // If absolutely no prompts, at least returning something to avoid crash, but ideally shouldn't happen
+    validatedPrompts = [`${subject} professional stock photography`].map(p => p);
+  }
+
+  const originalLength = validatedPrompts.length;
+  if (validatedPrompts.length < count) {
+    const modifiers = [
+      "cinematic macro photography, highly detailed",
+      "isometric 3D render, octane render, stylized lighting",
+      "vibrant watercolor ink illustration, splash art",
+      "futuristic cyberpunk city night life background, neon glow",
+      "classical oil painting, textured brush strokes, masterwork",
+      "minimalist flat graphic design icon",
+      "dramatic backlight, rim lighting, atmospheric depth",
+      "wide angle landscape composition, beautiful morning light",
+      "studio lighting portrait, bokeh depth of field",
+      "vintage retro concept art, detailed illustration"
+    ];
+    let modIdx = 0;
+    while (validatedPrompts.length < count) {
+      const base = validatedPrompts[validatedPrompts.length % originalLength];
+      const mod = modifiers[modIdx % modifiers.length];
+      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
+      modIdx++;
+    }
+  } else if (validatedPrompts.length > count) {
+    validatedPrompts = validatedPrompts.slice(0, count);
+  }
+  
+  const appendNeg = userNegativePrompt && userNegativePrompt.trim().length > 0 
+    ? `Avoid: ${userNegativePrompt.trim()}` 
+    : "";
+  
+  const processedPrompts = validatedPrompts.map((p: string) => {
+    if (appendNeg) {
+      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
+      return `${p.trim()}${separator}${appendNeg}`;
+    }
+    return p.trim();
+  });
+
+  return {
+    prompts: processedPrompts,
+    negativePrompt: appendNeg || parsed.negativePrompt || "",
+    styleExplanation: parsed.styleExplanation || [
+      `Berhasil mensintesis ${count} variasi prompt bertema ${subject}.`,
+      `Menggunakan spektrum gaya dan variabilitas komposisi visual.`,
+      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion.`
+    ]
+  };
+}
 
 export const generateOptimizedPrompt = async (options: {
   subject: string;
@@ -660,6 +945,9 @@ export const generateOptimizedPrompt = async (options: {
 
   const count = Math.min(Math.max(variation, 10), 150);
 
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
   const isPngMode = promptMode === 'png';
   let modeConstraint = "";
 
@@ -682,7 +970,7 @@ export const generateOptimizedPrompt = async (options: {
     "Anime/Manga": ' - Focus on cel-shaded aesthetics, expressive character features, vibrant colors, and classic Japanese hand-drawn illustration styles.',
     "Watercolor Painting": ' - Focus on flowing pigment washes, paper grain textures, organic color bleeds, and delicate artistic strokes.',
     "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.',
-    "Abstract": ' - Focus on non-representational forms, abstract shapes, dynamic liquid movements, vibrant color palettes, fluid contours, and minimalistic design compositions. Focus on pure design, artistic abstraction, and digital art. AVOID: Photographic elements, realistic textures, real-world lighting, camera settings, camera angles, shutter speed, aperture, ISO, photographic noise, and any mention of "photography" or "photorealistic".'
+    "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.'
   };
 
   const currentDirective = styleSpecificDirectives[styleCategory] || '';
@@ -734,10 +1022,10 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities.
 4. Environment: Only introduce environmental details if they naturally fit the theme. Do not introduce unrelated environments.
 5. Lighting: Essential details about mood, shadows, and light sources.
-6. Camera details: Specific lens types, aperture, and camera angles.
+6. Camera details: Specific lens types, aperture, and camera angles.${styleCategory !== 'Abstract' ? '' : ' EXCLUDE FOR ABSTRACT STYLE.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${styleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting] [Camera Details] [Commercial Intent]. Combine these elements into a fluid, professional magazine editorial-style description.
+0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${styleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${styleCategory !== 'Abstract' ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional magazine editorial-style description.
 0.1 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for commercial photography, use distinct camera settings, lighting, ambient conditions, and include "copy space" (negative space) for text placement.
@@ -787,86 +1075,63 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
   const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
-  for (const modelName of modelsToTry) {
+  if (provider === 'groq' || provider === 'mistral') {
     let attempts = 0;
     const maxAttempts = 2;
     while (attempts < maxAttempts) {
       try {
-        console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attempts + 1}/${maxAttempts})...`);
-        const response = await getAIClient().models.generateContent({
-          model: modelName,
-          contents: { parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }] },
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema,
-            temperature: 0.85
-          }
+        console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
+        const text = await callOpenAICompatibleWithRetry({
+          systemInstruction,
+          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
+          responseMimeType: "application/json",
+          responseSchema,
+          config: { temperature: 0.85 }
         });
-
-        const text = response.text || "{}";
+        
         const parsed = JSON.parse(text);
         if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
-          // Verify count or enforce exact quantity
-          let validatedPrompts = parsed.prompts.filter((p: any) => typeof p === 'string' && p.trim().length > 0);
-          
-          if (validatedPrompts.length > 0) {
-            // If model returned fewer prompts (e.g., due to token limit or lazy generation), pad them programmatically
-            const originalLength = validatedPrompts.length;
-            if (validatedPrompts.length < count) {
-              const modifiers = [
-                "cinematic macro photography, highly detailed",
-                "isometric 3D render, octane render, stylized lighting",
-                "vibrant watercolor ink illustration, splash art",
-                "futuristic cyberpunk city night life background, neon glow",
-                "classical oil painting, textured brush strokes, masterwork",
-                "minimalist flat graphic design icon",
-                "dramatic backlight, rim lighting, atmospheric depth",
-                "wide angle landscape composition, beautiful morning light",
-                "studio lighting portrait, bokeh depth of field",
-                "vintage retro concept art, detailed illustration"
-              ];
-              let modIdx = 0;
-              while (validatedPrompts.length < count) {
-                const base = validatedPrompts[validatedPrompts.length % originalLength];
-                const mod = modifiers[modIdx % modifiers.length];
-                validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
-                modIdx++;
-              }
-            } else if (validatedPrompts.length > count) {
-              validatedPrompts = validatedPrompts.slice(0, count);
-            }
-            
-            const appendNeg = userNegativePrompt && userNegativePrompt.trim().length > 0 
-              ? `Avoid: ${userNegativePrompt.trim()}` 
-              : "";
-            
-            const processedPrompts = validatedPrompts.map((p: string) => {
-              if (appendNeg) {
-                const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
-                return `${p.trim()}${separator}${appendNeg}`;
-              }
-              return p;
-            });
-
-            return {
-              prompts: processedPrompts,
-              negativePrompt: appendNeg || parsed.negativePrompt || "",
-              styleExplanation: parsed.styleExplanation || [
-                `Berhasil mensintesis ${count} variasi prompt bertema ${subject}.`,
-                `Menggunakan spektrum gaya dan variabilitas komposisi visual.`,
-                `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion.`
-              ]
-            };
-          }
+           // Reuse the validation/padding logic by breaking out and returning
+           return processPromptResults(parsed, count, subject, userNegativePrompt);
         }
       } catch (err: any) {
         lastError = err;
         attempts++;
-        console.warn(`Error on ${modelName} on attempt ${attempts}:`, err.message || err);
-        if (attempts < maxAttempts) {
-          const backoffTime = attempts * 1500;
-          await new Promise(resolve => setTimeout(resolve, backoffTime));
+        console.warn(`Error on ${provider.toUpperCase()} on attempt ${attempts}:`, err.message || err);
+        if (attempts < maxAttempts) await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  } else {
+    for (const modelName of modelsToTry) {
+      let attempts = 0;
+      const maxAttempts = 2;
+      while (attempts < maxAttempts) {
+        try {
+          console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attempts + 1}/${maxAttempts})...`);
+          const response = await getAIClient().models.generateContent({
+            model: modelName,
+            contents: { parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }] },
+            config: {
+              systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema,
+              temperature: 0.85
+            }
+          });
+
+          const text = response.text || "{}";
+          const parsed = JSON.parse(text);
+          if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
+            return processPromptResults(parsed, count, subject, userNegativePrompt);
+          }
+        } catch (err: any) {
+          lastError = err;
+          attempts++;
+          console.warn(`Error on ${modelName} on attempt ${attempts}:`, err.message || err);
+          if (attempts < maxAttempts) {
+            const backoffTime = attempts * 1500;
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+          }
         }
       }
     }
