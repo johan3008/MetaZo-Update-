@@ -681,7 +681,8 @@ export const generateOptimizedPrompt = async (options: {
     "Photorealistic": ' - Generate photorealistic stock photography prompts. Requirements: Authentic real-world photography, realistic people and environments, natural poses and actions, authentic lighting, realistic proportions, genuine human expressions, captured by a professional photographer. Include real-world camera settings (lens type and aperture), professional photography composition, natural imperfections allowed, and commercially usable. AVOID: Cinematic effects, unrealistic locations, fantasy elements, hyper-dramatic lighting, CGI appearance, and overly artistic descriptions. Use words like: "authentic", "realistic", "professional photography", "natural lighting", "copy space", "commercial concept", "clean composition", "genuine expressions", "realistic proportions".',
     "Anime/Manga": ' - Focus on cel-shaded aesthetics, expressive character features, vibrant colors, and classic Japanese hand-drawn illustration styles.',
     "Watercolor Painting": ' - Focus on flowing pigment washes, paper grain textures, organic color bleeds, and delicate artistic strokes.',
-    "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.'
+    "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.',
+    "Abstract": ' - Focus on non-representational forms, abstract shapes, dynamic liquid movements, vibrant color palettes, fluid contours, and minimalistic design compositions. Focus on pure design, artistic abstraction, and digital art. AVOID: Photographic elements, realistic textures, real-world lighting, camera settings, camera angles, shutter speed, aperture, ISO, photographic noise, and any mention of "photography" or "photorealistic".'
   };
 
   const currentDirective = styleSpecificDirectives[styleCategory] || '';
@@ -736,7 +737,7 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. Camera details: Specific lens types, aperture, and camera angles.
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting] [Camera Details] [Commercial Intent]. Combine these elements into a fluid, professional magazine editorial-style description.
+0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${styleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting] [Camera Details] [Commercial Intent]. Combine these elements into a fluid, professional magazine editorial-style description.
 0.1 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for commercial photography, use distinct camera settings, lighting, ambient conditions, and include "copy space" (negative space) for text placement.
@@ -1028,11 +1029,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "Radiant abstract light pulses, ethereal dark atmosphere, vibrant accent streaks, complex motion and light play",
       "Abstract digital light art, deep dark void background, sharp crystalline motion, vibrant glowing focal point",
       "Energetic abstract composition, fluid white light waves, sharp angular glass fragments, intense vibrant spotlight, dark noir atmosphere",
-      "Minimalist abstract composition, large color fields, harmonious gradients, plenty of negative copy space",
-      "Fluid abstract liquid motion, soft blended colors, ethereal light pathways, smooth composition",
-      "Abstract geometric pattern, subtle overlapping shapes, clean minimalist lines, soft textured background",
-      "Abstract light refraction effect, prismatic color diffusion, graceful sweeping motion, calm atmospheric mood",
-      "Abstract ethereal smoke patterns, graceful soft swirls, subtle light gradients, minimalist background"
+      "Vibrant fluid liquid art, colorful swirling thick pigments, high viscosity motion, chaotic yet harmonious abstract flow",
+      "Futuristic geometric abstract, complex interlocking angular shapes, metallic textures, neon grid lines, cinematic dark theme",
+      "Abstract particle simulation, dense glowing dots in motion, dark deep void, energetic dispersal, cinematic moody lighting",
+      "Holographic gradient abstract, iridescent flowing curves, light refraction, mysterious ethereal textures, dark background",
+      "Complex abstract fractal geometry, infinite intricate patterns, glowing edges, dark contrast lighting, futuristic artistic design"
     ],
     "Vintage Photography": [
       "authentic vintage analog photograph, film grain texture, classic 1970s warm color grading, nostalgic light leaks",

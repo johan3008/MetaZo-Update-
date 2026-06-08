@@ -316,14 +316,14 @@ const CopyBox: React.FC<{
             </div>
             {isTextArea ? (
                 <textarea 
-                    className={`w-full p-4 bg-slate-50/60 dark:bg-black/20 border border-slate-200/80 dark:border-white/5 rounded-2xl text-[12px] leading-relaxed outline-none focus:ring-4 ${focusRingClass} transition-all min-h-[90px] resize-none font-medium text-slate-700 dark:text-slate-200`} 
+                    className={`w-full p-4 bg-white/50 dark:bg-slate-900/40 border border-slate-300/50 dark:border-white/10 rounded-2xl text-[12px] leading-relaxed outline-none focus:ring-4 ${focusRingClass} focus:border-blue-400 dark:focus:border-blue-700/50 transition-all min-h-[90px] resize-none font-medium text-slate-700 dark:text-slate-200 shadow-inner`} 
                     value={value} 
                     onChange={(e) => onChange(e.target.value)} 
                 />
             ) : (
                 <input 
                     type="text" 
-                    className={`w-full p-4 bg-slate-50/60 dark:bg-black/20 border border-slate-200/80 dark:border-white/5 rounded-2xl text-[12px] outline-none focus:ring-4 ${focusRingClass} transition-all font-semibold text-slate-700 dark:text-slate-200`} 
+                    className={`w-full p-4 bg-white/50 dark:bg-slate-900/40 border border-slate-300/50 dark:border-white/10 rounded-2xl text-[12px] outline-none focus:ring-4 ${focusRingClass} focus:border-blue-400 dark:focus:border-blue-700/50 transition-all font-semibold text-slate-700 dark:text-slate-200 shadow-inner`} 
                     value={value} 
                     onChange={(e) => onChange(e.target.value)} 
                 />
@@ -2109,6 +2109,15 @@ const App: React.FC = () => {
             </div>
             <h2 className="text-sm font-black text-[#4e73df] mb-2 uppercase">Welcome to MetaZo PRO v1.0.0</h2>
             <p className="text-xs text-slate-500 mb-6 font-semibold bg-emerald-500/5 px-2 py-1 rounded">Stock Asset Optimizer</p>
+            <div className="text-left w-full mb-6">
+              <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">Features:</p>
+              <ul className="text-[10px] text-slate-500 dark:text-slate-400 space-y-1 list-disc pl-4">
+                <li>AI-powered stock asset optimization</li>
+                <li>Lightweight & fast generation</li>
+                <li>Multiple provider support</li>
+                <li>Advanced prompt management</li>
+              </ul>
+            </div>
             <button onClick={handleCloseWelcome} className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-lg text-xs uppercase">Get Started</button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import LogoImage from '../assets/images/metazo_pro_white_logo_1780846443986.png';
+import LogoImage from '../assets/images/metazo_new_logo_1780881376762.png';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle
