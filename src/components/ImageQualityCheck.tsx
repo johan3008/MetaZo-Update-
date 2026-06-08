@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
   asset_type_detection?: {
@@ -29,6 +30,29 @@ export const ImageQualityCheck: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [expandedReports, setExpandedReports] = useState<Record<string, boolean>>({});
+  const [progress, setProgress] = useState(0);
+
+  const LoadingSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={`qc-skeleton-${i}`} className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-xl p-5 border border-slate-200 dark:border-white/5 h-[400px] flex flex-col animate-pulse">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-1/2 h-4 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
+            <div className="w-16 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
+          </div>
+          <div className="w-full aspect-video bg-slate-200 dark:bg-slate-700/50 rounded-xl mb-4" />
+          <div className="space-y-3">
+            <div className="w-24 h-3 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
+            <div className="grid grid-cols-1 gap-2">
+              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg" />
+              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg" />
+              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const toggleReportExpand = (fileName: string) => {
     setExpandedReports(prev => ({ ...prev, [fileName]: !prev[fileName] }));
@@ -123,12 +147,23 @@ export const ImageQualityCheck: React.FC = () => {
   const handleAnalyze = async () => {
     if (files.length === 0) return;
     setLoading(true);
+    setProgress(0);
     setError(null);
+    setReports({}); // Clear previous
     const newReports: Record<string, QualityReport> = {};
 
-    for (const file of files) {
+    const progressPerFile = 100 / files.length;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const startProgress = i * progressPerFile;
+      
       try {
+        // Increment internally a bit
+        setProgress(startProgress + 5);
+        
         const base64Image = await resizeAndProcess(file);
+        setProgress(startProgress + 15);
 
         const response = await fetch('/api/check-image-quality', {
           method: 'POST',
@@ -139,17 +174,29 @@ export const ImageQualityCheck: React.FC = () => {
         const data = await response.json();
         newReports[file.name] = data;
         setReports({ ...newReports });
+        
+        setProgress(startProgress + progressPerFile);
       } catch (err: any) {
         setError(err.message);
       }
     }
-    setLoading(false);
+    setProgress(100);
+    setTimeout(() => setLoading(true), 100); // Trigger a quick refresh state if needed
+    setTimeout(() => setLoading(false), 300);
   };
 
   return (
     <div className="w-full space-y-6">
       {/* Brand Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4 relative overflow-hidden">
+        {/* Progress Bar Glow */}
+        {loading && (
+          <div 
+            className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all duration-300 ease-out z-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+            style={{ width: `${progress}%` }}
+          />
+        )}
+        
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
             <Sparkles className="text-emerald-500" size={24} />
@@ -216,8 +263,8 @@ export const ImageQualityCheck: React.FC = () => {
                   </button>
                 </div>
                 <div className="max-h-[250px] overflow-y-auto space-y-2 custom-scrollbar">
-                  {files.map((file) => (
-                    <div key={file.name} className="flex items-center gap-2.5 text-[10px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 p-1.5 rounded-xl">
+                  {files.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2.5 text-[10px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 p-1.5 rounded-xl">
                       {previews[file.name] ? (
                         <img 
                           src={previews[file.name]} 
@@ -240,108 +287,143 @@ export const ImageQualityCheck: React.FC = () => {
         {/* Right Column: Results */}
         <div className="xl:col-span-8 space-y-6">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm">
-            {error && <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-xl text-xs font-bold">{error}</div>}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(reports).map(([fileName, report]) => {
-                const r = report as QualityReport;
-                const audit = r.technical_audit;
-                const assetType = r.asset_type_detection;
-                const judgment = r.final_judgment;
-                const status = (judgment?.status || "REJECTED").toUpperCase();
-                const isApproved = status === "APPROVED";
-                const displayStatus = isApproved ? "APPROVED" : "REJECTED";
-                const rReason = judgment?.official_reason;
-                const confidence = judgment?.fixed_confidence;
-
-                const hasArtifacts = audit?.artifacts_and_noise === "FAILED";
-                const hasIpViolations = audit?.intellectual_property_and_logos === "FAILED";
-                const hasBrokenText = audit?.broken_text_and_oil_paint === "FAILED";
-                const hasBadFraming = audit?.bad_framing_and_clipping === "FAILED";
-                const hasSpam = audit?.similar_content_and_spam === "FAILED";
-                const hasAiPolicyViolations = audit?.generative_ai_policies === "FAILED";
-
-                return (
-                  <div key={fileName} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-5 space-y-4 border border-slate-100 dark:border-white/10">
-                    <div className="flex items-start justify-between gap-2 border-b border-white/5 pb-3">
-                      <p className="font-bold text-xs text-slate-700 dark:text-slate-300 truncate flex items-center gap-2">
-                        <FileImage size={14} className="text-slate-400" />
-                        {fileName}
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div
+                  key="loading-qc"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-6"
+                >
+                  <div className="flex flex-col items-center justify-center text-center py-6 space-y-4">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
+                      <Loader2 size={40} className="text-emerald-500 animate-spin relative" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
+                        {progress < 40 ? "Pixel Analysis..." : progress < 80 ? "Auditing IP & Logos..." : "Finalizing QC Report..."}
+                      </h3>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                        Performing deep technical audit for Adobe Stock standards
                       </p>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {confidence && (
-                          <span className="text-[9px] bg-slate-200/50 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-350 font-bold">
-                            Match: {confidence}
-                          </span>
-                        )}
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {displayStatus}
-                        </span>
-                      </div>
                     </div>
-
-                    {previews[fileName] && (
-                      <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-100 dark:border-white/5 shadow-inner">
-                        <img 
-                          src={previews[fileName]} 
-                          alt={fileName} 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                    )}
-
-                    {/* Knockout Validation Status Indicators */}
-                    <div className="space-y-2">
-                      <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">TECHNICAL AUDIT</p>
-                      <div className="grid grid-cols-1 gap-2 text-[11px]">
-                        {[
-                          { label: 'Artifacts & Noise', failed: hasArtifacts },
-                          { label: 'Intellectual Property', failed: hasIpViolations },
-                          { label: 'Broken Text & Oil Paint', failed: hasBrokenText },
-                          { label: 'Framing & Clipping', failed: hasBadFraming },
-                          { label: 'Spam/Duplicate', failed: hasSpam },
-                          { label: 'AI Policies', failed: hasAiPolicyViolations },
-                        ].map((item) => (
-                          <div key={item.label} className={`px-3 py-2 rounded-lg flex items-center justify-between border ${
-                            item.failed 
-                              ? 'bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30' 
-                              : 'bg-slate-50 border-slate-100 dark:bg-slate-800 dark:border-slate-700/50'
-                          }`}>
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">{item.label}</span>
-                            <span className={`font-black uppercase text-[9px] ${item.failed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                              {item.failed ? 'FAIL' : 'PASS'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {assetType && (
-                      <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-2.5">
-                          <p className="text-slate-400 font-semibold uppercase mb-0.5">AI Generated</p>
-                          <p className="font-black text-slate-800 dark:text-slate-200 text-xs">{assetType.is_ai_generated ? "Yes" : "No"}</p>
-                        </div>
-                        <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-2.5">
-                          <p className="text-slate-400 font-semibold uppercase mb-0.5">Category</p>
-                          <p className="font-black text-slate-800 dark:text-slate-200 text-xs uppercase">{assetType.correct_category}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {displayStatus === 'REJECTED' && rReason && (
-                      <div className="p-3 bg-rose-50/70 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 rounded-lg">
-                        <p className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 mb-1">Rejection Reason</p>
-                        <p className="text-[10px] font-medium text-rose-800 dark:text-rose-300">{rReason}</p>
-                      </div>
-                    )}
                   </div>
-                );
-              })}
-            </div>
+                  <LoadingSkeleton />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="results-qc"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-4"
+                >
+                  {error && <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-xl text-xs font-bold">{error}</div>}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(reports).map(([fileName, report], rIdx) => {
+                      const r = report as QualityReport;
+                      const audit = r.technical_audit;
+                      const assetType = r.asset_type_detection;
+                      const judgment = r.final_judgment;
+                      const status = (judgment?.status || "REJECTED").toUpperCase();
+                      const isApproved = status === "APPROVED";
+                      const displayStatus = isApproved ? "APPROVED" : "REJECTED";
+                      const rReason = judgment?.official_reason;
+                      const confidence = judgment?.fixed_confidence;
+
+                      const hasArtifacts = audit?.artifacts_and_noise === "FAILED";
+                      const hasIpViolations = audit?.intellectual_property_and_logos === "FAILED";
+                      const hasBrokenText = audit?.broken_text_and_oil_paint === "FAILED";
+                      const hasBadFraming = audit?.bad_framing_and_clipping === "FAILED";
+                      const hasSpam = audit?.similar_content_and_spam === "FAILED";
+                      const hasAiPolicyViolations = audit?.generative_ai_policies === "FAILED";
+
+                      return (
+                        <div key={`${fileName}-${rIdx}`} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-5 space-y-4 border border-slate-100 dark:border-white/10">
+                          <div className="flex items-start justify-between gap-2 border-b border-white/5 pb-3">
+                            <p className="font-bold text-xs text-slate-700 dark:text-slate-300 truncate flex items-center gap-2">
+                              <FileImage size={14} className="text-slate-400" />
+                              {fileName}
+                            </p>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {confidence && (
+                                <span className="text-[9px] bg-slate-200/50 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-350 font-bold">
+                                  Match: {confidence}
+                                </span>
+                              )}
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {displayStatus}
+                              </span>
+                            </div>
+                          </div>
+
+                          {previews[fileName] && (
+                            <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-100 dark:border-white/5 shadow-inner">
+                              <img 
+                                src={previews[fileName]} 
+                                alt={fileName} 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          )}
+
+                          {/* Knockout Validation Status Indicators */}
+                          <div className="space-y-2">
+                            <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">TECHNICAL AUDIT</p>
+                            <div className="grid grid-cols-1 gap-2 text-[11px]">
+                              {[
+                                { label: 'Artifacts & Noise', failed: hasArtifacts },
+                                { label: 'Intellectual Property', failed: hasIpViolations },
+                                { label: 'Broken Text & Oil Paint', failed: hasBrokenText },
+                                { label: 'Framing & Clipping', failed: hasBadFraming },
+                                { label: 'Spam/Duplicate', failed: hasSpam },
+                                { label: 'AI Policies', failed: hasAiPolicyViolations },
+                              ].map((item) => (
+                                <div key={item.label} className={`px-3 py-2 rounded-lg flex items-center justify-between border ${
+                                  item.failed 
+                                    ? 'bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30' 
+                                    : 'bg-slate-50 border-slate-100 dark:bg-slate-800 dark:border-slate-700/50'
+                                }`}>
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">{item.label}</span>
+                                  <span className={`font-black uppercase text-[9px] ${item.failed ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                    {item.failed ? 'FAIL' : 'PASS'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {assetType && (
+                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                              <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-2.5">
+                                <p className="text-slate-400 font-semibold uppercase mb-0.5">AI Generated</p>
+                                <p className="font-black text-slate-800 dark:text-slate-200 text-xs">{assetType.is_ai_generated ? "Yes" : "No"}</p>
+                              </div>
+                              <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-2.5">
+                                <p className="text-slate-400 font-semibold uppercase mb-0.5">Category</p>
+                                <p className="font-black text-slate-800 dark:text-slate-200 text-xs uppercase">{assetType.correct_category}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {displayStatus === 'REJECTED' && rReason && (
+                            <div className="p-3 bg-rose-50/70 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 rounded-lg">
+                              <p className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 mb-1">Rejection Reason</p>
+                              <p className="text-[10px] font-medium text-rose-800 dark:text-rose-300">{rReason}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

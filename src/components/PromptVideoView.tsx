@@ -35,7 +35,9 @@ interface HistoryItem {
 export const PromptVideoView: React.FC = () => {
   const [keyword, setKeyword] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
   const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
   const [result, setResult] = useState<VideoAnalysisResult | null>(null);
   const [hollywoodPrompts, setHollywoodPrompts] = useState<VideoPrompt[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +58,17 @@ export const PromptVideoView: React.FC = () => {
     if (!keyword.trim() || isAnalyzing) return;
 
     setIsAnalyzing(true);
+    setAnalysisProgress(0);
     setResult(null);
     setHollywoodPrompts([]);
     setError(null);
+
+    const progressInterval = setInterval(() => {
+      setAnalysisProgress(prev => {
+        if (prev >= 95) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 400);
 
     try {
       const response = await fetch('/api/analyze-video-keyword', {
@@ -67,11 +77,14 @@ export const PromptVideoView: React.FC = () => {
         body: JSON.stringify({ keyword: keyword.trim() }),
       });
 
+      clearInterval(progressInterval);
+
       if (!response.ok) {
         throw new Error('Gagal menganalisis keyword. Coba lagi nanti.');
       }
 
       const data = await response.json();
+      setAnalysisProgress(100);
       setResult(data);
 
       // Save to history
@@ -89,7 +102,7 @@ export const PromptVideoView: React.FC = () => {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setIsAnalyzing(false);
+      setTimeout(() => setIsAnalyzing(false), 300);
     }
   };
 
@@ -115,7 +128,15 @@ export const PromptVideoView: React.FC = () => {
     if (!keyword.trim() || isGeneratingPrompts) return;
     
     setIsGeneratingPrompts(true);
+    setGenerationProgress(0);
     setError(null);
+
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => {
+        if (prev >= 95) return prev;
+        return prev + Math.random() * 8;
+      });
+    }, 500);
 
     try {
       const response = await fetch('/api/generate-hollywood-prompts', {
@@ -124,16 +145,19 @@ export const PromptVideoView: React.FC = () => {
         body: JSON.stringify({ keyword: keyword.trim() }),
       });
 
+      clearInterval(progressInterval);
+
       if (!response.ok) {
         throw new Error('Gagal menghasilkan Hollywood prompts. Coba lagi nanti.');
       }
 
       const data = await response.json();
+      setGenerationProgress(100);
       setHollywoodPrompts(data);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setIsGeneratingPrompts(false);
+      setTimeout(() => setIsGeneratingPrompts(false), 300);
     }
   };
 
@@ -163,6 +187,23 @@ export const PromptVideoView: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       {/* Header Section */}
       <section className="bg-white dark:bg-[#1e293b] rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-white/5 relative overflow-hidden">
+        {/* Progress Bars */}
+        <AnimatePresence>
+          {(isAnalyzing || isGeneratingPrompts) && (
+            <motion.div 
+              initial={{ height: 0 }}
+              animate={{ height: 3 }}
+              exit={{ height: 0 }}
+              className="absolute bottom-0 left-0 right-0 bg-slate-100 dark:bg-white/5 overflow-hidden"
+            >
+              <motion.div 
+                className={`h-full transition-all duration-300 ${isGeneratingPrompts ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'}`}
+                style={{ width: `${isGeneratingPrompts ? generationProgress : analysisProgress}%` }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -201,7 +242,7 @@ export const PromptVideoView: React.FC = () => {
                   {isAnalyzing ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
-                      <span>Analyzing...</span>
+                      <span>{Math.round(analysisProgress)}% Analyzed</span>
                     </>
                   ) : (
                     <>
@@ -219,7 +260,7 @@ export const PromptVideoView: React.FC = () => {
                   {isGeneratingPrompts ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
-                      <span>Generating...</span>
+                      <span>{Math.round(generationProgress)}% Mastery</span>
                     </>
                   ) : (
                     <>

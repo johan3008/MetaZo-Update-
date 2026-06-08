@@ -1869,18 +1869,23 @@ Return EXACTLY this JSON structure:
 }
 
 export async function generateCalendarEvents(month: string) {
-  const systemInstruction = `You are an expert Content Strategist for Adobe Stock and Shutterstock. 
-Your task is to identify upcoming festivals, holidays, seasonal changes, and cultural events for the specified month. 
-These events help contributors know what kind of photos, videos, or vectors they should produce to be ready for buyer demand.
+  const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
+Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month. 
 
 Rules:
-1. Provide a mix of global holidays (e.g., Christmas, New Year) and specific regional/cultural events.
-2. Focus on events with high commercial value for stock assets.
+1. BE COMPREHENSIVE: Do not just list 5-10 events. Find as many important events as possible (aim for at least 15-20 if valid) covering:
+   - Global Holidays (e.g., Earth Day, New Year).
+   - National Days and Independence Days of major countries.
+   - Religious Festivals (Eid, Diwali, Lunar New Year, Christmas, etc.).
+   - Major Sports Events or Cultural Carnivals.
+   - Seasonal Transitions (Start of Summer, Winter solstice).
+2. Focus on events with high commercial value for stock contributors.
 3. For each event, provide:
-   - name: The name of the holiday/event.
-   - date: The date (or date range) in that month.
-   - commercial_potential: Why it's important for stock buyers.
-   - suggested_topics: Keywords or subjects to focus on (e.g., "Family dinner", "Winter sports").
+   - name: Clear name of the event.
+   - date: Date or date range.
+   - location: Country name or "Global/World".
+   - commercial_potential: A detailed explanation of why stock buyers need content for this (e.g., "High demand for authentic family dinner photos").
+   - suggested_topics: 5-8 specific keywords or subjects.
 
 Output strictly in JSON format.`;
 
@@ -1894,10 +1899,11 @@ Output strictly in JSON format.`;
           properties: {
             name: { type: Type.STRING },
             date: { type: Type.STRING },
+            location: { type: Type.STRING },
             commercial_potential: { type: Type.STRING },
             suggested_topics: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ["name", "date", "commercial_potential", "suggested_topics"]
+          required: ["name", "date", "location", "commercial_potential", "suggested_topics"]
         }
       }
     },
@@ -1906,12 +1912,12 @@ Output strictly in JSON format.`;
 
   const response = await getAIClient().models.generateContent({
     model: 'gemini-3.1-flash-lite',
-    contents: `List essential commercial events, holidays, and seasonal trends for the month of ${month} that are relevant for stock content creators.`,
+    contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from.`,
     config: {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
-      temperature: 0.7
+      temperature: 0.8
     }
   });
 

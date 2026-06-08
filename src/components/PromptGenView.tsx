@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { copyToClipboard as robustCopy } from '../utils';
 import { 
-  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X
+  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2
 } from 'lucide-react';
 
 interface PromptGenViewProps {
@@ -70,6 +70,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
   const [minWords, setMinWords] = useState<number>(15);
   const [maxWords, setMaxWords] = useState<number>(60);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [promptMode, setPromptMode] = useState<'background' | 'png'>('background');
   const [pngBgColor, setPngBgColor] = useState<'white' | 'black' | 'transparent'>('white');
   const [bgNegativePrompt, setBgNegativePrompt] = useState('blurry, low quality, worst quality, text, watermark, signature, bad proportions, bad anatomy');
@@ -166,9 +167,18 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
 
     setError(null);
     setLoading(true);
+    setProgress(0);
     setResult(null);
     setCurrentPage(1);
     setSearchQuery('');
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 95) return prev;
+        return prev + Math.random() * 10;
+      });
+    }, 400);
 
     // Scroll smoothly to output container
     setTimeout(() => {
@@ -208,6 +218,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
       }
 
       setResult(data);
+      setProgress(100);
       
       // Save to local storage history list
       const historyItem: PromptHistoryItem = {
@@ -228,7 +239,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
       console.error("Failed generating prompt variations:", err);
       setError(err.message || "Sistem sedang padat, silakan coba beberapa saat lagi.");
     } finally {
-      setLoading(false);
+      clearInterval(progressInterval);
+      setTimeout(() => setLoading(false), 300);
     }
   };
 
@@ -306,7 +318,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
   return (
     <div className="w-full space-y-6">
       {/* Brand Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4 relative overflow-hidden">
+        {/* Progress Bar */}
+        {loading && (
+          <div 
+            className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all duration-300 ease-out z-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+            style={{ width: `${progress}%` }}
+          />
+        )}
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
             <Wand2 className="text-emerald-500 fill-emerald-500/10" size={24} />
@@ -734,16 +753,33 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
             )}
 
             {loading ? (
-              <div className="py-24 flex flex-col items-center justify-center space-y-4">
+              <div className="py-24 flex flex-col items-center justify-center space-y-6">
                 <div className="relative">
-                  <div className="w-14 h-14 rounded-full border-2 border-emerald-500/10 border-t-emerald-400 animate-spin" />
-                  <Wand2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-emerald-400 animate-pulse animate-duration-1000" size={18} />
+                  <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
+                  <Loader2 size={48} className="text-emerald-500 animate-spin relative" />
                 </div>
                 <div className="text-center space-y-2 max-w-sm mx-auto px-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-300">Gemini Pro sedang merumuskan skenario</p>
-                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed font-mono">
-                    Sintesis {variation} model prompt untuk tema "{subject}". Kami menyematkan detail pencahayaan ultra realistis, camera depth, dan komposisi ke tiap-tiap prompt.
+                  <h3 className="text-lg font-black text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
+                    {progress < 30 ? "Formulating Creative Scenarios..." : 
+                     progress < 60 ? "Synthesizing Artistic Detail..." : 
+                     progress < 90 ? "Polishing Prompt Spektrum..." : "Finalizing Output Collection..."}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed font-mono uppercase tracking-widest">
+                    Gemini Pro is expanding {variation} variations for "{subject}"
                   </p>
+                </div>
+                
+                <div className="w-full max-w-md bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 transition-all duration-300 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 w-full gap-3 mt-6">
+                  {[1, 2, 3].map(i => (
+                    <div key={`prompt-skel-${i}`} className="h-16 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl animate-pulse" />
+                  ))}
                 </div>
               </div>
             ) : result && result.prompts && result.prompts.length > 0 ? (

@@ -33,6 +33,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [loadingBatch, setLoadingBatch] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
   const [styleCategory, setStyleCategory] = useState('Cinematic');
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -141,6 +142,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
     if (unanalyzed.length === 0) return;
 
     setLoadingBatch(true);
+    setBatchProgress(0);
     setGlobalError(null);
 
     // Filter images that haven't been processed yet
@@ -153,6 +155,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
     ));
 
     try {
+      // Simulate progress increments
+      const progressInterval = setInterval(() => {
+        setBatchProgress(prev => {
+          if (prev >= 95) return prev;
+          return prev + Math.random() * 5;
+        });
+      }, 500);
+
       const response = await fetch('/api/analyze-batch-image-to-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,11 +172,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
         })
       });
 
+      clearInterval(progressInterval);
+
       if (!response.ok) {
         throw new Error("Gagal menganalisis batch gambar.");
       }
 
       const results = await response.json();
+      setBatchProgress(100);
       
       setImages(prev => prev.map(img => {
         const idx = pendingIds.indexOf(img.id);
@@ -183,7 +196,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
         pendingIds.includes(img.id) ? { ...img, loading: false, error: "Gagal analisis" } : img
       ));
     } finally {
-      setLoadingBatch(false);
+      setTimeout(() => setLoadingBatch(false), 300);
     }
   };
 
@@ -198,7 +211,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
   return (
     <div className="w-full space-y-6">
       {/* Brand Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4 relative overflow-hidden">
+        {/* Progress Bar */}
+        {loadingBatch && (
+          <div 
+            className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all duration-300 ease-out z-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+            style={{ width: `${batchProgress}%` }}
+          />
+        )}
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
             <ImageIcon className="text-emerald-500" size={24} />
@@ -300,16 +320,22 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
             <button
               onClick={analyzeBatch}
               disabled={loadingBatch || images.filter(img => !img.result).length === 0}
-              className={`w-full py-3.5 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center space-x-3 transition-all duration-300 ${
+              className={`w-full py-3.5 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center space-x-3 transition-all duration-300 relative overflow-hidden ${
                 loadingBatch || images.filter(img => !img.result).length === 0
                   ? 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-white/5' 
                   : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 active:scale-[0.98]'
               }`}
             >
+              {loadingBatch && (
+                <div 
+                  className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300"
+                  style={{ width: `${batchProgress}%` }}
+                />
+              )}
               {loadingBatch ? (
                 <>
                   <RefreshCw className="animate-spin" size={14} />
-                  <span>Processing Batch ({images.filter(img => img.loading).length}/{images.filter(img => !img.result).length + images.filter(img => img.loading).length})...</span>
+                  <span>Processing {images.filter(img => img.loading).length} Items ({Math.round(batchProgress)}%)</span>
                 </>
               ) : (
                 <>

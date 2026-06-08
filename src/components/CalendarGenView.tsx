@@ -19,19 +19,60 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
   const [loadingKeywordsFor, setLoadingKeywordsFor] = useState<string | null>(null);
   const [eventKeywords, setEventKeywords] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     setError(null);
+    setGenerationProgress(0);
+    setEvents([]); // Clear previous results
+    
+    // Simulate progress while generating
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => {
+        if (prev >= 95) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 400);
+
     try {
       const data = await fetchCalendarEvents(selectedMonth);
       setEvents(data.events || []);
     } catch (err: any) {
       setError(err.message || "Failed to generate events");
     } finally {
-      setIsGenerating(false);
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+      setTimeout(() => setIsGenerating(false), 300);
     }
   };
+
+  const LoadingSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={`cal-skel-${i}`} className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-6 border border-slate-200 dark:border-white/5 h-80 flex flex-col animate-pulse">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex flex-col gap-2">
+              <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700/50 rounded-2xl" />
+              <div className="w-16 h-3 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
+            </div>
+            <div className="w-16 h-6 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
+          </div>
+          <div className="w-3/4 h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg mb-3" />
+          <div className="w-full h-4 bg-slate-200 dark:bg-slate-700/50 rounded-md mb-2" />
+          <div className="w-5/6 h-4 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+          <div className="mt-auto pt-4 border-t border-slate-200 dark:border-white/5 space-y-2">
+            <div className="w-24 h-3 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+            <div className="flex gap-2">
+              <div className="w-12 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+              <div className="w-16 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+              <div className="w-14 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const handleGenerateKeywords = async (eventName: string, commercialPotential: string) => {
     setLoadingKeywordsFor(eventName);
@@ -63,7 +104,15 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
 
       {/* Search Header */}
       <div className="w-full max-w-4xl mx-auto mb-8">
-        <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/80 dark:border-white/5 shadow-xl">
+        <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-md p-6 rounded-[2rem] border border-slate-200/80 dark:border-white/5 shadow-xl relative overflow-hidden">
+          {/* Progress Bar Glow */}
+          {isGenerating && (
+            <div 
+              className="absolute top-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all duration-300 ease-out z-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+              style={{ width: `${generationProgress}%` }}
+            />
+          )}
+
           <div className="flex flex-col md:flex-row items-center gap-4">
             <div className="flex-1 w-full">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
@@ -73,7 +122,8 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
                 <select 
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-5 py-3.5 text-slate-700 dark:text-white font-bold focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer"
+                  disabled={isGenerating}
+                  className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-5 py-3.5 text-slate-700 dark:text-white font-bold focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer disabled:opacity-50"
                 >
                   {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
@@ -92,7 +142,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
                 {isGenerating ? (
                   <>
                     <Loader2 className="animate-spin" size={20} />
-                    <span>Finding...</span>
+                    <span>Analyzing...</span>
                   </>
                 ) : (
                   <>
@@ -109,17 +159,42 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
       {/* Results Section */}
       <div className="w-full max-w-5xl mx-auto">
         <AnimatePresence mode="wait">
-          {error && (
+          {isGenerating ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-8"
+            >
+              <div className="flex flex-col items-center justify-center text-center py-10 space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
+                  <Loader2 size={48} className="text-emerald-500 animate-spin relative" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
+                    {generationProgress < 30 ? "Gathering International Data..." : 
+                     generationProgress < 60 ? "Searching National Holidays..." : 
+                     generationProgress < 90 ? "Identifying Niche Perayaan..." : "Polishing Global List..."}
+                  </h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                    AI is scanning {selectedMonth} for high-value stock opportunities
+                  </p>
+                </div>
+              </div>
+              <LoadingSkeleton />
+            </motion.div>
+          ) : error ? (
             <motion.div 
+              key="error"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl text-center font-bold mb-6"
             >
               {error}
             </motion.div>
-          )}
-
-          {events.length > 0 ? (
+          ) : events.length > 0 ? (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -134,8 +209,13 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
                   className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-3xl p-6 border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-shadow flex flex-col h-full"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 bg-emerald-500/10 rounded-2xl">
-                      <Sparkles className="text-emerald-500" size={20} />
+                    <div className="flex flex-col">
+                      <div className="p-3 bg-emerald-500/10 rounded-2xl w-fit mb-2">
+                        <Sparkles className="text-emerald-500" size={20} />
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">
+                        {event.location || 'Global'}
+                      </span>
                     </div>
                     <span className="text-xs font-black bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full text-slate-500 dark:text-slate-300">
                       {event.date}

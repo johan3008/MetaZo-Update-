@@ -1390,7 +1390,7 @@ const App: React.FC = () => {
     for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         const ext = file.name.split('.').pop()?.toLowerCase() || '';
-        const id = Math.random().toString(36).substring(7);
+        const id = `item-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
 
         let errorMsg: string | null = null;
         
@@ -2282,12 +2282,13 @@ const App: React.FC = () => {
                     ) : (
                       <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
                         {geminiKeysList.map((key, index) => {
+                          const keyId = `gemini-key-${index}-${key.substring(0, 10)}`;
                           const testResult = keyTestResults[`gemini-${index}`];
                           const isTesting = keyTestingIndex === index && keyTestProvider === 'gemini';
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={index} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -2374,12 +2375,13 @@ const App: React.FC = () => {
                     ) : (
                       <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
                         {groqKeysList.map((key, index) => {
+                          const keyId = `groq-key-${index}-${key.substring(0, 10)}`;
                           const testResult = keyTestResults[`groq-${index}`];
                           const isTesting = keyTestingIndex === index && keyTestProvider === 'groq';
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={index} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -2464,12 +2466,13 @@ const App: React.FC = () => {
                     ) : (
                       <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
                         {mistralKeysList.map((key, index) => {
+                          const keyId = `mistral-key-${index}-${key.substring(0, 10)}`;
                           const testResult = keyTestResults[`mistral-${index}`];
                           const isTesting = keyTestingIndex === index && keyTestProvider === 'mistral';
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={index} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
