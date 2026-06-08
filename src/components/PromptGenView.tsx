@@ -413,9 +413,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
                   💡 Butuh Inspirasi? Klik Preset di bawah:
                 </span>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {inspirations.map((insp, index) => (
+                  {inspirations.map((insp) => (
                     <button
-                      key={index}
+                      key={`${insp.label}-${insp.text.slice(0, 20)}`}
                       type="button"
                       onClick={() => {
                         setSubject(insp.text);

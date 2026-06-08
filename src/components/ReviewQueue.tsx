@@ -1,8 +1,9 @@
 import React from 'react';
-import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check } from 'lucide-react';
-import { ToolType, FileItem } from '../../types';
+import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles } from 'lucide-react';
+import { ToolType, FileItem, ProgressInfo } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from '../../constants';
 import { copyToClipboard } from '../utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Since we have helper subcomponents like CopyBox and KeywordList in the project,
 // we will declare props for them or import them if needed. 
@@ -164,6 +165,8 @@ interface ReviewQueueProps {
   isAllFinished: boolean;
   successfulFilesCount: number;
   canDownload: boolean;
+  isLoading?: boolean;
+  progressInfo?: ProgressInfo | null;
 }
 
 export const ReviewQueue: React.FC<ReviewQueueProps> = ({
@@ -179,9 +182,31 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   t,
   isAllFinished,
   successfulFilesCount,
-  canDownload
+  canDownload,
+  isLoading,
+  progressInfo
 }) => {
   const hasFiles = files.length > 0;
+
+  const LoadingSkeleton = () => (
+    <div className="space-y-6">
+      {[1, 2, 3].map((i) => (
+        <div key={`queue-skel-${i}`} className="bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 animate-pulse flex flex-col space-y-4">
+          <div className="flex items-start space-x-3">
+            <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-xl shrink-0" />
+            <div className="flex-1 space-y-2 pt-1">
+              <div className="w-1/2 h-3 bg-slate-200 dark:bg-slate-800 rounded-full" />
+              <div className="w-1/4 h-2 bg-slate-200 dark:bg-slate-800 rounded-full opacity-50" />
+            </div>
+          </div>
+          <div className="space-y-3 pt-2">
+            <div className="w-full h-10 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+            <div className="w-[85%] h-12 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const filteredFiles = files.filter(f => {
     const term = searchQuery.toLowerCase();
@@ -239,36 +264,97 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
         )}
 
         <div className="space-y-6 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
-          {!hasFiles ? (
-            <div className="flex flex-col items-center justify-center py-16 opacity-30">
-              <Info size={40} className="mb-2 text-slate-400" />
-              <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">No assets uploaded yet</p>
-            </div>
-          ) : filteredFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 opacity-40">
-              <Search size={40} className="mb-2 text-slate-400" />
-              <p className="text-xs font-extrabold uppercase tracking-widest text-[#5a5c69]">No matching assets found</p>
-            </div>
-          ) : (
-            filteredFiles.map((file, index) => (
-              <div 
-                key={file.id} 
-                className={`relative bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 transition-all duration-300 ${
-                  file.error ? 'border-red-500/20 bg-red-500/2' : file.title ? 'border-emerald-500/15 dark:border-emerald-500/10 hover:border-emerald-500/40' : 'border-slate-200/80 dark:border-white/5'
-                }`}
+          <AnimatePresence mode="wait">
+            {isLoading && files.some(f => f.isGenerating || f.isExtracting) && files.length > 0 ? (
+              <motion.div
+                key="queue-loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-6"
               >
-                {file.isGenerating && (
-                  <div className="absolute inset-0 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center z-20 space-y-2 rounded-2xl">
-                    <div className="w-6 h-6 border-2 border-[#4e73df] border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-[9px] font-black text-[#4e73df] dark:text-blue-400 uppercase tracking-widest pl-1 animate-pulse">Analyzing asset...</p>
+                {progressInfo && (
+                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 flex flex-col space-y-3 mb-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Loader2 size={14} className="text-blue-500 animate-spin" />
+                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider">
+                          Processing Batch {progressInfo.current}/{progressInfo.total}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-400">
+                        {Math.round((progressInfo.current / progressInfo.total) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                      <motion.div 
+                        className="h-full bg-blue-500"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 )}
-                {file.isExtracting && (
-                  <div className="absolute inset-0 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center z-20 space-y-2 rounded-2xl">
-                    <div className="w-6 h-6 border-2 border-indigo-650 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-[9px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-widest pl-1 animate-pulse">Extracting video frames...</p>
-                  </div>
-                )}
+                {/* Individual progress items are already handled in the map below, 
+                    but when the entire thing is loading, we might want skeletons for items that haven't started. */}
+              </motion.div>
+            ) : null}
+
+            {!hasFiles ? (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-16 opacity-30"
+              >
+                <Info size={40} className="mb-2 text-slate-400" />
+                <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">No assets uploaded yet</p>
+              </motion.div>
+            ) : filteredFiles.length === 0 ? (
+              <motion.div 
+                key="no-match"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-16 opacity-40"
+              >
+                <Search size={40} className="mb-2 text-slate-400" />
+                <p className="text-xs font-extrabold uppercase tracking-widest text-[#5a5c69]">No matching assets found</p>
+              </motion.div>
+            ) : (
+              filteredFiles.map((file, index) => (
+                <motion.div 
+                  layout
+                  key={file.id} 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`relative bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 transition-all duration-300 ${
+                    file.error ? 'border-red-500/20 bg-red-500/2' : file.title ? 'border-emerald-500/15 dark:border-emerald-500/10 hover:border-emerald-500/40' : 'border-slate-200/80 dark:border-white/5'
+                  }`}
+                >
+                  {file.isGenerating && (
+                    <div className="absolute inset-0 bg-white/95 dark:bg-[#111827]/95 flex flex-col items-center justify-center z-20 space-y-3 rounded-2xl backdrop-blur-[2px]">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse" />
+                        <Loader2 size={32} className="text-[#4e73df] animate-spin relative" />
+                      </div>
+                      <div className="text-center">
+                        <h5 className="text-[10px] font-black text-[#4e73df] dark:text-blue-400 uppercase tracking-[0.2em] animate-pulse">Analyzing Visual Spectrum</h5>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Metagen is identifying semantic identifiers...</p>
+                      </div>
+                    </div>
+                  )}
+                  {file.isExtracting && (
+                    <div className="absolute inset-0 bg-white/95 dark:bg-[#111827]/95 flex flex-col items-center justify-center z-20 space-y-3 rounded-2xl backdrop-blur-[2px]">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
+                        <Loader2 size={32} className="text-purple-600 animate-spin relative" />
+                      </div>
+                      <div className="text-center">
+                        <h5 className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-[0.2em] animate-pulse">Temporal Decoding</h5>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Extracting keyframes for contextual analysis...</p>
+                      </div>
+                    </div>
+                  )}
                 
                 <button 
                   onClick={() => handleDeleteFile(file.id)}
@@ -416,11 +502,12 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ))
           )}
-        </div>
+        </AnimatePresence>
       </div>
     </div>
-  );
+  </div>
+);
 };

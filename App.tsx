@@ -1968,7 +1968,15 @@ const App: React.FC = () => {
           ) : (
             <>
               {/* Welcome Intro Row */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-1">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-1 relative overflow-hidden border-b border-slate-200 dark:border-white/5 pb-4">
+                {/* Global Progress Bar for Batch Metadata Generation */}
+                {isLoading && progressInfo && (
+                  <div 
+                    className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all duration-300 ease-out z-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                    style={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
+                  />
+                )}
+                
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
                     {activeTool === ToolType.IMAGE ? "Image AI Workspace" : activeTool === ToolType.VIDEO ? "Video AI Workspace" : "Vector AI Workspace"}
@@ -2068,7 +2076,9 @@ const App: React.FC = () => {
                 t={t} 
                 isAllFinished={isAllFinished} 
                 successfulFilesCount={successfulFilesCount} 
-                canDownload={canDownload} 
+                canDownload={canDownload}
+                isLoading={isLoading}
+                progressInfo={progressInfo} 
               />
 
               {/* Section Row 3: Bulk Export Integration Panels */}

@@ -202,7 +202,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
             >
               {events.map((event, idx) => (
                 <motion.div
-                  key={idx}
+                  key={`${event.name}-${event.date}`}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.05 }}
@@ -256,9 +256,9 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
                       </div>
 
                       <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
-                        {(eventKeywords[event.name] || event.suggested_topics)?.map((topic: string, tIdx: number) => (
+                        {(eventKeywords[event.name] || event.suggested_topics)?.map((topic: string) => (
                           <button
-                            key={tIdx}
+                            key={topic}
                             onClick={() => onSendToPrompt?.(`${event.name}: ${topic}`)}
                             className="text-[10px] uppercase tracking-wider font-extrabold bg-emerald-500/5 text-emerald-500 border border-emerald-500/10 px-2 py-1 rounded-md hover:bg-emerald-500 hover:text-white transition-colors text-left"
                           >

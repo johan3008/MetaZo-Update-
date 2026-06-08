@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCcw, Zap, Clock, ArrowRight } from 'lucide-react';
+import { RefreshCcw, Zap, Clock, ArrowRight, Loader2 } from 'lucide-react';
 import { ToolType, ProgressInfo } from '../../types';
 
 interface AiConfigPanelProps {
@@ -105,7 +105,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                <div className="flex justify-between text-[9px] font-extrabold uppercase tracking-widest mb-1.5">
                   <span className="text-blue-600 dark:text-blue-400 flex items-center">
                     <RefreshCcw size={10} className="animate-spin mr-1.5"/> 
-                    Analyzing {progressInfo.current}/{progressInfo.total}
+                    {activeTool === ToolType.VIDEO ? "Decoding Frames" : activeTool === ToolType.VECTOR ? "Parsing Vector Data" : "Analyzing Visuals"} {progressInfo.current}/{progressInfo.total}
                   </span>
                   <span className="text-slate-400 font-mono">{progressInfo.duration}s elapsed</span>
                </div>
@@ -131,7 +131,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
               }`}
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Loader2 size={14} className="animate-spin" />
               ) : (
                 <Zap size={14} className="fill-white" />
               )}

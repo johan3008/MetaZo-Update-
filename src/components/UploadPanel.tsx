@@ -114,9 +114,9 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               {files.length} {t.files_selected}
             </span>
             <div className="flex -space-x-1.5">
-              {files.slice(0, 4).map((f, i) => (
+              {files.slice(0, 4).map((f) => (
                 <div 
-                  key={i} 
+                  key={f.id} 
                   onClick={() => setPreviewFile(f)} 
                   className="w-8 h-8 rounded-lg border-2 border-white dark:border-slate-900 bg-slate-200 overflow-hidden cursor-pointer hover:scale-110 hover:z-20 transition-all shadow-sm"
                 >
