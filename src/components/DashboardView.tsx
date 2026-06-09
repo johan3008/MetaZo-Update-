@@ -127,34 +127,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 border border-amber-500/25 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 select-none">
+        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/30 rounded-3xl p-6 sm:p-7 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-sm shadow-amber-500/5 select-none">
           {!isLicensed && (
-            <div className="flex items-start space-x-3.5">
-              <div className="p-2 sm:p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-0.5">
-                <Key size={18} className="rotate-45" />
+            <div className="flex items-start space-x-4">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-1">
+                <Key size={22} />
               </div>
               <div>
-                <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
-                  <span>Versi Evaluasi Gratis • Batasan Trial Aktif</span>
+                <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center space-x-2">
+                  <span>Versi Evaluasi Gratis</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <span className="opacity-75">Batasan Trial Aktif</span>
                 </h4>
-                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl mt-0.5">
-                  Anda sedang mencoba copy gratis aplikasi {appName}. Dapatkan lisensi premium seharga <strong className="text-slate-800 dark:text-slate-200">{pricingTier}</strong> untuk memproses batch massal tak terbatas serta menghapus kuncian token trial.
+                <p className="text-[12px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl mt-1.5">
+                  Anda sedang menggunakan versi trial aplikasi <strong className="text-slate-900 dark:text-slate-100 font-semibold">{appName}</strong>. Dapatkan akses ke semua fitur pro dengan lisensi premium seharga <strong className="text-amber-600 dark:text-amber-400 font-bold">{pricingTier}</strong> untuk batch tak terbatas.
                 </p>
               </div>
             </div>
           )}
-          <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
             <button
               onClick={() => setShowActivation?.(true)}
-              className="px-4.5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 active:scale-95 text-slate-900 font-black text-[10.5px] uppercase tracking-wider rounded-xl transition-all shadow shadow-amber-500/10 cursor-pointer"
+              className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all shadow-md shadow-amber-500/20 cursor-pointer"
             >
-              Masukkan Key
+              Masukkan Lisensi Key
             </button>
             <a
               href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName || '')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4.5 py-2 bg-slate-950 dark:bg-slate-800 w-full sm:w-auto text-center hover:bg-slate-850 text-white font-black text-[10.5px] uppercase tracking-wider rounded-xl transition-all"
+              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all flex items-center justify-center cursor-pointer"
             >
               Hubungi Admin
             </a>

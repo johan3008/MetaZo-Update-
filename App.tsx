@@ -2610,7 +2610,15 @@ const App: React.FC = () => {
             {/* Pemilihan Provider Utama */}
             <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shrink-0">
               <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Provider AI Utama Yang Digunakan</label>
-              <div className="grid grid-cols-3 gap-2">
+              <select
+                value={selectedProvider}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setSelectedProvider(val);
+                  setActiveSettingsTab(val);
+                }}
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+              >
                 {[
                   { id: 'gemini', name: 'Gemini', desc: 'Google AI' },
                   { id: 'groq', name: 'Groq', desc: 'Llama 4 Scout / Vision' },
@@ -2619,47 +2627,26 @@ const App: React.FC = () => {
                   { id: 'openrouter', name: 'Open Router', desc: 'Multi-LLM access' },
                   { id: 'blackbox', name: 'Blackbox AI', desc: 'Code specialized' },
                   { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' }
-                ].map(prov => {
-                  const isActive = selectedProvider === prov.id;
-                  return (
-                    <button
-                      key={prov.id}
-                      type="button"
-                      onClick={() => setSelectedProvider(prov.id as any)}
-                      className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
-                        isActive
-                          ? 'bg-[#4e73df]/10 border-[#4e73df] text-[#4e73df]'
-                          : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black">{prov.name}</span>
-                      <span className="text-[8px] font-medium opacity-80 mt-0.5">{prov.desc}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                ].map(prov => (
+                  <option key={prov.id} value={prov.id}>
+                    {prov.name} - {prov.desc}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* TAB Tombol */}
-            <div className="flex border-b border-slate-200 dark:border-white/5 mb-4 shrink-0 overflow-x-auto select-none scrollbar-none">
-              {(['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => {
-                const isActive = activeSettingsTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveSettingsTab(tab)}
-                    className={`flex-none px-3.5 py-1.5 font-bold uppercase text-[9.5px] tracking-wider border-b-2 text-center transition-all ${
-                      isActive
-                        ? 'border-[#4e73df] text-[#4e73df] font-black'
-                        : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-                    }`}
-                  >
-                    {tab === 'reseller' ? '💻 Reseller Portal' : `Keys ${tab}`}
-                  </button>
-                );
-              })}
-            </div>
+            <select
+              value={activeSettingsTab}
+              onChange={(e) => setActiveSettingsTab(e.target.value as any)}
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all mb-4"
+            >
+              {(['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => (
+                <option key={tab} value={tab}>
+                  {tab === 'reseller' ? '💻 Reseller Portal' : `${tab.toUpperCase()} Keys`}
+                </option>
+              ))}
+            </select>
 
             {/* Tab Content */}
             <div className="space-y-4 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
