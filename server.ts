@@ -696,6 +696,62 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/chat', async (req, res) => {
+        try {
+            const { message, history } = req.body;
+            if (!message) {
+                return res.status(400).json({ error: 'Missing message' });
+            }
+            
+            const ai = new GoogleGenAI({
+              apiKey: process.env.GEMINI_API_KEY!,
+              httpOptions: {
+                headers: {
+                  'User-Agent': 'aistudio-build',
+                }
+              }
+            });
+
+            const contents = [
+              ...(history || []).map((h: any) => ({
+                role: h.role === 'model' ? 'model' : 'user',
+                parts: [{ text: h.content }]
+              })),
+              { role: 'user', parts: [{ text: message }] }
+            ];
+
+            const executeCall = async () => ai.models.generateContent({
+              model: "gemini-3.5-flash",
+              contents: contents as any,
+              config: {
+                systemInstruction: "You are 'MetaZo Assistant', a helpful and professional customer service agent for MetaZo PRO. MetaZo PRO is an advanced AI-powered stock photography metadata assistant. We help stock contributors (photographers, videographers, illustrators) optimize their metadata (Title, Description, Keywords) for Adobe Stock, Shutterstock, Vecteezy, and other agencies. Features include: 1. Image/Video/Vector Metadata Editor with AI analysis. 2. Batch Processing for hundreds of files. 3. Prompt Generator for AI images. 4. Image Quality Check tool. 5. Calendar Generator for seasonal event planning. 6. Support for EPS/SVG metadata. Answer questions accurately about the app's features and stock photography best practices. Keep answers strictly related to MetaZo PRO and stock photography. If users ask about price, suggest checking the 'Premium' section or contacting Admin via WhatsApp. Answer in the same language as the user (default to Indonesian if unsure).",
+              },
+            });
+
+            let response;
+            let retries = 3;
+            while (retries > 0) {
+              try {
+                response = await executeCall();
+                break;
+              } catch (e: any) {
+                if (e.status === 503 && retries > 1) {
+                  console.warn(`Gemini API 503, retrying... (${retries - 1} attempts left)`);
+                  await new Promise(r => setTimeout(r, 2000));
+                  retries--;
+                  continue;
+                }
+                throw e;
+              }
+            }
+            
+            res.json({ reply: response!.text });
+        } catch (e: any) {
+            console.error('Server chat error:', e);
+            res.status(500).json({ error: e.message || 'Error communicating with Gemini (please try again)' });
+        }
+    });
+
     app.get('/api/inspirations', async (req, res) => {
         try {
             const inspirations = [

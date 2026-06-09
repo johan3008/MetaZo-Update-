@@ -88,3 +88,17 @@ export const fetchEventKeywords = async (eventName: string, eventDetails: string
   }
   return response.json();
 };
+
+export const chatWithGemini = async (message: string, history: {role: 'user'|'model', content: string}[]): Promise<{reply: string}> => {
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to chat via Gemini");
+  }
+  return response.json();
+};
