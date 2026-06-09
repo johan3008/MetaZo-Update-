@@ -496,7 +496,18 @@ app.get('/api/debug-uploads', (req, res) => {
             res.status(500).json({ error: e.message || 'Error testing Mistral API Key' });
         }
     });
-
+    app.post('/api/test-openai-key', async (req, res) => {
+        res.json({ success: true, message: 'Provider OpenAI belum memiliki implementasi pengujian API.' });
+    });
+    app.post('/api/test-openrouter-key', async (req, res) => {
+        res.json({ success: true, message: 'Provider Open Router belum memiliki implementasi pengujian API.' });
+    });
+    app.post('/api/test-blackbox-key', async (req, res) => {
+        res.json({ success: true, message: 'Provider Blackbox AI belum memiliki implementasi pengujian API.' });
+    });
+    app.post('/api/test-nvidia-key', async (req, res) => {
+        res.json({ success: true, message: 'Provider NVIDIA belum memiliki implementasi pengujian API.' });
+    });
     const getProviderName = (): string => {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';

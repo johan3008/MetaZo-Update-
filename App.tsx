@@ -897,8 +897,8 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral' | 'reseller'>('gemini');
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral'>('gemini');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'reseller'>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia'>('gemini');
 
   // Reseller & License state
   const [isResellerUnlocked, setIsResellerUnlocked] = useState(() => localStorage.getItem('mz_reseller_unlocked') === 'true');
@@ -1119,15 +1119,23 @@ const App: React.FC = () => {
 
   const [geminiKeysList, setGeminiKeysList] = useState<string[]>([]);
   const [groqKeysList, setGroqKeysList] = useState<string[]>([]);
-
   const [mistralKeysList, setMistralKeysList] = useState<string[]>([]);
+  const [openaiKeysList, setOpenaiKeysList] = useState<string[]>([]);
+  const [openrouterKeysList, setOpenrouterKeysList] = useState<string[]>([]);
+  const [blackboxKeysList, setBlackboxKeysList] = useState<string[]>([]);
+  const [nvidiaKeysList, setNvidiaKeysList] = useState<string[]>([]);
+  const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<'stepfun_step35_flash'>('stepfun_step35_flash');
 
   const [newGeminiKey, setNewGeminiKey] = useState('');
   const [newGroqKey, setNewGroqKey] = useState('');
   const [newMistralKey, setNewMistralKey] = useState('');
+  const [newOpenaiKey, setNewOpenaiKey] = useState('');
+  const [newOpenrouterKey, setNewOpenrouterKey] = useState('');
+  const [newBlackboxKey, setNewBlackboxKey] = useState('');
+  const [newNvidiaKey, setNewNvidiaKey] = useState('');
 
   const [keyTestingIndex, setKeyTestingIndex] = useState<number | null>(null);
-  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | null>(null);
+  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | null>(null);
   const [keyTestResults, setKeyTestResults] = useState<Record<string, { type: 'success' | 'error' | 'quota'; message: string }>>({}); // "provider-index"
   const [hasCustomKeySaved, setHasCustomKeySaved] = useState(false);
 
@@ -1173,6 +1181,10 @@ const App: React.FC = () => {
     let endpoint = '/api/test-gemini-key';
     if (provider === 'groq') endpoint = '/api/test-groq-key';
     if (provider === 'mistral') endpoint = '/api/test-mistral-key';
+    if (provider === 'openai') endpoint = '/api/test-openai-key';
+    if (provider === 'openrouter') endpoint = '/api/test-openrouter-key';
+    if (provider === 'blackbox') endpoint = '/api/test-blackbox-key';
+    if (provider === 'nvidia') endpoint = '/api/test-nvidia-key';
 
     try {
       const response = await fetch(endpoint, {
@@ -1210,7 +1222,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral') => {
+  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai') => {
     let key = '';
     let currentList: string[] = [];
     
@@ -1223,6 +1235,18 @@ const App: React.FC = () => {
     } else if (provider === 'mistral') {
       key = newMistralKey.trim();
       currentList = mistralKeysList;
+    } else if (provider === 'openai') {
+      key = newOpenaiKey.trim();
+      currentList = openaiKeysList;
+    } else if (provider === 'openrouter') {
+      key = newOpenrouterKey.trim();
+      currentList = openrouterKeysList;
+    } else if (provider === 'blackbox') {
+      key = newBlackboxKey.trim();
+      currentList = blackboxKeysList;
+    } else if (provider === 'nvidia') {
+      key = newNvidiaKey.trim();
+      currentList = nvidiaKeysList;
     }
 
     if (!key) return;
@@ -1240,10 +1264,22 @@ const App: React.FC = () => {
     } else if (provider === 'mistral') {
       setMistralKeysList(prev => [...prev, key]);
       setNewMistralKey('');
+    } else if (provider === 'openai') {
+      setOpenaiKeysList(prev => [...prev, key]);
+      setNewOpenaiKey('');
+    } else if (provider === 'openrouter') {
+      setOpenrouterKeysList(prev => [...prev, key]);
+      setNewOpenrouterKey('');
+    } else if (provider === 'blackbox') {
+      setBlackboxKeysList(prev => [...prev, key]);
+      setNewBlackboxKey('');
+    } else if (provider === 'nvidia') {
+      setNvidiaKeysList(prev => [...prev, key]);
+      setNewNvidiaKey('');
     }
   };
 
-  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral', index: number) => {
+  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai', index: number) => {
     let listSetter: any;
     let list: string[] = [];
 
@@ -1256,6 +1292,18 @@ const App: React.FC = () => {
     } else if (provider === 'mistral') {
       listSetter = setMistralKeysList;
       list = mistralKeysList;
+    } else if (provider === 'openai') {
+      listSetter = setOpenaiKeysList;
+      list = openaiKeysList;
+    } else if (provider === 'openrouter') {
+      listSetter = setOpenrouterKeysList;
+      list = openrouterKeysList;
+    } else if (provider === 'blackbox') {
+      listSetter = setBlackboxKeysList;
+      list = blackboxKeysList;
+    } else if (provider === 'nvidia') {
+      listSetter = setNvidiaKeysList;
+      list = nvidiaKeysList;
     }
 
     listSetter((prev: string[]) => prev.filter((_, i) => i !== index));
@@ -1283,6 +1331,10 @@ const App: React.FC = () => {
     const cleanGemini = geminiKeysList.map(k => k.trim()).filter(Boolean);
     const cleanGroq = groqKeysList.map(k => k.trim()).filter(Boolean);
     const cleanMistral = mistralKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanOpenai = openaiKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanOpenrouter = openrouterKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanBlackbox = blackboxKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanNvidia = nvidiaKeysList.map(k => k.trim()).filter(Boolean);
 
     if (cleanGemini.length > 0) {
       localStorage.setItem('gemini_api_key', cleanGemini.join(','));
@@ -1302,8 +1354,40 @@ const App: React.FC = () => {
       localStorage.removeItem('mistral_api_key');
     }
 
+    if (cleanOpenai.length > 0) {
+      localStorage.setItem('openai_api_key', cleanOpenai.join(','));
+    } else {
+      localStorage.removeItem('openai_api_key');
+    }
+
+    if (cleanOpenrouter.length > 0) {
+      localStorage.setItem('openrouter_api_key', cleanOpenrouter.join(','));
+    } else {
+      localStorage.removeItem('openrouter_api_key');
+    }
+
+    if (cleanBlackbox.length > 0) {
+      localStorage.setItem('blackbox_api_key', cleanBlackbox.join(','));
+    } else {
+      localStorage.removeItem('blackbox_api_key');
+    }
+
+    if (cleanNvidia.length > 0) {
+      localStorage.setItem('nvidia_api_key', cleanNvidia.join(','));
+    } else {
+      localStorage.removeItem('nvidia_api_key');
+    }
+
     localStorage.setItem('ai_provider', selectedProvider);
-    setHasCustomKeySaved(cleanGemini.length > 0 || cleanGroq.length > 0 || cleanMistral.length > 0);
+    setHasCustomKeySaved(
+      cleanGemini.length > 0 || 
+      cleanGroq.length > 0 || 
+      cleanMistral.length > 0 || 
+      cleanOpenai.length > 0 || 
+      cleanOpenrouter.length > 0 || 
+      cleanBlackbox.length > 0 || 
+      cleanNvidia.length > 0
+    );
     setShowSettingsModal(false);
   };
 
@@ -2530,7 +2614,11 @@ const App: React.FC = () => {
                 {[
                   { id: 'gemini', name: 'Gemini', desc: 'Google AI' },
                   { id: 'groq', name: 'Groq', desc: 'Llama 4 Scout / Vision' },
-                  { id: 'mistral', name: 'Mistral', desc: 'Mistral Large' }
+                  { id: 'mistral', name: 'Mistral', desc: 'Mistral Large' },
+                  { id: 'openai', name: 'OpenAI', desc: 'GPT-4o / DALL-E' },
+                  { id: 'openrouter', name: 'Open Router', desc: 'Multi-LLM access' },
+                  { id: 'blackbox', name: 'Blackbox AI', desc: 'Code specialized' },
+                  { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' }
                 ].map(prov => {
                   const isActive = selectedProvider === prov.id;
                   return (
@@ -2554,7 +2642,7 @@ const App: React.FC = () => {
 
             {/* TAB Tombol */}
             <div className="flex border-b border-slate-200 dark:border-white/5 mb-4 shrink-0 overflow-x-auto select-none scrollbar-none">
-              {(['gemini', 'groq', 'mistral', 'reseller'] as const).map(tab => {
+              {(['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => {
                 const isActive = activeSettingsTab === tab;
                 return (
                   <button
@@ -2664,6 +2752,373 @@ const App: React.FC = () => {
                         <span>Tambah</span>
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'openai' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key OpenAI pribadi Anda untuk mengakses kemampuan GPT-4o dan DALL-E.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key OpenAI ({openaiKeysList.length})</label>
+                    
+                    {openaiKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key OpenAI ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {openaiKeysList.map((key, index) => {
+                          const keyId = `openai-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`openai-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'openai';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('openai', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('openai', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key OpenAI</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="API Key OpenAI (sk-proj...)"
+                        value={newOpenaiKey}
+                        onChange={(e) => setNewOpenaiKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('openai', newOpenaiKey)}
+                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'openrouter' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key Open Router Anda untuk mengakses berbagai model LLM.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Open Router ({openrouterKeysList.length})</label>
+                    
+                    {openrouterKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Open Router ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {openrouterKeysList.map((key, index) => {
+                          const keyId = `openrouter-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`openrouter-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'openrouter';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('openrouter', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('openrouter', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Open Router</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="API Key Open Router (sk-or...)"
+                        value={newOpenrouterKey}
+                        onChange={(e) => setNewOpenrouterKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('openrouter', newOpenrouterKey)}
+                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'blackbox' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key Blackbox AI Anda untuk kemampuan coding yang terspesialisasi.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Blackbox AI ({blackboxKeysList.length})</label>
+                    
+                    {blackboxKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Blackbox AI ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {blackboxKeysList.map((key, index) => {
+                          const keyId = `blackbox-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`blackbox-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'blackbox';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('blackbox', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('blackbox', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Blackbox AI</label>
+                    <div className="flex gap-2">
+                       <input
+                        type="password"
+                        placeholder="API Key Blackbox AI"
+                        value={newBlackboxKey}
+                        onChange={(e) => setNewBlackboxKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('blackbox', newBlackboxKey)}
+                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'nvidia' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key NVIDIA Anda untuk mengakses NVIDIA NIM.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key NVIDIA ({nvidiaKeysList.length})</label>
+                    
+                    {nvidiaKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key NVIDIA ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {nvidiaKeysList.map((key, index) => {
+                          const keyId = `nvidia-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`nvidia-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'nvidia';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('nvidia', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('nvidia', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key NVIDIA</label>
+                    <div className="flex gap-2">
+                       <input
+                        type="password"
+                        placeholder="API Key NVIDIA"
+                        value={newNvidiaKey}
+                        onChange={(e) => setNewNvidiaKey(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddApiKey('nvidia', newNvidiaKey)}
+                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Pilih Model</label>
+                    <select
+                      value={selectedNvidiaModel}
+                      onChange={(e) => setSelectedNvidiaModel(e.target.value as any)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                    >
+                      <option value="stepfun_step35_flash">StepFun AI Step 3.5 Flash</option>
+                    </select>
                   </div>
                 </div>
               )}
