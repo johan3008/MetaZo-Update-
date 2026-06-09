@@ -21,6 +21,7 @@ interface SidebarProps {
   isLicensed?: boolean;
   setShowActivation?: (show: boolean) => void;
   onUnlockReseller?: () => void;
+  appName?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,13 +37,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   filesLength,
   isLicensed = false,
   setShowActivation,
-  onUnlockReseller
+  onUnlockReseller,
+  appName
 }) => {
   const [metadataGenOpen, setMetadataGenOpen] = useState(true);
   const [promptGenOpen, setPromptGenOpen] = useState(true);
   const [logoClicks, setLogoClicks] = useState(0);
 
-  const customAppName = localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO';
+  const customAppName = appName || localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO';
 
   const handleLogoClick = () => {
     const next = logoClicks + 1;

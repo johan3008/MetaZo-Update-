@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "BrandingConfig": {
+      "title": "BrandingConfig",
+      "description": "App branding configuration managed by the reseller/owner",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string", "description": "The custom app name" },
+        "appSubtitle": { "type": "string", "description": "The custom subtitle" },
+        "whatsAppLink": { "type": "string", "description": "Reseller WhatsApp channel link" },
+        "pricingTier": { "type": "string", "description": "Pricing rate description" },
+        "licenseSeed": { "type": "string", "description": "Secret validation seed key" },
+        "payInfo": { "type": "string", "description": "Manual bank / QR payment info" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp when configuration was modified" }
+      },
+      "required": ["appName", "appSubtitle", "whatsAppLink", "pricingTier", "licenseSeed", "payInfo"]
+    },
+    "LicenseKey": {
+      "title": "LicenseKey",
+      "description": "Single-use license key for pro feature unlock",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "description": "Unique License Code formatted as MZPRO-XXXX-XXXX-XXXX" },
+        "activated": { "type": "boolean", "description": "Active state verification flag" },
+        "activatedBy": { "type": "string", "description": "Identifier tracking which user/device activated this key" },
+        "activatedAt": { "type": "string", "format": "date-time", "description": "Timestamp tracking execution moment" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Key generation moment" }
+      },
+      "required": ["key", "activated"]
+    }
+  },
+  "firestore": {
+    "/branding/{brandingId}": {
+      "schema": "BrandingConfig",
+      "description": "Centralized branding rules. We will use a singleton document ID 'main' to represent the active config."
+    },
+    "/keys/{keyId}": {
+      "schema": "LicenseKey",
+      "description": "Unique key objects. Document ID matches the generated key string itself."
+    }
+  }
+}

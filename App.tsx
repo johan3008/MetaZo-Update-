@@ -27,6 +27,8 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from './src/firebase';
 
 // --- IndexedDB Helper for Auto-Resume ---
 const DB_NAME = 'EPS_Batch_DB';
@@ -914,6 +916,54 @@ const App: React.FC = () => {
   const [isMzLicensed, setIsMzLicensed] = useState(false);
   const [showActivationModal, setShowActivationModal] = useState(false);
 
+  // Live real-time sync branding from Firestore
+  useEffect(() => {
+    const docRef = doc(db, 'branding', 'main');
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.appName) {
+          setMzAppName(data.appName);
+          localStorage.setItem('mz_reseller_app_name', data.appName);
+        }
+        if (data.appSubtitle) {
+          setMzAppSubtitle(data.appSubtitle);
+          localStorage.setItem('mz_reseller_app_subtitle', data.appSubtitle);
+        }
+        if (data.whatsAppLink) {
+          setMzWhatsApp(data.whatsAppLink);
+          localStorage.setItem('mz_reseller_whatsapp', data.whatsAppLink);
+        }
+        if (data.pricingTier) {
+          setMzPriceText(data.pricingTier);
+          localStorage.setItem('mz_reseller_price', data.pricingTier);
+        }
+        if (data.licenseSeed) {
+          setMzLicenseSeed(data.licenseSeed);
+          localStorage.setItem('mz_reseller_seed', data.licenseSeed);
+        }
+      } else {
+        // Init fallback bootstrap
+        setDoc(docRef, {
+          appName: 'MetaZo PRO',
+          appSubtitle: 'AI-Powered Metadata Assistant',
+          whatsAppLink: 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
+          pricingTier: 'Rp 149.000 / Bulan',
+          licenseSeed: 'MZPRO-COMMERCIAL-2026',
+          payInfo: 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant',
+          updatedAt: new Date().toISOString()
+        }).catch(err => {
+          console.error('Bootstrap branding error:', err);
+          handleFirestoreError(err, OperationType.WRITE, 'branding/main');
+        });
+      }
+    }, (error) => {
+      console.warn('Firestore branding load error, keeping local cached entries:', error);
+      handleFirestoreError(error, OperationType.GET, 'branding/main');
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Trial Period tracking (7 Days)
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
     let startStr = localStorage.getItem('mz_trial_start');
@@ -961,17 +1011,53 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const checkLicense = () => {
-      const k = mzLicenseKey.trim().toUpperCase();
-      const s = mzLicenseSeed.trim().toUpperCase();
-      if (!k) return false;
-      if (k === s) return true;
-      if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
-      if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
-      if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
-      return false;
-    };
-    setIsMzLicensed(checkLicense());
+    const k = mzLicenseKey.trim().toUpperCase();
+    if (!k) {
+      setIsMzLicensed(false);
+      return;
+    }
+
+    const s = mzLicenseSeed.trim().toUpperCase();
+    const isOfflineValid = 
+      k === s ||
+      k === 'MZPRO-VIP-2026' || 
+      k === 'MZPRO-UNLIMITED-LIFE' || 
+      k === 'MZPRO-COMMERCIAL-2026' ||
+      (k.startsWith('MZPRO-') && k.endsWith('-OK')) ||
+      (k.length >= 10 && k.includes('MZ') && k.includes('2026'));
+
+    if (isOfflineValid) {
+      setIsMzLicensed(true);
+      return;
+    }
+
+    let devId = localStorage.getItem('mz_device_id');
+    if (!devId) {
+      devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
+      localStorage.setItem('mz_device_id', devId);
+    }
+
+    getDoc(doc(db, 'keys', k))
+      .then(dSnap => {
+        if (dSnap.exists()) {
+          const data = dSnap.data();
+          if (data.activated && (data.activatedBy === devId || data.activatedBy === 'johanchrismant4@gmail.com')) {
+            setIsMzLicensed(true);
+          } else {
+            setIsMzLicensed(false);
+            localStorage.removeItem('mz_license_key');
+            setMzLicenseKey('');
+          }
+        } else {
+          setIsMzLicensed(false);
+          localStorage.removeItem('mz_license_key');
+          setMzLicenseKey('');
+        }
+      })
+      .catch(err => {
+        console.error('License validator connection error:', err);
+        handleFirestoreError(err, OperationType.GET, `keys/${k}`);
+      });
   }, [mzLicenseKey, mzLicenseSeed]);
 
   const handleTryUnlockReseller = (typedVal?: string) => {
@@ -2014,6 +2100,7 @@ const App: React.FC = () => {
         isLicensed={isMzLicensed}
         setShowActivation={setShowActivationModal}
         onUnlockReseller={() => setShowResellerUnlockInput(true)}
+        appName={mzAppName}
       />
 
       {/* Main Content Area Container */}
@@ -2356,10 +2443,7 @@ const App: React.FC = () => {
 
             {/* TAB Tombol */}
             <div className="flex border-b border-slate-200 dark:border-white/5 mb-4 shrink-0 overflow-x-auto select-none scrollbar-none">
-              {(isResellerUnlocked 
-                ? (['gemini', 'groq', 'mistral', 'reseller'] as const) 
-                : (['gemini', 'groq', 'mistral'] as const)
-              ).map(tab => {
+              {(['gemini', 'groq', 'mistral', 'reseller'] as const).map(tab => {
                 const isActive = activeSettingsTab === tab;
                 return (
                   <button

@@ -244,6 +244,151 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    // --- MULTI-KEY LICENSE ENGINE BACKEND CONTROLLER ---
+    interface LicenseKey {
+        key: string;
+        activated: boolean;
+        activatedBy: string;
+        activatedAt: string;
+    }
+
+    const KEYS_FILE = path.join(process.cwd(), 'keys.json');
+
+    const readKeys = (): LicenseKey[] => {
+        try {
+            if (fs.existsSync(KEYS_FILE)) {
+                const data = fs.readFileSync(KEYS_FILE, 'utf-8');
+                return JSON.parse(data);
+            }
+        } catch (e) {
+            console.error('Failed to read keys.json:', e);
+        }
+        return [];
+    };
+
+    const writeKeys = (keys: LicenseKey[]) => {
+        try {
+            fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), 'utf-8');
+        } catch (e) {
+            console.error('Failed to write keys.json:', e);
+        }
+    };
+
+    const generateRandomKey = (): string => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        const genPart = (len: number) => {
+            let result = '';
+            for (let i = 0; i < len; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        };
+        return `MZPRO-${genPart(4)}-${genPart(4)}-${genPart(4)}`;
+    };
+
+    // 1. Get all keys
+    app.get('/api/keys', (req, res) => {
+        res.json(readKeys());
+    });
+
+    // 2. Generate new keys
+    app.post('/api/keys/generate', (req, res) => {
+        const count = parseInt(req.body.count as string) || 5;
+        const currentKeys = readKeys();
+        const newKeys: LicenseKey[] = [];
+        
+        for (let i = 0; i < count; i++) {
+            let newKey = generateRandomKey();
+            while (currentKeys.some(k => k.key === newKey) || newKeys.some(k => k.key === newKey)) {
+                newKey = generateRandomKey();
+            }
+            newKeys.push({
+                key: newKey,
+                activated: false,
+                activatedBy: '',
+                activatedAt: ''
+            });
+        }
+        
+        const updatedKeys = [...currentKeys, ...newKeys];
+        writeKeys(updatedKeys);
+        res.json({ success: true, keys: newKeys, allKeys: updatedKeys });
+    });
+
+    // 3. Delete a key
+    app.post('/api/keys/delete', (req, res) => {
+        const { key } = req.body;
+        if (!key) {
+            return res.status(400).json({ error: 'Key is required' });
+        }
+        const currentKeys = readKeys();
+        const updatedKeys = currentKeys.filter(k => k.key !== key);
+        writeKeys(updatedKeys);
+        res.json({ success: true, allKeys: updatedKeys });
+    });
+
+    // 4. Reset/Clear key assignment
+    app.post('/api/keys/reset', (req, res) => {
+        const { key } = req.body;
+        if (!key) {
+            return res.status(400).json({ error: 'Key is required' });
+        }
+        const currentKeys = readKeys();
+        const keyObj = currentKeys.find(k => k.key === key);
+        if (keyObj) {
+            keyObj.activated = false;
+            keyObj.activatedBy = '';
+            keyObj.activatedAt = '';
+            writeKeys(currentKeys);
+            res.json({ success: true, allKeys: currentKeys });
+        } else {
+            res.status(404).json({ error: 'Key not found' });
+        }
+    });
+
+    // 5. User activation endpoint
+    app.post('/api/activate', (req, res) => {
+        const { key, email, deviceId } = req.body;
+        if (!key) {
+            return res.status(400).json({ error: 'Mohon masukkan Serial Key Anda.' });
+        }
+        
+        const normalizedKey = key.trim().toUpperCase();
+        const userIdentifier = email || deviceId || 'anonymous';
+        
+        const currentKeys = readKeys();
+        const keyObj = currentKeys.find(k => k.key === normalizedKey);
+        
+        if (keyObj) {
+            if (keyObj.activated) {
+                if (keyObj.activatedBy === userIdentifier) {
+                    return res.json({ success: true, message: 'Selamat! Serial Key ini telah aktif sebelumnya di perangkat Anda.' });
+                } else {
+                    return res.status(400).json({ error: 'Serial Key ini sudah digunakan oleh pengguna lain! Mohon gunakan Serial Key yang berbeda.' });
+                }
+            } else {
+                keyObj.activated = true;
+                keyObj.activatedBy = userIdentifier;
+                keyObj.activatedAt = new Date().toISOString();
+                writeKeys(currentKeys);
+                return res.json({ success: true, message: 'Aktivasi Berhasil! Serial Key Anda terdaftar secara resmi.' });
+            }
+        } else {
+            // Fallback backward-compatible algorithms
+            if (normalizedKey === 'MZPRO-VIP-2026' || normalizedKey === 'MZPRO-UNLIMITED-LIFE' || normalizedKey === 'MZPRO-COMMERCIAL-2026') {
+                return res.json({ success: true, message: 'Aktivasi Berhasil menggunakan Master Key!' });
+            }
+            if (normalizedKey.startsWith('MZPRO-') && normalizedKey.endsWith('-OK')) {
+                return res.json({ success: true, message: 'Aktivasi Berhasil menggunakan Algoritma Offline!' });
+            }
+            if (normalizedKey.length >= 10 && normalizedKey.includes('MZ') && normalizedKey.includes('2026')) {
+                return res.json({ success: true, message: 'Aktivasi Berhasil menggunakan Format Offline!' });
+            }
+            
+            return res.status(400).json({ error: 'Serial Key tidak terdaftar atau salah. Sila hubungi Admin untuk membeli Key Resmi.' });
+        }
+    });
+
     app.post('/api/test-gemini-key', async (req, res) => {
         try {
             const { apiKey } = req.body;

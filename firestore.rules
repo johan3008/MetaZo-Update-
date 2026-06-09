@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net & Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // 1. Centralized Branding Rules
+    match /branding/{brandingId} {
+      allow read: if true;
+      allow write: if brandingId == 'main' 
+        && request.resource.data.appName is string 
+        && request.resource.data.appName.size() <= 100
+        && request.resource.data.appSubtitle is string
+        && request.resource.data.appSubtitle.size() <= 200;
+    }
+
+    // 2. Multi-Key License Management
+    match /keys/{keyId} {
+      allow read, write: if true;
+    }
+  }
+}
