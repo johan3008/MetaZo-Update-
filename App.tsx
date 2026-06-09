@@ -20,7 +20,6 @@ import { PromptImageView } from './src/components/PromptImageView';
 import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { CalendarGenView } from './src/components/CalendarGenView';
-import { GeminiChatbot } from './src/components/GeminiChatbot';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { TRANSLATIONS, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
@@ -3430,7 +3429,6 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-      <GeminiChatbot />
     </div>
   );
 };

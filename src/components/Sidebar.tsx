@@ -3,7 +3,7 @@ import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, MessageSquare
+  Calendar
 } from 'lucide-react';
 import { ToolType, GenerationMode } from '../../types';
 
