@@ -2473,7 +2473,7 @@ const App: React.FC = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
-                <h3 className="font-extrabold text-amber-500 uppercase tracking-wider mb-2 text-[11px]">⚡ Tips Mode Pemrosesan</h3>
+                <h3 className="font-extrabold text-emerald-500 uppercase tracking-wider mb-2 text-[11px]">⚡ Tips Mode Pemrosesan</h3>
                 <div className="grid grid-cols-1 gap-2.5">
                   <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
                     <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">Standard Mode</span>
@@ -2483,6 +2483,15 @@ const App: React.FC = () => {
                     <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">Batch Mode</span>
                     <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Memproses banyak file sekaligus secara simultan. Disarankan untuk memproses asset dalam jumlah besar jika waktu menjadi prioritas utama Anda.</p>
                   </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-white/5">
+                <h3 className="font-extrabold text-[#4e73df] uppercase tracking-wider mb-2 text-[11px]">💳 Handbook Trial & Premium</h3>
+                <div className="space-y-2 text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+                    <p><strong className="text-slate-800 dark:text-white">Mode Trial:</strong> Anda berada dalam masa uji coba gratis dengan batasan harian untuk memastikan kestabilan sistem. Fitur tertentu mungkin terbatas.</p>
+                    <p><strong className="text-slate-800 dark:text-white">Premium (Lisensi):</strong> Dengan Serial Key lisensi, semua batasan dihapus sepenuhnya. Dapatkan akses unlimited untuk pemrosesan aset profesional Anda.</p>
+                    <p>Butuh lisensi? Hubungi admin untuk mendapatkan Serial Key resmi & tingkatkan akun Anda ke Premium!</p>
                 </div>
               </div>
 
