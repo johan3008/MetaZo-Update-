@@ -105,22 +105,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 2. PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
       {isLicensed ? (
-        <div className="bg-emerald-550/10 dark:bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start space-x-3">
-            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-2xl shrink-0 mt-0.5">
-              <ShieldCheck size={18} />
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xl shadow-emerald-500/10">
+          <div className="flex items-start space-x-4">
+            <div className="p-3 bg-white/20 text-white rounded-2xl shrink-0 mt-0.5">
+              <ShieldCheck size={24} />
             </div>
             <div>
-              <h4 className="text-xs sm:text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider animate-pulse">
+              <h4 className="text-sm font-black text-white uppercase tracking-wider">
                 Lisensi Komersial Aktif • {appName} PRO
               </h4>
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">
-                Salinan berlisensi penuh dibeli secara sah untuk workflow profesional terakreditasi oleh {appName} Reseller Network. Semua fitur pengunggahan cerdas dan ekspor batch telah aktif tanpa pembatasan.
+              <p className="text-xs font-medium text-emerald-50 leading-relaxed mt-1">
+                Salinan berlisensi penuh dibeli secara sah untuk workflow profesional terakreditasi oleh {appName} Reseller Network. 
+                Semua fitur pengunggahan cerdas dan ekspor batch telah aktif tanpa pembatasan.
               </p>
             </div>
           </div>
           <div className="flex items-center shrink-0">
-            <span className="px-3 py-1 bg-emerald-500 text-white font-extrabold text-[10px] rounded-full uppercase tracking-widest">
+            <span className="px-4 py-2 bg-white text-emerald-700 font-extrabold text-[11px] rounded-full uppercase tracking-widest shadow-lg">
               ★ ACTIVE PRO
             </span>
           </div>
