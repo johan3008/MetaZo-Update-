@@ -43,15 +43,14 @@ const BACKGROUND_STYLE_OPTIONS = [
 ];
 
 const PNG_STYLE_OPTIONS = [
-  { id: '3D CGI', label: '3D CGI (Gaya 3D CGI)', icon: '🧊' },
   { id: '3D Render', label: '3D Render (Animasi 3D)', icon: '🎮' },
-  { id: 'Flat Icon', label: 'Flat Icon (Desain Flat)', icon: '📱' },
-  { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
   { id: 'Isometric', label: 'Isometric (Isometrik 3D)', icon: '📦' },
+  { id: 'Lowpoly', label: 'Lowpoly (Poli Rendah)', icon: '💎' },
+  { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
+  { id: 'Flat Icon', label: 'Flat Icon (Desain Flat)', icon: '📱' },
+  { id: 'Sticker Illustration', label: 'Sticker Illustration (Stiker Aset)', icon: '🏷️' },
   { id: 'Pixel Art', label: 'Pixel Art (Seni Piksel Retro)', icon: '👾' },
   { id: 'Claymation Style', label: 'Claymation Style (Model Lempung)', icon: '🧸' },
-  { id: 'Sticker Illustration', label: 'Sticker Illustration (Stiker Aset)', icon: '🏷️' },
-  { id: 'Lowpoly', label: 'Lowpoly (Poli Rendah)', icon: '💎' },
   { id: 'HandDrawn Sketch', label: 'HandDrawn Sketch (Sketsa Tangan)', icon: '✏️' },
   { id: 'Origami Style', label: 'Origami Style (Seni Origami)', icon: '📄' },
   { id: 'Glassmorphism', label: 'Glassmorphism (Efek Kaca)', icon: '🔮' },
