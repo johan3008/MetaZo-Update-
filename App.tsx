@@ -1062,7 +1062,7 @@ const App: React.FC = () => {
 
   const handleTryUnlockReseller = (typedVal?: string) => {
     const val = (typedVal !== undefined ? typedVal : resellerPasscodeVal).trim();
-    if (val === 'METAZO-OWNER-2026' || val === 'admin123' || val === 'METAZO-RESELLER-2026') {
+    if (val === 'METAZO-OWNER-2026' || val === 'METAZO-RESELLER-2026') {
       setIsResellerUnlocked(true);
       localStorage.setItem('mz_reseller_unlocked', 'true');
       setActiveSettingsTab('reseller');

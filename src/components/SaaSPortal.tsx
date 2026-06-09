@@ -82,7 +82,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     setIsVerifyingLanding(true);
     setTimeout(() => {
       const code = landingPasscode.trim();
-      if (code === 'METAZO-OWNER-2026' || code === 'admin123' || code === 'METAZO-RESELLER-2026') {
+      if (code === 'METAZO-OWNER-2026' || code === 'METAZO-RESELLER-2026') {
         if (setIsResellerUnlocked) {
           setIsResellerUnlocked(true);
           localStorage.setItem('mz_reseller_unlocked', 'true');
