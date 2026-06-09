@@ -20,6 +20,9 @@ interface DashboardViewProps {
   pricingTier?: string;
   whatsAppLink?: string;
   setShowActivation?: (show: boolean) => void;
+  imageDailyCount?: number;
+  videoDailyCount?: number;
+  vectorDailyCount?: number;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -35,7 +38,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   appName = 'MetaZo PRO',
   pricingTier = 'Rp 149.000 / Bulan',
   whatsAppLink = 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
-  setShowActivation
+  setShowActivation,
+  imageDailyCount = 0,
+  videoDailyCount = 0,
+  vectorDailyCount = 0
 }) => {
   // Compute some quick statistics
   const totalFiles = files.length;
@@ -181,6 +187,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
                 Kompatibel dengan file foto, raster ilustrasi, atau screenshot berformat <strong className="text-slate-700 dark:text-slate-200">JPG, PNG & WEBP</strong>. Deteksi warna, struktur visual, elemen estetika, dan lokasi otomatis.
               </p>
+
+              {!isLicensed && (
+                <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                  <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
+                    <span>Trial Hari Ini</span>
+                    <span className={imageDailyCount >= 50 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/50 Aset</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= 50 ? 'bg-red-550' : 'bg-[#4e73df]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 50) * 100)}%` }} />
+                  </div>
+                  {imageDailyCount >= 50 && (
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             <button 
@@ -208,6 +229,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
                 Didesain khusus untuk klip video footage berformat <strong className="text-slate-700 dark:text-slate-200">MP4, MOV & WEBM</strong>. Menganalisis sekuen gambar dinamis serta mencocokkan gaya sinematografi objek bergerak.
               </p>
+
+              {!isLicensed && (
+                <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                  <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
+                    <span>Trial Hari Ini</span>
+                    <span className={videoDailyCount >= 50 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/50 Aset</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${videoDailyCount >= 50 ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / 50) * 100)}%` }} />
+                  </div>
+                  {videoDailyCount >= 50 && (
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             <button 
@@ -235,6 +271,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
                 Dibuat untuk berkas gambar ilustrasi berbasis garis/vektor yang fleksibel seperti <strong className="text-slate-700 dark:text-slate-200">SVG, EPS & AI</strong>. Menghasilkan pencarian tag terarah untuk kebutuhan elemen web UI/UX.
               </p>
+
+              {!isLicensed && (
+                <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                  <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
+                    <span>Trial Hari Ini</span>
+                    <span className={vectorDailyCount >= 50 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/50 Aset</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${vectorDailyCount >= 50 ? 'bg-red-550' : 'bg-emerald-555'}`} style={{ width: `${Math.min(100, (vectorDailyCount / 50) * 100)}%` }} />
+                  </div>
+                  {vectorDailyCount >= 50 && (
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             <button 

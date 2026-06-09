@@ -964,6 +964,49 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Daily Asset Generation Tracking for Trial Users
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDailyCount = useCallback((type: ToolType): number => {
+    const dateStr = getTodayDateString();
+    const val = localStorage.getItem(`mz_daily_gen_${type}_${dateStr}`);
+    return val ? parseInt(val) || 0 : 0;
+  }, []);
+
+  const [dailyGenCounts, setDailyGenCounts] = useState<{ [key in ToolType]?: number }>({});
+
+  const refreshDailyCounts = useCallback(() => {
+    setDailyGenCounts({
+      [ToolType.IMAGE]: getDailyCount(ToolType.IMAGE),
+      [ToolType.VIDEO]: getDailyCount(ToolType.VIDEO),
+      [ToolType.VECTOR]: getDailyCount(ToolType.VECTOR),
+      [ToolType.DASHBOARD]: 0,
+      [ToolType.PROMPT_GEN]: 0,
+      [ToolType.PROMPT_IMAGE]: 0,
+      [ToolType.PROMPT_VIDEO]: 0,
+      [ToolType.PROMPT_IMAGE_CHECK]: 0,
+      [ToolType.VECTOR_EPS]: 0,
+      [ToolType.CALENDAR_GEN]: 0
+    });
+  }, [getDailyCount]);
+
+  const incrementDailyCount = useCallback((type: ToolType, amount: number = 1) => {
+    const dateStr = getTodayDateString();
+    const current = getDailyCount(type);
+    localStorage.setItem(`mz_daily_gen_${type}_${dateStr}`, String(current + amount));
+    refreshDailyCounts();
+  }, [getDailyCount, refreshDailyCounts]);
+
+  useEffect(() => {
+    refreshDailyCounts();
+  }, [refreshDailyCounts]);
+
   // Trial Period tracking (7 Days)
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
     let startStr = localStorage.getItem('mz_trial_start');
@@ -1618,6 +1661,13 @@ const App: React.FC = () => {
     if (stopGenerationRef.current) return false;
 
     try {
+        if (!isMzLicensed) {
+            const todayCount = getDailyCount(activeTool);
+            if (todayCount >= 50) {
+                throw new Error("Batas Trial Terlampaui. Coba di esok hari.");
+            }
+        }
+
         updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isGenerating: true, error: null } : f));
         
         let analysisFrames = fileItem.analysisFrames;
@@ -1655,6 +1705,10 @@ const App: React.FC = () => {
                 error: null
               } : f));
               
+              if (!isMzLicensed) {
+                incrementDailyCount(activeTool, 1);
+              }
+
               return true; // Success
             } catch (err: any) {
               const errorMessage = err.message || "Failed to contact AI";
@@ -1696,6 +1750,13 @@ const App: React.FC = () => {
     if (stopGenerationRef.current) return false;
 
     try {
+        if (!isMzLicensed) {
+            const todayCount = getDailyCount(activeTool);
+            if (todayCount >= 50) {
+                throw new Error("Batas Trial Terlampaui. Coba di esok hari.");
+            }
+        }
+
         // 1. Mark as extracting/generating
         updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: true, error: null } : f));
 
@@ -1721,7 +1782,24 @@ const App: React.FC = () => {
             }
         }
 
-        if (itemsToProcess.length === 0) return true;
+        let finalItemsToProcess = itemsToProcess;
+        if (!isMzLicensed) {
+            const todayCount = getDailyCount(activeTool);
+            const remaining = Math.max(0, 50 - todayCount);
+            if (finalItemsToProcess.length > remaining) {
+                const allowed = finalItemsToProcess.slice(0, remaining);
+                const excluded = finalItemsToProcess.slice(remaining);
+                updateFiles(prev => prev.map(f => {
+                    if (excluded.some(ex => ex.id === f.id)) {
+                        return { ...f, isGenerating: false, isExtracting: false, error: "Batas Trial Terlampaui. Coba di esok hari." };
+                    }
+                    return f;
+                }));
+                finalItemsToProcess = allowed;
+            }
+        }
+
+        if (finalItemsToProcess.length === 0) return true;
 
         // 3. Call API
         let retryCount = 0;
@@ -1730,7 +1808,7 @@ const App: React.FC = () => {
             if (stopGenerationRef.current) return false;
             try {
                 const kCount = keywordCount || 25;
-                const batchResults = await generateBatchStockMetadata(itemsToProcess, kCount, customPrompt, activeTool);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -1750,6 +1828,11 @@ const App: React.FC = () => {
                     }
                     return f;
                 }));
+
+                if (!isMzLicensed) {
+                    incrementDailyCount(activeTool, batchResults.length);
+                }
+
                 return true;
             } catch (err: any) {
                 const errorMessage = err.message || "Failed to contact AI";
@@ -1774,6 +1857,14 @@ const App: React.FC = () => {
   };
 
   const handleGenerateAll = async (isRetry = false) => {
+    if (!isMzLicensed) {
+      const todayCount = getDailyCount(activeTool);
+      if (todayCount >= 50) {
+        alert("Coba di esok hari.\n\nBatas gratis harian (50 aset) untuk tipe ini telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
+        return;
+      }
+    }
+
     // Initial check to see if there's anything to do at all
     const currentFilesForCheck = filesRef.current;
     const initialPending = isRetry 
@@ -2136,6 +2227,9 @@ const App: React.FC = () => {
               pricingTier={mzPriceText}
               whatsAppLink={mzWhatsApp}
               setShowActivation={setShowActivationModal}
+              imageDailyCount={dailyGenCounts[ToolType.IMAGE] || 0}
+              videoDailyCount={dailyGenCounts[ToolType.VIDEO] || 0}
+              vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView t={t} prefilledSubject={prefilledSubject} onPrefillConsumed={() => setPrefilledSubject('')} />
