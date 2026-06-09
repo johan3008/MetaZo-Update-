@@ -127,19 +127,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       ) : (
         <div className="bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 border border-amber-500/25 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 select-none">
-          <div className="flex items-start space-x-3.5">
-            <div className="p-2 sm:p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-0.5">
-              <Key size={18} className="rotate-45" />
+          {!isLicensed && (
+            <div className="flex items-start space-x-3.5">
+              <div className="p-2 sm:p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-0.5">
+                <Key size={18} className="rotate-45" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span>Versi Evaluasi Gratis • Batasan Trial Aktif</span>
+                </h4>
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl mt-0.5">
+                  Anda sedang mencoba copy gratis aplikasi {appName}. Dapatkan lisensi premium seharga <strong className="text-slate-800 dark:text-slate-200">{pricingTier}</strong> untuk memproses batch massal tak terbatas serta menghapus kuncian token trial.
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
-                <span>Versi Evaluasi Gratis • Batasan Trial Aktif</span>
-              </h4>
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl mt-0.5">
-                Anda sedang mencoba copy gratis aplikasi {appName}. Dapatkan lisensi premium seharga <strong className="text-slate-800 dark:text-slate-200">{pricingTier}</strong> untuk memproses batch massal tak terbatas serta menghapus kuncian token trial.
-              </p>
-            </div>
-          </div>
+          )}
           <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0">
             <button
               onClick={() => setShowActivation?.(true)}

@@ -12,6 +12,7 @@ interface TopbarProps {
   setShowSettingsModal: (s: boolean) => void;
   t: any;
   setShowActivation?: (show: boolean) => void;
+  isLicensed?: boolean;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -24,26 +25,10 @@ export const Topbar: React.FC<TopbarProps> = ({
   setShowInfoModal,
   setShowSettingsModal,
   t,
-  setShowActivation
+  setShowActivation,
+  isLicensed
 }) => {
   const [time, setTime] = React.useState(new Date());
-
-  // Load licence state dynamically
-  const licenseKeyVal = localStorage.getItem('mz_license_key') || '';
-  const licenseSeedVal = localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026';
-  
-  const checkIsLicensedVal = () => {
-    const k = licenseKeyVal.trim().toUpperCase();
-    const s = licenseSeedVal.trim().toUpperCase();
-    if (!k) return false;
-    if (k === s) return true;
-    if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
-    if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
-    if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
-    return false;
-  };
-
-  const isLicensed = checkIsLicensedVal();
 
   React.useEffect(() => {
     const timer = setInterval(() => {

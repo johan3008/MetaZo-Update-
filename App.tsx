@@ -1084,14 +1084,17 @@ const App: React.FC = () => {
       .then(dSnap => {
         if (dSnap.exists()) {
           const data = dSnap.data();
+          console.log('License validation data:', data, 'devId:', devId);
           if (data.activated && (data.activatedBy === devId || data.activatedBy === 'johanchrismant4@gmail.com')) {
             setIsMzLicensed(true);
           } else {
+            console.log('License validation failed: Activation requirement not met');
             setIsMzLicensed(false);
             localStorage.removeItem('mz_license_key');
             setMzLicenseKey('');
           }
         } else {
+          console.log('License validation failed: Key does not exist');
           setIsMzLicensed(false);
           localStorage.removeItem('mz_license_key');
           setMzLicenseKey('');
@@ -2208,6 +2211,7 @@ const App: React.FC = () => {
           setShowSettingsModal={setShowSettingsModal}
           t={t} 
           setShowActivation={setShowActivationModal}
+          isLicensed={isMzLicensed}
         />
 
         {/* Core Dashboard Stage */}
