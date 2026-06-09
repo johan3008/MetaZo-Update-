@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Sparkles, ImageIcon, Film, FileCode, Zap, BookOpen, 
   ArrowRight, ShieldCheck, Activity, BarChart2, CheckCircle, 
-  AlertTriangle, Clock, HelpCircle
+  AlertTriangle, Clock, HelpCircle, Key
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
 
@@ -15,6 +15,11 @@ interface DashboardViewProps {
   filesWithErrorCount: number;
   unprocessedFilesCount: number;
   generationMode: string;
+  isLicensed?: boolean;
+  appName?: string;
+  pricingTier?: string;
+  whatsAppLink?: string;
+  setShowActivation?: (show: boolean) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -25,7 +30,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   filesToGenerateCount,
   filesWithErrorCount,
   unprocessedFilesCount,
-  generationMode
+  generationMode,
+  isLicensed = false,
+  appName = 'MetaZo PRO',
+  pricingTier = 'Rp 149.000 / Bulan',
+  whatsAppLink = 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
+  setShowActivation
 }) => {
   // Compute some quick statistics
   const totalFiles = files.length;
@@ -87,7 +97,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 2. CHOOSE YOUR WORKSPACE GRID */}
+      {/* 2. PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
+      {isLicensed ? (
+        <div className="bg-emerald-550/10 dark:bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start space-x-3">
+            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-2xl shrink-0 mt-0.5">
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider animate-pulse">
+                Lisensi Komersial Aktif • {appName} PRO
+              </h4>
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">
+                Salinan berlisensi penuh dibeli secara sah untuk workflow profesional terakreditasi oleh {appName} Reseller Network. Semua fitur pengunggahan cerdas dan ekspor batch telah aktif tanpa pembatasan.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center shrink-0">
+            <span className="px-3 py-1 bg-emerald-500 text-white font-extrabold text-[10px] rounded-full uppercase tracking-widest">
+              ★ ACTIVE PRO
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-amber-500/5 via-amber-500/10 to-amber-500/5 border border-amber-500/25 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 select-none">
+          <div className="flex items-start space-x-3.5">
+            <div className="p-2 sm:p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-0.5">
+              <Key size={18} className="rotate-45" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
+                <span>Versi Evaluasi Gratis • Batasan Trial Aktif</span>
+              </h4>
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl mt-0.5">
+                Anda sedang mencoba copy gratis aplikasi {appName}. Dapatkan lisensi premium seharga <strong className="text-slate-800 dark:text-slate-200">{pricingTier}</strong> untuk memproses batch massal tak terbatas serta menghapus kuncian token trial.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0">
+            <button
+              onClick={() => setShowActivation?.(true)}
+              className="px-4.5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 active:scale-95 text-slate-900 font-black text-[10.5px] uppercase tracking-wider rounded-xl transition-all shadow shadow-amber-500/10 cursor-pointer"
+            >
+              Masukkan Key
+            </button>
+            <a
+              href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName || '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4.5 py-2 bg-slate-950 dark:bg-slate-800 w-full sm:w-auto text-center hover:bg-slate-850 text-white font-black text-[10.5px] uppercase tracking-wider rounded-xl transition-all"
+            >
+              Hubungi Admin
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* 3. CHOOSE YOUR WORKSPACE GRID */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2">

@@ -11,6 +11,7 @@ interface TopbarProps {
   setShowInfoModal: (s: boolean) => void;
   setShowSettingsModal: (s: boolean) => void;
   t: any;
+  setShowActivation?: (show: boolean) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -22,9 +23,27 @@ export const Topbar: React.FC<TopbarProps> = ({
   setSidebarOpen,
   setShowInfoModal,
   setShowSettingsModal,
-  t
+  t,
+  setShowActivation
 }) => {
   const [time, setTime] = React.useState(new Date());
+
+  // Load licence state dynamically
+  const licenseKeyVal = localStorage.getItem('mz_license_key') || '';
+  const licenseSeedVal = localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026';
+  
+  const checkIsLicensedVal = () => {
+    const k = licenseKeyVal.trim().toUpperCase();
+    const s = licenseSeedVal.trim().toUpperCase();
+    if (!k) return false;
+    if (k === s) return true;
+    if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
+    if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
+    if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
+    return false;
+  };
+
+  const isLicensed = checkIsLicensedVal();
 
   React.useEffect(() => {
     const timer = setInterval(() => {
@@ -92,6 +111,27 @@ export const Topbar: React.FC<TopbarProps> = ({
             STABILITY CORE ONLINE
           </span>
         </div>
+
+        {/* Dynamic License Badge */}
+        {isLicensed ? (
+          <button 
+            type="button"
+            onClick={() => setShowActivation?.(true)}
+            className="text-[10px] font-black uppercase bg-emerald-500/10 dark:bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-full text-emerald-600 dark:text-emerald-400 cursor-pointer transition-all hover:scale-105 active:scale-95"
+            title="Kelola Lisensi / Berhenti Langganan"
+          >
+            👑 PRO ACTIVE
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowActivation?.(true)}
+            className="text-[10px] font-black uppercase bg-amber-500/10 dark:bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2.5 py-1 rounded-full text-amber-600 dark:text-amber-400 cursor-pointer transition-all hover:scale-105 active:scale-95 animate-pulse"
+            title="Aktivasi Lisensi Resmi / Mulai Pro"
+          >
+            ⚠️ TRIAL EVAL
+          </button>
+        )}
 
         {/* Theme Swapper */}
         <button 

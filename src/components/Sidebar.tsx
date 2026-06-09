@@ -18,6 +18,9 @@ interface SidebarProps {
   setGenerationMode: (mode: GenerationMode) => void;
   t: any;
   filesLength: number;
+  isLicensed?: boolean;
+  setShowActivation?: (show: boolean) => void;
+  onUnlockReseller?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,10 +33,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   generationMode,
   setGenerationMode,
   t,
-  filesLength
+  filesLength,
+  isLicensed = false,
+  setShowActivation,
+  onUnlockReseller
 }) => {
   const [metadataGenOpen, setMetadataGenOpen] = useState(true);
   const [promptGenOpen, setPromptGenOpen] = useState(true);
+  const [logoClicks, setLogoClicks] = useState(0);
+
+  const customAppName = localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO';
+
+  const handleLogoClick = () => {
+    const next = logoClicks + 1;
+    setLogoClicks(next);
+    if (next >= 5) {
+      onUnlockReseller?.();
+      setLogoClicks(0);
+    }
+  };
 
   const handleNavClick = (tool: ToolType) => {
     setActiveTool(tool);
@@ -58,13 +76,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const SidebarContent = (
     <>
       {/* Brand Header */}
-      <div className="flex items-center space-x-3 px-4 py-5 border-b border-white/10">
+      <div 
+        onClick={handleLogoClick}
+        className="flex items-center space-x-3 px-4 py-5 border-b border-white/10 cursor-pointer select-none active:scale-[0.99] transition-all"
+        title="MetaZo PRO Stock Assistant"
+      >
         <div className="w-9 h-9 bg-gradient-to-br from-[#4e73df] to-[#224abe] rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 transition-all overflow-hidden border border-white/20">
           <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover" />
         </div>
         {!sidebarCollapsed && (
           <div className="flex flex-col select-none">
-            <span className="font-black text-base tracking-tight text-white leading-none">MetaZo <span className="text-emerald-400">PRO</span></span>
+            <span className="font-black text-base tracking-tight text-white leading-none">{customAppName}</span>
             <span className="text-[9px] font-extrabold text-[#e3e6f0]/75 uppercase tracking-widest mt-1">STOCK ASSISTANT</span>
           </div>
         )}
@@ -298,6 +320,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </p>
           )}
           <nav className="space-y-1">
+            {isLicensed ? (
+              <button 
+                type="button"
+                onClick={() => setShowActivation?.(true)}
+                className="w-full flex items-center justify-between px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 rounded-lg text-[10px] font-black text-emerald-400 mb-1.5 transition-all text-left cursor-pointer"
+                title="Kelola Lisensi / Berhenti Langganan"
+              >
+                <div className="flex items-center space-x-2 truncate">
+                  <CheckCircle size={13} className="text-emerald-400 shrink-0" />
+                  {!sidebarCollapsed && <span className="truncate">PRO AKTIF</span>}
+                </div>
+                {!sidebarCollapsed && <span className="text-[9px] opacity-75 underline font-bold uppercase hover:text-white shrink-0">Kelola</span>}
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={() => setShowActivation?.(true)}
+                className="w-full flex items-center space-x-3 px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 hover:brightness-110 active:scale-[0.98] rounded-lg text-[10.5px] font-black shadow-md transition-all mb-1.5 cursor-pointer"
+              >
+                <Sparkles size={14} className="shrink-0 animate-bounce text-amber-900" />
+                {!sidebarCollapsed && <span>AKTIVASI PREMIUM</span>}
+              </button>
+            )}
+
             <a 
               href={t.whatsapp_link} 
               target="_blank" 
@@ -352,12 +398,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <X size={16} />
             </button>
             <div className="flex-1 flex flex-col h-full select-none">
-              <div className="flex items-center space-x-3 px-1 py-5 border-b border-white/10">
+              <div 
+                onClick={handleLogoClick}
+                className="flex items-center space-x-3 px-1 py-5 border-b border-white/10 cursor-pointer active:scale-[0.99] transition-all animate-none"
+              >
                 <div className="w-9 h-9 bg-gradient-to-br from-[#4e73df] to-[#224abe] rounded-xl flex items-center justify-center shadow overflow-hidden border border-white/20">
                   <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-extrabold text-sm tracking-tight text-white leading-none">MetaZo PRO</span>
+                  <span className="font-extrabold text-sm tracking-tight text-white leading-none">{customAppName}</span>
                   <span className="text-[8px] font-extrabold text-[#e3e6f0]/75 uppercase tracking-widest mt-1">STOCK ASSISTANT</span>
                 </div>
               </div>

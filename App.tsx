@@ -4,7 +4,7 @@ import {
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
-  Plus, Key
+  Plus, Key, Lock
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -20,6 +20,7 @@ import { PromptImageView } from './src/components/PromptImageView';
 import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { CalendarGenView } from './src/components/CalendarGenView';
+import { SaaSPortal } from './src/components/SaaSPortal';
 import { TRANSLATIONS, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
@@ -894,8 +895,98 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral'>('gemini');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral' | 'reseller'>('gemini');
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral'>('gemini');
+
+  // Reseller & License state
+  const [isResellerUnlocked, setIsResellerUnlocked] = useState(() => localStorage.getItem('mz_reseller_unlocked') === 'true');
+  const [resellerClicks, setResellerClicks] = useState(0);
+  const [showResellerUnlockInput, setShowResellerUnlockInput] = useState(false);
+  const [resellerPasscodeVal, setResellerPasscodeVal] = useState('');
+  const [resellerPasscodeError, setResellerPasscodeError] = useState('');
+
+  const [mzAppName, setMzAppName] = useState(() => localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO');
+  const [mzAppSubtitle, setMzAppSubtitle] = useState(() => localStorage.getItem('mz_reseller_app_subtitle') || 'AI-Powered Metadata Assistant');
+  const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
+  const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || 'Rp 149.000 / Bulan');
+  const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
+  const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
+  const [isMzLicensed, setIsMzLicensed] = useState(false);
+  const [showActivationModal, setShowActivationModal] = useState(false);
+
+  // Trial Period tracking (7 Days)
+  const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
+    let startStr = localStorage.getItem('mz_trial_start');
+    if (!startStr) {
+      startStr = new Date().toISOString();
+      localStorage.setItem('mz_trial_start', startStr);
+    }
+    const startTime = new Date(startStr).getTime();
+    const currTime = new Date().getTime();
+    const diffMs = currTime - startTime;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    const leftRaw = 7 - diffDays;
+    return Math.max(0, leftRaw);
+  });
+
+  // Automatically check trial status on mount or when licensing changes
+  useEffect(() => {
+    if (!isMzLicensed && trialDaysLeft <= 0) {
+      setShowActivationModal(true);
+    }
+  }, [isMzLicensed, trialDaysLeft]);
+
+  // Wrapped activeTool setter to enforce trial constraints
+  const handleSetActiveTool = (tool: ToolType) => {
+    if (!isMzLicensed) {
+      if (trialDaysLeft <= 0) {
+        setShowActivationModal(true);
+        return;
+      }
+      const allowedTrialTools = [
+        ToolType.DASHBOARD,
+        ToolType.IMAGE,
+        ToolType.VIDEO,
+        ToolType.VECTOR,
+        ToolType.PROMPT_GEN,
+        ToolType.CALENDAR_GEN
+      ];
+      if (!allowedTrialTools.includes(tool)) {
+        alert("Fitur Premium Terkunci!\n\nSelama masa trial 7 hari, Anda hanya dapat mengakses Metadata Gen, Prompt Teks, dan Calendar Gen.\n\nSilakan lakukan aktivasi berbayar untuk membuka fitur ini.");
+        setShowActivationModal(true);
+        return;
+      }
+    }
+    setActiveTool(tool);
+  };
+
+  useEffect(() => {
+    const checkLicense = () => {
+      const k = mzLicenseKey.trim().toUpperCase();
+      const s = mzLicenseSeed.trim().toUpperCase();
+      if (!k) return false;
+      if (k === s) return true;
+      if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
+      if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
+      if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
+      return false;
+    };
+    setIsMzLicensed(checkLicense());
+  }, [mzLicenseKey, mzLicenseSeed]);
+
+  const handleTryUnlockReseller = (typedVal?: string) => {
+    const val = (typedVal !== undefined ? typedVal : resellerPasscodeVal).trim();
+    if (val === 'METAZO-OWNER-2026' || val === 'admin123' || val === 'METAZO-RESELLER-2026') {
+      setIsResellerUnlocked(true);
+      localStorage.setItem('mz_reseller_unlocked', 'true');
+      setActiveSettingsTab('reseller');
+      setShowResellerUnlockInput(false);
+      setResellerPasscodeVal('');
+      setResellerPasscodeError('');
+    } else {
+      setResellerPasscodeError('Passcode salah atau kedaluwarsa!');
+    }
+  };
 
   const [geminiKeysList, setGeminiKeysList] = useState<string[]>([]);
   const [groqKeysList, setGroqKeysList] = useState<string[]>([]);
@@ -1911,7 +2002,7 @@ const App: React.FC = () => {
       {/* Sidebar Navigation */}
       <Sidebar 
         activeTool={activeTool} 
-        setActiveTool={setActiveTool} 
+        setActiveTool={handleSetActiveTool} 
         sidebarCollapsed={sidebarCollapsed} 
         setSidebarCollapsed={setSidebarCollapsed} 
         sidebarOpen={sidebarOpen} 
@@ -1920,6 +2011,9 @@ const App: React.FC = () => {
         setGenerationMode={setGenerationMode} 
         t={t} 
         filesLength={files.length} 
+        isLicensed={isMzLicensed}
+        setShowActivation={setShowActivationModal}
+        onUnlockReseller={() => setShowResellerUnlockInput(true)}
       />
 
       {/* Main Content Area Container */}
@@ -1935,6 +2029,7 @@ const App: React.FC = () => {
           setShowInfoModal={setShowInfoModal} 
           setShowSettingsModal={setShowSettingsModal}
           t={t} 
+          setShowActivation={setShowActivationModal}
         />
 
         {/* Core Dashboard Stage */}
@@ -1942,13 +2037,18 @@ const App: React.FC = () => {
           {activeTool === ToolType.DASHBOARD ? (
             <DashboardView 
               files={files}
-              setActiveTool={setActiveTool}
+              setActiveTool={handleSetActiveTool}
               setShowInfoModal={setShowInfoModal}
               successfulFilesCount={successfulFilesCount}
               filesToGenerateCount={filesToGenerateCount}
               filesWithErrorCount={filesWithErrorCount}
               unprocessedFilesCount={filesToGenerateCount}
               generationMode={generationMode}
+              isLicensed={isMzLicensed}
+              appName={mzAppName}
+              pricingTier={mzPriceText}
+              whatsAppLink={mzWhatsApp}
+              setShowActivation={setShowActivationModal}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView t={t} prefilledSubject={prefilledSubject} onPrefillConsumed={() => setPrefilledSubject('')} />
@@ -1962,7 +2062,7 @@ const App: React.FC = () => {
             <CalendarGenView 
               onSendToPrompt={(text) => {
                 setPrefilledSubject(text);
-                setActiveTool(ToolType.PROMPT_GEN);
+                handleSetActiveTool(ToolType.PROMPT_GEN);
               }} 
             />
           ) : (
@@ -2218,9 +2318,11 @@ const App: React.FC = () => {
           <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <button onClick={() => setShowSettingsModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
             
-            <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5 shrink-0">
+            <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5 shrink-0 select-none">
               <Settings size={16} className="text-[#4e73df] animate-spin-slow" />
-              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Pengaturan Provider Model AI</h2>
+              <div className="flex-1 flex items-center justify-between">
+                <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Pengaturan Provider Model AI</h2>
+              </div>
             </div>
             
             {/* Pemilihan Provider Utama */}
@@ -2253,21 +2355,24 @@ const App: React.FC = () => {
             </div>
 
             {/* TAB Tombol */}
-            <div className="flex border-b border-slate-200 dark:border-white/5 mb-4 shrink-0">
-              {(['gemini', 'groq', 'mistral'] as const).map(tab => {
+            <div className="flex border-b border-slate-200 dark:border-white/5 mb-4 shrink-0 overflow-x-auto select-none scrollbar-none">
+              {(isResellerUnlocked 
+                ? (['gemini', 'groq', 'mistral', 'reseller'] as const) 
+                : (['gemini', 'groq', 'mistral'] as const)
+              ).map(tab => {
                 const isActive = activeSettingsTab === tab;
                 return (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setActiveSettingsTab(tab)}
-                    className={`flex-1 py-2 font-bold uppercase text-[10px] tracking-wider border-b-2 text-center transition-all ${
+                    className={`flex-none px-3.5 py-1.5 font-bold uppercase text-[9.5px] tracking-wider border-b-2 text-center transition-all ${
                       isActive
-                        ? 'border-[#4e73df] text-[#4e73df]'
+                        ? 'border-[#4e73df] text-[#4e73df] font-black'
                         : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
                     }`}
                   >
-                    Keys {tab}
+                    {tab === 'reseller' ? '💻 Reseller Portal' : `Keys ${tab}`}
                   </button>
                 );
               })}
@@ -2550,6 +2655,30 @@ const App: React.FC = () => {
                 </div>
               )}
 
+              {activeSettingsTab === 'reseller' && (
+                <SaaSPortal 
+                  appName={mzAppName}
+                  setAppName={setMzAppName}
+                  appSubtitle={mzAppSubtitle}
+                  setAppSubtitle={setMzAppSubtitle}
+                  whatsAppLink={mzWhatsApp}
+                  setWhatsAppLink={setMzWhatsApp}
+                  pricingTier={mzPriceText}
+                  setPricingTier={setMzPriceText}
+                  licenseSeed={mzLicenseSeed}
+                  setLicenseSeed={setMzLicenseSeed}
+                  licenseKey={mzLicenseKey}
+                  setLicenseKey={setMzLicenseKey}
+                  isLicensed={isMzLicensed}
+                  showActivation={showActivationModal}
+                  setShowActivation={setShowActivationModal}
+                  userEmail="johanchrismant4@gmail.com"
+                  isResellerUnlocked={isResellerUnlocked}
+                  setIsResellerUnlocked={setIsResellerUnlocked}
+                  trialDaysLeft={trialDaysLeft}
+                />
+              )}
+
               {/* Status Penggunaan info footer */}
               <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-250 dark:border-slate-800">
                 <span className="text-slate-500 dark:text-slate-400 font-medium">Status Provider Aktif</span>
@@ -2574,6 +2703,90 @@ const App: React.FC = () => {
                 className="flex-1 py-1.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-xl text-xs uppercase shadow transition-colors"
               >
                 Simpan & Pasang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Serial Activation Popup Overlay */}
+      <SaaSPortal 
+        appName={mzAppName}
+        setAppName={setMzAppName}
+        appSubtitle={mzAppSubtitle}
+        setAppSubtitle={setMzAppSubtitle}
+        whatsAppLink={mzWhatsApp}
+        setWhatsAppLink={setMzWhatsApp}
+        pricingTier={mzPriceText}
+        setPricingTier={setMzPriceText}
+        licenseSeed={mzLicenseSeed}
+        setLicenseSeed={setMzLicenseSeed}
+        licenseKey={mzLicenseKey}
+        setLicenseKey={setMzLicenseKey}
+        isLicensed={isMzLicensed}
+        showActivation={showActivationModal}
+        setShowActivation={setShowActivationModal}
+        userEmail="johanchrismant4@gmail.com"
+        onlyModal={true}
+        trialDaysLeft={trialDaysLeft}
+      />
+
+      {/* Hidden Custom Secure Reseller Passcode Dialog Overlay */}
+      {showResellerUnlockInput && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={() => {
+          setShowResellerUnlockInput(false);
+          setResellerPasscodeVal('');
+          setResellerPasscodeError('');
+        }}>
+          <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <button 
+              type="button"
+              onClick={() => {
+                setShowResellerUnlockInput(false);
+                setResellerPasscodeVal('');
+                setResellerPasscodeError('');
+              }} 
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+            <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5">
+              <Lock size={15} className="text-[#4e73df]" />
+              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Owner / Reseller Access</h2>
+            </div>
+            
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-4 leading-relaxed">
+              Silakan masukkan passcode otorisasi Anda untuk membuka fitur administrasi reseller:
+            </p>
+
+            <div className="space-y-3">
+              <input
+                type="password"
+                placeholder="Masukkan Passcode Reseller"
+                value={resellerPasscodeVal}
+                onChange={(e) => {
+                  setResellerPasscodeVal(e.target.value);
+                  setResellerPasscodeError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleTryUnlockReseller();
+                  }
+                }}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#4e73df] dark:text-white transition-all text-slate-900"
+                autoFocus
+              />
+              
+              {resellerPasscodeError && (
+                <p className="text-[10px] text-red-500 font-extrabold uppercase tracking-wide">⚠️ {resellerPasscodeError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleTryUnlockReseller()}
+                className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <span>Aktifkan Akses</span>
               </button>
             </div>
           </div>
