@@ -407,9 +407,56 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   };
 
   const handleCopyText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(label);
-    setTimeout(() => setCopiedKey(''), 2000);
+    try {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          setCopiedKey(label);
+          setTimeout(() => setCopiedKey(''), 2500);
+        }).catch((err) => {
+          console.warn('Clipboard API failed, using fallback', err);
+          fallbackCopyText(text, label);
+        });
+      } else {
+        fallbackCopyText(text, label);
+      }
+    } catch (e) {
+      console.warn('Clipboard write failure, trying fallback', e);
+      fallbackCopyText(text, label);
+    }
+  };
+
+  const fallbackCopyText = (text: string, label: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    // Make it non-disruptive
+    textArea.style.position = "absolute";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    textArea.setAttribute("readonly", "");
+    document.body.appendChild(textArea);
+    
+    // Check if there is active element to restore later
+    const activeEl = document.activeElement as HTMLElement | null;
+    
+    textArea.select();
+    textArea.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+      const successful = document.execCommand("copy");
+      if (successful) {
+        setCopiedKey(label);
+        setTimeout(() => setCopiedKey(''), 2500);
+      } else {
+        console.error("Fallback copy command was unsuccessful");
+      }
+    } catch (err) {
+      console.error("Fallback copy failed completely", err);
+    }
+    
+    document.body.removeChild(textArea);
+    if (activeEl) {
+      activeEl.focus();
+    }
   };
 
   return (

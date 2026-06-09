@@ -987,7 +987,7 @@ const App: React.FC = () => {
       [ToolType.VIDEO]: getDailyCount(ToolType.VIDEO),
       [ToolType.VECTOR]: getDailyCount(ToolType.VECTOR),
       [ToolType.DASHBOARD]: 0,
-      [ToolType.PROMPT_GEN]: 0,
+      [ToolType.PROMPT_GEN]: getDailyCount(ToolType.PROMPT_GEN),
       [ToolType.PROMPT_IMAGE]: 0,
       [ToolType.PROMPT_VIDEO]: 0,
       [ToolType.PROMPT_IMAGE_CHECK]: 0,
@@ -2232,7 +2232,14 @@ const App: React.FC = () => {
               vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
-            <PromptGenView t={t} prefilledSubject={prefilledSubject} onPrefillConsumed={() => setPrefilledSubject('')} />
+            <PromptGenView 
+              t={t} 
+              prefilledSubject={prefilledSubject} 
+              onPrefillConsumed={() => setPrefilledSubject('')} 
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_GEN] || 0}
+              incrementDailyCount={() => incrementDailyCount(ToolType.PROMPT_GEN)}
+            />
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
             <PromptImageView t={t} />
           ) : activeTool === ToolType.PROMPT_VIDEO ? (

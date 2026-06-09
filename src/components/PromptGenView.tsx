@@ -8,6 +8,9 @@ interface PromptGenViewProps {
   t: any;
   prefilledSubject?: string;
   onPrefillConsumed?: () => void;
+  isLicensed?: boolean;
+  dailyGenCount?: number;
+  incrementDailyCount?: () => void;
 }
 
 interface PromptHistoryItem {
@@ -55,7 +58,14 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' }
 ];
 
-export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubject, onPrefillConsumed }) => {
+export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
+  t, 
+  prefilledSubject, 
+  onPrefillConsumed,
+  isLicensed = false,
+  dailyGenCount = 0,
+  incrementDailyCount
+}) => {
   const [subject, setSubject] = useState('');
 
   useEffect(() => {
@@ -160,6 +170,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
   };
 
   const handleGenerate = async () => {
+    if (!isLicensed && dailyGenCount >= 50) {
+      setError("Batas Trial Terlampaui. Anda telah mencapai batas maksimal 50 kali generate Prompt Teks hari ini. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
+      return;
+    }
+
     if (!subject.trim()) {
       setError("Silakan masukkan ide dasar atau subjek murni visual terlebih dahulu.");
       return;
@@ -219,6 +234,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
 
       setResult(data);
       setProgress(100);
+      
+      if (!isLicensed && incrementDailyCount) {
+        incrementDailyCount();
+      }
       
       // Save to local storage history list
       const historyItem: PromptHistoryItem = {
@@ -386,6 +405,37 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({ t, prefilledSubjec
               <span>Tab PNG Asset</span>
             </button>
           </div>
+
+          {!isLicensed && (
+            <div className="bg-emerald-500/5 dark:bg-black/20 p-4 rounded-2xl border border-emerald-500/15 dark:border-white/5 shadow-inner">
+              <div className="flex justify-between text-[11px] uppercase font-black text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-550 animate-pulse" />
+                  Trial Hari Ini: Prompt Teks
+                </span>
+                <span className={dailyGenCount >= 50 ? "text-red-500 font-black" : "text-emerald-500 font-black"}>
+                  {dailyGenCount}/50 Kali Generate
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-205 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    dailyGenCount >= 50 ? 'bg-red-500' : 'bg-emerald-500'
+                  }`} 
+                  style={{ width: `${Math.min(100, (dailyGenCount / 50) * 100)}%` }} 
+                />
+              </div>
+              {dailyGenCount >= 50 ? (
+                <span className="text-[10px] text-red-500 font-extrabold block mt-2 leading-tight">
+                  ⚠️ Batas trial gratis harian (50 generate) telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-1.5 leading-tight">
+                  Masa Trial gratis 50 generate/hari. Sisa kuota generate hari ini: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 50 - dailyGenCount)} kali</strong>.
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             {/* Left side within the input panel */}
