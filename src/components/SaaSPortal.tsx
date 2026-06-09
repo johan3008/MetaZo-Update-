@@ -182,13 +182,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   };
 
   const handleDeleteKey = async (keyToDelete: string) => {
-    if (!window.confirm(`Hapus Serial Key ${keyToDelete}?`)) return;
     setIsKeysLoading(true);
     try {
       await deleteDoc(doc(db, 'keys', keyToDelete));
       await fetchBackendKeys();
+      alert(`Key ${keyToDelete} berhasil dihapus.`);
     } catch (err) {
       console.error('Failed to delete key inside Firestore:', err);
+      alert(`Gagal menghapus key: ${err}`);
       handleFirestoreError(err, OperationType.DELETE, `keys/${keyToDelete}`);
     } finally {
       setIsKeysLoading(false);
@@ -196,7 +197,6 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   };
 
   const handleResetKey = async (keyToReset: string) => {
-    if (!window.confirm(`Reset status aktivasi key ${keyToReset} agar bisa digunakan kembali?`)) return;
     setIsKeysLoading(true);
     try {
       await updateDoc(doc(db, 'keys', keyToReset), {
@@ -205,8 +205,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         activatedAt: ''
       });
       await fetchBackendKeys();
+      alert(`Key ${keyToReset} berhasil direset.`);
     } catch (err) {
       console.error('Failed to reset key inside Firestore:', err);
+      alert(`Gagal mereset key: ${err}`);
       handleFirestoreError(err, OperationType.UPDATE, `keys/${keyToReset}`);
     } finally {
       setIsKeysLoading(false);
@@ -400,10 +402,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
   const handleRemoveLicenseKey = () => {
     localStorage.removeItem('mz_license_key');
+    // Fully return to trial mode by resetting the trial period
+    localStorage.setItem('mz_trial_start', new Date().toISOString());
     setLicenseKey('');
     setInputKey('');
     setActivationError('');
     setShowCancelConfirm(false);
+    alert("Lisensi telah dihapus. Aplikasi akan dimuat ulang.");
+    window.location.reload(); // Force reload to ensure App state updates
   };
 
   const handleCopyText = (text: string, label: string) => {
