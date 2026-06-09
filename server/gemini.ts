@@ -1734,105 +1734,82 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
   }));
 }
 
-export async function checkImageQuality(image: string) {
-  const systemInstruction = `You are a Senior Professional AI Curator officially working for Adobe Stock (Legal & Quality Assurance Division). Your primary task is to review, select, and curate image assets uploaded by contributors. You judge assets with the same ruthlessness as an actual Adobe Stock inspector.
+export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM') {
+  const toleranceRules = {
+    STRICT: `Anda bertindak sebagai kurator komersial yang tanpa ampun. Deteksi teks spesifik, marka fasilitas (seperti "LANE 4", "TARGET 3"), papan tanda, atau teks dekoratif apa pun. Jika ada, langsung berikan status FAIL dan nilai legalitas maksimal 0-5.`,
+    MEDIUM: `Lebih longgar terhadap teks generik, angka penanda, atau elemen latar belakang yang tidak bermerek (misal, nomor jalur lari masih ditoleransi). Berikan status FAIL HANYA jika mendeteksi logo brand terkenal (Nike, Apple, dll.) atau wajah manusia tanpa release yang jelas.`,
+    LOOSE: `Abaikan semua elemen teks, angka, marka, atau properti komersial. Fokuskan penilaian Anda 100% pada kualitas teknis, pencahayaan, dan komposisi. Jangan berikan status FAIL hanya karena adanya teks di dalam gambar.`
+  };
 
-You must be extremely strict, objective, and follow a "Zero Tolerance" knockout (sistem gugur) validation process. If an asset has even one minor technical or legal flaw, it MUST be rejected.
+  const systemInstruction = `Anda adalah seorang Kurator Senior Microstock (seperti Adobe Stock dan Shutterstock) yang sangat ketat dan berpengalaman. Tugas Anda adalah melakukan Quality Check (QC) secara visual dan teknis terhadap gambar yang diunggah oleh kontributor. 
 
-*** CRITICAL CURATION PROTOCOLS (SISTEM GUGUR) ***
+Analisislah gambar yang diberikan secara objektif dan berikan penilaian dalam format JSON yang bersih, tanpa markdown tambahan.
 
-1. TECHNICAL QUALITY & ARTIFACTS:
-- Focus & Sharpness: Reject if the primary subject is slightly out of focus, has motion blur (unless artistic), or is too soft.
-- Compression & Noise: Reject if there are visible JPEG artifacts, heavy digital noise in shadows, or chromatic aberration (purple/green fringing on high-contrast edges).
-- Posterization & Banding: Reject if gradients (like skies or studio backgrounds) show visible steps/banding.
-- Anatomy & Structure: Reject immediately for "AI Hallucinations": extra fingers, merged limbs, 3-legged animals, melting faces, or inconsistent perspective.
-- Jika ditemukan salah satu saja -> set "artifacts_and_noise" to "FAILED".
+Parameter Toleransi Saat Ini: ${tolerance}
+Aturan Khusus Toleransi: ${toleranceRules[tolerance]}
 
-2. INTELLECTUAL PROPERTY (IP) & LOGOS:
-- ANY Trademark: Reject for logos on shirts, shoes (Nike swoosh, etc.), recognizable luxury watch faces, car emblems, recognizable camera bodies (Nikon/Canon dials), or branded electronics.
-- Recognizable Faces: Reject if a person is recognizable without a model release (assume no release is present in this check).
-- Copyrighted Designs: Reject for iconic building interiors, specific toy designs, or modern architectural landmarks.
-- Jika ditemukan branding/logo sekecil apapun -> set "intellectual_property_and_logos" to "FAILED".
+Evaluasi gambar berdasarkan 4 kriteria utama berikut:
 
-3. TEXTURE INTEGRITY (ANTI OIL-PAINT):
-- Upscaling Damage: Reject if the image looks like it has been "upscaled" poorly, resulting in "waxy", "smeary", or "clay-like" skin textures.
-- AI Texture Glitch: Watch for "Oil-Paint Look" where fine details (grass, hair, skin pores) look like brush strokes instead of real physical detail. 
-- Gibberish Text: Reject any image with AI-generated text that is distorted, mirrored, or nonsensical.
-- Jika ditemukan tekstur 'palsu' atau teks rusak -> set "broken_text_and_oil_paint" to "FAILED".
+1. COMPOSITION & COMMERCIAL VALUE (Bobot: 25)
+   - Apakah sudut pandang menarik (misal: cinematic wide-angle)?
+   - Apakah ada 'copy space' (ruang kosong) yang cukup untuk teks desain bagi pembeli?
+   - Apakah subjeknya jelas dan memiliki nilai jual komersial?
 
-4. COMPOSITION & FRAMING:
-- Bad Clipping: Reject if hair, fingers, or objects are awkwardly cut off at the edge of the frame.
-- Borders: Reject images with any kind of digital border, frame, or metadata overlays.
-- Jika framing tidak rapi -> set "bad_framing_and_clipping" to "FAILED".
+2. TECHNICAL QUALITY & SHARPNESS (Bobot: 25)
+   - Apakah gambar tajam, fokusnya tepat, dan bebas dari blur yang tidak natural?
+   - Jika gambar ini hasil AI, apakah ada artefak distorsi (seperti kecacatan pada mata, jari tangan berlebih, atau tekstur yang 'berlumpur/smudging' akibat upscaling)?
 
-5. SIMILARITY & VALUE:
-- Avoid "Simples" (recolors or minor rotations). Adobe Stock wants unique value.
-- Jika aset tidak memiliki nilai komersial unik -> set "similar_content_and_spam" to "FAILED".
+3. LIGHTING & COLOR (Bobot: 25)
+   - Apakah pencahayaan seimbang (tidak overexposure atau underexposure)?
+   - Apakah kontras dan saturasi warna terlihat profesional dan tidak merusak detail piksel?
 
-6. AI CATEGORY POLICIES:
-- Photorealistic AI assets MUST look absolutely real. If they look "too perfect" or "synthetic" but attempt to be a photo, they are a failure of the "Illustration" vs "Photo" categorization.
-- Jika cacat estetik parah -> set "generative_ai_policies" to "FAILED".
+4. LEGAL & INTELLECTUAL PROPERTY SAFETY (Bobot: 25) - CRITICAL!
+   - Periksa dengan sangat teliti setiap sudut gambar menggunakan kemampuan OCR Anda.
+   - Apakah terdapat teks, angka spesifik (misal: "LANE 4", "TARGET 3"), logo, marka, atau tanda pengenal yang mengindikasikan identitas tempat komersial, properti publik, atau merek tertentu? 
+   - CATATAN: Jika ditemukan teks spesifik yang melanggar properti komersial, kurangi nilai pada poin ini secara drastis (maksimal beri nilai 0-5 untuk kategori ini).
 
-DECISION TREE:
-- One "FAILED" in ANY audit item = final_judgment.status "REJECTED".
-- ALL items "PASSED" = final_judgment.status "APPROVED".
+---
 
-Return EXACTLY this JSON structure:
+OUTPUT FORMAT:
+Respons Anda WAJIB menggunakan format JSON dengan struktur sebagai berikut:
+
 {
-  "asset_type_detection": {
-    "is_ai_generated": boolean,
-    "correct_category": "Photos" | "Illustrations" | "Vectors"
+  "status": "PASS" atau "FAIL",
+  "final_score": [Total nilai dari ke-4 kriteria, skala 0-100],
+  "breakdown": {
+    "composition_value": [Nilai 0-25],
+    "technical_quality": [Nilai 0-25],
+    "lighting_color": [Nilai 0-25],
+    "legal_safety": [Nilai 0-25]
   },
-  "technical_audit": {
-    "artifacts_and_noise": "PASSED" | "FAILED",
-    "intellectual_property_and_logos": "PASSED" | "FAILED",
-    "broken_text_and_oil_paint": "PASSED" | "FAILED",
-    "bad_framing_and_clipping": "PASSED" | "FAILED",
-    "similar_content_and_spam": "PASSED" | "FAILED",
-    "generative_ai_policies": "PASSED" | "FAILED"
-  },
-  "final_judgment": {
-    "status": "APPROVED" | "REJECTED",
-    "official_reason": "Technical Quality" | "Intellectual Property" | "Spam" | "Generative AI Policy" | null,
-    "fixed_confidence": "HIGH" | "LOW"
-  }
+  "rejection_reasons": [
+    "Sebutkan alasan penolakan secara spesifik jika status FAIL. Jika PASS, biarkan array ini kosong []"
+  ],
+  "actionable_feedback": [
+    "Berikan instruksi perbaikan yang konkret dan jelas untuk desainer (misal: 'Hapus teks LANE 4 menggunakan Generative Fill', atau 'Lakukan denoising pada area shadow')."
+  ]
 }
 `;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      asset_type_detection: {
-        type: Type.OBJECT,
-        properties: {
-          is_ai_generated: { type: Type.BOOLEAN },
-          correct_category: { type: Type.STRING, enum: ["Photos", "Illustrations", "Vectors"] }
+        status: { type: Type.STRING, enum: ["PASS", "FAIL"] },
+        final_score: { type: Type.INTEGER },
+        breakdown: {
+            type: Type.OBJECT,
+            properties: {
+                composition_value: { type: Type.INTEGER },
+                technical_quality: { type: Type.INTEGER },
+                lighting_color: { type: Type.INTEGER },
+                legal_safety: { type: Type.INTEGER }
+            },
+            required: ["composition_value", "technical_quality", "lighting_color", "legal_safety"]
         },
-        required: ["is_ai_generated", "correct_category"]
-      },
-      technical_audit: {
-        type: Type.OBJECT,
-        properties: {
-          artifacts_and_noise: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
-          intellectual_property_and_logos: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
-          broken_text_and_oil_paint: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
-          bad_framing_and_clipping: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
-          similar_content_and_spam: { type: Type.STRING, enum: ["PASSED", "FAILED"] },
-          generative_ai_policies: { type: Type.STRING, enum: ["PASSED", "FAILED"] }
-        },
-        required: ["artifacts_and_noise", "intellectual_property_and_logos", "broken_text_and_oil_paint", "bad_framing_and_clipping", "similar_content_and_spam", "generative_ai_policies"]
-      },
-      final_judgment: {
-        type: Type.OBJECT,
-        properties: {
-          status: { type: Type.STRING, enum: ["APPROVED", "REJECTED"] },
-          official_reason: { type: Type.STRING, nullable: true },
-          fixed_confidence: { type: Type.STRING, enum: ["HIGH", "LOW"] }
-        },
-        required: ["status", "official_reason", "fixed_confidence"]
-      }
+        rejection_reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
+        actionable_feedback: { type: Type.ARRAY, items: { type: Type.STRING } }
     },
-    required: ["asset_type_detection", "technical_audit", "final_judgment"]
+    required: ["status", "final_score", "breakdown", "rejection_reasons", "actionable_feedback"]
   };
 
   const imagePart = processFrameServer(image);
