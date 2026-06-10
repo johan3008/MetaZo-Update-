@@ -6,10 +6,16 @@ interface QualityReport {
   status: "PASS" | "FAIL";
   final_score: number;
   breakdown: {
-    composition_value: number;
     technical_quality: number;
-    lighting_color: number;
-    legal_safety: number;
+    legal_ip_safety: number;
+  };
+  adobe_analysis: {
+    decision: string;
+    primary_reason: string;
+    technical_summary: string;
+    ip_brand_summary: string;
+    landmark_summary: string;
+    short_advice: string;
   };
   rejection_reasons: string[];
   actionable_feedback: string[];
@@ -25,6 +31,17 @@ export const ImageQualityCheck: React.FC = () => {
   // removed toggleReportExpand helper since it's not used
   const [progress, setProgress] = useState(0);
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
+  const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
+
+  const toggleReportExpand = (fileName: string) => {
+    const next = new Set(expandedReports);
+    if (next.has(fileName)) {
+      next.delete(fileName);
+    } else {
+      next.add(fileName);
+    }
+    setExpandedReports(next);
+  };
 
   const LoadingSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -175,253 +192,392 @@ export const ImageQualityCheck: React.FC = () => {
   };
 
   return (
-    <div className="w-full space-y-6">
-      {/* Brand Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4 relative overflow-hidden">
-        {/* Progress Bar Glow */}
-        {loading && (
-          <div 
-            className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all duration-300 ease-out z-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-            style={{ width: `${progress}%` }}
-          />
-        )}
-        
-        <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
-            <Sparkles className="text-emerald-500" size={24} />
-            Adobe Stock Curator AI
-          </h2>
-          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
-            Kurasi teknis & komersial otomatis untuk aset Adobe Stock
-          </p>
-        </div>
-        
-        <div className="mt-3 md:mt-0 flex items-center gap-3">
-          {(files.length > 0 || Object.keys(reports).length > 0) && (
-            <button
-              onClick={handleClearAll}
-              disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-full text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all cursor-pointer border border-rose-500/10"
-            >
-              <Trash2 size={13} />
-              Clear All
-            </button>
+    <div className="w-full space-y-8 animate-in fade-in duration-700">
+      {/* Brand Header - Premium Overhaul */}
+      <div className="relative group">
+        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-emerald-500/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+        <div className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/60 dark:border-white/10 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
+          {/* Progress Bar Glow */}
+          {loading && (
+            <div 
+              className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-blue-500 to-emerald-600 transition-all duration-500 ease-out z-50"
+              style={{ width: `${progress}%` }}
+            />
           )}
-          <button
-            onClick={handleAnalyze}
-            disabled={files.length === 0 || loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
-          >
-            {loading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
-            {loading ? 'Menganalisis...' : 'Analisis Kualitas (Batch)'}
-          </button>
+          
+          <div className="flex items-center gap-5">
+            <div className="relative">
+              <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse"></div>
+              <div className="relative bg-emerald-500 p-4 rounded-2xl shadow-lg shadow-emerald-500/20 ring-4 ring-emerald-500/10">
+                <Sparkles className="text-white" size={28} />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">
+                Curator <span className="text-emerald-500">AI</span>
+              </h2>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.15em]">
+                  Professional Microstock Compliance Hub
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {(files.length > 0 || Object.keys(reports).length > 0) && (
+              <button
+                onClick={handleClearAll}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 hover:bg-rose-500/10 text-slate-600 dark:text-slate-400 hover:text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 border border-slate-200 dark:border-white/10"
+              >
+                <Trash2 size={13} />
+                Reset
+              </button>
+            )}
+            <button
+              onClick={handleAnalyze}
+              disabled={files.length === 0 || loading}
+              className="relative group/btn flex items-center gap-3 px-8 py-3.5 bg-slate-900 dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-400 text-white dark:text-slate-950 rounded-xl text-[11px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-2xl shadow-slate-900/10 dark:shadow-emerald-500/20"
+            >
+              {loading ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} className="group-hover/btn:animate-bounce" />}
+              {loading ? 'Menganalisis...' : 'Mulai Audit Batch'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Tolerance Control */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-4 sm:p-5 shadow-sm gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl">
-             <Zap size={18} />
-          </div>
-          <div>
-            <h3 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Tingkat Toleransi QC</h3>
-            <p className="text-[10px] text-slate-500 font-medium">Sesuaikan ketatnya kurasi untuk aset Anda</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <select 
-              value={tolerance} 
-              onChange={(e) => setTolerance(e.target.value as any)}
-              className="flex-1 sm:flex-none text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none text-slate-800 dark:text-slate-200 font-bold uppercase transition-all focus:ring-2 focus:ring-emerald-500/20"
-          >
-              <option value="STRICT">STRICT (Ketati Tanpa Ampun)</option>
-              <option value="MEDIUM">MEDIUM (Standard Industri)</option>
-              <option value="LOOSE">LOOSE (Longgar/AI Fokus)</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Upload */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        {/* Left Stats & Upload */}
         <div className="xl:col-span-4 space-y-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-5 space-y-6 shadow-sm">
+          {/* Tolerance Card */}
+          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Quality Tolerance</h3>
+            <div className="space-y-4">
+              <select 
+                  value={tolerance} 
+                  onChange={(e) => setTolerance(e.target.value as any)}
+                  className="w-full text-[11px] bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-4 outline-none text-slate-800 dark:text-slate-200 font-bold uppercase transition-all focus:ring-2 focus:ring-emerald-500/20 appearance-none cursor-pointer"
+              >
+                  <option value="STRICT">STRICT (Hardcore mode)</option>
+                  <option value="MEDIUM">MEDIUM (Standard Adobe)</option>
+                  <option value="LOOSE">LOOSE (AI Playground)</option>
+              </select>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <a href="https://helpx.adobe.com/stock/contributor/help/known-image-restrictions.html" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-3 rounded-lg bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 hover:text-emerald-500 transition-all uppercase tracking-tighter">
+                  Restrictions
+                </a>
+                <a href="https://helpx.adobe.com/stock/contributor/help/quality-and-technical-issues.html" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-3 rounded-lg bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 hover:text-emerald-500 transition-all uppercase tracking-tighter">
+                  Tech Guide
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Upload Hub */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-2 shadow-2xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-white/5">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Upload Hub</h3>
+            </div>
+            
             <label 
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`group relative cursor-pointer border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center space-y-3 transition-all duration-300 ${isDragging ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-black/20'}`}
+              className={`group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 ${isDragging ? 'border-emerald-500 bg-emerald-500/5 scale-[0.98]' : 'border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50'}`}
             >
-              <Upload className={`${isDragging ? 'text-emerald-500' : 'text-emerald-500'}`} size={32} />
-              <div className="text-center">
-                <span className="block text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                  {isDragging ? 'Lepaskan Gambar' : 'Unggah / Seret Gambar'}
+              <div className={`p-4 rounded-2xl bg-white dark:bg-white/5 shadow-xl transition-transform duration-500 group-hover:scale-110 ${isDragging ? 'rotate-12' : ''}`}>
+                <Upload className="text-emerald-500" size={32} />
+              </div>
+              <div className="text-center px-4">
+                <span className="block text-xs font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight">
+                  {isDragging ? 'Lepaskan Gambar 🔥' : 'Drop Images Here'}
                 </span>
-                <span className="block text-[10px] text-slate-400 font-medium tracking-tight">Mendukung banyak file</span>
+                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 flex items-center justify-center gap-2">
+                  <FileImage size={12} /> Multiple Upload Supported
+                </span>
               </div>
               <input type="file" accept="image/*" onChange={handleFileChange} multiple className="hidden" />
             </label>
 
-            {files.length > 0 && (
-              <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-4 space-y-2 border border-slate-100 dark:border-white/5">
-                <div className="flex justify-between items-center border-b border-slate-200/50 dark:border-white/5 pb-1.5">
-                  <h4 className="font-black text-[10px] uppercase text-slate-500">File Dalam Antrian ({files.length})</h4>
-                  <button
-                    onClick={handleClearAll}
-                    disabled={loading}
-                    className="text-[10px] text-rose-500 hover:text-rose-650 font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    <Trash2 size={10} />
-                    Clear All
-                  </button>
-                </div>
-                <div className="max-h-[250px] overflow-y-auto space-y-2 custom-scrollbar">
-                  {files.map((file, idx) => (
-                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2.5 text-[10px] text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 p-1.5 rounded-xl">
-                      {previews[file.name] ? (
-                        <img 
-                          src={previews[file.name]} 
-                          alt={file.name} 
-                          className="w-10 h-10 object-cover rounded-lg bg-slate-100 dark:bg-slate-950 shrink-0 border border-slate-200 dark:border-white/5"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <FileImage size={10} className="text-slate-400 shrink-0"/>
-                      )}
-                      <span className="truncate font-medium flex-1">{file.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Results */}
-        <div className="xl:col-span-8 space-y-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm">
-            <AnimatePresence mode="wait">
-              {loading ? (
-                <motion.div
-                  key="loading-qc"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="space-y-6"
+            <AnimatePresence>
+              {files.length > 0 && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  className="px-4 pb-4 space-y-3"
                 >
-                  <div className="flex flex-col items-center justify-center text-center py-6 space-y-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
-                      <Loader2 size={40} className="text-emerald-500 animate-spin relative" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-black text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
-                        {progress < 40 ? "Pixel Analysis..." : progress < 80 ? "Auditing IP & Logos..." : "Finalizing QC Report..."}
-                      </h3>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-                        Performing deep technical audit for Adobe Stock standards
-                      </p>
-                    </div>
+                  <div className="flex justify-between items-center bg-slate-100 dark:bg-black/40 px-3 py-2 rounded-xl">
+                    <p className="font-black text-[9px] uppercase text-slate-500 tracking-widest">Queue: {files.length} Assets</p>
                   </div>
-                  <LoadingSkeleton />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="results-qc"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="space-y-4"
-                >
-                  {error && <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-xl text-xs font-bold">{error}</div>}
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(reports).map(([fileName, report], rIdx) => {
-                      const r = report as QualityReport;
-                      const isPassed = r.status === "PASS";
-
-                      return (
-                        <div key={`${fileName}-${rIdx}`} className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-5 mb-5">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                                    <FileImage size={16} className="text-slate-400" />
-                                </div>
-                                <p className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">
-                                  {fileName}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                               <div className="flex flex-col items-end">
-                                   <span className="text-[10px] font-black text-slate-400 uppercase">QC Score</span>
-                                   <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{r.final_score}/100</span>
-                               </div>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                isPassed ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                              }`}>
-                                {r.status}
-                              </span>
-                            </div>
-                          </div>
-
-                          {previews[fileName] && (
-                            <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-100 dark:border-white/5 shadow-inner">
-                              <img 
-                                src={previews[fileName]} 
-                                alt={fileName} 
-                                className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">QC BREAKDOWN (SCORE: {r.final_score})</p>
-                            <div className="grid grid-cols-2 gap-2 text-[11px]">
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-2 rounded-lg">
-                                    <p className="text-[9px] font-bold text-slate-500 uppercase">Composition</p>
-                                    <p className="font-black text-slate-800 dark:text-slate-200">{r.breakdown.composition_value}/25</p>
-                                </div>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-2 rounded-lg">
-                                    <p className="text-[9px] font-bold text-slate-500 uppercase">Technical</p>
-                                    <p className="font-black text-slate-800 dark:text-slate-200">{r.breakdown.technical_quality}/25</p>
-                                </div>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-2 rounded-lg">
-                                    <p className="text-[9px] font-bold text-slate-500 uppercase">Lighting/Color</p>
-                                    <p className="font-black text-slate-800 dark:text-slate-200">{r.breakdown.lighting_color}/25</p>
-                                </div>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-2 rounded-lg">
-                                    <p className="text-[9px] font-bold text-slate-500 uppercase">Legal/IP</p>
-                                    <p className="font-black text-slate-800 dark:text-slate-200">{r.breakdown.legal_safety}/25</p>
-                                </div>
-                            </div>
-                          </div>
-                          
-                          {!isPassed && r.rejection_reasons.length > 0 && (
-                            <div className="p-3 bg-rose-50/70 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 rounded-lg">
-                              <p className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 mb-1">Rejection Reasons</p>
-                              <ul className="text-[10px] font-medium text-rose-800 dark:text-rose-300 list-disc list-inside">
-                                {r.rejection_reasons.map((reason, i) => <li key={i}>{reason}</li>)}
-                              </ul>
-                            </div>
-                          )}
-
-                           {r.actionable_feedback.length > 0 && (
-                            <div className="p-3 bg-emerald-50/70 border border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30 rounded-lg">
-                              <p className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 mb-1">Actionable Feedback</p>
-                              <ul className="text-[10px] font-medium text-emerald-800 dark:text-emerald-300 list-disc list-inside">
-                                {r.actionable_feedback.map((f, i) => <li key={i}>{f}</li>)}
-                              </ul>
-                            </div>
+                  <div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+                    {files.map((file, idx) => (
+                      <motion.div 
+                        initial={{ x: -20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ delay: idx * 0.05 }}
+                        key={`${file.name}-${idx}`} 
+                        className="flex items-center gap-3 bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 p-2 rounded-xl hover:shadow-lg transition-all group"
+                      >
+                        <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+                          {previews[file.name] && (
+                            <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
                           )}
                         </div>
-                      );
-                    })}
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
+                          <p className="text-[9px] text-slate-400 font-black uppercase">Pending Audit</p>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+        </div>
+
+        {/* Right Column: Visual Audit Reports */}
+        <div className="xl:col-span-8">
+          <AnimatePresence mode="wait">
+            {loading ? (
+              <motion.div
+                key="loading-qc"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="space-y-8"
+              >
+                <div className="flex flex-col items-center justify-center text-center py-20 space-y-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-emerald-500/30 blur-3xl rounded-full animate-pulse" />
+                    <div className="relative w-24 h-24 flex items-center justify-center">
+                       <Loader2 size={48} className="text-emerald-500 animate-[spin_1.5s_linear_infinite]" />
+                       <Sparkles size={24} className="text-emerald-400 absolute animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">
+                      Deep Pixel Analysis
+                    </h3>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">
+                      AI Expert for Adobe Stock standards is on duty
+                    </p>
+                  </div>
+                </div>
+                <LoadingSkeleton />
+              </motion.div>
+            ) : Object.keys(reports).length === 0 ? (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="h-[600px] flex flex-col items-center justify-center bg-slate-50/50 dark:bg-white/[0.02] border-2 border-dashed border-slate-200 dark:border-white/5 rounded-3xl"
+              >
+                <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-white/5 mb-6">
+                  <FileImage size={48} className="text-slate-200 dark:text-slate-800" />
+                </div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest text-center max-w-[250px]">
+                  Silahkan upload gambar dulu untuk memulai proses audit kurasi
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="results-qc"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              >
+                {Object.entries(reports).map(([fileName, report], rIdx) => {
+                  const r = report as QualityReport;
+                  const isPassed = r.status === "PASS";
+
+                  return (
+                    <motion.div 
+                      key={`${fileName}-${rIdx}`}
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: rIdx * 0.1 }}
+                      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-5 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 flex flex-col"
+                    >
+                      {/* Card Header */}
+                      <div className="flex items-center justify-between mb-5 px-1">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${isPassed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                            {isPassed ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-black text-slate-800 dark:text-white truncate uppercase tracking-tight">{fileName}</p>
+                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {isPassed ? 'Assets Approved' : 'Rejected Needs Fix'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                           <p className="text-[18px] font-black text-slate-900 dark:text-emerald-400 leading-none">{r.final_score}</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1">QC SCORE</p>
+                        </div>
+                      </div>
+
+                      {/* Image Stage */}
+                      {previews[fileName] && (
+                        <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700">
+                          <img 
+                            src={previews[fileName]} 
+                            alt={fileName} 
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full backdrop-blur-md border text-[9px] font-black uppercase tracking-widest shadow-xl ${isPassed ? 'bg-emerald-500/80 border-emerald-400 text-white' : 'bg-rose-500/80 border-rose-400 text-white'}`}>
+                            {isPassed ? 'Approved' : 'Rejected'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Detail Section */}
+                      <div className="mt-6 flex-1 space-y-6">
+                        {/* Score Bento */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-4 rounded-2xl group/score">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-[9px] font-black text-slate-400 uppercase">Technical</p>
+                              <Sparkles size={10} className="text-emerald-500 opacity-0 group-hover/score:opacity-100 transition-opacity" />
+                            </div>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-xl font-black text-slate-900 dark:text-slate-100">{r.breakdown.technical_quality}</span>
+                              <span className="text-[10px] font-bold text-slate-400">/50</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-200 dark:bg-white/5 rounded-full mt-3 overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(r.breakdown.technical_quality / 50) * 100}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                                className="h-full bg-emerald-500" 
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-4 rounded-2xl group/score">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-[9px] font-black text-slate-400 uppercase">Legal & IP</p>
+                              <Zap size={10} className="text-emerald-500 opacity-0 group-hover/score:opacity-100 transition-opacity" />
+                            </div>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-xl font-black text-slate-900 dark:text-slate-100">{r.breakdown.legal_ip_safety}</span>
+                              <span className="text-[10px] font-bold text-slate-400">/50</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-200 dark:bg-white/5 rounded-full mt-3 overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(r.breakdown.legal_ip_safety / 50) * 100}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                                className="h-full bg-emerald-500" 
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Audit Details Dropdown UI */}
+                        {r.adobe_analysis && (
+                          <div className="space-y-4">
+                            <button 
+                              onClick={() => toggleReportExpand(fileName)}
+                              className="flex items-center justify-between w-full group/audit"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <p className="text-[10px] font-black uppercase text-slate-400 group-hover/audit:text-emerald-500 transition-colors tracking-[0.1em]">Adobe Audit Data 🚀</p>
+                              </div>
+                              <div className="flex items-center gap-2 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/10 group-hover/audit:bg-emerald-500 group-hover/audit:text-white transition-all">
+                                {expandedReports.has(fileName) ? 'Close' : 'Inspect Details'}
+                                {expandedReports.has(fileName) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              </div>
+                            </button>
+
+                            <AnimatePresence>
+                              {expandedReports.has(fileName) && (
+                                <motion.div 
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="grid grid-cols-1 gap-3 pt-2">
+                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:shadow-xl transition-all">
+                                      <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-500 shrink-0">
+                                        <Sparkles size={16} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Kualitas Teknis (100% Zoom Check)</p>
+                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal">{r.adobe_analysis.technical_summary}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:shadow-xl transition-all">
+                                      <div className="bg-blue-500/10 p-2.5 rounded-xl text-blue-500 shrink-0">
+                                        <Zap size={16} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Trade Dress & Safety Audit</p>
+                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal">{r.adobe_analysis.ip_brand_summary}</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:shadow-xl transition-all">
+                                      <div className="bg-amber-500/10 p-2.5 rounded-xl text-amber-500 shrink-0">
+                                        <AlertCircle size={16} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">IP & Property Inspection</p>
+                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal">{r.adobe_analysis.landmark_summary}</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="bg-emerald-500/5 border border-emerald-500/20 p-5 rounded-2xl mt-2 relative overflow-hidden group/saran">
+                                      <div className="absolute top-0 right-0 p-2 opacity-10 group-hover/saran:scale-110 transition-transform">
+                                        <Sparkles size={40} className="text-emerald-500" />
+                                      </div>
+                                      <div className="relative">
+                                        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                                          <CheckCircle size={12} /> Expert Advisor Tips
+                                        </p>
+                                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 leading-relaxed italic">
+                                          "{r.adobe_analysis.short_advice}"
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+
+                        {/* Error Highlights if failed */}
+                        {!isPassed && r.rejection_reasons.length > 0 && (
+                          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900/20 p-5 rounded-2xl">
+                             <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+                               Compliance Issues 
+                               <AlertCircle size={14} />
+                             </p>
+                             <div className="space-y-3">
+                               {r.rejection_reasons.map((reason, i) => (
+                                 <div key={i} className="flex items-start gap-3">
+                                   <div className="mt-1.5 w-1 h-1 rounded-full bg-rose-400 shrink-0" />
+                                   <p className="text-[11px] font-bold text-rose-800 dark:text-rose-300 leading-tight">{reason}</p>
+                                 </div>
+                               ))}
+                             </div>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

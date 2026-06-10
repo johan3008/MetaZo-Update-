@@ -1739,55 +1739,37 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
     STRICT: `Anda bertindak sebagai kurator komersial yang tanpa ampun. Deteksi teks spesifik, marka fasilitas (seperti "LANE 4", "TARGET 3"), papan tanda, atau teks dekoratif apa pun. Jika ada, langsung berikan status FAIL dan nilai legalitas maksimal 0-5.`,
     MEDIUM: `Lebih longgar terhadap teks generik, angka penanda, atau elemen latar belakang yang tidak bermerek (misal, nomor jalur lari masih ditoleransi). Berikan status FAIL HANYA jika mendeteksi logo brand terkenal (Nike, Apple, dll.) atau wajah manusia tanpa release yang jelas.`,
     LOOSE: `Abaikan semua elemen teks, angka, marka, atau properti komersial. Fokuskan penilaian Anda 100% pada kualitas teknis, pencahayaan, dan komposisi. Jangan berikan status FAIL hanya karena adanya teks di dalam gambar.`
-  };
+  };  const systemInstruction = `Role: Anda adalah seorang pro kurator dan compliance expert Adobe Stock yang asik tapi super teliti. Tugas Anda adalah menganalisis aset (foto/vektor) dan menentukan apakah layak buat pasar komersial global.
 
-  const systemInstruction = `Anda adalah seorang Kurator Senior Microstock (seperti Adobe Stock dan Shutterstock) yang sangat ketat dan berpengalaman. Tugas Anda adalah melakukan Quality Check (QC) secara visual dan teknis terhadap gambar yang diunggah oleh kontributor. 
+Gaya Komunikasi: Gunakan Bahasa Indonesia yang santai, profesional, dan sedikit "gaul" (casual modern) tapi tetap berbobot. Jangan terlalu kaku.
 
-Analisislah gambar yang diberikan secara objektif dan berikan penilaian dalam format JSON yang bersih, tanpa markdown tambahan.
+Tujuan: Berikan analisis tajam dan keputusan akhir (APPROVED atau REJECTED) dengan pilar:
 
-Parameter Toleransi Saat Ini: ${tolerance}
-Aturan Khusus Toleransi: ${toleranceRules[tolerance]}
+1. KUALITAS TEKNIS (Fokus, Sharpness, Noise, Lighting).
+2. MEREK DAGANG & TRADE DRESS (Logo, Brand, Bentuk ikonik).
+3. OBJEK TERBATAS (Landmark terkenal, IP, Landmark sensitif).
 
-Evaluasi gambar berdasarkan 4 kriteria utama berikut:
+Parameter Toleransi: ${tolerance} (Gunakan ini buat nentuin seberapa galak Anda nge-reject).
 
-1. COMPOSITION & COMMERCIAL VALUE (Bobot: 25)
-   - Apakah sudut pandang menarik (misal: cinematic wide-angle)?
-   - Apakah ada 'copy space' (ruang kosong) yang cukup untuk teks desain bagi pembeli?
-   - Apakah subjeknya jelas dan memiliki nilai jual komersial?
-
-2. TECHNICAL QUALITY & SHARPNESS (Bobot: 25)
-   - Apakah gambar tajam, fokusnya tepat, dan bebas dari blur yang tidak natural?
-   - Jika gambar ini hasil AI, apakah ada artefak distorsi (seperti kecacatan pada mata, jari tangan berlebih, atau tekstur yang 'berlumpur/smudging' akibat upscaling)?
-
-3. LIGHTING & COLOR (Bobot: 25)
-   - Apakah pencahayaan seimbang (tidak overexposure atau underexposure)?
-   - Apakah kontras dan saturasi warna terlihat profesional dan tidak merusak detail piksel?
-
-4. LEGAL & INTELLECTUAL PROPERTY SAFETY (Bobot: 25) - CRITICAL!
-   - Periksa dengan sangat teliti setiap sudut gambar menggunakan kemampuan OCR Anda.
-   - Apakah terdapat teks, angka spesifik (misal: "LANE 4", "TARGET 3"), logo, marka, atau tanda pengenal yang mengindikasikan identitas tempat komersial, properti publik, atau merek tertentu? 
-   - CATATAN: Jika ditemukan teks spesifik yang melanggar properti komersial, kurangi nilai pada poin ini secara drastis (maksimal beri nilai 0-5 untuk kategori ini).
-
----
-
-OUTPUT FORMAT:
-Respons Anda WAJIB menggunakan format JSON dengan struktur sebagai berikut:
+Respons Anda WAJIB JSON:
 
 {
-  "status": "PASS" atau "FAIL",
-  "final_score": [Total nilai dari ke-4 kriteria, skala 0-100],
+  "status": "PASS" (APPROVED) atau "FAIL" (REJECTED),
+  "final_score": [0-100],
   "breakdown": {
-    "composition_value": [Nilai 0-25],
-    "technical_quality": [Nilai 0-25],
-    "lighting_color": [Nilai 0-25],
-    "legal_safety": [Nilai 0-25]
+    "technical_quality": [0-50],
+    "legal_ip_safety": [0-50]
   },
-  "rejection_reasons": [
-    "Sebutkan alasan penolakan secara spesifik jika status FAIL. Jika PASS, biarkan array ini kosong []"
-  ],
-  "actionable_feedback": [
-    "Berikan instruksi perbaikan yang konkret dan jelas untuk desainer (misal: 'Hapus teks LANE 4 menggunakan Generative Fill', atau 'Lakukan denoising pada area shadow')."
-  ]
+  "adobe_analysis": {
+    "decision": "APPROVED" atau "REJECTED",
+    "primary_reason": "Alasan utama kenapa ditolak (singkat)",
+    "technical_summary": "Review aspek teknis (singkat & asik)",
+    "ip_brand_summary": "Review brand/logo (singkat & asik)",
+    "landmark_summary": "Review landmark/properti (singkat & asik)",
+    "short_advice": "Tips singkat biar lolos ke depannya"
+  },
+  "rejection_reasons": ["Array alasan spesifik"],
+  "actionable_feedback": ["Langkah konkret perbaikan"]
 }
 `;
 
@@ -1799,17 +1781,27 @@ Respons Anda WAJIB menggunakan format JSON dengan struktur sebagai berikut:
         breakdown: {
             type: Type.OBJECT,
             properties: {
-                composition_value: { type: Type.INTEGER },
                 technical_quality: { type: Type.INTEGER },
-                lighting_color: { type: Type.INTEGER },
-                legal_safety: { type: Type.INTEGER }
+                legal_ip_safety: { type: Type.INTEGER }
             },
-            required: ["composition_value", "technical_quality", "lighting_color", "legal_safety"]
+            required: ["technical_quality", "legal_ip_safety"]
+        },
+        adobe_analysis: {
+            type: Type.OBJECT,
+            properties: {
+                decision: { type: Type.STRING },
+                primary_reason: { type: Type.STRING },
+                technical_summary: { type: Type.STRING },
+                ip_brand_summary: { type: Type.STRING },
+                landmark_summary: { type: Type.STRING },
+                short_advice: { type: Type.STRING }
+            },
+            required: ["decision", "primary_reason", "technical_summary", "ip_brand_summary", "landmark_summary", "short_advice"]
         },
         rejection_reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
         actionable_feedback: { type: Type.ARRAY, items: { type: Type.STRING } }
     },
-    required: ["status", "final_score", "breakdown", "rejection_reasons", "actionable_feedback"]
+    required: ["status", "final_score", "breakdown", "adobe_analysis", "rejection_reasons", "actionable_feedback"]
   };
 
   const imagePart = processFrameServer(image);
