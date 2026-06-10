@@ -353,31 +353,38 @@ export const generateStockMetadata = async (
   // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION ---
   let visualDescriptionText = "";
   
-  if (provider === 'groq' || provider === 'mistral') {
-    console.log(`[JohMeta Pipeline] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
-    
-    // UPGRADE: Menyuruh Gemini mengekstrak data fisik SEKALIGUS esensi abstrak/mood
-    const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+  console.log(`[JohMeta Pipeline] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
+  
+  let mediaTypeContext = "The provided image is a photograph or digital artwork.";
+  if (toolType === ToolType.VIDEO) {
+    mediaTypeContext = "CRITICAL: The provided images are sequential frames from a single VIDEO. Analyze the continuous motion, flow, narrative progression, and visual storyline (alur) across frames.";
+  } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
+    mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility.";
+  }
+
+  // UPGRADE: Menyuruh Gemini mengekstrak data fisik SEKALIGUS esensi abstrak/mood secara akurat
+  const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+Asset Context: ${mediaTypeContext}
+
 Your task is to look at the provided image(s) and write an exhaustive, two-part analysis for a stock metadata specialist:
 
-1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements.
-2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, and specific commercial industries or business use-cases this asset target.
+1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with maximum physical accuracy. Do not make up objects.
+2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
 
-DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly.`;
+DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly and with complete factual accuracy.`;
 
-    try {
-      const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-        parts: [...imageParts, { text: "Analyze this visual asset in absolute literal and conceptual detail for a stock metadata specialist." }] 
-      }, {
-        systemInstruction: visionSystemInstruction,
-        temperature: 0.35
-      });
-      
-      visualDescriptionText = visionResponse.text || "";
-    } catch (err) {
-      console.error("[JohMeta Pipeline] Gemini Vision Extraction Failed:", err);
-      throw new Error("Gagal melakukan analisis gambar awal menggunakan Gemini Vision.");
-    }
+  try {
+    const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
+      parts: [...imageParts, { text: "Analyze this visual asset in absolute literal, conceptual, and storyline details for a stock metadata specialist." }] 
+    }, {
+      systemInstruction: visionSystemInstruction,
+      temperature: 0.35
+    });
+    
+    visualDescriptionText = visionResponse.text || "";
+  } catch (err) {
+    console.error("[JohMeta Pipeline] Gemini Vision Extraction Failed:", err);
+    throw new Error("Gagal melakukan analisis gambar awal menggunakan Gemini Vision.");
   }
 
   // --- TAHAP 2: DEFINISI SKEMA OUTPUT METADATA (MENGGUNAKAN BUFFER) ---
@@ -386,16 +393,16 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
     properties: {
       title: { 
         type: Type.STRING, 
-        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). It MUST naturally combine the core subject, action, and commercial concept.' 
+        description: 'Impactful title in clean Sentence case (MUST BE 50-70 characters, NO commas). It MUST start with the main subject and describe its commercial or emotional concept. STRICTLY based on the Provided Analysis below.' 
       },
       description: { 
         type: Type.STRING, 
-        description: 'Detailed visual and conceptual description followed by a sentence starting with "Ideal for..." suggesting commercial uses, max 200 chars.' 
+        description: 'Detailed visual and conceptual description. MUST conclude with a sentence starting with "Ideal for..." suggesting commercial uses. STRICTLY based on the Provided Analysis below. Max 200 chars.' 
       },
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a single word.` 
+        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a SINGLE WORD only. MUST strictly match the visual analysis.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -414,21 +421,12 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
   };
 
   // --- TAHAP 3: KONDISIONAL MEDIA CONTEXT ---
-  let mediaContext = "";
-  if (provider === 'groq' || provider === 'mistral') {
-    mediaContext = `The asset has been thoroughly analyzed. Build your metadata strictly by blending the physical facts and abstract ideas from this text:
+  const mediaContext = `The asset has been thoroughly and accurately analyzed by an advanced vision model. Build your metadata strictly by blending the physical facts, dynamic flow/storyline, and abstract ideas from this vision text (DO NOT introduce any subjects or surroundings not described here):
 === BEGIN VISUAL & CONCEPTUAL DESCRIPTION ===
 ${visualDescriptionText}
-=== END VISUAL & CONCEPTUAL DESCRIPTION ===`;
-  } else {
-    if (toolType === ToolType.VIDEO) {
-      mediaContext = "CRITICAL: The provided images are sequential frames from a single VIDEO. Capture the overall continuous motion, flow, and thematic mood.";
-    } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-      mediaContext = "The provided image is a VECTOR illustration preview. Focus on the main subject, clean lines, and its commercial design concept.";
-    } else {
-      mediaContext = "The provided image is a photograph or digital artwork.";
-    }
-  }
+=== END VISUAL & CONCEPTUAL DESCRIPTION ===
+
+Asset Media Type Context: ${toolType === ToolType.VIDEO ? 'This is a premium stock video file (analyse the storyline flow / alur)' : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? 'This is a clean, modern commercial vector layout' : 'This is a high-quality commercial photo or graphic content'}.`;
 
   // --- TAHAP 4: PERAKITAN SYSTEM INSTRUCTION DENGAN ATURAN KONSEP BARU ---
   const groqOptimizationRules = provider === 'groq' ? `
@@ -438,26 +436,53 @@ ${visualDescriptionText}
 
   const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
 Your goal is to maximize the search discoverability of visual assets for premium buyers.
-OUTPUT MUST BE 100% IN ENGLISH for titles and keywords.${groqOptimizationRules}
+OUTPUT MUST BE 100% IN ENGLISH for titles, keywords, and descriptions.${groqOptimizationRules}
 
 ${mediaContext}
 
-[STRICT ADOBE STOCK COMPLIANCE RULES]
-1. TITLE RULES:
-   - Formatted strictly in Sentence case. Max 100 chars. NO commas.
-   - CRITICAL: DO NOT start titles with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "Isolated shot of", or "A minimalist...". 
-   - START DIRECTLY with the main subject and its emotional/commercial concept (e.g., "Seated dog silhouette symbolizing loyalty for modern pet branding").
+CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
+1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
+3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
+5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 
-2. CONCEPTUAL KEYWORD EXPANSION:
-   - You MUST generate exactly ${aiRequestCount} unique keywords. Do not stop early.
-   - Do not just focus on literal objects. You MUST extract abstract concepts, metaphors, emotions, and target industries based on the provided analysis text.
-   - Maintain a balanced mix: 50% literal terms (subjects, actions, textures) and 50% conceptual terms (emotions, business niches, design styles).
-   - Every keyword MUST be a single word. No spaces, no hyphens. Split terms like "white background" into "white" and "background".
-   - No synonym stacking (do not use "dog", "canine", "hound" together; pick the highest search-volume term).
 
-3. TOTAL AI BAN & IP RULES:
-   - NEVER use AI terms like "generative ai", "midjourney", "stable diffusion", "photorealistic", "render", etc.
-   - Absolutely no brand names or trademarks.
+[STRICT ADOBE STOCK COMPLIANCE RULES (Helpx Guidelines)]
+Rules for Titles:
+1. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning", "spectacular", "amazing", "wonderful", "perfect"). Keep all adjectives purely objective and direct.
+2. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the very end of the title.
+3. NO KEYWORD STUFFING: Do NOT chain keywords with commas. The title MUST read like a natural, complete, cohesive English sentence/phrase.
+4. CAPITIALIZATION: Use Sentence case only (only the first letter of the first word capitalized, all minor/other words in lowercase except proper nouns). No Title Case, no uppercase.
+5. NO TECHNICAL SPECS: DO NOT include camera names, lens names, focal lengths, aperture, shutter speed, etc (e.g., no "shot on DSLR", "f/8", "50mm").
+6. LENGTH & STRUCTURE CONSTRAINT: MANDATORY 50 to 70 characters length. If the visual analysis has few words, you MUST expand the title by describing more physical context, setting, or corporate concepts while remaining accurate.
+7. STRUCTURE FORMULA: Combine [Subject] + [Action/State] + [Context/Environment] + [Concept/Industry] + [Style/Technical].
+   Examples of compliant, expanded titles (with character count):
+   - "Smiling happy young child in green sunny garden childhood concept" (62 characters)
+   - "Joyful young beach girl splashing in blue ocean water during summer vacation" (77 characters -> adjusted down to: "Joyful girl splashing in blue ocean water during summer vacation") (64 characters)
+   - "Clean empty negative wall space inside modern minimalist room interior" (70 characters)
+8. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects, objects, or themes.
+9. ACCURACY & ASSET CONTENT: The title must accurately describe exactly what is physically featured in the asset (people, actions, setting, colors), without generic placeholders. If a person, child, adult, or concrete subject is present, description is mandatory.
+10. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, visual progression/flow (alur/story flow), ideas, emotions, and conceptual commercial themes rather than purely static literal details.
+11. SEARCH INTENT BUYER (FIRST-PAGE RANKING): Build the title structure around direct commercial queries that high-intent premium buyers actually search for (e.g., real-world search intent), ensuring the metadata ranks on the first page of stock libraries.
+
+Rules for Descriptions:
+1. Provide a thorough, objective, and literal visual breakdown based on the description provided.
+2. ALWAYS conclude with a sentence starting with "Ideal for..." or "Perfect for..." suggesting real-world commercial uses.
+3. Max 200 characters.
+
+Rules for Keywords:
+1. FORMULA & ORDER OF RELEVANCE (MANDATORY): Keywords MUST strictly follow this formula/sequence of priority: [Subject] + [Action] + [Concept] + [Style] + [Environment] + [Usage]. Populate keywords from each of these categories in that exact order (all subject-related words first, then action-related words, then concept words, then style words, then environment words, and finally usage words). Use as many single-word descriptors representing all elements of the formula as possible.
+2. SEARCH INTENT BUYER & FIRST-PAGE VISIBILITY: Optimize all keywords towards terms that commercial stock buyers frequently search for. Ensure keywords fully describe what is physically in the asset, the visual flow/storyline (alur), and the thematic business/creative concept to capture high-intent search traffic.
+3. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces or hyphens. Split all concepts (e.g., "white background" becomes "white" and "background" as separate elements).
+4. LOWERCASE: Every keyword must be strictly in lowercase.
+5. Ensure no IP, brands, trademarks, or personal/celebrity names.
+6. No subjective words ("beautiful", "awesome"). Use only factual, physical, and accurate conceptual terms.
+
+Rules for Categories:
+1. Adobe: Choose carefully from the provided list.
+2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -475,10 +500,15 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
     try {
       const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Analyze the provided visual and conceptual text data and generate the required stock metadata JSON containing exactly ${aiRequestCount} single-word keywords.`,
+        contents: `Analyze the following visual analysis text and generate a strict matching stock metadata JSON. 
+=== SOURCE VISUAL ANALYSIS ===
+${visualDescriptionText}
+=== END SOURCE ===
+
+Task: Generate title, description, and exactly ${aiRequestCount} single-word keywords based ENTIRELY on the source text above. COMPLIANCE IS MANDATORY. TITLES MUST BE DESCRIPTIVE AND 50-70 CHARACTERS LONG.`,
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.35 } // Menaikkan sedikit ke 0.35 agar Llama lebih berani memilih kosakata konsep
+        config: { temperature: 0.1 } // Lower temperature for stricter adherence
       });
       response = { text: answerText };
     } catch (err) {
@@ -486,18 +516,18 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
       console.warn(`[generateStockMetadata] Hybrid pipeline failed with ${provider.toUpperCase()}:`, err);
     }
   } else {
-    // Jalur Sinkronisasi Gemini Tradisional (Multimodal)
+    // Jalur Sinkronisasi Gemini Tradisional (Multimodal + Pre-analisis)
     const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
     for (const modelName of modelsToTry) {
       try {
         response = await getAIClient().models.generateContent({
           model: modelName,
-          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} keywords.` }] },
+          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}` }] },
           config: {
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.35 // Disamakan agar Gemini juga kaya akan variasi kata kunci konsep
+            temperature: 0.1 // Lowered to 0.1 for maximum precision and strict adherence (no ngawur/acak-acakan)
           }
         });
         break;
@@ -587,32 +617,40 @@ export const generateBatchStockMetadata = async (
 
   // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION UNTUK BATCH ---
   let visualDescriptions: string[] = [];
-  if (provider === 'groq' || provider === 'mistral') {
-    console.log(`[JohMeta Pipeline - Batch] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
-    
-    for (let i = 0; i < items.length; i++) {
-        const imageParts = items[i].frames.map(frame => processFrameServer(frame));
-        const visionSystemInstruction = `You are an expert creative director and computer vision engine.
-Your task is to look at the provided image(s) (Asset #${i + 1}) and write an exhaustive, two-part analysis for a metadata specialist:
+  console.log(`[JohMeta Pipeline - Batch] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
+  
+  for (let i = 0; i < items.length; i++) {
+      const imageParts = items[i].frames.map(frame => processFrameServer(frame));
+      
+      let mediaTypeContext = "The provided image is a photograph or digital artwork.";
+      if (toolType === ToolType.VIDEO) {
+        mediaTypeContext = "CRITICAL: The provided images are sequential frames from a single VIDEO. Analyze the continuous motion, flow, narrative progression, and visual storyline (alur) across frames.";
+      } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
+        mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility.";
+      }
 
-1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements.
-2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, and specific commercial industries or business use-cases this asset target.
+      const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+Asset Context: ${mediaTypeContext}
 
-DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly.`;
-        
-        try {
-            const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-              parts: [...imageParts, { text: "Analyze this visual asset in absolute literal and conceptual detail for stock metadata generation." }] 
-            }, {
-              systemInstruction: visionSystemInstruction,
-              temperature: 0.35
-            });
-            visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${visionResponse.text || ""}`);
-        } catch (err) {
-            console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err);
-            visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION: [Factual literal and conceptual analysis failed for this asset]`);
-        }
-    }
+Your task is to look at the provided image(s) (Asset #${i + 1}) and write an exhaustive, two-part analysis for a stock metadata specialist:
+
+1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with maximum physical accuracy. Do not make up objects.
+2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
+
+DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly and with complete factual accuracy.`;
+      
+      try {
+          const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
+            parts: [...imageParts, { text: "Analyze this visual asset in absolute literal, conceptual, and storyline details for stock metadata generation." }] 
+          }, {
+            systemInstruction: visionSystemInstruction,
+            temperature: 0.35
+          });
+          visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${visionResponse.text || ""}`);
+      } catch (err) {
+          console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err);
+          visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION: [Factual literal and conceptual analysis failed for this asset]`);
+      }
   }
 
   const itemSchema = {
@@ -620,16 +658,16 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
     properties: {
       title: { 
         type: Type.STRING, 
-        description: 'Impactful title in clean Sentence case (max 100 chars, NO commas). It MUST naturally combine the core subject, action, and commercial concept.' 
+        description: 'Impactful title in clean Sentence case (MUST BE 50-70 characters, NO commas). It MUST start with the main subject and describe its commercial or emotional concept. STRICTLY based on the Provided Analysis.' 
       },
       description: { 
         type: Type.STRING, 
-        description: 'Detailed visual and conceptual description followed by a sentence starting with "Ideal for..." suggesting commercial uses, max 200 chars.' 
+        description: 'Detailed visual and conceptual description. MUST conclude with a sentence starting with "Ideal for..." suggesting commercial uses. STRICTLY based on the Provided Analysis. Max 200 chars.' 
       },
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a single word.` 
+        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a SINGLE WORD only. MUST strictly match the visual analysis.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -653,14 +691,7 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
     description: `An array of exactly ${items.length} metadata objects corresponding to each visual asset.`
   };
 
-  let mediaContext = "";
-  if (provider === 'groq' || provider === 'mistral') {
-    mediaContext = `The assets have been thoroughly analyzed. Build your metadata strictly by blending the physical facts and abstract ideas from these descriptions:\n\n${visualDescriptions.join('\n\n')}`;
-  } else {
-    mediaContext = toolType === ToolType.VIDEO 
-      ? `Sequential storyboard frames for ${items.length} separate video items are provided. Capture flow and thematic mood.` 
-      : `Photographs or digital artworks for ${items.length} separate items are provided.`;
-  }
+  const mediaContext = `The assets have been thoroughly and accurately analyzed by an advanced vision model. Build your metadata strictly by blending the physical facts, dynamic flow/storyline, and abstract ideas from these descriptions:\n\n${visualDescriptions.join('\n\n')}\n\nAsset Media Type Context: ${toolType === ToolType.VIDEO ? 'This is a premium stock video file' : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? 'This is a clean, modern commercial vector layout' : 'This is a high-quality commercial photo or graphic content'}.`;
 
   const groqOptimizationRules = provider === 'groq' ? `
 [CRITICAL GROQ SPEED OPTIMIZATION]
@@ -669,25 +700,52 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
 
   const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
 Your goal is to maximize discoverability for premium buyers.
-OUTPUT MUST BE 100% IN ENGLISH.${groqOptimizationRules}
+OUTPUT MUST BE 100% IN ENGLISH for titles, keywords, and descriptions.${groqOptimizationRules}
 
 ${mediaContext}
 
-[STRICT ADOBE STOCK COMPLIANCE RULES]
-1. TITLE RULES:
-   - Formatted strictly in Sentence case. Max 100 chars. NO commas.
-   - CRITICAL: DO NOT start titles with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "Isolated shot of", or "A minimalist...". 
-   - START DIRECTLY with the main subject and its emotional/commercial concept.
+CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
+1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
+3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
+5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 
-2. CONCEPTUAL KEYWORD EXPANSION:
-   - You MUST generate exactly ${aiRequestCount} unique keywords for each item. Do not stop early.
-   - Extract abstract concepts, metaphors, emotions, and target industries based on the provided analysis text.
-   - Maintain a balanced mix: 50% literal terms and 50% conceptual terms.
-   - Every keyword MUST be a single word. No spaces, no hyphens.
+[STRICT ADOBE STOCK COMPLIANCE RULES (Helpx Guidelines)]
+Rules for Titles:
+1. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning", "spectacular", "amazing", "wonderful", "perfect"). Keep all adjectives purely objective and direct.
+2. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the very end of the title.
+3. NO KEYWORD STUFFING: Do NOT chain keywords with commas. The title MUST read like a natural, complete, cohesive English sentence/phrase.
+4. CAPITIALIZATION: Use Sentence case only (only the first letter of the first word capitalized, all minor/other words in lowercase except proper nouns). No Title Case, no uppercase.
+5. NO TECHNICAL SPECS: DO NOT include camera names, lens names, focal lengths, aperture, shutter speed, etc (e.g., no "shot on DSLR", "f/8", "50mm").
+6. LENGTH & STRUCTURE CONSTRAINT: MANDATORY 50 to 70 characters length. If the visual analysis has few words, you MUST expand the title by describing more physical context, setting, or corporate concepts while remaining accurate.
+7. STRUCTURE FORMULA: Combine [Subject] + [Action/State] + [Context/Environment] + [Concept/Industry] + [Style/Technical].
+   Examples of compliant, expanded titles (with character count):
+   - "Smiling happy young child in green sunny garden childhood concept" (62 characters)
+   - "Joyful young beach girl splashing in blue ocean water during summer vacation" (77 characters -> adjusted down to: "Joyful girl splashing in blue ocean water during summer vacation") (64 characters)
+   - "Clean empty negative wall space inside modern minimalist room interior" (70 characters)
+8. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects, objects, or themes.
+9. ACCURACY & ASSET CONTENT: The title must accurately describe exactly what is physically featured in the asset (people, actions, setting, colors), without generic placeholders. If a person, child, adult, or concrete subject is present, description is mandatory.
+10. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, visual progression/flow (alur/story flow), ideas, emotions, and conceptual commercial themes rather than purely static literal details.
+11. SEARCH INTENT BUYER (FIRST-PAGE RANKING): Build the title structure around direct commercial queries that high-intent premium buyers actually search for (e.g., real-world search intent), ensuring the metadata ranks on the first page of stock libraries.
 
-3. TOTAL AI BAN & IP RULES:
-   - NEVER use AI terms like "generative ai", "midjourney", "stable diffusion", "photorealistic", "render", etc.
-   - Absolutely no brand names or trademarks.
+Rules for Descriptions:
+1. Provide a thorough, objective, and literal visual breakdown based on the description provided.
+2. ALWAYS conclude with a sentence starting with "Ideal for..." or "Perfect for..." suggesting real-world commercial uses.
+3. Max 200 characters.
+
+Rules for Keywords:
+1. FORMULA & ORDER OF RELEVANCE (MANDATORY): Keywords MUST strictly follow this formula/sequence of priority: [Subject] + [Action] + [Concept] + [Style] + [Environment] + [Usage]. Populate keywords from each of these categories in that exact order (all subject-related words first, then action-related words, then concept words, then style words, then environment words, and finally usage words). Use as many single-word descriptors representing all elements of the formula as possible.
+2. SEARCH INTENT BUYER & FIRST-PAGE VISIBILITY: Optimize all keywords towards terms that commercial stock buyers frequently search for. Ensure keywords fully describe what is physically in the asset, the visual flow/storyline (alur), and the thematic business/creative concept to capture high-intent search traffic.
+3. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces or hyphens. Split all concepts (e.g., "white background" becomes "white" and "background" as separate elements).
+4. LOWERCASE: Every keyword must be strictly in lowercase.
+5. Ensure no IP, brands, trademarks, or personal/celebrity names.
+6. No subjective words ("beautiful", "awesome"). Use only factual, physical, and accurate conceptual terms.
+
+Rules for Categories:
+1. Adobe: Choose carefully from the provided list.
+2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -705,10 +763,15 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
     try {
       const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Generate a JSON array of exactly ${items.length} metadata objects for the assets described, ensuring each has approximately ${aiRequestCount} single-word keywords based on visual and conceptual analysis.`,
+        contents: `Analyze the provided visual descriptions and generate a JSON array of exactly ${items.length} metadata objects.
+=== SOURCE ASSET DESCRIPTIONS ===
+${visualDescriptions.join('\n\n')}
+=== END SOURCE ===
+
+Task: For EACH asset described above, generate a compliant metadata object. Ensure titles and keywords are strictly derived from the specific description for that asset. COMPLIANCE IS MANDATORY. TITLES MUST BE DESCRIPTIVE AND 50-70 CHARACTERS LONG.`,
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.35 }
+        config: { temperature: 0.1 }
       });
       response = { text: answerText };
     } catch (err) {
@@ -719,10 +782,10 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
     const parts: any[] = [];
     for (let index = 0; index < items.length; index++) {
         const item = items[index];
-        parts.push({ text: `\n\n--- ITEM ${index + 1} ---\n` });
+        parts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
         item.frames.forEach(f => parts.push(processFrameServer(f)));
     }
-    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} keywords.` });
+    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings). Ensure strict compliance with all SEO rules.` });
 
     const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
     for (const modelName of modelsToTry) {
@@ -734,7 +797,7 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.35
+            temperature: 0.1 // Lowered to 0.1 for maximum precision and strict adherence (no ngawur/acak-acakan)
           }
         });
         break;
@@ -1732,95 +1795,81 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
     ...p,
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
-}
+}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM') {
+  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global. Tugas Anda adalah melakukan inspeksi visual "Zero Tolerance" terhadap gambar stok komersial sebelum proses upload.
 
-export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM') {
-  const toleranceRules = {
-    STRICT: `Anda bertindak sebagai kurator komersial yang tanpa ampun. Deteksi teks spesifik, marka fasilitas (seperti "LANE 4", "TARGET 3"), papan tanda, atau teks dekoratif apa pun. Jika ada, langsung berikan status FAIL dan nilai legalitas maksimal 0-5.`,
-    MEDIUM: `Lebih longgar terhadap teks generik, angka penanda, atau elemen latar belakang yang tidak bermerek (misal, nomor jalur lari masih ditoleransi). Berikan status FAIL HANYA jika mendeteksi logo brand terkenal (Nike, Apple, dll.) atau wajah manusia tanpa release yang jelas.`,
-    LOOSE: `Abaikan semua elemen teks, angka, marka, atau properti komersial. Fokuskan penilaian Anda 100% pada kualitas teknis, pencahayaan, dan komposisi. Jangan berikan status FAIL hanya karena adanya teks di dalam gambar.`
-  };  const systemInstruction = `Role: Anda adalah seorang pro kurator dan compliance expert Adobe Stock yang asik tapi super teliti. Tugas Anda adalah menganalisis aset (foto/vektor) dan menentukan apakah layak buat pasar komersial global.
+Tingkat Toleransi Saat Ini: ${tolerance} (Gunakan ini untuk menentukan ambang batas ketegasan Anda).
 
-Gaya Komunikasi: Gunakan Bahasa Indonesia yang santai, profesional, dan sedikit "gaul" (casual modern) tapi tetap berbobot. Jangan terlalu kaku.
+A. CEK LIST PEMBATALAN OTOMATIS (Known Restrictions)
+Berdasarkan kebijakan Adobe Stock, Anda wajib menandai FAIL jika mendeteksi hal berikut, bahkan jika tidak ada logo yang terlihat jelas:
 
-Tujuan: Berikan analisis tajam dan keputusan akhir (APPROVED atau REJECTED) dengan pilar:
+1. Arsitektur & Lokasi Terbatas (Subjek Utama)
+- Eropa: Menara Eiffel (malam hari/lampu menyala), Atomium (Brussel), interior Katedral Berlin, properti Kerajaan Inggris (Buckingham Palace, dll), Agriturismo Baccoleno (pemandangan pohon cemara ikonik).
+- Amerika: Sign "Beverly Hills", Hollywood Sign, Gedung Flatiron (NYC), interior Chrysler Building, Empire State Building (sebagai fokus utama), properti Walt Disney/Disneyland.
+- Global: Burj Al Arab, Bahrain World Trade Center, Beijing National Stadium (Bird's Nest), dan Museum Guggenheim.
 
-1. KUALITAS TEKNIS (Fokus, Sharpness, Noise, Lighting).
-2. MEREK DAGANG & TRADE DRESS (Logo, Brand, Bentuk ikonik).
-3. OBJEK TERBATAS (Landmark terkenal, IP, Landmark sensitif).
+2. Produk & Desain Industri yang Dilindungi
+- Gawai & Teknologi: Semua produk Apple (iPhone, MacBook, Apple Watch), Amazon (Kindle, Echo), dan desain antarmuka (UI) media sosial (ikon Like, interface Instagram/TikTok).
+- Transportasi: Bentuk ikonik Airstream (perak membulat), kapal pesiar Aida (wajah tersenyum), mobil Porsche (siluet 911), Vespa (desain bodi), dan Harley Davidson.
+- Mainan & Hiburan: Karakter LEGO/Minifigures, Boneka Barbie, Rubik’s Cube, patung Oscar (Academy Awards), Batmobile, dan kostum superhero yang mirip Marvel/DC.
 
-Visual Heatmap: Identifikasi 3-8 titik koordinat (X, Y dalam %) di mana terdapat masalah atau area kritis terkait Noise (bintik/grain), Focus (area blur/tidak tajam), atau Lighting (area overexposure/shadow terlalu gelap).
+3. Branding & Identitas Visual
+- Fashion: Desain "3-Stripes" Adidas, pola kotak-kotak Burberry, sol merah Christian Louboutin, dan logo pada kacamata atau jam tangan.
+- Lainnya: Botol Absolut Vodka, Bendera Aboriginal Australia, dan segala bentuk mata uang asli yang terlihat jelas.
 
-Parameter Toleransi: ${tolerance} (Gunakan ini buat nentuin seberapa galak Anda nge-reject).
+B. KRITERIA EVALUASI TEKNIS & LEGAL
+- IP & Merek Dagang: Cari logo kecil atau nama merek pada kancing baju, ban mobil, atau label di kerah pakaian. Hapus secara digital atau tandai gagal.
+- Kemiripan Tokoh (Likeness): Deteksi wajah yang menyerupai tokoh publik (contoh: kemiripan dengan Albert Einstein, Bruce Lee, atau aktor terkenal).
+- Kebersihan Konten (Clean Content): Gambar tidak boleh mengandung teks buatan, metadata visual (tanggal/jam), garis koordinat, atau elemen grafis overlay.
+- Kualitas AI (Artifacts): Periksa kesalahan anatomi (jari ke-6, mata tidak simetris), tekstur "halus" berlebihan khas AI, atau distorsi pada garis arsitektur.
 
-Respons Anda WAJIB JSON:
+STATUS & SKOR:
+- PASS: Jika gambar bersih (Clean) secara legal dan teknis memenuhi standar komersial. Skor biasanya 70-100.
+- FAIL: Jika ditemukan pelanggaran IP, artifak AI yang mengganggu, atau masalah teknis fatal. Skor biasanya 0-69.
+- Konsistensi: Jangan memberikan skor tinggi (>= 70) jika statusnya FAIL, kecuali ada alasan sangat spesifik (misal: secara teknis bagus tapi ada logo kecil). Namun, dahulukan penolakan jika ada pelanggaran kebijakan.
 
+PIXEL HEATMAPS (Untuk visualisasi UI):
+- Identifikasi 3-8 titik koordinat (X, Y dalam 0-100) di mana terdapat masalah teknis atau legal nyata (Noise, Focus, Lighting, atau IP Violations).
+
+Respons Anda WAJIB dalam format JSON:
 {
-  "status": "PASS" (APPROVED) atau "FAIL" (REJECTED),
-  "final_score": [0-100],
-  "breakdown": {
-    "technical_quality": [0-50],
-    "legal_ip_safety": [0-50]
-  },
+  "recommendation": "PASS" atau "FAIL",
+  "overall_score": [0-100],
+  "legal_status": "Status legal singkat (misal: 'CLEAN' atau 'IP VIOLATION: Burj Al Arab detected')",
+  "technical_issues": ["list masalah teknis/isue spesifik"],
+  "strengths": ["list kekuatan visual gambar"],
+  "detailed_feedback": "Penjelasan singkat namun spesifik mengenai alasan kelulusan atau detail kegagalan (Evaluasi Notes)",
   "heatmaps": [
-    { "type": "noise" | "focus" | "lighting", "x": [0-100], "y": [0-100], "intensity": [0.0-1.0], "raw_value": "Nilai detail (misal: '12dB', '90% brightness', '1.5px blur')" }
-  ],
-  "adobe_analysis": {
-    "decision": "APPROVED" atau "REJECTED",
-    "primary_reason": "Alasan utama kenapa ditolak (singkat)",
-    "technical_summary": "Review aspek teknis (singkat & asik)",
-    "ip_brand_summary": "Review brand/logo (singkat & asik)",
-    "landmark_summary": "Review landmark/properti (singkat & asik)",
-    "short_advice": "Tips singkat biar lolos ke depannya"
-  },
-  "rejection_reasons": ["Array alasan spesifik"],
-  "actionable_feedback": ["Langkah konkret perbaikan"]
+    { "type": "noise" | "focus" | "lighting", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail spesifik temuan" }
+  ]
 }
 `;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-        status: { type: Type.STRING, enum: ["PASS", "FAIL"] },
-        final_score: { type: Type.INTEGER },
-        breakdown: {
-            type: Type.OBJECT,
-            properties: {
-                technical_quality: { type: Type.INTEGER },
-                legal_ip_safety: { type: Type.INTEGER }
-            },
-            required: ["technical_quality", "legal_ip_safety"]
-        },
+        legal_status: { type: Type.STRING },
+        technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+        strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+        overall_score: { type: Type.NUMBER },
+        recommendation: { type: Type.STRING, enum: ["PASS", "FAIL"] },
+        detailed_feedback: { type: Type.STRING },
         heatmaps: {
             type: Type.ARRAY,
             items: {
                 type: Type.OBJECT,
                 properties: {
                     type: { type: Type.STRING, enum: ["noise", "focus", "lighting"] },
-                    x: { type: Type.INTEGER, description: "X coordinate in percentage (0-100)" },
-                    y: { type: Type.INTEGER, description: "Y coordinate in percentage (0-100)" },
-                    intensity: { type: Type.NUMBER, description: "Intensity of the issue (0.0 to 1.0)" },
-                    raw_value: { type: Type.STRING, description: "The raw numerical value with unit (e.g., '14.2dB', '85%', '2.4px blur')" }
+                    x: { type: Type.INTEGER },
+                    y: { type: Type.INTEGER },
+                    intensity: { type: Type.NUMBER },
+                    raw_value: { type: Type.STRING }
                 },
                 required: ["type", "x", "y", "intensity", "raw_value"]
             }
-        },
-        adobe_analysis: {
-            type: Type.OBJECT,
-            properties: {
-                decision: { type: Type.STRING },
-                primary_reason: { type: Type.STRING },
-                technical_summary: { type: Type.STRING },
-                ip_brand_summary: { type: Type.STRING },
-                landmark_summary: { type: Type.STRING },
-                short_advice: { type: Type.STRING }
-            },
-            required: ["decision", "primary_reason", "technical_summary", "ip_brand_summary", "landmark_summary", "short_advice"]
-        },
-        rejection_reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
-        actionable_feedback: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
     },
-    required: ["status", "final_score", "breakdown", "adobe_analysis", "rejection_reasons", "actionable_feedback"]
+    required: ["legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "heatmaps"]
   };
 
   const imagePart = processFrameServer(image);
@@ -1831,7 +1880,7 @@ Respons Anda WAJIB JSON:
 
   for (const modelName of modelsToTry) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as a ruthless Adobe Stock curator. Perform a strict technical and legal audit of this asset. If even a minor flaw exists, set the status to REJECTED." }] }, {
+      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as a ruthless Adobe Stock curator. Perform a strict technical and legal audit. Determine final status as PASS or FAIL." }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -1947,3 +1996,53 @@ Rules:
 
   return JSON.parse(response.text);
 }
+
+export async function suggestKeywords(
+  title: string,
+  description: string,
+  existingKeywords: string[]
+): Promise<string[]> {
+  const systemInstruction = `You are a professional SEO and Adobe Stock Keyword Specialist.
+Your task is to analyze the existing title, description, and list of keywords of an asset, and suggest exactly 5 high-volume, generic, relevant keywords or short conceptual phrases that are currently missing from the user's list.
+These suggested keywords must be highly searchable, commercial, and directly related to the visual subject and context described in the title and description, while not repeating any existing keywords.
+
+Rules:
+1. Suggest EXACTLY 5 new, unique, generic keywords. Do not suggest more, do not suggest less.
+2. The suggested keywords must NOT be in the existing keywords list: ${JSON.stringify(existingKeywords)}.
+3. Keep the suggested keywords in lowercase, clean, single-word or short phrases (typically 1-2 words).
+4. Strictly return your answer as a JSON array of strings under the property "keywords".`;
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      keywords: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      }
+    },
+    required: ["keywords"]
+  };
+
+  const response = await getAIClient().models.generateContent({
+    model: 'gemini-3.1-flash-lite',
+    contents: `Suggest 5 missing SEO keywords for this asset:
+Title: "${title}"
+Description: "${description}"
+Existing Keywords: ${existingKeywords.join(', ')}`,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.3
+    }
+  });
+
+  try {
+    const parsed = JSON.parse(response.text);
+    return parsed.keywords || [];
+  } catch (err) {
+    console.error("Failed to parse suggested keywords:", err);
+    return [];
+  }
+}
+

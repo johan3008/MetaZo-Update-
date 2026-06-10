@@ -73,17 +73,25 @@ interface KeywordListProps {
   keywords: string[];
   themeColor: 'blue' | 'purple' | 'emerald';
   onChange: (kw: string[]) => void;
+  title?: string;
+  description?: string;
 }
 
 const ProjectKeywordList: React.FC<KeywordListProps> = ({
   label,
   keywords,
   themeColor,
-  onChange
+  onChange,
+  title,
+  description
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+  const [isSuggesting, setIsSuggesting] = React.useState(false);
+  const [suggestError, setSuggestError] = React.useState<string | null>(null);
+
   const badgeClass = themeColor === 'blue' ? 'bg-blue-500/10 text-[#4e73df]' : themeColor === 'purple' ? 'bg-purple-500/10 text-purple-600' : 'bg-emerald-500/10 text-emerald-600';
+  const buttonColorClass = themeColor === 'blue' ? 'text-[#4e73df] hover:text-blue-600' : themeColor === 'purple' ? 'text-purple-600 hover:text-purple-750' : 'text-emerald-600 hover:text-emerald-700';
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -121,23 +129,107 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     onChange(keywords.filter(k => k !== kw));
   };
 
+  const handleSmartSuggest = async () => {
+    if (!title || !title.trim()) {
+      setSuggestError("Tulis Judul dulu");
+      setTimeout(() => setSuggestError(null), 3000);
+      return;
+    }
+
+    setIsSuggesting(true);
+    setSuggestError(null);
+
+    try {
+      const response = await fetch('/api/smart-suggest-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description: description || '',
+          existingKeywords: keywords
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Gagal menyarankan");
+      }
+
+      const data = await response.json();
+      const suggested: string[] = data.keywords || [];
+
+      if (suggested.length === 0) {
+        setSuggestError("Saran kosong");
+        setTimeout(() => setSuggestError(null), 3000);
+      } else {
+        const uniqueNew = suggested.filter(kw => !keywords.includes(kw));
+        if (uniqueNew.length > 0) {
+          onChange([...keywords, ...uniqueNew]);
+        } else {
+          setSuggestError("Kata sudah lengkap");
+          setTimeout(() => setSuggestError(null), 3000);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSuggestError(err.message || "Error");
+      setTimeout(() => setSuggestError(null), 5000);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
   return (
     <div className="space-y-1">
-      <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">{label} ({keywords.length}/49)</label>
-      <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-xl border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
-        {keywords.map((kw, index) => (
-          <span 
-            key={`${kw}-${index}`} 
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDragEnd={handleDragEnd}
-            className={`inline-flex cursor-grab items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass} ${draggedIndex === index ? 'opacity-50' : ''}`}
+      <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+        <label>{label} ({keywords.length}/49)</label>
+        <div className="flex items-center space-x-2">
+          {suggestError && (
+            <span className="text-rose-500 font-extrabold normal-case leading-none animate-pulse">
+              {suggestError}
+            </span>
+          )}
+          <button
+            onClick={handleSmartSuggest}
+            disabled={isSuggesting || !title || !title.trim()}
+            title={!title || !title.trim() ? "Tulis judul terlebih dahulu sebagai konteks" : "Sukai 5 kata kunci SEO penting secara otomatis"}
+            className={`${buttonColorClass} font-extrabold flex items-center gap-1 hover:underline lowercase disabled:opacity-50 disabled:no-underline cursor-pointer`}
           >
-            <span>{kw}</span>
-            <button onClick={() => handleRemove(kw)} className="ml-1 text-[9px] text-rose-500 font-extrabold">×</button>
-          </span>
-        ))}
+            {isSuggesting ? (
+              <>
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>suggesting...</span>
+              </>
+            ) : (
+              <span>✨ smart suggest</span>
+            )}
+          </button>
+        </div>
+      </div>
+      <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-xl border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
+        <AnimatePresence mode="popLayout">
+          {keywords.map((kw, index) => (
+            <motion.span 
+              key={`${kw}-${index}`} 
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              initial={{ scale: 0.6, opacity: 0, y: 8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.7, opacity: 0, y: -4, transition: { duration: 0.15 } }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
+              layout
+              className={`inline-flex cursor-grab items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass} ${draggedIndex === index ? 'opacity-50' : ''}`}
+            >
+              <span>{kw}</span>
+              <button onClick={() => handleRemove(kw)} className="ml-1 text-[9px] text-rose-500 font-extrabold cursor-pointer">×</button>
+            </motion.span>
+          ))}
+        </AnimatePresence>
         <input
           type="text"
           value={inputValue}
@@ -455,6 +547,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                       <ProjectKeywordList 
                         label={t.keywords_label} 
                         keywords={file.keywords} 
+                        title={file.title}
+                        description={file.description}
                         themeColor={activeTool === ToolType.IMAGE ? 'blue' : activeTool === ToolType.VIDEO ? 'purple' : 'emerald'} 
                         onChange={(newKeywords) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, keywords: newKeywords} : f))} 
                       />

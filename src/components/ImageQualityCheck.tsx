@@ -1,25 +1,15 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
-  status: "PASS" | "FAIL";
-  final_score: number;
-  breakdown: {
-    technical_quality: number;
-    legal_ip_safety: number;
-  };
+  recommendation: "PASS" | "FAIL";
+  overall_score: number;
+  legal_status: string;
+  technical_issues: string[];
+  strengths: string[];
+  detailed_feedback: string;
   heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
-  adobe_analysis: {
-    decision: string;
-    primary_reason: string;
-    technical_summary: string;
-    ip_brand_summary: string;
-    landmark_summary: string;
-    short_advice: string;
-  };
-  rejection_reasons: string[];
-  actionable_feedback: string[];
 }
 
 export const ImageQualityCheck: React.FC = () => {
@@ -227,12 +217,12 @@ export const ImageQualityCheck: React.FC = () => {
             </div>
             <div>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">
-                Curator <span className="text-emerald-500">AI</span>
+                Quality <span className="text-emerald-500">Check</span>
               </h2>
               <div className="flex items-center gap-2 mt-2">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.15em]">
-                  Professional Microstock Compliance Hub
+                  AI Expert for Adobe Stock Standards
                 </p>
               </div>
             </div>
@@ -255,7 +245,7 @@ export const ImageQualityCheck: React.FC = () => {
               className="relative group/btn flex items-center gap-3 px-8 py-3.5 bg-slate-900 dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-400 text-white dark:text-slate-950 rounded-xl text-[11px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-2xl shadow-slate-900/10 dark:shadow-emerald-500/20"
             >
               {loading ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} className="group-hover/btn:animate-bounce" />}
-              {loading ? 'Menganalisis...' : 'Mulai Audit Batch'}
+              {loading ? 'Menganalisis...' : 'Mulai Audit Asset'}
             </button>
           </div>
         </div>
@@ -277,15 +267,6 @@ export const ImageQualityCheck: React.FC = () => {
                   <option value="MEDIUM">MEDIUM (Standard Adobe)</option>
                   <option value="LOOSE">LOOSE (AI Playground)</option>
               </select>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <a href="https://helpx.adobe.com/stock/contributor/help/known-image-restrictions.html" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-3 rounded-lg bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 hover:text-emerald-500 transition-all uppercase tracking-tighter">
-                  Restrictions
-                </a>
-                <a href="https://helpx.adobe.com/stock/contributor/help/quality-and-technical-issues.html" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-3 rounded-lg bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 hover:text-emerald-500 transition-all uppercase tracking-tighter">
-                  Tech Guide
-                </a>
-              </div>
             </div>
           </div>
 
@@ -373,10 +354,10 @@ export const ImageQualityCheck: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">
-                      Deep Pixel Analysis
+                      Adobe Stock QC Specialist
                     </h3>
                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">
-                      AI Expert for Adobe Stock standards is on duty
+                      Analyzing legal, technical, and commercial value
                     </p>
                   </div>
                 </div>
@@ -404,7 +385,7 @@ export const ImageQualityCheck: React.FC = () => {
               >
                 {Object.entries(reports).map(([fileName, report], rIdx) => {
                   const r = report as QualityReport;
-                  const isPassed = r.status === "PASS";
+                  const isPassed = r.recommendation === "PASS";
 
                   return (
                     <motion.div 
@@ -418,17 +399,20 @@ export const ImageQualityCheck: React.FC = () => {
                       <div className="flex items-center justify-between mb-5 px-1">
                         <div className="flex items-center gap-3 overflow-hidden">
                           <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${isPassed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                            {isPassed ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                            {isPassed ? <CheckCircle size={18} /> : <XCircle size={18} />}
                           </div>
                           <div className="min-w-0">
                             <p className="text-[11px] font-black text-slate-800 dark:text-white truncate uppercase tracking-tight">{fileName}</p>
-                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {isPassed ? 'Assets Approved' : 'Rejected Needs Fix'}
-                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`w-1 h-1 rounded-full ${isPassed ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                              <p className={`text-[9px] font-bold uppercase tracking-widest ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {isPassed ? 'PASSED' : 'REJECTED'}
+                              </p>
+                            </div>
                           </div>
                         </div>
                         <div className="flex flex-col items-end">
-                           <p className="text-[18px] font-black text-slate-900 dark:text-emerald-400 leading-none">{r.final_score}</p>
+                           <p className={`text-[18px] font-black leading-none ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>{r.overall_score}</p>
                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1">QC SCORE</p>
                         </div>
                       </div>
@@ -472,47 +456,25 @@ export const ImageQualityCheck: React.FC = () => {
                                       className="absolute group/point"
                                       style={{ left: `${h.x}%`, top: `${h.y}%` }}
                                     >
-                                      {/* Radial Glow */}
                                       <div className={`w-12 h-12 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl opacity-80 animate-pulse ${colors[h.type]}`} />
-                                      {/* Center Point */}
                                       <div className={`w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg cursor-help flex items-center justify-center transition-transform hover:scale-125 pointer-events-auto ${colors[h.type]}`}>
-                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 border border-white/20 shadow-2xl px-3 py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover/point:opacity-100 transition-all scale-90 group-hover/point:scale-100 flex flex-col items-center gap-1">
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 bg-slate-900 border border-white/20 shadow-2xl px-3 py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover/point:opacity-100 transition-all scale-90 group-hover/point:scale-100 flex flex-col items-center gap-1">
                                           <div className="flex items-center gap-1.5 border-b border-white/10 pb-1 w-full justify-center">
                                             <span className={`w-1.5 h-1.5 rounded-full ${colors[h.type]}`} />
-                                            {labels[h.type]}
+                                            <span className="whitespace-nowrap">{labels[h.type]}</span>
                                           </div>
-                                          <div className="text-emerald-400 text-xs font-mono font-bold">
+                                          <div className="text-emerald-400 text-xs font-mono font-bold leading-tight text-center break-words w-full px-1">
                                             {h.raw_value}
-                                          </div>
-                                          <div className="text-[7px] text-white/40">
-                                            INTENSITY: {Math.round(h.intensity * 100)}%
                                           </div>
                                         </div>
                                       </div>
                                     </motion.div>
                                   );
                                 })}
-                                
-                                {/* Legend */}
-                                <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-4">
-                                  <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
-                                    <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">Noise</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
-                                    <div className="w-2 h-2 rounded-full bg-amber-500" />
-                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">Focus</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">Lighting</span>
-                                  </div>
-                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>
 
-                          {/* Control Bar Overlay */}
                           <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                              <button 
                                onClick={() => toggleHeatmap(fileName)}
@@ -525,154 +487,102 @@ export const ImageQualityCheck: React.FC = () => {
                              <div className="flex items-center gap-2">
                                <div className="flex flex-col items-end">
                                  <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">Pixel Engine</p>
-                                 <p className="text-[9px] font-black text-emerald-400 leading-none">v4.2 PRO</p>
+                                 <p className="text-[9px] font-black text-emerald-400 leading-none">v5.0 Expert</p>
                                </div>
                                <Zap size={14} className="text-emerald-500" />
                              </div>
                           </div>
 
-                          <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full backdrop-blur-md border text-[9px] font-black uppercase tracking-widest shadow-xl transition-opacity duration-300 ${showHeatmaps.has(fileName) ? 'opacity-0' : 'opacity-100'} ${isPassed ? 'bg-emerald-500/80 border-emerald-400 text-white' : 'bg-rose-500/80 border-rose-400 text-white'}`}>
-                            {isPassed ? 'Approved' : 'Rejected'}
+                          <div className={`absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md border text-[9px] font-black uppercase tracking-widest shadow-xl transition-opacity duration-300 ${showHeatmaps.has(fileName) ? 'opacity-0' : 'opacity-100'} ${isPassed ? 'bg-emerald-500/80 border-emerald-400 text-white' : 'bg-rose-500/80 border-rose-400 text-white'}`}>
+                            {isPassed ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                            {isPassed ? 'PASS' : 'FAIL'}
                           </div>
                         </div>
                       )}
 
                       {/* Detail Section */}
                       <div className="mt-6 flex-1 space-y-6">
-                        {/* Score Bento */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-4 rounded-2xl group/score">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-[9px] font-black text-slate-400 uppercase">Technical</p>
-                              <Sparkles size={10} className="text-emerald-500 opacity-0 group-hover/score:opacity-100 transition-opacity" />
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-xl font-black text-slate-900 dark:text-slate-100">{r.breakdown.technical_quality}</span>
-                              <span className="text-[10px] font-bold text-slate-400">/50</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-200 dark:bg-white/5 rounded-full mt-3 overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(r.breakdown.technical_quality / 50) * 100}%` }}
-                                transition={{ duration: 1, ease: "easeOut" }}
-                                className="h-full bg-emerald-500" 
-                              />
-                            </div>
+                        {/* Detailed Feedback (Prominent if Fail) */}
+                        {!isPassed && (
+                          <div className="bg-rose-500/5 border border-rose-500/10 p-4 rounded-2xl">
+                             <div className="flex items-center gap-2 mb-2">
+                               <Info size={12} className="text-rose-500" />
+                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">Rejection Reason</p>
+                             </div>
+                             <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
+                               "{r.detailed_feedback}"
+                             </p>
                           </div>
-                          
-                          <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-4 rounded-2xl group/score">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-[9px] font-black text-slate-400 uppercase">Legal & IP</p>
-                              <Zap size={10} className="text-emerald-500 opacity-0 group-hover/score:opacity-100 transition-opacity" />
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-xl font-black text-slate-900 dark:text-slate-100">{r.breakdown.legal_ip_safety}</span>
-                              <span className="text-[10px] font-bold text-slate-400">/50</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-200 dark:bg-white/5 rounded-full mt-3 overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(r.breakdown.legal_ip_safety / 50) * 100}%` }}
-                                transition={{ duration: 1, ease: "easeOut" }}
-                                className="h-full bg-emerald-500" 
-                              />
-                            </div>
-                          </div>
+                        )}
+
+                        {/* Legal Status */}
+                        <div className={`p-4 rounded-2xl border ${r.legal_status.includes('VIOLATION') ? 'bg-rose-500/5 border-rose-500/20 text-rose-600' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600'}`}>
+                          <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Legal Status</p>
+                          <p className="text-[11px] font-bold">{r.legal_status}</p>
                         </div>
 
                         {/* Audit Details Dropdown UI */}
-                        {r.adobe_analysis && (
-                          <div className="space-y-4">
-                            <button 
-                              onClick={() => toggleReportExpand(fileName)}
-                              className="flex items-center justify-between w-full group/audit"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <p className="text-[10px] font-black uppercase text-slate-400 group-hover/audit:text-emerald-500 transition-colors tracking-[0.1em]">Adobe Audit Data 🚀</p>
-                              </div>
-                              <div className="flex items-center gap-2 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/10 group-hover/audit:bg-emerald-500 group-hover/audit:text-white transition-all">
-                                {expandedReports.has(fileName) ? 'Close' : 'Inspect Details'}
-                                {expandedReports.has(fileName) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                              </div>
-                            </button>
+                        <div className="space-y-4">
+                          <button 
+                            onClick={() => toggleReportExpand(fileName)}
+                            className="flex items-center justify-between w-full group/audit"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                              <p className="text-[10px] font-black uppercase text-slate-400 group-hover/audit:text-emerald-500 transition-colors tracking-[0.1em]">Quality Metadata 🚀</p>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/10 group-hover/audit:bg-emerald-500 group-hover/audit:text-white transition-all">
+                              {expandedReports.has(fileName) ? 'Close' : 'View Audit'}
+                              {expandedReports.has(fileName) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </div>
+                          </button>
 
-                            <AnimatePresence>
-                              {expandedReports.has(fileName) && (
-                                <motion.div 
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="grid grid-cols-1 gap-3 pt-2">
-                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:shadow-xl transition-all">
-                                      <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-500 shrink-0">
-                                        <Sparkles size={16} />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Kualitas Teknis (100% Zoom Check)</p>
-                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal">{r.adobe_analysis.technical_summary}</p>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:shadow-xl transition-all">
-                                      <div className="bg-blue-500/10 p-2.5 rounded-xl text-blue-500 shrink-0">
-                                        <Zap size={16} />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Trade Dress & Safety Audit</p>
-                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal">{r.adobe_analysis.ip_brand_summary}</p>
-                                      </div>
-                                    </div>
-
-                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex items-start gap-4 hover:shadow-xl transition-all">
-                                      <div className="bg-amber-500/10 p-2.5 rounded-xl text-amber-500 shrink-0">
-                                        <AlertCircle size={16} />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">IP & Property Inspection</p>
-                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal">{r.adobe_analysis.landmark_summary}</p>
-                                      </div>
-                                    </div>
-
-                                    <div className="bg-emerald-500/5 border border-emerald-500/20 p-5 rounded-2xl mt-2 relative overflow-hidden group/saran">
-                                      <div className="absolute top-0 right-0 p-2 opacity-10 group-hover/saran:scale-110 transition-transform">
-                                        <Sparkles size={40} className="text-emerald-500" />
-                                      </div>
-                                      <div className="relative">
-                                        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-                                          <CheckCircle size={12} /> Expert Advisor Tips
-                                        </p>
-                                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 leading-relaxed italic">
-                                          "{r.adobe_analysis.short_advice}"
-                                        </p>
-                                      </div>
+                          <AnimatePresence>
+                            {expandedReports.has(fileName) && (
+                              <motion.div 
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="grid grid-cols-1 gap-3 pt-2">
+                                  {/* Strengths */}
+                                  <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
+                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tight mb-2">Strengths</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {r.strengths.map((s, idx) => (
+                                        <span key={idx} className="px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded text-[10px] font-bold">
+                                          {s}
+                                        </span>
+                                      ))}
                                     </div>
                                   </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        )}
 
-                        {/* Error Highlights if failed */}
-                        {!isPassed && r.rejection_reasons.length > 0 && (
-                          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900/20 p-5 rounded-2xl">
-                             <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
-                               Compliance Issues 
-                               <AlertCircle size={14} />
-                             </p>
-                             <div className="space-y-3">
-                               {r.rejection_reasons.map((reason, i) => (
-                                 <div key={i} className="flex items-start gap-3">
-                                   <div className="mt-1.5 w-1 h-1 rounded-full bg-rose-400 shrink-0" />
-                                   <p className="text-[11px] font-bold text-rose-800 dark:text-rose-300 leading-tight">{reason}</p>
-                                 </div>
-                               ))}
-                             </div>
-                          </div>
-                        )}
+                                  {/* Technical Issues */}
+                                  <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
+                                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-tight mb-2">Technical Analysis</p>
+                                    <ul className="space-y-1">
+                                      {r.technical_issues.map((issue, idx) => (
+                                        <li key={idx} className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-start gap-2">
+                                          <span className="mt-1.5 w-1 h-1 rounded-full bg-amber-400 shrink-0" />
+                                          {issue}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  {/* Detailed Feedback */}
+                                  <div className="bg-indigo-500/5 border border-indigo-500/20 p-5 rounded-2xl mt-2">
+                                    <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-2">Detailed Feedback</p>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-relaxed italic">
+                                      "{r.detailed_feedback}"
+                                    </p>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
                     </motion.div>
                   );

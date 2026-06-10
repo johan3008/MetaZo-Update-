@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords } from './server/gemini.ts';
 import { GoogleGenAI } from '@google/genai';
 
 // TRICK: Strict Queue to prevent Server OOM.
@@ -693,6 +693,24 @@ app.get('/api/debug-uploads', (req, res) => {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating keywords' });
+            }
+        }
+    });
+
+    app.post('/api/smart-suggest-keywords', async (req, res) => {
+        try {
+            const { title, description, existingKeywords } = req.body;
+            if (!title) {
+                return res.status(400).json({ error: 'Missing title field or asset context' });
+            }
+            const data = await suggestKeywords(title, description || '', existingKeywords || []);
+            res.json({ keywords: data });
+        } catch (e: any) {
+            console.error('Server smart-suggest-keywords error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error suggesting keywords' });
             }
         }
     });
