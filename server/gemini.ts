@@ -1749,6 +1749,8 @@ Tujuan: Berikan analisis tajam dan keputusan akhir (APPROVED atau REJECTED) deng
 2. MEREK DAGANG & TRADE DRESS (Logo, Brand, Bentuk ikonik).
 3. OBJEK TERBATAS (Landmark terkenal, IP, Landmark sensitif).
 
+Visual Heatmap: Identifikasi 3-8 titik koordinat (X, Y dalam %) di mana terdapat masalah atau area kritis terkait Noise (bintik/grain), Focus (area blur/tidak tajam), atau Lighting (area overexposure/shadow terlalu gelap).
+
 Parameter Toleransi: ${tolerance} (Gunakan ini buat nentuin seberapa galak Anda nge-reject).
 
 Respons Anda WAJIB JSON:
@@ -1760,6 +1762,9 @@ Respons Anda WAJIB JSON:
     "technical_quality": [0-50],
     "legal_ip_safety": [0-50]
   },
+  "heatmaps": [
+    { "type": "noise" | "focus" | "lighting", "x": [0-100], "y": [0-100], "intensity": [0.0-1.0], "raw_value": "Nilai detail (misal: '12dB', '90% brightness', '1.5px blur')" }
+  ],
   "adobe_analysis": {
     "decision": "APPROVED" atau "REJECTED",
     "primary_reason": "Alasan utama kenapa ditolak (singkat)",
@@ -1785,6 +1790,20 @@ Respons Anda WAJIB JSON:
                 legal_ip_safety: { type: Type.INTEGER }
             },
             required: ["technical_quality", "legal_ip_safety"]
+        },
+        heatmaps: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    type: { type: Type.STRING, enum: ["noise", "focus", "lighting"] },
+                    x: { type: Type.INTEGER, description: "X coordinate in percentage (0-100)" },
+                    y: { type: Type.INTEGER, description: "Y coordinate in percentage (0-100)" },
+                    intensity: { type: Type.NUMBER, description: "Intensity of the issue (0.0 to 1.0)" },
+                    raw_value: { type: Type.STRING, description: "The raw numerical value with unit (e.g., '14.2dB', '85%', '2.4px blur')" }
+                },
+                required: ["type", "x", "y", "intensity", "raw_value"]
+            }
         },
         adobe_analysis: {
             type: Type.OBJECT,

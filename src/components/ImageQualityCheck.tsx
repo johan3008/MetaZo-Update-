@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
@@ -9,6 +9,7 @@ interface QualityReport {
     technical_quality: number;
     legal_ip_safety: number;
   };
+  heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
   adobe_analysis: {
     decision: string;
     primary_reason: string;
@@ -32,6 +33,17 @@ export const ImageQualityCheck: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
+  const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
+
+  const toggleHeatmap = (fileName: string) => {
+    const next = new Set(showHeatmaps);
+    if (next.has(fileName)) {
+      next.delete(fileName);
+    } else {
+      next.add(fileName);
+    }
+    setShowHeatmaps(next);
+  };
 
   const toggleReportExpand = (fileName: string) => {
     const next = new Set(expandedReports);
@@ -71,6 +83,7 @@ export const ImageQualityCheck: React.FC = () => {
     setPreviews({});
     setReports({});
     setError(null);
+    setShowHeatmaps(new Set());
   };
 
   const resizeAndProcess = (file: File): Promise<string> => {
@@ -422,14 +435,103 @@ export const ImageQualityCheck: React.FC = () => {
 
                       {/* Image Stage */}
                       {previews[fileName] && (
-                        <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700">
+                        <div className="image-check-viewer relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700">
                           <img 
                             src={previews[fileName]} 
                             alt={fileName} 
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover transition-all duration-500 ${showHeatmaps.has(fileName) ? 'brightness-[0.4] grayscale-[0.5]' : ''}`}
                             referrerPolicy="no-referrer"
                           />
-                          <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full backdrop-blur-md border text-[9px] font-black uppercase tracking-widest shadow-xl ${isPassed ? 'bg-emerald-500/80 border-emerald-400 text-white' : 'bg-rose-500/80 border-rose-400 text-white'}`}>
+                          
+                          {/* Heatmap Overlay */}
+                          <AnimatePresence>
+                            {showHeatmaps.has(fileName) && r.heatmaps && (
+                              <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 z-10 pointer-events-none"
+                              >
+                                {r.heatmaps.map((h, i) => {
+                                  const colors = {
+                                    noise: 'bg-rose-500',
+                                    focus: 'bg-amber-500',
+                                    lighting: 'bg-blue-500'
+                                  };
+                                  const labels = {
+                                    noise: 'Grain/Noise',
+                                    focus: 'Soft Focus',
+                                    lighting: 'Lighting Issue'
+                                  };
+                                  return (
+                                    <motion.div
+                                      key={`heatmap-${i}`}
+                                      initial={{ scale: 0, opacity: 0 }}
+                                      animate={{ scale: 1, opacity: 0.6 }}
+                                      transition={{ delay: i * 0.1, type: "spring", stiffness: 100 }}
+                                      className="absolute group/point"
+                                      style={{ left: `${h.x}%`, top: `${h.y}%` }}
+                                    >
+                                      {/* Radial Glow */}
+                                      <div className={`w-12 h-12 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl opacity-80 animate-pulse ${colors[h.type]}`} />
+                                      {/* Center Point */}
+                                      <div className={`w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg cursor-help flex items-center justify-center transition-transform hover:scale-125 pointer-events-auto ${colors[h.type]}`}>
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 border border-white/20 shadow-2xl px-3 py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover/point:opacity-100 transition-all scale-90 group-hover/point:scale-100 flex flex-col items-center gap-1">
+                                          <div className="flex items-center gap-1.5 border-b border-white/10 pb-1 w-full justify-center">
+                                            <span className={`w-1.5 h-1.5 rounded-full ${colors[h.type]}`} />
+                                            {labels[h.type]}
+                                          </div>
+                                          <div className="text-emerald-400 text-xs font-mono font-bold">
+                                            {h.raw_value}
+                                          </div>
+                                          <div className="text-[7px] text-white/40">
+                                            INTENSITY: {Math.round(h.intensity * 100)}%
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                                
+                                {/* Legend */}
+                                <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-4">
+                                  <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
+                                    <div className="w-2 h-2 rounded-full bg-rose-500" />
+                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">Noise</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
+                                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">Focus</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">Lighting</span>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {/* Control Bar Overlay */}
+                          <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                             <button 
+                               onClick={() => toggleHeatmap(fileName)}
+                               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
+                             >
+                               {showHeatmaps.has(fileName) ? <EyeOff size={14} /> : <Eye size={14} />}
+                               {showHeatmaps.has(fileName) ? 'Hide Heatmap' : 'Analyze Pixel Heatmap'}
+                             </button>
+                             
+                             <div className="flex items-center gap-2">
+                               <div className="flex flex-col items-end">
+                                 <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">Pixel Engine</p>
+                                 <p className="text-[9px] font-black text-emerald-400 leading-none">v4.2 PRO</p>
+                               </div>
+                               <Zap size={14} className="text-emerald-500" />
+                             </div>
+                          </div>
+
+                          <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full backdrop-blur-md border text-[9px] font-black uppercase tracking-widest shadow-xl transition-opacity duration-300 ${showHeatmaps.has(fileName) ? 'opacity-0' : 'opacity-100'} ${isPassed ? 'bg-emerald-500/80 border-emerald-400 text-white' : 'bg-rose-500/80 border-rose-400 text-white'}`}>
                             {isPassed ? 'Approved' : 'Rejected'}
                           </div>
                         </div>
