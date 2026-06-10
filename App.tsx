@@ -1166,7 +1166,7 @@ const App: React.FC = () => {
     }
   }, [showSettingsModal]);
 
-  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral', index: number, keyValue: string) => {
+  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia', index: number, keyValue: string) => {
     if (!keyValue.trim()) return;
     setKeyTestingIndex(index);
     setKeyTestProvider(provider);
@@ -1222,7 +1222,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai') => {
+  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia') => {
     let key = '';
     let currentList: string[] = [];
     
@@ -1279,7 +1279,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai', index: number) => {
+  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia', index: number) => {
     let listSetter: any;
     let list: string[] = [];
 
@@ -2822,7 +2822,7 @@ const App: React.FC = () => {
                       />
                       <button
                         type="button"
-                        onClick={() => handleAddApiKey('openai', newOpenaiKey)}
+                        onClick={() => handleAddApiKey('openai')}
                         className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
@@ -2911,7 +2911,7 @@ const App: React.FC = () => {
                       />
                       <button
                         type="button"
-                        onClick={() => handleAddApiKey('openrouter', newOpenrouterKey)}
+                        onClick={() => handleAddApiKey('openrouter')}
                         className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
@@ -3000,7 +3000,7 @@ const App: React.FC = () => {
                       />
                       <button
                         type="button"
-                        onClick={() => handleAddApiKey('blackbox', newBlackboxKey)}
+                        onClick={() => handleAddApiKey('blackbox')}
                         className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
@@ -3089,7 +3089,7 @@ const App: React.FC = () => {
                       />
                       <button
                         type="button"
-                        onClick={() => handleAddApiKey('nvidia', newNvidiaKey)}
+                        onClick={() => handleAddApiKey('nvidia')}
                         className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah

@@ -5,6 +5,7 @@ import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords } from './server/gemini.ts';
 import { GoogleGenAI } from '@google/genai';
 
@@ -714,6 +715,77 @@ app.get('/api/debug-uploads', (req, res) => {
             res.json(shuffled.slice(0, 5));
         } catch (e: any) {
             res.status(500).json({ error: 'Error fetching inspirations' });
+        }
+    });
+
+    app.post('/api/send-key', async (req, res) => {
+        const { email, licenseKey, appName, caption } = req.body;
+
+        if (!email || !licenseKey) {
+            return res.status(400).json({ message: 'Email and license key are required.' });
+        }
+
+        const emailUser = process.env.EMAIL_USER;
+        const emailPass = process.env.EMAIL_PASS;
+
+        if (!emailUser || !emailPass) {
+            console.error('Email credentials not configured.');
+            return res.status(500).json({ message: 'Layanan email belum dikonfigurasi. Sila masukkan EMAIL_USER dan EMAIL_PASS di menu Settings aplikasi.' });
+        }
+
+        try {
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: emailUser,
+                    pass: emailPass,
+                },
+            });
+
+            const mailOptions = {
+                from: `"${appName} Pro" <${emailUser}>`,
+                to: email,
+                subject: `License Key ${appName} PRO Anda`,
+                text: `Halo!\n\n${caption || 'Terima kasih telah menggunakan layanan kami.'}\n\nBerikut adalah License Key ${appName} PRO Anda:\n\nSERIAL KEY: ${licenseKey}\n\nSila masukkan key ini pada menu aktivasi di dalam aplikasi.\n\nSalam,\nTim ${appName}`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;">
+                        <h2 style="color: #4e73df; text-transform: uppercase; font-size: 18px; margin-bottom: 20px;">License Key ${appName} PRO</h2>
+                        <p style="font-size: 14px; line-height: 1.5;">Halo!</p>
+                        <p style="font-size: 14px; line-height: 1.5;">${caption || 'Terima kasih telah mempercayai <b>' + appName + '</b>.'} Berikut adalah Serial Key lisensi Anda:</p>
+                        <div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; border: 1px dashed #4e73df; text-align: center; margin: 24px 0;">
+                            <code style="font-family: monospace; font-size: 20px; font-weight: 800; color: #1e1b4b; letter-spacing: 2px;">${licenseKey}</code>
+                        </div>
+                        <p style="font-size: 14px; line-height: 1.5;"><b>Cara Aktivasi:</b></p>
+                        <ul style="font-size: 13px; line-height: 1.5; color: #475569;">
+                            <li>Buka aplikasi <b>${appName}</b></li>
+                            <li>Masuk ke menu Saas Portal / Pengaturan</li>
+                            <li>Salin dan tempel Serial Key di atas</li>
+                        </ul>
+                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+                        <p style="font-size: 11px; color: #94a3b8; text-align: center;">Pesan ini dikirim secara otomatis oleh sistem lisensi ${appName}. Jangan membalas email ini.</p>
+                    </div>
+                `,
+            };
+
+            await transporter.sendMail(mailOptions);
+            res.json({ success: true, message: 'Email sent successfully' });
+        } catch (error: any) {
+            console.error('Nodemailer error:', error);
+            let userMessage = 'Gagal mengirim email backend.';
+            
+            if (error.code === 'EAUTH' || (error.response && (error.response.includes('535') || error.response.includes('534')))) {
+                if (error.response && error.response.includes('534')) {
+                    userMessage = 'Gmail memerlukan "App Password". Akun Anda memiliki 2-Step Verification aktif atau memblokir login biasa. Anda WAJIB membuat 16-karakter App Password di Akun Google Anda untuk variabel EMAIL_PASS.';
+                } else {
+                    userMessage = 'Login email gagal (Invalid Credentials). Pastikan EMAIL_USER dan EMAIL_PASS benar. Jika menggunakan Gmail, Anda HARUS menggunakan "App Password", bukan password akun biasa.';
+                }
+            }
+
+            res.status(500).json({ 
+                message: userMessage, 
+                error: error.message,
+                tip: 'Cek Settings menu untuk konfigurasi EMAIL_USER dan EMAIL_PASS.'
+            });
         }
     });
 

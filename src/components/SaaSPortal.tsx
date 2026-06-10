@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
-  Trash2, RefreshCw
+  Trash2, RefreshCw, Download, Mail, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -102,6 +102,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [activationSuccess, setActivationSuccess] = useState(false);
   const [copiedKey, setCopiedKey] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Email sending states
+  const [activeEmailKey, setActiveEmailKey] = useState<string | null>(null);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [emailCaption, setEmailCaption] = useState('Terima kasih telah berlangganan layanan PRO kami.');
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   // Single-use multi-key engine states
   interface LicenseKeyBackend {
@@ -212,6 +218,68 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       handleFirestoreError(err, OperationType.UPDATE, `keys/${keyToReset}`);
     } finally {
       setIsKeysLoading(false);
+    }
+  };
+
+  const handleDownloadKey = (key: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([`LICENSE KEY ${appName.toUpperCase()}\n\nSerial Key: ${key}\nTanggal Generate: ${new Date().toLocaleDateString()}\nStatus: Siap Pakai\n\nSimpan key ini untuk aktivasi premium aplikasi.`], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    element.download = `License_${key}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleDownloadAllKeys = () => {
+    if (backendKeys.length === 0) return;
+    const content = backendKeys.map(k => `${k.key}${k.activated ? ' (Used)' : ' (Ready)'}`).join('\n');
+    const element = document.createElement("a");
+    const file = new Blob([`DAFTAR SEMUA LICENSE KEY ${appName.toUpperCase()}\n\n${content}`], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    element.download = `All_Licenses_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleSendToEmail = async (key: string) => {
+    if (!emailAddress || !emailAddress.includes('@')) {
+      alert('Mohon masukkan alamat email yang valid.');
+      return;
+    }
+
+    setIsEmailSending(true);
+    try {
+      const response = await fetch('/api/send-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailAddress,
+          licenseKey: key,
+          appName: appName,
+          caption: emailCaption
+        })
+      });
+
+      if (response.ok) {
+        alert(`Key berhasil dikirim ke ${emailAddress}`);
+        setActiveEmailKey(null);
+        setEmailAddress('');
+        setEmailCaption('Terima kasih telah berlangganan layanan PRO kami.');
+      } else {
+        let errorMsg = 'Gagal mengirim email.';
+        try {
+          const data = await response.json();
+          errorMsg = data.message || errorMsg;
+        } catch (e) {}
+        throw new Error(errorMsg);
+      }
+    } catch (err) {
+      console.error('Email send error:', err);
+      alert(`Gagal mengirim email: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsEmailSending(false);
     }
   };
 
@@ -733,7 +801,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 {/* Active Keys Database List */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                    <span>Daftar Key di Database ({backendKeys.length})</span>
+                    <div className="flex items-center gap-2">
+                       <span>Daftar Key di Database ({backendKeys.length})</span>
+                       {backendKeys.length > 0 && (
+                         <button 
+                           type="button" 
+                           onClick={handleDownloadAllKeys}
+                           className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-0.5"
+                           title="Download All as .txt"
+                         >
+                           <Download size={10} />
+                           <span>Export</span>
+                         </button>
+                       )}
+                    </div>
                     <button 
                       type="button" 
                       onClick={fetchBackendKeys}
@@ -752,7 +833,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       </div>
                     ) : (
                       backendKeys.map((kObj, i) => (
-                        <div key={kObj.key} className="p-2 flex items-center justify-between gap-2 hover:bg-slate-100/50 dark:hover:bg-slate-950/50 transition-colors">
+                        <React.Fragment key={kObj.key}>
+                          <div className="p-2 flex items-center justify-between gap-2 hover:bg-slate-100/50 dark:hover:bg-slate-950/50 transition-colors">
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200 select-all">{kObj.key}</span>
@@ -782,6 +864,33 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
                           {/* Action buttons on item */}
                           <div className="flex items-center gap-1 shrink-0">
+                            {!kObj.activated && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadKey(kObj.key)}
+                                  className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded transition-colors"
+                                  title="Unduh .txt"
+                                >
+                                  <Download size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeEmailKey === kObj.key) {
+                                      setActiveEmailKey(null);
+                                    } else {
+                                      setActiveEmailKey(kObj.key);
+                                      setEmailAddress('');
+                                    }
+                                  }}
+                                  className={`p-1 rounded transition-colors ${activeEmailKey === kObj.key ? 'bg-indigo-500 text-white' : 'text-indigo-500 hover:bg-indigo-500/10'}`}
+                                  title="Kirim ke Email"
+                                >
+                                  <Mail size={12} />
+                                </button>
+                              </>
+                            )}
                             {kObj.activated && (
                               <button
                                 type="button"
@@ -802,8 +911,51 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                             </button>
                           </div>
                         </div>
-                      ))
-                    )}
+                        
+                        {/* Inline Email Form */}
+                        <AnimatePresence>
+                          {activeEmailKey === kObj.key && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="px-2 pb-2 overflow-hidden"
+                            >
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 flex gap-2 shadow-inner">
+                                <input 
+                                  type="email"
+                                  placeholder="Input email penerima..."
+                                  value={emailAddress}
+                                  onChange={(e) => setEmailAddress(e.target.value)}
+                                  className="flex-1 bg-transparent text-[10px] outline-none font-bold placeholder:text-slate-400"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 mt-1 shadow-inner">
+                                <textarea 
+                                  placeholder="Input caption/pesan..."
+                                  value={emailCaption}
+                                  onChange={(e) => setEmailCaption(e.target.value)}
+                                  className="w-full bg-transparent text-[10px] outline-none font-medium h-12 resize-none placeholder:text-slate-400"
+                                />
+                              </div>
+                              <div className="flex justify-end mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendToEmail(kObj.key)}
+                                  disabled={isEmailSending}
+                                  className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white text-[9px] font-black uppercase rounded-lg flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition-all"
+                                >
+                                  {isEmailSending ? <RefreshCw size={10} className="animate-spin" /> : <Send size={10} />}
+                                  {isEmailSending ? 'Menyiapkan...' : 'Kirim Sekarang'}
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </React.Fragment>
+                    ))
+                  )}
                   </div>
                 </div>
               </div>
