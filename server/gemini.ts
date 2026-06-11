@@ -158,16 +158,10 @@ async function callOpenAICompatibleWithRetry(params: {
         console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
         lastErr = err;
         
-        // Fallback for Llama 4 Scout if model doesn't exist
+        // Fallback or retry if model fails
         const errorMsg = String(err.message || "").toLowerCase();
-        if (tryCount === 0 && provider === 'groq' && errorMsg.includes('model_not_found')) {
-          console.warn(`[callOpenAICompatibleWithRetry] Model ${model} not found, falling back to Llama 3.3.`);
-          model = 'llama-3.3-70b-versatile';
-          payload.model = model;
-          tryCount++;
-          continue;
-        }
-
+        
+        // Handle common API issues or rate limits
         if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit')) {
           if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
             const prevIdx = providerState.activeIndex;
