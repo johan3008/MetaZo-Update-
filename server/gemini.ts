@@ -457,25 +457,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 
+[STRICT MICROSTOCK OPTIMIZATION RULES]
+1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element + Industrial Sector within 60-80 characters.
+2. FRONT-LOADING KEYWORDS: You MUST place the most descriptive, literal, and crucial keywords within the first 7 positions of the keyword list.
+3. COMMERCIAL KEYWORDS: Include MINIMUM 5 keywords related to advertising, marketing, social media campaigns, or commercial business concepts relevant to the asset.
+4. ANTI-WASTE: DO NOT include overly broad keywords or irrelevant terms simply to achieve quantity.
 
-[STRICT ADOBE STOCK COMPLIANCE RULES (Helpx Guidelines)]
+[ADOBE STOCK COMPLIANCE RULES]
 Rules for Titles:
-1. NATURAL HUMAN LANGUAGE & ZERO JARGON: Use grammatically perfect, natural human English. Avoid any technical terms, artificial labels, code-speak, or system terms (such as "Asset", "ToolType", "concept", "generation", etc.). Write as a real human would write.
-2. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning", "spectacular", "amazing", "wonderful", "perfect"). Keep all adjectives purely objective and direct.
-3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the very end of the title.
-4. NO KEYWORD STUFFING: Do NOT chain keywords with commas. The title MUST read like a natural, complete, cohesive English sentence/phrase.
-5. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title (the very first character of the title). Every other word MUST be strictly in lowercase, including nouns, verbs, and adjectives. Proper nouns (e.g. "Asia", "London") are the only exception. Do NOT use Title Case (no capitalization of every word), and no random uppercase words.
-6. NO TECHNICAL SPECS: DO NOT include camera names, lens names, focal lengths, aperture, shutter speed, etc (e.g., no "shot on DSLR", "f/8", "50mm").
-6. LENGTH & STRUCTURE CONSTRAINT: MANDATORY 50 to 200 characters length. If the visual analysis has few words, you MUST expand the title by describing more physical context, setting, or corporate concepts while remaining accurate.
-7. STRUCTURE FORMULA: Combine [Subject] + [Action/State] + [Context/Environment] + [Concept/Industry] + [Style/Technical].
-   Examples of compliant, expanded titles (with character count):
-   - "Smiling happy young child in green sunny garden childhood concept" (62 characters)
-   - "Joyful young beach girl splashing in blue ocean water during summer vacation" (77 characters -> adjusted down to: "Joyful girl splashing in blue ocean water during summer vacation") (64 characters)
-   - "Clean empty negative wall space inside modern minimalist room interior" (70 characters)
-8. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects, objects, or themes.
-9. ACCURACY & ASSET CONTENT: The title must accurately describe exactly what is physically featured in the asset (people, actions, setting, colors), without generic placeholders. If a person, child, adult, or concrete subject is present, description is mandatory.
-10. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, visual progression/flow (alur/story flow), ideas, emotions, and conceptual commercial themes rather than purely static literal details.
-11. SEARCH INTENT BUYER (FIRST-PAGE RANKING): Build the title structure around direct commercial queries that high-intent premium buyers actually search for (e.g., real-world search intent), ensuring the metadata ranks on the first page of stock libraries.
+1. NATURAL HUMAN LANGUAGE & ZERO JARGON: Use grammatically perfect, natural human English. Avoid any technical terms, artificial labels, code-speak, or system terms.
+2. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning").
+3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the end.
+4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Every other word MUST be strictly in lowercase.
+5. NO TECHNICAL SPECS: No camera names, lens names, focal lengths, etc.
+6. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects.
+7. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, ideas, emotions, and conceptual commercial themes.
 
 Rules for Descriptions:
 1. Provide a thorough, objective, and literal visual breakdown based on the description provided.
@@ -483,12 +479,11 @@ Rules for Descriptions:
 3. Max 200 characters.
 
 Rules for Keywords:
-1. FORMULA & ORDER OF RELEVANCE (MANDATORY): Keywords MUST strictly follow this formula/sequence of priority: [Subject] + [Action] + [Concept] + [Style] + [Environment] + [Usage]. Populate keywords from each of these categories in that exact order (all subject-related words first, then action-related words, then concept words, then style words, then environment words, and finally usage words). Use as many single-word descriptors representing all elements of the formula as possible.
-2. SEARCH INTENT BUYER & FIRST-PAGE VISIBILITY: Optimize all keywords towards terms that commercial stock buyers frequently search for. Ensure keywords fully describe what is physically in the asset, the visual flow/storyline (alur), and the thematic business/creative concept to capture high-intent search traffic.
-3. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces or hyphens. Split all concepts (e.g., "white background" becomes "white" and "background" as separate elements).
-4. LOWERCASE: Every keyword must be strictly in lowercase.
-5. Ensure no IP, brands, trademarks, or personal/celebrity names.
-6. No subjective words ("beautiful", "awesome"). Use only factual, physical, and accurate conceptual terms.
+1. FORMULA & ORDER OF RELEVANCE: Keywords MUST follow this priority sequence: [Subject] + [Action] + [Commercial Concepts (Advert/Marketing)] + [Style] + [Environment].
+2. SINGLE WORDS: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
+3. LOWERCASE: Every keyword must be strictly in lowercase.
+4. Ensure no IP, brands, trademarks, or personal/celebrity names.
+5. No subjective words ("beautiful").
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list.
@@ -778,24 +773,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 
-[STRICT ADOBE STOCK COMPLIANCE RULES (Helpx Guidelines)]
+[STRICT MICROSTOCK OPTIMIZATION RULES]
+1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element + Industrial Sector within 60-80 characters.
+2. FRONT-LOADING KEYWORDS: You MUST place the most descriptive, literal, and crucial keywords within the first 7 positions of the keyword list.
+3. COMMERCIAL KEYWORDS: Include MINIMUM 5 keywords related to advertising, marketing, social media campaigns, or commercial business concepts relevant to the asset.
+4. ANTI-WASTE: DO NOT include overly broad keywords or irrelevant terms simply to achieve quantity.
+
+[ADOBE STOCK COMPLIANCE RULES]
 Rules for Titles:
-1. NATURAL HUMAN LANGUAGE & ZERO JARGON: Use grammatically perfect, natural human English. Avoid any technical terms, artificial labels, code-speak, or system terms (such as "Asset", "ToolType", "concept", "generation", etc.). Write as a real human would write.
-2. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning", "spectacular", "amazing", "wonderful", "perfect"). Keep all adjectives purely objective and direct.
-3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the very end of the title.
-4. NO KEYWORD STUFFING: Do NOT chain keywords with commas. The title MUST read like a natural, complete, cohesive English sentence/phrase.
-5. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title (the very first character of the title). Every other word MUST be strictly in lowercase, including nouns, verbs, and adjectives. Proper nouns (e.g. "Asia", "London") are the only exception. Do NOT use Title Case (no capitalization of every word), and no random uppercase words.
-6. NO TECHNICAL SPECS: DO NOT include camera names, lens names, focal lengths, aperture, shutter speed, etc (e.g., no "shot on DSLR", "f/8", "50mm").
-6. LENGTH & STRUCTURE CONSTRAINT: MANDATORY 50 to 200 characters length. If the visual analysis has few words, you MUST expand the title by describing more physical context, setting, or corporate concepts while remaining accurate.
-7. STRUCTURE FORMULA: Combine [Subject] + [Action/State] + [Context/Environment] + [Concept/Industry] + [Style/Technical].
-   Examples of compliant, expanded titles (with character count):
-   - "Smiling happy young child in green sunny garden childhood concept" (62 characters)
-   - "Joyful young beach girl splashing in blue ocean water during summer vacation" (77 characters -> adjusted down to: "Joyful girl splashing in blue ocean water during summer vacation") (64 characters)
-   - "Clean empty negative wall space inside modern minimalist room interior" (70 characters)
-8. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects, objects, or themes.
-9. ACCURACY & ASSET CONTENT: The title must accurately describe exactly what is physically featured in the asset (people, actions, setting, colors), without generic placeholders. If a person, child, adult, or concrete subject is present, description is mandatory.
-10. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, visual progression/flow (alur/story flow), ideas, emotions, and conceptual commercial themes rather than purely static literal details.
-11. SEARCH INTENT BUYER (FIRST-PAGE RANKING): Build the title structure around direct commercial queries that high-intent premium buyers actually search for (e.g., real-world search intent), ensuring the metadata ranks on the first page of stock libraries.
+1. NATURAL HUMAN LANGUAGE & ZERO JARGON: Use grammatically perfect, natural human English. Avoid any technical terms, artificial labels, code-speak, or system terms.
+2. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning").
+3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the end.
+4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Every other word MUST be strictly in lowercase.
+5. NO TECHNICAL SPECS: No camera names, lens names, focal lengths, etc.
+6. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects.
+7. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, ideas, emotions, and conceptual commercial themes.
 
 Rules for Descriptions:
 1. Provide a thorough, objective, and literal visual breakdown based on the description provided.
@@ -803,12 +795,11 @@ Rules for Descriptions:
 3. Max 200 characters.
 
 Rules for Keywords:
-1. FORMULA & ORDER OF RELEVANCE (MANDATORY): Keywords MUST strictly follow this formula/sequence of priority: [Subject] + [Action] + [Concept] + [Style] + [Environment] + [Usage]. Populate keywords from each of these categories in that exact order (all subject-related words first, then action-related words, then concept words, then style words, then environment words, and finally usage words). Use as many single-word descriptors representing all elements of the formula as possible.
-2. SEARCH INTENT BUYER & FIRST-PAGE VISIBILITY: Optimize all keywords towards terms that commercial stock buyers frequently search for. Ensure keywords fully describe what is physically in the asset, the visual flow/storyline (alur), and the thematic business/creative concept to capture high-intent search traffic.
-3. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces or hyphens. Split all concepts (e.g., "white background" becomes "white" and "background" as separate elements).
-4. LOWERCASE: Every keyword must be strictly in lowercase.
-5. Ensure no IP, brands, trademarks, or personal/celebrity names.
-6. No subjective words ("beautiful", "awesome"). Use only factual, physical, and accurate conceptual terms.
+1. FORMULA & ORDER OF RELEVANCE: Keywords MUST follow this priority sequence: [Subject] + [Action] + [Commercial Concepts (Advert/Marketing)] + [Style] + [Environment].
+2. SINGLE WORDS: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
+3. LOWERCASE: Every keyword must be strictly in lowercase.
+4. Ensure no IP, brands, trademarks, or personal/celebrity names.
+5. No subjective words ("beautiful").
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list.
