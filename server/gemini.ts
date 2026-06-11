@@ -511,17 +511,29 @@ export const generateStockMetadata = async (
   // Choose model for vision analysis, defaulting to gemini-3.1-flash-lite as before (must be a valid gemini model)
   const visionModelToUse = (model && model.startsWith('gemini-')) ? model : 'gemini-3.1-flash-lite';
   
-  // UPGRADE: Menyuruh Gemini mengekstrak data fisik SEKALIGUS esensi abstrak/mood secara akurat
-  const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+  // UPGRADE: Menyuruh Gemini mengekstrak data fisik dengan skenario Scene Analysis & Object Detection secara akurat sesuai pipeline baru
+  const visionSystemInstruction = `You are an expert creative director and highly specialized computer vision engine for stock photography metadata (Adobe Stock compliance).
 Asset Context: ${mediaTypeContext}
 Target Keywords/Themes to incorporate: ${customPrompt || "None"}
 
-Your task is to look at the provided image(s) and write an exhaustive, two-part analysis for a stock metadata specialist:
+Your task is to analyze the provided asset following a strict two-step pipeline:
 
-1. LITERAL DETAILS: STRICTLY describe ALL visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with MAXIMUM PHYSICAL ACCURACY. DO NOT HALLUCINATE OR GUESS. If you cannot identify a subject with absolute certainty, DO NOT name it; describe its shape/form instead.
-2. CONCEPTUAL DETAILS: ONLY AFTER complete literal description, analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
+STEP 1: Analyze image. Thoroughly analyze the composition, arrangement, setting, lighting styles, color palette, visual medium, framing, perspective, physical elements, specific garments, skin tones, textures, and visible details clearly present.
+STEP 2: Create VISUAL_FACTS JSON. Output a structured JSON block labeled as VISUAL_FACTS. The JSON must contain these exact keys:
+{
+  "scene_analysis": "Detailed description of the setting, layout, medium, lighting, perspective, framing, composition, and colors.",
+  "object_detection": "Exhaustive, highly literal list of physical objects, garments, models, and skin tones undeniably visible."
+}
 
-DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly, rigorously, and with complete factual accuracy based ONLY on what is undoubtedly visible.`;
+=== CRITICAL METADATA COMPLIANCE RULE ===
+Never infer profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible in the frame:
+- No speculative professions: Do NOT call a person a 'businessman', 'doctor', or 'executive' unless they wear an unambiguous uniform, badge, or equipment (like a stethoscope). Describe them literal-first: e.g. "man in suit", "person wearing apron", or "individual using computer".
+- No speculative ethnicity: Do NOT assign specific race/ethnicity labels (e.g., "Asian", "Caucasian", "black person", "Hispanic", "white person") unless undeniably confirmed by the customer preference or undeniable indicators. Use literal physical features like "man with short dark hair" or "person with light skin tone" instead.
+- No speculative locations: Do NOT assume locations like "Paris", "Japan", "New York", or even general "office space" unless iconic visual landmarks, clear signs, or explicit cues are undeniably visible. Use safe, general descriptions instead (e.g., "modern indoor setting", "bright room", "cozy dining table", "urban street").
+- No speculative emotions: Do NOT assume someone is "happy", "excited", "worried", "thoughtful", or "sad" unless their face shows an extreme, unambiguous representation. Instead, describe visible physical states, e.g. "person smiling gently", "calm expression", "straight face".
+- No speculative events/concepts: Do NOT use keywords such as "job interview", "corporate recruitment", "wedding", "first date", "success", "wealth" unless literal physical elements (like a wedding rings ceremony, a birthday cake with lit candles, or a stack of dollar notes) are unmistakably displayed.
+
+Output ONLY the raw JSON block containing VISUAL_FACTS under the exact structure above with absolute literal accuracy based ONLY on what is undeniably visible.`;
 
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
@@ -545,10 +557,10 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
   } catch (err: any) {
     console.warn("[JohMeta Pipeline] Gemini Vision Extraction Failed or Blocked:", err.message || err);
     const assetTypeStr = toolType === ToolType.VIDEO ? "footage video" : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "vector illustration" : "photograph";
-    const customPromptStr = customPrompt ? ` relating to: ${customPrompt}` : " representing modern visual concepts";
+    const customPromptStr = customPrompt ? ` relating to: ${customPrompt}` : "";
     visualDescriptionText = `
-LITERAL DETAILS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Features professional lighting, balanced composition, crisp details, clean colors, and modern aesthetic style. If there are people or humans present, they exhibit natural, positive, friendly, or focused facial expressions in a clean, positive lifestyle or corporate environment.
-CONCEPTUAL DETAILS: Focuses on modern corporate, personal development, technology, lifestyle, and business use-cases. Evokes themes of productivity, professionalism, success, growth, optimistic future, and genuine human connection. Ideal for website heroes, digital banners, commercial advertisements, and high-end editorial content.
+SCENE ANALYSIS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Features professional lighting, balanced composition, crisp details, natural color palette, and modern aesthetic style. Set in a clean, simple background.
+OBJECT DETECTION: Factual details representing the main subject<sup>[literal]</sup>, with clear details and realistic textures. If containing a person, depicts a person with a calm, neutral facial expression wearing simple apparel. Everything is captured strictly literally.
 `;
   }
   
@@ -609,46 +621,57 @@ Asset Media Type Context: ${toolType === ToolType.VIDEO ? 'This is a premium sto
 - DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
 - Start your response directly with '{' and end exactly with '}'.` : '';
 
-  const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
-Your goal is to maximize the search discoverability of visual assets for premium buyers.
-OUTPUT MUST BE 100% IN ENGLISH for titles, keywords, and descriptions.${groqOptimizationRules}
+  const systemInstruction = `You are an elite, highly compliant Adobe Stock and Shutterstock metadata cataloging specialist.
+Your goal is to maximize search discoverability for premium buyers while maintaining 100% strict adherence to stock photography regulations and the Gemini metadata pipeline model.
 
-${mediaContext}
+=== GEMINI METADATA PIPELINE STEAGES ===
 
-[STRICT ANTI-HALLUCINATION & GROUNDING RULES]
-1. SOURCE OF TRUTH LOCK: Title, description, dan keywords HARUS 100% bersumber dari teks "VISUAL & CONCEPTUAL DESCRIPTION" yang diberikan. DILARANG menambahkan objek, warna, lokasi, aktivitas, emosi, atau konsep yang TIDAK disebutkan secara eksplisit maupun tersirat kuat di dalam deskripsi tersebut.
-2. NO GENERIC FILLER SUBJECTS: Jangan menambahkan kata seperti "people", "business", "technology", "nature" dsb hanya untuk basa-basi jika subjek tersebut tidak ada di deskripsi visual.
-3. UNCERTAINTY = OMIT: Jika deskripsi visual menyebut sesuatu secara samar atau tidak yakin, JANGAN dipaksakan jadi keyword utama. Lebih baik gunakan istilah yang lebih umum/aman daripada menebak.
-4. CONCEPTUAL VS LITERAL BALANCE: Keyword literal (objek, warna, aksi yang benar-benar terlihat) harus mendominasi posisi 1-10. Keyword konseptual/mood/industri (dari bagian CONCEPTUAL DETAILS) hanya diisi jika benar-benar relevan dan disebutkan.
-5. NO CONTRADICTORY KEYWORDS: Jika title/description menyebut adanya subjek manusia (orang, profesi, karakter), DILARANG MUTLAK menambahkan keyword seperti "no people", "nobody", "no person", "empty", "vacant" — kecuali deskripsi visual eksplisit menyatakan TIDAK ADA manusia di frame.
-6. TARGET KEYWORDS / USER PREFERENCES: Jika pengguna menentukan Target Keywords/Themes to incorporate (di bawah "User custom preference"), Anda WAJIB menggabungkan kata kunci atau tema tersebut ke dalam metadata (keywords, title, atau description) selama tidak bertentangan secara ekstrem dengan fakta fisik pada aset visual tersebut. Instruksi eksplisit dari pengguna ini memiliki prioritas sangat tinggi dalam pembentukan daftar kata kunci.
+STEP 3: Generate title from VISUAL_FACTS.
+- Carefully read the "scene_analysis" and "object_detection" from the provided VISUAL_FACTS JSON.
+- Synthesize a descriptive, long-tail Title (60-120 characters) using plain, natural human language.
+- Strictly ground the Title in the physical elements of VISUAL_FACTS.
 
-[NATURAL LANGUAGE & SEARCH INTENT RULES — TITLE]
-1. Tulis title seperti cara ORANG AWAM/BUYER mencari gambar di Adobe Stock atau Shutterstock — bukan seperti laporan ilmiah, bukan seperti caption Instagram, dan bukan seperti deskripsi teknis fotografi.
-2. Gunakan struktur kalimat alami: [Subjek] + [sedang melakukan apa] + [di mana/konteks] + [untuk apa/industri terkait].
-   Contoh BENAR: "Woman drinking coffee while working on laptop in cozy home office"
-   Contoh SALAH (terlalu kaku/ilmiah): "Subject depicting a female individual consuming caffeinated beverage during remote occupational activity"
-3. Hindari kata-kata kaku/robotic seperti: "depicting", "individual", "subject matter", "represents", "showcasing", "illustrating the concept of".
-4. Title harus terasa seperti SEARCH QUERY yang manusiawi — kombinasi kata benda + kata kerja + konteks, bukan rangkaian istilah teknis.
+STEP 4: Generate description from VISUAL_FACTS.
+- Write a detailed visual breakdown based strictly on VISUAL_FACTS.
+- ALWAYS conclude the Description with a sentence starting with "Ideal for..." or "Perfect for..." proposing real-world commercial use-cases.
+- Max 200 characters.
+
+STEP 5: Generate keywords from VISUAL_FACTS.
+- Generate high-quality candidate keywords describing the physical setting, characters, objects, colors, and medium from the VISUAL_FACTS.
+
+STEP 6: Audit every keyword.
+- Critically audit every candidate keyword. Remove any keyword not directly supported by or explicitly present in the VISUAL_FACTS JSON:
+  - NEVER INFER profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible or explicitly present in VISUAL_FACTS:
+    * Audit: Check if any keyword implies a profession (e.g. "doctor", "manager", "engineer", "businessman", "employee"). If the model does not wear a clear stethoscope or uniform, REMOVE the keyword. Replace with literal terms: e.g., "man", "woman", "person wearing suit", etc.
+    * Audit: Check for specific ethnicity labels (e.g. "Asian", "Caucasian", "Spanish", "black", "white"). If NOT undeniably present in VISUAL_FACTS, REMOVE them immediately.
+    * Audit: Check for specific geographic locations (e.g. "Paris", "New York", "London"). Unless an iconic structure (like Eiffel Tower) is explicitly described, REMOVE them. Use generic descriptors (e.g., "cozy kitchen", "indoor room", "bright environment").
+    * Audit: Check for emotions (e.g. "happy", "depressed", "loving", "sad"). Omit subjective internal states unless dramatically physical.
+    * Audit: Check for speculative events/business concepts (e.g. "meeting", "job interview", "negotiation", "wedding"). Remove them, as stock agencies reject files for metadata that assumes unproven contexts.
+
+STEP 7: Sort keywords by Adobe Stock relevance.
+- Sort the audited keywords lists by relevance:
+  - Place the most descriptive, literal, and physical main subject keywords in the first 7 positions.
+  - Secondary background, setting, and medium keywords should follow afterward.
+  - Output exactly the requested quantity of keywords.
+
+\${groqOptimizationRules}
+
+\${mediaContext}
 
 [STRICT MICROSTOCK OPTIMIZATION RULES]
-1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element + Industrial Sector within 60-80 characters.
-2. FRONT-LOADING KEYWORDS: You MUST place the most descriptive, literal, and crucial keywords within the first 7 positions of the keyword list.
-3. COMMERCIAL KEYWORDS: Include MINIMUM 5 keywords related to advertising, marketing, social media campaigns, or commercial business concepts relevant to the asset.
-4. ANTI-WASTE: DO NOT include overly broad keywords or irrelevant terms simply to achieve quantity.
+1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element within 60-120 characters in Sentence case. No punctuation/commas. NO trailing period.
+2. FRONT-LOADING KEYWORDS: Place the most descriptive, literal, and physical keywords within the first 7 positions of the keyword list.
+3. ANTI-WASTE: DO NOT include overly broad keywords or subjective aesthetic-only terms ("beautiful", "stunning", "fantastic").
 
 [ADOBE STOCK COMPLIANCE RULES]
 Rules for Titles:
-1. NATURAL HUMAN LANGUAGE & ZERO JARGON: Use grammatically perfect, natural human English. Avoid any technical terms, artificial labels, code-speak, or system terms.
-2. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning").
-3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the end.
-4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Every other word MUST be strictly in lowercase.
-5. NO TECHNICAL SPECS: No camera names, lens names, focal lengths, etc.
-6. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects.
-7. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, ideas, emotions, and conceptual commercial themes.
+1. NATURAL HUMAN LANGUAGE: Use grammatically perfect, natural human English. No code-speak, robotic terms, or hashtags.
+2. NO SUBJECTIVE / QUALITY WORDS: Avoid marketing power-words or emotional quality buzzwords.
+3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashes, or exclamation marks. No period at the end.
+4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Keep all other words in lowercase.
 
 Rules for Descriptions:
-1. Provide a thorough, objective, and literal visual breakdown based on the description provided.
+1. Provide a thorough, objective, and literal visual breakdown based ONLY on the vision analysis text.
 2. ALWAYS conclude with a sentence starting with "Ideal for..." or "Perfect for..." suggesting real-world commercial uses.
 3. Max 200 characters.
 
@@ -656,13 +679,13 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 Keyword Priority:
-- The first 10 keywords must describe the main subject.
-- Secondary and conceptual keywords should come afterward.
+- The first 10 keywords must describe the main physical subject.
+- Secondary, audited background keywords should come afterward.
+- The list must contain EXACTLY the requested quantity of keywords.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
-
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -670,7 +693,7 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-User custom preference: ${customPrompt || "Follow standard best practices."}`;
+User Custom Prompt: ${customPrompt || "Follow best practices."}`;
 
   // --- TAHAP 5: EKSEKUSI PANGGILAN API DENGAN SUHU OPTIMAL ---
   let response;
@@ -899,16 +922,28 @@ export const generateBatchStockMetadata = async (
         mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility.";
       }
 
-      const visionSystemInstruction = `You are an expert creative director and computer vision engine.
+      const visionSystemInstruction = `You are an expert creative director and highly specialized computer vision engine for stock photography metadata (Adobe Stock compliance).
 Asset Context: ${mediaTypeContext}
 Target Keywords/Themes to incorporate: ${customPrompt || "None"}
 
-Your task is to look at the provided image(s) (Asset #${i + 1}) and write an exhaustive, two-part analysis for a stock metadata specialist:
+Your task is to analyze the provided asset following a strict two-step pipeline:
 
-1. LITERAL DETAILS: STRICTLY describe ALL visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with MAXIMUM PHYSICAL ACCURACY. DO NOT HALLUCINATE OR GUESS. If you cannot identify a subject with absolute certainty, DO NOT name it; describe its shape/form instead.
-2. CONCEPTUAL DETAILS: ONLY AFTER complete literal description, analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
+STEP 1: Analyze image. Thoroughly analyze the composition, arrangement, setting, lighting styles, color palette, visual medium, framing, perspective, physical elements, specific garments, skin tones, textures, and visible details clearly present.
+STEP 2: Create VISUAL_FACTS JSON. Output a structured JSON block labeled as VISUAL_FACTS. The JSON must contain these exact keys:
+{
+  "scene_analysis": "Detailed description of the setting, layout, medium, lighting, perspective, framing, composition, and colors.",
+  "object_detection": "Exhaustive, highly literal list of physical objects, garments, models, and skin tones undeniably visible."
+}
 
-DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly, rigorously, and with complete factual accuracy based ONLY on what is undoubtedly visible.`;
+=== CRITICAL METADATA COMPLIANCE RULE ===
+Never infer profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible in the frame:
+- No speculative professions: Do NOT call a person a 'businessman', 'doctor', or 'executive' unless they wear an unambiguous uniform, badge, or equipment (like a stethoscope). Describe them literal-first: e.g. "man in suit", "person wearing apron", or "individual using computer".
+- No speculative ethnicity: Do NOT assign specific race/ethnicity labels (e.g., "Asian", "Caucasian", "black person", "Hispanic", "white person") unless undeniably confirmed by the customer preference or undeniable indicators. Use literal physical features like "man with short dark hair" or "person with light skin tone" instead.
+- No speculative locations: Do NOT assume locations like "Paris", "Japan", "New York", or even general "office space" unless iconic visual landmarks, clear signs, or explicit cues are undeniably visible. Use safe, general descriptions instead (e.g., "modern indoor setting", "bright room", "cozy dining table", "urban street").
+- No speculative emotions: Do NOT assume someone is "happy", "excited", "worried", "thoughtful", or "sad" unless their face shows an extreme, unambiguous representation. Instead, describe visible physical states, e.g. "person smiling gently", "calm expression", "straight face".
+- No speculative events/concepts: Do NOT use keywords such as "job interview", "corporate recruitment", "wedding", "first date", "success", "wealth" unless literal physical elements (like a wedding rings ceremony, a birthday cake with lit candles, or a stack of dollar notes) are unmistakably displayed.
+
+Output ONLY the raw JSON block containing VISUAL_FACTS under the exact structure above with absolute literal accuracy based ONLY on what is undeniably visible.`;
       
       try {
           const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
@@ -932,10 +967,10 @@ DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output
       } catch (err: any) {
           console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
           const assetTypeStr = toolType === ToolType.VIDEO ? "footage video" : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "vector illustration" : "photograph";
-          const customPromptStr = customPrompt ? ` relating to: ${customPrompt}` : " representing modern visual concepts";
+          const customPromptStr = customPrompt ? ` relating to: ${customPrompt}` : "";
           const fallbackDescription = `
-LITERAL DETAILS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Features professional lighting, balanced composition, crisp details, clean colors, and modern aesthetic style. Contains professional subjects, lifestyle scenes, or objects.
-CONCEPTUAL DETAILS: Focuses on modern corporate, personal development, technology, lifestyle, and business use-cases. Evokes themes of productivity, professionalism, success, growth, optimistic future, and genuine human connection. Ideal for website heroes, digital banners, commercial advertisements, and high-end editorial content.
+SCENE ANALYSIS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Features professional lighting, balanced composition, crisp details, natural color palette, and modern aesthetic style. Set in a clean, simple background.
+OBJECT DETECTION: Factual details representing the main subject, with clear details and realistic textures. If containing a person, depicts a person with a calm, neutral facial expression wearing simple apparel. Everything is captured strictly literally.
 `;
           visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${fallbackDescription}`);
       }
@@ -991,9 +1026,8 @@ Keyword Priority:
 - DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
 - Start your response directly with '[' and end exactly with ']'.` : '';
 
-  const systemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist.
-Your goal is to maximize discoverability for premium buyers.
-OUTPUT MUST BE 100% IN ENGLISH for titles, keywords, and descriptions.
+  const systemInstruction = `You are an elite, highly compliant Adobe Stock and Shutterstock metadata cataloging specialist.
+Your goal is to maximize search discoverability for premium buyers while maintaining 100% strict adherence to stock photography regulations and the Gemini metadata pipeline model.
 
 CRITICAL ARRAY ORDER RULES:
 - The output JSON array MUST contain exactly ${items.length} metadata elements.
@@ -1002,60 +1036,50 @@ CRITICAL ARRAY ORDER RULES:
 
 ${mediaContext}
 
-[STRICT ANTI-HALLUCINATION & GROUNDING RULES]
-1. SOURCE OF TRUTH LOCK: Title, description, dan keywords HARUS 100% bersumber dari teks "VISUAL & CONCEPTUAL DESCRIPTION" yang diberikan. DILARANG menambahkan objek, warna, lokasi, aktivitas, emosi, atau konsep yang TIDAK disebutkan secara eksplisit maupun tersirat kuat di dalam deskripsi tersebut.
-2. NO GENERIC FILLER SUBJECTS: Jangan menambahkan kata seperti "people", "business", "technology", "nature" dsb hanya untuk basa-basi jika subjek tersebut tidak ada di deskripsi visual.
-3. UNCERTAINTY = OMIT: Jika deskripsi visual menyebut sesuatu secara samar atau tidak yakin, JANGAN dipaksakan jadi keyword utama. Lebih baik gunakan istilah yang lebih umum/aman daripada menebak.
-4. CONCEPTUAL VS LITERAL BALANCE: Keyword literal (objek, warna, aksi yang benar-benar terlihat) harus mendominasi posisi 1-10. Keyword konseptual/mood/industri (dari bagian CONCEPTUAL DETAILS) hanya diisi jika benar-benar relevan dan disebutkan.
-5. NO CONTRADICTORY KEYWORDS: Jika title/description menyebut adanya subjek manusia (orang, profesi, karakter), DILARANG MUTLAK menambahkan keyword seperti "no people", "nobody", "no person", "empty", "vacant" — kecuali deskripsi visual eksplisit menyatakan TIDAK ADA manusia di frame.
-6. TARGET KEYWORDS / USER PREFERENCES: Jika pengguna menentukan Target Keywords/Themes to incorporate (di bawah "User Custom Prompt"), Anda WAJIB menggabungkan kata kunci atau tema tersebut ke dalam metadata (keywords, title, atau description) selama tidak bertentangan secara ekstrem dengan fakta fisik pada aset visual tersebut. Instruksi eksplisit dari pengguna ini memiliki prioritas sangat tinggi dalam pembentukan daftar kata kunci.
+=== GEMINI METADATA PIPELINE STAGES ===
 
-[NATURAL LANGUAGE & SEARCH INTENT RULES — TITLE]
-1. Tulis title seperti cara ORANG AWAM/BUYER mencari gambar di Adobe Stock atau Shutterstock — bukan seperti laporan ilmiah, bukan seperti caption Instagram, dan bukan seperti deskripsi teknis fotografi.
-2. Gunakan struktur kalimat alami: [Subjek] + [sedang melakukan apa] + [di mana/konteks] + [untuk apa/industri terkait].
-   Contoh BENAR: "Woman drinking coffee while working on laptop in cozy home office"
-   Contoh SALAH (terlalu kaku/ilmiah): "Subject depicting a female individual consuming caffeinated beverage during remote occupational activity"
-3. Hindari kata-kata kaku/robotic seperti: "depicting", "individual", "subject matter", "represents", "showcasing", "illustrating the concept of".
-4. Title harus terasa seperti SEARCH QUERY yang manusiawi — kombinasi kata benda + kata kerja + konteks, bukan rangkaian istilah teknis.
+STEP 3: Generate title from VISUAL_FACTS.
+- Carefully read the "scene_analysis" and "object_detection" from each asset's provided VISUAL_FACTS JSON.
+- Synthesize a descriptive, long-tail Title (60-120 characters) using plain, natural human language.
+- Strictly ground the Title in the physical elements of VISUAL_FACTS.
+
+STEP 4: Generate description from VISUAL_FACTS.
+- Write a detailed visual breakdown based strictly on VISUAL_FACTS.
+- ALWAYS conclude the Description with a sentence starting with "Ideal for..." or "Perfect for..." proposing real-world commercial use-cases.
+- Max 200 characters.
+
+STEP 5: Generate keywords from VISUAL_FACTS.
+- Generate high-quality candidate keywords describing the physical setting, characters, objects, colors, and medium from the VISUAL_FACTS.
+
+STEP 6: Audit every keyword.
+- Critically audit every candidate keyword for EACH asset separately. Remove any keyword not directly supported by or explicitly present in that asset's VISUAL_FACTS JSON:
+  - NEVER INFER profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible or explicitly present in the VISUAL_FACTS:
+    * Audit: Check if any keyword implies a profession (e.g. "doctor", "manager", "engineer", "businessman", "employee"). If the model does not wear a clear stethoscope or uniform, REMOVE the keyword. Replace with literal terms: e.g., "man", "woman", "person wearing suit", etc.
+    * Audit: Check for specific ethnicity labels (e.g. "Asian", "Caucasian", "Spanish", "black", "white"). If NOT undeniably present in VISUAL_FACTS, REMOVE them immediately.
+    * Audit: Check for specific geographic locations (e.g. "Paris", "New York", "London"). Unless an iconic structure (like Eiffel Tower) is explicitly described, REMOVE them. Use generic descriptors (e.g., "cozy kitchen", "indoor room", "bright environment").
+    * Audit: Check for emotions (e.g. "happy", "depressed", "loving", "sad"). Omit subjective internal states unless dramatically physical.
+    * Audit: Check for speculative events/business concepts (e.g. "meeting", "job interview", "negotiation", "wedding"). Remove them, as stock agencies reject files for metadata that assumes unproven contexts.
+
+STEP 7: Sort keywords by Adobe Stock relevance.
+- Sort the audited keywords lists by relevance:
+  - Place the most descriptive, literal, and physical main subject keywords in the first 7 positions of the asset's keyword list.
+  - Secondary background, setting, and medium keywords should follow afterward.
+  - Output exactly the requested quantity of keywords.
 
 [STRICT MICROSTOCK OPTIMIZATION RULES]
-1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element + Industrial Sector within 60-80 characters.
-2. FRONT-LOADING KEYWORDS: You MUST place the most descriptive, literal, and crucial keywords within the first 7 positions of the keyword list.
-3. COMMERCIAL KEYWORDS: Include MINIMUM 5 keywords related to advertising, marketing, social media campaigns, or commercial business concepts relevant to the asset.
-4. ANTI-WASTE: DO NOT include overly broad keywords or irrelevant terms simply to achieve quantity.
-5. NATURAL SEO: Craft titles and descriptions that read naturally to humans, avoiding keyword stuffing, filler, or robotic language. Use conversational but professional language that would genuinely resonate with a buyer searching for commercial content.
-
-[NATURAL LANGUAGE & SEARCH INTENT RULES — KEYWORDS]
-1. Setiap keyword harus mewakili SATU search intent nyata yang benar-benar dipakai buyer di search bar (bukan istilah akademis/jargon).
-   Hindari: "anthropomorphic", "chromatic", "compositional", "juxtaposition", "aesthetic", "ambiance" (kecuali kata umum seperti "mood").
-   Gunakan: kata-kata umum sehari-hari yang relevan dengan industri (misal: "office", "remote", "morning", "laptop", "coffee", "relax", "productivity").
-2. PRIORITAS URUTAN KEYWORD (WAJIB DIIKUTI):
-   - Posisi 1-7: Subjek utama + aksi paling jelas terlihat (literal, paling sering dicari).
-   - Posisi 8-15: Konteks lingkungan/setting yang benar-benar terlihat.
-   - Posisi 16-25: Konsep komersial/industri (marketing, advertising, business, lifestyle, dll — HANYA jika sesuai konteks deskripsi).
-   - Sisanya: Mood/emosi/tema konseptual yang didukung oleh bagian CONCEPTUAL DETAILS.
-3. SINONIM BERGUNA, BUKAN DUPLIKAT KOSONG: Boleh menambahkan sinonim umum yang dicari buyer (misal "phone" dan "smartphone", "outside" dan "outdoor") SELAMA keduanya relevan dan dicari secara terpisah — tapi jangan membuat variasi tak berguna hanya untuk mengejar jumlah.
-4. DILARANG KEYWORD STUFFING TIDAK RELEVAN: Setiap keyword harus bisa dijawab dengan "ya" untuk pertanyaan: "Apakah ada buyer yang akan mencari gambar/video INI menggunakan kata ini?" Jika jawabannya tidak yakin, buang.
-
-[CONSISTENCY CHECK SEBELUM OUTPUT]
-Sebelum finalisasi, lakukan validasi internal:
-- Apakah title HANYA menyebut hal yang ada di deskripsi visual? Jika ada kata yang tidak didukung deskripsi, ganti/hapus.
-- Apakah 7 keyword pertama benar-benar literal dan sesuai gambar?
-- Apakah ada keyword yang terdengar seperti istilah laporan/ilmiah? Jika ya, ganti dengan padanan kata sehari-hari.
-- Apakah description konsisten dengan title and keyword (tidak menyebut hal berbeda)?
+1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element within 60-120 characters in Sentence case. No punctuation/commas. NO trailing period.
+2. FRONT-LOADING KEYWORDS: Place the most descriptive, literal, and physical keywords within the first 7 positions of the keyword list.
+3. ANTI-WASTE: DO NOT include overly broad keywords or subjective aesthetic-only terms ("beautiful", "stunning", "fantastic").
 
 [ADOBE STOCK COMPLIANCE RULES]
 Rules for Titles:
-1. NATURAL HUMAN LANGUAGE & ZERO JARGON: Use grammatically perfect, natural human English. Avoid any technical terms, artificial labels, code-speak, or system terms.
-2. NO SUBJECTIVE OR QUALITY WORDS: DO NOT use subjective, flowery, or emotional marketing/aesthetic buzzwords (e.g., "beautiful", "gorgeous", "stunning").
-3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashtags, exclamation marks, or special characters in the title. NO period at the end.
-4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Every other word MUST be strictly in lowercase.
-5. NO TECHNICAL SPECS: No camera names, lens names, focal lengths, etc.
-6. STICK STRICTLY TO THE SPECIFIC VISUAL ANALYSIS: Do NOT assume or introduce random unrelated subjects.
-7. STORYLINE, FLOW & CONCEPTUAL NARRATIVE (ALUR): Focus heavily on storytelling, ideas, emotions, and conceptual commercial themes.
+1. NATURAL HUMAN LANGUAGE: Use grammatically perfect, natural human English. No code-speak, robotic terms, or hashtags.
+2. NO SUBJECTIVE / QUALITY WORDS: Avoid marketing power-words or emotional quality buzzwords.
+3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashes, or exclamation marks. No period at the end.
+4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Keep all other words in lowercase.
 
 Rules for Descriptions:
-1. Provide a thorough, objective, and literal visual breakdown based on the description provided.
+1. Provide a thorough, objective, and literal visual breakdown based ONLY on the vision analysis text.
 2. ALWAYS conclude with a sentence starting with "Ideal for..." or "Perfect for..." suggesting real-world commercial uses.
 3. Max 200 characters.
 
@@ -1063,13 +1087,13 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 Keyword Priority:
-- The first 10 keywords must describe the main subject.
-- Secondary and conceptual keywords should come afterward.
+- The first 10 keywords must describe the main physical subject.
+- Secondary, audited background keywords should come afterward.
+- The list must contain EXACTLY the requested quantity of keywords.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
-
 
 Adobe Stock Categories:
 ${categoriesText}
