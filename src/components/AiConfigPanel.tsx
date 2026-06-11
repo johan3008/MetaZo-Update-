@@ -8,6 +8,8 @@ interface AiConfigPanelProps {
   setCustomPrompt: (p: string) => void;
   keywordCount: number | string;
   setKeywordCount: (c: number | string) => void;
+  keywordMode: 'mixed' | 'single' | 'multi';
+  setKeywordMode: (mode: 'mixed' | 'single' | 'multi') => void;
   aiCreativity: number;
   setAiCreativity: (val: number) => void;
   isLoading: boolean;
@@ -29,6 +31,8 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   setCustomPrompt,
   keywordCount,
   setKeywordCount,
+  keywordMode,
+  setKeywordMode,
   aiCreativity,
   setAiCreativity,
   isLoading,
@@ -98,6 +102,34 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                 }} 
                 className="w-14 p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-blue-500/30 outline-none" 
               />
+            </div>
+
+            <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800/80">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  Keyword Style / Gaya Keyword
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { value: 'mixed', label: 'Mixed' },
+                  { value: 'single', label: 'Single' },
+                  { value: 'multi', label: 'Multi' }
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setKeywordMode(opt.value as 'mixed' | 'single' | 'multi')}
+                    className={`py-1.5 px-2 text-[10px] uppercase font-extrabold rounded-lg border transition-all text-center ${
+                      keywordMode === opt.value
+                        ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-sm shadow-[#4e73df]/15'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200/80 dark:border-slate-700 hover:bg-slate-105 dark:hover:bg-slate-750'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2.5 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800/80">

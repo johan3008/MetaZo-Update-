@@ -36,6 +36,7 @@ interface SaaSPortalProps {
 
   // Trial status control
   trialDaysLeft?: number;
+  subDaysLeft?: number | null;
 }
 
 export const SaaSPortal: React.FC<SaaSPortalProps> = ({
@@ -58,7 +59,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   onlyModal = false,
   isResellerUnlocked = false,
   setIsResellerUnlocked,
-  trialDaysLeft
+  trialDaysLeft,
+  subDaysLeft = null
 }) => {
   // Local Temp States for Reseller Portal
   const [tempAppName, setTempAppName] = useState(appName);
@@ -115,9 +117,11 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     activated: boolean;
     activatedBy: string;
     activatedAt: string;
+    duration?: string;
   }
   const [backendKeys, setBackendKeys] = useState<LicenseKeyBackend[]>([]);
   const [keysCountToGen, setKeysCountToGen] = useState(5);
+  const [selectedDuration, setSelectedDuration] = useState<'30days' | 'unlimited'>('30days');
   const [isKeysLoading, setIsKeysLoading] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
 
@@ -133,7 +137,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           key: doc.id,
           activated: !!data.activated,
           activatedBy: data.activatedBy || '',
-          activatedAt: data.activatedAt || ''
+          activatedAt: data.activatedAt || '',
+          duration: data.duration || 'unlimited'
         });
       });
       keysList.sort((a, b) => a.key.localeCompare(b.key));
@@ -175,6 +180,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           activated: false,
           activatedBy: '',
           activatedAt: '',
+          duration: selectedDuration,
           createdAt: new Date().toISOString()
         });
       }
@@ -403,6 +409,17 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         const data = dSnap.data();
         if (data.activated) {
           if (data.activatedBy === devId || data.activatedBy === userEmail) {
+            if (data.duration === '30days' && data.activatedAt) {
+              const activatedTime = new Date(data.activatedAt).getTime();
+              const nowTime = new Date().getTime();
+              const elapsedMs = nowTime - activatedTime;
+              const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+              if (elapsedDays > 30) {
+                setActivationError('Masa aktif Serial Key ini (30 Hari) telah kedaluwarsa. Sila beli key baru.');
+                setIsActivating(false);
+                return;
+              }
+            }
             localStorage.setItem('mz_license_key', targetKeyFormatted);
             setLicenseKey(targetKeyFormatted);
             setActivationSuccess(true);
@@ -784,17 +801,28 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       max="100"
                       value={keysCountToGen}
                       onChange={(e) => setKeysCountToGen(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-center font-bold text-xs outline-none"
+                      className="w-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-center font-bold text-xs outline-none text-slate-800 dark:text-slate-100"
                     />
+                  </div>
+                  <div className="space-y-0.5 min-w-[100px] flex-1">
+                    <label className="text-slate-500 dark:text-slate-400 font-bold text-[9px] uppercase tracking-wider block">Durasi</label>
+                    <select
+                      value={selectedDuration}
+                      onChange={(e) => setSelectedDuration(e.target.value as '30days' | 'unlimited')}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 font-bold text-xs outline-none text-slate-800 dark:text-slate-100 cursor-pointer"
+                    >
+                      <option value="30days">30 Hari</option>
+                      <option value="unlimited">Unlimited</option>
+                    </select>
                   </div>
                   <button
                     type="button"
                     onClick={handleGenerateKeys}
                     disabled={isKeysLoading}
-                    className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer shrink-0"
                   >
                     <RefreshCw size={12} className={isKeysLoading ? 'animate-spin' : ''} />
-                    <span>{isKeysLoading ? 'Generating...' : 'Generate Key Baru'}</span>
+                    <span>{isKeysLoading ? 'Generating...' : 'Generate Key'}</span>
                   </button>
                 </div>
 
@@ -850,14 +878,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                             
                             {/* Key Activation details */}
                             {kObj.activated ? (
-                              <div className="text-[9px] text-[#4e73df] font-bold flex items-center gap-1">
+                              <div className="text-[9px] text-[#4e73df] font-bold flex items-center gap-1.5 flex-wrap">
                                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                                 <span className="truncate">Terpakai: {kObj.activatedBy}</span>
+                                <span className="px-1.5 py-0.5 text-[7.5px] bg-blue-500/10 text-blue-600 dark:text-[#4e73df] rounded font-black uppercase tracking-wide">
+                                  {kObj.duration === '30days' ? '30 Hari' : 'Unlimited'}
+                                </span>
                               </div>
                             ) : (
-                              <div className="text-[9px] text-emerald-500 font-bold flex items-center gap-1">
+                              <div className="text-[9px] text-emerald-500 font-bold flex items-center gap-1.5 flex-wrap">
                                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                 <span>Ready to Sell</span>
+                                <span className="px-1.5 py-0.5 text-[7.5px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded font-black uppercase tracking-wide">
+                                  {kObj.duration === '30days' ? '30 Hari' : 'Unlimited'}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -1085,6 +1119,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         <p className="text-[10px] font-semibold text-slate-455 mt-1">
                           Kunci Terdaftar: <code className="font-mono bg-emerald-500/5 text-emerald-600 px-1 border border-emerald-500/10 dark:text-emerald-400">{licenseKey}</code>
                         </p>
+                        {subDaysLeft !== undefined && subDaysLeft !== null && (
+                          <div className="mt-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-[10px] py-1 px-1.5 rounded-lg flex items-center justify-center space-x-1">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            <span>Masa Berlangganan: {Math.ceil(subDaysLeft)} Hari Lagi</span>
+                          </div>
+                        )}
                         <p className="text-[9px] font-bold text-slate-400 mt-2">
                           Commercial copy licensed under key constraints.
                         </p>

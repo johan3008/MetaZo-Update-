@@ -24,6 +24,7 @@
         "activated": { "type": "boolean", "description": "Active state verification flag" },
         "activatedBy": { "type": "string", "description": "Identifier tracking which user/device activated this key" },
         "activatedAt": { "type": "string", "format": "date-time", "description": "Timestamp tracking execution moment" },
+        "duration": { "type": "string", "enum": ["30days", "unlimited"], "description": "Key subscription expiration validity duration type" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Key generation moment" }
       },
       "required": ["key", "activated"]

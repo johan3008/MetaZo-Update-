@@ -34,50 +34,140 @@ import { db, handleFirestoreError, OperationType } from './src/firebase';
 const DB_NAME = 'EPS_Batch_DB';
 const STORE_NAME = 'app_state_store';
 
-const initDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 1);
-        request.onupgradeneeded = () => {
-            if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-                request.result.createObjectStore(STORE_NAME);
+// Keep an in-memory fallback in case IndexedDB is blocked or disabled (common in sandboxed iframes)
+const inMemoryFallback: Record<string, any> = {};
+
+const initDB = (): Promise<IDBDatabase | null> => {
+    return new Promise((resolve) => {
+        try {
+            if (typeof indexedDB === 'undefined' || !indexedDB) {
+                resolve(null);
+                return;
             }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = () => {
+                try {
+                    if (!request.result.objectStoreNames.contains(STORE_NAME)) {
+                        request.result.createObjectStore(STORE_NAME);
+                    }
+                } catch (e) {
+                    console.warn("IDB upgrade error:", e);
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (e) => {
+                console.warn("IDB open blocked/error (falling back):", e);
+                resolve(null);
+            };
+        } catch (err) {
+            console.warn("IDB initialization error (falling back to memory):", err);
+            resolve(null);
+        }
     });
 };
 
 const saveStateToDB = async (state: any) => {
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.put(state, 'current_batch');
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
+    try {
+        const db = await initDB();
+        if (!db) {
+            inMemoryFallback['current_batch'] = state;
+            try { localStorage.setItem('current_batch_backup', JSON.stringify(state)); } catch (e) {}
+            return;
+        }
+        return new Promise<void>((resolve) => {
+            try {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put(state, 'current_batch');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => {
+                    inMemoryFallback['current_batch'] = state;
+                    resolve();
+                };
+            } catch (e) {
+                inMemoryFallback['current_batch'] = state;
+                resolve();
+            }
+        });
+    } catch (err) {
+        inMemoryFallback['current_batch'] = state;
+    }
 };
 
 const loadStateFromDB = async (): Promise<any> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.get('current_batch');
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        const db = await initDB();
+        if (!db) {
+            if (inMemoryFallback['current_batch']) return inMemoryFallback['current_batch'];
+            try {
+                const backup = localStorage.getItem('current_batch_backup');
+                if (backup) return JSON.parse(backup);
+            } catch (e) {}
+            return null;
+        }
+        return new Promise((resolve) => {
+            try {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.get('current_batch');
+                request.onsuccess = () => {
+                    if (request.result) {
+                        resolve(request.result);
+                    } else {
+                        if (inMemoryFallback['current_batch']) {
+                            resolve(inMemoryFallback['current_batch']);
+                        } else {
+                            try {
+                                const backup = localStorage.getItem('current_batch_backup');
+                                resolve(backup ? JSON.parse(backup) : null);
+                            } catch (e) {
+                                resolve(null);
+                            }
+                        }
+                    }
+                };
+                request.onerror = () => {
+                    try {
+                        const backup = localStorage.getItem('current_batch_backup');
+                        resolve(backup ? JSON.parse(backup) : (inMemoryFallback['current_batch'] || null));
+                    } catch (e) {
+                        resolve(inMemoryFallback['current_batch'] || null);
+                    }
+                };
+            } catch (e) {
+                try {
+                    const backup = localStorage.getItem('current_batch_backup');
+                    resolve(backup ? JSON.parse(backup) : (inMemoryFallback['current_batch'] || null));
+                } catch (err) {
+                    resolve(inMemoryFallback['current_batch'] || null);
+                }
+            }
+        });
+    } catch (err) {
+        return inMemoryFallback['current_batch'] || null;
+    }
 };
 
 const clearStateFromDB = async () => {
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.delete('current_batch');
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
+    try {
+        delete inMemoryFallback['current_batch'];
+        try { localStorage.removeItem('current_batch_backup'); } catch (e) {}
+        const db = await initDB();
+        if (!db) return;
+        return new Promise<void>((resolve) => {
+            try {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.delete('current_batch');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch (e) {
+                resolve();
+            }
+        });
+    } catch (err) {
+        // Safe skip
+    }
 };
 // ----------------------------------------
 
@@ -875,6 +965,12 @@ const App: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [keywordCount, setKeywordCount] = useState<number | string>('');
+  const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => (localStorage.getItem('mz_keyword_mode') as 'mixed' | 'single' | 'multi') || 'mixed');
+
+  useEffect(() => {
+    localStorage.setItem('mz_keyword_mode', keywordMode);
+  }, [keywordMode]);
+
   const [aiCreativity, setAiCreativity] = useState<number>(0.7);
   const [generationMode, setGenerationMode] = useState<GenerationMode>(GenerationMode.STANDARD);
   const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
@@ -911,6 +1007,7 @@ const App: React.FC = () => {
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
   const [isMzLicensed, setIsMzLicensed] = useState(false);
+  const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
 
@@ -1060,6 +1157,7 @@ const App: React.FC = () => {
     const k = mzLicenseKey.trim().toUpperCase();
     if (!k) {
       setIsMzLicensed(false);
+      setSubDaysLeft(null);
       return;
     }
 
@@ -1074,6 +1172,7 @@ const App: React.FC = () => {
 
     if (isOfflineValid) {
       setIsMzLicensed(true);
+      setSubDaysLeft(null);
       return;
     }
 
@@ -1088,14 +1187,36 @@ const App: React.FC = () => {
         if (dSnap.exists()) {
           const data = dSnap.data();
           if (data.activated) {
+            // Check if 30days subscription is expired
+            if (data.duration === '30days' && data.activatedAt) {
+              const activatedTime = new Date(data.activatedAt).getTime();
+              const nowTime = new Date().getTime();
+              const elapsedMs = nowTime - activatedTime;
+              const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+              const remainingDays = 30 - elapsedDays;
+
+              if (remainingDays <= 0) {
+                setIsMzLicensed(false);
+                setSubDaysLeft(null);
+                localStorage.removeItem('mz_license_key');
+                setMzLicenseKey('');
+                alert('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
+                return;
+              }
+              setSubDaysLeft(Math.max(0, remainingDays));
+            } else {
+              setSubDaysLeft(null);
+            }
             setIsMzLicensed(true);
           } else {
             setIsMzLicensed(false);
+            setSubDaysLeft(null);
             localStorage.removeItem('mz_license_key');
             setMzLicenseKey('');
           }
         } else {
           setIsMzLicensed(false);
+          setSubDaysLeft(null);
           localStorage.removeItem('mz_license_key');
           setMzLicenseKey('');
         }
@@ -1475,6 +1596,9 @@ const App: React.FC = () => {
                   setCustomPrompt(state.customPrompt);
                   setActiveTool(state.activeTool);
                   setGenerationMode(state.generationMode);
+                  if (state.keywordMode) {
+                      setKeywordMode(state.keywordMode);
+                  }
                   
                   // Clear the DB so we don't resume again on next normal refresh
                   await clearStateFromDB();
@@ -1488,7 +1612,7 @@ const App: React.FC = () => {
                   }, 1000);
               }
           } catch (e) {
-              console.error("Failed to load state from DB:", e);
+              console.warn("Failed to load state from DB:", e);
           }
       };
       checkResume();
@@ -1787,7 +1911,7 @@ const App: React.FC = () => {
               } else if (selectedProvider === 'groq') {
                   modelParam = selectedGroqModel;
               }
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -1912,7 +2036,7 @@ const App: React.FC = () => {
                 } else if (selectedProvider === 'groq') {
                     modelParam = selectedGroqModel;
                 }
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -2036,7 +2160,8 @@ const App: React.FC = () => {
                         keywordCount,
                         customPrompt,
                         activeTool,
-                        generationMode
+                        generationMode,
+                        keywordMode
                     });
                     window.location.reload();
                     return; // Stop execution
@@ -2445,6 +2570,8 @@ const App: React.FC = () => {
                   setCustomPrompt={setCustomPrompt} 
                   keywordCount={keywordCount} 
                   setKeywordCount={setKeywordCount} 
+                  keywordMode={keywordMode}
+                  setKeywordMode={setKeywordMode}
                   aiCreativity={aiCreativity}
                   setAiCreativity={setAiCreativity}
                   isLoading={isLoading} 
@@ -3375,6 +3502,7 @@ const App: React.FC = () => {
                   isResellerUnlocked={isResellerUnlocked}
                   setIsResellerUnlocked={setIsResellerUnlocked}
                   trialDaysLeft={trialDaysLeft}
+                  subDaysLeft={subDaysLeft}
                 />
               )}
 
@@ -3428,6 +3556,7 @@ const App: React.FC = () => {
         userEmail="johanchrismant4@gmail.com"
         onlyModal={true}
         trialDaysLeft={trialDaysLeft}
+        subDaysLeft={subDaysLeft}
       />
 
       {/* Hidden Custom Secure Reseller Passcode Dialog Overlay */}

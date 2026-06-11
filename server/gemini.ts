@@ -2,9 +2,37 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
+import fs from "node:fs";
+import path from "node:path";
 
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
+
+// Load environment variables dynamically from local .env file
+try {
+  const envPath = path.join(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, "utf-8");
+    envContent.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return;
+      const index = trimmed.indexOf("=");
+      if (index > 0) {
+        const key = trimmed.slice(0, index).trim();
+        let val = trimmed.slice(index + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (key && !process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    });
+    console.log("[ENV LOAD] Loaded custom configurations from workspace .env file.");
+  }
+} catch (e) {
+  console.warn("[ENV LOAD WARNING] Could not read .env file:", e);
+}
 
 // Initialize lazy backend Google GenAI SDK.
 let aiClient: GoogleGenAI | null = null;
@@ -289,7 +317,7 @@ function getAIClient(): any {
           return { text };
         }
 
-        let key = process.env.GEMINI_API_KEY;
+        let key = process.env.GEMINI_API_KEY || process.env.API_KEY;
         let activeIndex = 0;
         let keysList: string[] = [];
 
@@ -313,7 +341,7 @@ function getAIClient(): any {
 
         const runGemini = async (keyToUse: string | undefined) => {
           if (!keyToUse) {
-            throw new Error('GEMINI_API_KEY environment variable is required');
+            throw new Error('GEMINI_API_KEY / API_KEY environment variable is required. Silakan masukkan API Key Gemini Anda terlebih dahulu melalui tombol Pengaturan (ikon Gear) di bagian samping aplikasi.');
           }
           const client = new GoogleGenAI({
             apiKey: keyToUse,
@@ -423,7 +451,8 @@ export const generateStockMetadata = async (
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
-  model?: string
+  model?: string,
+  keywordMode?: 'mixed' | 'single' | 'multi'
 ): Promise<StockMetadata> => {
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
@@ -436,6 +465,36 @@ export const generateStockMetadata = async (
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
+
+  // Rules for keywords depending on keywordMode
+  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English.`;
+  let keywordRulePromptText = `1. Start with the most important descriptors first.
+2. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
+3. Prioritize highly searchable buyer terms.
+4. Avoid duplicates and keyword stuffing.
+5. Ensure no IP, brands, trademarks, or names are included.
+6. Every keyword/phrase must be strictly in lowercase.
+7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+
+  if (keywordMode === 'single') {
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces.`;
+    keywordRulePromptText = `1. Start with the most important descriptors first.
+2. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
+3. Prioritize highly searchable buyer terms.
+4. Avoid duplicates and keyword stuffing.
+5. Ensure no IP, brands, trademarks, or names are included.
+6. Every keyword must be strictly in lowercase.
+7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+  } else if (keywordMode === 'multi') {
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords.`;
+    keywordRulePromptText = `1. Start with the most important descriptors first.
+2. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords.
+3. Prioritize highly searchable buyer terms.
+4. Avoid duplicates and keyword stuffing.
+5. Ensure no IP, brands, trademarks, or names are included.
+6. Every keyword/phrase must be strictly in lowercase.
+7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+  }
 
   // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION ---
   let visualDescriptionText = "";
@@ -510,7 +569,12 @@ CONCEPTUAL DETAILS: Focuses on modern corporate, personal development, technolog
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a SINGLE WORD only. MUST strictly match the visual analysis.` 
+        description: `${keywordRuleSchemaDesc} Rules for Keywords:
+${keywordRulePromptText}
+
+Keyword Priority:
+- The first 10 keywords must describe the main subject.
+- Secondary and conceptual keywords should come afterward.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -589,11 +653,11 @@ Rules for Descriptions:
 3. Max 200 characters.
 
 Rules for Keywords:
-1. FORMULA & ORDER OF RELEVANCE: Keywords MUST follow this priority sequence: [Subject] + [Action] + [Commercial Concepts (Advert/Marketing)] + [Style] + [Environment].
-2. SINGLE WORDS: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
-3. LOWERCASE: Every keyword must be strictly in lowercase.
-4. Ensure no IP, brands, trademarks, or personal/celebrity names.
-5. No subjective words ("beautiful").
+${keywordRulePromptText}
+
+Keyword Priority:
+- The first 10 keywords must describe the main subject.
+- Secondary and conceptual keywords should come afterward.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list.
@@ -621,7 +685,7 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
 ${visualDescriptionText}
 === END SOURCE ===
 
-Task: Generate title, description, and exactly ${aiRequestCount} single-word keywords based ENTIRELY on the source text above.${customPrompt ? ` Be sure to strongly incorporate and prioritize these target keywords/themes in the output metadata: ${customPrompt}.` : ""} FOLLOW ALL COMPLIANCE RULES. TITLES MUST BE DESCRIPTIVE, LONG-TAIL (60-80 chars), NATURAL, AND SEO-OPTIMIZED.`,
+Task: Generate title, description, and exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases) based ENTIRELY on the source text above.${customPrompt ? ` Be sure to strongly incorporate and prioritize these target keywords/themes in the output metadata: ${customPrompt}.` : ""} FOLLOW ALL COMPLIANCE RULES. TITLES MUST BE DESCRIPTIVE, LONG-TAIL (60-80 chars), NATURAL, AND SEO-OPTIMIZED.`,
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: temperature ?? 0.1 }, // Lower temperature for stricter adherence
@@ -645,7 +709,7 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
       try {
         response = await getAIClient().models.generateContent({
           model: modelName,
-          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
+          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
           config: {
             systemInstruction,
             responseMimeType: "application/json",
@@ -671,7 +735,7 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
           console.log(`[generateStockMetadata] Retrying Stage 5 using pure text path for ${modelName}...`);
           response = await getAIClient().models.generateContent({
             model: modelName,
-            contents: { parts: [{ text: `Generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
+            contents: { parts: [{ text: `Generate the requested stock metadata in full compliance with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
             config: {
               systemInstruction,
               responseMimeType: "application/json",
@@ -705,21 +769,36 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
     
     // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (data.keywords && Array.isArray(data.keywords)) {
-      let strictSingleWords: string[] = [];
+      let cleanedKeywords: string[] = [];
       
       data.keywords.forEach((k: any) => {
         if (typeof k === 'string') {
-          const pieces = k.replace(/[-_]/g, ' ').split(/\s+/);
-          pieces.forEach(word => {
-            const cleanWord = word.toLowerCase().trim().replace(/[^a-z]/g, '');
-            if (cleanWord.length > 1) {
-              strictSingleWords.push(cleanWord);
+          const cleanPhrase = k.toLowerCase()
+                               .trim()
+                               .replace(/[^a-z0-9\s]/g, '')
+                               .replace(/\s+/g, ' ');
+          if (cleanPhrase.length > 1) {
+            if (keywordMode === 'single') {
+              // split any multi-word phrase into individual words
+              const pieces = cleanPhrase.split(/\s+/);
+              pieces.forEach(word => {
+                if (word.length > 1) {
+                  cleanedKeywords.push(word);
+                }
+              });
+            } else if (keywordMode === 'multi') {
+              // must contain at least one space to be a multi-word phrase
+              if (cleanPhrase.includes(' ')) {
+                cleanedKeywords.push(cleanPhrase);
+              }
+            } else {
+              cleanedKeywords.push(cleanPhrase);
             }
-          });
+          }
         }
       });
       
-      const uniqueKeywords = Array.from(new Set(strictSingleWords));
+      const uniqueKeywords = Array.from(new Set(cleanedKeywords));
       data.keywords = uniqueKeywords.slice(0, targetCount); // Selalu pas sesuai targetCount pengguna (misal: 40)
     }
 
@@ -763,7 +842,8 @@ export const generateBatchStockMetadata = async (
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
-  model?: string
+  model?: string,
+  keywordMode?: 'mixed' | 'single' | 'multi'
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
@@ -771,6 +851,36 @@ export const generateBatchStockMetadata = async (
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
   const aiRequestCount = targetCount + 10; 
+
+  // Rules for keywords depending on keywordMode for batch
+  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English.`;
+  let keywordRulePromptText = `1. Start with the most important descriptors first.
+2. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
+3. Prioritize highly searchable buyer terms.
+4. Avoid duplicates and keyword stuffing.
+5. Ensure no IP, brands, trademarks, or names are included.
+6. Every keyword/phrase must be strictly in lowercase.
+7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+
+  if (keywordMode === 'single') {
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces.`;
+    keywordRulePromptText = `1. Start with the most important descriptors first.
+2. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
+3. Prioritize highly searchable buyer terms.
+4. Avoid duplicates and keyword stuffing.
+5. Ensure no IP, brands, trademarks, or names are included.
+6. Every keyword must be strictly in lowercase.
+7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+  } else if (keywordMode === 'multi') {
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords.`;
+    keywordRulePromptText = `1. Start with the most important descriptors first.
+2. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords.
+3. Prioritize highly searchable buyer terms.
+4. Avoid duplicates and keyword stuffing.
+5. Ensure no IP, brands, trademarks, or names are included.
+6. Every keyword/phrase must be strictly in lowercase.
+7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+  }
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -845,7 +955,12 @@ CONCEPTUAL DETAILS: Focuses on modern corporate, personal development, technolog
       keywords: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: `List of exactly ${aiRequestCount} high-volume keywords in English. Every keyword MUST be a SINGLE WORD only. MUST strictly match the visual analysis.` 
+        description: `${keywordRuleSchemaDesc} Rules for Keywords:
+${keywordRulePromptText}
+
+Keyword Priority:
+- The first 10 keywords must describe the main subject.
+- Secondary and conceptual keywords should come afterward.` 
       },
       category_id: { 
         type: Type.INTEGER, 
@@ -945,11 +1060,11 @@ Rules for Descriptions:
 3. Max 200 characters.
 
 Rules for Keywords:
-1. FORMULA & ORDER OF RELEVANCE: Keywords MUST follow this priority sequence: [Subject] + [Action] + [Commercial Concepts (Advert/Marketing)] + [Style] + [Environment].
-2. SINGLE WORDS: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
-3. LOWERCASE: Every keyword must be strictly in lowercase.
-4. Ensure no IP, brands, trademarks, or personal/celebrity names.
-5. No subjective words ("beautiful").
+${keywordRulePromptText}
+
+Keyword Priority:
+- The first 10 keywords must describe the main subject.
+- Secondary and conceptual keywords should come afterward.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list.
@@ -995,7 +1110,7 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
         parts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
         item.frames.forEach(f => parts.push(processFrameServer(f)));
     }
-    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
+    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
 
     let modelsToTry = (model && (model.startsWith('gemini-') || model.startsWith('gemma-'))) 
         ? [model, 'gemini-3.1-flash-lite', 'gemini-3-flash'] 
@@ -1035,7 +1150,7 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
           for (let index = 0; index < items.length; index++) {
               textOnlyParts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
           }
-          textOnlyParts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
+          textOnlyParts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
 
           response = await getAIClient().models.generateContent({
             model: modelName,
@@ -1072,19 +1187,34 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
     return dataArray.map((metadata, index) => {
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (metadata.keywords && Array.isArray(metadata.keywords)) {
-            let strictSingleWords: string[] = [];
+            let cleanedKeywords: string[] = [];
             metadata.keywords.forEach((k: any) => {
                 if (typeof k === 'string') {
-                    const pieces = k.replace(/[-_]/g, ' ').split(/\s+/);
-                    pieces.forEach(word => {
-                        const cleanWord = word.toLowerCase().trim().replace(/[^a-z]/g, '');
-                        if (cleanWord.length > 1) {
-                            strictSingleWords.push(cleanWord);
+                    const cleanPhrase = k.toLowerCase()
+                                         .trim()
+                                         .replace(/[^a-z0-9\s]/g, '')
+                                         .replace(/\s+/g, ' ');
+                    if (cleanPhrase.length > 1) {
+                        if (keywordMode === 'single') {
+                            // split any multi-word phrase into individual words
+                            const pieces = cleanPhrase.split(/\s+/);
+                            pieces.forEach(word => {
+                                if (word.length > 1) {
+                                    cleanedKeywords.push(word);
+                                }
+                            });
+                        } else if (keywordMode === 'multi') {
+                            // must contain at least one space to be a multi-word phrase
+                            if (cleanPhrase.includes(' ')) {
+                                cleanedKeywords.push(cleanPhrase);
+                            }
+                        } else {
+                            cleanedKeywords.push(cleanPhrase);
                         }
-                    });
+                    }
                 }
             });
-            const uniqueKeywords = Array.from(new Set(strictSingleWords));
+            const uniqueKeywords = Array.from(new Set(cleanedKeywords));
             metadata.keywords = uniqueKeywords.slice(0, targetCount);
         }
 
