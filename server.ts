@@ -514,17 +514,21 @@ app.get('/api/debug-uploads', (req, res) => {
         const provider = (store && store.provider) || 'gemini';
         if (provider === 'groq') return 'Groq';
         if (provider === 'mistral') return 'Mistral';
+        if (provider === 'openai') return 'OpenAI';
+        if (provider === 'openrouter') return 'OpenRouter';
+        if (provider === 'blackbox') return 'Blackbox AI';
+        if (provider === 'nvidia') return 'NVIDIA';
         return 'Gemini';
     };
 
     app.post('/api/generate-metadata', async (req, res) => {
         try {
-            const { frames, keywordCount, customPrompt, toolType, temperature } = req.body;
+            const { frames, keywordCount, customPrompt, toolType, temperature, model } = req.body;
             if (!frames || !Array.isArray(frames)) {
                 return res.status(400).json({ error: 'Missing or invalid frames' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal);
+            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model);
             res.json(metadata);
         } catch (e: any) {
             console.error('Server generate-metadata error:', e);
@@ -538,12 +542,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-batch-metadata', async (req, res) => {
         try {
-            const { items, keywordCount, customPrompt, toolType, temperature } = req.body;
+            const { items, keywordCount, customPrompt, toolType, temperature, model } = req.body;
             if (!items || !Array.isArray(items)) {
                 return res.status(400).json({ error: 'Missing or invalid items' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal);
+            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model);
             res.json(batchMetadata);
         } catch (e: any) {
             console.error('Server generate-batch-metadata error:', e);

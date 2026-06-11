@@ -1128,6 +1128,8 @@ const App: React.FC = () => {
   const [blackboxKeysList, setBlackboxKeysList] = useState<string[]>([]);
   const [nvidiaKeysList, setNvidiaKeysList] = useState<string[]>([]);
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<'stepfun_step35_flash'>('stepfun_step35_flash');
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
+  const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
 
   const [newGeminiKey, setNewGeminiKey] = useState('');
   const [newGroqKey, setNewGroqKey] = useState('');
@@ -1779,7 +1781,13 @@ const App: React.FC = () => {
 
             try {
               const kCount = keywordCount || 25;
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity);
+              let modelParam: string | undefined = undefined;
+              if (selectedProvider === 'gemini') {
+                  modelParam = selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel;
+              } else if (selectedProvider === 'groq') {
+                  modelParam = selectedGroqModel;
+              }
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -1898,7 +1906,13 @@ const App: React.FC = () => {
             if (stopGenerationRef.current) return false;
             try {
                 const kCount = keywordCount || 25;
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity);
+                let modelParam: string | undefined = undefined;
+                if (selectedProvider === 'gemini') {
+                    modelParam = selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel;
+                } else if (selectedProvider === 'groq') {
+                    modelParam = selectedGroqModel;
+                }
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -2665,6 +2679,25 @@ const App: React.FC = () => {
             <div className="space-y-4 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
               {activeSettingsTab === 'gemini' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
+                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Pilih Model Gemini</label>
+                    <select
+                      value={selectedGeminiModel}
+                      onChange={(e) => {
+                          const val = e.target.value as any;
+                          setSelectedGeminiModel(val);
+                          localStorage.setItem('mz_gemini_model', val);
+                      }}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                    >
+                      <option value="auto">Automatic (Auto-Select Reliable)</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                      <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                      <option value="gemini-3-flash">Gemini 3 Flash</option>
+                      <option value="gemma-4-31b-it">Gemma 4 31B IT (Free RPD 1.5K)</option>
+                    </select>
+                  </div>
+                  
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
                     Anda dapat menyimpan beberapa API Key Gemini pribadi. Sistem secara cerdas melakukan rotasi otomatis demi menghindari hambatan kuota (*rate limit / RESOURCE_EXHAUSTED*).
                   </p>
@@ -3126,8 +3159,24 @@ const App: React.FC = () => {
               {activeSettingsTab === 'groq' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
-                    Masukkan API Key Groq Anda. Model Groq (<code className="font-mono text-[10px]">llama-3.3-70b-versatile</code>) digunakan untuk memproses teks, visual, dan pembuatan prompt yang sangat cepat dan akurat.
+                    Masukkan API Key Groq Anda. Gunakan model tercepat untuk pemrosesan metadata.
                   </p>
+
+                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Pilih Model Groq</label>
+                    <select
+                      value={selectedGroqModel}
+                      onChange={(e) => {
+                          const val = e.target.value as any;
+                          setSelectedGroqModel(val);
+                          localStorage.setItem('mz_groq_model', val);
+                      }}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                    >
+                      <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
+                      <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B Instruct</option>
+                    </select>
+                  </div>
 
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Groq ({groqKeysList.length})</label>

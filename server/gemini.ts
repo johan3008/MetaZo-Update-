@@ -9,33 +9,104 @@ export const apiKeyStorage = new AsyncLocalStorage<any>();
 // Initialize lazy backend Google GenAI SDK.
 let aiClient: GoogleGenAI | null = null;
 
+const PROVIDER_ENDPOINTS: Record<string, string> = {
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+  mistral: 'https://api.mistral.ai/v1/chat/completions',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+  blackbox: 'https://api.blackbox.ai/v1/chat/completions',
+  nvidia: 'https://integrate.api.nvidia.com/v1/chat/completions',
+};
+
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  groq: 'meta-llama/llama-4-scout-17b-16e-instruct',
+  mistral: 'pixtral-12b',
+  openai: 'gpt-4o-mini',
+  openrouter: 'google/gemini-2.0-flash-001',
+  blackbox: 'blackboxai',
+  nvidia: 'meta/llama-3.2-90b-vision-instruct',
+};
+
+const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
+  groq: 'llama-3.3-70b-versatile',
+  mistral: 'mistral-large-latest',
+  openai: 'gpt-4o',
+  openrouter: 'anthropic/claude-3.5-haiku',
+  blackbox: 'blackboxai-pro',
+  nvidia: 'meta/llama-3.2-11b-vision-instruct',
+};
+
+// Provider yang reliable mendukung response_format: json_object
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter']);
+
+const PROVIDER_ENV_KEYS: Record<string, string> = {
+  groq: 'GROQ_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  blackbox: 'BLACKBOX_API_KEY',
+  nvidia: 'NVIDIA_API_KEY',
+};
+
+const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia']);
+
+/**
+ * Ekstrak JSON yang valid dari teks response, toleran terhadap:
+ * - markdown code fences (```json ... ```)
+ * - teks pengantar/penutup di luar JSON
+ * - whitespace ekstra
+ */
+function extractJSON(raw: string): string {
+  let cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+
+  const firstBraceIdx = cleaned.indexOf('{');
+  const firstBracketIdx = cleaned.indexOf('[');
+
+  let start = -1;
+  if (firstBraceIdx === -1) start = firstBracketIdx;
+  else if (firstBracketIdx === -1) start = firstBraceIdx;
+  else start = Math.min(firstBraceIdx, firstBracketIdx);
+
+  const lastBraceIdx = cleaned.lastIndexOf('}');
+  const lastBracketIdx = cleaned.lastIndexOf(']');
+  const end = Math.max(lastBraceIdx, lastBracketIdx);
+
+  if (start !== -1 && end !== -1 && end > start) {
+    cleaned = cleaned.slice(start, end + 1);
+  }
+
+  return cleaned.trim();
+}
+
 async function callOpenAICompatibleWithRetry(params: {
   systemInstruction?: string;
   contents: any;
   responseMimeType?: string;
   responseSchema?: any;
   config?: any;
+  model?: string;
 }): Promise<string> {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  
-  if (provider !== 'groq' && provider !== 'mistral') {
+
+  if (!PROVIDER_ENDPOINTS[provider]) {
     throw new Error(`Unsupported provider: ${provider}`);
   }
 
+  const endpoint = PROVIDER_ENDPOINTS[provider];
   const providerState = store?.[provider];
-  const keysList = (providerState && providerState.keys) || [];
+  const keysList: string[] = (providerState && providerState.keys) || [];
   const maxRotationAttempts = keysList.length > 0 ? keysList.length : 1;
   let lastErr: any;
 
   for (let rot = 0; rot < maxRotationAttempts; rot++) {
     let apiKey = '';
-    
+
     if (keysList.length > 0) {
       const activeIdx = providerState.activeIndex || 0;
       apiKey = keysList[activeIdx];
     } else {
-      apiKey = provider === 'groq' ? (process.env.GROQ_API_KEY || '') : (process.env.MISTRAL_API_KEY || '');
+      apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || '';
     }
 
     if (!apiKey) {
@@ -84,15 +155,17 @@ async function callOpenAICompatibleWithRetry(params: {
       content: contentParts.length === 1 && contentParts[0].type === 'text' ? contentParts[0].text : contentParts
     });
 
-    let model = '';
-    let endpoint = '';
-    if (provider === 'groq') {
-      endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      // FIX: Set Llama 4 Scout as the primary model
+    let model = params.model || PROVIDER_DEFAULT_MODELS[provider];
+
+    // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
+    // (artinya caller belum sempat resolve), pakai default provider ini.
+    if (model?.startsWith('gemini-') || model?.startsWith('gemma-')) {
+      model = PROVIDER_DEFAULT_MODELS[provider];
+    }
+
+    // Map the model 'llama-4-scout-17b-16e-instruct' to the exact name required by Groq
+    if (provider === 'groq' && model === 'llama-4-scout-17b-16e-instruct') {
       model = 'meta-llama/llama-4-scout-17b-16e-instruct';
-    } else {
-      endpoint = 'https://api.mistral.ai/v1/chat/completions';
-      model = hasImages ? 'pixtral-12b' : 'mistral-large-latest';
     }
 
     const payload: any = {
@@ -101,17 +174,20 @@ async function callOpenAICompatibleWithRetry(params: {
       temperature: params.config?.temperature ?? 0.85,
     };
 
-    if (provider === 'groq') {
+    if (SUPPORTS_JSON_MODE.has(provider)) {
       payload.response_format = { type: "json_object" };
+    }
+
+    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
       payload.max_tokens = 8192;
     }
 
     if (params.responseMimeType === 'application/json') {
-      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" and end exactly with the closing curly brace "}". DO NOT write any introductory or concluding text.';
+      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested) and end exactly with the matching closing character. DO NOT write any introductory or concluding text. DO NOT use markdown code blocks.';
       if (params.responseSchema) {
         schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
       }
-      
+
       const lastMessage = messages[messages.length - 1];
       if (lastMessage && lastMessage.role === 'user') {
         if (typeof lastMessage.content === 'string') {
@@ -124,19 +200,24 @@ async function callOpenAICompatibleWithRetry(params: {
       }
     }
 
-    const endpointOrigin = endpoint;
-    const modelOrigin = model;
-
     let tryCount = 0;
     while (tryCount < 2) {
       try {
         console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`,
+        };
+        // OpenRouter butuh header tambahan untuk identifikasi (opsional tapi disarankan)
+        if (provider === 'openrouter') {
+          headers['HTTP-Referer'] = process.env.APP_URL || 'http://localhost';
+          headers['X-Title'] = 'JohMeta';
+        }
+
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey.trim()}`
-          },
+          headers,
           body: JSON.stringify(payload)
         });
 
@@ -151,26 +232,36 @@ async function callOpenAICompatibleWithRetry(params: {
           throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
         }
         if (params.responseMimeType === 'application/json') {
-          answer = answer.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+          answer = extractJSON(answer);
         }
         return answer;
       } catch (err: any) {
         console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
         lastErr = err;
-        
-        // Fallback or retry if model fails
+
         const errorMsg = String(err.message || "").toLowerCase();
-        
-        // Handle common API issues or rate limits
+
         if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit')) {
           if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
             const prevIdx = providerState.activeIndex;
             providerState.activeIndex++;
             console.warn(`[Key Rotation - ${provider.toUpperCase()}] Rotating from Key index ${prevIdx} to ${providerState.activeIndex}`);
-            // Break the tryCount loop to let the outer key rotation loop take over
-            break; 
+            break;
           }
         }
+
+        // Automatic model fallback on failure (generic, semua provider)
+        if (tryCount === 0) {
+          tryCount++;
+          const fallback = PROVIDER_FALLBACK_MODELS[provider];
+          if (fallback && fallback !== model) {
+            model = fallback;
+            console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model} (retry 1/2)`);
+            payload.model = model;
+            continue;
+          }
+        }
+
         throw err;
       }
     }
@@ -185,9 +276,9 @@ function getAIClient(): any {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
 
-        // ONLY redirect to Groq/Mistral if the model name is NOT explicitly a Gemini model.
+        // ONLY redirect to Groq/Mistral/OpenAI/etc if the model name is NOT explicitly a Gemini / Gemma model.
         // This allows hybrid vision tasks (which explicitly request gemini-3.1-flash-lite) to work.
-        if ((provider === 'groq' || provider === 'mistral') && !params.model?.startsWith('gemini-')) {
+        if (NON_GEMINI_PROVIDERS.has(provider) && !params.model?.startsWith('gemini-') && !params.model?.startsWith('gemma-')) {
           const text = await callOpenAICompatibleWithRetry({
             systemInstruction: params.config?.systemInstruction,
             contents: params.contents,
@@ -331,7 +422,8 @@ export const generateStockMetadata = async (
   keywordCount: number | string,
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
-  temperature?: number
+  temperature?: number,
+  model?: string
 ): Promise<StockMetadata> => {
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
@@ -342,8 +434,8 @@ export const generateStockMetadata = async (
   const imageParts = frames.map(frame => processFrameServer(frame));
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 40;
-  const aiRequestCount = targetCount + 5; // Buffer +5 agar array tetap gemuk setelah deduplikasi
+  const targetCount = parseInt(String(keywordCount), 10) || 60;
+  const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
   // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION ---
   let visualDescriptionText = "";
@@ -357,20 +449,24 @@ export const generateStockMetadata = async (
     mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility.";
   }
 
+  // Choose model for vision analysis, defaulting to gemini-3.1-flash-lite as before (must be a valid gemini model)
+  const visionModelToUse = (model && model.startsWith('gemini-')) ? model : 'gemini-3.1-flash-lite';
+  
   // UPGRADE: Menyuruh Gemini mengekstrak data fisik SEKALIGUS esensi abstrak/mood secara akurat
   const visionSystemInstruction = `You are an expert creative director and computer vision engine.
 Asset Context: ${mediaTypeContext}
+Target Keywords/Themes to incorporate: ${customPrompt || "None"}
 
 Your task is to look at the provided image(s) and write an exhaustive, two-part analysis for a stock metadata specialist:
 
-1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with maximum physical accuracy. Do not make up objects.
-2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
+1. LITERAL DETAILS: STRICTLY describe ALL visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with MAXIMUM PHYSICAL ACCURACY. DO NOT HALLUCINATE OR GUESS. If you cannot identify a subject with absolute certainty, DO NOT name it; describe its shape/form instead.
+2. CONCEPTUAL DETAILS: ONLY AFTER complete literal description, analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
 
-DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly and with complete factual accuracy.`;
+DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly, rigorously, and with complete factual accuracy based ONLY on what is undoubtedly visible.`;
 
   try {
-    const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-      parts: [...imageParts, { text: "Analyze this visual asset in absolute literal, conceptual, and storyline details for a stock metadata specialist." }] 
+    const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
+      parts: [...imageParts, { text: `Analyze this visual asset in absolute literal, conceptual, and storyline details for a stock metadata specialist.${customPrompt ? ` Be sure to analyze how these user-requested target keywords/themes relate to or are represented in the asset to ensure they are explicitly included: ${customPrompt}` : ""}` }] 
     }, {
       systemInstruction: visionSystemInstruction,
       temperature: 0.35,
@@ -396,6 +492,8 @@ LITERAL DETAILS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Fe
 CONCEPTUAL DETAILS: Focuses on modern corporate, personal development, technology, lifestyle, and business use-cases. Evokes themes of productivity, professionalism, success, growth, optimistic future, and genuine human connection. Ideal for website heroes, digital banners, commercial advertisements, and high-end editorial content.
 `;
   }
+  
+  // ... (rest of the function omitted for brevity in thought, will replace fully)
 
   // --- TAHAP 2: DEFINISI SKEMA OUTPUT METADATA (MENGGUNAKAN BUFFER) ---
   const responseSchema = {
@@ -431,8 +529,11 @@ CONCEPTUAL DETAILS: Focuses on modern corporate, personal development, technolog
   };
 
   // --- TAHAP 3: KONDISIONAL MEDIA CONTEXT ---
-  const mediaContext = `The asset has been thoroughly and accurately analyzed by an advanced vision model. Build your metadata strictly by blending the physical facts, dynamic flow/storyline, and abstract ideas from this vision text (DO NOT introduce any subjects or surroundings not described here):
-=== BEGIN VISUAL & CONCEPTUAL DESCRIPTION ===
+  const mediaContext = `The asset has been thoroughly and accurately analyzed by an advanced vision model. Build your metadata strictly by blending the physical facts, dynamic flow/storyline, and abstract ideas from this vision text (DO NOT introduce any subjects or surroundings not described here).
+
+  OPTIONAL TARGET KEYWORDS/THEMES TO INCORPORATE: ${customPrompt || "None (Focus on physical facts)."}
+
+  === BEGIN VISUAL & CONCEPTUAL DESCRIPTION ===
 ${visualDescriptionText}
 === END VISUAL & CONCEPTUAL DESCRIPTION ===
 
@@ -450,12 +551,21 @@ OUTPUT MUST BE 100% IN ENGLISH for titles, keywords, and descriptions.${groqOpti
 
 ${mediaContext}
 
-CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
-3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
-5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
+[STRICT ANTI-HALLUCINATION & GROUNDING RULES]
+1. SOURCE OF TRUTH LOCK: Title, description, dan keywords HARUS 100% bersumber dari teks "VISUAL & CONCEPTUAL DESCRIPTION" yang diberikan. DILARANG menambahkan objek, warna, lokasi, aktivitas, emosi, atau konsep yang TIDAK disebutkan secara eksplisit maupun tersirat kuat di dalam deskripsi tersebut.
+2. NO GENERIC FILLER SUBJECTS: Jangan menambahkan kata seperti "people", "business", "technology", "nature" dsb hanya untuk basa-basi jika subjek tersebut tidak ada di deskripsi visual.
+3. UNCERTAINTY = OMIT: Jika deskripsi visual menyebut sesuatu secara samar atau tidak yakin, JANGAN dipaksakan jadi keyword utama. Lebih baik gunakan istilah yang lebih umum/aman daripada menebak.
+4. CONCEPTUAL VS LITERAL BALANCE: Keyword literal (objek, warna, aksi yang benar-benar terlihat) harus mendominasi posisi 1-10. Keyword konseptual/mood/industri (dari bagian CONCEPTUAL DETAILS) hanya diisi jika benar-benar relevan dan disebutkan.
+5. NO CONTRADICTORY KEYWORDS: Jika title/description menyebut adanya subjek manusia (orang, profesi, karakter), DILARANG MUTLAK menambahkan keyword seperti "no people", "nobody", "no person", "empty", "vacant" — kecuali deskripsi visual eksplisit menyatakan TIDAK ADA manusia di frame.
+6. TARGET KEYWORDS / USER PREFERENCES: Jika pengguna menentukan Target Keywords/Themes to incorporate (di bawah "User custom preference"), Anda WAJIB menggabungkan kata kunci atau tema tersebut ke dalam metadata (keywords, title, atau description) selama tidak bertentangan secara ekstrem dengan fakta fisik pada aset visual tersebut. Instruksi eksplisit dari pengguna ini memiliki prioritas sangat tinggi dalam pembentukan daftar kata kunci.
+
+[NATURAL LANGUAGE & SEARCH INTENT RULES — TITLE]
+1. Tulis title seperti cara ORANG AWAM/BUYER mencari gambar di Adobe Stock atau Shutterstock — bukan seperti laporan ilmiah, bukan seperti caption Instagram, dan bukan seperti deskripsi teknis fotografi.
+2. Gunakan struktur kalimat alami: [Subjek] + [sedang melakukan apa] + [di mana/konteks] + [untuk apa/industri terkait].
+   Contoh BENAR: "Woman drinking coffee while working on laptop in cozy home office"
+   Contoh SALAH (terlalu kaku/ilmiah): "Subject depicting a female individual consuming caffeinated beverage during remote occupational activity"
+3. Hindari kata-kata kaku/robotic seperti: "depicting", "individual", "subject matter", "represents", "showcasing", "illustrating the concept of".
+4. Title harus terasa seperti SEARCH QUERY yang manusiawi — kombinasi kata benda + kata kerja + konteks, bukan rangkaian istilah teknis.
 
 [STRICT MICROSTOCK OPTIMIZATION RULES]
 1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element + Industrial Sector within 60-80 characters.
@@ -502,19 +612,20 @@ User custom preference: ${customPrompt || "Follow standard best practices."}`;
   let response;
   let lastError;
 
-  if (provider === 'groq' || provider === 'mistral') {
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
     try {
       const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Analyze the following visual analysis text and generate a strict matching stock metadata JSON. 
+        contents: `Perform a Smart AI Analysis on the following visual description text to generate a highly relevant, descriptive, and effective stock metadata JSON. 
 === SOURCE VISUAL ANALYSIS ===
 ${visualDescriptionText}
 === END SOURCE ===
 
-Task: Generate title, description, and exactly ${aiRequestCount} single-word keywords based ENTIRELY on the source text above. COMPLIANCE IS MANDATORY. TITLES MUST BE DESCRIPTIVE AND 50-200 CHARACTERS LONG.`,
+Task: Generate title, description, and exactly ${aiRequestCount} single-word keywords based ENTIRELY on the source text above.${customPrompt ? ` Be sure to strongly incorporate and prioritize these target keywords/themes in the output metadata: ${customPrompt}.` : ""} FOLLOW ALL COMPLIANCE RULES. TITLES MUST BE DESCRIPTIVE, LONG-TAIL (60-80 chars), NATURAL, AND SEO-OPTIMIZED.`,
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: temperature ?? 0.1 } // Lower temperature for stricter adherence
+        config: { temperature: temperature ?? 0.1 }, // Lower temperature for stricter adherence
+        model
       });
       response = { text: answerText };
     } catch (err) {
@@ -523,12 +634,18 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
     }
   } else {
     // Jalur Sinkronisasi Gemini Tradisional (Multimodal + Pre-analisis)
-    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    let modelsToTry = (model && (model.startsWith('gemini-') || model.startsWith('gemma-'))) 
+        ? [model, 'gemini-3.1-flash-lite', 'gemini-3-flash'] 
+        : ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    
+    // Deduplicate
+    modelsToTry = Array.from(new Set(modelsToTry));
+    
     for (const modelName of modelsToTry) {
       try {
         response = await getAIClient().models.generateContent({
           model: modelName,
-          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}` }] },
+          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
           config: {
             systemInstruction,
             responseMimeType: "application/json",
@@ -543,6 +660,7 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
             ]
           }
         });
+        console.log(`[generateStockMetadata] Successfully generated metadata with model: ${modelName}`);
         break;
       } catch (err: any) {
         lastError = err;
@@ -553,7 +671,7 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
           console.log(`[generateStockMetadata] Retrying Stage 5 using pure text path for ${modelName}...`);
           response = await getAIClient().models.generateContent({
             model: modelName,
-            contents: { parts: [{ text: `Generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}` }] },
+            contents: { parts: [{ text: `Generate the requested stock metadata in full compliance with exactly ${aiRequestCount} single-word keywords. Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
             config: {
               systemInstruction,
               responseMimeType: "application/json",
@@ -568,6 +686,7 @@ Task: Generate title, description, and exactly ${aiRequestCount} single-word key
               ]
             }
           });
+          console.log(`[generateStockMetadata] Successfully generated metadata with text-only fallback on model: ${modelName}`);
           break;
         } catch (retryErr: any) {
           lastError = retryErr;
@@ -643,14 +762,15 @@ export const generateBatchStockMetadata = async (
   keywordCount: number | string,
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
-  temperature?: number
+  temperature?: number,
+  model?: string
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 40;
-  const aiRequestCount = targetCount + 5; 
+  const targetCount = parseInt(String(keywordCount), 10) || 60;
+  const aiRequestCount = targetCount + 10; 
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -671,17 +791,18 @@ export const generateBatchStockMetadata = async (
 
       const visionSystemInstruction = `You are an expert creative director and computer vision engine.
 Asset Context: ${mediaTypeContext}
+Target Keywords/Themes to incorporate: ${customPrompt || "None"}
 
 Your task is to look at the provided image(s) (Asset #${i + 1}) and write an exhaustive, two-part analysis for a stock metadata specialist:
 
-1. LITERAL DETAILS: Describe all visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with maximum physical accuracy. Do not make up objects.
-2. CONCEPTUAL DETAILS: Analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
+1. LITERAL DETAILS: STRICTLY describe ALL visible subjects, their movements/actions, explicit colors, textures, lighting style, framing, and background elements with MAXIMUM PHYSICAL ACCURACY. DO NOT HALLUCINATE OR GUESS. If you cannot identify a subject with absolute certainty, DO NOT name it; describe its shape/form instead.
+2. CONCEPTUAL DETAILS: ONLY AFTER complete literal description, analyze the underlying abstract themes, psychological moods, emotional tones, symbolism, storyline/flow (alur), and specific commercial industries or business use-cases this asset targets.
 
-DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly and with complete factual accuracy.`;
+DO NOT generate a title, DO NOT list keywords, and DO NOT format as JSON. Output raw descriptive text paragraphs covering both aspects thoroughly, rigorously, and with complete factual accuracy based ONLY on what is undoubtedly visible.`;
       
       try {
           const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-            parts: [...imageParts, { text: "Analyze this visual asset in absolute literal, conceptual, and storyline details for stock metadata generation." }] 
+            parts: [...imageParts, { text: `Analyze this visual asset in absolute literal, conceptual, and storyline details for stock metadata generation.${customPrompt ? ` Be sure to analyze how these user-requested target keywords/themes relate to or are represented in this asset to ensure they are explicitly included: ${customPrompt}` : ""}` }] 
           }, {
             systemInstruction: visionSystemInstruction,
             temperature: 0.35,
@@ -766,18 +887,47 @@ CRITICAL ARRAY ORDER RULES:
 
 ${mediaContext}
 
-CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
-3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
-5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
+[STRICT ANTI-HALLUCINATION & GROUNDING RULES]
+1. SOURCE OF TRUTH LOCK: Title, description, dan keywords HARUS 100% bersumber dari teks "VISUAL & CONCEPTUAL DESCRIPTION" yang diberikan. DILARANG menambahkan objek, warna, lokasi, aktivitas, emosi, atau konsep yang TIDAK disebutkan secara eksplisit maupun tersirat kuat di dalam deskripsi tersebut.
+2. NO GENERIC FILLER SUBJECTS: Jangan menambahkan kata seperti "people", "business", "technology", "nature" dsb hanya untuk basa-basi jika subjek tersebut tidak ada di deskripsi visual.
+3. UNCERTAINTY = OMIT: Jika deskripsi visual menyebut sesuatu secara samar atau tidak yakin, JANGAN dipaksakan jadi keyword utama. Lebih baik gunakan istilah yang lebih umum/aman daripada menebak.
+4. CONCEPTUAL VS LITERAL BALANCE: Keyword literal (objek, warna, aksi yang benar-benar terlihat) harus mendominasi posisi 1-10. Keyword konseptual/mood/industri (dari bagian CONCEPTUAL DETAILS) hanya diisi jika benar-benar relevan dan disebutkan.
+5. NO CONTRADICTORY KEYWORDS: Jika title/description menyebut adanya subjek manusia (orang, profesi, karakter), DILARANG MUTLAK menambahkan keyword seperti "no people", "nobody", "no person", "empty", "vacant" — kecuali deskripsi visual eksplisit menyatakan TIDAK ADA manusia di frame.
+6. TARGET KEYWORDS / USER PREFERENCES: Jika pengguna menentukan Target Keywords/Themes to incorporate (di bawah "User Custom Prompt"), Anda WAJIB menggabungkan kata kunci atau tema tersebut ke dalam metadata (keywords, title, atau description) selama tidak bertentangan secara ekstrem dengan fakta fisik pada aset visual tersebut. Instruksi eksplisit dari pengguna ini memiliki prioritas sangat tinggi dalam pembentukan daftar kata kunci.
+
+[NATURAL LANGUAGE & SEARCH INTENT RULES — TITLE]
+1. Tulis title seperti cara ORANG AWAM/BUYER mencari gambar di Adobe Stock atau Shutterstock — bukan seperti laporan ilmiah, bukan seperti caption Instagram, dan bukan seperti deskripsi teknis fotografi.
+2. Gunakan struktur kalimat alami: [Subjek] + [sedang melakukan apa] + [di mana/konteks] + [untuk apa/industri terkait].
+   Contoh BENAR: "Woman drinking coffee while working on laptop in cozy home office"
+   Contoh SALAH (terlalu kaku/ilmiah): "Subject depicting a female individual consuming caffeinated beverage during remote occupational activity"
+3. Hindari kata-kata kaku/robotic seperti: "depicting", "individual", "subject matter", "represents", "showcasing", "illustrating the concept of".
+4. Title harus terasa seperti SEARCH QUERY yang manusiawi — kombinasi kata benda + kata kerja + konteks, bukan rangkaian istilah teknis.
 
 [STRICT MICROSTOCK OPTIMIZATION RULES]
 1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element + Industrial Sector within 60-80 characters.
 2. FRONT-LOADING KEYWORDS: You MUST place the most descriptive, literal, and crucial keywords within the first 7 positions of the keyword list.
 3. COMMERCIAL KEYWORDS: Include MINIMUM 5 keywords related to advertising, marketing, social media campaigns, or commercial business concepts relevant to the asset.
 4. ANTI-WASTE: DO NOT include overly broad keywords or irrelevant terms simply to achieve quantity.
+5. NATURAL SEO: Craft titles and descriptions that read naturally to humans, avoiding keyword stuffing, filler, or robotic language. Use conversational but professional language that would genuinely resonate with a buyer searching for commercial content.
+
+[NATURAL LANGUAGE & SEARCH INTENT RULES — KEYWORDS]
+1. Setiap keyword harus mewakili SATU search intent nyata yang benar-benar dipakai buyer di search bar (bukan istilah akademis/jargon).
+   Hindari: "anthropomorphic", "chromatic", "compositional", "juxtaposition", "aesthetic", "ambiance" (kecuali kata umum seperti "mood").
+   Gunakan: kata-kata umum sehari-hari yang relevan dengan industri (misal: "office", "remote", "morning", "laptop", "coffee", "relax", "productivity").
+2. PRIORITAS URUTAN KEYWORD (WAJIB DIIKUTI):
+   - Posisi 1-7: Subjek utama + aksi paling jelas terlihat (literal, paling sering dicari).
+   - Posisi 8-15: Konteks lingkungan/setting yang benar-benar terlihat.
+   - Posisi 16-25: Konsep komersial/industri (marketing, advertising, business, lifestyle, dll — HANYA jika sesuai konteks deskripsi).
+   - Sisanya: Mood/emosi/tema konseptual yang didukung oleh bagian CONCEPTUAL DETAILS.
+3. SINONIM BERGUNA, BUKAN DUPLIKAT KOSONG: Boleh menambahkan sinonim umum yang dicari buyer (misal "phone" dan "smartphone", "outside" dan "outdoor") SELAMA keduanya relevan dan dicari secara terpisah — tapi jangan membuat variasi tak berguna hanya untuk mengejar jumlah.
+4. DILARANG KEYWORD STUFFING TIDAK RELEVAN: Setiap keyword harus bisa dijawab dengan "ya" untuk pertanyaan: "Apakah ada buyer yang akan mencari gambar/video INI menggunakan kata ini?" Jika jawabannya tidak yakin, buang.
+
+[CONSISTENCY CHECK SEBELUM OUTPUT]
+Sebelum finalisasi, lakukan validasi internal:
+- Apakah title HANYA menyebut hal yang ada di deskripsi visual? Jika ada kata yang tidak didukung deskripsi, ganti/hapus.
+- Apakah 7 keyword pertama benar-benar literal dan sesuai gambar?
+- Apakah ada keyword yang terdengar seperti istilah laporan/ilmiah? Jika ya, ganti dengan padanan kata sehari-hari.
+- Apakah description konsisten dengan title and keyword (tidak menyebut hal berbeda)?
 
 [ADOBE STOCK COMPLIANCE RULES]
 Rules for Titles:
@@ -818,19 +968,20 @@ User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}
   let response;
   let lastError;
 
-  if (provider === 'groq' || provider === 'mistral') {
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
     try {
       const answerText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Analyze the provided visual descriptions and generate a JSON array of exactly ${items.length} metadata objects.
+        contents: `Perform a Smart AI Analysis on the provided visual descriptions to generate a highly relevant, descriptive, and effective stock metadata JSON array of exactly ${items.length} metadata objects.
 === SOURCE ASSET DESCRIPTIONS ===
 ${visualDescriptions.join('\n\n')}
 === END SOURCE ===
 
-Task: For EACH asset described above, generate a compliant metadata object. Ensure titles and keywords are strictly derived from the specific description for that asset. COMPLIANCE IS MANDATORY. TITLES MUST BE DESCRIPTIVE AND 50-200 CHARACTERS LONG.`,
+Task: For EACH asset described above, generate a compliant metadata object. Ensure titles and keywords are strictly derived from the specific description for that asset.${customPrompt ? ` Be sure to strongly incorporate and prioritize these target keywords/themes in the output metadata for each asset where appropriate: ${customPrompt}.` : ""} FOLLOW ALL COMPLIANCE RULES. TITLES MUST BE DESCRIPTIVE, LONG-TAIL (60-80 chars), NATURAL, AND SEO-OPTIMIZED.`,
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: temperature ?? 0.1 }
+        config: { temperature: temperature ?? 0.1 },
+        model
       });
       response = { text: answerText };
     } catch (err) {
@@ -844,9 +995,15 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
         parts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
         item.frames.forEach(f => parts.push(processFrameServer(f)));
     }
-    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings). Ensure strict compliance with all SEO rules.` });
+    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
 
-    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    let modelsToTry = (model && (model.startsWith('gemini-') || model.startsWith('gemma-'))) 
+        ? [model, 'gemini-3.1-flash-lite', 'gemini-3-flash'] 
+        : ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    
+    // Deduplicate
+    modelsToTry = Array.from(new Set(modelsToTry));
+
     for (const modelName of modelsToTry) {
       try {
         response = await getAIClient().models.generateContent({
@@ -878,7 +1035,7 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
           for (let index = 0; index < items.length; index++) {
               textOnlyParts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
           }
-          textOnlyParts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings). Ensure strict compliance with all SEO rules.` });
+          textOnlyParts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} single-word keywords. Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
 
           response = await getAIClient().models.generateContent({
             model: modelName,
@@ -1196,7 +1353,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
   const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
-  if (provider === 'groq' || provider === 'mistral') {
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
     let attempts = 0;
     const maxAttempts = 2;
     while (attempts < maxAttempts) {

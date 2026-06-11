@@ -19,7 +19,8 @@ export const generateStockMetadata = async (
   keywordCount: number | string,
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
-  temperature?: number
+  temperature?: number,
+  model?: string
 ): Promise<StockMetadata> => {
   // Convert any blob: URLs into Base64 data URLs on the client side
   const base64Frames = await Promise.all(frames.map(ensureBase64));
@@ -27,7 +28,7 @@ export const generateStockMetadata = async (
   const response = await fetch('/api/generate-metadata', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType, temperature })
+    body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType, temperature, model })
   });
   
   if (!response.ok) {
@@ -42,7 +43,8 @@ export const generateBatchStockMetadata = async (
   keywordCount: number | string,
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
-  temperature?: number
+  temperature?: number,
+  model?: string
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   // Convert any blob: URLs to Base64 data URLs inside items
   const processedItems = await Promise.all(items.map(async (item) => {
@@ -53,7 +55,7 @@ export const generateBatchStockMetadata = async (
   const response = await fetch('/api/generate-batch-metadata', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType, temperature })
+    body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType, temperature, model })
   });
 
   if (!response.ok) {
