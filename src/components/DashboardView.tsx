@@ -197,12 +197,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>Trial Hari Ini</span>
-                    <span className={imageDailyCount >= 50 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/50 Aset</span>
+                    <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/30 Aset</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= 50 ? 'bg-red-550' : 'bg-[#4e73df]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 50) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= 30 ? 'bg-red-550' : 'bg-[#4e73df]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 30) * 100)}%` }} />
                   </div>
-                  {imageDailyCount >= 50 && (
+                  {imageDailyCount >= 30 && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
                   )}
                 </div>
@@ -239,12 +239,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>Trial Hari Ini</span>
-                    <span className={videoDailyCount >= 50 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/50 Aset</span>
+                    <span className={videoDailyCount >= 30 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/30 Aset</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${videoDailyCount >= 50 ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / 50) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${videoDailyCount >= 30 ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / 30) * 100)}%` }} />
                   </div>
-                  {videoDailyCount >= 50 && (
+                  {videoDailyCount >= 30 && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
                   )}
                 </div>
@@ -281,12 +281,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>Trial Hari Ini</span>
-                    <span className={vectorDailyCount >= 50 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/50 Aset</span>
+                    <span className={vectorDailyCount >= 30 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/30 Aset</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${vectorDailyCount >= 50 ? 'bg-red-550' : 'bg-emerald-555'}`} style={{ width: `${Math.min(100, (vectorDailyCount / 50) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${vectorDailyCount >= 30 ? 'bg-red-550' : 'bg-emerald-600'}`} style={{ width: `${Math.min(100, (vectorDailyCount / 30) * 100)}%` }} />
                   </div>
-                  {vectorDailyCount >= 50 && (
+                  {vectorDailyCount >= 30 && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
                   )}
                 </div>

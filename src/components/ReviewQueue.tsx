@@ -38,8 +38,8 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
   };
 
   const len = value.length;
-  const ratingText = len < 10 ? 'Too short' : len <= 70 ? 'Optimal' : 'Too long';
-  const ratingColor = len < 10 ? 'text-rose-500' : len <= 70 ? 'text-emerald-500' : 'text-amber-500';
+  const ratingText = len < 50 ? 'Too short' : len <= 200 ? 'Optimal' : 'Too long';
+  const ratingColor = len < 50 ? 'text-rose-500' : len <= 200 ? 'text-emerald-500' : 'text-amber-500';
 
   return (
     <div className="space-y-1">
@@ -251,6 +251,7 @@ interface ReviewQueueProps {
   setPreviewFile: (file: FileItem | null) => void;
   updateFiles: React.Dispatch<React.SetStateAction<FileItem[]>>;
   handleDeleteFile: (id: string) => void;
+  handleRegenerateFile?: (file: FileItem) => void;
   mobileTab: 'upload' | 'ai' | 'review';
   setMobileTab: (tab: 'upload' | 'ai' | 'review') => void;
   t: any;
@@ -269,6 +270,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   setPreviewFile,
   updateFiles,
   handleDeleteFile,
+  handleRegenerateFile,
   mobileTab,
   setMobileTab,
   t,
@@ -448,13 +450,25 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     </div>
                   )}
                 
-                <button 
-                  onClick={() => handleDeleteFile(file.id)}
-                  className="absolute top-4 right-4 p-1.5 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/15 text-slate-400 hover:text-red-500 rounded-lg transition-all border border-slate-200 dark:border-slate-700 hover:border-red-500/20 focus:outline-none z-10"
-                  title="Delete asset"
-                >
-                  <Trash2 size={12} />
-                </button>
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+                  {handleRegenerateFile && (
+                    <button
+                      onClick={() => handleRegenerateFile(file)}
+                      disabled={file.isGenerating || file.isExtracting}
+                      className="p-1.5 bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/15 text-slate-400 hover:text-blue-500 disabled:opacity-40 rounded-lg transition-all border border-slate-200 dark:border-slate-700 hover:border-blue-500/20 focus:outline-none cursor-pointer"
+                      title="Regenerate metadata for this asset"
+                    >
+                      <Sparkles size={12} className={file.isGenerating ? "animate-spin text-blue-500" : ""} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => handleDeleteFile(file.id)}
+                    className="p-1.5 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/15 text-slate-400 hover:text-red-500 rounded-lg transition-all border border-slate-200 dark:border-slate-700 hover:border-red-500/20 focus:outline-none"
+                    title="Delete asset"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
 
                 <div className="flex flex-col space-y-4">
                   <div className="flex items-start space-x-3">
@@ -593,6 +607,20 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                           </select>
                         </div>
                       </div>
+
+                      {/* REGENERATE METADATA BUTTON */}
+                      {handleRegenerateFile && (
+                        <div className="pt-2">
+                          <button
+                            onClick={() => handleRegenerateFile(file)}
+                            disabled={file.isGenerating || file.isExtracting}
+                            className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-[#1e3a8a] text-white text-[10px] font-black uppercase tracking-wider rounded-xl hover:from-blue-600 hover:to-blue-900 transition-all flex items-center justify-center space-x-2 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                          >
+                            <Sparkles size={13} className={file.isGenerating ? "animate-spin" : "animate-pulse"} />
+                            <span>{file.isGenerating ? "Menghasilkan..." : "Regenerate Metadata"}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

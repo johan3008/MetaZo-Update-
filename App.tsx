@@ -288,24 +288,20 @@ const CopyBox: React.FC<{
     let ratingColor = "bg-slate-300 dark:bg-slate-700";
     let ratingText = "";
     let ratingTextColor = "text-slate-400 dark:text-slate-500";
-    let percentage = Math.min(100, (count / 150) * 100);
+    let percentage = Math.min(100, (count / 200) * 100);
 
     if (count > 0) {
-        if (count >= 70 && count <= 120) {
+        if (count >= 50 && count <= 200) {
             ratingColor = "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]";
-            ratingText = "Ideal: 70-120 chars for optimal SEO indexing";
+            ratingText = "Ideal: 50-200 chars for optimal SEO indexing";
             ratingTextColor = "text-emerald-500 dark:text-emerald-400";
-        } else if (count > 150) {
+        } else if (count > 200) {
             ratingColor = "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]";
-            ratingText = "Too long! Exceeds 150 characters maximum";
+            ratingText = "Too long! Exceeds 200 characters maximum";
             ratingTextColor = "text-red-500 dark:text-red-400";
-        } else if (count > 120) {
-            ratingColor = "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]";
-            ratingText = "Acceptable range (within 70-150 character limit)";
-            ratingTextColor = "text-amber-500 dark:text-amber-400";
         } else {
             ratingColor = "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)]";
-            ratingText = "Short: consider 70+ chars to boost search index";
+            ratingText = "Short: consider 50+ chars to boost search index";
             ratingTextColor = "text-amber-500 dark:text-amber-450";
         }
     }
@@ -336,7 +332,7 @@ const CopyBox: React.FC<{
                 <div className="mt-1 px-1 space-y-1 animate-in fade-in duration-300">
                     <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-wider">
                         <span className={ratingTextColor}>{ratingText}</span>
-                        <span className="font-mono text-slate-500 dark:text-slate-400">{count} / 150 chars</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">{count} / 200 chars</span>
                     </div>
                     <div className="w-full h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                         <div className={`h-full ${ratingColor} transition-all duration-300`} style={{ width: `${percentage}%` }}></div>
@@ -879,6 +875,7 @@ const App: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [keywordCount, setKeywordCount] = useState<number | string>('');
+  const [aiCreativity, setAiCreativity] = useState<number>(0.7);
   const [generationMode, setGenerationMode] = useState<GenerationMode>(GenerationMode.STANDARD);
   const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
@@ -1747,7 +1744,7 @@ const App: React.FC = () => {
     try {
         if (!isMzLicensed) {
             const todayCount = getDailyCount(activeTool);
-            if (todayCount >= 50) {
+            if (todayCount >= 30) {
                 throw new Error("Batas Trial Terlampaui. Coba di esok hari.");
             }
         }
@@ -1775,7 +1772,7 @@ const App: React.FC = () => {
 
             try {
               const kCount = keywordCount || 25;
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -1836,7 +1833,7 @@ const App: React.FC = () => {
     try {
         if (!isMzLicensed) {
             const todayCount = getDailyCount(activeTool);
-            if (todayCount >= 50) {
+            if (todayCount >= 30) {
                 throw new Error("Batas Trial Terlampaui. Coba di esok hari.");
             }
         }
@@ -1869,7 +1866,7 @@ const App: React.FC = () => {
         let finalItemsToProcess = itemsToProcess;
         if (!isMzLicensed) {
             const todayCount = getDailyCount(activeTool);
-            const remaining = Math.max(0, 50 - todayCount);
+            const remaining = Math.max(0, 30 - todayCount);
             if (finalItemsToProcess.length > remaining) {
                 const allowed = finalItemsToProcess.slice(0, remaining);
                 const excluded = finalItemsToProcess.slice(remaining);
@@ -1892,7 +1889,7 @@ const App: React.FC = () => {
             if (stopGenerationRef.current) return false;
             try {
                 const kCount = keywordCount || 25;
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -1943,8 +1940,8 @@ const App: React.FC = () => {
   const handleGenerateAll = async (isRetry = false) => {
     if (!isMzLicensed) {
       const todayCount = getDailyCount(activeTool);
-      if (todayCount >= 50) {
-        alert("Coba di esok hari.\n\nBatas gratis harian (50 aset) untuk tipe ini telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
+      if (todayCount >= 30) {
+        alert("Coba di esok hari.\n\nBatas gratis harian (30 aset) untuk tipe ini telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
         return;
       }
     }
@@ -2249,6 +2246,10 @@ const App: React.FC = () => {
     updateFiles(prev => prev.filter(f => f.id !== id));
   };
 
+  const handleRegenerateFile = async (fileItem: FileItem) => {
+    await processOneFile(fileItem);
+  };
+
   const t = TRANSLATIONS;
   const hasFiles = files.length > 0;
   const filesToGenerateCount = files.filter(f => !f.title && !f.error && !f.isExtracting).length;
@@ -2421,6 +2422,8 @@ const App: React.FC = () => {
                   setCustomPrompt={setCustomPrompt} 
                   keywordCount={keywordCount} 
                   setKeywordCount={setKeywordCount} 
+                  aiCreativity={aiCreativity}
+                  setAiCreativity={setAiCreativity}
                   isLoading={isLoading} 
                   progressInfo={progressInfo} 
                   isPaused={isPaused} 
@@ -2444,6 +2447,7 @@ const App: React.FC = () => {
                 setPreviewFile={setPreviewFile} 
                 updateFiles={updateFiles} 
                 handleDeleteFile={handleDeleteFile} 
+                handleRegenerateFile={handleRegenerateFile}
                 mobileTab={mobileTab} 
                 setMobileTab={setMobileTab} 
                 t={t} 

@@ -8,6 +8,8 @@ interface AiConfigPanelProps {
   setCustomPrompt: (p: string) => void;
   keywordCount: number | string;
   setKeywordCount: (c: number | string) => void;
+  aiCreativity: number;
+  setAiCreativity: (val: number) => void;
   isLoading: boolean;
   progressInfo: ProgressInfo | null;
   isPaused: boolean;
@@ -27,6 +29,8 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   setCustomPrompt,
   keywordCount,
   setKeywordCount,
+  aiCreativity,
+  setAiCreativity,
   isLoading,
   progressInfo,
   isPaused,
@@ -94,6 +98,28 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                 }} 
                 className="w-14 p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-blue-500/30 outline-none" 
               />
+            </div>
+
+            <div className="space-y-2.5 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800/80">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  AI Creativity
+                </label>
+                <span className="px-2.5 py-1 bg-slate-900 dark:bg-black/40 text-white text-xs font-black rounded-lg border border-slate-800 dark:border-white/10 shadow-sm min-w-[36px] text-center font-mono">
+                  {aiCreativity.toFixed(1)}
+                </span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <input 
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={aiCreativity}
+                  onChange={(e) => setAiCreativity(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#4e73df] focus:outline-none"
+                />
+              </div>
             </div>
           </div>
         </div>

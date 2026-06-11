@@ -169,8 +169,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   };
 
   const handleGenerate = async () => {
-    if (!isLicensed && dailyGenCount >= 50) {
-      setError("Batas Trial Terlampaui. Anda telah mencapai batas maksimal 50 kali generate Prompt Teks hari ini. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
+    if (!isLicensed && dailyGenCount >= 30) {
+      setError("Batas Trial Terlampaui. Anda telah mencapai batas maksimal 30 kali generate Prompt Teks hari ini. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
       return;
     }
 
@@ -412,25 +412,25 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <span className="w-2 h-2 rounded-full bg-emerald-550 animate-pulse" />
                   Trial Hari Ini: Prompt Teks
                 </span>
-                <span className={dailyGenCount >= 50 ? "text-red-500 font-black" : "text-emerald-500 font-black"}>
-                  {dailyGenCount}/50 Kali Generate
+                <span className={dailyGenCount >= 30 ? "text-red-500 font-black" : "text-emerald-500 font-black"}>
+                  {dailyGenCount}/30 Kali Generate
                 </span>
               </div>
               <div className="w-full h-2 bg-slate-205 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ease-out ${
-                    dailyGenCount >= 50 ? 'bg-red-500' : 'bg-emerald-500'
+                    dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
                   }`} 
-                  style={{ width: `${Math.min(100, (dailyGenCount / 50) * 100)}%` }} 
+                  style={{ width: `${Math.min(100, (dailyGenCount / 30) * 100)}%` }} 
                 />
               </div>
-              {dailyGenCount >= 50 ? (
+              {dailyGenCount >= 30 ? (
                 <span className="text-[10px] text-red-500 font-extrabold block mt-2 leading-tight">
-                  ⚠️ Batas trial gratis harian (50 generate) telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.
+                  ⚠️ Batas trial gratis harian (30 generate) telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-1.5 leading-tight">
-                  Masa Trial gratis 50 generate/hari. Sisa kuota generate hari ini: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 50 - dailyGenCount)} kali</strong>.
+                  Masa Trial gratis 30 generate/hari. Sisa kuota generate hari ini: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} kali</strong>.
                 </span>
               )}
             </div>
