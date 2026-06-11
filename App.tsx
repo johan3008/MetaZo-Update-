@@ -912,6 +912,7 @@ const App: React.FC = () => {
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
   const [isMzLicensed, setIsMzLicensed] = useState(false);
   const [showActivationModal, setShowActivationModal] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   // Live real-time sync branding from Firestore
   useEffect(() => {
@@ -975,6 +976,11 @@ const App: React.FC = () => {
     const val = localStorage.getItem(`mz_daily_gen_${type}_${dateStr}`);
     return val ? parseInt(val) || 0 : 0;
   }, []);
+
+  const getTotalDailyCount = useCallback((): number => {
+    const tools = [ToolType.IMAGE, ToolType.VIDEO, ToolType.VECTOR, ToolType.PROMPT_GEN];
+    return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
+  }, [getDailyCount]);
 
   const [dailyGenCounts, setDailyGenCounts] = useState<{ [key in ToolType]?: number }>({});
 
@@ -1743,9 +1749,10 @@ const App: React.FC = () => {
 
     try {
         if (!isMzLicensed) {
-            const todayCount = getDailyCount(activeTool);
-            if (todayCount >= 30) {
-                throw new Error("Batas Trial Terlampaui. Coba di esok hari.");
+            const totalToday = getTotalDailyCount();
+            if (totalToday >= 30) {
+                setShowLimitModal(true);
+                throw new Error("Limit harian telah habis.");
             }
         }
 
@@ -1832,9 +1839,10 @@ const App: React.FC = () => {
 
     try {
         if (!isMzLicensed) {
-            const todayCount = getDailyCount(activeTool);
-            if (todayCount >= 30) {
-                throw new Error("Batas Trial Terlampaui. Coba di esok hari.");
+            const totalToday = getTotalDailyCount();
+            if (totalToday >= 30) {
+                setShowLimitModal(true);
+                throw new Error("Limit harian telah habis.");
             }
         }
 
@@ -1865,17 +1873,18 @@ const App: React.FC = () => {
 
         let finalItemsToProcess = itemsToProcess;
         if (!isMzLicensed) {
-            const todayCount = getDailyCount(activeTool);
-            const remaining = Math.max(0, 30 - todayCount);
+            const totalToday = getTotalDailyCount();
+            const remaining = Math.max(0, 30 - totalToday);
             if (finalItemsToProcess.length > remaining) {
                 const allowed = finalItemsToProcess.slice(0, remaining);
                 const excluded = finalItemsToProcess.slice(remaining);
                 updateFiles(prev => prev.map(f => {
                     if (excluded.some(ex => ex.id === f.id)) {
-                        return { ...f, isGenerating: false, isExtracting: false, error: "Batas Trial Terlampaui. Coba di esok hari." };
+                        return { ...f, isGenerating: false, isExtracting: false, error: "Limit harian telah habis." };
                     }
                     return f;
                 }));
+                if (remaining === 0) setShowLimitModal(true);
                 finalItemsToProcess = allowed;
             }
         }
@@ -1939,9 +1948,9 @@ const App: React.FC = () => {
 
   const handleGenerateAll = async (isRetry = false) => {
     if (!isMzLicensed) {
-      const todayCount = getDailyCount(activeTool);
-      if (todayCount >= 30) {
-        alert("Coba di esok hari.\n\nBatas gratis harian (30 aset) untuk tipe ini telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
+      const totalToday = getTotalDailyCount();
+      if (totalToday >= 30) {
+        setShowLimitModal(true);
         return;
       }
     }
@@ -3430,6 +3439,52 @@ const App: React.FC = () => {
                 <span>Aktifkan Akses</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Limit Harian Modal */}
+      {showLimitModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={() => setShowLimitModal(false)}>
+          <div className="bg-white dark:bg-[#111827] rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col items-center text-center relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setShowLimitModal(false)} 
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-full transition-colors"
+            >
+              <X size={16} />
+            </button>
+            
+            <div className="w-20 h-20 bg-amber-100 dark:bg-amber-500/10 rounded-full flex items-center justify-center mb-6">
+              <Clock size={40} className="text-amber-500" />
+            </div>
+            
+            <h2 className="text-xl font-black text-slate-800 dark:text-white mb-2 uppercase tracking-tight">Limit Tercapai</h2>
+            <p className="text-base font-bold text-[#4e73df] mb-4">Coba Besok lagi ya</p>
+            
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl w-full mb-6 border border-slate-100 dark:border-white/5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                Limit harian telah habis. Anda telah memproses <span className="text-slate-800 dark:text-white font-black">30 aset</span> hari ini. 
+                Sila kembali besok atau aktifkan akun PRO untuk memproses tanpa batas.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowLimitModal(false);
+                setShowActivationModal(true);
+              }}
+              className="w-full py-4 bg-gradient-to-r from-[#4e73df] to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-black text-sm uppercase rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-95"
+            >
+              <Zap size={16} fill="currentColor" />
+              <span>Buka Akses Unlimited</span>
+            </button>
+            
+            <button
+              onClick={() => setShowLimitModal(false)}
+              className="mt-3 text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors uppercase tracking-widest"
+            >
+              Mungkin Nanti
+            </button>
           </div>
         </div>
       )}

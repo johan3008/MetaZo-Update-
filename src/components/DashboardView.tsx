@@ -82,10 +82,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span>AI-Driven Metadata Engine</span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight leading-tight select-none">
-            Solusi Unggul Pengoptimal <span className="text-emerald-300">Stock Asset</span> Anda
+            Optimalisasi <span className="text-emerald-300">Stock Asset</span> Instan
           </h1>
           <p className="mt-2 text-xs sm:text-sm text-slate-100/90 font-medium leading-relaxed max-w-xl">
-            MetaZo mengintegrasikan kecerdasan model Vision-LLM mutakhir untuk membedah visual aset Anda secara presisi guna menghasilkan judul, deskripsi deskriptif, dan pengelompokan tag terindeks bagi ragam portal stock global.
+            MetaZo memanfaatkan kecerdasan AI untuk menghasilkan judul, deskripsi, dan tag otomatis bagi portal stock global.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button 
@@ -93,11 +93,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               className="px-4 py-2 bg-emerald-400 text-slate-900 font-extrabold text-xs rounded-xl shadow-lg hover:bg-emerald-300 hover:scale-[1.03] transition-all flex items-center space-x-1.5 uppercase cursor-pointer"
             >
               <BookOpen size={14} />
-              <span>Petunjuk Penggunaan</span>
+              <span>Cara Pakai</span>
             </button>
             <div className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 select-none text-white font-extrabold text-xs rounded-xl transition-all flex items-center space-x-1.5 uppercase">
               <ShieldCheck size={14} className="text-emerald-300" />
-              <span>Mode: {generationMode.toUpperCase()} ({totalFiles} Diunggah)</span>
+              <span>{generationMode.toUpperCase()} ({totalFiles} File)</span>
             </div>
           </div>
         </div>
@@ -105,29 +105,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 2. PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
       {isLicensed ? (
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xl shadow-emerald-500/10">
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xl shadow-emerald-500/10">
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-white/20 text-white rounded-2xl shrink-0 mt-0.5">
               <ShieldCheck size={24} />
             </div>
             <div>
               <h4 className="text-sm font-black text-white uppercase tracking-wider">
-                Lisensi Komersial Aktif • {appName} PRO
+                Lisensi Komersial Aktif
               </h4>
               <p className="text-xs font-medium text-emerald-50 leading-relaxed mt-1">
-                Salinan berlisensi penuh dibeli secara sah untuk workflow profesional terakreditasi oleh {appName} Reseller Network. 
-                Semua fitur pengunggahan cerdas dan ekspor batch telah aktif tanpa pembatasan.
+                Akses tanpa batas telah aktif untuk workflow profesional {appName}.
               </p>
             </div>
           </div>
           <div className="flex items-center shrink-0">
             <span className="px-4 py-2 bg-white text-emerald-700 font-extrabold text-[11px] rounded-full uppercase tracking-widest shadow-lg">
-              ★ ACTIVE PRO
+              ★ PRO
             </span>
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/30 rounded-3xl p-6 sm:p-7 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-sm shadow-amber-500/5 select-none">
+        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/30 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-sm shadow-amber-500/5 select-none">
           {!isLicensed && (
             <div className="flex items-start space-x-4">
               <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-1">
@@ -135,12 +134,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div>
                 <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center space-x-2">
-                  <span>Versi Evaluasi Gratis</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                  <span className="opacity-75">Batasan Trial Aktif</span>
+                  <span>Versi Trial</span>
                 </h4>
                 <p className="text-[12px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl mt-1.5">
-                  Anda sedang menggunakan versi trial aplikasi <strong className="text-slate-900 dark:text-slate-100 font-semibold">{appName}</strong>. Dapatkan akses ke semua fitur pro dengan lisensi premium seharga <strong className="text-amber-600 dark:text-amber-400 font-bold">{pricingTier}</strong> untuk batch tak terbatas.
+                  Gunakan <strong className="text-slate-900 dark:text-slate-100 font-semibold">{appName}</strong> dalam mode terbatas. Dapatkan akses unlimited dengan lisensi premium seharga <strong className="text-amber-600 dark:text-amber-400 font-bold">{pricingTier}</strong>.
                 </p>
               </div>
             </div>
@@ -150,7 +147,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setShowActivation?.(true)}
               className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all shadow-md shadow-amber-500/20 cursor-pointer"
             >
-              Masukkan Lisensi Key
+              Lisensi
             </button>
             <a
               href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName || '')}`}
@@ -158,7 +155,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               rel="noopener noreferrer"
               className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all flex items-center justify-center cursor-pointer"
             >
-              Hubungi Admin
+              Admin
             </a>
           </div>
         </div>
@@ -169,9 +166,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2">
             <Activity size={16} className="text-[#4e73df]" />
-            <span>Pilih Ruang Kerja AI (Workspace)</span>
+            <span>Pilih Ruang Kerja</span>
           </h3>
-          <span className="text-[10px] font-black text-[#4e73df] uppercase tracking-widest bg-[#4e73df]/5 border border-[#4e73df]/10 px-2 py-0.5 rounded-md">3 Mode Aktif</span>
+          <span className="text-[10px] font-black text-[#4e73df] uppercase tracking-widest bg-[#4e73df]/5 border border-[#4e73df]/10 px-2 py-0.5 rounded-md">3 Mode</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -187,23 +184,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <ImageIcon size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-[#4e73df] transition-colors">
-                Image AI Workspace
+                Image AI
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Kompatibel dengan file foto, raster ilustrasi, atau screenshot berformat <strong className="text-slate-700 dark:text-slate-200">JPG, PNG & WEBP</strong>. Deteksi warna, struktur visual, elemen estetika, dan lokasi otomatis.
+                Optimasi foto, poster, atau karya seni raster (JPG, PNG, WEBP) secara otomatis.
               </p>
 
               {!isLicensed && (
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    <span>Trial Hari Ini</span>
-                    <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/30 Aset</span>
+                    <span>Kuota Hari Ini</span>
+                    <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${imageDailyCount >= 30 ? 'bg-red-550' : 'bg-[#4e73df]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 30) * 100)}%` }} />
                   </div>
                   {imageDailyCount >= 30 && (
-                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Kuota habis. Coba besok.</span>
                   )}
                 </div>
               )}
@@ -213,8 +210,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setActiveTool(ToolType.IMAGE)}
               className="w-full py-2 bg-[#4e73df] hover:bg-blue-600 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
-              <span>Mulai Optimasi Gambar</span>
-              <ArrowRight size={13} />
+              <span>Optimasi Gambar</span>
             </button>
           </div>
 
@@ -229,23 +225,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <Film size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-purple-500 transition-colors">
-                Video AI Workspace
+                Video AI
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Didesain khusus untuk klip video footage berformat <strong className="text-slate-700 dark:text-slate-200">MP4, MOV & WEBM</strong>. Menganalisis sekuen gambar dinamis serta mencocokkan gaya sinematografi objek bergerak.
+                Analisis klip video (MP4, MOV, WEBM) untuk metadata sinematik yang presisi.
               </p>
 
               {!isLicensed && (
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    <span>Trial Hari Ini</span>
-                    <span className={videoDailyCount >= 30 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/30 Aset</span>
+                    <span>Kuota Hari Ini</span>
+                    <span className={videoDailyCount >= 30 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${videoDailyCount >= 30 ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / 30) * 100)}%` }} />
                   </div>
                   {videoDailyCount >= 30 && (
-                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Kuota habis. Coba besok.</span>
                   )}
                 </div>
               )}
@@ -255,8 +251,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setActiveTool(ToolType.VIDEO)}
               className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
-              <span>Mulai Optimasi Video</span>
-              <ArrowRight size={13} />
+              <span>Optimasi Video</span>
             </button>
           </div>
 
@@ -271,23 +266,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <FileCode size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-emerald-500 transition-colors">
-                Vector AI Workspace
+                Vector AI
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Dibuat untuk berkas gambar ilustrasi berbasis garis/vektor yang fleksibel seperti <strong className="text-slate-700 dark:text-slate-200">SVG, EPS & AI</strong>. Menghasilkan pencarian tag terarah untuk kebutuhan elemen web UI/UX.
+                Metadata otomatis untuk file vektor (SVG, EPS, AI) guna kebutuhan elemen desain UI/UX.
               </p>
 
               {!isLicensed && (
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    <span>Trial Hari Ini</span>
-                    <span className={vectorDailyCount >= 30 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/30 Aset</span>
+                    <span>Kuota Hari Ini</span>
+                    <span className={vectorDailyCount >= 30 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${vectorDailyCount >= 30 ? 'bg-red-550' : 'bg-emerald-600'}`} style={{ width: `${Math.min(100, (vectorDailyCount / 30) * 100)}%` }} />
                   </div>
                   {vectorDailyCount >= 30 && (
-                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Batas tercapai. Coba di esok hari.</span>
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Kuota habis. Coba besok.</span>
                   )}
                 </div>
               )}
@@ -297,8 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setActiveTool(ToolType.VECTOR)}
               className="w-full py-2 bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
-              <span>Mulai Optimasi Vektor</span>
-              <ArrowRight size={13} />
+              <span>Optimasi Vektor</span>
             </button>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Search, Loader2, Sparkles, Wand2, ArrowRight, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchCalendarEvents, fetchEventKeywords } from '../../services/geminiService';
@@ -20,6 +20,10 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
   const [eventKeywords, setEventKeywords] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
+
+  useEffect(() => {
+    handleGenerate();
+  }, []);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -206,61 +210,62 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-3xl p-6 border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-shadow flex flex-col h-full"
+                  className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-emerald-500/10 transition-all flex flex-col h-full"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex flex-col">
-                      <div className="p-3 bg-emerald-500/10 rounded-2xl w-fit mb-2">
-                        <Sparkles className="text-emerald-500" size={20} />
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="p-1.5 bg-emerald-500/10 rounded-lg">
+                          <Sparkles className="text-emerald-500" size={14} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+                          {event.location || 'Global'}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">
-                        {event.location || 'Global'}
-                      </span>
                     </div>
-                    <span className="text-xs font-black bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full text-slate-500 dark:text-slate-300">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
                       {event.date}
                     </span>
                   </div>
                   
-                  <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2 leading-tight">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white mb-2 leading-tight">
                     {event.name}
                   </h3>
                   
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 font-medium line-clamp-3">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 font-normal leading-relaxed line-clamp-3">
                     {event.commercial_potential}
                   </p>
 
                   <div className="space-y-4 mt-auto">
                     {/* Event Keywords Selection */}
-                    <div className="pt-4 border-t border-slate-100 dark:border-white/5">
+                    <div className="pt-3 border-t border-slate-100 dark:border-white/5">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Suggested Focus</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Focus Tags</span>
                         {!eventKeywords[event.name] ? (
                           <button 
                             onClick={() => handleGenerateKeywords(event.name, event.commercial_potential)}
                             disabled={loadingKeywordsFor === event.name}
-                            className="text-[10px] flex items-center space-x-1 text-emerald-500 hover:text-emerald-600 font-bold disabled:text-slate-400"
+                            className="text-[9px] flex items-center space-x-1 text-emerald-600 hover:text-emerald-700 font-bold disabled:text-slate-400"
                           >
                             {loadingKeywordsFor === event.name ? <Loader2 size={10} className="animate-spin" /> : <Tag size={10} />}
-                            <span>{loadingKeywordsFor === event.name ? 'Generating...' : 'Get Keywords'}</span>
+                            <span>{loadingKeywordsFor === event.name ? '...' : 'Get Tags'}</span>
                           </button>
                         ) : (
                           <button 
                             onClick={() => onSendToPrompt?.(event.name + ": " + eventKeywords[event.name].join(", "))}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md font-black flex items-center space-x-1 shadow-sm active:scale-95 transition-all"
+                            className="text-emerald-600 font-black text-[9px] hover:text-emerald-700"
                           >
-                            <span>Send to Prompt</span>
-                            <ArrowRight size={10} />
+                            Copy Prompt
                           </button>
                         )}
                       </div>
 
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
-                        {(eventKeywords[event.name] || event.suggested_topics)?.map((topic: string) => (
+                      <div className="flex flex-wrap gap-1">
+                        {(eventKeywords[event.name] || event.suggested_topics)?.slice(0, 8).map((topic: string) => (
                           <button
                             key={topic}
                             onClick={() => onSendToPrompt?.(`${event.name}: ${topic}`)}
-                            className="text-[10px] uppercase tracking-wider font-extrabold bg-emerald-500/5 text-emerald-500 border border-emerald-500/10 px-2 py-1 rounded-md hover:bg-emerald-500 hover:text-white transition-colors text-left"
+                            className="text-[9px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full hover:bg-emerald-500/10 hover:text-emerald-600 transition-colors"
                           >
                             {topic}
                           </button>
