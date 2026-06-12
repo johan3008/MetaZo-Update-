@@ -1281,22 +1281,38 @@ const App: React.FC = () => {
       const gSaved = localStorage.getItem('gemini_api_key') || '';
       const grSaved = localStorage.getItem('groq_api_key') || '';
       const mSaved = localStorage.getItem('mistral_api_key') || '';
-      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral';
+      const oSaved = localStorage.getItem('openai_api_key') || '';
+      const orSaved = localStorage.getItem('openrouter_api_key') || '';
+      const bSaved = localStorage.getItem('blackbox_api_key') || '';
+      const nSaved = localStorage.getItem('nvidia_api_key') || '';
+      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia';
 
       const gParsed = gSaved.split(',').map(k => k.trim()).filter(Boolean);
       const grParsed = grSaved.split(',').map(k => k.trim()).filter(Boolean);
       const mParsed = mSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const oParsed = oSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const orParsed = orSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const bParsed = bSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const nParsed = nSaved.split(',').map(k => k.trim()).filter(Boolean);
 
       setGeminiKeysList(gParsed);
       setGroqKeysList(grParsed);
       setMistralKeysList(mParsed);
+      setOpenaiKeysList(oParsed);
+      setOpenrouterKeysList(orParsed);
+      setBlackboxKeysList(bParsed);
+      setNvidiaKeysList(nParsed);
       
       setNewGeminiKey('');
       setNewGroqKey('');
       setNewMistralKey('');
+      setNewOpenaiKey('');
+      setNewOpenrouterKey('');
+      setNewBlackboxKey('');
+      setNewNvidiaKey('');
 
       setSelectedProvider(pSaved);
-      setHasCustomKeySaved(gParsed.length > 0 || grParsed.length > 0 || mParsed.length > 0);
+      setHasCustomKeySaved(gParsed.length > 0 || grParsed.length > 0 || mParsed.length > 0 || oParsed.length > 0 || orParsed.length > 0 || bParsed.length > 0 || nParsed.length > 0);
       setKeyTestingIndex(null);
       setKeyTestProvider(null);
       setKeyTestResults({});
