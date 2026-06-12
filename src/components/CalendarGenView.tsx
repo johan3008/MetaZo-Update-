@@ -3,16 +3,19 @@ import { Calendar, Search, Loader2, Sparkles, Wand2, ArrowRight, Tag } from 'luc
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchCalendarEvents, fetchEventKeywords } from '../../services/geminiService';
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
 interface CalendarGenViewProps {
+  t: any;
   onSendToPrompt?: (text: string) => void;
 }
 
-export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt }) => {
+export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPrompt }) => {
+  const MONTHS = [
+    t.calendar_months_january, t.calendar_months_february, t.calendar_months_march, 
+    t.calendar_months_april, t.calendar_months_may, t.calendar_months_june,
+    t.calendar_months_july, t.calendar_months_august, t.calendar_months_september, 
+    t.calendar_months_october, t.calendar_months_november, t.calendar_months_december
+  ];
+
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[new Date().getMonth()]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
@@ -43,7 +46,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
       const data = await fetchCalendarEvents(selectedMonth);
       setEvents(data.events || []);
     } catch (err: any) {
-      setError(err.message || "Failed to generate events");
+      setError(err.message || t.calendar_error_fail);
     } finally {
       clearInterval(progressInterval);
       setGenerationProgress(100);
@@ -101,8 +104,8 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
           <Calendar className="text-emerald-500" size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Calendar Gen</h1>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Stock Content Event Finder</p>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.calendar_title}</h1>
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mt-1">{t.calendar_subtitle}</p>
         </div>
       </div>
 
@@ -120,7 +123,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
           <div className="flex flex-col md:flex-row items-center gap-4">
             <div className="flex-1 w-full">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                Select Month
+                {t.calendar_month_label}
               </label>
               <div className="relative">
                 <select 
@@ -146,12 +149,12 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ onSendToPrompt
                 {isGenerating ? (
                   <>
                     <Loader2 className="animate-spin" size={20} />
-                    <span>Analyzing...</span>
+                    <span>{t.calendar_btn_generating}</span>
                   </>
                 ) : (
                   <>
                     <Search size={20} />
-                    <span>Find Events</span>
+                    <span>{t.calendar_btn_generate}</span>
                   </>
                 )}
               </button>

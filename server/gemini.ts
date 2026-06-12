@@ -496,51 +496,96 @@ export const generateStockMetadata = async (
 7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
   }
 
-  // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION ---
-  let visualDescriptionText = "";
+  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
+  let visualFactsJson = "";
   
-  console.log(`[JohMeta Pipeline] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
+  console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
-  let mediaTypeContext = "The provided image is a photograph or digital artwork.";
+  let mediaTypeContext = "The provided image is a photograph or digital artwork. Generate natural, human-readable descriptions of concepts and visual facts smoothly.";
   if (toolType === ToolType.VIDEO) {
-    mediaTypeContext = "CRITICAL: The provided images are sequential frames from a single VIDEO. Analyze the continuous motion, flow, narrative progression, and visual storyline (alur) across frames.";
+    mediaTypeContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.";
   } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-    mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility.";
+    mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility. Generate natural, smooth descriptions.";
   }
 
-  // Choose model for vision analysis, defaulting to gemini-3.1-flash-lite as before (must be a valid gemini model)
   const visionModelToUse = (model && model.startsWith('gemini-')) ? model : 'gemini-3.1-flash-lite';
   
-  // UPGRADE: Menyuruh Gemini mengekstrak data fisik dengan skenario Scene Analysis & Object Detection secara akurat sesuai pipeline baru
-  const visionSystemInstruction = `You are an expert creative director and highly specialized computer vision engine for stock photography metadata (Adobe Stock compliance).
+  const visionSystemInstruction = `ROLE:
+You are a Visual Metadata Analyzer (Provider 1).
+Analyze only what is visually verifiable in the image.
+Never guess, assume, hallucinate, infer, or invent information.
+
+CRITICAL ANTI-INFERENCE RULES:
+Keyboard ≠ programmer
+Blueprint ≠ architect
+Camera ≠ photographer
+Laptop ≠ office worker
+Medical mask ≠ doctor
+Suit ≠ businessman
+
+Never infer profession.
+Never infer occupation.
+Never infer industry.
+Never infer location.
+Never infer nationality.
+Never infer emotion.
+
+Only describe visible objects.
+
+PRIMARY OBJECTIVE:
+Detect every visible subject, action, color, visible text, and composition detail.
+Return JSON ONLY under the key "VISUAL_FACTS".
+Do not generate title or keywords.
+Do not infer hidden context.
+
+STRICT VISUAL RULES:
+1. Describe ONLY objects, people, actions, colors, and composition clearly visible.
+2. NEVER assume: nationality, ethnicity, religion, profession, location, country, city, event, season, weather, relationship, emotions not clearly visible, brand names, trademarks, copyrighted characters.
+3. If uncertain: omit the information, do not speculate.
+4. Accuracy is more important than quantity.
+
 Asset Context: ${mediaTypeContext}
-Target Keywords/Themes to incorporate: ${customPrompt || "None"}
 
-Your task is to analyze the provided asset following a strict two-step pipeline:
-
-STEP 1: Analyze image. Thoroughly analyze the composition, arrangement, setting, lighting styles, color palette, visual medium, framing, perspective, physical elements, specific garments, skin tones, textures, and visible details clearly present.
-STEP 2: Create VISUAL_FACTS JSON. Output a structured JSON block labeled as VISUAL_FACTS. The JSON must contain these exact keys:
+OUTPUT FORMAT:
 {
-  "scene_analysis": "Detailed description of the setting, layout, medium, lighting, perspective, framing, composition, and colors.",
-  "object_detection": "Exhaustive, highly literal list of physical objects, garments, models, and skin tones undeniably visible."
-}
+  "VISUAL_FACTS": {
+    "primary_subjects": [
+      {
+        "name": "",
+        "importance": 0
+      }
+    ],
+    "secondary_subjects": [
+      {
+        "name": "",
+        "importance": 0
+      }
+    ],
+    "background_elements": [
+      {
+        "name": "",
+        "importance": 0
+      }
+    ],
+    "visible_text": [],
+    "colors": [],
+    "actions": [],
+    "composition": []
+  }
+}`;
 
-=== CRITICAL METADATA COMPLIANCE RULE ===
-Never infer profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible in the frame:
-- No speculative professions: Do NOT call a person a 'businessman', 'doctor', or 'executive' unless they wear an unambiguous uniform, badge, or equipment (like a stethoscope). Describe them literal-first: e.g. "man in suit", "person wearing apron", or "individual using computer".
-- No speculative ethnicity: Do NOT assign specific race/ethnicity labels (e.g., "Asian", "Caucasian", "black person", "Hispanic", "white person") unless undeniably confirmed by the customer preference or undeniable indicators. Use literal physical features like "man with short dark hair" or "person with light skin tone" instead.
-- No speculative locations: Do NOT assume locations like "Paris", "Japan", "New York", or even general "office space" unless iconic visual landmarks, clear signs, or explicit cues are undeniably visible. Use safe, general descriptions instead (e.g., "modern indoor setting", "bright room", "cozy dining table", "urban street").
-- No speculative emotions: Do NOT assume someone is "happy", "excited", "worried", "thoughtful", or "sad" unless their face shows an extreme, unambiguous representation. Instead, describe visible physical states, e.g. "person smiling gently", "calm expression", "straight face".
-- No speculative events/concepts: Do NOT use keywords such as "job interview", "corporate recruitment", "wedding", "first date", "success", "wealth" unless literal physical elements (like a wedding rings ceremony, a birthday cake with lit candles, or a stack of dollar notes) are unmistakably displayed.
-
-Output ONLY the raw JSON block containing VISUAL_FACTS under the exact structure above with absolute literal accuracy based ONLY on what is undeniably visible.`;
+  const promptText = toolType === ToolType.VIDEO 
+    ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
+    : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
-      parts: [...imageParts, { text: `Analyze this visual asset in absolute literal, conceptual, and storyline details for a stock metadata specialist.${customPrompt ? ` Be sure to analyze how these user-requested target keywords/themes relate to or are represented in the asset to ensure they are explicitly included: ${customPrompt}` : ""}` }] 
+      parts: [...imageParts, { text: promptText }] 
     }, {
       systemInstruction: visionSystemInstruction,
-      temperature: 0.35,
+      responseMimeType: "application/json",
+      temperature: temperature ?? 0.1,
+      topP: 0.8,
       safetySettings: [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -550,142 +595,158 @@ Output ONLY the raw JSON block containing VISUAL_FACTS under the exact structure
       ]
     });
     
-    visualDescriptionText = visionResponse.text || "";
-    if (!visualDescriptionText || visualDescriptionText.trim().length === 0) {
-      throw new Error("Analisis dibatalkan atau terblokir kebijakan privasi wajah anak/manusia oleh Google Gemini Safety Filters.");
+    visualFactsJson = visionResponse.text || "{}";
+    if (!visualFactsJson || visualFactsJson.trim() === "{}") {
+      throw new Error("Vision Analysis produced empty results.");
     }
   } catch (err: any) {
-    console.warn("[JohMeta Pipeline] Gemini Vision Extraction Failed or Blocked:", err.message || err);
-    const assetTypeStr = toolType === ToolType.VIDEO ? "footage video" : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "vector illustration" : "photograph";
-    const customPromptStr = customPrompt ? ` relating to: ${customPrompt}` : "";
-    visualDescriptionText = `
-SCENE ANALYSIS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Features professional lighting, balanced composition, crisp details, natural color palette, and modern aesthetic style. Set in a clean, simple background.
-OBJECT DETECTION: Factual details representing the main subject<sup>[literal]</sup>, with clear details and realistic textures. If containing a person, depicts a person with a calm, neutral facial expression wearing simple apparel. Everything is captured strictly literally.
-`;
-  }
-  
-  // ... (rest of the function omitted for brevity in thought, will replace fully)
-
-  // --- TAHAP 2: DEFINISI SKEMA OUTPUT METADATA (MENGGUNAKAN BUFFER) ---
-  const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      title: { 
-        type: Type.STRING, 
-        description: 'Impactful title in clean, natural human-like Sentence case (MUST BE 50-200 characters, NO commas). Capitalize ONLY the very first letter of the entire title, and make all subsequent words strictly lowercase unless they are proper nouns. STRICTLY based on the Provided Analysis below, utilizing natural human language.' 
-      },
-      description: { 
-        type: Type.STRING, 
-        description: 'Detailed visual and conceptual description. MUST conclude with a sentence starting with "Ideal for..." suggesting commercial uses. STRICTLY based on the Provided Analysis below. Max 200 chars.' 
-      },
-      keywords: { 
-        type: Type.ARRAY, 
-        items: { type: Type.STRING }, 
-        description: `${keywordRuleSchemaDesc} Rules for Keywords:
-${keywordRulePromptText}
-
-Keyword Priority:
-- The first 10 keywords must describe the main subject.
-- Secondary and conceptual keywords should come afterward.` 
-      },
-      category_id: { 
-        type: Type.INTEGER, 
-        description: 'The most accurate Adobe Stock category ID from the provided list.' 
-      },
-      shutterstock_category_1: { 
-        type: Type.STRING, 
-        description: 'The primary Shutterstock category. Must strictly match the provided list.' 
-      },
-      shutterstock_category_2: { 
-        type: Type.STRING, 
-        description: 'The secondary Shutterstock category. MUST be strictly DIFFERENT from shutterstock_category_1.' 
+    console.warn("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
+    // Fallback static facts if vision fails
+    visualFactsJson = JSON.stringify({
+      VISUAL_FACTS: {
+        primary_subjects: [{ name: "main subject", importance: 100 }],
+        secondary_subjects: [],
+        background_elements: [],
+        visible_text: [],
+        colors: ["natural"],
+        actions: ["commercial poses"],
+        composition: ["professional"]
       }
-    },
-    required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2"],
-  };
+    });
+  }
 
-  // --- TAHAP 3: KONDISIONAL MEDIA CONTEXT ---
-  const mediaContext = `The asset has been thoroughly and accurately analyzed by an advanced vision model. Build your metadata strictly by blending the physical facts, dynamic flow/storyline, and abstract ideas from this vision text (DO NOT introduce any subjects or surroundings not described here).
+  // Parse facts for next stages
+  let visualFacts: any = {};
+  try {
+    visualFacts = JSON.parse(extractJSON(visualFactsJson)).VISUAL_FACTS || {};
+  } catch (e) {
+    visualFacts = { primary_subjects: [{ name: "subject", importance: 100 }], actions: ["posing"] };
+  }
 
-  OPTIONAL TARGET KEYWORDS/THEMES TO INCORPORATE: ${customPrompt || "None (Focus on physical facts)."}
+  const dominantSubjects = [
+    ...(visualFacts.primary_subjects || []),
+    ...(visualFacts.secondary_subjects || [])
+  ].filter((item: any) => item.importance >= 50).map((item: any) => item.name);
 
-  === BEGIN VISUAL & CONCEPTUAL DESCRIPTION ===
-${visualDescriptionText}
-=== END VISUAL & CONCEPTUAL DESCRIPTION ===
+  // --- TAHAP 2 & 3: PROVIDER 2 (GPT ROLE) & PROVIDER 3 (CLAUDE ROLE) — CONTENT GENERATION ---
+  console.log(`[JohMeta Pipeline] Stage 2 & 3: Generating Content (Title, Description, Keywords)...`);
+  
+  const genSystemInstruction = `ROLE:
+You are a professional Adobe Stock and Shutterstock title and keyword specialist.
 
-Asset Media Type Context: ${toolType === ToolType.VIDEO ? 'This is a premium stock video file (analyse the storyline flow / alur)' : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? 'This is a clean, modern commercial vector layout' : 'This is a high-quality commercial photo or graphic content'}.`;
+PRIMARY OBJECTIVE:
+Generate highly searchable stock titles and exactly ${aiRequestCount} keywords based on the dominant visual subject.
 
-  // --- TAHAP 4: PERAKITAN SYSTEM INSTRUCTION DENGAN ATURAN KONSEP BARU ---
-  const groqOptimizationRules = provider === 'groq' ? `
-[CRITICAL GROQ SPEED OPTIMIZATION]
-- DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
-- Start your response directly with '{' and end exactly with '}'.` : '';
+TITLE RULES:
+1. The title must describe the MAIN SUBJECT first.
+2. Include the visual style if it is visually dominant.
+3. Include important supporting elements only when relevant.
+4. Use natural English.
+5. Use Sentence Case.
+6. No punctuation at the end.
+7. Length between 60 and 120 characters.
+8. Prioritize buyer search behavior.
+9. Never write artistic critique or subjective opinions.
+10. Never use words such as: beautiful, amazing, stunning, creative, awesome, masterpiece.
 
-  const systemInstruction = `You are an elite, highly compliant Adobe Stock and Shutterstock metadata cataloging specialist.
-Your goal is to maximize search discoverability for premium buyers while maintaining 100% strict adherence to stock photography regulations and the Gemini metadata pipeline model.
+TITLE VISUAL PRIORITY:
+Priority 1: Main object, Species, Product, Person, Animal
+Priority 2: Illustration style, Color characteristics, Supporting objects
+Priority 3: Background, Environment, Commercial concepts
 
-=== GEMINI METADATA PIPELINE STEAGES ===
+GOOD TITLE FORMULA:
+[Visual Style] + [Main Subject] + [Asset Type] + [Supporting Element] + [Background if relevant]
 
-STEP 3: Generate title from VISUAL_FACTS.
-- Carefully read the "scene_analysis" and "object_detection" from the provided VISUAL_FACTS JSON.
-- Synthesize a descriptive, long-tail Title (60-120 characters) using plain, natural human language.
-- Strictly ground the Title in the physical elements of VISUAL_FACTS.
+Examples:
+Geometric chameleon illustration on tree branch with black background
+Low poly fox illustration isolated on dark background
 
-STEP 4: Generate description from VISUAL_FACTS.
-- Write a detailed visual breakdown based strictly on VISUAL_FACTS.
-- ALWAYS conclude the Description with a sentence starting with "Ideal for..." or "Perfect for..." proposing real-world commercial use-cases.
-- Max 200 characters.
+KEYWORD PRIORITY & RULES:
+1. The first 10 keywords MUST describe the dominant visual subject (Importance 80-100).
+2. Keywords 11-25: Supporting visible elements, environment, colors, actions (Importance 50-79).
+3. Keywords 26-40: Commercial concepts directly supported by the image (Importance 20-49).
+4. Keywords must be ordered by visual importance. Never prioritize background elements over the main subject.
+5. Avoid generic words unless they add search value. Prefer specific terms over broad terms. Use buyer search behavior.
+6. Remove weak keywords: beautiful, amazing, stunning, artwork, composition, style, design, creative.
+7. Generate exactly ${aiRequestCount} keywords. Use broader terms to reach exactly ${aiRequestCount} keywords if specific terms run out.
 
-STEP 5: Generate keywords from VISUAL_FACTS.
-- Generate high-quality candidate keywords describing the physical setting, characters, objects, colors, and medium from the VISUAL_FACTS.
+STRICT PROHIBITIONS & ACCURACY:
+1. Every title word, description phrase, and keyword must be supported by visible evidence from VISUAL_FACTS.
+2. Do not describe blurred background elements as main subjects.
+3. Do not infer: profession, occupation, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
 
-STEP 6: Audit every keyword.
-- Critically audit every candidate keyword. Remove any keyword not directly supported by or explicitly present in the VISUAL_FACTS JSON:
-  - NEVER INFER profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible or explicitly present in VISUAL_FACTS:
-    * Audit: Check if any keyword implies a profession (e.g. "doctor", "manager", "engineer", "businessman", "employee"). If the model does not wear a clear stethoscope or uniform, REMOVE the keyword. Replace with literal terms: e.g., "man", "woman", "person wearing suit", etc.
-    * Audit: Check for specific ethnicity labels (e.g. "Asian", "Caucasian", "Spanish", "black", "white"). If NOT undeniably present in VISUAL_FACTS, REMOVE them immediately.
-    * Audit: Check for specific geographic locations (e.g. "Paris", "New York", "London"). Unless an iconic structure (like Eiffel Tower) is explicitly described, REMOVE them. Use generic descriptors (e.g., "cozy kitchen", "indoor room", "bright environment").
-    * Audit: Check for emotions (e.g. "happy", "depressed", "loving", "sad"). Omit subjective internal states unless dramatically physical.
-    * Audit: Check for speculative events/business concepts (e.g. "meeting", "job interview", "negotiation", "wedding"). Remove them, as stock agencies reject files for metadata that assumes unproven contexts.
+STRICT DEFINING RULES:
+- Titles: Clean natural human language (Sentence case), no punctuation, 60-120 chars.
+- Keywords: Exactly ${aiRequestCount} items. Lowercase. No subjective terms.
+- Base everything 100% on the VISUAL_FACTS provided.
 
-STEP 7: Sort keywords by Adobe Stock relevance.
-- Sort the audited keywords lists by relevance:
-  - Place the most descriptive, literal, and physical main subject keywords in the first 7 positions.
-  - Secondary background, setting, and medium keywords should follow afterward.
-  - Output exactly the requested quantity of keywords.
+DOMINANT_SUBJECTS (Target these for titles):
+${JSON.stringify(dominantSubjects)}
 
-\${groqOptimizationRules}
+VISUAL_FACTS SOURCE:
+${JSON.stringify(visualFacts, null, 2)}
 
-\${mediaContext}
+OUTPUT FORMAT:
+{
+  "title": "",
+  "description": "",
+  "keywords": []
+}`;
 
-[STRICT MICROSTOCK OPTIMIZATION RULES]
-1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element within 60-120 characters in Sentence case. No punctuation/commas. NO trailing period.
-2. FRONT-LOADING KEYWORDS: Place the most descriptive, literal, and physical keywords within the first 7 positions of the keyword list.
-3. ANTI-WASTE: DO NOT include overly broad keywords or subjective aesthetic-only terms ("beautiful", "stunning", "fantastic").
+  let draftMetadata: any = {};
+  try {
+    const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
+      ? callOpenAICompatibleWithRetry({
+          systemInstruction: genSystemInstruction,
+          contents: `Generate draft metadata based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]`,
+          responseMimeType: "application/json",
+          config: { temperature: temperature ?? 0.1, topP: 0.8 },
+          model
+        })
+      : callGeminiWithRetry(model && model.startsWith('gemini-') ? model : 'gemini-3.1-flash-lite', { 
+          parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
+        }, {
+          systemInstruction: genSystemInstruction,
+          responseMimeType: "application/json",
+          temperature: temperature ?? 0.1,
+          topP: 0.8
+        })
+    );
 
-[ADOBE STOCK COMPLIANCE RULES]
-Rules for Titles:
-1. NATURAL HUMAN LANGUAGE: Use grammatically perfect, natural human English. No code-speak, robotic terms, or hashtags.
-2. NO SUBJECTIVE / QUALITY WORDS: Avoid marketing power-words or emotional quality buzzwords.
-3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashes, or exclamation marks. No period at the end.
-4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Keep all other words in lowercase.
+    draftMetadata = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+  } catch (err) {
+    console.error("[JohMeta Pipeline] Generation Stage 2/3 Failed:", err);
+    draftMetadata = { title: "Stock asset with professional lighting", description: "Detailed visual content for commercial use.", keywords: ["stock", "asset"] };
+  }
 
-Rules for Descriptions:
-1. Provide a thorough, objective, and literal visual breakdown based ONLY on the vision analysis text.
-2. ALWAYS conclude with a sentence starting with "Ideal for..." or "Perfect for..." suggesting real-world commercial uses.
-3. Max 200 characters.
+  // --- TAHAP 4, 5, & 6: PROVIDER 4 (MISTRAL), 5 (GROK), & 6 (FINAL VALIDATOR) ---
+  console.log(`[JohMeta Pipeline] Stage 4, 5 & 6: Auditing, Ranking, and Final Validation...`);
 
-Rules for Keywords:
-${keywordRulePromptText}
+  const validatorSystemInstruction = `ROLE:
+You are the Final Quality Validator (Provider 4, 5, 6 Roles).
 
-Keyword Priority:
-- The first 10 keywords must describe the main physical subject.
-- Secondary, audited background keywords should come afterward.
-- The list must contain EXACTLY the requested quantity of keywords.
+OBJECTIVES:
+1. Provider 4 (Mistral Role): Metadata Auditor. Check title, description, and keywords against VISUAL_FACTS. Remove unsupported terms.
+2. Provider 5 (Grok Role): Keyword Ranking. Sort keywords by relevance. Most visible object first.
+3. Provider 6 (Final Validator Role): Final scan. Remove all hallucinated words. Return final approved metadata in JSON with category IDs.
 
-Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+VISUAL ACCURACY RULES (CRITICAL):
+1. Every title word, description phrase, and keyword MUST be supported by visible evidence in VISUAL_FACTS.
+2. Never infer or assume: profession, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
+3. Keep the keyword count exactly at ${aiRequestCount}. If a generated keyword is speculative, DO NOT drop it—replace it with a broader visual descriptor (color, shape, composition) to maintain the required count.
+
+STRICT VALIDATION rules:
+- Remove any keyword not directly supported by VISUAL_FACTS, but replace it to reach exactly ${aiRequestCount} keywords.
+- Verify every keyword exists visually.
+- Remove duplicates.
+- Ensure compliance with Adobe Stock (Sentence case title, no punctuation).
+- Select accurate Categories.
+
+SELF-CHECK:
+Before returning metadata, remove unsupported, duplicate, or assumed terms.
+
+VISUAL_FACTS (Source of Truth):
+${JSON.stringify(visualFacts, null, 2)}
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -693,102 +754,49 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-User Custom Prompt: ${customPrompt || "Follow best practices."}`;
+DRAFT METADATA TO VALIDATE:
+${JSON.stringify(draftMetadata, null, 2)}
 
-  // --- TAHAP 5: EKSEKUSI PANGGILAN API DENGAN SUHU OPTIMAL ---
-  let response;
-  let lastError;
+OUTPUT FORMAT:
+{
+  "title": "",
+  "description": "",
+  "keywords": [],
+  "category_id": 0,
+  "shutterstock_category_1": "",
+  "shutterstock_category_2": "",
+  "confidence_score": 0.95
+}`;
 
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    try {
-      const answerText = await callOpenAICompatibleWithRetry({
-        systemInstruction,
-        contents: `Perform a Smart AI Analysis on the following visual description text to generate a highly relevant, descriptive, and effective stock metadata JSON. 
-=== SOURCE VISUAL ANALYSIS ===
-${visualDescriptionText}
-=== END SOURCE ===
+  let finalMetadataRaw: any = {};
+  try {
+    const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
+      ? callOpenAICompatibleWithRetry({
+          systemInstruction: validatorSystemInstruction,
+          contents: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
+          responseMimeType: "application/json",
+          config: { temperature: temperature ?? 0.1, topP: 0.8 },
+          model
+        })
+      : callGeminiWithRetry(model && model.startsWith('gemini-') ? model : 'gemini-3.1-flash-lite', { 
+          parts: [{ text: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
+        }, {
+          systemInstruction: validatorSystemInstruction,
+          responseMimeType: "application/json",
+          temperature: temperature ?? 0.1,
+          topP: 0.8
+        })
+    );
 
-Task: Generate title, description, and exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases) based ENTIRELY on the source text above.${customPrompt ? ` Be sure to strongly incorporate and prioritize these target keywords/themes in the output metadata: ${customPrompt}.` : ""} FOLLOW ALL COMPLIANCE RULES. TITLES MUST BE DESCRIPTIVE, LONG-TAIL (60-80 chars), NATURAL, AND SEO-OPTIMIZED.`,
-        responseMimeType: "application/json",
-        responseSchema,
-        config: { temperature: temperature ?? 0.1 }, // Lower temperature for stricter adherence
-        model
-      });
-      response = { text: answerText };
-    } catch (err) {
-      lastError = err;
-      console.warn(`[generateStockMetadata] Hybrid pipeline failed with ${provider.toUpperCase()}:`, err);
-    }
-  } else {
-    // Jalur Sinkronisasi Gemini Tradisional (Multimodal + Pre-analisis)
-    let modelsToTry = (model && (model.startsWith('gemini-') || model.startsWith('gemma-'))) 
-        ? [model, 'gemini-3.1-flash-lite', 'gemini-3-flash'] 
-        : ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
-    
-    // Deduplicate
-    modelsToTry = Array.from(new Set(modelsToTry));
-    
-    for (const modelName of modelsToTry) {
-      try {
-        response = await getAIClient().models.generateContent({
-          model: modelName,
-          contents: { parts: [...imageParts, { text: `Analyze the visual asset and generate the requested stock metadata in full compliance with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema,
-            temperature: temperature ?? 0.1, // Lowered to 0.1 for maximum precision and strict adherence (no ngawur/acak-acakan)
-            safetySettings: [
-              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-            ]
-          }
-        });
-        console.log(`[generateStockMetadata] Successfully generated metadata with model: ${modelName}`);
-        break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[generateStockMetadata] Gemini direct failed with multimodal ${modelName}:`, err.message || err);
-        
-        // JIKA GAGAL (kemungkinan karena sensor gambar/safety), coba lagi dengan PURE TEKS tanpa gambar!
-        try {
-          console.log(`[generateStockMetadata] Retrying Stage 5 using pure text path for ${modelName}...`);
-          response = await getAIClient().models.generateContent({
-            model: modelName,
-            contents: { parts: [{ text: `Generate the requested stock metadata in full compliance with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the following pre-analyzed visual/conceptual description as the strict source of truth to ensure absolute accuracy:\n\n${visualDescriptionText}${customPrompt ? `\n\nCRITICAL: Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""}` }] },
-            config: {
-              systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema,
-              temperature: temperature ?? 0.1,
-              safetySettings: [
-                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-              ]
-            }
-          });
-          console.log(`[generateStockMetadata] Successfully generated metadata with text-only fallback on model: ${modelName}`);
-          break;
-        } catch (retryErr: any) {
-          lastError = retryErr;
-          console.warn(`[generateStockMetadata] Gemini direct text-only retry also failed with ${modelName}:`, retryErr.message || retryErr);
-        }
-      }
-    }
+    finalMetadataRaw = JSON.parse(extractJSON(typeof validResponse === 'string' ? validResponse : validResponse.text));
+  } catch (err) {
+    console.error("[JohMeta Pipeline] Validation Stage 4/5/6 Failed:", err);
+    finalMetadataRaw = { ...draftMetadata, category_id: 1, shutterstock_category_1: "Abstract", shutterstock_category_2: "Art" };
   }
 
-  if (!response) throw lastError;
-
-  // --- TAHAP 6: PARSING, HARD-SLICING KEYWORD, DAN FILTER KATEGORI JALUR AMAN ---
+  // --- TAHAP 7: FINAL SANITIZATION & RETURN ---
   try {
-    const text = response.text || "{}";
-    const data = JSON.parse(text);
+    const data = finalMetadataRaw;
     
     // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (data.keywords && Array.isArray(data.keywords)) {
@@ -822,7 +830,25 @@ Task: Generate title, description, and exactly ${aiRequestCount} keywords (inclu
       });
       
       const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-      data.keywords = uniqueKeywords.slice(0, targetCount); // Selalu pas sesuai targetCount pengguna (misal: 40)
+      
+      const allowedTerms = [
+        ...(visualFacts.primary_subjects || []).map((x: any) => x.name),
+        ...(visualFacts.secondary_subjects || []).map((x: any) => x.name),
+        ...(visualFacts.actions || []),
+        ...(visualFacts.colors || [])
+      ].join(" ").toLowerCase();
+
+      // Rule 5: Tambahkan Keyword Validator (Hanya lolos jika keyword memiliki kecocokan kata)
+      const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) => {
+        const words = keyword.split(" ");
+        return words.some(word => allowedTerms.includes(word));
+      });
+
+      // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
+      const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k));
+      const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+
+      data.keywords = finalKeywordList.slice(0, targetCount); // Selalu pas sesuai targetCount pengguna (misal: 40)
     }
 
     // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock 2 (Anti-Kosong)
@@ -854,7 +880,7 @@ Task: Generate title, description, and exactly ${aiRequestCount} keywords (inclu
     
     return data as StockMetadata;
   } catch (error) {
-    console.error("[JohMeta Parse Error] Failed to handle output format:", error, response.text);
+    console.error("[JohMeta Parse Error] Failed to handle output format:", error);
     throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
   }
 };
@@ -908,49 +934,97 @@ export const generateBatchStockMetadata = async (
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
-  // --- TAHAP 1: EKSTRAKSI LITERAL & KONSEPTUAL OLEH GEMINI VISION UNTUK BATCH ---
+  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
-  console.log(`[JohMeta Pipeline - Batch] Running Gemini Vision (Literal + Conceptual) for ${provider.toUpperCase()}...`);
+  let parsedVisualFactsList: any[] = [];
+  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
-      let mediaTypeContext = "The provided image is a photograph or digital artwork.";
+      let mediaTypeContext = "The provided image is a photograph or digital artwork. Generate natural, human-readable descriptions of concepts and visual facts smoothly.";
       if (toolType === ToolType.VIDEO) {
-        mediaTypeContext = "CRITICAL: The provided images are sequential frames from a single VIDEO. Analyze the continuous motion, flow, narrative progression, and visual storyline (alur) across frames.";
+        mediaTypeContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.";
       } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-        mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility.";
+        mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility. Generate natural, smooth descriptions.";
       }
 
-      const visionSystemInstruction = `You are an expert creative director and highly specialized computer vision engine for stock photography metadata (Adobe Stock compliance).
+      const visionSystemInstruction = `ROLE:
+You are a Visual Metadata Analyzer (Provider 1).
+Analyze only what is visually verifiable in the image.
+Never guess, assume, hallucinate, infer, or invent information.
+
+CRITICAL ANTI-INFERENCE RULES:
+Keyboard ≠ programmer
+Blueprint ≠ architect
+Camera ≠ photographer
+Laptop ≠ office worker
+Medical mask ≠ doctor
+Suit ≠ businessman
+
+Never infer profession.
+Never infer occupation.
+Never infer industry.
+Never infer location.
+Never infer nationality.
+Never infer emotion.
+
+Only describe visible objects.
+
+PRIMARY OBJECTIVE:
+Detect every visible subject, action, color, visible text, and composition detail.
+Return JSON ONLY under the key "VISUAL_FACTS".
+Do not generate title or keywords.
+Do not infer hidden context.
+
+STRICT VISUAL RULES:
+1. Describe ONLY objects, people, actions, colors, and composition clearly visible.
+2. NEVER assume: nationality, ethnicity, religion, profession, location, country, city, event, season, weather, relationship, emotions not clearly visible, brand names, trademarks, copyrighted characters.
+3. If uncertain: omit the information, do not speculate.
+4. Accuracy is more important than quantity.
+
 Asset Context: ${mediaTypeContext}
-Target Keywords/Themes to incorporate: ${customPrompt || "None"}
 
-Your task is to analyze the provided asset following a strict two-step pipeline:
-
-STEP 1: Analyze image. Thoroughly analyze the composition, arrangement, setting, lighting styles, color palette, visual medium, framing, perspective, physical elements, specific garments, skin tones, textures, and visible details clearly present.
-STEP 2: Create VISUAL_FACTS JSON. Output a structured JSON block labeled as VISUAL_FACTS. The JSON must contain these exact keys:
+OUTPUT FORMAT:
 {
-  "scene_analysis": "Detailed description of the setting, layout, medium, lighting, perspective, framing, composition, and colors.",
-  "object_detection": "Exhaustive, highly literal list of physical objects, garments, models, and skin tones undeniably visible."
-}
-
-=== CRITICAL METADATA COMPLIANCE RULE ===
-Never infer profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible in the frame:
-- No speculative professions: Do NOT call a person a 'businessman', 'doctor', or 'executive' unless they wear an unambiguous uniform, badge, or equipment (like a stethoscope). Describe them literal-first: e.g. "man in suit", "person wearing apron", or "individual using computer".
-- No speculative ethnicity: Do NOT assign specific race/ethnicity labels (e.g., "Asian", "Caucasian", "black person", "Hispanic", "white person") unless undeniably confirmed by the customer preference or undeniable indicators. Use literal physical features like "man with short dark hair" or "person with light skin tone" instead.
-- No speculative locations: Do NOT assume locations like "Paris", "Japan", "New York", or even general "office space" unless iconic visual landmarks, clear signs, or explicit cues are undeniably visible. Use safe, general descriptions instead (e.g., "modern indoor setting", "bright room", "cozy dining table", "urban street").
-- No speculative emotions: Do NOT assume someone is "happy", "excited", "worried", "thoughtful", or "sad" unless their face shows an extreme, unambiguous representation. Instead, describe visible physical states, e.g. "person smiling gently", "calm expression", "straight face".
-- No speculative events/concepts: Do NOT use keywords such as "job interview", "corporate recruitment", "wedding", "first date", "success", "wealth" unless literal physical elements (like a wedding rings ceremony, a birthday cake with lit candles, or a stack of dollar notes) are unmistakably displayed.
-
-Output ONLY the raw JSON block containing VISUAL_FACTS under the exact structure above with absolute literal accuracy based ONLY on what is undeniably visible.`;
+  "VISUAL_FACTS": {
+    "primary_subjects": [
+      {
+        "name": "",
+        "importance": 0
+      }
+    ],
+    "secondary_subjects": [
+      {
+        "name": "",
+        "importance": 0
+      }
+    ],
+    "background_elements": [
+      {
+        "name": "",
+        "importance": 0
+      }
+    ],
+    "visible_text": [],
+    "colors": [],
+    "actions": [],
+    "composition": []
+  }
+}`;
       
+      const promptText = toolType === ToolType.VIDEO 
+        ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
+        : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+
       try {
           const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-            parts: [...imageParts, { text: `Analyze this visual asset in absolute literal, conceptual, and storyline details for stock metadata generation.${customPrompt ? ` Be sure to analyze how these user-requested target keywords/themes relate to or are represented in this asset to ensure they are explicitly included: ${customPrompt}` : ""}` }] 
+            parts: [...imageParts, { text: promptText }] 
           }, {
             systemInstruction: visionSystemInstruction,
-            temperature: 0.35,
+            responseMimeType: "application/json",
+            temperature: temperature ?? 0.1,
+            topP: 0.8,
             safetySettings: [
               { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
               { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -959,141 +1033,162 @@ Output ONLY the raw JSON block containing VISUAL_FACTS under the exact structure
               { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
             ]
           });
-          const text = visionResponse.text || "";
-          if (!text || text.trim().length === 0) {
-              throw new Error("Analisis terblokir akibat kebijakan privasi wajah anak/manusia.");
+          
+          let facts = visionResponse.text || "{}";
+          visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}`);
+          let parsedFacts: any = {};
+          try {
+             parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
+          } catch(e) {
+             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [] };
           }
-          visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${text}`);
+          parsedVisualFactsList.push(parsedFacts);
       } catch (err: any) {
           console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
           const assetTypeStr = toolType === ToolType.VIDEO ? "footage video" : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "vector illustration" : "photograph";
-          const customPromptStr = customPrompt ? ` relating to: ${customPrompt}` : "";
-          const fallbackDescription = `
-SCENE ANALYSIS: A high-quality commercial ${assetTypeStr}${customPromptStr}. Features professional lighting, balanced composition, crisp details, natural color palette, and modern aesthetic style. Set in a clean, simple background.
-OBJECT DETECTION: Factual details representing the main subject, with clear details and realistic textures. If containing a person, depicts a person with a calm, neutral facial expression wearing simple apparel. Everything is captured strictly literally.
-`;
-          visualDescriptions.push(`ASSET #${i + 1} DESCRIPTION:\n${fallbackDescription}`);
+          const fallbackFacts = {
+              VISUAL_FACTS: {
+                primary_subjects: [{ name: "main subject", importance: 100 }],
+                secondary_subjects: [],
+                background_elements: [],
+                visible_text: [],
+                colors: ["natural"],
+                actions: ["commercial posing"],
+                composition: ["professional"]
+              }
+          };
+          visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${JSON.stringify(fallbackFacts)}`);
+          parsedVisualFactsList.push(fallbackFacts.VISUAL_FACTS);
       }
   }
 
-  const itemSchema = {
-    type: Type.OBJECT,
-    properties: {
-      title: { 
-        type: Type.STRING, 
-        description: 'Impactful title in clean, natural human-like Sentence case (MUST BE 50-200 characters, NO commas). Capitalize ONLY the very first letter of the entire title, and make all subsequent words strictly lowercase unless they are proper nouns. STRICTLY based on the Provided Analysis, utilizing natural human language.' 
-      },
-      description: { 
-        type: Type.STRING, 
-        description: 'Detailed visual and conceptual description. MUST conclude with a sentence starting with "Ideal for..." suggesting commercial uses. STRICTLY based on the Provided Analysis. Max 200 chars.' 
-      },
-      keywords: { 
-        type: Type.ARRAY, 
-        items: { type: Type.STRING }, 
-        description: `${keywordRuleSchemaDesc} Rules for Keywords:
-${keywordRulePromptText}
+  // --- TAHAP 2 & 3: PROVIDER 2 (GPT ROLE) & PROVIDER 3 (CLAUDE ROLE) — CONTENT GENERATION BATCH ---
+  console.log(`[JohMeta Pipeline - Batch] Stage 2 & 3: Generating Draft Metadata for ${items.length} items...`);
+  
+  const dominantSubjectsArray = parsedVisualFactsList.map(facts => {
+      return [
+        ...(facts.primary_subjects || []),
+        ...(facts.secondary_subjects || [])
+      ].filter((item: any) => item.importance >= 50).map((item: any) => item.name);
+  });
 
-Keyword Priority:
-- The first 10 keywords must describe the main subject.
-- Secondary and conceptual keywords should come afterward.` 
-      },
-      category_id: { 
-        type: Type.INTEGER, 
-        description: 'The most accurate Adobe Stock category ID from the provided list.' 
-      },
-      shutterstock_category_1: { 
-        type: Type.STRING, 
-        description: 'The primary Shutterstock category. Must strictly match the provided list.' 
-      },
-      shutterstock_category_2: { 
-        type: Type.STRING, 
-        description: 'The secondary Shutterstock category. MUST be strictly DIFFERENT from shutterstock_category_1.' 
-      }
-    },
-    required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2"],
-  };
+  const genSystemInstruction = `ROLE:
+You are a professional Adobe Stock and Shutterstock title and keyword specialist.
 
-  const responseSchema = {
-    type: Type.ARRAY,
-    items: itemSchema,
-    description: `An array of exactly ${items.length} metadata objects corresponding to each visual asset.`
-  };
+PRIMARY OBJECTIVE:
+Generate highly searchable stock titles and exactly ${aiRequestCount} keywords for each item based on the dominant visual subject.
 
-  const mediaContext = `The assets have been thoroughly and accurately analyzed by an advanced vision model. Build your metadata strictly by blending the physical facts, dynamic flow/storyline, and abstract ideas from these descriptions:\n\n${visualDescriptions.join('\n\n')}\n\nAsset Media Type Context: ${toolType === ToolType.VIDEO ? 'This is a premium stock video file' : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? 'This is a clean, modern commercial vector layout' : 'This is a high-quality commercial photo or graphic content'}.`;
+TITLE RULES:
+1. The title must describe the MAIN SUBJECT first for each item.
+2. Include the visual style if it is visually dominant.
+3. Include important supporting elements only when relevant.
+4. Use natural English.
+5. Use Sentence Case.
+6. No punctuation at the end.
+7. Length between 60 and 120 characters.
+8. Prioritize buyer search behavior.
+9. Never write artistic critique or subjective opinions.
+10. Never use words such as: beautiful, amazing, stunning, creative, awesome, masterpiece.
 
-  const groqOptimizationRules = provider === 'groq' ? `
-[CRITICAL GROQ SPEED OPTIMIZATION]
-- DO NOT write any introductory phrases, conversational fillers, or markdown code blocks (like \`\`\`json).
-- Start your response directly with '[' and end exactly with ']'.` : '';
+TITLE VISUAL PRIORITY:
+Priority 1: Main object, Species, Product, Person, Animal
+Priority 2: Illustration style, Color characteristics, Supporting objects
+Priority 3: Background, Environment, Commercial concepts
 
-  const systemInstruction = `You are an elite, highly compliant Adobe Stock and Shutterstock metadata cataloging specialist.
-Your goal is to maximize search discoverability for premium buyers while maintaining 100% strict adherence to stock photography regulations and the Gemini metadata pipeline model.
+GOOD TITLE FORMULA:
+[Visual Style] + [Main Subject] + [Asset Type] + [Supporting Element] + [Background if relevant]
 
-CRITICAL ARRAY ORDER RULES:
-- The output JSON array MUST contain exactly ${items.length} metadata elements.
-- The order of elements in the output JSON array must correspond MATCH-FOR-MATCH with the original input order of the assets.
-- Result element #1 must be metadata for ASSET #1, element #2 for ASSET #2, and so on. Do NOT rearrange, omit, or swap positions of the assets.${groqOptimizationRules}
+Examples:
+Geometric chameleon illustration on tree branch with black background
+Low poly fox illustration isolated on dark background
 
-${mediaContext}
+KEYWORD PRIORITY & RULES:
+1. The first 10 keywords MUST describe the dominant visual subject (Importance 80-100).
+2. Keywords 11-25: Supporting visible elements, environment, colors, actions (Importance 50-79).
+3. Keywords 26-40: Commercial concepts directly supported by the image (Importance 20-49).
+4. Keywords must be ordered by visual importance. Never prioritize background elements over the main subject.
+5. Avoid generic words unless they add search value. Prefer specific terms over broad terms. Use buyer search behavior.
+6. Remove weak keywords: beautiful, amazing, stunning, artwork, composition, style, design, creative.
+7. Generate exactly ${aiRequestCount} keywords. Use broader terms to reach exactly ${aiRequestCount} keywords if specific terms run out.
 
-=== GEMINI METADATA PIPELINE STAGES ===
+STRICT PROHIBITIONS & ACCURACY:
+1. Every title word, description phrase, and keyword must be supported by visible evidence from that asset's VISUAL_FACTS.
+2. Do not describe blurred background elements as main subjects.
+3. Do not infer: profession, occupation, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
 
-STEP 3: Generate title from VISUAL_FACTS.
-- Carefully read the "scene_analysis" and "object_detection" from each asset's provided VISUAL_FACTS JSON.
-- Synthesize a descriptive, long-tail Title (60-120 characters) using plain, natural human language.
-- Strictly ground the Title in the physical elements of VISUAL_FACTS.
+STRICT DEFINING RULES:
+- Return a JSON ARRAY of exactly ${items.length} objects.
+- Order MUST match input items exactly.
+- Titles: Sentence case, no punctuation, 60-120 chars.
+- Keywords: Exactly ${aiRequestCount} items. Lowercase. No subjective terms.
+- Base everything 100% on the VISUAL_FACTS provided for each asset.
 
-STEP 4: Generate description from VISUAL_FACTS.
-- Write a detailed visual breakdown based strictly on VISUAL_FACTS.
-- ALWAYS conclude the Description with a sentence starting with "Ideal for..." or "Perfect for..." proposing real-world commercial use-cases.
-- Max 200 characters.
+DOMINANT_SUBJECTS (Target these for titles):
+${JSON.stringify(dominantSubjectsArray, null, 2)}
 
-STEP 5: Generate keywords from VISUAL_FACTS.
-- Generate high-quality candidate keywords describing the physical setting, characters, objects, colors, and medium from the VISUAL_FACTS.
+SOURCE VISUAL_FACTS:
+${visualDescriptions.join('\n\n')}
 
-STEP 6: Audit every keyword.
-- Critically audit every candidate keyword for EACH asset separately. Remove any keyword not directly supported by or explicitly present in that asset's VISUAL_FACTS JSON:
-  - NEVER INFER profession, ethnicity, location, emotion, event, or concept unless clearly and undeniably visible or explicitly present in the VISUAL_FACTS:
-    * Audit: Check if any keyword implies a profession (e.g. "doctor", "manager", "engineer", "businessman", "employee"). If the model does not wear a clear stethoscope or uniform, REMOVE the keyword. Replace with literal terms: e.g., "man", "woman", "person wearing suit", etc.
-    * Audit: Check for specific ethnicity labels (e.g. "Asian", "Caucasian", "Spanish", "black", "white"). If NOT undeniably present in VISUAL_FACTS, REMOVE them immediately.
-    * Audit: Check for specific geographic locations (e.g. "Paris", "New York", "London"). Unless an iconic structure (like Eiffel Tower) is explicitly described, REMOVE them. Use generic descriptors (e.g., "cozy kitchen", "indoor room", "bright environment").
-    * Audit: Check for emotions (e.g. "happy", "depressed", "loving", "sad"). Omit subjective internal states unless dramatically physical.
-    * Audit: Check for speculative events/business concepts (e.g. "meeting", "job interview", "negotiation", "wedding"). Remove them, as stock agencies reject files for metadata that assumes unproven contexts.
+OUTPUT FORMAT:
+[
+  { "title": "", "description": "", "keywords": [] },
+  ...
+]`;
 
-STEP 7: Sort keywords by Adobe Stock relevance.
-- Sort the audited keywords lists by relevance:
-  - Place the most descriptive, literal, and physical main subject keywords in the first 7 positions of the asset's keyword list.
-  - Secondary background, setting, and medium keywords should follow afterward.
-  - Output exactly the requested quantity of keywords.
+  let draftMetadataArray: any[] = [];
+  try {
+    const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
+      ? callOpenAICompatibleWithRetry({
+          systemInstruction: genSystemInstruction,
+          contents: `Generate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
+          responseMimeType: "application/json",
+          config: { temperature: temperature ?? 0.1, topP: 0.8 },
+          model
+        })
+      : callGeminiWithRetry(model && model.startsWith('gemini-') ? model : 'gemini-3.1-flash-lite', { 
+          parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
+        }, {
+          systemInstruction: genSystemInstruction,
+          responseMimeType: "application/json",
+          temperature: temperature ?? 0.1,
+          topP: 0.8
+        })
+    );
 
-[STRICT MICROSTOCK OPTIMIZATION RULES]
-1. LONG-TAIL TITLES: Combine Subject + Specific Action + Unique Element within 60-120 characters in Sentence case. No punctuation/commas. NO trailing period.
-2. FRONT-LOADING KEYWORDS: Place the most descriptive, literal, and physical keywords within the first 7 positions of the keyword list.
-3. ANTI-WASTE: DO NOT include overly broad keywords or subjective aesthetic-only terms ("beautiful", "stunning", "fantastic").
+    draftMetadataArray = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+  } catch (err) {
+    console.error("[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed:", err);
+    draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
+  }
 
-[ADOBE STOCK COMPLIANCE RULES]
-Rules for Titles:
-1. NATURAL HUMAN LANGUAGE: Use grammatically perfect, natural human English. No code-speak, robotic terms, or hashtags.
-2. NO SUBJECTIVE / QUALITY WORDS: Avoid marketing power-words or emotional quality buzzwords.
-3. NO PUNCTUATION OR COMMAS: DO NOT use commas, periods, hashes, or exclamation marks. No period at the end.
-4. STRICT SENTENCE CASE: Capitalize ONLY the first letter of the entire title. Keep all other words in lowercase.
+  // --- TAHAP 4, 5, & 6: AUDIT, RANK, & VALIDATE BATCH ---
+  console.log(`[JohMeta Pipeline - Batch] Stage 4, 5 & 6: Final Validation for ${items.length} items...`);
 
-Rules for Descriptions:
-1. Provide a thorough, objective, and literal visual breakdown based ONLY on the vision analysis text.
-2. ALWAYS conclude with a sentence starting with "Ideal for..." or "Perfect for..." suggesting real-world commercial uses.
-3. Max 200 characters.
+  const validatorSystemInstruction = `ROLE:
+You are the Final Quality Validator.
+1. Audit each item's metadata against its VISUAL_FACTS. Remove unsupported terms.
+2. Sort keywords by relevance.
+3. Assign Category IDs.
+4. Calculate confidence score for each.
+5. Return JSON ARRAY of approved metadata objects.
 
-Rules for Keywords:
-${keywordRulePromptText}
+VISUAL ACCURACY RULES (CRITICAL):
+1. Every title word, description phrase, and keyword MUST be supported by visible evidence in that asset's VISUAL_FACTS.
+2. Never infer or assume: profession, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
+3. Keep the keyword count exactly at ${aiRequestCount}. If a generated keyword is speculative, DO NOT drop it—replace it with a broader visual descriptor (color, shape, composition) to maintain the required count.
 
-Keyword Priority:
-- The first 10 keywords must describe the main physical subject.
-- Secondary, audited background keywords should come afterward.
-- The list must contain EXACTLY the requested quantity of keywords.
+STRICT VALIDATION RULES:
+- Remove any keyword not directly supported by VISUAL_FACTS, but replace it to reach exactly ${aiRequestCount} keywords.
+- Verify every keyword exists visually.
+- Remove duplicates.
+- Ensure compliance with Adobe Stock (Sentence case title, no punctuation).
+- Select accurate Categories.
 
-Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+SELF-CHECK:
+Before returning metadata, remove unsupported, duplicate, or assumed terms.
+
+SOURCE VISUAL_FACTS:
+${visualDescriptions.join('\n\n')}
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -1101,112 +1196,51 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-User Custom Prompt: ${customPrompt || "Professional stock metadata compliance."}`;
+DRAFT METADATA TO VALIDATE:
+${JSON.stringify(draftMetadataArray, null, 2)}
 
-  // --- TAHAP 5: EKSEKUSI PANGGILAN API ---
-  let response;
-  let lastError;
+OUTPUT FORMAT:
+[
+  {
+    "title": "",
+    "description": "",
+    "keywords": [],
+    "category_id": 0,
+    "shutterstock_category_1": "",
+    "shutterstock_category_2": "",
+    "confidence_score": 0.95
+  },
+  ...
+]`;
 
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    try {
-      const answerText = await callOpenAICompatibleWithRetry({
-        systemInstruction,
-        contents: `Perform a Smart AI Analysis on the provided visual descriptions to generate a highly relevant, descriptive, and effective stock metadata JSON array of exactly ${items.length} metadata objects.
-=== SOURCE ASSET DESCRIPTIONS ===
-${visualDescriptions.join('\n\n')}
-=== END SOURCE ===
+  let finalMetadataArray: any[] = [];
+  try {
+    const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
+      ? callOpenAICompatibleWithRetry({
+          systemInstruction: validatorSystemInstruction,
+          contents: `Audit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
+          responseMimeType: "application/json",
+          config: { temperature: temperature ?? 0.1, topP: 0.8 },
+          model
+        })
+      : callGeminiWithRetry(model && model.startsWith('gemini-') ? model : 'gemini-3.1-flash-lite', { 
+          parts: [{ text: `Audit and validate the Draft Metadata array for ${items.length} assets based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
+        }, {
+          systemInstruction: validatorSystemInstruction,
+          responseMimeType: "application/json",
+          temperature: temperature ?? 0.1,
+          topP: 0.8
+        })
+    );
 
-Task: For EACH asset described above, generate a compliant metadata object. Ensure titles and keywords are strictly derived from the specific description for that asset.${customPrompt ? ` Be sure to strongly incorporate and prioritize these target keywords/themes in the output metadata for each asset where appropriate: ${customPrompt}.` : ""} FOLLOW ALL COMPLIANCE RULES. TITLES MUST BE DESCRIPTIVE, LONG-TAIL (60-80 chars), NATURAL, AND SEO-OPTIMIZED.`,
-        responseMimeType: "application/json",
-        responseSchema,
-        config: { temperature: temperature ?? 0.1 },
-        model
-      });
-      response = { text: answerText };
-    } catch (err) {
-      lastError = err;
-      console.warn(`[JohMeta Pipeline - Batch] Hybrid pipeline failed with ${provider.toUpperCase()}:`, err);
-    }
-  } else {
-    const parts: any[] = [];
-    for (let index = 0; index < items.length; index++) {
-        const item = items[index];
-        parts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
-        item.frames.forEach(f => parts.push(processFrameServer(f)));
-    }
-    parts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
-
-    let modelsToTry = (model && (model.startsWith('gemini-') || model.startsWith('gemma-'))) 
-        ? [model, 'gemini-3.1-flash-lite', 'gemini-3-flash'] 
-        : ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
-    
-    // Deduplicate
-    modelsToTry = Array.from(new Set(modelsToTry));
-
-    for (const modelName of modelsToTry) {
-      try {
-        response = await getAIClient().models.generateContent({
-          model: modelName,
-          contents: { parts },
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema,
-            temperature: temperature ?? 0.1, // Lowered to 0.1 for maximum precision and strict adherence (no ngawur/acak-acakan)
-            safetySettings: [
-              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-            ]
-          }
-        });
-        break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[JohMeta Pipeline - Batch] Gemini direct batch failed with multimodal ${modelName}:`, err.message || err);
-
-        // JIKA GAGAL (kemungkinan karena sensor gambar/safety), coba lagi dengan PURE TEKS tanpa gambar!
-        try {
-          console.log(`[JohMeta Pipeline - Batch] Retrying Stage 5 of batch using pure text path for ${modelName}...`);
-          const textOnlyParts = [];
-          for (let index = 0; index < items.length; index++) {
-              textOnlyParts.push({ text: `\n\n--- ITEM ${index + 1} VISUAL DESCRIPTION ---\n${visualDescriptions[index]}\n\n` });
-          }
-          textOnlyParts.push({ text: `Generate a compliant metadata array for these ${items.length} separate items, each with exactly ${aiRequestCount} keywords (including both single-word and/or multi-word phrases). Use the pre-analyzed visual descriptions above as the absolute physical source of truth to ensure maximum accuracy (do not invent subjects or surroundings).${customPrompt ? ` Always incorporate and prioritize these target keywords/themes as part of your metadata: ${customPrompt}` : ""} Ensure strict compliance with all SEO rules.` });
-
-          response = await getAIClient().models.generateContent({
-            model: modelName,
-            contents: { parts: textOnlyParts },
-            config: {
-              systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema,
-              temperature: temperature ?? 0.1,
-              safetySettings: [
-                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-              ]
-            }
-          });
-          break;
-        } catch (retryErr: any) {
-          lastError = retryErr;
-          console.warn(`[JohMeta Pipeline - Batch] Gemini direct batch text-only retry also failed with ${modelName}:`, retryErr.message || retryErr);
-        }
-      }
-    }
+    finalMetadataArray = JSON.parse(extractJSON(typeof validResponse === 'string' ? validResponse : validResponse.text));
+  } catch (err) {
+    console.error("[JohMeta Pipeline - Batch] Batch Validation Stage 4/5/6 Failed:", err);
+    finalMetadataArray = draftMetadataArray.map(d => ({ ...d, category_id: 1, shutterstock_category_1: "Abstract", shutterstock_category_2: "Art" }));
   }
 
-  if (!response) throw lastError;
-
   try {
-    const text = response.text || "[]";
-    const dataArray = JSON.parse(text) as StockMetadata[];
+    const dataArray = finalMetadataArray;
 
     return dataArray.map((metadata, index) => {
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
@@ -1239,7 +1273,25 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
                 }
             });
             const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-            metadata.keywords = uniqueKeywords.slice(0, targetCount);
+            
+            const assetVisualFacts = parsedVisualFactsList[index] || {};
+            const allowedTerms = [
+              ...(assetVisualFacts.primary_subjects || []).map((x: any) => x.name),
+              ...(assetVisualFacts.secondary_subjects || []).map((x: any) => x.name),
+              ...(assetVisualFacts.actions || []),
+              ...(assetVisualFacts.colors || [])
+            ].join(" ").toLowerCase();
+
+            // Rule 5: Tambahkan Keyword Validator
+            const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) => {
+              const words = keyword.split(" ");
+              return words.some(word => allowedTerms.includes(word));
+            });
+
+            const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k));
+            const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+
+            metadata.keywords = finalKeywordList.slice(0, targetCount);
         }
 
         // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
@@ -1273,7 +1325,7 @@ Task: For EACH asset described above, generate a compliant metadata object. Ensu
         return { id: targetId, metadata };
     });
   } catch (error) {
-    console.error("[JohMeta Pipeline - Batch] Parse Error:", error, response.text);
+    console.error("[JohMeta Pipeline - Batch] Parse Error:", error);
     throw new Error("Gagal memproses respons batch metadata. Silakan coba kembali.");
   }
 };

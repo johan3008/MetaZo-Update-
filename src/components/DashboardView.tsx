@@ -23,6 +23,7 @@ interface DashboardViewProps {
   imageDailyCount?: number;
   videoDailyCount?: number;
   vectorDailyCount?: number;
+  t: any;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -41,7 +42,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   setShowActivation,
   imageDailyCount = 0,
   videoDailyCount = 0,
-  vectorDailyCount = 0
+  vectorDailyCount = 0,
+  t
 }) => {
   // Compute some quick statistics
   const totalFiles = files.length;
@@ -79,13 +81,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
             <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
-            <span>AI-Driven Metadata Engine</span>
+            <span>{t.hero_badge}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight leading-tight select-none">
-            Optimalisasi <span className="text-emerald-300">Stock Asset</span> Instan
+            {t.hero_title_part1} <span className="text-emerald-300">{t.hero_title_part2}</span> {t.hero_title_part3}
           </h1>
           <p className="mt-2 text-xs sm:text-sm text-slate-100/90 font-medium leading-relaxed max-w-xl">
-            MetaZo memanfaatkan kecerdasan AI untuk menghasilkan judul, deskripsi, dan tag otomatis bagi portal stock global.
+            {t.hero_description}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button 
@@ -93,11 +95,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               className="px-4 py-2 bg-emerald-400 text-slate-900 font-extrabold text-xs rounded-xl shadow-lg hover:bg-emerald-300 hover:scale-[1.03] transition-all flex items-center space-x-1.5 uppercase cursor-pointer"
             >
               <BookOpen size={14} />
-              <span>Cara Pakai</span>
+              <span>{t.hero_cta_how}</span>
             </button>
             <div className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 select-none text-white font-extrabold text-xs rounded-xl transition-all flex items-center space-x-1.5 uppercase">
               <ShieldCheck size={14} className="text-emerald-300" />
-              <span>{generationMode.toUpperCase()} ({totalFiles} File)</span>
+              <span>{generationMode.toUpperCase()} ({totalFiles} {t.hero_stats_file})</span>
             </div>
           </div>
         </div>
@@ -112,16 +114,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div>
               <h4 className="text-sm font-black text-white uppercase tracking-wider">
-                Lisensi Komersial Aktif
+                {t.license_active_title}
               </h4>
               <p className="text-xs font-medium text-emerald-50 leading-relaxed mt-1">
-                Akses tanpa batas telah aktif untuk workflow profesional {appName}.
+                {t.license_active_desc} {appName}.
               </p>
             </div>
           </div>
           <div className="flex items-center shrink-0">
             <span className="px-4 py-2 bg-white text-emerald-700 font-extrabold text-[11px] rounded-full uppercase tracking-widest shadow-lg">
-              ★ PRO
+              {t.license_pro_badge}
             </span>
           </div>
         </div>
@@ -134,10 +136,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div>
                 <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center space-x-2">
-                  <span>Versi Trial</span>
+                  <span>{t.trial_badge}</span>
                 </h4>
                 <p className="text-[12px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl mt-1.5">
-                  Gunakan <strong className="text-slate-900 dark:text-slate-100 font-semibold">{appName}</strong> dalam mode terbatas. Dapatkan akses unlimited dengan lisensi premium seharga <strong className="text-amber-600 dark:text-amber-400 font-bold">{pricingTier}</strong>.
+                  {t.trial_desc_part1} <strong className="text-slate-900 dark:text-slate-100 font-semibold">{appName}</strong> {t.trial_desc_part2} <strong className="text-amber-600 dark:text-amber-400 font-bold">{pricingTier}</strong>.
                 </p>
               </div>
             </div>
@@ -147,7 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setShowActivation?.(true)}
               className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all shadow-md shadow-amber-500/20 cursor-pointer"
             >
-              Lisensi
+              {t.trial_cta_license}
             </button>
             <a
               href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName || '')}`}
@@ -155,7 +157,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               rel="noopener noreferrer"
               className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all flex items-center justify-center cursor-pointer"
             >
-              Admin
+              {t.trial_cta_admin}
             </a>
           </div>
         </div>
@@ -166,9 +168,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2">
             <Activity size={16} className="text-[#4e73df]" />
-            <span>Pilih Ruang Kerja</span>
+            <span>{t.workspace_title}</span>
           </h3>
-          <span className="text-[10px] font-black text-[#4e73df] uppercase tracking-widest bg-[#4e73df]/5 border border-[#4e73df]/10 px-2 py-0.5 rounded-md">3 Mode</span>
+          <span className="text-[10px] font-black text-[#4e73df] uppercase tracking-widest bg-[#4e73df]/5 border border-[#4e73df]/10 px-2 py-0.5 rounded-md">{t.workspace_modes}</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -184,23 +186,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <ImageIcon size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-[#4e73df] transition-colors">
-                Image AI
+                {t.image_ws_title}
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Optimasi foto, poster, atau karya seni raster (JPG, PNG, WEBP) secara otomatis.
+                {t.image_ws_desc}
               </p>
 
               {!isLicensed && (
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    <span>Kuota Hari Ini</span>
+                    <span>{t.daily_quota}</span>
                     <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${imageDailyCount >= 30 ? 'bg-red-550' : 'bg-[#4e73df]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 30) * 100)}%` }} />
                   </div>
                   {imageDailyCount >= 30 && (
-                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Kuota habis. Coba besok.</span>
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
                   )}
                 </div>
               )}
@@ -210,7 +212,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setActiveTool(ToolType.IMAGE)}
               className="w-full py-2 bg-[#4e73df] hover:bg-blue-600 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
-              <span>Optimasi Gambar</span>
+              <span>{t.image_ws_cta}</span>
             </button>
           </div>
 
@@ -225,23 +227,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <Film size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-purple-500 transition-colors">
-                Video AI
+                {t.video_ws_title}
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Analisis klip video (MP4, MOV, WEBM) untuk metadata sinematik yang presisi.
+                {t.video_ws_desc}
               </p>
 
               {!isLicensed && (
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    <span>Kuota Hari Ini</span>
+                    <span>{t.daily_quota}</span>
                     <span className={videoDailyCount >= 30 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${videoDailyCount >= 30 ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / 30) * 100)}%` }} />
                   </div>
                   {videoDailyCount >= 30 && (
-                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Kuota habis. Coba besok.</span>
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
                   )}
                 </div>
               )}
@@ -251,7 +253,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setActiveTool(ToolType.VIDEO)}
               className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
-              <span>Optimasi Video</span>
+              <span>{t.video_ws_cta}</span>
             </button>
           </div>
 
@@ -266,23 +268,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <FileCode size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-emerald-500 transition-colors">
-                Vector AI
+                {t.vector_ws_title}
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
-                Metadata otomatis untuk file vektor (SVG, EPS, AI) guna kebutuhan elemen desain UI/UX.
+                {t.vector_ws_desc}
               </p>
 
               {!isLicensed && (
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    <span>Kuota Hari Ini</span>
+                    <span>{t.daily_quota}</span>
                     <span className={vectorDailyCount >= 30 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${vectorDailyCount >= 30 ? 'bg-red-550' : 'bg-emerald-600'}`} style={{ width: `${Math.min(100, (vectorDailyCount / 30) * 100)}%` }} />
                   </div>
                   {vectorDailyCount >= 30 && (
-                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">⚠️ Kuota habis. Coba besok.</span>
+                    <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
                   )}
                 </div>
               )}
@@ -292,7 +294,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => setActiveTool(ToolType.VECTOR)}
               className="w-full py-2 bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
-              <span>Optimasi Vektor</span>
+              <span>{t.vector_ws_cta}</span>
             </button>
           </div>
 
@@ -307,45 +309,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2 mb-4 pb-2 border-b border-slate-100 dark:border-white/5">
               <BarChart2 size={15} className="text-blue-500" />
-              <span>Status Antrean Data</span>
+              <span>{t.queue_status_title}</span>
             </h3>
 
             <div className="space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>Metadata Oke</span>
+                  <span>{t.status_success}</span>
                 </div>
-                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{successfulFilesCount} File</span>
+                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{successfulFilesCount} {t.hero_stats_file}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
                   <span className="w-2 h-2 rounded-full bg-[#4e73df]" />
-                  <span>Siap Diproses AI</span>
+                  <span>{t.status_ready}</span>
                 </div>
-                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{filesToGenerateCount} File</span>
+                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{filesToGenerateCount} {t.hero_stats_file}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Draf Belum Dikonfigurasi</span>
+                  <span>{t.status_draft}</span>
                 </div>
-                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{unprocessedFilesCount} File</span>
+                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{unprocessedFilesCount} {t.hero_stats_file}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
                   <span className="w-2 h-2 rounded-full bg-red-500" />
-                  <span>Masalah / Error</span>
+                  <span>{t.status_error}</span>
                 </div>
-                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{filesWithErrorCount} File</span>
+                <span className="text-xs font-black text-slate-850 dark:text-slate-200">{filesWithErrorCount} {t.hero_stats_file}</span>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Persentase Sukses</span>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t.success_rate}</span>
                   <span className="text-xs font-black text-emerald-500">{processedPercent}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -362,21 +364,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2 mb-4 pb-2 border-b border-slate-100 dark:border-white/5">
               <Zap size={14} className="text-emerald-500 animate-pulse" />
-              <span>Distribusi Format Upload</span>
+              <span>{t.dist_title}</span>
             </h3>
 
             {totalFiles === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center select-none">
                 <HelpCircle size={32} className="text-slate-300 dark:text-slate-700 mb-2" />
-                <p className="text-xs font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest">Belum Ada File Terunggah</p>
-                <p className="text-[10px] font-bold text-slate-400/80 dark:text-slate-600/70 mt-1">Gunakan tab menu "Metadata Gen" untuk mengunggah file Anda.</p>
+                <p className="text-xs font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest">{t.no_files_title}</p>
+                <p className="text-[10px] font-bold text-slate-400/80 dark:text-slate-600/70 mt-1">{t.no_files_desc}</p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    <span className="flex items-center space-x-2"><ImageIcon size={14} className="text-blue-500" /> <span>Ruang Kerja Gambar (Image)</span></span>
-                    <span>{imageFilesCount} File ({Math.round((imageFilesCount / totalFiles) * 100)}%)</span>
+                    <span className="flex items-center space-x-2"><ImageIcon size={14} className="text-blue-500" /> <span>{t.dist_image_label}</span></span>
+                    <span>{imageFilesCount} {t.hero_stats_file} ({Math.round((imageFilesCount / totalFiles) * 100)}%)</span>
                   </div>
                   <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                     <div className="h-full bg-blue-500 rounded-lg transition-all" style={{ width: `${(imageFilesCount / totalFiles) * 100}%` }} />
@@ -385,8 +387,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <div>
                   <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    <span className="flex items-center space-x-2"><Film size={14} className="text-purple-500" /> <span>Ruang Kerja Video (Video)</span></span>
-                    <span>{videoFilesCount} File ({Math.round((videoFilesCount / totalFiles) * 100)}%)</span>
+                    <span className="flex items-center space-x-2"><Film size={14} className="text-purple-500" /> <span>{t.dist_video_label}</span></span>
+                    <span>{videoFilesCount} {t.hero_stats_file} ({Math.round((videoFilesCount / totalFiles) * 100)}%)</span>
                   </div>
                   <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                     <div className="h-full bg-purple-500 rounded-lg transition-all" style={{ width: `${(videoFilesCount / totalFiles) * 100}%` }} />
@@ -395,8 +397,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <div>
                   <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    <span className="flex items-center space-x-2"><FileCode size={14} className="text-emerald-500" /> <span>Ruang Kerja Vektor (Vector)</span></span>
-                    <span>{vectorFilesCount} File ({Math.round((vectorFilesCount / totalFiles) * 100)}%)</span>
+                    <span className="flex items-center space-x-2"><FileCode size={14} className="text-emerald-500" /> <span>{t.dist_vector_label}</span></span>
+                    <span>{vectorFilesCount} {t.hero_stats_file} ({Math.round((vectorFilesCount / totalFiles) * 100)}%)</span>
                   </div>
                   <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                     <div className="h-full bg-emerald-500 rounded-lg transition-all" style={{ width: `${(vectorFilesCount / totalFiles) * 100}%` }} />
@@ -413,7 +415,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase truncate">{portal}</span>
                 <span className="inline-flex items-center space-x-1 mt-0.5 text-[8px] font-bold text-emerald-500 uppercase">
                   <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                  <span>Siap</span>
+                  <span>{t.portal_ready}</span>
                 </span>
               </div>
             ))}

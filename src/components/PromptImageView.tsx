@@ -20,13 +20,13 @@ interface ImageItem {
   error?: string | null;
 }
 
-const STYLE_OPTIONS = [
-  { id: 'Photorealistic', label: 'Photorealistic (Realistis)', icon: '📷' },
-  { id: 'Cinematic', label: 'Cinematic (Film)', icon: '🎬' },
-  { id: 'Adobe Stock', label: 'Adobe Stock Style', icon: '💎' },
-  { id: 'Editorial', label: 'Editorial (Majalah)', icon: '📖' },
-  { id: 'Lifestyle', label: 'Lifestyle (Gaya Hidup)', icon: '✨' },
-  { id: 'Fine Art', label: 'Fine Art (Seni Tinggi)', icon: '🏛️' }
+const STYLE_OPTIONS = (t: any) => [
+  { id: 'Photorealistic', label: t.style_photorealistic, icon: '📷' },
+  { id: 'Cinematic', label: t.style_cinematic, icon: '🎬' },
+  { id: 'Adobe Stock', label: t.style_adobe_stock, icon: '💎' },
+  { id: 'Editorial', label: t.style_editorial, icon: '📖' },
+  { id: 'Lifestyle', label: t.style_lifestyle, icon: '✨' },
+  { id: 'Fine Art', label: t.style_fine_art, icon: '🏛️' }
 ];
 
 export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
@@ -208,6 +208,8 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
     }
   };
 
+  const currentStyleOptions = STYLE_OPTIONS(t);
+
   return (
     <div className="w-full space-y-6">
       {/* Brand Header */}
@@ -222,17 +224,17 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
             <ImageIcon className="text-emerald-500" size={24} />
-            Prompt Image Studio
+            {t.image_studio_title}
             <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full tracking-widest font-black ml-2 animate-pulse">BATCH ENABLED</span>
           </h2>
           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
-            Ekstraksi Deskripsi & Estetika dari Referensi Gambar Anda (Single & Batch Mode)
+            {t.image_studio_subtitle}
           </p>
         </div>
         
-        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-205 dark:border-white/5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
           <Layers size={12} className="text-emerald-500 animate-bounce" />
-          <span>Image-to-Prompt Batch v2.0</span>
+          <span>{t.image_studio_version}</span>
         </div>
       </div>
 
@@ -243,11 +245,11 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Panel Unggah Gambar
+                  {t.image_studio_upload_label}
                 </label>
                 {images.length > 0 && (
                   <button onClick={clearAll} className="text-[10px] text-red-500 font-black uppercase hover:underline">
-                    Hapus Semua ({images.length})
+                    {t.image_studio_clear_all} ({images.length})
                   </button>
                 )}
               </div>
@@ -270,9 +272,9 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
                 </div>
                 <div className="text-center space-y-1">
                   <p className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
-                    {isDragging ? 'Lepaskan Gambar' : 'Unggah / Seret Gambar'}
+                    {isDragging ? t.image_studio_release : t.image_studio_drag_drop}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-medium tracking-tight">Mendukung banyak file sekaligus</p>
+                  <p className="text-[10px] text-slate-400 font-medium tracking-tight">{t.image_studio_support_multiple}</p>
                 </div>
                 <input 
                   type="file" 
@@ -287,10 +289,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
 
             <div className="space-y-4 border-t border-slate-100 dark:border-white/5 pt-5">
               <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Pilih Target Estetika
+                {t.image_studio_target_label}
               </label>
               <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {STYLE_OPTIONS.map((opt) => (
+                {currentStyleOptions.map((opt: any) => (
                   <button
                     key={opt.id}
                     onClick={() => setStyleCategory(opt.id)}
@@ -335,12 +337,12 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
               {loadingBatch ? (
                 <>
                   <RefreshCw className="animate-spin" size={14} />
-                  <span>Processing {images.filter(img => img.loading).length} Items ({Math.round(batchProgress)}%)</span>
+                  <span>{t.image_studio_btn_analyzing.replace('{count}', images.filter(img => img.loading).length.toString()).replace('{progress}', Math.round(batchProgress).toString())}</span>
                 </>
               ) : (
                 <>
                   <Sparkles size={14} className="animate-pulse" />
-                  <span>Hasilkan Prompt ({images.filter(img => !img.result).length} Item Baru)</span>
+                  <span>{t.image_studio_btn_analyze.replace('{count}', images.filter(img => !img.result).length.toString())}</span>
                 </>
               )}
             </button>
@@ -354,12 +356,12 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
               <div className="flex items-center gap-3">
                 <Grid size={16} className="text-emerald-500" />
                 <h3 className="font-black text-xs text-slate-800 dark:text-slate-200 uppercase tracking-widest">
-                  Progress Dashboard Antrian
+                  {t.image_studio_dashboard_title}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                  Status: {images.filter(img => img.result).length}/{images.length} Selesai
+                  {t.image_studio_status_label.replace('{finished}', images.filter(img => img.result).length.toString()).replace('{total}', images.length.toString())}
                 </span>
                 {images.some(img => img.result) && (
                   <>
@@ -379,7 +381,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
                       }`}
                     >
                       {copiedId === 'all-batch' ? <Check size={12} /> : <Layers size={12} />}
-                      <span>{copiedId === 'all-batch' ? 'Copied All' : 'Salin Semua'}</span>
+                      <span>{copiedId === 'all-batch' ? t.image_studio_btn_copied_all : t.image_studio_btn_copy_all}</span>
                     </button>
                   </>
                 )}
@@ -393,9 +395,9 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
                     <Wand2 size={48} className="text-slate-300 dark:text-slate-700" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest italic">Belum Ada Gambar dalam Antrian</p>
+                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest italic">{t.image_studio_empty_title}</p>
                     <p className="text-xs text-slate-400 font-medium max-w-xs leading-relaxed">
-                      Unggah satu atau beberapa gambar referensi untuk mengekstraksi prompt estetika AI secara instan.
+                      {t.image_studio_empty_desc}
                     </p>
                   </div>
                 </div>

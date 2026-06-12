@@ -89,9 +89,18 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
   const [isSuggesting, setIsSuggesting] = React.useState(false);
   const [suggestError, setSuggestError] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
 
   const badgeClass = themeColor === 'blue' ? 'bg-blue-500/10 text-[#4e73df]' : themeColor === 'purple' ? 'bg-purple-500/10 text-purple-600' : 'bg-emerald-500/10 text-emerald-600';
   const buttonColorClass = themeColor === 'blue' ? 'text-[#4e73df] hover:text-blue-600' : themeColor === 'purple' ? 'text-purple-600 hover:text-purple-750' : 'text-emerald-600 hover:text-emerald-700';
+
+  const handleCopy = async () => {
+    const success = await copyToClipboard(keywords.join(', '));
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -183,12 +192,15 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     <div className="space-y-1">
       <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
         <label>{label} ({keywords.length}/49)</label>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           {suggestError && (
             <span className="text-rose-500 font-extrabold normal-case leading-none animate-pulse">
               {suggestError}
             </span>
           )}
+          <button onClick={handleCopy} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
+            {copied ? 'copied!' : 'copy'}
+          </button>
           <button
             onClick={handleSmartSuggest}
             disabled={isSuggesting || !title || !title.trim()}
@@ -617,7 +629,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                             className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-[#1e3a8a] text-white text-[10px] font-black uppercase tracking-wider rounded-xl hover:from-blue-600 hover:to-blue-900 transition-all flex items-center justify-center space-x-2 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                           >
                             <Sparkles size={13} className={file.isGenerating ? "animate-spin" : "animate-pulse"} />
-                            <span>{file.isGenerating ? "Menghasilkan..." : "Regenerate Metadata"}</span>
+                            <span>{file.isGenerating ? t.generating : t.regenerate}</span>
                           </button>
                         </div>
                       )}

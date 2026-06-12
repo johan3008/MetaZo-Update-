@@ -37,6 +37,7 @@ interface SaaSPortalProps {
   // Trial status control
   trialDaysLeft?: number;
   subDaysLeft?: number | null;
+  t: any;
 }
 
 export const SaaSPortal: React.FC<SaaSPortalProps> = ({
@@ -60,7 +61,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   isResellerUnlocked = false,
   setIsResellerUnlocked,
   trialDaysLeft,
-  subDaysLeft = null
+  subDaysLeft = null,
+  t
 }) => {
   // Local Temp States for Reseller Portal
   const [tempAppName, setTempAppName] = useState(appName);
@@ -387,7 +389,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
   const handleApplyLicenseKey = async () => {
     if (!inputKey.trim()) {
-      setActivationError('Mohon masukkan Serial Key lisensi Anda terlebih dahulu.');
+      setActivationError(t.activation_error_empty);
       return;
     }
 
@@ -415,7 +417,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               const elapsedMs = nowTime - activatedTime;
               const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
               if (elapsedDays > 30) {
-                setActivationError('Masa aktif Serial Key ini (30 Hari) telah kedaluwarsa. Sila beli key baru.');
+                setActivationError(t.activation_error_expired);
                 setIsActivating(false);
                 return;
               }
@@ -429,7 +431,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               setShowActivation(false);
             }, 2500);
           } else {
-            setActivationError('Serial Key ini sudah digunakan oleh pengguna lain! Mohon gunakan Serial Key yang berbeda.');
+            setActivationError(t.activation_error_used);
           }
         } else {
           // Unactivated single-use key -> activate it!
@@ -461,7 +463,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             setShowActivation(false);
           }, 2500);
         } else {
-          setActivationError('Serial Key tidak terdaftar atau salah. Sila hubungi Admin untuk membeli Key Resmi.');
+          setActivationError(t.activation_error_invalid);
         }
       }
     } catch (err) {
@@ -477,7 +479,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           setShowActivation(false);
         }, 2500);
       } else {
-        setActivationError('Koneksi internet bermasalah dan validasi offline gagal.');
+        setActivationError(t.activation_error_offline);
         handleFirestoreError(err, OperationType.GET, `keys/${targetKeyFormatted}`);
       }
     } finally {
@@ -1072,10 +1074,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   <Key size={22} className="rotate-45" />
                 </div>
                 <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                  {trialDaysLeft !== undefined && trialDaysLeft <= 0 && !isLicensed ? "Masa Trial Habis" : "Aktivasi Lisensi Resmi"}
+                  {trialDaysLeft !== undefined && trialDaysLeft <= 0 && !isLicensed ? t.activation_modal_title_trial_expired : t.activation_modal_title_normal}
                 </h3>
                 <p className="text-xs text-slate-400 uppercase font-extrabold tracking-widest">
-                  Unlock {appName} Premium SaaS
+                  {t.activation_modal_unlock_premium} {appName}
                 </p>
                 <div className="h-[2px] w-12 bg-gradient-to-r from-blue-500 to-emerald-400 mx-auto rounded-full mt-2" />
               </div>
@@ -1088,9 +1090,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       <div className="text-red-500 flex justify-center">
                         <AlertTriangle size={24} className="animate-bounce" />
                       </div>
-                      <h4 className="font-extrabold uppercase text-xs tracking-wider text-red-500">Konfirmasi Berhenti</h4>
+                      <h4 className="font-extrabold uppercase text-xs tracking-wider text-red-500">{t.activation_confirm_stop_title}</h4>
                       <p className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400 leading-normal">
-                        Apakah Anda yakin ingin mematikan status premium dan mengembalikan aplikasi ke masa uji coba / trial?
+                        {t.activation_confirm_stop_desc}
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -1098,14 +1100,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           onClick={handleRemoveLicenseKey}
                           className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-all cursor-pointer shadow-md"
                         >
-                          Ya, Berhenti
+                          {t.activation_btn_stop_yes}
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowCancelConfirm(false)}
                           className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black text-[10px] rounded-xl uppercase tracking-wider transition-all cursor-pointer"
                         >
-                          Batal
+                          {t.activation_btn_stop_no}
                         </button>
                       </div>
                     </div>
@@ -1115,18 +1117,18 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         <CheckCircle2 size={32} className="text-emerald-500 animate-pulse" />
                       </div>
                       <div>
-                        <h4 className="font-extrabold uppercase text-xs tracking-wider text-emerald-500">Aplikasi Aktif • Premium PRO</h4>
+                        <h4 className="font-extrabold uppercase text-xs tracking-wider text-emerald-500">{t.activation_active_status}</h4>
                         <p className="text-[10px] font-semibold text-slate-455 mt-1">
-                          Kunci Terdaftar: <code className="font-mono bg-emerald-500/5 text-emerald-600 px-1 border border-emerald-500/10 dark:text-emerald-400">{licenseKey}</code>
+                          {t.activation_key_registered} <code className="font-mono bg-emerald-500/5 text-emerald-600 px-1 border border-emerald-500/10 dark:text-emerald-400">{licenseKey}</code>
                         </p>
                         {subDaysLeft !== undefined && subDaysLeft !== null && (
                           <div className="mt-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-[10px] py-1 px-1.5 rounded-lg flex items-center justify-center space-x-1">
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                            <span>Masa Berlangganan: {Math.ceil(subDaysLeft)} Hari Lagi</span>
+                            <span>{t.activation_subscription_left} {Math.ceil(subDaysLeft)} {t.activation_days_left}</span>
                           </div>
                         )}
                         <p className="text-[9px] font-bold text-slate-400 mt-2">
-                          Commercial copy licensed under key constraints.
+                          {t.activation_commercial_notice}
                         </p>
                       </div>
                       <button 
@@ -1134,7 +1136,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         onClick={() => setShowCancelConfirm(true)}
                         className="w-full py-2.5 bg-red-650/10 hover:bg-red-600 text-red-600 hover:text-white font-extrabold text-[10px] rounded-xl uppercase tracking-wider transition-all cursor-pointer border border-red-500/20 shadow-sm flex items-center justify-center space-x-1.5"
                       >
-                        <span>Berhenti Berlangganan (Cabut Lisensi)</span>
+                        <span>{t.activation_btn_unsubscribe}</span>
                       </button>
                     </div>
                   )}
@@ -1145,31 +1147,31 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center space-y-1.5 animate-pulse">
                       <div className="flex items-center justify-center text-red-500 space-x-1.5 font-extrabold text-[11px] uppercase tracking-wider">
                         <AlertTriangle size={13} className="text-red-500" />
-                        <span>Masa Trial 7 Hari Habis!</span>
+                        <span>{t.activation_trial_expired_hero}</span>
                       </div>
                       <p className="text-slate-500 dark:text-slate-450 font-semibold text-[10px] leading-relaxed">
-                        Masa uji coba gratis Anda telah berakhir. Sila lakukan pembayaran dan masukkan Serial Key Lisensi di bawah untuk melanjutkan pemakaian Metadata Gen, Prompt Teks, & Calendar Gen.
+                        {t.activation_trial_expired_desc}
                       </p>
                     </div>
                   ) : (
                     <div className="bg-amber-400/5 border border-amber-500/20 rounded-2xl p-4 text-center space-y-1.5">
                       <div className="flex items-center justify-center text-amber-500 space-x-1.5 font-extrabold text-[11px] uppercase tracking-wider">
                         <AlertTriangle size={13} />
-                        <span>Masa Trial Aktif ({trialDaysLeft !== undefined ? Math.ceil(trialDaysLeft) : 7} Hari Lagi)</span>
+                        <span>{t.activation_trial_active_hero} ({trialDaysLeft !== undefined ? Math.ceil(trialDaysLeft) : 7} {t.activation_trial_active_days})</span>
                       </div>
                       <p className="text-slate-450 dark:text-slate-400 font-semibold text-[10px] leading-relaxed">
-                        Anda berada di mode Trial 7 Hari. Anda dapat mengakses penuh fitur <strong className="text-[#3c5ab5] dark:text-white">Metadata Gen</strong>, <strong className="text-[#3c5ab5] dark:text-white">Prompt Teks</strong>, dan <strong className="text-[#3c5ab5] dark:text-white">Calendar Gen</strong>. Lakukan aktivasi resmi untuk membuka semua tool premium selamanya.
+                        {t.activation_trial_active_desc}
                       </p>
                     </div>
                   )}
 
                   {/* Activation input */}
                   <div className="space-y-1.5 mt-2">
-                    <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block">Masukkan Serial Key Lisensi</label>
+                    <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block">{t.activation_input_label}</label>
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="FORMAT: MZPRO-XXXX-XXXX-XXXX"
+                        placeholder={t.activation_input_placeholder}
                         value={inputKey}
                         onChange={(e) => {
                           setInputKey(e.target.value.toUpperCase());
@@ -1192,7 +1194,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         animate={{ opacity: 1, scale: 1 }}
                         className="text-[10px] font-black text-emerald-500 border-l-2 border-emerald-500 pl-1.5 mt-1.5 uppercase transition-all"
                       >
-                        ✔ Lisensi divalidasi! Mengaktifkan premium...
+                        {t.activation_success_waiting}
                       </motion.p>
                     )}
                   </div>
@@ -1208,19 +1210,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     ) : (
                       <ShieldCheck size={14} />
                     )}
-                    <span>{isActivating ? 'Memproses Aktivasi...' : 'Aktivasi Premium'}</span>
+                    <span>{isActivating ? t.activation_btn_process : t.activation_btn_activate}</span>
                   </button>
 
                   {/* Need support details */}
                   <div className="pt-4 border-t border-slate-100 dark:border-white/5 space-y-3">
                     <h5 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">
-                      Belum Punya Lisensi? Dapatkan Instan:
+                      {t.activation_no_license_title}
                     </h5>
                     
                     <div className="p-3 bg-blue-500/5 hover:bg-blue-500/8 border border-blue-500/10 rounded-2xl flex flex-col items-center text-center space-y-1 transition-all">
                       <ShoppingCart size={16} className="text-[#4e73df] animate-bounce" />
-                      <span className="text-[11px] font-black text-[#4e73df] uppercase tracking-wider">Aktivasi Personal</span>
-                      <span className="text-[10px] font-bold text-slate-400">Harga Lisensi: <strong className="text-slate-700 dark:text-white">{pricingTier}</strong></span>
+                      <span className="text-[11px] font-black text-[#4e73df] uppercase tracking-wider">{t.activation_personal_activation}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{t.activation_license_price} <strong className="text-slate-700 dark:text-white">{pricingTier}</strong></span>
                       <span className="text-[9px] font-semibold text-slate-400 max-w-xs">{tempPayInfo}</span>
                     </div>
 
@@ -1231,7 +1233,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10.5px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/10"
                     >
                       <MessageCircle size={14} className="animate-pulse" />
-                      <span>Beli Key Lisensi via WhatsApp</span>
+                      <span>{t.activation_buy_whatsapp}</span>
                     </a>
                   </div>
                 </div>

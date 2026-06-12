@@ -1,10 +1,10 @@
 import React from 'react';
 import { ImageQualityCheck } from './ImageQualityCheck';
 
-export const ImageCheckView: React.FC = () => {
+export const ImageCheckView: React.FC<{ t: any }> = ({ t }) => {
   return (
     <div className="w-full">
-      <ImageQualityCheck />
+      <ImageQualityCheck t={t} />
     </div>
   );
 };

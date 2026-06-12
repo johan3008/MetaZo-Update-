@@ -21,7 +21,7 @@ import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
-import { TRANSLATIONS, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
+import { TRANSLATIONS, AppLanguage, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
@@ -966,6 +966,17 @@ const App: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [keywordCount, setKeywordCount] = useState<number | string>('');
   const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => (localStorage.getItem('mz_keyword_mode') as 'mixed' | 'single' | 'multi') || 'mixed');
+  const [uiLanguage, setUiLanguage] = useState<AppLanguage>(() => {
+    try {
+      const saved = localStorage.getItem('mz_ui_language');
+      if (saved === 'id' || saved === 'en') return saved as AppLanguage;
+    } catch (e) {}
+    return 'en';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mz_ui_language', uiLanguage);
+  }, [uiLanguage]);
 
   useEffect(() => {
     localStorage.setItem('mz_keyword_mode', keywordMode);
@@ -1003,7 +1014,7 @@ const App: React.FC = () => {
   const [mzAppName, setMzAppName] = useState(() => localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO');
   const [mzAppSubtitle, setMzAppSubtitle] = useState(() => localStorage.getItem('mz_reseller_app_subtitle') || 'AI-Powered Metadata Assistant');
   const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
-  const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || 'Rp 149.000 / Bulan');
+  const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
   const [isMzLicensed, setIsMzLicensed] = useState(false);
@@ -2398,7 +2409,7 @@ const App: React.FC = () => {
     await processOneFile(fileItem);
   };
 
-  const t = TRANSLATIONS;
+  const t = TRANSLATIONS[uiLanguage];
   const hasFiles = files.length > 0;
   const filesToGenerateCount = files.filter(f => !f.title && !f.error && !f.isExtracting).length;
   const filesWithErrorCount = files.filter(f => f.error).length;
@@ -2442,6 +2453,8 @@ const App: React.FC = () => {
           t={t} 
           setShowActivation={setShowActivationModal}
           isLicensed={!!isMzLicensed}
+          uiLanguage={uiLanguage}
+          setUiLanguage={setUiLanguage}
         />
 
         {/* Core Dashboard Stage */}
@@ -2458,12 +2471,13 @@ const App: React.FC = () => {
               generationMode={generationMode}
               isLicensed={isMzLicensed}
               appName={mzAppName}
-              pricingTier={mzPriceText}
+              pricingTier={mzPriceText || t.default_pricing}
               whatsAppLink={mzWhatsApp}
               setShowActivation={setShowActivationModal}
               imageDailyCount={dailyGenCounts[ToolType.IMAGE] || 0}
               videoDailyCount={dailyGenCounts[ToolType.VIDEO] || 0}
               vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
+              t={t}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView 
@@ -2477,11 +2491,12 @@ const App: React.FC = () => {
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
             <PromptImageView t={t} />
           ) : activeTool === ToolType.PROMPT_VIDEO ? (
-            <PromptVideoView />
+            <PromptVideoView t={t} />
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
-            <ImageCheckView />
+            <ImageCheckView t={t} />
           ) : activeTool === ToolType.CALENDAR_GEN ? (
             <CalendarGenView 
+              t={t}
               onSendToPrompt={(text) => {
                 setPrefilledSubject(text);
                 handleSetActiveTool(ToolType.PROMPT_GEN);
@@ -2654,18 +2669,18 @@ const App: React.FC = () => {
             <div className="w-12 h-12 mb-4 bg-[#4e73df] rounded-xl flex items-center justify-center shadow animate-pulse">
               <Zap className="text-white fill-white" size={24} />
             </div>
-            <h2 className="text-sm font-black text-[#4e73df] mb-2 uppercase">Welcome to MetaZo PRO v1.0.0</h2>
-            <p className="text-xs text-slate-500 mb-6 font-semibold bg-emerald-500/5 px-2 py-1 rounded">Stock Asset Optimizer</p>
+            <h2 className="text-sm font-black text-[#4e73df] mb-2 uppercase">{t.welcome_title}</h2>
+            <p className="text-xs text-slate-500 mb-6 font-semibold bg-emerald-500/5 px-2 py-1 rounded">{t.welcome_subtitle}</p>
             <div className="text-left w-full mb-6">
-              <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">Features:</p>
+              <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">{t.welcome_features_label}</p>
               <ul className="text-[10px] text-slate-500 dark:text-slate-400 space-y-1 list-disc pl-4">
-                <li>AI-powered stock asset optimization</li>
-                <li>Lightweight & fast generation</li>
-                <li>Multiple provider support</li>
-                <li>Advanced prompt management</li>
+                <li>{t.welcome_feature1}</li>
+                <li>{t.welcome_feature2}</li>
+                <li>{t.welcome_feature3}</li>
+                <li>{t.welcome_feature4}</li>
               </ul>
             </div>
-            <button onClick={handleCloseWelcome} className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-lg text-xs uppercase">Get Started</button>
+            <button onClick={handleCloseWelcome} className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-lg text-xs uppercase">{t.welcome_get_started}</button>
           </div>
         </div>
       )}
@@ -2675,67 +2690,69 @@ const App: React.FC = () => {
           <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative" onClick={e => e.stopPropagation()}>
             <button onClick={() => setShowInfoModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
             <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5">
-              <Info size={16} className="text-[#4e73df]" />
-              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">MetaZo PRO Handbook & Petunjuk Penggunaan</h2>
+              <span className="p-1.5 bg-blue-500/10 rounded-lg">
+                <Info size={16} className="text-[#4e73df]" />
+              </span>
+              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.info_modal_title}</h2>
             </div>
             
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 text-xs text-slate-600 dark:text-slate-300 font-semibold leading-relaxed scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
               <div>
-                <h3 className="font-extrabold text-[#4e73df] dark:text-blue-400 uppercase tracking-wider mb-2 text-[11px]">✨ Panduan Operasional MetaZo PRO</h3>
+                <h3 className="font-extrabold text-[#4e73df] dark:text-blue-400 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_operational_guide}</h3>
                 <ol className="space-y-2.5 list-decimal pl-4">
                   <li>
-                    <strong className="text-slate-800 dark:text-white">Workspace Selection</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Pilih mode <strong className="text-[#4e73df]">Image</strong>, <strong className="text-purple-500">Video</strong>, atau <strong className="text-emerald-500">Vector</strong> pada Dashboard utama. Unggah file Anda melalui fitur drag-and-drop atau klik area unggah.</p>
+                    <strong className="text-slate-800 dark:text-white">{t.info_modal_step1_title}</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step1_desc_p1} <strong className="text-[#4e73df]">Image</strong>, <strong className="text-purple-500">Video</strong>, {t.common_or} <strong className="text-emerald-500">Vector</strong> {t.info_modal_step1_desc_p2}</p>
                   </li>
                   <li>
-                    <strong className="text-slate-800 dark:text-white">AI Analysis & Metadata Generation</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Setelah diunggah, klik <strong className="text-slate-700 dark:text-slate-300">Process Metadata</strong>. Mesin AI Vision kami akan menganalisis konten visual untuk menghasilkan Judul, Deskripsi, dan Kategori secara otomatis.</p>
+                    <strong className="text-slate-800 dark:text-white">{t.info_modal_step2_title}</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step2_desc}</p>
                   </li>
                   <li>
-                    <strong className="text-slate-800 dark:text-white">Prompt Gen & Image AI (Terintegrasi!)</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-bold italic text-blue-500 bg-blue-500/5 p-1 rounded">Fitur Prompt Gen kini terintegrasi dengan Calendar Gen untuk memudahkan pembuatan konten stok berdasarkan event terpopuler.</p>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-1">Gunakan fitur <strong className="text-pink-500">Prompt Gen</strong> untuk menghasilkan deskripsi visual yang mendalam untuk AI Art.</p>
+                    <strong className="text-slate-800 dark:text-white">{t.info_modal_step3_title}</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-bold italic text-blue-500 bg-blue-500/5 p-1 rounded">{t.info_modal_step3_desc_highlight}</p>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-1">{t.info_modal_step3_desc_main}</p>
                   </li>
                   <li>
-                    <strong className="text-slate-800 dark:text-white">Image Check (QC)</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Pastikan aset Anda bebas dari pelanggaran IP, logo, dan noise berlebih dengan fitur <strong className="text-emerald-500">Image Check</strong> sebelum diunggah ke agency.</p>
+                    <strong className="text-slate-800 dark:text-white">{t.info_modal_step4_title}</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step4_desc}</p>
                   </li>
                   <li>
-                    <strong className="text-slate-800 dark:text-white">Calendar Gen (Niche Hunter)</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Temukan event-event penting di masa depan secara global untuk membantu Anda menentukan tema produksi konten stok yang sedang dicari buyer.</p>
+                    <strong className="text-slate-800 dark:text-white">{t.info_modal_step5_title}</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step5_desc}</p>
                   </li>
                   <li>
-                    <strong className="text-slate-800 dark:text-white">Export & Download</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Setelah sesuai, gunakan fitur Export untuk mengunduh metadata dalam format CSV yang kompatibel dengan Adobe Stock, Shutterstock, dll.</p>
+                    <strong className="text-slate-800 dark:text-white">{t.info_modal_step6_title}</strong>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step6_desc}</p>
                   </li>
                 </ol>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
-                <h3 className="font-extrabold text-emerald-500 uppercase tracking-wider mb-2 text-[11px]">⚡ Tips Mode Pemrosesan</h3>
+                <h3 className="font-extrabold text-emerald-500 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_tips_title}</h3>
                 <div className="grid grid-cols-1 gap-2.5">
                   <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
-                    <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">Standard Mode</span>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Memproses file satu per satu secara berurutan. Sangat aman dan stabil untuk menghindari kendala batasan API (rate limit).</p>
+                    <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">{t.info_modal_std_mode_title}</span>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_std_mode_desc}</p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
-                    <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">Batch Mode</span>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">Memproses banyak file sekaligus secara simultan. Disarankan untuk memproses asset dalam jumlah besar jika waktu menjadi prioritas utama Anda.</p>
+                    <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">{t.info_modal_batch_mode_title}</span>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_batch_mode_desc}</p>
                   </div>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
-                <h3 className="font-extrabold text-[#4e73df] uppercase tracking-wider mb-2 text-[11px]">💳 Handbook Trial & Premium</h3>
+                <h3 className="font-extrabold text-[#4e73df] dark:text-blue-400 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_trial_premium_title}</h3>
                 <div className="space-y-2 text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
-                    <p><strong className="text-slate-800 dark:text-white">Mode Trial:</strong> Anda berada dalam masa uji coba gratis dengan batasan harian untuk memastikan kestabilan sistem. Fitur tertentu mungkin terbatas.</p>
-                    <p><strong className="text-slate-800 dark:text-white">Premium (Lisensi):</strong> Dengan Serial Key lisensi, semua batasan dihapus sepenuhnya. Dapatkan akses unlimited untuk pemrosesan aset profesional Anda.</p>
-                    <p>Butuh lisensi? Hubungi admin untuk mendapatkan Serial Key resmi & tingkatkan akun Anda ke Premium!</p>
+                    <p><strong className="text-slate-800 dark:text-white">{t.info_modal_trial_mode_label}</strong> {t.info_modal_trial_mode_desc}</p>
+                    <p><strong className="text-slate-800 dark:text-white">{t.info_modal_premium_mode_label}</strong> {t.info_modal_premium_mode_desc}</p>
+                    <p>{t.info_modal_license_cta}</p>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
-                <h3 className="font-extrabold text-blue-500 uppercase tracking-wider mb-2 text-[11px]">📁 Format File yang Didukung</h3>
+                <h3 className="font-extrabold text-blue-500 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_supported_formats}</h3>
                 <ul className="grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase">
                   <li className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20">JPEG, PNG, WEBP</li>
                   <li className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20">MP4, MOV, WEBM</li>
@@ -2744,7 +2761,7 @@ const App: React.FC = () => {
               </div>
             </div>
             
-            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full py-2 bg-[#4e73df] text-white font-bold rounded-lg text-xs uppercase">Tutup Petunjuk</button>
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-lg text-xs uppercase shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all">{t.info_modal_close_button}</button>
           </div>
         </div>
       )}
@@ -2755,15 +2772,17 @@ const App: React.FC = () => {
             <button onClick={() => setShowSettingsModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
             
             <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5 shrink-0 select-none">
-              <Settings size={16} className="text-[#4e73df] animate-spin-slow" />
+              <span className="p-1.5 bg-blue-500/10 rounded-lg">
+                <Settings size={16} className="text-[#4e73df] animate-spin-slow" />
+              </span>
               <div className="flex-1 flex items-center justify-between">
-                <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Pengaturan Provider Model AI</h2>
+                <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.settings_modal_title}</h2>
               </div>
             </div>
             
             {/* Pemilihan Provider Utama */}
-            <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shrink-0">
-              <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Provider AI Utama Yang Digunakan</label>
+            <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shrink-0 shadow-inner">
+              <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">{t.settings_main_provider_label}</label>
               <select
                 value={selectedProvider}
                 onChange={(e) => {
@@ -2793,7 +2812,7 @@ const App: React.FC = () => {
             <select
               value={activeSettingsTab}
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
-              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all mb-4"
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all mb-4 shadow-sm"
             >
               {(['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
@@ -2806,8 +2825,8 @@ const App: React.FC = () => {
             <div className="space-y-4 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
               {activeSettingsTab === 'gemini' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
-                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
-                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Pilih Model Gemini</label>
+                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">{t.settings_gemini_model_label}</label>
                     <select
                       value={selectedGeminiModel}
                       onChange={(e) => {
@@ -2817,7 +2836,7 @@ const App: React.FC = () => {
                       }}
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
                     >
-                      <option value="auto">Automatic (Auto-Select Reliable)</option>
+                      <option value="auto">{t.settings_gemini_model_auto}</option>
                       <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
                       <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
                       <option value="gemini-3-flash">Gemini 3 Flash</option>
@@ -2826,16 +2845,16 @@ const App: React.FC = () => {
                   </div>
                   
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
-                    Anda dapat menyimpan beberapa API Key Gemini pribadi. Sistem secara cerdas melakukan rotasi otomatis demi menghindari hambatan kuota (*rate limit / RESOURCE_EXHAUSTED*).
+                    {t.settings_gemini_desc}
                   </p>
 
                   <div className="space-y-2">
-                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Gemini ({geminiKeysList.length})</label>
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">{t.settings_gemini_key_list} ({geminiKeysList.length})</label>
                     
                     {geminiKeysList.length === 0 ? (
-                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
                         <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
-                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Menggunakan Gemini Key default server global.</p>
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">{t.settings_use_default_key}</p>
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
@@ -3503,6 +3522,7 @@ const App: React.FC = () => {
                   setIsResellerUnlocked={setIsResellerUnlocked}
                   trialDaysLeft={trialDaysLeft}
                   subDaysLeft={subDaysLeft}
+                  t={t}
                 />
               )}
 
@@ -3557,6 +3577,7 @@ const App: React.FC = () => {
         onlyModal={true}
         trialDaysLeft={trialDaysLeft}
         subDaysLeft={subDaysLeft}
+        t={t}
       />
 
       {/* Hidden Custom Secure Reseller Passcode Dialog Overlay */}

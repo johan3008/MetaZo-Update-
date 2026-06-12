@@ -32,7 +32,11 @@ interface HistoryItem {
   timestamp: number;
 }
 
-export const PromptVideoView: React.FC = () => {
+interface PromptVideoViewProps {
+  t: any;
+}
+
+export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t }) => {
   const [keyword, setKeyword] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -80,7 +84,7 @@ export const PromptVideoView: React.FC = () => {
       clearInterval(progressInterval);
 
       if (!response.ok) {
-        throw new Error('Gagal menganalisis keyword. Coba lagi nanti.');
+        throw new Error(t.video_studio_error_fail);
       }
 
       const data = await response.json();
@@ -212,11 +216,10 @@ export const PromptVideoView: React.FC = () => {
               <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
                 <Video className="text-white" size={28} />
               </div>
-              <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Video Stock Analyst</h1>
+              <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.video_studio_title}</h1>
             </div>
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
-              Dapatkan analisis <span className="text-red-500 italic">Brutal & Jujur</span> dari AI untuk keyword video footage Anda. 
-              Ketahui apakah ide Anda layak diproduksi atau hanya membuang waktu.
+              {t.video_studio_subtitle}
             </p>
           </div>
           
@@ -228,7 +231,7 @@ export const PromptVideoView: React.FC = () => {
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="Misal: Person running in cyber city..."
+                  placeholder={t.video_studio_keyword_placeholder}
                   className="w-full sm:w-80 h-12 pl-12 pr-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-800 dark:text-white"
                 />
               </div>
@@ -242,12 +245,12 @@ export const PromptVideoView: React.FC = () => {
                   {isAnalyzing ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
-                      <span>{Math.round(analysisProgress)}% Analyzed</span>
+                      <span>{Math.round(analysisProgress)}% {t.video_studio_btn_analyzing}</span>
                     </>
                   ) : (
                     <>
                       <ShieldAlert size={16} />
-                      <span>Analisis</span>
+                      <span>{t.video_studio_btn_analyze}</span>
                     </>
                   )}
                 </button>
@@ -436,8 +439,8 @@ export const PromptVideoView: React.FC = () => {
                     <Clapperboard className="text-white" size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-white uppercase tracking-tight">AI Hollywood Director</h2>
-                    <p className="text-xs font-bold text-white/70 italic">50 Masterpiece prompts for Text-to-Video Generators</p>
+                    <h2 className="text-xl font-black text-white uppercase tracking-tight">{t.video_studio_hollywood_title}</h2>
+                    <p className="text-xs font-bold text-white/70 italic">{t.video_studio_hollywood_desc}</p>
                   </div>
                 </div>
                 <button 
@@ -496,7 +499,7 @@ export const PromptVideoView: React.FC = () => {
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider flex items-center space-x-1.5">
-                              <Camera size={12}/> <span>Camera</span>
+                              <Camera size={12}/> <span>{t.video_studio_camera_label}</span>
                             </label>
                             <p className="text-sm font-bold text-emerald-400">{prompt.camera_angle}, {prompt.camera_movement}</p>
                           </div>
@@ -505,7 +508,7 @@ export const PromptVideoView: React.FC = () => {
                       
                       <div className="pt-4 border-t border-white/5">
                         <div className="text-[9px] font-black text-slate-500 uppercase mb-2 flex items-center space-x-1.5">
-                          <Terminal size={12} /> <span>Technical String</span>
+                          <Terminal size={12} /> <span>{t.video_studio_technical_label}</span>
                         </div>
                         <div className="p-3 bg-black/60 rounded-xl border border-white/5 group-hover:border-emerald-500/20 transition-colors">
                           <code className="text-xs text-slate-400 font-mono leading-relaxed block overflow-x-auto whitespace-pre-wrap">
@@ -590,13 +593,13 @@ export const PromptVideoView: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-60">
           <div className="p-8 rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center text-center space-y-3">
             <ShieldAlert size={32} className="text-slate-300" />
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Market Saturation Alert</h3>
-            <p className="text-[11px] font-medium text-slate-400">Peringatan otomatis jika pasar sudah terlalu jenuh dengan konten serupa.</p>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.video_studio_saturation_title}</h3>
+            <p className="text-[11px] font-medium text-slate-400">{t.video_studio_saturation_desc}</p>
           </div>
           <div className="p-8 rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center text-center space-y-3">
             <TrendingUp size={32} className="text-slate-300" />
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Revenue Forecast</h3>
-            <p className="text-[11px] font-medium text-slate-400">Estimasi potensi pendapatan berdasarkan tren pembeli di Adobe Stock & Shutterstock.</p>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.video_studio_revenue_title}</h3>
+            <p className="text-[11px] font-medium text-slate-400">{t.video_studio_revenue_desc}</p>
           </div>
         </div>
       )}

@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           {!sidebarCollapsed && (
             <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] px-2.5 mb-2.5">
-              Core Generators
+              {t.sidebar_core_generators}
             </p>
           )}
           <nav className="space-y-1">
@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`w-full text-left ${navItemClass(ToolType.DASHBOARD)} mb-1.5`}
             >
               <LayoutDashboard size={16} className={activeTool === ToolType.DASHBOARD ? "text-white" : "text-slate-300"} />
-              {!sidebarCollapsed && <span>Dashboard</span>}
+              {!sidebarCollapsed && <span>{t.sidebar_dashboard}</span>}
             </button>
 
             {/* Metadata Gen tab and dropdown */}
@@ -132,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <div className="flex items-center space-x-3">
                   <Sparkles size={16} className={isMetadataGenActive ? "text-emerald-300 animate-pulse" : "text-slate-300"} />
-                  {!sidebarCollapsed && <span>Metadata Gen</span>}
+                  {!sidebarCollapsed && <span>{t.sidebar_metadata_gen}</span>}
                 </div>
                 {!sidebarCollapsed && (
                   <ChevronDown 
@@ -154,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <ImageIcon size={14} className={activeTool === ToolType.IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                    <span>{t.image_tool} Editor</span>
+                    <span>{t.image_tool} {t.common_editor}</span>
                   </button>
 
                   <button 
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <Film size={14} className={activeTool === ToolType.VIDEO ? "text-purple-400" : "text-slate-400"} />
-                    <span>{t.video_tool} Editor</span>
+                    <span>{t.video_tool} {t.common_editor}</span>
                   </button>
 
                   <button 
@@ -178,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <FileCode size={14} className={activeTool === ToolType.VECTOR ? "text-amber-400" : "text-slate-400"} />
-                    <span>{t.vector_tool} Editor</span>
+                    <span>{t.vector_tool} {t.common_editor}</span>
                   </button>
                 </div>
               )}
@@ -203,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <div className="flex items-center space-x-3">
                   <Wand2 size={16} className={isPromptGenActive ? "text-white rotate-12 transition-transform" : "text-slate-300"} />
-                  {!sidebarCollapsed && <span>Prompt Gen</span>}
+                  {!sidebarCollapsed && <span>{t.sidebar_prompt_gen}</span>}
                 </div>
                 {!sidebarCollapsed && (
                   <ChevronDown 
@@ -225,7 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <Type size={14} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
-                    <span>Prompt Teks</span>
+                    <span>{t.sidebar_prompt_text}</span>
                   </button>
 
                   <button 
@@ -237,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <ImageIcon size={14} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                    <span>Prompt Image</span>
+                    <span>{t.sidebar_prompt_image}</span>
                   </button>
 
                   <button 
@@ -249,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <Film size={14} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
-                    <span>Prompt Video</span>
+                    <span>{t.sidebar_prompt_video}</span>
                   </button>
                 </div>
               )}
@@ -264,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <CheckCircle size={16} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-300"} />
-              {!sidebarCollapsed && <span>Image Check</span>}
+              {!sidebarCollapsed && <span>{t.sidebar_image_check}</span>}
             </button>
 
             <button 
@@ -276,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Calendar size={16} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-300"} />
-              {!sidebarCollapsed && <span>Calendar Gen</span>}
+              {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
             </button>
           </nav>
         </div>
@@ -285,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           {!sidebarCollapsed && (
             <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] px-2.5 mb-3">
-              Processing Mode
+              {t.sidebar_processing_mode}
             </p>
           )}
           <div className={`space-y-1 ${sidebarCollapsed ? 'items-center flex flex-col' : ''}`}>
@@ -298,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Clock size={14} />
-              {!sidebarCollapsed && <span>{t.generation_mode_standard} Mode</span>}
+              {!sidebarCollapsed && <span>{t.generation_mode_standard} {t.common_mode}</span>}
             </button>
             <button
               onClick={() => setGenerationMode(GenerationMode.BATCH)}
@@ -309,7 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Zap size={14} className="animate-pulse" />
-              {!sidebarCollapsed && <span>{t.generation_mode_batch} Mode</span>}
+              {!sidebarCollapsed && <span>{t.generation_mode_batch} {t.common_mode}</span>}
             </button>
           </div>
         </div>
@@ -318,7 +318,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           {!sidebarCollapsed && (
             <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] px-2.5 mb-2.5">
-              Resources
+              {t.sidebar_resources}
             </p>
           )}
           <nav className="space-y-1">
@@ -327,13 +327,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={() => setShowActivation?.(true)}
                 className="w-full flex items-center justify-between px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 rounded-lg text-[10px] font-black text-emerald-400 mb-1.5 transition-all text-left cursor-pointer"
-                title="Kelola Lisensi / Berhenti Langganan"
+                title={t.sidebar_manage_license}
               >
                 <div className="flex items-center space-x-2 truncate">
                   <CheckCircle size={13} className="text-emerald-400 shrink-0" />
-                  {!sidebarCollapsed && <span className="truncate">PRO AKTIF</span>}
+                  {!sidebarCollapsed && <span className="truncate">{t.sidebar_pro_active}</span>}
                 </div>
-                {!sidebarCollapsed && <span className="text-[9px] opacity-75 underline font-bold uppercase hover:text-white shrink-0">Kelola</span>}
+                {!sidebarCollapsed && <span className="text-[9px] opacity-75 underline font-bold uppercase hover:text-white shrink-0">{t.sidebar_manage}</span>}
               </button>
             ) : (
               <button 
@@ -342,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-full flex items-center space-x-3 px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 hover:brightness-110 active:scale-[0.98] rounded-lg text-[10.5px] font-black shadow-md transition-all mb-1.5 cursor-pointer"
               >
                 <Sparkles size={14} className="shrink-0 animate-bounce text-amber-900" />
-                {!sidebarCollapsed && <span>AKTIVASI PREMIUM</span>}
+                {!sidebarCollapsed && <span>{t.sidebar_activation_premium}</span>}
               </button>
             )}
 
@@ -364,7 +364,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button 
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
-          title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          title={sidebarCollapsed ? t.sidebar_expand : t.sidebar_collapse}
         >
           {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
         </button>
@@ -416,7 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex-1 overflow-y-auto pt-6 space-y-6">
                 <div>
                   <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] mb-3 px-1">
-                    Core Tools
+                    {t.sidebar_core_tools}
                   </p>
                   <nav className="space-y-1.5">
                     {/* Dashboard Button for Mobile */}
@@ -429,7 +429,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       } mb-1.5`}
                     >
                       <LayoutDashboard size={14} className={activeTool === ToolType.DASHBOARD ? "text-white animate-pulse" : "text-slate-300"} />
-                      <span>Dashboard</span>
+                      <span>{t.sidebar_dashboard}</span>
                     </button>
 
                     {/* Metadata Gen Dropdown for Mobile */}
@@ -444,7 +444,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       >
                         <div className="flex items-center space-x-3">
                           <Sparkles size={14} className={isMetadataGenActive ? "text-emerald-300 animate-pulse" : "text-slate-300"} />
-                          <span>Metadata Gen</span>
+                          <span>{t.sidebar_metadata_gen}</span>
                         </div>
                         <ChevronDown 
                           size={12} 
@@ -506,7 +506,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       >
                         <div className="flex items-center space-x-3">
                           <Wand2 size={14} className={isPromptGenActive ? "text-white" : "text-slate-300"} />
-                          <span>Prompt Gen</span>
+                          <span>{t.sidebar_prompt_gen}</span>
                         </div>
                         <ChevronDown 
                           size={12} 
@@ -526,7 +526,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Type size={12} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
-                            <span>Prompt Teks</span>
+                            <span>{t.sidebar_prompt_text}</span>
                           </button>
 
                           <button 
@@ -538,7 +538,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <ImageIcon size={12} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                            <span>Prompt Image</span>
+                            <span>{t.sidebar_prompt_image}</span>
                           </button>
 
                           <button 
@@ -550,7 +550,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Film size={12} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
-                            <span>Prompt Video</span>
+                            <span>{t.sidebar_prompt_video}</span>
                           </button>
                         </div>
                       )}
@@ -565,7 +565,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <CheckCircle size={14} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-300"} />
-                      <span>Image Check</span>
+                      <span>{t.sidebar_image_check}</span>
                     </button>
 
                     <button 
@@ -577,14 +577,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <Calendar size={14} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-300"} />
-                      <span>Calendar Gen</span>
+                      <span>{t.sidebar_calendar_gen}</span>
                     </button>
                   </nav>
                 </div>
 
                 <div>
                   <p className="text-[10px] font-extrabold text-[#e3e6f0]/60 uppercase tracking-[0.15em] mb-3 px-1">
-                    Tuning
+                    {t.sidebar_tuning}
                   </p>
                   <div className="space-y-1.5">
                     <button onClick={() => { setGenerationMode(GenerationMode.STANDARD); setSidebarOpen(false); }} className={`w-full text-left flex items-center space-x-3 px-4 py-2 rounded-lg text-xs font-bold ${generationMode === GenerationMode.STANDARD ? 'bg-amber-500 text-white' : 'text-slate-200/80 hover:bg-white/5'}`}>

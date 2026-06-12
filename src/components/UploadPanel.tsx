@@ -49,8 +49,8 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             1
           </div>
           <h3 className="m-0 font-extrabold text-[#4e73df] dark:text-blue-400 text-xs sm:text-sm uppercase tracking-wider flex items-center space-x-2">
-            <span>Upload Assets</span>
-            <HelpIcon title="Unggah file gambar, video, atau vektor Anda di sini untuk diproses." />
+            <span>{t.upload_title}</span>
+            <HelpIcon title={t.upload_help} />
           </h3>
         </div>
         {hasFiles && (
@@ -68,10 +68,10 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               updateFiles(() => []);
             }} 
             className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/15 text-red-500 rounded-md transition-all border border-red-500/15 flex items-center space-x-1 text-[10px] font-black uppercase tracking-wider"
-            title="Reset Everything"
+            title={t.upload_reset_title}
           >
             <Trash2 size={12} />
-            <span>Reset</span>
+            <span>{t.upload_reset}</span>
           </button>
         )}
       </div>
@@ -126,7 +126,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                     <img src={f.thumbnail || undefined} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
                     <div className="w-full h-full bg-slate-400 flex items-center justify-center text-[8px] text-white font-bold">
-                      FILE
+                      {t.upload_file_placeholder}
                     </div>
                   )}
                 </div>
@@ -152,7 +152,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               }}
               className="w-full py-3 bg-[#4e73df] hover:bg-blue-600 text-white font-black rounded-xl flex items-center justify-center space-x-1.5 text-xs uppercase tracking-wider shadow active:scale-[0.98] transition-all"
             >
-              <span>Next: AI Config</span>
+              <span>{t.upload_next_ai}</span>
               <ArrowRight size={13} />
             </button>
           </div>

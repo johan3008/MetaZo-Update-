@@ -170,12 +170,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
   const handleGenerate = async () => {
     if (!isLicensed && dailyGenCount >= 30) {
-      setError("Batas Trial Terlampaui. Anda telah mencapai batas maksimal 30 kali generate Prompt Teks hari ini. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.");
+      setError(t.prompt_error_trial);
       return;
     }
 
     if (!subject.trim()) {
-      setError("Silakan masukkan ide dasar atau subjek murni visual terlebih dahulu.");
+      setError(t.prompt_error_empty);
       return;
     }
 
@@ -322,15 +322,15 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   // Derive variation description
   let presetLevelInfo = "⚡ Lite Draft";
   let presetLevelColor = "text-sky-500 bg-sky-500/10 border-sky-500/20";
-  let presetLevelSummary = "Cepat, efisien, formulasi ringkas dan representatif.";
+  let presetLevelSummary = t.prompt_preset_lite;
   if (variation > 40 && variation <= 80) {
     presetLevelInfo = "🎨 Artistic Mix";
     presetLevelColor = "text-amber-500 bg-amber-500/10 border-amber-500/20";
-    presetLevelSummary = "Penuh opsi atmosfer kamera, lensa variatif, dan gaya estetis seimbang.";
+    presetLevelSummary = t.prompt_preset_artistic;
   } else if (variation > 80) {
     presetLevelInfo = "🔥 Ultra Collection";
     presetLevelColor = "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
-    presetLevelSummary = "Detail super kompleks, kaya tekstur, opsi lighting, dan ragam sudut pandang.";
+    presetLevelSummary = t.prompt_preset_ultra;
   }
 
   return (
@@ -347,16 +347,16 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
             <Wand2 className="text-emerald-500 fill-emerald-500/10" size={24} />
-            Prompt Teks Studio
+            {t.prompt_studio_title}
           </h2>
           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
-            Sintesis Ide Visual dengan Spektrum Kreativitas & Kategori Artistik
+            {t.prompt_studio_subtitle}
           </p>
         </div>
         
-        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-205 dark:border-white/5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
           <Sliders size={12} className="text-emerald-500 animate-pulse" />
-          <span>Advanced AI Teks Creator v2.5</span>
+          <span>{t.prompt_studio_version}</span>
         </div>
       </div>
 
@@ -366,10 +366,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           <div className="border-b border-slate-100 dark:border-white/5 pb-3 flex justify-between items-center">
             <h3 className="font-extrabold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
               <Sparkles size={14} className="text-emerald-500" />
-              Formula & Konfigurasi Estetika
+              {t.prompt_formula_title}
             </h3>
             <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-md">
-              Gemini Pro Engine Active
+              {t.prompt_engine_active}
             </span>
           </div>
 
@@ -387,7 +387,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               }`}
             >
               <span className="text-sm">🖼️</span>
-              <span>Tab Background</span>
+              <span>{t.prompt_tab_background}</span>
             </button>
             <button
               onClick={() => {
@@ -401,7 +401,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               }`}
             >
               <span className="text-sm">✨</span>
-              <span>Tab PNG Asset</span>
+              <span>{t.prompt_tab_png}</span>
             </button>
           </div>
 
@@ -410,13 +410,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               <div className="flex justify-between text-[11px] uppercase font-black text-slate-500 dark:text-slate-400 mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-550 animate-pulse" />
-                  Trial Hari Ini: Prompt Teks
+                  {t.prompt_trial_label}
                 </span>
                 <span className={dailyGenCount >= 30 ? "text-red-500 font-black" : "text-emerald-500 font-black"}>
-                  {dailyGenCount}/30 Kali Generate
+                  {dailyGenCount}/30 {t.prompt_generate_count}
                 </span>
               </div>
-              <div className="w-full h-2 bg-slate-205 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ease-out ${
                     dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
@@ -426,11 +426,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
               {dailyGenCount >= 30 ? (
                 <span className="text-[10px] text-red-500 font-extrabold block mt-2 leading-tight">
-                  ⚠️ Batas trial gratis harian (30 generate) telah dicapai. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.
+                  {t.prompt_trial_expired}
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-1.5 leading-tight">
-                  Masa Trial gratis 30 generate/hari. Sisa kuota generate hari ini: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} kali</strong>.
+                  {t.prompt_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_trial_times}</strong>.
                 </span>
               )}
             </div>
@@ -443,7 +443,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Ide Visual / Subjek Gambar
+                    {t.prompt_subject_label}
                   </label>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Bilingual Support</span>
                 </div>
@@ -451,7 +451,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 <textarea
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Ketik ide visual Anda secara bebas di sini..."
+                  placeholder={t.prompt_subject_placeholder}
                   className="w-full min-h-[140px] rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/25 p-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all font-medium leading-relaxed resize-y"
                 />
               </div>
@@ -459,7 +459,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* Inspiration Presets */}
               <div className="space-y-2">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                  💡 Butuh Inspirasi? Klik Preset di bawah:
+                  {t.prompt_inspiration_label}
                 </span>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {inspirations.map((insp) => (
@@ -488,9 +488,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 <div className="flex justify-between items-center">
                   <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                    Negative Prompt (Anti-Elemen)
+                    {t.prompt_negative_label}
                   </label>
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Avoid Elements</span>
+                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{t.prompt_negative_subtitle}</span>
                 </div>
 
                 {promptMode === 'background' ? (
@@ -509,7 +509,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   />
                 )}
                 <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium leading-relaxed">
-                  Elemen di atas akan dikirimkan ke model AI untuk dihindari secara ketat pada hasil sintesis prompt.
+                  {t.prompt_negative_desc}
                 </p>
               </div>
             </div>
@@ -519,7 +519,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* 2. Style Category Dropdown & Pills */}
               <div className="space-y-3">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                  Kategori Gaya Master (Artistic Master Style)
+                  {t.prompt_style_master_label}
                 </label>
                 <div className="relative">
                   <select
@@ -543,7 +543,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 {/* Quick Selection Option Chips */}
                 <div className="space-y-1.5 pt-1">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-405 dark:text-slate-550 block">
-                    Gaya Cepat (Quick Selection Tab)
+                    {t.prompt_style_quick_label}
                   </span>
                   <div className="grid grid-cols-2 xs:flex xs:flex-wrap gap-1.5">
                     {currentStyleOptions.map((opt) => {
@@ -572,7 +572,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {promptMode === 'png' && (
                 <div className="space-y-3 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
                   <label className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
-                    <span>Pilihan Background PNG</span>
+                    <span>{t.prompt_png_bg_label}</span>
                     <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 rounded font-black font-mono">PNG Style</span>
                   </label>
                   
@@ -582,9 +582,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       onChange={(e) => setPngBgColor(e.target.value as any)}
                       className="w-full rounded-xl border border-emerald-550/20 dark:border-emerald-500/30 bg-white dark:bg-slate-950 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
                     >
-                      <option value="white">⚪ White background (Latar Putih)</option>
-                      <option value="black">⚫ Black background (Latar Hitam)</option>
-                      <option value="transparent">🏁 Transparent background (Latar Transparan)</option>
+                      <option value="white">{t.prompt_png_bg_white}</option>
+                      <option value="black">{t.prompt_png_bg_black}</option>
+                      <option value="transparent">{t.prompt_png_bg_transparent}</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
                       <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -594,7 +594,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   </div>
                   
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                    AI secara pintar akan menyematkan instruksi warna latar belakang solid ini ke dalam prompt agar subjek gambar terisolasi dengan rapi.
+                    {t.prompt_png_bg_desc}
                   </p>
                 </div>
               )}
@@ -602,9 +602,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* 3. Variation Slider (Determines count of generated prompts: 10 to 150) */}
               <div className="space-y-3 bg-slate-50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center text-xs font-black uppercase tracking-wider">
-                  <span className="text-slate-550 dark:text-slate-400">Dimensi & Jml Variasi Output</span>
+                  <span className="text-slate-550 dark:text-slate-400">{t.prompt_variation_label}</span>
                   <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/25 px-2.5 py-1 rounded-md text-xs font-black font-mono">
-                    {variation} Variasi
+                    {variation} {t.prompt_variation_unit}
                   </span>
                 </div>
                 
@@ -633,7 +633,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* 4. Word Count Range Sliders */}
               <div className="space-y-4 bg-slate-50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center text-xs font-black uppercase tracking-wider">
-                  <span className="text-slate-550 dark:text-slate-400">Word Count Range (Panjang Prompt)</span>
+                  <span className="text-slate-550 dark:text-slate-400">{t.prompt_word_count_label}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded font-bold">{minWords}-{maxWords} Words</span>
                   </div>
@@ -674,7 +674,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 </div>
 
                 <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium leading-relaxed italic border-t border-slate-100 dark:border-white/5 pt-2">
-                  Mengatur seberapa detail AI mengekspansi deskripsi visual setiap prompt.
+                  {t.prompt_word_count_desc}
                 </p>
               </div>
             </div>
@@ -704,12 +704,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {loading ? (
                 <>
                   <RefreshCw className="animate-spin" size={14} />
-                  <span>AI Mengekspansi {variation} Variasi Estetika...</span>
+                  <span>{t.prompt_btn_synthesizing.replace('{count}', variation.toString())}</span>
                 </>
               ) : (
                 <>
                   <Sparkles size={13} className="fill-white animate-pulse" />
-                  <span>Sintesis {variation} Prompt Sekarang</span>
+                  <span>{t.prompt_btn_synthesize.replace('{count}', variation.toString())}</span>
                 </>
               )}
             </button>
@@ -724,15 +724,15 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800 pb-4 gap-3">
               <div>
                 <h3 className="text-sm sm:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
-                  Generated Prompts {result && `(${totalPrompts !== (result?.prompts?.length || 0) ? `${totalPrompts} of ${result?.prompts?.length || 0}` : `${totalPrompts}`})`}
+                  {t.prompt_output_title} {result && `(${totalPrompts !== (result?.prompts?.length || 0) ? `${totalPrompts} of ${result?.prompts?.length || 0}` : `${totalPrompts}`})`}
                 </h3>
                 {result && (
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
                     <p className="text-[10px] text-slate-400 font-medium font-mono">
-                      Semua prompt siap disalin ke Midjourney / DALL-E / Firefly / Stable Diffusion
+                      {t.prompt_output_subtitle}
                     </p>
                     <span className="text-[9px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black rounded uppercase tracking-wider font-mono">
-                      {promptMode === 'png' ? `✨ PNG: Latar ${pngBgColor.toUpperCase()}` : '🖼️ Background Scene'}
+                      {promptMode === 'png' ? t.prompt_output_badge_png.replace('{color}', pngBgColor.toUpperCase()) : t.prompt_output_badge_scene}
                     </span>
                   </div>
                 )}
@@ -749,7 +749,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     }`}
                   >
                     {copiedAll ? <Check size={14} className="text-emerald-400 animate-pulse" /> : <Copy size={14} />}
-                    <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
+                    <span>{copiedAll ? t.prompt_output_btn_copied : t.prompt_output_btn_copy_all}</span>
                   </button>
 
                   <button
@@ -757,7 +757,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <Download size={14} />
-                    <span>Download</span>
+                    <span>{t.prompt_output_btn_download}</span>
                   </button>
 
                   {/* Clean clear-workspace action */}
@@ -770,7 +770,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     title="Bersihkan workspace saat ini"
                   >
                     <X size={14} />
-                    <span>Clear</span>
+                    <span>{t.prompt_output_btn_clear}</span>
                   </button>
                 </div>
               )}
@@ -787,7 +787,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  placeholder="Saring prompt (contoh: 'lighting', 'macro', 'epic', 'camera')..."
+                  placeholder={t.prompt_output_search_placeholder}
                   className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-8 text-xs font-medium text-slate-800 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-550 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono"
                 />
                 {searchQuery && (
@@ -809,9 +809,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 </div>
                 <div className="text-center space-y-2 max-w-sm mx-auto px-4">
                   <h3 className="text-lg font-black text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
-                    {progress < 30 ? "Formulating Creative Scenarios..." : 
-                     progress < 60 ? "Synthesizing Artistic Detail..." : 
-                     progress < 90 ? "Polishing Prompt Spektrum..." : "Finalizing Output Collection..."}
+                    {progress < 30 ? t.prompt_loading_step1 : 
+                     progress < 60 ? t.prompt_loading_step2 : 
+                     progress < 90 ? t.prompt_loading_step3 : t.prompt_loading_step4}
                   </h3>
                   <p className="text-[10px] text-slate-400 font-medium leading-relaxed font-mono uppercase tracking-widest">
                     Gemini Pro is expanding {variation} variations for "{subject}"
@@ -838,8 +838,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 {totalPrompts === 0 && (
                   <div className="py-12 text-center text-slate-500 space-y-1 border border-dashed border-white/5 rounded-xl">
                     <Search className="mx-auto text-slate-600 mb-2" size={20} />
-                    <p className="text-xs font-bold uppercase tracking-wider">Tidak ada kecocokan filter</p>
-                    <p className="text-[10px]">Kata kunci "{searchQuery}" tidak ditemukan pada {result.prompts.length} prompt.</p>
+                    <p className="text-xs font-bold uppercase tracking-wider">{t.prompt_output_no_match_title}</p>
+                    <p className="text-[10px]">{t.prompt_output_no_match_desc.replace('{query}', searchQuery).replace('{count}', result.prompts.length.toString())}</p>
                   </div>
                 )}
 

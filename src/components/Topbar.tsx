@@ -1,5 +1,6 @@
 import React from 'react';
-import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings } from 'lucide-react';
+import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe } from 'lucide-react';
+import { AppLanguage } from '../../constants';
 
 interface TopbarProps {
   searchQuery: string;
@@ -13,6 +14,8 @@ interface TopbarProps {
   t: any;
   setShowActivation?: (show: boolean) => void;
   isLicensed?: boolean;
+  uiLanguage: AppLanguage;
+  setUiLanguage: (lang: AppLanguage) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -26,7 +29,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   setShowSettingsModal,
   t,
   setShowActivation,
-  isLicensed
+  isLicensed,
+  uiLanguage,
+  setUiLanguage
 }) => {
   const [time, setTime] = React.useState(new Date());
 
@@ -70,7 +75,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         <div className="hidden sm:flex items-center space-x-3 px-4 py-1.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-white/5 shadow-inner">
           <div className="flex flex-col items-start leading-none">
             <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter mb-0.5">
-              Current System Time
+              {t.topbar_system_time}
             </span>
             <div className="flex items-baseline space-x-2">
               <span className="text-sm font-black text-slate-700 dark:text-emerald-400 font-mono tracking-widest leading-none">
@@ -93,7 +98,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-            STABILITY CORE ONLINE
+            {t.topbar_stability_core}
           </span>
         </div>
 
@@ -103,26 +108,36 @@ export const Topbar: React.FC<TopbarProps> = ({
             type="button"
             onClick={() => setShowActivation?.(true)}
             className="text-[10px] font-black uppercase bg-emerald-500/10 dark:bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-full text-emerald-600 dark:text-emerald-400 cursor-pointer transition-all hover:scale-105 active:scale-95"
-            title="Kelola Lisensi / Berhenti Langganan"
+            title={t.sidebar_manage_license}
           >
-            👑 PRO ACTIVE
+            {t.topbar_pro_active}
           </button>
         ) : (
           <button
             type="button"
             onClick={() => setShowActivation?.(true)}
             className="text-[10px] font-black uppercase bg-amber-500/10 dark:bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2.5 py-1 rounded-full text-amber-600 dark:text-amber-400 cursor-pointer transition-all hover:scale-105 active:scale-95 animate-pulse"
-            title="Aktivasi Lisensi Resmi / Mulai Pro"
+            title={t.sidebar_activation_tooltip}
           >
-            ⚠️ TRIAL EVAL
+            {t.topbar_trial_eval}
           </button>
         )}
+
+        {/* Language Swapper */}
+        <button 
+          onClick={() => setUiLanguage(uiLanguage === 'en' ? 'id' : 'en')}
+          className="p-2 flex items-center space-x-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none"
+          title={t.language}
+        >
+          <Globe size={17} />
+          <span className="text-[10px] font-black uppercase">{uiLanguage}</span>
+        </button>
 
         {/* Theme Swapper */}
         <button 
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none"
-          title="Toggle Theme"
+          title={t.topbar_toggle_theme}
         >
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
@@ -131,7 +146,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         <button 
           onClick={() => setShowInfoModal(true)}
           className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none flex items-center space-x-1"
-          title="Information Manual"
+          title={t.topbar_info_manual}
         >
           <Info size={17} />
         </button>
@@ -140,7 +155,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         <button 
           onClick={() => setShowSettingsModal(true)}
           className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none flex items-center space-x-1"
-          title="Settings & API Key"
+          title={t.topbar_settings_api}
         >
           <Settings size={17} className="animate-hover-spin" />
         </button>

@@ -12,7 +12,7 @@ interface QualityReport {
   heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
 }
 
-export const ImageQualityCheck: React.FC = () => {
+export const ImageQualityCheck: React.FC<{ t: any }> = ({ t }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -217,12 +217,12 @@ export const ImageQualityCheck: React.FC = () => {
             </div>
             <div>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">
-                Quality <span className="text-emerald-500">Check</span>
+                {t.qc_title} <span className="text-emerald-500">{t.qc_title_check}</span>
               </h2>
               <div className="flex items-center gap-2 mt-2">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.15em]">
-                  AI Expert for Adobe Stock Standards
+                  {t.qc_subtitle}
                 </p>
               </div>
             </div>
@@ -236,7 +236,7 @@ export const ImageQualityCheck: React.FC = () => {
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 hover:bg-rose-500/10 text-slate-600 dark:text-slate-400 hover:text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 border border-slate-200 dark:border-white/10"
               >
                 <Trash2 size={13} />
-                Reset
+                {t.qc_btn_reset}
               </button>
             )}
             <button
@@ -245,7 +245,7 @@ export const ImageQualityCheck: React.FC = () => {
               className="relative group/btn flex items-center gap-3 px-8 py-3.5 bg-slate-900 dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-400 text-white dark:text-slate-950 rounded-xl text-[11px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-2xl shadow-slate-900/10 dark:shadow-emerald-500/20"
             >
               {loading ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} className="group-hover/btn:animate-bounce" />}
-              {loading ? 'Menganalisis...' : 'Mulai Audit Asset'}
+              {loading ? t.qc_btn_analyzing : t.qc_btn_analyze}
             </button>
           </div>
         </div>
@@ -256,7 +256,7 @@ export const ImageQualityCheck: React.FC = () => {
         <div className="xl:col-span-4 space-y-6">
           {/* Tolerance Card */}
           <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Quality Tolerance</h3>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{t.qc_tolerance_label}</h3>
             <div className="space-y-4">
               <select 
                   value={tolerance} 
@@ -273,7 +273,7 @@ export const ImageQualityCheck: React.FC = () => {
           {/* Upload Hub */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-2 shadow-2xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
             <div className="p-4 border-b border-slate-100 dark:border-white/5">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Upload Hub</h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t.qc_upload_hub}</h3>
             </div>
             
             <label 
@@ -287,10 +287,10 @@ export const ImageQualityCheck: React.FC = () => {
               </div>
               <div className="text-center px-4">
                 <span className="block text-xs font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight">
-                  {isDragging ? 'Lepaskan Gambar 🔥' : 'Drop Images Here'}
+                  {isDragging ? t.qc_release_images : t.qc_drop_images_here}
                 </span>
                 <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 flex items-center justify-center gap-2">
-                  <FileImage size={12} /> Multiple Upload Supported
+                  <FileImage size={12} /> {t.qc_multiple_upload}
                 </span>
               </div>
               <input type="file" accept="image/*" onChange={handleFileChange} multiple className="hidden" />
@@ -304,7 +304,7 @@ export const ImageQualityCheck: React.FC = () => {
                   className="px-4 pb-4 space-y-3"
                 >
                   <div className="flex justify-between items-center bg-slate-100 dark:bg-black/40 px-3 py-2 rounded-xl">
-                    <p className="font-black text-[9px] uppercase text-slate-500 tracking-widest">Queue: {files.length} Assets</p>
+                    <p className="font-black text-[9px] uppercase text-slate-500 tracking-widest">{t.qc_queue_assets}: {files.length}</p>
                   </div>
                   <div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
                     {files.map((file, idx) => (
@@ -322,7 +322,7 @@ export const ImageQualityCheck: React.FC = () => {
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
-                          <p className="text-[9px] text-slate-400 font-black uppercase">Pending Audit</p>
+                          <p className="text-[9px] text-slate-400 font-black uppercase">{t.qc_pending_audit}</p>
                         </div>
                       </motion.div>
                     ))}
@@ -354,10 +354,10 @@ export const ImageQualityCheck: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">
-                      Adobe Stock QC Specialist
+                      {t.qc_analyzing_text}
                     </h3>
                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">
-                      Analyzing legal, technical, and commercial value
+                      {t.qc_analyzing_desc}
                     </p>
                   </div>
                 </div>
@@ -373,7 +373,7 @@ export const ImageQualityCheck: React.FC = () => {
                   <FileImage size={48} className="text-slate-200 dark:text-slate-800" />
                 </div>
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest text-center max-w-[250px]">
-                  Silahkan upload gambar dulu untuk memulai proses audit kurasi
+                  {t.qc_info_empty}
                 </p>
               </motion.div>
             ) : (
@@ -413,7 +413,7 @@ export const ImageQualityCheck: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end">
                            <p className={`text-[18px] font-black leading-none ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>{r.overall_score}</p>
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1">QC SCORE</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1">{t.qc_score_label}</p>
                         </div>
                       </div>
 
@@ -481,12 +481,12 @@ export const ImageQualityCheck: React.FC = () => {
                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
                              >
                                {showHeatmaps.has(fileName) ? <EyeOff size={14} /> : <Eye size={14} />}
-                               {showHeatmaps.has(fileName) ? 'Hide Heatmap' : 'Analyze Pixel Heatmap'}
+                               {showHeatmaps.has(fileName) ? t.qc_hide_heatmap : t.qc_analyze_heatmap}
                              </button>
                              
                              <div className="flex items-center gap-2">
                                <div className="flex flex-col items-end">
-                                 <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">Pixel Engine</p>
+                                 <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">{t.qc_pixel_engine}</p>
                                  <p className="text-[9px] font-black text-emerald-400 leading-none">v5.0 Expert</p>
                                </div>
                                <Zap size={14} className="text-emerald-500" />
@@ -507,7 +507,7 @@ export const ImageQualityCheck: React.FC = () => {
                           <div className="bg-rose-500/5 border border-rose-500/10 p-4 rounded-2xl">
                              <div className="flex items-center gap-2 mb-2">
                                <Info size={12} className="text-rose-500" />
-                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">Rejection Reason</p>
+                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">{t.qc_rejection_reason}</p>
                              </div>
                              <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
                                "{r.detailed_feedback}"
@@ -517,7 +517,7 @@ export const ImageQualityCheck: React.FC = () => {
 
                         {/* Legal Status */}
                         <div className={`p-4 rounded-2xl border ${r.legal_status.includes('VIOLATION') ? 'bg-rose-500/5 border-rose-500/20 text-rose-600' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600'}`}>
-                          <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Legal Status</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">{t.qc_legal_status}</p>
                           <p className="text-[11px] font-bold">{r.legal_status}</p>
                         </div>
 
@@ -529,10 +529,10 @@ export const ImageQualityCheck: React.FC = () => {
                           >
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                              <p className="text-[10px] font-black uppercase text-slate-400 group-hover/audit:text-emerald-500 transition-colors tracking-[0.1em]">Quality Metadata 🚀</p>
+                              <p className="text-[10px] font-black uppercase text-slate-400 group-hover/audit:text-emerald-500 transition-colors tracking-[0.1em]">{t.qc_quality_metadata} 🚀</p>
                             </div>
                             <div className="flex items-center gap-2 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/10 group-hover/audit:bg-emerald-500 group-hover/audit:text-white transition-all">
-                              {expandedReports.has(fileName) ? 'Close' : 'View Audit'}
+                              {expandedReports.has(fileName) ? t.qc_close : t.qc_view_audit}
                               {expandedReports.has(fileName) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             </div>
                           </button>
@@ -548,7 +548,7 @@ export const ImageQualityCheck: React.FC = () => {
                                 <div className="grid grid-cols-1 gap-3 pt-2">
                                   {/* Strengths */}
                                   <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
-                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tight mb-2">Strengths</p>
+                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tight mb-2">{t.qc_strengths}</p>
                                     <div className="flex flex-wrap gap-1.5">
                                       {r.strengths.map((s, idx) => (
                                         <span key={idx} className="px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded text-[10px] font-bold">
@@ -560,7 +560,7 @@ export const ImageQualityCheck: React.FC = () => {
 
                                   {/* Technical Issues */}
                                   <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
-                                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-tight mb-2">Technical Analysis</p>
+                                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-tight mb-2">{t.qc_tech_analysis}</p>
                                     <ul className="space-y-1">
                                       {r.technical_issues.map((issue, idx) => (
                                         <li key={idx} className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-start gap-2">
@@ -573,7 +573,7 @@ export const ImageQualityCheck: React.FC = () => {
 
                                   {/* Detailed Feedback */}
                                   <div className="bg-indigo-500/5 border border-indigo-500/20 p-5 rounded-2xl mt-2">
-                                    <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-2">Detailed Feedback</p>
+                                    <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-2">{t.qc_detailed_feedback}</p>
                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-relaxed italic">
                                       "{r.detailed_feedback}"
                                     </p>
