@@ -267,6 +267,16 @@ async function callOpenAICompatibleWithRetry(params: {
         console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
         lastErr = err;
 
+        // Add detailed key inspection logging for NVIDIA provider on failure
+        if (provider === 'nvidia') {
+          console.error(`[NVIDIA Key Inspection] providerState:`, JSON.stringify(providerState, null, 2));
+          console.error(`[NVIDIA Key Inspection] keysList length:`, keysList.length);
+          console.error(`[NVIDIA Key Inspection] keysList:`, keysList.map((k, i) => `Index ${i}: ${k ? k.substring(0, 8) + '...' : 'EMPTY'}`));
+          console.error(`[NVIDIA Key Inspection] activeIndex:`, providerState?.activeIndex || 0);
+          console.error(`[NVIDIA Key Inspection] apiKey being used (first 8 chars):`, apiKey ? apiKey.substring(0, 8) + '...' : 'EMPTY');
+          console.error(`[NVIDIA Key Inspection] process.env.NVIDIA_API_KEY (first 8 chars):`, process.env.NVIDIA_API_KEY ? process.env.NVIDIA_API_KEY.substring(0, 8) + '...' : 'NOT SET');
+        }
+
         const errorMsg = String(err.message || "").toLowerCase();
 
         if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit')) {
