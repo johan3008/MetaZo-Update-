@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getHeaders } from '../../services/geminiService';
 import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -12,7 +13,7 @@ interface QualityReport {
   heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
 }
 
-export const ImageQualityCheck: React.FC<{ t: any }> = ({ t }) => {
+export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, aiOptions }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -176,7 +177,7 @@ export const ImageQualityCheck: React.FC<{ t: any }> = ({ t }) => {
 
         const response = await fetch('/api/check-image-quality', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(aiOptions),
           body: JSON.stringify({ image: base64Image, tolerance }),
         });
         if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);

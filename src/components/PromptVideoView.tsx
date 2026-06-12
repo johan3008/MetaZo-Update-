@@ -32,11 +32,14 @@ interface HistoryItem {
   timestamp: number;
 }
 
+import { getHeaders } from '../../services/geminiService';
+
 interface PromptVideoViewProps {
   t: any;
+  aiOptions?: any;
 }
 
-export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t }) => {
+export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }) => {
   const [keyword, setKeyword] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -77,7 +80,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t }) => {
     try {
       const response = await fetch('/api/analyze-video-keyword', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(aiOptions),
         body: JSON.stringify({ keyword: keyword.trim() }),
       });
 
@@ -145,7 +148,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t }) => {
     try {
       const response = await fetch('/api/generate-hollywood-prompts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(aiOptions),
         body: JSON.stringify({ keyword: keyword.trim() }),
       });
 

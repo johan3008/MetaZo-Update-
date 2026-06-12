@@ -118,62 +118,43 @@ try {
 const localGsPath = path.join(__dirname_safe, 'bin', 'gs');
 const gsExecutable = fs.existsSync(localGsPath) ? localGsPath : 'gs';
 
-const upload = multer({ dest: uploadDir });
+const upload = multer({ 
+    dest: uploadDir,
+    limits: { fileSize: 500 * 1024 * 1024 } // 500MB Limit
+});
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // Custom Multi-Provider API Key Context Middleware (Thread safe via AsyncLocalStorage with auto-rotation)
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const customGeminiKey = req.headers['x-gemini-key'];
     const customGroqKey = req.headers['x-groq-key'];
     const customMistralKey = req.headers['x-mistral-key'];
+    const customOpenAIKey = req.headers['x-openai-key'];
+    const customOpenRouterKey = req.headers['x-openrouter-key'];
     const customNvidiaKey = req.headers['x-nvidia-key'];
-    const customOpenaiKey = req.headers['x-openai-key'];
-    const customOpenrouterKey = req.headers['x-openrouter-key'];
     const customBlackboxKey = req.headers['x-blackbox-key'];
     const provider = req.headers['x-ai-provider'] || 'gemini';
 
-    const geminiKeys = customGeminiKey && typeof customGeminiKey === 'string'
-        ? customGeminiKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
-        
-    const groqKeys = customGroqKey && typeof customGroqKey === 'string'
-        ? customGroqKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
-        
-    const mistralKeys = customMistralKey && typeof customMistralKey === 'string'
-        ? customMistralKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
-        
-    const nvidiaKeys = customNvidiaKey && typeof customNvidiaKey === 'string'
-        ? customNvidiaKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
-        
-    const openaiKeys = customOpenaiKey && typeof customOpenaiKey === 'string'
-        ? customOpenaiKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
-        
-    const openrouterKeys = customOpenrouterKey && typeof customOpenrouterKey === 'string'
-        ? customOpenrouterKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
-        
-    const blackboxKeys = customBlackboxKey && typeof customBlackboxKey === 'string'
-        ? customBlackboxKey.split(',').map(k => k.trim()).filter(Boolean)
-        : [];
+    const getKeys = (headerVal: any) => {
+        return headerVal && typeof headerVal === 'string'
+            ? headerVal.split(',').map(k => k.trim()).filter(Boolean)
+            : [];
+    };
 
     apiKeyStorage.run({
         provider: String(provider),
-        gemini: { keys: geminiKeys, activeIndex: 0 },
-        groq: { keys: groqKeys, activeIndex: 0 },
-        mistral: { keys: mistralKeys, activeIndex: 0 },
-        nvidia: { keys: nvidiaKeys, activeIndex: 0 },
-        openai: { keys: openaiKeys, activeIndex: 0 },
-        openrouter: { keys: openrouterKeys, activeIndex: 0 },
-        blackbox: { keys: blackboxKeys, activeIndex: 0 }
+        gemini: { keys: getKeys(customGeminiKey), activeIndex: 0 },
+        groq: { keys: getKeys(customGroqKey), activeIndex: 0 },
+        mistral: { keys: getKeys(customMistralKey), activeIndex: 0 },
+        openai: { keys: getKeys(customOpenAIKey), activeIndex: 0 },
+        openrouter: { keys: getKeys(customOpenRouterKey), activeIndex: 0 },
+        nvidia: { keys: getKeys(customNvidiaKey), activeIndex: 0 },
+        blackbox: { keys: getKeys(customBlackboxKey), activeIndex: 0 }
     }, () => {
         next();
     });
@@ -183,8 +164,13 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (err) {
         console.error('[GLOBAL ERROR]', err);
-        if (err.status === 413) {
-            return res.status(413).json({ error: 'Paylod too large. Gambar terlalu besar untuk diproses.' });
+        // Handle Multer limits or platform 413 errors
+        if (err.status === 413 || err.code === 'LIMIT_FILE_SIZE' || err.message?.includes('too large')) {
+            const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+            const limitMsg = isVercel 
+                ? 'Vercel has a strict 4.5MB limit for serverless functions. Please optimize your EPS/AI file below 4.5MB or deploy to a platform with higher limits (like Railway or Cloud Run).'
+                : 'Payload too large. Vector file exceeds the server capacity (max 500MB). Try optimizing the EPS file.';
+            return res.status(413).json({ error: limitMsg });
         }
         if (!res.headersSent) {
             return res.status(500).json({ error: err.message || 'Internal Server Error' });

@@ -4,6 +4,7 @@ import { ToolType, FileItem, ProgressInfo } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from '../../constants';
 import { copyToClipboard } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { getHeaders } from '../../services/geminiService';
 
 // Since we have helper subcomponents like CopyBox and KeywordList in the project,
 // we will declare props for them or import them if needed. 
@@ -75,6 +76,7 @@ interface KeywordListProps {
   onChange: (kw: string[]) => void;
   title?: string;
   description?: string;
+  aiOptions?: any;
 }
 
 const ProjectKeywordList: React.FC<KeywordListProps> = ({
@@ -83,7 +85,8 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   themeColor,
   onChange,
   title,
-  description
+  description,
+  aiOptions
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
@@ -151,7 +154,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     try {
       const response = await fetch('/api/smart-suggest-keywords', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(aiOptions),
         body: JSON.stringify({
           title,
           description: description || '',
@@ -272,6 +275,7 @@ interface ReviewQueueProps {
   canDownload: boolean;
   isLoading?: boolean;
   progressInfo?: ProgressInfo | null;
+  aiOptions?: any;
 }
 
 export const ReviewQueue: React.FC<ReviewQueueProps> = ({
@@ -290,7 +294,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   successfulFilesCount,
   canDownload,
   isLoading,
-  progressInfo
+  progressInfo,
+  aiOptions
 }) => {
   const hasFiles = files.length > 0;
 
@@ -577,6 +582,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         description={file.description}
                         themeColor={activeTool === ToolType.IMAGE ? 'blue' : activeTool === ToolType.VIDEO ? 'purple' : 'emerald'} 
                         onChange={(newKeywords) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, keywords: newKeywords} : f))} 
+                        aiOptions={aiOptions}
                       />
 
                       <div className="space-y-1 px-0.5">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { copyToClipboard as robustCopy } from '../utils';
+import { getHeaders } from '../../services/geminiService';
 import { 
   Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2
 } from 'lucide-react';
@@ -11,6 +12,7 @@ interface PromptGenViewProps {
   isLicensed?: boolean;
   dailyGenCount?: number;
   incrementDailyCount?: () => void;
+  aiOptions?: any;
 }
 
 interface PromptHistoryItem {
@@ -63,7 +65,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   onPrefillConsumed,
   isLicensed = false,
   dailyGenCount = 0,
-  incrementDailyCount
+  incrementDailyCount,
+  aiOptions
 }) => {
   const [subject, setSubject] = useState('');
 
@@ -202,7 +205,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     try {
       const response = await fetch('/api/generate-prompt', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(aiOptions),
         body: JSON.stringify({
           subject: subject.trim(),
           styleCategory,

@@ -5,8 +5,10 @@ import {
 
 interface PromptImageViewProps {
   t: any;
+  aiOptions?: any;
 }
 import { copyToClipboard as robustCopy } from '../utils';
+import { getHeaders } from '../../services/geminiService';
 
 interface ImageItem {
   id: string;
@@ -29,7 +31,7 @@ const STYLE_OPTIONS = (t: any) => [
   { id: 'Fine Art', label: t.style_fine_art, icon: '🏛️' }
 ];
 
-export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
+export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }) => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [loadingBatch, setLoadingBatch] = useState(false);
@@ -165,7 +167,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t }) => {
 
       const response = await fetch('/api/analyze-batch-image-to-prompt', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(aiOptions),
         body: JSON.stringify({
           images: pendingImages,
           styleCategory

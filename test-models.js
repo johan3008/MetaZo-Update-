@@ -6,7 +6,7 @@ async function test() {
       return;
   }
   
-  const models = ['llama-3.2-90b-vision-preview', 'llama-3.2-11b-vision-preview', 'llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile'];
+  const models = ['meta-llama/llama-3.2-90b-vision-preview', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768'];
   
   for (const model of models) {
     console.log("Testing " + model);

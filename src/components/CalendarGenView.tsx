@@ -6,9 +6,10 @@ import { fetchCalendarEvents, fetchEventKeywords } from '../../services/geminiSe
 interface CalendarGenViewProps {
   t: any;
   onSendToPrompt?: (text: string) => void;
+  aiOptions?: any;
 }
 
-export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPrompt }) => {
+export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPrompt, aiOptions }) => {
   const MONTHS = [
     t.calendar_months_january, t.calendar_months_february, t.calendar_months_march, 
     t.calendar_months_april, t.calendar_months_may, t.calendar_months_june,
@@ -43,7 +44,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
     }, 400);
 
     try {
-      const data = await fetchCalendarEvents(selectedMonth);
+      const data = await fetchCalendarEvents(selectedMonth, aiOptions);
       setEvents(data.events || []);
     } catch (err: any) {
       setError(err.message || t.calendar_error_fail);
@@ -84,7 +85,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
   const handleGenerateKeywords = async (eventName: string, commercialPotential: string) => {
     setLoadingKeywordsFor(eventName);
     try {
-      const data = await fetchEventKeywords(eventName, commercialPotential);
+      const data = await fetchEventKeywords(eventName, commercialPotential, aiOptions);
       setEventKeywords(prev => ({
         ...prev,
         [eventName]: data.keywords

@@ -52,7 +52,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   openrouter: 'google/gemini-2.0-flash-001',
   blackbox: 'blackboxai',
-  nvidia: 'meta/llama-3.2-90b-vision-instruct',
+  nvidia: 'step-3.5-flash',
 };
 
 const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
@@ -61,11 +61,12 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
   openai: 'gpt-4o',
   openrouter: 'anthropic/claude-3.5-haiku',
   blackbox: 'blackboxai-pro',
-  nvidia: 'meta/llama-3.2-11b-vision-instruct',
+  nvidia: 'step-3.5-flash',
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter']);
+// NOTE: NVIDIA added after testing showed it supports json_object mode for structured output
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'blackbox']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -101,9 +102,46 @@ function extractJSON(raw: string): string {
 
   if (start !== -1 && end !== -1 && end > start) {
     cleaned = cleaned.slice(start, end + 1);
+  } else {
+    return "{}";
   }
 
   return cleaned.trim();
+}
+
+// Normalize many possible SDK/HTTP response shapes into a single string
+async function extractText(result: any): Promise<string> {
+  if (!result) return '';
+  if (typeof result === 'string') return result;
+
+  // Some SDKs return an object with a `.text()` async function
+  if (typeof result.text === 'function') {
+    try {
+      const t = await result.text();
+      return typeof t === 'string' ? t : JSON.stringify(t);
+    } catch (e) {
+      // fall through to other detectors
+    }
+  }
+
+  // Some SDKs return `{ text: string }`
+  if (typeof result.text === 'string') return result.text;
+
+  // OpenAI-like HTTP responses
+  if (result.choices && Array.isArray(result.choices)) {
+    const first = result.choices[0];
+    if (first) {
+      if (first.message && typeof first.message.content === 'string') return first.message.content;
+      if (typeof first.text === 'string') return first.text;
+    }
+  }
+
+  // Fallback: stringify whatever we have
+  try {
+    return JSON.stringify(result);
+  } catch (e) {
+    return String(result);
+  }
 }
 
 async function callOpenAICompatibleWithRetry(params: {
@@ -115,7 +153,12 @@ async function callOpenAICompatibleWithRetry(params: {
   model?: string;
 }): Promise<string> {
   const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
+  // This function is intended to call OpenAI-compatible HTTP endpoints (non-Gemini).
+  // Default to a non-Gemini provider when none is set in the AsyncLocalStorage.
+  // Using 'gemini' here causes an unsupported-endpoint error because Gemini uses
+  // the Google GenAI SDK path (`getAIClient()`), not the HTTP endpoints listed
+  // in `PROVIDER_ENDPOINTS`.
+  const provider = (store && store.provider) || 'openai';
 
   if (!PROVIDER_ENDPOINTS[provider]) {
     throw new Error(`Unsupported provider: ${provider}`);
@@ -135,6 +178,17 @@ async function callOpenAICompatibleWithRetry(params: {
       apiKey = keysList[activeIdx];
     } else {
       apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || '';
+    }
+
+      if (!apiKey && provider === 'nvidia') {
+      console.warn('NVIDIA key missing. Fallback to Gemini.');
+      const fallbackResult = await getAIClient().models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: params.contents,
+        config: params.config
+      });
+      // Normalize varied SDK responses
+      return await extractText(fallbackResult);
     }
 
     if (!apiKey) {
@@ -157,12 +211,15 @@ async function callOpenAICompatibleWithRetry(params: {
         contentParts.push({ type: 'text', text: part.text });
       } else if (part.inlineData) {
         hasImages = true;
-        contentParts.push({
+        // NVIDIA NIM uses different image format than standard OpenAI API
+        // Standard OpenAI-compatible API uses 'image_url', but test both
+        const imageObj = {
           type: 'image_url',
           image_url: {
             url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
           }
-        });
+        };
+        contentParts.push(imageObj);
       }
     };
 
@@ -196,6 +253,13 @@ async function callOpenAICompatibleWithRetry(params: {
       model = 'meta-llama/llama-4-scout-17b-16e-instruct';
     }
 
+    // NVIDIA NIM model name must use 'meta/' prefix for LLaMA models
+    if (provider === 'nvidia' && model && model.toLowerCase().includes('llama')) {
+      if (!model.startsWith('meta/')) {
+        model = 'meta/' + model.replace(/^meta\/?/i, '');
+      }
+    }
+
     const payload: any = {
       model,
       messages,
@@ -208,6 +272,13 @@ async function callOpenAICompatibleWithRetry(params: {
 
     if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
       payload.max_tokens = 8192;
+    }
+
+    // CRITICAL: NVIDIA NIM response quality significantly improves with lower temperature for JSON output
+    // Default 0.85 often produces malformed/random metadata for NVIDIA
+    if (provider === 'nvidia' && params.responseMimeType === 'application/json') {
+      payload.temperature = 0.3; // Conservative temperature for structured JSON responses
+      console.log(`[callOpenAICompatibleWithRetry] Lowered NVIDIA temperature to 0.3 for JSON mode (was ${params.config?.temperature ?? 0.85})`);
     }
 
     if (params.responseMimeType === 'application/json') {
@@ -254,28 +325,33 @@ async function callOpenAICompatibleWithRetry(params: {
           throw new Error(`HTTP ${response.status}: ${errText}`);
         }
 
-        const responseData = await response.json();
-        let answer = responseData.choices?.[0]?.message?.content;
-        if (!answer) {
+        const responseData = await response.json().catch(() => null);
+        let answer = await extractText(responseData);
+        
+        // Added debug logging for NVIDIA to catch malformed responses
+        if (provider === 'nvidia' && params.responseMimeType === 'application/json') {
+          console.log(`[callOpenAICompatibleWithRetry - NVIDIA] Raw answer preview: ${String(answer).substring(0, 200)}`);
+        }
+        
+        if (!answer || String(answer).trim().length === 0) {
           throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
         }
         if (params.responseMimeType === 'application/json') {
           answer = extractJSON(answer);
+          // Validate JSON structure for NVIDIA
+          if (provider === 'nvidia') {
+            try {
+              JSON.parse(answer);
+            } catch (parseErr) {
+              console.error(`[callOpenAICompatibleWithRetry - NVIDIA] Invalid JSON structure after extraction:`, answer);
+              throw new Error(`NVIDIA returned unparseable JSON: ${parseErr}`);
+            }
+          }
         }
         return answer;
       } catch (err: any) {
         console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
         lastErr = err;
-
-        // Add detailed key inspection logging for NVIDIA provider on failure
-        if (provider === 'nvidia') {
-          console.error(`[NVIDIA Key Inspection] providerState:`, JSON.stringify(providerState, null, 2));
-          console.error(`[NVIDIA Key Inspection] keysList length:`, keysList.length);
-          console.error(`[NVIDIA Key Inspection] keysList:`, keysList.map((k, i) => `Index ${i}: ${k ? k.substring(0, 8) + '...' : 'EMPTY'}`));
-          console.error(`[NVIDIA Key Inspection] activeIndex:`, providerState?.activeIndex || 0);
-          console.error(`[NVIDIA Key Inspection] apiKey being used (first 8 chars):`, apiKey ? apiKey.substring(0, 8) + '...' : 'EMPTY');
-          console.error(`[NVIDIA Key Inspection] process.env.NVIDIA_API_KEY (first 8 chars):`, process.env.NVIDIA_API_KEY ? process.env.NVIDIA_API_KEY.substring(0, 8) + '...' : 'NOT SET');
-        }
 
         const errorMsg = String(err.message || "").toLowerCase();
 
@@ -506,10 +582,10 @@ export const generateStockMetadata = async (
 7. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
   }
 
-  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: PROVIDER 1 — MULTI-PROVIDER VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
   
-  console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
+  console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Multi-Provider Vision (Visual Facts Detection)...`);
   
   let mediaTypeContext = "The provided image is a photograph or digital artwork. Generate natural, human-readable descriptions of concepts and visual facts smoothly.";
   if (toolType === ToolType.VIDEO) {
@@ -518,41 +594,74 @@ export const generateStockMetadata = async (
     mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility. Generate natural, smooth descriptions.";
   }
 
-  const visionModelToUse = (model && model.startsWith('gemini-')) ? model : 'gemini-3.1-flash-lite';
+  // Vision-capable model fallback chain (using provider from line 547)
+  const VISION_MODELS_TAHAP1: Record<string, string[]> = {
+    'gemini': ['gemini-3.1-flash-lite', 'gemini-flash-latest'],
+    'openai': ['gpt-4-turbo', 'gpt-4o'],
+    'openrouter': ['google/gemini-2.0-flash-001', 'openai/gpt-4-turbo'],
+    'groq': [], // No vision support
+    'mistral': [], // Limited vision
+    'blackbox': [],
+    'nvidia': ['step-3.5-flash']
+  };
+
+  // Build fallback chain for TAHAP 1
+  const visionModelsToTry: string[] = [];
+  if (VISION_MODELS_TAHAP1[provider]?.length > 0) {
+    visionModelsToTry.push(...VISION_MODELS_TAHAP1[provider]);
+    console.log(`[JohMeta Pipeline] TAHAP 1 - Trying primary provider ${provider.toUpperCase()}: ${VISION_MODELS_TAHAP1[provider].join(', ')}`);
+  }
+  visionModelsToTry.push(...VISION_MODELS_TAHAP1['gemini']);
+  if (provider !== 'gemini') {
+    console.log(`[JohMeta Pipeline] TAHAP 1 - Gemini added as fallback for provider: ${provider}`);
+  }
   
   const visionSystemInstruction = `ROLE:
-You are a Visual Metadata Analyzer (Provider 1).
+You are a Visual Metadata Analyzer.
 Analyze only what is visually verifiable in the image.
-Never guess, assume, hallucinate, infer, or invent information.
 
-CRITICAL ANTI-INFERENCE RULES:
+ABSOLUTE RULE:
+Describe only what is clearly visible in the image.
+
+VISUAL ACCURACY RULES:
+1. Never hallucinate.
+2. Never guess.
+3. Never infer hidden information.
+4. Never invent objects, actions, locations, professions, events, or concepts not visually supported.
+5. If uncertain, omit the information.
+
+STRICT PROHIBITIONS:
+Never infer:
+* profession
+* occupation
+* nationality
+* ethnicity
+* religion
+* political affiliation
+* location
+* country
+* city
+* event
+* season
+* relationship
+* emotion
+* brand
+* trademark
+* copyrighted character
+
+Examples:
 Keyboard ≠ programmer
 Blueprint ≠ architect
 Camera ≠ photographer
+Suit ≠ businessman
 Laptop ≠ office worker
 Medical mask ≠ doctor
-Suit ≠ businessman
-
-Never infer profession.
-Never infer occupation.
-Never infer industry.
-Never infer location.
-Never infer nationality.
-Never infer emotion.
-
-Only describe visible objects.
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 Do not infer hidden context.
-
-STRICT VISUAL RULES:
-1. Describe ONLY objects, people, actions, colors, and composition clearly visible.
-2. NEVER assume: nationality, ethnicity, religion, profession, location, country, city, event, season, weather, relationship, emotions not clearly visible, brand names, trademarks, copyrighted characters.
-3. If uncertain: omit the information, do not speculate.
-4. Accuracy is more important than quantity.
 
 Asset Context: ${mediaTypeContext}
 
@@ -589,29 +698,60 @@ OUTPUT FORMAT:
     : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
   try {
-    const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
-      parts: [...imageParts, { text: promptText }] 
-    }, {
-      systemInstruction: visionSystemInstruction,
-      responseMimeType: "application/json",
-      temperature: temperature ?? 0.1,
-      topP: 0.8,
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-      ]
-    });
-    
-    visualFactsJson = visionResponse.text || "{}";
+    let visionResponse;
+    let lastVisionError: any;
+
+    for (const modelName of visionModelsToTry) {
+      try {
+        const modelProvider = modelName.includes('gemini') ? 'gemini' : modelName.includes('gpt') ? 'openai' : 'openrouter';
+        
+        console.log(`[JohMeta Pipeline] TAHAP 1 - Attempting ${modelProvider.toUpperCase()}: ${modelName}`);
+        
+        if (modelProvider === 'gemini') {
+          visionResponse = await callGeminiWithRetry(modelName, { 
+            parts: [...imageParts, { text: promptText }] 
+          }, {
+            systemInstruction: visionSystemInstruction,
+            responseMimeType: "application/json",
+            temperature: temperature ?? 0.1,
+            topP: 0.8,
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+            ]
+          });
+        } else {
+          visionResponse = await callOpenAICompatibleWithRetry({
+            systemInstruction: visionSystemInstruction,
+            contents: [...imageParts, { text: promptText }],
+            responseMimeType: "application/json",
+            model: modelName,
+            config: { temperature: temperature ?? 0.1 }
+          });
+        }
+        
+        visualFactsJson = (await extractText(visionResponse)) || "{}";
+        if (!visualFactsJson || visualFactsJson.trim() === "{}") {
+          throw new Error("Vision Analysis produced empty results.");
+        }
+        
+        console.log(`[JohMeta Pipeline] TAHAP 1 - SUCCESS with ${modelProvider.toUpperCase()}: ${modelName}`);
+        break;
+      } catch (err: any) {
+        lastVisionError = err;
+        console.warn(`[JohMeta Pipeline] TAHAP 1 - Failed with ${modelName}:`, err.message || err);
+      }
+    }
+
     if (!visualFactsJson || visualFactsJson.trim() === "{}") {
-      throw new Error("Vision Analysis produced empty results.");
+      throw lastVisionError || new Error("Vision Analysis produced empty results for all providers.");
     }
   } catch (err: any) {
-    console.warn("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
-    // Fallback static facts if vision fails
+    console.warn("[JohMeta Pipeline] TAHAP 1 - Multi-Provider Vision Stage Failed:", err.message || err);
+    // Fallback static facts if all vision providers fail
     visualFactsJson = JSON.stringify({
       VISUAL_FACTS: {
         primary_subjects: [{ name: "main subject", importance: 100 }],
@@ -642,53 +782,82 @@ OUTPUT FORMAT:
   console.log(`[JohMeta Pipeline] Stage 2 & 3: Generating Content (Title, Description, Keywords)...`);
   
   const genSystemInstruction = `ROLE:
-You are a professional Adobe Stock and Shutterstock title and keyword specialist.
+You are a professional Adobe Stock, Shutterstock, and Canva metadata specialist.
 
 PRIMARY OBJECTIVE:
+Generate commercially valuable metadata that accurately describes the visual content and maximizes discoverability while fully complying with Adobe Stock content guidelines.
 Generate highly searchable stock titles and exactly ${aiRequestCount} keywords based on the dominant visual subject.
 
+ABSOLUTE RULE:
+Describe only what is clearly visible in the image.
+
+VISUAL ACCURACY RULES:
+1. Never hallucinate.
+2. Never guess.
+3. Never infer hidden information.
+4. Never invent objects, actions, locations, professions, events, or concepts not visually supported.
+5. If uncertain, omit the information.
+
+STRICT PROHIBITIONS (Never infer):
+profession, occupation, nationality, ethnicity, religion, political affiliation, location, country, city, event, season, relationship, emotion, brand, trademark, copyrighted character.
+
 TITLE RULES:
-1. The title must describe the MAIN SUBJECT first.
-2. Include the visual style if it is visually dominant.
-3. Include important supporting elements only when relevant.
-4. Use natural English.
-5. Use Sentence Case.
-6. No punctuation at the end.
-7. Length between 60 and 120 characters.
-8. Prioritize buyer search behavior.
-9. Never write artistic critique or subjective opinions.
-10. Never use words such as: beautiful, amazing, stunning, creative, awesome, masterpiece.
+1. Title must focus on the dominant visual subject.
+2. Place the main subject first.
+3. Include visual style only if clearly visible.
+4. Include supporting objects only if relevant.
+5. Use natural English.
+6. Use Sentence Case.
+7. Length between 70 and 120 characters.
+8. No keyword stuffing.
+9. No punctuation at the end.
+10. No marketing language.
 
-TITLE VISUAL PRIORITY:
-Priority 1: Main object, Species, Product, Person, Animal
-Priority 2: Illustration style, Color characteristics, Supporting objects
-Priority 3: Background, Environment, Commercial concepts
+TITLE PRIORITY:
+1. Main subject
+2. Object type
+3. Visual style
+4. Supporting element
+5. Background or environment
 
-GOOD TITLE FORMULA:
-[Visual Style] + [Main Subject] + [Asset Type] + [Supporting Element] + [Background if relevant]
+DESCRIPTION RULES:
+1. Describe only visible content.
+2. Use clear natural English.
+3. One complete sentence.
+4. Mention important supporting elements.
+5. Do not add assumptions.
+6. Do not add commercial claims.
 
-Examples:
-Geometric chameleon illustration on tree branch with black background
-Low poly fox illustration isolated on dark background
+KEYWORD RULES:
+1. Generate exactly ${aiRequestCount} highly relevant keywords.
+2. Order keywords by importance.
+3. The first 10 keywords must represent the dominant visual subject.
+4. Prioritize buyer search behavior.
+5. Use both visual and commercial concepts when supported.
+6. Remove weak or generic keywords: beautiful, amazing, stunning, artwork, composition, style, design, creative.
+7. No duplicate keywords.
+8. All keywords must be lowercase.
+9. No trademarks or copyrighted names.
 
-KEYWORD PRIORITY & RULES:
-1. The first 10 keywords MUST describe the dominant visual subject (Importance 80-100).
-2. Keywords 11-25: Supporting visible elements, environment, colors, actions (Importance 50-79).
-3. Keywords 26-40: Commercial concepts directly supported by the image (Importance 20-49).
-4. Keywords must be ordered by visual importance. Never prioritize background elements over the main subject.
-5. Avoid generic words unless they add search value. Prefer specific terms over broad terms. Use buyer search behavior.
-6. Remove weak keywords: beautiful, amazing, stunning, artwork, composition, style, design, creative.
-7. Generate exactly ${aiRequestCount} keywords. Use broader terms to reach exactly ${aiRequestCount} keywords if specific terms run out.
+KEYWORD PRIORITY:
+Priority 1: Main subject, Species, Object name, Product type.
+Priority 2: Supporting objects, Colors, Materials, Actions.
+Priority 3: Environment, Commercial concepts, Lifestyle concepts.
 
-STRICT PROHIBITIONS & ACCURACY:
-1. Every title word, description phrase, and keyword must be supported by visible evidence from VISUAL_FACTS.
-2. Do not describe blurred background elements as main subjects.
-3. Do not infer: profession, occupation, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
+AVOID LOW VALUE KEYWORDS:
+artwork, beautiful, amazing, stunning, creative, composition, shape, pattern, horizontal, vertical, graphic, design, style. Only use these if they are a major searchable feature.
 
-STRICT DEFINING RULES:
-- Titles: Clean natural human language (Sentence case), no punctuation, 60-120 chars.
-- Keywords: Exactly ${aiRequestCount} items. Lowercase. No subjective terms.
-- Base everything 100% on the VISUAL_FACTS provided.
+ADOBE STOCK COMPLIANCE:
+No trademarks, brand names, logos, copyrighted characters, celebrity names, misleading keywords, or false descriptions. Metadata must accurately represent the asset.
+
+QUALITY CHECK BEFORE OUTPUT:
+* Is every title word visually supported?
+* Is every keyword visually supported?
+* Is every description statement visually supported?
+* Are there any assumptions?
+* Are there any brands or trademarks?
+* Are there any duplicate keywords?
+If any answer is YES, remove the problematic content.
 
 DOMINANT_SUBJECTS (Target these for titles):
 ${JSON.stringify(dominantSubjects)}
@@ -723,7 +892,10 @@ OUTPUT FORMAT:
         })
     );
 
-    draftMetadata = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+    {
+      const genText = typeof genResponse === 'string' ? genResponse : await extractText(genResponse);
+      draftMetadata = JSON.parse(extractJSON(genText));
+    }
   } catch (err) {
     console.error("[JohMeta Pipeline] Generation Stage 2/3 Failed:", err);
     draftMetadata = { title: "Stock asset with professional lighting", description: "Detailed visual content for commercial use.", keywords: ["stock", "asset"] };
@@ -733,27 +905,32 @@ OUTPUT FORMAT:
   console.log(`[JohMeta Pipeline] Stage 4, 5 & 6: Auditing, Ranking, and Final Validation...`);
 
   const validatorSystemInstruction = `ROLE:
-You are the Final Quality Validator (Provider 4, 5, 6 Roles).
+You are the Final Quality Validator.
 
 OBJECTIVES:
-1. Provider 4 (Mistral Role): Metadata Auditor. Check title, description, and keywords against VISUAL_FACTS. Remove unsupported terms.
-2. Provider 5 (Grok Role): Keyword Ranking. Sort keywords by relevance. Most visible object first.
-3. Provider 6 (Final Validator Role): Final scan. Remove all hallucinated words. Return final approved metadata in JSON with category IDs.
+1. Audit metadata against VISUAL_FACTS. Remove unsupported terms.
+2. Sort keywords by relevance.
+3. Assign Category IDs.
+4. Remove all hallucinated words. Return final approved metadata in JSON.
 
-VISUAL ACCURACY RULES (CRITICAL):
-1. Every title word, description phrase, and keyword MUST be supported by visible evidence in VISUAL_FACTS.
-2. Never infer or assume: profession, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
-3. Keep the keyword count exactly at ${aiRequestCount}. If a generated keyword is speculative, DO NOT drop it—replace it with a broader visual descriptor (color, shape, composition) to maintain the required count.
+ABSOLUTE RULE:
+Describe only what is clearly visible in the image.
 
-STRICT VALIDATION rules:
-- Remove any keyword not directly supported by VISUAL_FACTS, but replace it to reach exactly ${aiRequestCount} keywords.
-- Verify every keyword exists visually.
-- Remove duplicates.
-- Ensure compliance with Adobe Stock (Sentence case title, no punctuation).
-- Select accurate Categories.
+VISUAL ACCURACY RULES:
+1. Never hallucinate. Never guess. Never infer hidden information.
+2. Every word MUST be supported by visible evidence in VISUAL_FACTS.
+3. Absolutely NO inference of: profession, occupation, nationality, ethnicity, religion, political affiliation, location, country, city, event, season, relationship, emotion, brand, trademark, copyrighted character.
+4. Keep the keyword count exactly at ${aiRequestCount}. Replace speculative keywords with broader visual descriptors to maintain the count.
 
-SELF-CHECK:
-Before returning metadata, remove unsupported, duplicate, or assumed terms.
+ADOBE STOCK COMPLIANCE:
+No trademarks, brand names, logos, copyrighted characters, celebrity names, misleading keywords, or false descriptions. Sentence case title, no punctuation.
+
+QUALITY CHECK BEFORE OUTPUT:
+* Is every word visually supported?
+* Are there any assumptions?
+* Are there any brands or trademarks?
+* Are there any duplicate keywords?
+If any answer is YES, remove the problematic content.
 
 VISUAL_FACTS (Source of Truth):
 ${JSON.stringify(visualFacts, null, 2)}
@@ -798,7 +975,10 @@ OUTPUT FORMAT:
         })
     );
 
-    finalMetadataRaw = JSON.parse(extractJSON(typeof validResponse === 'string' ? validResponse : validResponse.text));
+    {
+      const validText = typeof validResponse === 'string' ? validResponse : await extractText(validResponse);
+      finalMetadataRaw = JSON.parse(extractJSON(validText));
+    }
   } catch (err) {
     console.error("[JohMeta Pipeline] Validation Stage 4/5/6 Failed:", err);
     finalMetadataRaw = { ...draftMetadata, category_id: 1, shutterstock_category_1: "Abstract", shutterstock_category_2: "Art" };
@@ -944,11 +1124,33 @@ export const generateBatchStockMetadata = async (
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
-  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
+  // --- TAHAP 1: PROVIDER 1 — MULTI-PROVIDER VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
+  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Multi-Provider Vision (Visual Facts Detection)...`);
   
+  // Vision-capable model fallback chain
+  const BATCH_VISION_MODELS: Record<string, string[]> = {
+    'gemini': ['gemini-3.1-flash-lite', 'gemini-flash-latest'],
+    'openai': ['gpt-4-turbo', 'gpt-4o'],
+    'openrouter': ['google/gemini-2.0-flash-001', 'openai/gpt-4-turbo'],
+    'groq': [],
+    'mistral': [],
+    'blackbox': [],
+    'nvidia': ['step-3.5-flash']
+  };
+
+  // Build fallback chain for batch TAHAP 1
+  const batchVisionModelsToTry: string[] = [];
+  if (BATCH_VISION_MODELS[provider]?.length > 0) {
+    batchVisionModelsToTry.push(...BATCH_VISION_MODELS[provider]);
+    console.log(`[JohMeta Pipeline - Batch] TAHAP 1 - Trying primary provider ${provider.toUpperCase()}: ${BATCH_VISION_MODELS[provider].join(', ')}`);
+  }
+  batchVisionModelsToTry.push(...BATCH_VISION_MODELS['gemini']);
+  if (provider !== 'gemini') {
+    console.log(`[JohMeta Pipeline - Batch] TAHAP 1 - Gemini added as fallback for provider: ${provider}`);
+  }
+
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
@@ -960,38 +1162,50 @@ export const generateBatchStockMetadata = async (
       }
 
       const visionSystemInstruction = `ROLE:
-You are a Visual Metadata Analyzer (Provider 1).
+You are a Visual Metadata Analyzer.
 Analyze only what is visually verifiable in the image.
-Never guess, assume, hallucinate, infer, or invent information.
 
-CRITICAL ANTI-INFERENCE RULES:
+ABSOLUTE RULE:
+Describe only what is clearly visible in the image.
+
+VISUAL ACCURACY RULES:
+1. Never hallucinate.
+2. Never guess.
+3. Never infer hidden information.
+4. Never invent objects, actions, locations, professions, events, or concepts not visually supported.
+5. If uncertain, omit the information.
+
+STRICT PROHIBITIONS:
+Never infer:
+* profession
+* occupation
+* nationality
+* ethnicity
+* religion
+* political affiliation
+* location
+* country
+* city
+* event
+* season
+* relationship
+* emotion
+* brand
+* trademark
+* copyrighted character
+
+Examples:
 Keyboard ≠ programmer
 Blueprint ≠ architect
 Camera ≠ photographer
-Laptop ≠ office worker
-Medical mask ≠ doctor
 Suit ≠ businessman
-
-Never infer profession.
-Never infer occupation.
-Never infer industry.
-Never infer location.
-Never infer nationality.
-Never infer emotion.
-
-Only describe visible objects.
+Laptop ≠ office worker
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 Do not infer hidden context.
-
-STRICT VISUAL RULES:
-1. Describe ONLY objects, people, actions, colors, and composition clearly visible.
-2. NEVER assume: nationality, ethnicity, religion, profession, location, country, city, event, season, weather, relationship, emotions not clearly visible, brand names, trademarks, copyrighted characters.
-3. If uncertain: omit the information, do not speculate.
-4. Accuracy is more important than quantity.
 
 Asset Context: ${mediaTypeContext}
 
@@ -1027,24 +1241,43 @@ OUTPUT FORMAT:
         ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
         : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
-      try {
-          const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
-            parts: [...imageParts, { text: promptText }] 
-          }, {
-            systemInstruction: visionSystemInstruction,
-            responseMimeType: "application/json",
-            temperature: temperature ?? 0.1,
-            topP: 0.8,
-            safetySettings: [
-              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-            ]
-          });
+      let visionResponse;
+      let lastVisionError: any;
+      let visionSuccess = false;
+
+      for (const modelName of batchVisionModelsToTry) {
+        try {
+          const modelProvider = modelName.includes('gemini') ? 'gemini' : modelName.includes('gpt') ? 'openai' : 'openrouter';
           
-          let facts = visionResponse.text || "{}";
+          console.log(`[JohMeta Pipeline - Batch] TAHAP 1 Item #${i+1} - Attempting ${modelProvider.toUpperCase()}: ${modelName}`);
+          
+          if (modelProvider === 'gemini') {
+            visionResponse = await callGeminiWithRetry(modelName, { 
+              parts: [...imageParts, { text: promptText }] 
+            }, {
+              systemInstruction: visionSystemInstruction,
+              responseMimeType: "application/json",
+              temperature: temperature ?? 0.1,
+              topP: 0.8,
+              safetySettings: [
+                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+              ]
+            });
+          } else {
+            visionResponse = await callOpenAICompatibleWithRetry({
+              systemInstruction: visionSystemInstruction,
+              contents: [...imageParts, { text: promptText }],
+              responseMimeType: "application/json",
+              model: modelName,
+              config: { temperature: temperature ?? 0.1 }
+            });
+          }
+          
+          let facts = (await extractText(visionResponse)) || "{}";
           visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}`);
           let parsedFacts: any = {};
           try {
@@ -1053,8 +1286,17 @@ OUTPUT FORMAT:
              parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [] };
           }
           parsedVisualFactsList.push(parsedFacts);
-      } catch (err: any) {
-          console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
+          console.log(`[JohMeta Pipeline - Batch] TAHAP 1 Item #${i+1} - SUCCESS with ${modelProvider.toUpperCase()}: ${modelName}`);
+          visionSuccess = true;
+          break;
+        } catch (err: any) {
+          lastVisionError = err;
+          console.warn(`[JohMeta Pipeline - Batch] TAHAP 1 Item #${i+1} - Failed with ${modelName}:`, err.message || err);
+        }
+      }
+
+      if (!visionSuccess) {
+          console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, lastVisionError?.message || lastVisionError);
           const assetTypeStr = toolType === ToolType.VIDEO ? "footage video" : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "vector illustration" : "photograph";
           const fallbackFacts = {
               VISUAL_FACTS: {
@@ -1083,54 +1325,86 @@ OUTPUT FORMAT:
   });
 
   const genSystemInstruction = `ROLE:
-You are a professional Adobe Stock and Shutterstock title and keyword specialist.
+You are a professional Adobe Stock, Shutterstock, and Canva metadata specialist.
 
 PRIMARY OBJECTIVE:
-Generate highly searchable stock titles and exactly ${aiRequestCount} keywords for each item based on the dominant visual subject.
+Generate commercially valuable metadata for each item.
+Generate highly searchable stock titles and exactly ${aiRequestCount} keywords for each item based on its dominant visual subject.
+
+ABSOLUTE RULE:
+Describe only what is clearly visible in the image.
+
+VISUAL ACCURACY RULES:
+1. Never hallucinate. Never guess. Never infer hidden information.
+2. Never invent objects, actions, locations, professions, events, or concepts not visually supported.
+3. If uncertain, omit the information.
+
+STRICT PROHIBITIONS (Never infer):
+profession, occupation, nationality, ethnicity, religion, political affiliation, location, country, city, event, season, relationship, emotion, brand, trademark, copyrighted character.
 
 TITLE RULES:
-1. The title must describe the MAIN SUBJECT first for each item.
-2. Include the visual style if it is visually dominant.
-3. Include important supporting elements only when relevant.
-4. Use natural English.
-5. Use Sentence Case.
-6. No punctuation at the end.
-7. Length between 60 and 120 characters.
-8. Prioritize buyer search behavior.
-9. Never write artistic critique or subjective opinions.
-10. Never use words such as: beautiful, amazing, stunning, creative, awesome, masterpiece.
+1. Title must focus on the dominant visual subject.
+2. Place the main subject first.
+3. Include visual style only if clearly visible.
+4. Include supporting objects only if relevant.
+5. Use natural English.
+6. Use Sentence Case.
+7. Length between 70 and 120 characters.
+8. No keyword stuffing.
+9. No punctuation at the end.
+10. No marketing language.
 
-TITLE VISUAL PRIORITY:
-Priority 1: Main object, Species, Product, Person, Animal
-Priority 2: Illustration style, Color characteristics, Supporting objects
-Priority 3: Background, Environment, Commercial concepts
+TITLE PRIORITY:
+1. Main subject
+2. Object type
+3. Visual style
+4. Supporting element
+5. Background or environment
 
-GOOD TITLE FORMULA:
-[Visual Style] + [Main Subject] + [Asset Type] + [Supporting Element] + [Background if relevant]
+DESCRIPTION RULES:
+1. Describe only visible content.
+2. Use clear natural English.
+3. One complete sentence.
+4. Mention important supporting elements.
+5. Do not add assumptions.
+6. Do not add commercial claims.
 
-Examples:
-Geometric chameleon illustration on tree branch with black background
-Low poly fox illustration isolated on dark background
+KEYWORD RULES:
+1. Generate exactly ${aiRequestCount} highly relevant keywords per item.
+2. Order keywords by importance.
+3. The first 10 keywords must represent the dominant visual subject.
+4. Prioritize buyer search behavior.
+5. Use both visual and commercial concepts when supported.
+6. Remove weak or generic keywords: beautiful, amazing, stunning, artwork, composition, style, design, creative.
+7. No duplicate keywords.
+8. All keywords must be lowercase.
+9. No trademarks or copyrighted names.
 
-KEYWORD PRIORITY & RULES:
-1. The first 10 keywords MUST describe the dominant visual subject (Importance 80-100).
-2. Keywords 11-25: Supporting visible elements, environment, colors, actions (Importance 50-79).
-3. Keywords 26-40: Commercial concepts directly supported by the image (Importance 20-49).
-4. Keywords must be ordered by visual importance. Never prioritize background elements over the main subject.
-5. Avoid generic words unless they add search value. Prefer specific terms over broad terms. Use buyer search behavior.
-6. Remove weak keywords: beautiful, amazing, stunning, artwork, composition, style, design, creative.
-7. Generate exactly ${aiRequestCount} keywords. Use broader terms to reach exactly ${aiRequestCount} keywords if specific terms run out.
+KEYWORD PRIORITY:
+Priority 1: Main subject, Species, Object name, Product type.
+Priority 2: Supporting objects, Colors, Materials, Actions.
+Priority 3: Environment, Commercial concepts, Lifestyle concepts.
 
-STRICT PROHIBITIONS & ACCURACY:
-1. Every title word, description phrase, and keyword must be supported by visible evidence from that asset's VISUAL_FACTS.
-2. Do not describe blurred background elements as main subjects.
-3. Do not infer: profession, occupation, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
+AVOID LOW VALUE KEYWORDS:
+artwork, beautiful, amazing, stunning, creative, composition, shape, pattern, horizontal, vertical, graphic, design, style. Only use these if they are a major searchable feature.
+
+ADOBE STOCK COMPLIANCE:
+No trademarks, brand names, logos, copyrighted characters, celebrity names, misleading keywords, or false descriptions. Metadata must accurately represent the asset.
+
+QUALITY CHECK BEFORE OUTPUT:
+* Is every title word visually supported?
+* Is every keyword visually supported?
+* Is every description statement visually supported?
+* Are there any assumptions?
+* Are there any brands or trademarks?
+* Are there any duplicate keywords?
+If any answer is YES, remove the problematic content.
 
 STRICT DEFINING RULES:
 - Return a JSON ARRAY of exactly ${items.length} objects.
 - Order MUST match input items exactly.
-- Titles: Sentence case, no punctuation, 60-120 chars.
-- Keywords: Exactly ${aiRequestCount} items. Lowercase. No subjective terms.
+- Titles: 70-120 chars.
+- Keywords: Exactly ${aiRequestCount} items.
 - Base everything 100% on the VISUAL_FACTS provided for each asset.
 
 DOMINANT_SUBJECTS (Target these for titles):
@@ -1165,7 +1439,10 @@ OUTPUT FORMAT:
         })
     );
 
-    draftMetadataArray = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+    {
+      const genText = typeof genResponse === 'string' ? genResponse : await extractText(genResponse);
+      draftMetadataArray = JSON.parse(extractJSON(genText));
+    }
   } catch (err) {
     console.error("[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed:", err);
     draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
@@ -1176,26 +1453,31 @@ OUTPUT FORMAT:
 
   const validatorSystemInstruction = `ROLE:
 You are the Final Quality Validator.
+
+OBJECTIVES:
 1. Audit each item's metadata against its VISUAL_FACTS. Remove unsupported terms.
 2. Sort keywords by relevance.
-3. Assign Category IDs.
-4. Calculate confidence score for each.
-5. Return JSON ARRAY of approved metadata objects.
+3. Assign Category IDs and return JSON ARRAY.
+4. Remove all hallucinated words. Return final approved metadata in JSON array.
 
-VISUAL ACCURACY RULES (CRITICAL):
-1. Every title word, description phrase, and keyword MUST be supported by visible evidence in that asset's VISUAL_FACTS.
-2. Never infer or assume: profession, nationality, ethnicity, religion, location, event, season, relationship, or emotions not clearly visible.
-3. Keep the keyword count exactly at ${aiRequestCount}. If a generated keyword is speculative, DO NOT drop it—replace it with a broader visual descriptor (color, shape, composition) to maintain the required count.
+ABSOLUTE RULE:
+Describe only what is clearly visible in the image.
 
-STRICT VALIDATION RULES:
-- Remove any keyword not directly supported by VISUAL_FACTS, but replace it to reach exactly ${aiRequestCount} keywords.
-- Verify every keyword exists visually.
-- Remove duplicates.
-- Ensure compliance with Adobe Stock (Sentence case title, no punctuation).
-- Select accurate Categories.
+VISUAL ACCURACY RULES:
+1. Never hallucinate. Never guess. Never infer hidden information.
+2. Every word MUST be supported by visible evidence in that asset's VISUAL_FACTS.
+3. Absolutely NO inference of profession, nationality, ethnicity, religion, location, event, season, relationship, or emotion.
+4. Keep the keyword count exactly at ${aiRequestCount}. Replace speculative keywords with broader visual descriptors to maintain the count.
 
-SELF-CHECK:
-Before returning metadata, remove unsupported, duplicate, or assumed terms.
+ADOBE STOCK COMPLIANCE:
+No trademarks, brand names, logos, copyrighted characters, celebrity names, misleading keywords, or false descriptions. Sentence case title, no punctuation.
+
+QUALITY CHECK BEFORE OUTPUT:
+* Is every word visually supported?
+* Are there any assumptions?
+* Are there any brands or trademarks?
+* Are there any duplicate keywords?
+If any answer is YES, remove the problematic content.
 
 SOURCE VISUAL_FACTS:
 ${visualDescriptions.join('\n\n')}
@@ -1243,7 +1525,10 @@ OUTPUT FORMAT:
         })
     );
 
-    finalMetadataArray = JSON.parse(extractJSON(typeof validResponse === 'string' ? validResponse : validResponse.text));
+    {
+      const validText = typeof validResponse === 'string' ? validResponse : await extractText(validResponse);
+      finalMetadataArray = JSON.parse(extractJSON(validText));
+    }
   } catch (err) {
     console.error("[JohMeta Pipeline - Batch] Batch Validation Stage 4/5/6 Failed:", err);
     finalMetadataArray = draftMetadataArray.map(d => ({ ...d, category_id: 1, shutterstock_category_1: "Abstract", shutterstock_category_2: "Art" }));
@@ -1613,7 +1898,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             }
           });
 
-          const text = response.text || "{}";
+          const text = (await extractText(response)) || "{}";
           const parsed = JSON.parse(text);
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
             return processPromptResults(parsed, count, subject, userNegativePrompt);
@@ -2004,6 +2289,20 @@ export const analyzeImageToPrompt = async (
   image: string,
   styleCategory: string = 'Cinematic'
 ): Promise<{ prompt: string; description: string }> => {
+  const store = apiKeyStorage.getStore();
+  const primaryProvider = (store && store.provider) || 'gemini';
+
+  // Vision-capable model fallback chain for each provider
+  const VISION_MODELS: Record<string, string[]> = {
+    'gemini': ['gemini-3.1-flash-lite', 'gemini-flash-latest'],
+    'openai': ['gpt-4-turbo', 'gpt-4o'],
+    'openrouter': ['google/gemini-2.0-flash-001', 'openai/gpt-4-turbo', 'anthropic/claude-3.5-sonnet'],
+    'groq': [], // Groq doesn't support vision well for this type of analysis
+    'mistral': [], // Mistral vision support is limited
+    'blackbox': [],
+    'nvidia': ['step-3.5-flash']  // NVIDIA has some vision models
+  };
+
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
@@ -2042,31 +2341,64 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  
+  // Build fallback chain: primary provider → alternative providers → Gemini
+  const modelsToTry: string[] = [];
+  if (VISION_MODELS[primaryProvider]?.length > 0) {
+    modelsToTry.push(...VISION_MODELS[primaryProvider]);
+    console.log(`[analyzeImageToPrompt] Trying primary provider ${primaryProvider.toUpperCase()}: ${VISION_MODELS[primaryProvider].join(', ')}`);
+  }
+  // Always add Gemini as final fallback
+  modelsToTry.push(...VISION_MODELS['gemini']);
+  if (primaryProvider !== 'gemini') {
+    console.log(`[analyzeImageToPrompt] Gemini added as fallback for provider: ${primaryProvider}`);
+  }
+
   let response;
   let lastError;
 
   for (const modelName of modelsToTry) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema
-      });
+      const provider = modelName.includes('gemini') || modelName.includes('gpt') || modelName.includes('claude') ? 
+        (modelName.includes('gemini') ? 'gemini' : modelName.includes('gpt') ? 'openai' : 'openrouter') : 
+        primaryProvider;
+      
+      console.log(`[analyzeImageToPrompt] Attempting ${provider.toUpperCase()}: ${modelName}`);
+      
+      if (provider === 'gemini') {
+        response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.3
+        });
+      } else {
+        // Use HTTP endpoint for non-Gemini providers
+        response = await callOpenAICompatibleWithRetry({
+          systemInstruction,
+          contents: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }],
+          responseMimeType: "application/json",
+          responseSchema,
+          model: modelName,
+          config: { temperature: 0.3 }
+        });
+      }
+      
+      console.log(`[analyzeImageToPrompt] SUCCESS with ${provider.toUpperCase()} model: ${modelName}`);
       break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message);
     }
   }
 
   if (!response) {
-    console.error("analyzeImageToPrompt Error:", lastError);
-    throw new Error("Failed to analyze image. Please try again.");
+    console.error("analyzeImageToPrompt Error - all models failed:", lastError);
+    throw new Error("Failed to analyze image with any provider. Please try again.");
   }
 
   try {
-    let text = response.text || "{}";
+    let text = (await extractText(response)) || "{}";
     // Clean potential markdown backticks
     if (text.includes("```")) {
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -2075,7 +2407,8 @@ CRITICAL RULES:
     const data = JSON.parse(text);
     return data as { prompt: string; description: string };
   } catch (error) {
-    console.error("Gemini Parse Error:", error, response.text);
+    const raw = await extractText(response);
+    console.error("Gemini Parse Error:", error, raw);
     throw new Error("Failed to parse AI response. Please try again.");
   }
 };
@@ -2084,6 +2417,20 @@ export const analyzeBatchImageToPrompt = async (
   images: string[],
   styleCategory: string = 'Cinematic'
 ): Promise<{ prompt: string; description: string }[]> => {
+  const store = apiKeyStorage.getStore();
+  const primaryProvider = (store && store.provider) || 'gemini';
+
+  // Vision-capable model fallback chain
+  const VISION_MODELS: Record<string, string[]> = {
+    'gemini': ['gemini-3.1-flash-lite', 'gemini-flash-latest'],
+    'openai': ['gpt-4-turbo', 'gpt-4o'],
+    'openrouter': ['google/gemini-2.0-flash-001', 'openai/gpt-4-turbo'],
+    'groq': [],
+    'mistral': [],
+    'blackbox': [],
+    'nvidia': ['step-3.5-flash']
+  };
+
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
 
@@ -2122,31 +2469,59 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // Build fallback chain
+  const modelsToTry: string[] = [];
+  if (VISION_MODELS[primaryProvider]?.length > 0) {
+    modelsToTry.push(...VISION_MODELS[primaryProvider]);
+    console.log(`[analyzeBatchImageToPrompt] Trying primary provider ${primaryProvider.toUpperCase()}: ${VISION_MODELS[primaryProvider].join(', ')}`);
+  }
+  modelsToTry.push(...VISION_MODELS['gemini']);
+  if (primaryProvider !== 'gemini') {
+    console.log(`[analyzeBatchImageToPrompt] Gemini added as fallback for provider: ${primaryProvider}`);
+  }
+
   let response;
   let lastError;
 
   for (const modelName of modelsToTry) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema
-      });
+      const provider = modelName.includes('gemini') ? 'gemini' : modelName.includes('gpt') ? 'openai' : 'openrouter';
+      
+      console.log(`[analyzeBatchImageToPrompt] Attempting ${provider.toUpperCase()}: ${modelName} for ${images.length} images`);
+      
+      if (provider === 'gemini') {
+        response = await callGeminiWithRetry(modelName, { parts }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.3
+        });
+      } else {
+        response = await callOpenAICompatibleWithRetry({
+          systemInstruction,
+          contents: parts,
+          responseMimeType: "application/json",
+          responseSchema,
+          model: modelName,
+          config: { temperature: 0.3 }
+        });
+      }
+      
+      console.log(`[analyzeBatchImageToPrompt] SUCCESS with ${provider.toUpperCase()}: ${modelName}`);
       break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message);
     }
   }
 
   if (!response) {
-    console.error("analyzeBatchImageToPrompt Error:", lastError);
-    throw new Error("Failed to analyze images in batch.");
+    console.error("analyzeBatchImageToPrompt Error - all models failed:", lastError);
+    throw new Error("Failed to analyze images in batch with any provider.");
   }
 
   try {
-    let text = response.text || "[]";
+    let text = (await extractText(response)) || "[]";
     if (text.includes("```")) {
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     }
@@ -2154,7 +2529,8 @@ Return a JSON array of objects, each with "prompt" and "description".`;
     const data = JSON.parse(text);
     return data as { prompt: string; description: string }[];
   } catch (error) {
-    console.error("Gemini Parse Error:", error, response.text);
+    const raw = await extractText(response);
+    console.error("Gemini Parse Error:", error, raw);
     throw new Error("Failed to parse AI response. Please try again.");
   }
 };
@@ -2216,7 +2592,10 @@ export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysi
     },
   });
 
-  return JSON.parse(response.text) as VideoAnalysisResult;
+  {
+    const raw = await extractText(response);
+    return JSON.parse(raw) as VideoAnalysisResult;
+  }
 };
 
 export async function generateHollywoodPrompts(keyword: string): Promise<VideoPrompt[]> {
@@ -2260,7 +2639,7 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
     },
   });
 
-  const parsed = JSON.parse(response.text) as Omit<VideoPrompt, 'id'>[];
+  const parsed = JSON.parse(await extractText(response)) as Omit<VideoPrompt, 'id'>[];
   const timestamp = Date.now();
   return parsed.map((p, index) => ({
     ...p,
@@ -2367,11 +2746,12 @@ Respons Anda WAJIB dalam format JSON:
   if (!response) throw lastError;
   
   try {
-    const text = response.text || "{}";
+    const text = (await extractText(response)) || "{}";
     console.log('Gemini raw response:', text);
     return JSON.parse(text);
   } catch(e) {
-    console.error("Gemini Parse Error:", response?.text);
+    const raw = await extractText(response);
+    console.error("Gemini Parse Error:", raw);
     throw e;
   }
 }
@@ -2429,7 +2809,8 @@ Output strictly in JSON format.`;
     }
   });
 
-  return JSON.parse(response.text);
+  const raw = await extractText(response);
+  return JSON.parse(raw);
 }
 
 export async function generateEventKeywords(eventName: string, eventDetails: string) {
@@ -2465,7 +2846,8 @@ Rules:
     }
   });
 
-  return JSON.parse(response.text);
+  const raw = await extractText(response);
+  return JSON.parse(raw);
 }
 
 export async function suggestKeywords(
@@ -2509,7 +2891,8 @@ Existing Keywords: ${existingKeywords.join(', ')}`,
   });
 
   try {
-    const parsed = JSON.parse(response.text);
+    const raw = await extractText(response);
+    const parsed = JSON.parse(raw);
     return parsed.keywords || [];
   } catch (err) {
     console.error("Failed to parse suggested keywords:", err);
