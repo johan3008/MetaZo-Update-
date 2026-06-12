@@ -10,6 +10,10 @@ function injectProviderHeaders(init: any, url: any) {
     const geminiKey = localStorage.getItem('gemini_api_key') || '';
     const groqKey = localStorage.getItem('groq_api_key') || '';
     const mistralKey = localStorage.getItem('mistral_api_key') || '';
+    const nvidiaKey = localStorage.getItem('nvidia_api_key') || '';
+    const openaiKey = localStorage.getItem('openai_api_key') || '';
+    const openrouterKey = localStorage.getItem('openrouter_api_key') || '';
+    const blackboxKey = localStorage.getItem('blackbox_api_key') || '';
     const provider = localStorage.getItem('ai_provider') || 'gemini';
 
     init = init || {};
@@ -17,6 +21,10 @@ function injectProviderHeaders(init: any, url: any) {
     if (geminiKey) headers.set('x-gemini-key', geminiKey);
     if (groqKey) headers.set('x-groq-key', groqKey);
     if (mistralKey) headers.set('x-mistral-key', mistralKey);
+    if (nvidiaKey) headers.set('x-nvidia-key', nvidiaKey);
+    if (openaiKey) headers.set('x-openai-key', openaiKey);
+    if (openrouterKey) headers.set('x-openrouter-key', openrouterKey);
+    if (blackboxKey) headers.set('x-blackbox-key', blackboxKey);
     headers.set('x-ai-provider', provider);
     init.headers = headers;
   }

@@ -131,6 +131,10 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     const customGeminiKey = req.headers['x-gemini-key'];
     const customGroqKey = req.headers['x-groq-key'];
     const customMistralKey = req.headers['x-mistral-key'];
+    const customNvidiaKey = req.headers['x-nvidia-key'];
+    const customOpenaiKey = req.headers['x-openai-key'];
+    const customOpenrouterKey = req.headers['x-openrouter-key'];
+    const customBlackboxKey = req.headers['x-blackbox-key'];
     const provider = req.headers['x-ai-provider'] || 'gemini';
 
     const geminiKeys = customGeminiKey && typeof customGeminiKey === 'string'
@@ -144,12 +148,32 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     const mistralKeys = customMistralKey && typeof customMistralKey === 'string'
         ? customMistralKey.split(',').map(k => k.trim()).filter(Boolean)
         : [];
+        
+    const nvidiaKeys = customNvidiaKey && typeof customNvidiaKey === 'string'
+        ? customNvidiaKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
+        
+    const openaiKeys = customOpenaiKey && typeof customOpenaiKey === 'string'
+        ? customOpenaiKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
+        
+    const openrouterKeys = customOpenrouterKey && typeof customOpenrouterKey === 'string'
+        ? customOpenrouterKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
+        
+    const blackboxKeys = customBlackboxKey && typeof customBlackboxKey === 'string'
+        ? customBlackboxKey.split(',').map(k => k.trim()).filter(Boolean)
+        : [];
 
     apiKeyStorage.run({
         provider: String(provider),
         gemini: { keys: geminiKeys, activeIndex: 0 },
         groq: { keys: groqKeys, activeIndex: 0 },
-        mistral: { keys: mistralKeys, activeIndex: 0 }
+        mistral: { keys: mistralKeys, activeIndex: 0 },
+        nvidia: { keys: nvidiaKeys, activeIndex: 0 },
+        openai: { keys: openaiKeys, activeIndex: 0 },
+        openrouter: { keys: openrouterKeys, activeIndex: 0 },
+        blackbox: { keys: blackboxKeys, activeIndex: 0 }
     }, () => {
         next();
     });
