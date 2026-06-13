@@ -1204,7 +1204,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         </div>
                         <div className="space-y-1 text-center">
                           <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-[#4e73df] dark:text-blue-400">30 Days Plan</h5>
-                          <p className="text-[#4e73df] dark:text-blue-300 font-black text-xs">Rp 50.000</p>
+                          <p className="text-[#4e73df] dark:text-blue-300 font-black text-xs">{t.language === 'Bahasa' ? 'Rp 50.000' : '$2'}</p>
                           <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
                             <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
                             <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
@@ -1219,7 +1219,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         </div>
                         <div className="space-y-1 text-center">
                           <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-amber-600 dark:text-amber-400">Unlimited</h5>
-                          <p className="text-amber-600 dark:text-amber-400 font-black text-xs">Rp 99.000</p>
+                          <p className="text-amber-600 dark:text-amber-400 font-black text-xs">{t.language === 'Bahasa' ? 'Rp 250.000' : '$14'}</p>
                           <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
                             <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Akses Selamanya' : 'Lifetime Access'}</span></li>
                             <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas' : 'Unlimited Limits'}</span></li>
