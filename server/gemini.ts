@@ -2875,40 +2875,28 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
 }export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa') {
-  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global. Tugas Anda adalah melakukan inspeksi visual "Zero Tolerance" terhadap gambar stok komersial sebelum proses upload.
+  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global. Tugas Anda adalah melakukan inspeksi visual yang konsisten dan akurat terhadap gambar stok komersial sebelum proses upload.
 
-Tingkat Toleransi Saat Ini: ${tolerance} (Gunakan ini untuk menentukan ambang batas ketegasan Anda).
+Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
+- STRICT: "Zero Tolerance". Sekecil apapun cacat teknis, artifak AI, atau pelanggaran IP = FAIL.
+- MEDIUM: Cacat minor (seperti sedikit noise atau blur di latar belakang) bisa ditoleransi. Fokus pada pelanggaran IP dan artifak AI di subjek utama.
+- LOOSE: Loloskan selama gambar dapat digunakan secara komersial. Hanya cacat teknis sangat fatal atau pelanggaran merek dagang mencolok yang menyebabkan FAIL.
 
-A. CEK LIST PEMBATALAN OTOMATIS (Known Restrictions)
-Berdasarkan kebijakan Adobe Stock, Anda wajib menandai FAIL jika mendeteksi hal berikut, bahkan jika tidak ada logo yang terlihat jelas:
-
-1. Arsitektur & Lokasi Terbatas (Subjek Utama)
-- Eropa: Menara Eiffel (malam hari/lampu menyala), Atomium (Brussel), interior Katedral Berlin, properti Kerajaan Inggris (Buckingham Palace, dll), Agriturismo Baccoleno (pemandangan pohon cemara ikonik).
-- Amerika: Sign "Beverly Hills", Hollywood Sign, Gedung Flatiron (NYC), interior Chrysler Building, Empire State Building (sebagai fokus utama), properti Walt Disney/Disneyland.
-- Global: Burj Al Arab, Bahrain World Trade Center, Beijing National Stadium (Bird's Nest), dan Museum Guggenheim.
-
-2. Produk & Desain Industri yang Dilindungi
-- Gawai & Teknologi: Semua produk Apple (iPhone, MacBook, Apple Watch), Amazon (Kindle, Echo), dan desain antarmuka (UI) media sosial (ikon Like, interface Instagram/TikTok).
-- Transportasi: Bentuk ikonik Airstream (perak membulat), kapal pesiar Aida (wajah tersenyum), mobil Porsche (siluet 911), Vespa (desain bodi), dan Harley Davidson.
-- Mainan & Hiburan: Karakter LEGO/Minifigures, Boneka Barbie, Rubik’s Cube, patung Oscar (Academy Awards), Batmobile, dan kostum superhero yang mirip Marvel/DC.
-
-3. Branding & Identitas Visual
-- Fashion: Desain "3-Stripes" Adidas, pola kotak-kotak Burberry, sol merah Christian Louboutin, dan logo pada kacamata atau jam tangan.
-- Lainnya: Botol Absolut Vodka, Bendera Aboriginal Australia, dan segala bentuk mata uang asli yang terlihat jelas.
+A. CEK LIST PEMBATALAN (Known Restrictions)
+Berdasarkan kebijakan Adobe Stock, Anda wajib menandai FAIL jika mendeteksi pelanggaran IP, arsitektur yang dilindungi, atau merek dagang yang tanpa izin (contoh: Menara Eiffel malam hari, Apple, Adidas, karakter Disney).
 
 B. KRITERIA EVALUASI TEKNIS & LEGAL
-- IP & Merek Dagang: Cari logo kecil atau nama merek pada kancing baju, ban mobil, atau label di kerah pakaian. Hapus secara digital atau tandai gagal.
-- Kemiripan Tokoh (Likeness): Deteksi wajah yang menyerupai tokoh publik (contoh: kemiripan dengan Albert Einstein, Bruce Lee, atau aktor terkenal).
-- Kebersihan Konten (Clean Content): Gambar tidak boleh mengandung teks buatan, metadata visual (tanggal/jam), garis koordinat, atau elemen grafis overlay.
-- Kualitas AI (Artifacts): Periksa kesalahan anatomi (jari ke-6, mata tidak simetris), tekstur "halus" berlebihan khas AI, atau distorsi pada garis arsitektur.
+- IP & Merek Dagang: Cari logo kecil atau nama merek.
+- Kebersihan Konten (Clean Content): Hindari teks buatan, metadata visual, garis koordinat.
+- Kualitas AI (Artifacts): Perhatikan artifak kulit 'plastik', jari berlebih, garis tidak konsisten.
 
-STATUS & SKOR:
-- PASS: Jika gambar bersih (Clean) secara legal dan teknis memenuhi standar komersial. Skor biasanya 70-100.
-- FAIL: Jika ditemukan pelanggaran IP, artifak AI yang mengganggu, atau masalah teknis fatal. Skor biasanya 0-69.
-- Konsistensi: Jangan memberikan skor tinggi (>= 70) jika statusnya FAIL, kecuali ada alasan sangat spesifik (misal: secara teknis bagus tapi ada logo kecil). Namun, dahulukan penolakan jika ada pelanggaran kebijakan.
+STATUS & SKOR (KONSISTENSI MUTLAK):
+- PASS: Gambar komersial yang layak jual sesuai tingkat toleransi. Anda WAJIB memberikan skor antara 75 - 100.
+- FAIL: Gambar ditolak sesuai tingkat toleransi. Anda WAJIB memberikan skor di bawah 70 (0 - 69).
+Jangan pernah memberikan skor 70+ jika FAIL, dan jangan berikan skor <75 jika PASS, agar pengguna tidak bingung.
 
 PIXEL HEATMAPS (Untuk visualisasi UI):
-- Identifikasi 3-8 titik koordinat (X, Y dalam 0-100) di mana terdapat masalah teknis atau legal nyata (Noise, Focus, Lighting, atau IP Violations).
+- Identifikasi 3-8 titik koordinat (X, Y dalam 0-100) di mana terdapat masalah spesifik (Noise, Focus, Lighting, dll).
 
 ATURAN BAHASA OUTPUT (OUTPUT LANGUAGE RULE):
 Jika parameter bahasa adalah 'Bahasa' / Indonesian, keluarkan nilai feedback dalam Bahasa Indonesia.
@@ -2920,10 +2908,10 @@ Respons Anda WAJIB dalam format JSON:
 {
   "recommendation": "PASS" atau "FAIL",
   "overall_score": [0-100],
-  "legal_status": "Status legal singkat (misal: 'CLEAN' atau 'IP VIOLATION: Burj Al Arab detected')",
+  "legal_status": "Status legal singkat (misal: 'CLEAN' atau 'IP VIOLATION: Merek terdeteksi')",
   "technical_issues": ["list masalah teknis/isue spesifik"],
   "strengths": ["list kekuatan visual gambar"],
-  "detailed_feedback": "Penjelasan singkat namun spesifik mengenai alasan kelulusan atau detail kegagalan (Evaluasi Notes)",
+  "detailed_feedback": "Penjelasan spesifik dan objektif mengenai alasan penilaian",
   "heatmaps": [
     { "type": "noise" | "focus" | "lighting", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail spesifik temuan" }
   ]
@@ -2965,7 +2953,7 @@ Respons Anda WAJIB dalam format JSON:
 
   for (const modelName of modelsToTry) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as a ruthless Adobe Stock curator. Perform a strict technical and legal audit. Determine final status as PASS or FAIL." }] }, {
+      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,

@@ -412,9 +412,9 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end">
+                        <div className="flex flex-col items-end shrink-0 ml-3">
                            <p className={`text-[18px] font-black leading-none ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>{r.overall_score}</p>
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1">{t.qc_score_label}</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1 whitespace-nowrap">{t.qc_score_label}</p>
                         </div>
                       </div>
 
@@ -511,7 +511,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">{t.qc_rejection_reason}</p>
                              </div>
                              <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
-                               "{r.detailed_feedback}"
+                               {r.detailed_feedback}
                              </p>
                           </div>
                         )}
@@ -576,7 +576,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                                   <div className="bg-indigo-500/5 border border-indigo-500/20 p-5 rounded-2xl mt-2">
                                     <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-2">{t.qc_detailed_feedback}</p>
                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-relaxed italic">
-                                      "{r.detailed_feedback}"
+                                      {r.detailed_feedback}
                                     </p>
                                   </div>
                                 </div>
