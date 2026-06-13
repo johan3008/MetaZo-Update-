@@ -16,38 +16,45 @@ const ensureBase64 = async (frame: string): Promise<string> => {
 
 export interface ServiceOptions {
   provider?: string;
-  geminiKey?: string;
-  groqKey?: string;
-  mistralKey?: string;
-  openaiKey?: string;
-  openrouterKey?: string;
-  nvidiaKey?: string;
-  blackboxKey?: string;
-  // When true, allow including API keys in outgoing headers (DANGEROUS).
-  // Defaults to false. Keys SHOULD NOT be sent from browser clients.
-  allowClientKeys?: boolean;
+  geminiKeys?: string | string[];
+  groqKeys?: string | string[];
+  mistralKeys?: string | string[];
+  openaiKeys?: string | string[];
+  openrouterKeys?: string | string[];
+  nvidiaKeys?: string | string[];
+  blackboxKeys?: string | string[];
 }
 
 export const getHeaders = (options?: ServiceOptions) => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (options) {
     if (options.provider) headers['x-ai-provider'] = options.provider;
+    
+    const joinKeys = (keys: string | string[] | undefined) => {
+      if (!keys) return undefined;
+      return Array.isArray(keys) ? keys.join(',') : keys;
+    };
 
-    // SECURITY: Do NOT include secret API keys by default when called from
-    // browser/client-side code. If the caller explicitly passes
-    // `allowClientKeys: true`, keys will be forwarded (this is dangerous and
-    // should only be used in controlled environments such as server-to-server
-    // calls or secure internal tooling).
-    const allow = !!options.allowClientKeys;
-    if (allow) {
-      if (options.geminiKey) headers['x-gemini-key'] = options.geminiKey;
-      if (options.groqKey) headers['x-groq-key'] = options.groqKey;
-      if (options.mistralKey) headers['x-mistral-key'] = options.mistralKey;
-      if (options.openaiKey) headers['x-openai-key'] = options.openaiKey;
-      if (options.openrouterKey) headers['x-openrouter-key'] = options.openrouterKey;
-      if (options.nvidiaKey) headers['x-nvidia-key'] = options.nvidiaKey;
-      if (options.blackboxKey) headers['x-blackbox-key'] = options.blackboxKey;
-    }
+    const gKey = joinKeys(options.geminiKeys);
+    if (gKey) headers['x-gemini-key'] = gKey;
+
+    const grKey = joinKeys(options.groqKeys);
+    if (grKey) headers['x-groq-key'] = grKey;
+
+    const mKey = joinKeys(options.mistralKeys);
+    if (mKey) headers['x-mistral-key'] = mKey;
+
+    const oKey = joinKeys(options.openaiKeys);
+    if (oKey) headers['x-openai-key'] = oKey;
+
+    const orKey = joinKeys(options.openrouterKeys);
+    if (orKey) headers['x-openrouter-key'] = orKey;
+
+    const nKey = joinKeys(options.nvidiaKeys);
+    if (nKey) headers['x-nvidia-key'] = nKey;
+
+    const bKey = joinKeys(options.blackboxKeys);
+    if (bKey) headers['x-blackbox-key'] = bKey;
   }
   return headers;
 };

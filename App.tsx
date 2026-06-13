@@ -1259,7 +1259,7 @@ const App: React.FC = () => {
   const [openrouterKeysList, setOpenrouterKeysList] = useState<string[]>([]);
   const [blackboxKeysList, setBlackboxKeysList] = useState<string[]>([]);
   const [nvidiaKeysList, setNvidiaKeysList] = useState<string[]>([]);
-  const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<'stepfun_step35_flash'>('stepfun_step35_flash');
+  const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
 
@@ -1943,6 +1943,8 @@ const App: React.FC = () => {
                   modelParam = selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel;
               } else if (selectedProvider === 'groq') {
                   modelParam = selectedGroqModel;
+              } else if (selectedProvider === 'nvidia') {
+                  modelParam = selectedNvidiaModel;
               }
               const aiOptions = {
                 provider: selectedProvider,
@@ -2078,6 +2080,8 @@ const App: React.FC = () => {
                     modelParam = selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel;
                 } else if (selectedProvider === 'groq') {
                     modelParam = selectedGroqModel;
+                } else if (selectedProvider === 'nvidia') {
+                    modelParam = selectedNvidiaModel;
                 }
                 const aiOptions = {
                   provider: selectedProvider,
@@ -2448,7 +2452,8 @@ const App: React.FC = () => {
   };
 
   const handleRegenerateFile = async (fileItem: FileItem) => {
-    await processOneFile(fileItem);
+    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, error: null, isGenerating: true } : f));
+    await processOneFile({ ...fileItem, error: null });
   };
 
   const t = TRANSLATIONS[uiLanguage];
@@ -3401,10 +3406,20 @@ const App: React.FC = () => {
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Pilih Model</label>
                     <select
                       value={selectedNvidiaModel}
-                      onChange={(e) => setSelectedNvidiaModel(e.target.value as any)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedNvidiaModel(val);
+                        localStorage.setItem('mz_nvidia_model', val);
+                      }}
                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
                     >
-                      <option value="stepfun_step35_flash">StepFun AI Step 3.5 Flash</option>
+                      <option value="stepfun-ai/step-3.5-flash">Stepfun 3.5 Flash (New! - Recommended)</option>
+                      <option value="nvidia/llama-3.1-nemotron-70b-instruct">Nemotron 70B (Recommended for SEO)</option>
+                      <option value="meta/llama-3.2-90b-vision-instruct">Llama 3.2 90B Vision (Highest Quality)</option>
+                      <option value="meta/llama-3.2-11b-vision-instruct">Llama 3.2 11B Vision (Fast)</option>
+                      <option value="meta/llama-3.1-405b-instruct">Llama 3.1 405B (Ultra Powerful)</option>
+                      <option value="google/paligemma-3b-224-base">Palingemma 3B (Experimental)</option>
+                      <option value="stepfun/step-1.5v-vision">Stepfun 1.5V Vision</option>
                     </select>
                   </div>
                 </div>
