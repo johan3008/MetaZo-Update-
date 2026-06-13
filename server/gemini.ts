@@ -258,8 +258,13 @@ function getHeuristicCategories(title: string, keywords: string[]): {
 }
 
 function ensureTitleLength(title: string, keywords: string[], description: string): string {
-  if (!title) title = "Stock asset";
-  else title = String(title);
+  if (!title || title.trim() === "" || title.includes("Write a descriptive title here") || title.includes("<generate a") || title.includes("A highly descriptive") || title.includes("A detailed")) {
+    if (description && description.trim().length > 10 && !description.includes("Write a detailed description here") && !description.includes("<generate a") && !description.includes("A highly descriptive") && !description.includes("A detailed")) title = description;
+    else if (keywords && keywords.length >= 3) title = keywords.slice(0, 5).join(' ');
+    else title = "Stock asset";
+  } else {
+    title = String(title);
+  }
   
   // Clean input title: remove all commas, periods, double spaces
   let cleanedTitle = title.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
@@ -500,12 +505,12 @@ async function callOpenAICompatibleWithRetry(params: {
       const activeIdx = providerState.activeIndex || 0;
       apiKey = keysList[activeIdx];
       if (provider === 'nvidia') {
-        console.log(`[NVIDIA DEBUG] Using key index ${activeIdx}/${keysList.length} (Starts with: ${apiKey.substring(0, 8)}...)`);
+        console.log(`[NVIDIA DEBUG] Using key index ${activeIdx}/${keysList.length} (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
       }
     } else {
       apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || '';
       if (provider === 'nvidia') {
-        console.log(`[NVIDIA DEBUG] Using key from process.env (Starts with: ${apiKey.substring(0, 8)}...)`);
+        console.log(`[NVIDIA DEBUG] Using key from process.env (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
       }
     }
 
@@ -572,6 +577,7 @@ async function callOpenAICompatibleWithRetry(params: {
     if (provider === 'nvidia') {
       // mapping legacy or short names to official NIM names
       if (model === 'stepfun_step35_flash') model = 'stepfun-ai/step-3.5-flash';
+      if (model.startsWith('stepfun/')) model = model.replace('stepfun/', 'stepfun-ai/');
       if (model === 'nemotron') model = 'nvidia/llama-3.1-nemotron-70b-instruct';
       if (!model.includes('/')) {
          // If it's a bare name like 'llama-3.2-90b-vision-instruct', prepend 'meta/'
@@ -608,7 +614,7 @@ async function callOpenAICompatibleWithRetry(params: {
     }
 
     if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
-      payload.max_tokens = provider === 'nvidia' ? 2048 : 8192;
+      payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
     }
 
     if (params.responseMimeType === 'application/json') {
@@ -933,7 +939,7 @@ export const generateStockMetadata = async (
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. Structure keywords to cover the highly searchable categories (they can be mixed or randomized, and highly SEO-optimized):
    - Subject (Main Focus: descriptors of the primary subjects or objects)
@@ -947,10 +953,11 @@ export const generateStockMetadata = async (
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: primary single-word subject descriptors)
@@ -964,9 +971,10 @@ export const generateStockMetadata = async (
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: multi-word subject/object descriptors, e.g. "smartphone device")
@@ -980,7 +988,8 @@ export const generateStockMetadata = async (
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -1046,6 +1055,7 @@ Do not infer hidden context.
 
 Asset Context: ${mediaTypeContext}
 
+CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
 {
   "VISUAL_FACTS": {
@@ -1128,7 +1138,7 @@ OUTPUT FORMAT:
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
 ${mediaContext}${customPromptCommand}
 
@@ -1173,10 +1183,11 @@ ${shutterstockCategoriesText}
 VISUAL_FACTS:
 ${JSON.stringify(visualFacts, null, 2)}
 
+CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
 {
-  "title": "",
-  "description": "",
+  "title": "A highly descriptive natural language title representing the core subject",
+  "description": "A detailed visual description focusing on subjects, setting, and mood",
   "keywords": [],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
@@ -1187,8 +1198,8 @@ OUTPUT FORMAT:
   try {
     const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
-          systemInstruction: genSystemInstruction,
-          contents: `Generate draft metadata based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]`,
+          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
+          contents: genSystemInstruction + `\n\nGenerate draft metadata based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
@@ -1202,18 +1213,26 @@ OUTPUT FORMAT:
           topP: 0.8 })
     );
 
-    draftMetadata = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+    let rawContent = typeof genResponse === 'string' ? genResponse : genResponse.text;
+    console.log('[STAGE 2/3] RAW RESPONSE:');
+    console.log(rawContent);
+    draftMetadata = JSON.parse(extractJSON(rawContent));
+    console.log('[STAGE 2/3] PARSED:');
+    console.log(draftMetadata);
+    if (!draftMetadata || typeof draftMetadata !== 'object' || Array.isArray(draftMetadata)) { throw new Error('Model did not return a valid object'); }
+    if (!draftMetadata.title && !draftMetadata.description && (!draftMetadata.keywords || draftMetadata.keywords.length === 0)) { throw new Error('Model returned empty object {}'); }
   } catch (err) {
-    console.warn("[JohMeta Pipeline] Generation Stage 2/3 Failed: bypassed:", err.message);
-    draftMetadata = { title: "Stock asset with professional lighting", description: "Detailed visual content for commercial use.", keywords: ["stock", "asset"] };
+    console.error('[JohMeta Pipeline] Generation Stage 2/3 Failed:', err);
+    throw err;
   }
 
   // --- TAHAP 4, 5, & 6: PROVIDER 4 (MISTRAL), 5 (GROK), & 6 (FINAL VALIDATOR) ---
   console.log(`[JohMeta Pipeline] Stage 4, 5 & 6: Auditing, Ranking, and Final Validation...`);
+  console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadata, null, 2));
 
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words.
 
 ${mediaContext}${customPromptCommand}
 
@@ -1261,10 +1280,11 @@ ${JSON.stringify(visualFacts, null, 2)}
 DRAFT METADATA TO VALIDATE:
 ${JSON.stringify(draftMetadata, null, 2)}
 
+CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
 {
-  "title": "",
-  "description": "",
+  "title": "A highly descriptive natural language title representing the core subject",
+  "description": "A detailed visual description focusing on subjects, setting, and mood",
   "keywords": [],
   "category_id": 0,
   "shutterstock_category_1": "",
@@ -1276,8 +1296,8 @@ OUTPUT FORMAT:
   try {
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
-          systemInstruction: validatorSystemInstruction,
-          contents: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
+          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
+          contents: validatorSystemInstruction + `\n\nAudit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
@@ -1427,7 +1447,7 @@ export const generateBatchStockMetadata = async (
   const aiRequestCount = targetCount + 10; 
 
   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. Structure keywords to cover the highly searchable categories (they can be mixed or randomized, and highly SEO-optimized):
    - Subject (Main Focus: descriptors of the primary subjects or objects)
@@ -1441,10 +1461,11 @@ export const generateBatchStockMetadata = async (
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: primary single-word subject descriptors)
@@ -1458,9 +1479,10 @@ export const generateBatchStockMetadata = async (
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: multi-word subject/object descriptors, e.g. "smartphone device")
@@ -1474,7 +1496,8 @@ export const generateBatchStockMetadata = async (
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
   }
 
   const store = apiKeyStorage.getStore();
@@ -1544,6 +1567,7 @@ Do not infer hidden context.
 
 Asset Context: ${mediaTypeContext}
 
+CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
 {
   "VISUAL_FACTS": {
@@ -1629,7 +1653,7 @@ OUTPUT FORMAT:
 
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words.
 
 ${mediaContext}${customPromptCommand}
 
@@ -1679,25 +1703,25 @@ STRICT DEFINING RULES:
 SOURCE VISUAL_FACTS:
 ${visualDescriptions.join('\n\n')}
 
+CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
 [
   { 
-    "title": "", 
-    "description": "", 
+    "title": "A highly descriptive natural language title representing the core subject", 
+    "description": "A detailed visual description focusing on subjects, setting, and mood", 
     "keywords": [],
     "category_id": 1,
     "shutterstock_category_1": "Abstract",
     "shutterstock_category_2": "Backgrounds/Textures"
-  },
-  ...
+  }
 ]`;
 
   let draftMetadataArray: any = [];
   try {
     const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
-          systemInstruction: genSystemInstruction,
-          contents: `Generate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
+          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
+          contents: genSystemInstruction + `\n\nGenerate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
@@ -1711,27 +1735,35 @@ OUTPUT FORMAT:
           topP: 0.8 })
     );
 
-    draftMetadataArray = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+    let rawContent = typeof genResponse === 'string' ? genResponse : genResponse.text;
+    console.log('[STAGE 2/3 BATCH] RAW RESPONSE:');
+    console.log(rawContent);
+    draftMetadataArray = JSON.parse(extractJSON(rawContent));
+    console.log('[STAGE 2/3 BATCH] PARSED:');
+    console.log(draftMetadataArray);
+
+    if (Array.isArray(draftMetadataArray) && draftMetadataArray.length === 0) { throw new Error("NVIDIA generated an empty array []"); }
     if (!Array.isArray(draftMetadataArray)) {
       if (draftMetadataArray && typeof draftMetadataArray === 'object') {
         if (Array.isArray(draftMetadataArray.metadata)) draftMetadataArray = draftMetadataArray.metadata;
         else if (Array.isArray(draftMetadataArray.items)) draftMetadataArray = draftMetadataArray.items;
         else draftMetadataArray = [draftMetadataArray];
       } else {
-        draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
+        throw new Error('Not an array and cannot map to array');
       }
     }
   } catch (err) {
-    console.warn("[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed: bypassed:", err.message);
-    draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
+    console.error('[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed:', err);
+    throw err;
   }
 
   // --- TAHAP 4, 5, & 6: AUDIT, RANK, & VALIDATE BATCH ---
   console.log(`[JohMeta Pipeline - Batch] Stage 4, 5 & 6: Final Validation for ${items.length} items...`);
+  console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadataArray, null, 2));
 
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words.
 
 ${mediaContext}${customPromptCommand}
 
@@ -1779,26 +1811,26 @@ ${visualDescriptions.join('\n\n')}
 DRAFT METADATA TO VALIDATE:
 ${JSON.stringify(draftMetadataArray, null, 2)}
 
+CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
 [
   {
-    "title": "",
-    "description": "",
+    "title": "A highly descriptive natural language title representing the core subject",
+    "description": "A detailed visual description focusing on subjects, setting, and mood",
     "keywords": [],
     "category_id": 0,
     "shutterstock_category_1": "",
     "shutterstock_category_2": "",
     "confidence_score": 0.95
-  },
-  ...
+  }
 ]`;
 
   let finalMetadataArray: any = [];
   try {
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
-          systemInstruction: validatorSystemInstruction,
-          contents: `Audit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
+          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
+          contents: validatorSystemInstruction + `\n\nAudit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
@@ -2196,6 +2228,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
            // Reuse the validation/padding logic by breaking out and returning
            return processPromptResults(parsed, count, subject, userNegativePrompt);
         }
+        throw new Error('Missing or empty prompts array in JSON response');
       } catch (err: any) {
         lastError = err;
         attempts++;
@@ -2226,6 +2259,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
             return processPromptResults(parsed, count, subject, userNegativePrompt);
           }
+          throw new Error('Missing or empty prompts array in JSON response');
         } catch (err: any) {
           lastError = err;
           attempts++;

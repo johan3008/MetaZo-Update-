@@ -38,9 +38,10 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
     }
   };
 
-  const len = value.length;
-  const ratingText = len < 50 ? 'Too short' : len <= 200 ? 'Optimal' : 'Too long';
-  const ratingColor = len < 50 ? 'text-rose-500' : len <= 200 ? 'text-emerald-500' : 'text-amber-500';
+  const safeValue = value || '';
+  const len = safeValue.length;
+  const minLen = label.toLowerCase().includes('title') ? 15 : 50; const ratingText = len < minLen ? 'Too short' : len <= 200 ? 'Optimal' : 'Too long';
+  const ratingColor = len < minLen ? 'text-rose-500' : len <= 200 ? 'text-emerald-500' : 'text-amber-500';
 
   return (
     <div className="space-y-1">
@@ -53,14 +54,14 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
       </div>
       {isTextArea ? (
         <textarea
-          value={value}
+          value={safeValue}
           onChange={(e) => onChange(e.target.value)}
           className={`w-full p-2.5 bg-slate-100/50 dark:bg-black/25 rounded-xl border border-slate-200/85 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-200 transition-all font-semibold resize-none min-h-[65px] focus:ring-2 focus:ring-[#4e73df]/20`}
         />
       ) : (
         <input
           type="text"
-          value={value}
+          value={safeValue}
           onChange={(e) => onChange(e.target.value)}
           className={`w-full p-2.5 bg-slate-100/55 dark:bg-black/25 rounded-xl border border-slate-200 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-300 transition-all font-extrabold focus:ring-2 focus:ring-[#4e73df]/20`}
         />
@@ -81,7 +82,7 @@ interface KeywordListProps {
 
 const ProjectKeywordList: React.FC<KeywordListProps> = ({
   label,
-  keywords,
+  keywords = [],
   themeColor,
   onChange,
   title,
