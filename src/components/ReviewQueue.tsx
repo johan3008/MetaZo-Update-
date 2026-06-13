@@ -94,6 +94,20 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   const [suggestError, setSuggestError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
 
+  React.useEffect(() => {
+    const seen = new Set<string>();
+    const uniqueKeywords = keywords.filter(k => {
+      const normalized = k.toLowerCase().trim();
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+
+    if (uniqueKeywords.length !== keywords.length) {
+      onChange(uniqueKeywords);
+    }
+  }, [keywords, onChange]);
+
   const badgeClass = themeColor === 'blue' ? 'bg-blue-500/10 text-[#4e73df]' : themeColor === 'purple' ? 'bg-purple-500/10 text-purple-600' : 'bg-emerald-500/10 text-emerald-600';
   const buttonColorClass = themeColor === 'blue' ? 'text-[#4e73df] hover:text-blue-600' : themeColor === 'purple' ? 'text-purple-600 hover:text-purple-750' : 'text-emerald-600 hover:text-emerald-700';
 

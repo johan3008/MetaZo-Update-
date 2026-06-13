@@ -508,16 +508,124 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
     app.post('/api/test-openai-key', async (req, res) => {
-        res.json({ success: true, message: 'Provider OpenAI belum memiliki implementasi pengujian API.' });
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const testResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{role: 'user', content: 'test'}],
+                    max_tokens: 16
+                })
+            });
+
+            if (testResponse.ok) {
+                return res.json({ success: true, message: 'OpenAI API Key valid!' });
+            } else {
+                const errText = await testResponse.text();
+                return res.status(400).json({ error: `Gagal verifikasi OpenAI API: ${errText}` });
+            }
+        } catch (e: any) {
+            console.warn('Test OpenAI API Key error exception:', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
     app.post('/api/test-openrouter-key', async (req, res) => {
-        res.json({ success: true, message: 'Provider Open Router belum memiliki implementasi pengujian API.' });
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const testResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'google/gemini-2.0-flash-001',
+                    messages: [{role: 'user', content: 'test'}],
+                    max_tokens: 16
+                })
+            });
+
+            if (testResponse.ok) {
+                return res.json({ success: true, message: 'OpenRouter API Key valid!' });
+            } else {
+                const errText = await testResponse.text();
+                return res.status(400).json({ error: `Gagal verifikasi OpenRouter API: ${errText}` });
+            }
+        } catch (e: any) {
+            console.warn('Test OpenRouter API Key error exception:', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
     app.post('/api/test-blackbox-key', async (req, res) => {
-        res.json({ success: true, message: 'Provider Blackbox AI belum memiliki implementasi pengujian API.' });
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const testResponse = await fetch('https://api.blackbox.ai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'blackboxai',
+                    messages: [{role: 'user', content: 'test'}],
+                    max_tokens: 16
+                })
+            });
+
+            if (testResponse.ok) {
+                return res.json({ success: true, message: 'Blackbox API Key valid!' });
+            } else {
+                const errText = await testResponse.text();
+                return res.status(400).json({ error: `Gagal verifikasi Blackbox API: ${errText}` });
+            }
+        } catch (e: any) {
+            console.warn('Test Blackbox API Key error exception:', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
     app.post('/api/test-nvidia-key', async (req, res) => {
-        res.json({ success: true, message: 'Provider NVIDIA belum memiliki implementasi pengujian API.' });
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const testResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'stepfun-ai/step-3.5-flash',
+                    messages: [{role: 'user', content: 'test'}],
+                    max_tokens: 16
+                })
+            });
+
+            if (testResponse.ok) {
+                return res.json({ success: true, message: 'NVIDIA API Key valid! (Models working)' });
+            } else {
+                const errText = await testResponse.text();
+                return res.status(400).json({ error: `Gagal verifikasi NVIDIA API: ${errText}` });
+            }
+        } catch (e: any) {
+            console.warn('Test NVIDIA API Key error exception:', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
     const getProviderName = (): string => {
         const store = apiKeyStorage.getStore();
@@ -541,7 +649,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode);
             res.json(metadata);
         } catch (e: any) {
-            console.error('Server generate-metadata error:', e);
+            console.warn('Server generate-metadata error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -560,7 +668,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode);
             res.json(batchMetadata);
         } catch (e: any) {
-            console.error('Server generate-batch-metadata error:', e);
+            console.warn('Server generate-batch-metadata error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -587,7 +695,7 @@ app.get('/api/debug-uploads', (req, res) => {
             });
             res.json(promptData);
         } catch (e: any) {
-            console.error('Server generate-prompt error:', e);
+            console.warn('Server generate-prompt error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -605,7 +713,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const data = await analyzeImageToPrompt(image, styleCategory);
             res.json(data);
         } catch (e: any) {
-            console.error('Server analyze-image-to-prompt error:', e);
+            console.warn('Server analyze-image-to-prompt error:', e);
             res.status(500).json({ error: e.message || 'Error analyzing image' });
         }
     });
@@ -619,7 +727,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const data = await analyzeBatchImageToPrompt(images, styleCategory);
             res.json(data);
         } catch (e: any) {
-            console.error('Server analyze-batch-image-to-prompt error:', e);
+            console.warn('Server analyze-batch-image-to-prompt error:', e);
             res.status(500).json({ error: e.message || 'Error analyzing images' });
         }
     });
@@ -633,7 +741,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const data = await analyzeVideoKeyword(keyword);
             res.json(data);
         } catch (e: any) {
-            console.error('Server analyze-video-keyword error:', e);
+            console.warn('Server analyze-video-keyword error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -646,7 +754,7 @@ app.get('/api/debug-uploads', (req, res) => {
         try {
             const { image, tolerance } = req.body;
             if (!image) {
-                console.error('Server check-image-quality error: Missing image data');
+                console.warn('Server check-image-quality error: Missing image data');
                 return res.status(400).json({ error: 'Missing image data' });
             }
             console.log('Server check-image-quality: Analyzing image...');
@@ -654,7 +762,7 @@ app.get('/api/debug-uploads', (req, res) => {
             console.log('Server check-image-quality: Analysis successful');
             res.json(data);
         } catch (e: any) {
-            console.error('Server check-image-quality error:', e);
+            console.warn('Server check-image-quality error:', e);
             res.status(500).json({ error: e.message || 'Error checking image quality' });
         }
     });
@@ -668,7 +776,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const prompts = await generateHollywoodPrompts(keyword);
             res.json(prompts);
         } catch (e: any) {
-            console.error('Server generate-hollywood-prompts error:', e);
+            console.warn('Server generate-hollywood-prompts error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -686,7 +794,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const events = await generateCalendarEvents(month);
             res.json(events);
         } catch (e: any) {
-            console.error('Server generate-calendar-events error:', e);
+            console.warn('Server generate-calendar-events error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -704,7 +812,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const data = await generateEventKeywords(eventName, eventDetails || '');
             res.json(data);
         } catch (e: any) {
-            console.error('Server generate-event-keywords error:', e);
+            console.warn('Server generate-event-keywords error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
@@ -722,7 +830,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const data = await suggestKeywords(title, description || '', existingKeywords || []);
             res.json({ keywords: data });
         } catch (e: any) {
-            console.error('Server smart-suggest-keywords error:', e);
+            console.warn('Server smart-suggest-keywords error:', e);
             if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {

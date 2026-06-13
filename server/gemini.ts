@@ -158,6 +158,105 @@ function isProhibitedKeyword(word: string): boolean {
   return false;
 }
 
+function getHeuristicCategories(title: string, keywords: string[]): {
+  category_id: number;
+  shutterstock_category_1: string;
+  shutterstock_category_2: string;
+} {
+  const t = (title || "").toLowerCase();
+  const kList = (keywords || []).map(x => String(x).toLowerCase());
+
+  // Helper to count matches in title + keywords
+  const countMatches = (terms: string[]): number => {
+    let score = 0;
+    terms.forEach(term => {
+      if (t.includes(term)) score += 5; // title word matches get higher weight
+      kList.forEach(k => {
+        if (k === term || k.includes(term)) score += 1;
+      });
+    });
+    return score;
+  };
+
+  const categoryScores: Record<number, number> = {};
+
+  // Keywords patterns for each Adobe Category
+  const patterns: Record<number, string[]> = {
+    1: ['animal', 'cat', 'dog', 'pet', 'wildlife', 'bird', 'fish', 'monkey', 'lion', 'tiger', 'bear', 'insect', 'reptilian', 'creature', 'beast', 'fauna', 'mammal', 'species', 'wilderness', 'habitat', 'furry', 'adorable', 'close-up', 'environment', 'wild', 'zoology'],
+    2: ['architecture', 'building', 'structure', 'house', 'room', 'office', 'home', 'tower', 'bridge', 'monument', 'museum', 'interior', 'exterior', 'floor', 'window', 'wall', 'door', 'facade', 'construction', 'metropolis', 'tower', 'estate'],
+    3: ['business', 'corporate', 'office', 'money', 'chart', 'graph', 'marketing', 'manager', 'meeting', 'resume', 'professional', 'work', 'job', 'finance', 'desk', 'computer', 'presentation', 'leadership', 'organization', 'colleague', 'career', 'investment', 'growth'],
+    4: ['drink', 'beverage', 'coffee', 'tea', 'wine', 'beer', 'juice', 'glass', 'cup', 'mug', 'bottle', 'liquid', 'cocktail', 'draft', 'soda'],
+    5: ['environment', 'eco', 'recycle', 'green', 'sustainability', 'recycle', 'conservation', 'earth', 'planet', 'wind', 'solar', 'climate', 'environmental', 'organic'],
+    6: ['emotion', 'mood', 'feeling', 'happy', 'sad', 'angry', 'conceptual', 'thought', 'brain', 'mind', 'stress', 'focus', 'psychology', 'attitude', 'behavior', 'expression', 'abstract', 'idea', 'sensation'],
+    7: ['food', 'dish', 'meal', 'kitchen', 'restaurant', 'dining', 'plate', 'chef', 'fruit', 'vegetable', 'meat', 'dessert', 'cake', 'bread', 'pancake', 'pizza', 'burger', 'fast food', 'dinner', 'breakfast', 'lunch', 'sweet', 'cream', 'baked', 'cookies', 'sugar', 'cuisine', 'gourmet', 'culinary', 'recipe', 'diet'],
+    8: ['vector', 'graphic', 'design', 'illustration', 'logo', 'icon', 'frame', 'template', 'banner', 'layout', 'sticker', 'elements', 'background', 'wallpaper', 'texture', 'pattern', 'asset', 'flat', 'backdrop', 'seamless'],
+    9: ['hobby', 'leisure', 'play', 'game', 'guitar', 'music', 'movie', 'craft', 'book', 'read', 'garden', 'recreation', 'activity', 'fun', 'pastime', 'indoor', 'enjoyment'],
+    10: ['industrial', 'factory', 'manufacturing', 'machine', 'worker', 'equipment', 'facility', 'metal', 'power', 'warehouse', 'technical', 'automated', 'construction', 'engineering', 'machinery'],
+    11: ['landscape', 'mountain', 'sea', 'beach', 'ocean', 'lake', 'river', 'forest', 'desert', 'valley', 'sunrise', 'sunset', 'nature', 'view', 'panorama', 'scenery', 'scenic', 'vista', 'sky', 'horizon'],
+    12: ['lifestyle', 'life', 'daily', 'routine', 'casual', 'luxury', 'habits', 'comfort', 'domestic', 'style', 'casual', 'wellness', 'health', 'fitness'],
+    13: ['person', 'people', 'human', 'man', 'woman', 'crowd', 'family', 'child', 'baby', 'girl', 'boy', 'group', 'face', 'hand', 'arm', 'leg', 'foot', 'pose', 'portrait', 'individual', 'young', 'adult', 'interaction', 'relationship'],
+    14: ['plant', 'flower', 'tree', 'leaf', 'garden', 'grass', 'rose', 'floral', 'botany', 'botanical', 'moss', 'herbal', 'seeds', 'blossom', 'petal', 'growth', 'stem', 'vegetation', 'spring', 'summer'],
+    15: ['culture', 'religion', 'traditional', 'church', 'temple', 'mosque', 'cross', 'holy', 'ceremonial', 'holiday', 'festival', 'heritage', 'history', 'spiritual', 'belief', 'faith', 'tradition', 'custom', 'sacred', 'ritual', 'symbol', 'history', 'celebration'],
+    16: ['science', 'biology', 'chemistry', 'physics', 'medicine', 'research', 'laboratory', 'math', 'microscope', 'formula', 'experimental', 'data', 'lab', 'discovery', 'study', 'experiment'],
+    17: ['social issue', 'protest', 'poverty', 'homeless', 'war', 'peace', 'justice', 'human rights', 'community', 'support', 'help', 'charity', 'assistance', 'advocacy', 'global', 'campaign'],
+    18: ['sport', 'run', 'ball', 'football', 'soccer', 'tennis', 'golf', 'gym', 'workout', 'athletic', 'athlete', 'competition', 'swimming', 'basketball', 'training', 'exercise', 'fitness', 'active'],
+    19: ['technology', 'tech', 'smart', 'digital', 'screen', 'laser', 'circuit', 'code', 'program', 'blockchain', 'database', 'ai', 'server', 'network', 'connection', 'internet', 'future', 'futuristic', 'communication', 'virtual'],
+    20: ['transport', 'car', 'truck', 'vehicle', 'train', 'airplane', 'ship', 'boat', 'road', 'street', 'highway', 'traffic', 'transit', 'logistics', 'delivery', 'automobile', 'drive', 'engine', 'auto'],
+    21: ['travel', 'tourism', 'traveler', 'hotel', 'map', 'compass', 'passport', 'luggage', 'packing', 'tourist', 'vacation', 'flight', 'destination', 'trip', 'journey', 'adventure', 'explore']
+  };
+
+  let maxScore = -1;
+  let bestCatId = 8; // Default to Graphic Resources, which is a very safe visual fallback category!
+
+  for (const [catIdStr, words] of Object.entries(patterns)) {
+    const catId = parseInt(catIdStr, 10);
+    const score = countMatches(words);
+    categoryScores[catId] = score;
+    if (score > maxScore) {
+      maxScore = score;
+      bestCatId = catId;
+    }
+  }
+
+  // If high score is 0, let's look at a default fallback
+  if (maxScore <= 0) {
+    bestCatId = 8; // Graphic Resources
+  }
+
+  // Map to Shutterstock categories logically
+  const mapping: Record<number, { cat1: string; cat2: string }> = {
+    1: { cat1: "Animals/Wildlife", cat2: "Nature" },
+    2: { cat1: "Buildings/Landmarks", cat2: "Interiors" },
+    3: { cat1: "Business/Finance", cat2: "Technology" },
+    4: { cat1: "Food and Drink", cat2: "Objects" },
+    5: { cat1: "Nature", cat2: "Backgrounds/Textures" },
+    6: { cat1: "Abstract", cat2: "Miscellaneous" },
+    7: { cat1: "Food and Drink", cat2: "Objects" },
+    8: { cat1: "Abstract", cat2: "Backgrounds/Textures" },
+    9: { cat1: "Objects", cat2: "Sports/Recreation" },
+    10: { cat1: "Industrial", cat2: "Technology" },
+    11: { cat1: "Nature", cat2: "Parks/Outdoor" },
+    12: { cat1: "People", cat2: "Miscellaneous" },
+    13: { cat1: "People", cat2: "Miscellaneous" },
+    14: { cat1: "Nature", cat2: "Backgrounds/Textures" },
+    15: { cat1: "Religion", cat2: "Holidays" },
+    16: { cat1: "Science", cat2: "Technology" },
+    17: { cat1: "Miscellaneous", cat2: "People" },
+    18: { cat1: "Sports/Recreation", cat2: "Objects" },
+    19: { cat1: "Technology", cat2: "Industrial" },
+    20: { cat1: "Transportation", cat2: "Objects" },
+    21: { cat1: "Nature", cat2: "Buildings/Landmarks" }
+  };
+
+  const choice = mapping[bestCatId] || { cat1: "Abstract", cat2: "Backgrounds/Textures" };
+
+  return {
+    category_id: bestCatId,
+    shutterstock_category_1: choice.cat1,
+    shutterstock_category_2: choice.cat2
+  };
+}
+
 function ensureTitleLength(title: string, keywords: string[], description: string): string {
   if (!title) title = "Stock asset";
   
@@ -508,7 +607,7 @@ async function callOpenAICompatibleWithRetry(params: {
     }
 
     if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
-      payload.max_tokens = 8192;
+      payload.max_tokens = provider === 'nvidia' ? 2048 : 8192;
     }
 
     if (params.responseMimeType === 'application/json') {
@@ -533,7 +632,7 @@ async function callOpenAICompatibleWithRetry(params: {
     }
 
     let tryCount = 0;
-    while (tryCount < 2) {
+    while (tryCount < 6) {
       try {
         console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
 
@@ -552,17 +651,18 @@ async function callOpenAICompatibleWithRetry(params: {
           console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
         }
 
+        const fetchTimeout = provider === 'nvidia' ? 180000 : 180000;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload),
           // @ts-ignore - undici/node-fetch support signal/timeout
-          signal: AbortSignal.timeout(180000) // 3 minutes timeout
+          signal: AbortSignal.timeout(fetchTimeout)
         });
 
         if (!response.ok) {
           const errText = await response.text();
-          console.error(`[NVIDIA API FAILURE] Status: ${response.status}, Response: ${errText}`);
+          console.warn(`[NVIDIA API FAILURE] Status: ${response.status}, Response: ${errText}`);
           throw new Error(`HTTP ${response.status}: ${errText}`);
         }
 
@@ -583,10 +683,10 @@ async function callOpenAICompatibleWithRetry(params: {
         }
         return answer;
       } catch (err: any) {
-        console.error(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
+        console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
         if (provider === 'nvidia') {
           const status = err.status || (err.message && err.message.includes('HTTP ') ? err.message.split(' ')[1].replace(':', '') : 'unknown');
-          console.error(`[NVIDIA ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
+          console.warn(`[NVIDIA ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
         }
         lastErr = err;
 
@@ -611,16 +711,23 @@ async function callOpenAICompatibleWithRetry(params: {
           }
         }
 
-        // Automatic model fallback on failure (generic, semua provider)
-        if (tryCount === 0) {
-          tryCount++;
-          const fallback = PROVIDER_FALLBACK_MODELS[provider];
-          if (fallback && fallback !== model) {
-            model = fallback;
-            console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model} (retry 1/2)`);
-            payload.model = model;
-            continue;
-          }
+        // Automatic model fallback and exponential backoff
+        tryCount++;
+        const fallback = PROVIDER_FALLBACK_MODELS[provider];
+        const isRateLimitOrTimeout = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('timeout') || errorMsg.includes('exceeded') || errorMsg.includes('fetch failed');
+
+        if (tryCount === 1 && fallback && fallback !== model) {
+          model = fallback;
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model}`);
+          payload.model = model;
+          continue;
+        }
+
+        if (tryCount < 6 && isRateLimitOrTimeout) {
+          const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error due to rate limit/timeout. Waiting ${backoff / 1000}s (attempt ${tryCount + 1}/6)...`);
+          await new Promise(resolve => setTimeout(resolve, backoff));
+          continue;
         }
 
         throw err;
@@ -732,13 +839,14 @@ const callGeminiWithRetry = async (
   modelName: string,
   contents: any,
   config: any,
-  maxAttempts: number = 5
+  maxAttempts: number = 8
 ): Promise<any> => {
   let lastError: any;
+  let currentModel = modelName;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await getAIClient().models.generateContent({
-        model: modelName,
+        model: currentModel,
         contents,
         config
       });
@@ -750,20 +858,38 @@ const callGeminiWithRetry = async (
       if (statusCode === 429 || statusCode >= 500) {
         const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
         
-        // If it's a hard quota limit or resource exhaustion (as opposed to transient rate limit),
-        // let's fail immediately on this model so we can fall back to the next model in modelsToTry without wasting 30+ seconds.
-        if (statusCode === 429 && (errorMsg.includes("quota") || errorMsg.includes("exceeded") || errorMsg.includes("resource_exhausted") || errorMsg.includes("limit"))) {
-          console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${modelName}.`);
-          
-          if (modelName.includes('lite')) {
-             throw new Error(`[QUOTA EXCEEDED] Anda telah mencapai batas penggunaan gratis Gemini (15 RPM). Silakan tunggu sekitar 1 menit atau gunakan provider lain seperti NVIDIA NIM / Mistral di Pengaturan.`);
-          }
-          throw err;
+        let customDelay = 0;
+        const retryMatch = errorMsg.match(/retry in ([\d\.]+)s/i) || errorMsg.match(/retrydelay['":\s]+([\d\.]+)s/i);
+        if (retryMatch && retryMatch[1]) {
+           customDelay = parseFloat(retryMatch[1]) * 1000 + 1000; // Add 1 second buffer
         }
 
-        // Backoff: exponential with jitter
-        const backoff = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-        console.warn(`Gemini Error ${statusCode} on ${modelName}, retrying in ${backoff / 1000}s (attempt ${attempt + 1}/${maxAttempts})...`);
+        if (statusCode === 429 && !customDelay && (errorMsg.includes("quota exceeded for metric") || errorMsg.includes("billing"))) {
+           if (errorMsg.includes("limit: 20") || errorMsg.includes("limit: 15") || errorMsg.includes("retry in")) {
+             // Let it backoff.
+           } else {
+             console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel}.`);
+             throw err;
+           }
+        }
+        
+        // Dynamically rotate to gemini-3.1-flash-lite if 429 on gemini-3.5-flash to bypass the quota wait time
+        if (statusCode === 429 && attempt === 0 && currentModel !== 'gemini-3.1-flash-lite') {
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash-lite to bypass quota limits.`);
+             currentModel = 'gemini-3.1-flash-lite';
+             customDelay = 1000; // Reset wait time so we try the new model immediately
+        } else if (statusCode === 429 && customDelay > 60000) {
+             console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel} (Wait time > 60s). Failing fast.`);
+             throw err;
+        }
+
+        let backoff = customDelay > 0 ? customDelay : Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+        if (statusCode === 429 && !customDelay) {
+            // For general 429 rate limit (usually 15 RPM), wait longer if it keeps failing
+            backoff = Math.min(30000, backoff); 
+        }
+
+        console.warn(`Gemini Error ${statusCode} on ${currentModel}, retrying in ${backoff / 1000}s (attempt ${attempt + 1}/${maxAttempts})...`);
         await new Promise(resolve => setTimeout(resolve, backoff));
         continue;
       }
@@ -955,15 +1081,7 @@ OUTPUT FORMAT:
       systemInstruction: visionSystemInstruction,
       responseMimeType: "application/json",
       temperature: temperature ?? 0.1,
-      topP: 0.8,
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-      ]
-    });
+      topP: 0.8 });
     
     visualFactsJson = visionResponse.text || "{}";
     if (!visualFactsJson || visualFactsJson.trim() === "{}") {
@@ -1050,7 +1168,10 @@ OUTPUT FORMAT:
 {
   "title": "",
   "description": "",
-  "keywords": []
+  "keywords": [],
+  "category_id": 1,
+  "shutterstock_category_1": "Abstract",
+  "shutterstock_category_2": "Backgrounds/Textures"
 }`;
 
   let draftMetadata: any = {};
@@ -1063,19 +1184,18 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash-lite', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: genSystemInstruction,
           responseMimeType: "application/json",
           temperature: temperature ?? 0.1,
-          topP: 0.8
-        })
+          topP: 0.8 })
     );
 
     draftMetadata = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
   } catch (err) {
-    console.error("[JohMeta Pipeline] Generation Stage 2/3 Failed:", err);
+    console.warn("[JohMeta Pipeline] Generation Stage 2/3 Failed: bypassed:", err.message);
     draftMetadata = { title: "Stock asset with professional lighting", description: "Detailed visual content for commercial use.", keywords: ["stock", "asset"] };
   }
 
@@ -1150,20 +1270,25 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash-lite', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
           temperature: temperature ?? 0.1,
-          topP: 0.8
-        })
+          topP: 0.8 })
     );
 
     finalMetadataRaw = JSON.parse(extractJSON(typeof validResponse === 'string' ? validResponse : validResponse.text));
   } catch (err) {
-    console.error("[JohMeta Pipeline] Validation Stage 4/5/6 Failed:", err);
-    finalMetadataRaw = { ...draftMetadata, category_id: 1, shutterstock_category_1: "Abstract", shutterstock_category_2: "Art" };
+    console.warn("[JohMeta Pipeline] Validation Stage 4/5/6 Failed: bypassed:", err.message);
+    const heur = getHeuristicCategories(draftMetadata.title, draftMetadata.keywords || []);
+    finalMetadataRaw = { 
+      ...draftMetadata, 
+      category_id: heur.category_id, 
+      shutterstock_category_1: heur.shutterstock_category_1, 
+      shutterstock_category_2: heur.shutterstock_category_2 
+    };
   }
 
   // --- TAHAP 7: FINAL SANITIZATION & RETURN ---
@@ -1233,11 +1358,21 @@ OUTPUT FORMAT:
     // 1.5. Enforce professional Adobe Stock title length of 70-120 characters strictly
     data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "");
 
-    // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock 2 (Anti-Kosong)
+    // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
+    const parsedCategoryId = parseInt(String(data.category_id), 10);
+    if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.category_id = heur.category_id;
+    } else {
+      data.category_id = parsedCategoryId;
+    }
+
+    // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
     const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
     if (!data.shutterstock_category_1 || !validShutterstockCats.includes(data.shutterstock_category_1)) {
-      data.shutterstock_category_1 = validShutterstockCats[0] || "Animals/Wildlife";
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
     }
 
     if (
@@ -1245,24 +1380,18 @@ OUTPUT FORMAT:
       !validShutterstockCats.includes(data.shutterstock_category_2) || 
       data.shutterstock_category_2 === data.shutterstock_category_1
     ) {
-      const smartFallbackMap: Record<string, string> = {
-        "Animals/Wildlife": "Backgrounds/Textures",
-        "Backgrounds/Textures": "Abstract",
-        "Abstract": "Art",
-        "Illustrations": "Graphic Art"
-      };
-
-      const customFallback = smartFallbackMap[data.shutterstock_category_1];
-      if (customFallback && validShutterstockCats.includes(customFallback)) {
-        data.shutterstock_category_2 = customFallback;
-      } else {
-        data.shutterstock_category_2 = validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Abstract";
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      let secondFallback = heur.shutterstock_category_2;
+      if (secondFallback === data.shutterstock_category_1) {
+        const possibleVal = toolType === ToolType.VIDEO ? "Backgrounds/Textures" : "Abstract";
+        secondFallback = validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || possibleVal;
       }
+      data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Backgrounds/Textures");
     }
     
     return data as StockMetadata;
   } catch (error) {
-    console.error("[JohMeta Parse Error] Failed to handle output format:", error);
+    console.warn("[JohMeta Parse Error] Failed to handle output format:", error);
     throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
   }
 };
@@ -1438,15 +1567,7 @@ OUTPUT FORMAT:
             systemInstruction: visionSystemInstruction,
             responseMimeType: "application/json",
             temperature: temperature ?? 0.1,
-            topP: 0.8,
-            safetySettings: [
-              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-            ]
-          });
+            topP: 0.8 });
           
           let facts = visionResponse.text || "{}";
           visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}`);
@@ -1538,7 +1659,14 @@ ${visualDescriptions.join('\n\n')}
 
 OUTPUT FORMAT:
 [
-  { "title": "", "description": "", "keywords": [] },
+  { 
+    "title": "", 
+    "description": "", 
+    "keywords": [],
+    "category_id": 1,
+    "shutterstock_category_1": "Abstract",
+    "shutterstock_category_2": "Backgrounds/Textures"
+  },
   ...
 ]`;
 
@@ -1552,19 +1680,18 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash-lite', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: genSystemInstruction,
           responseMimeType: "application/json",
           temperature: temperature ?? 0.1,
-          topP: 0.8
-        })
+          topP: 0.8 })
     );
 
     draftMetadataArray = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
   } catch (err) {
-    console.error("[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed:", err);
+    console.warn("[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed: bypassed:", err.message);
     draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
   }
 
@@ -1642,20 +1769,27 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash-lite', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Audit and validate the Draft Metadata array for ${items.length} assets based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
           temperature: temperature ?? 0.1,
-          topP: 0.8
-        })
+          topP: 0.8 })
     );
 
     finalMetadataArray = JSON.parse(extractJSON(typeof validResponse === 'string' ? validResponse : validResponse.text));
   } catch (err) {
-    console.error("[JohMeta Pipeline - Batch] Batch Validation Stage 4/5/6 Failed:", err);
-    finalMetadataArray = draftMetadataArray.map(d => ({ ...d, category_id: 1, shutterstock_category_1: "Abstract", shutterstock_category_2: "Art" }));
+    console.warn("[JohMeta Pipeline - Batch] Batch Validation Stage 4/5/6 Failed: bypassed:", err.message);
+    finalMetadataArray = draftMetadataArray.map(d => {
+      const heur = getHeuristicCategories(d.title, d.keywords || []);
+      return { 
+        ...d, 
+        category_id: heur.category_id, 
+        shutterstock_category_1: heur.shutterstock_category_1, 
+        shutterstock_category_2: heur.shutterstock_category_2 
+      };
+    });
   }
 
   try {
@@ -1723,11 +1857,21 @@ OUTPUT FORMAT:
         // 1.5. Enforce professional Adobe Stock title length of 70-120 characters strictly
         metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "");
 
+        // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
+        const parsedCategoryId = parseInt(String(metadata.category_id), 10);
+        if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
+            const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+            metadata.category_id = heur.category_id;
+        } else {
+            metadata.category_id = parsedCategoryId;
+        }
+
         // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
         const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
         if (!metadata.shutterstock_category_1 || !validShutterstockCats.includes(metadata.shutterstock_category_1)) {
-            metadata.shutterstock_category_1 = validShutterstockCats[0] || "Animals/Wildlife";
+            const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+            metadata.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
         }
 
         if (
@@ -1735,26 +1879,20 @@ OUTPUT FORMAT:
           !validShutterstockCats.includes(metadata.shutterstock_category_2) || 
           metadata.shutterstock_category_2 === metadata.shutterstock_category_1
         ) {
-          const smartFallbackMap: Record<string, string> = {
-            "Animals/Wildlife": "Backgrounds/Textures",
-            "Backgrounds/Textures": "Abstract",
-            "Abstract": "Art",
-            "Illustrations": "Graphic Art"
-          };
-
-          const customFallback = smartFallbackMap[metadata.shutterstock_category_1];
-          if (customFallback && validShutterstockCats.includes(customFallback)) {
-            metadata.shutterstock_category_2 = customFallback;
-          } else {
-            metadata.shutterstock_category_2 = validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Abstract";
+          const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+          let secondFallback = heur.shutterstock_category_2;
+          if (secondFallback === metadata.shutterstock_category_1) {
+              const possibleVal = toolType === ToolType.VIDEO ? "Backgrounds/Textures" : "Abstract";
+              secondFallback = validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || possibleVal;
           }
+          metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures");
         }
 
         const targetId = items[index] ? items[index].id : (items[0]?.id || 'unknown');
         return { id: targetId, metadata };
     });
   } catch (error) {
-    console.error("[JohMeta Pipeline - Batch] Parse Error:", error);
+    console.warn("[JohMeta Pipeline - Batch] Parse Error:", error);
     throw new Error("Gagal memproses respons batch metadata. Silakan coba kembali.");
   }
 };
@@ -2050,7 +2188,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     }
   }
 
-  console.error("All AI models and attempts failed for Prompt Generation. Failing back to programmatic fallback...", lastError);
+  console.warn("All AI models and attempts failed for Prompt Generation. Failing back to programmatic fallback...", lastError);
 
   // Helper translations & mappings
   const translationPairs: Record<string, string> = {
@@ -2480,7 +2618,7 @@ CRITICAL RULES:
   }
 
   if (!response) {
-    console.error("analyzeImageToPrompt Error:", lastError);
+    console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
     throw new Error("Failed to analyze image. Please try again.");
   }
 
@@ -2494,7 +2632,7 @@ CRITICAL RULES:
     const data = JSON.parse(text);
     return data as { prompt: string; description: string };
   } catch (error) {
-    console.error("Gemini Parse Error:", error, response.text);
+    console.warn("Gemini Parse Error:", error, response.text);
     throw new Error("Failed to parse AI response. Please try again.");
   }
 };
@@ -2560,7 +2698,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
 
   if (!response) {
-    console.error("analyzeBatchImageToPrompt Error:", lastError);
+    console.warn("analyzeBatchImageToPrompt bypassed:", lastError?.message);
     throw new Error("Failed to analyze images in batch.");
   }
 
@@ -2573,7 +2711,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
     const data = JSON.parse(text);
     return data as { prompt: string; description: string }[];
   } catch (error) {
-    console.error("Gemini Parse Error:", error, response.text);
+    console.warn("Gemini Parse Error:", error, response.text);
     throw new Error("Failed to parse AI response. Please try again.");
   }
 };
@@ -2790,7 +2928,7 @@ Respons Anda WAJIB dalam format JSON:
     console.log('Gemini raw response:', text);
     return JSON.parse(text);
   } catch(e) {
-    console.error("Gemini Parse Error:", response?.text);
+    console.warn("Gemini Parse Error:", response?.text);
     throw e;
   }
 }
@@ -2931,7 +3069,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`,
     const parsed = JSON.parse(response.text);
     return parsed.keywords || [];
   } catch (err) {
-    console.error("Failed to parse suggested keywords:", err);
+    console.warn("Failed to parse suggested keywords:", err);
     return [];
   }
 }

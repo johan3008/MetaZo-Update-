@@ -3,7 +3,7 @@ import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar
+  Calendar, CreditCard
 } from 'lucide-react';
 import { ToolType, GenerationMode } from '../../types';
 
@@ -345,6 +345,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {!sidebarCollapsed && <span>{t.sidebar_activation_premium}</span>}
               </button>
             )}
+
+            <button 
+              type="button"
+              onClick={() => setShowActivation?.(true)}
+              className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-bold text-slate-100/75 hover:bg-white/10 hover:text-white transition-all cursor-pointer mb-1.5"
+            >
+              <CreditCard size={14} className="text-amber-400" />
+              {!sidebarCollapsed && <span>{t.sidebar_subscription_plan}</span>}
+            </button>
 
             <a 
               href={t.whatsapp_link} 

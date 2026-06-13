@@ -65,6 +65,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return ['svg', 'eps', 'ai'].includes(ext);
   }).length;
 
+  const [currentSlide, setCurrentSlide] = React.useState(0);
+
+  const slides = [
+    {
+      badge: t.language === 'Bahasa' ? "GENERATOR METADATA" : "METADATA GENERATOR",
+      title: <>{t.hero_title_part1} <span className="text-emerald-300">{t.hero_title_part2}</span> {t.hero_title_part3}</>,
+      desc: t.hero_description
+    },
+    {
+      badge: t.language === 'Bahasa' ? "GENERATOR PROMPT AI" : "AI PROMPT GENERATOR",
+      title: <>{t.language === 'Bahasa' ? "OPTIMASI" : "PROMPT"} <span className="text-emerald-300">PROMPT</span> {t.language === 'Bahasa' ? "TEKS" : "OPTIMIZATION"}</>,
+      desc: t.language === 'Bahasa' 
+        ? "Ubah konsep sederhana menjadi prompt visual yang kompleks dan kaya detail untuk platform generative AI." 
+        : "Transform simple concepts into highly detailed and optimized visual prompts for AI generation platforms."
+    },
+    {
+      badge: t.language === 'Bahasa' ? "INSPEKSI KUALITAS" : "QUALITY INSPECTOR",
+      title: <>{t.language === 'Bahasa' ? "AUDIT" : "TECHNICAL"} <span className="text-emerald-300">STANDAR</span> {t.language === 'Bahasa' ? "TEKNIS" : "AUDIT"}</>,
+      desc: t.language === 'Bahasa'
+        ? "Pengecekan dan inspeksi kualitas visual secara otomatis mendeteksi masalah sebelum aset ditolak oleh agensi."
+        : "Automated quality checks and visual inspection to detect issues before assets are rejected by agencies."
+    },
+    {
+      badge: t.language === 'Bahasa' ? "KALENDER KONTEN" : "CONTENT CALENDAR",
+      title: <>{t.language === 'Bahasa' ? "IDE" : "COMMERCIAL"} <span className="text-emerald-300">EVENT</span> {t.language === 'Bahasa' ? "KOMERSIAL" : "IDEAS"}</>,
+      desc: t.language === 'Bahasa'
+        ? "Temukan ide acara, tren lokal, dan liburan global untuk strategi portofolio stock bulanan Anda."
+        : "Discover global events, trending holidays, and seasonal ideas for your monthly stock portfolio strategy."
+    },
+    {
+      badge: t.language === 'Bahasa' ? "AKSES PREMIUM" : "PREMIUM ACCESS",
+      title: <>{t.language === 'Bahasa' ? "PRO" : "UNLIMITED"} <span className="text-amber-300">SUBSCRIPTION</span> {t.language === 'Bahasa' ? "PLAN" : "PLAN"}</>,
+      desc: t.language === 'Bahasa'
+        ? "Berlangganan untuk membuka semua fitur premium, batas bulk process tanpa batas, dan performa AI yang lebih optimal."
+        : "Subscribe to unlock all premium features, unlimited bulk processing, and optimized AI performance."
+    }
+  ];
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       
@@ -78,18 +123,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute left-1/3 bottom-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
-            <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
-            <span>{t.hero_badge}</span>
+        <div className="relative z-10 max-w-2xl min-h-[160px] flex flex-col justify-center">
+          <div key={currentSlide} className="animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
+              <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
+              <span>{slides[currentSlide].badge}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight leading-tight select-none">
+              {slides[currentSlide].title}
+            </h1>
+            <p className="mt-2 text-xs sm:text-sm text-slate-100/90 font-medium leading-relaxed max-w-xl min-h-[40px]">
+              {slides[currentSlide].desc}
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight leading-tight select-none">
-            {t.hero_title_part1} <span className="text-emerald-300">{t.hero_title_part2}</span> {t.hero_title_part3}
-          </h1>
-          <p className="mt-2 text-xs sm:text-sm text-slate-100/90 font-medium leading-relaxed max-w-xl">
-            {t.hero_description}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <button 
               onClick={() => setShowInfoModal(true)}
               className="px-4 py-2 bg-emerald-400 text-slate-900 font-extrabold text-xs rounded-xl shadow-lg hover:bg-emerald-300 hover:scale-[1.03] transition-all flex items-center space-x-1.5 uppercase cursor-pointer"
@@ -100,6 +147,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 select-none text-white font-extrabold text-xs rounded-xl transition-all flex items-center space-x-1.5 uppercase">
               <ShieldCheck size={14} className="text-emerald-300" />
               <span>{generationMode.toUpperCase()} ({totalFiles} {t.hero_stats_file})</span>
+            </div>
+            
+            {/* Slide Navigation Pagination */}
+            <div className="ml-4 flex items-center space-x-2 border-l border-white/20 pl-4">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentSlide(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${i === currentSlide ? 'w-6 bg-emerald-300' : 'w-2 bg-white/30 hover:bg-white/50'}`}
+                />
+              ))}
             </div>
           </div>
         </div>

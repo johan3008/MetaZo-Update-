@@ -1165,6 +1165,66 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     </div>
                   )}
 
+                  {/* Subscription Plans */}
+                  <div className="space-y-2 mt-4 mb-4">
+                    <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block mb-2">{t.language === 'Bahasa' ? 'Pilih Paket' : 'Choose Plan'}</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {/* Free Trial */}
+                      <div className="border border-slate-200 dark:border-white/10 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col justify-between transition-all">
+                        <div className="space-y-1 text-center">
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-slate-700 dark:text-slate-200">{t.language === 'Bahasa' ? 'Uji Coba' : 'Free Trial'}</h5>
+                          <p className="text-slate-600 dark:text-slate-400 font-black text-xs">Gratis</p>
+                          <ul className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 space-y-1 mt-2 text-left">
+                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Akses 7 Hari' : '7 Days Access'}</span></li>
+                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Hanya Metadata Gen, Prompt Image, Calendar Gen' : 'Metadata Gen, Prompt Image, Calendar Gen only'}</span></li>
+                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Batas 30 Generasi / Hari' : '30 Generations / Day Limit'}</span></li>
+                          </ul>
+                        </div>
+                      </div>
+                      {/* 30 Days Plan */}
+                      <div className="border border-[#4e73df] rounded-xl p-3 bg-blue-500/5 flex flex-col justify-between relative shadow-sm hover:scale-[1.02] transition-transform">
+                        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/2">
+                          <span className="bg-[#4e73df] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Pro</span>
+                        </div>
+                        <div className="space-y-1 text-center">
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-[#4e73df] dark:text-blue-400">30 Days Plan</h5>
+                          <p className="text-[#4e73df] dark:text-blue-300 font-black text-xs">Rp 50.000</p>
+                          <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>Premium AI Engine</span></li>
+                          </ul>
+                        </div>
+                      </div>
+                      {/* Unlimited Plan */}
+                      <div className="border border-amber-500 rounded-xl p-3 bg-amber-500/5 flex flex-col justify-between relative shadow-sm hover:scale-[1.02] transition-transform">
+                        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/2">
+                          <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Best</span>
+                        </div>
+                        <div className="space-y-1 text-center">
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-amber-600 dark:text-amber-400">Unlimited</h5>
+                          <p className="text-amber-600 dark:text-amber-400 font-black text-xs">Rp 99.000</p>
+                          <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Akses Selamanya' : 'Lifetime Access'}</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas' : 'Unlimited Limits'}</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>Prioritas Support</span></li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-lg flex items-center justify-between border border-slate-200 dark:border-slate-700">
+                      <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center space-x-1.5">
+                        <ShoppingCart size={12} className="text-emerald-500" />
+                        <span>{t.language === 'Bahasa' ? 'Beli lisensi melalui WhatsApp:' : 'Buy license via WhatsApp:'}</span>
+                      </div>
+                      <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-lg flex items-center space-x-1 transition-all shadow-sm">
+                        <MessageCircle size={10} />
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
+
                   {/* Activation input */}
                   <div className="space-y-1.5 mt-2">
                     <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block">{t.activation_input_label}</label>
