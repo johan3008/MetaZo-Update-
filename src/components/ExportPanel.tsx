@@ -41,10 +41,10 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   t
 }) => {
   return (
-    <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm flex flex-col relative overflow-hidden">
+    <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 flex flex-col relative overflow-hidden">
       {/* HEADER */}
       <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg">
-        <h3 className="m-0 font-extrabold text-[#4e73df] dark:text-blue-400 text-xs sm:text-sm uppercase tracking-wider">
+        <h3 className="m-0 font-extrabold text-[#7c3aed] dark:text-violet-400 text-xs sm:text-sm uppercase tracking-wider">
           Bulk Multi-Platform Export Controls
         </h3>
       </div>
@@ -57,7 +57,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           </label>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
             {/* Adobe Stock */}
-            <label className={`flex flex-col justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
               exportAdobe ? 'border-slate-800 dark:border-indigo-500 bg-slate-50/50 dark:bg-indigo-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-slate-350 dark:hover:border-slate-800'
             }`}>
               <input type="checkbox" className="hidden" checked={exportAdobe} onChange={(e) => setExportAdobe(e.target.checked)} />
@@ -76,7 +76,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             </label>
 
             {/* Shutterstock */}
-            <label className={`flex flex-col justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
               exportShutterstock ? 'border-red-500 bg-red-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-red-300 dark:hover:border-slate-800'
             }`}>
               <input type="checkbox" className="hidden" checked={exportShutterstock} onChange={(e) => setExportShutterstock(e.target.checked)} />
@@ -95,7 +95,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             </label>
 
             {/* Vecteezy */}
-            <label className={`flex flex-col justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
               exportVecteezy ? 'border-orange-500 bg-orange-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-orange-355 dark:hover:border-slate-800'
             }`}>
               <input type="checkbox" className="hidden" checked={exportVecteezy} onChange={(e) => setExportVecteezy(e.target.checked)} />
@@ -114,14 +114,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             </label>
 
             {/* Canva */}
-            <label className={`flex flex-col justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
-              exportCanva ? 'border-blue-500 bg-blue-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-blue-300 dark:hover:border-slate-800'
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
+              exportCanva ? 'border-violet-500 bg-violet-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-blue-300 dark:hover:border-slate-800'
             }`}>
               <input type="checkbox" className="hidden" checked={exportCanva} onChange={(e) => setExportCanva(e.target.checked)} />
               <div className="flex items-center justify-between w-full mb-3">
-                <span className="text-[9px] font-black px-1.5 py-0.5 bg-blue-500 text-white rounded uppercase">CANVO</span>
+                <span className="text-[9px] font-black px-1.5 py-0.5 bg-violet-500 text-white rounded uppercase">CANVO</span>
                 <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border ${
-                  exportCanva ? 'bg-blue-500 text-white border-transparent' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-slate-800'
+                  exportCanva ? 'bg-violet-500 text-white border-transparent' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-slate-800'
                 }`}>
                   {exportCanva && <Check size={10} />}
                 </div>
@@ -133,7 +133,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             </label>
 
             {/* Freepik */}
-            <label className={`flex flex-col justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
               exportFreepik ? 'border-emerald-500 bg-emerald-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-emerald-300 dark:hover:border-slate-800'
             }`}>
               <input type="checkbox" className="hidden" checked={exportFreepik} onChange={(e) => setExportFreepik(e.target.checked)} />
@@ -157,23 +157,23 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           {/* Shutterstock format toggle */}
           {exportShutterstock && (
-            <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 animate-in slide-in-from-top-1 duration-200">
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] space-y-2 animate-in slide-in-from-top-1 duration-200">
               <label className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
                 Shutterstock Description Column Mode
               </label>
               <div className="flex space-x-2">
                 <button 
                   onClick={() => setShutterstockDescMode('desc')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[10px] font-bold transition-all ${
-                    shutterstockDescMode === 'desc' ? 'bg-[#e74a3b] text-white shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
+                  className={`flex-1 py-1.5 px-3 rounded-2xl text-[10px] font-bold transition-all ${
+                    shutterstockDescMode === 'desc' ? 'bg-[#e74a3b] text-white shadow-md shadow-black/5' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
                   }`}
                 >
                   Description Only
                 </button>
                 <button 
                   onClick={() => setShutterstockDescMode('title_desc')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-[10px] font-bold transition-all ${
-                    shutterstockDescMode === 'title_desc' ? 'bg-[#e74a3b] text-white shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
+                  className={`flex-1 py-1.5 px-3 rounded-2xl text-[10px] font-bold transition-all ${
+                    shutterstockDescMode === 'title_desc' ? 'bg-[#e74a3b] text-white shadow-md shadow-black/5' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
                   }`}
                 >
                   Title + Description
@@ -183,7 +183,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           )}
 
           {/* Master Auto-Download Toggle */}
-          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem]">
             <div>
               <label className="text-[10px] font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest block">
                 Auto-Download All
@@ -210,8 +210,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           <button
             onClick={handleExport}
             disabled={!canDownload}
-            className={`w-full sm:w-auto px-6 py-3 text-sm font-black rounded-xl text-white shadow transition-all flex items-center justify-center space-x-2 active:scale-[0.98] ${
-              canDownload ? 'bg-gradient-to-r from-[#4e73df] to-indigo-600 hover:from-blue-620 shadow-blue-500/10' : 'bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+            className={`w-full sm:w-auto px-6 py-3 text-sm font-black rounded-[1.5rem] text-white shadow transition-all flex items-center justify-center space-x-2 active:scale-[0.98] ${
+              canDownload ? 'bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-blue-620 shadow-violet-500/10' : 'bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
             }`}
           >
             <Download size={15} />

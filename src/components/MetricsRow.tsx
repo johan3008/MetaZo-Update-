@@ -17,23 +17,23 @@ export const MetricsRow: React.FC<MetricsRowProps> = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* CARD 1: TOTAL FILES */}
-      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#4e73df]" />
+      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#7c3aed]" />
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-extrabold text-[#4e73df] uppercase tracking-wider leading-none">
+            <div className="text-[10px] font-extrabold text-[#7c3aed] uppercase tracking-wider leading-none">
               Uploaded Queue
             </div>
             <div className="text-xl font-black text-slate-800 dark:text-white mt-1.5 leading-none">
               {filesLength} <span className="text-xs text-slate-400 font-bold">files</span>
             </div>
           </div>
-          <FileCode size={24} className="text-[#4e73df] opacity-25" />
+          <FileCode size={24} className="text-[#7c3aed] opacity-25" />
         </div>
       </div>
 
       {/* CARD 2: ANALYSES COMPLETE */}
-      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1cc88a]" />
         <div className="flex items-center justify-between">
           <div>
@@ -49,7 +49,7 @@ export const MetricsRow: React.FC<MetricsRowProps> = ({
       </div>
 
       {/* CARD 3: PENDING CONVERSIONS */}
-      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#36b9cc]" />
         <div className="flex items-center justify-between">
           <div>
@@ -65,7 +65,7 @@ export const MetricsRow: React.FC<MetricsRowProps> = ({
       </div>
 
       {/* CARD 4: ISSUES/ERRORS */}
-      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+      <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 py-4 px-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#e74a3b]" />
         <div className="flex items-center justify-between">
           <div>

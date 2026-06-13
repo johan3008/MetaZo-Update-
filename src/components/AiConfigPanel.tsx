@@ -48,16 +48,16 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   hasFiles
 }) => {
   return (
-    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm flex flex-col justify-between min-h-[460px] relative overflow-hidden ${
+    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 flex flex-col justify-between min-h-[460px] relative overflow-hidden ${
       mobileTab === 'ai' ? 'flex animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:flex'
     }`}>
       {/* CARD HEADER */}
       <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg flex justify-between items-center">
         <div className="flex items-center space-x-2.5">
-          <div className="w-6.5 h-6.5 rounded-lg bg-[#4e73df] text-white flex items-center justify-center font-black text-xs shadow-sm">
+          <div className="w-6.5 h-6.5 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center font-black text-xs shadow-md shadow-black/5">
             2
           </div>
-          <h3 className="m-0 font-extrabold text-[#4e73df] dark:text-blue-400 text-xs sm:text-sm uppercase tracking-wider">
+          <h3 className="m-0 font-extrabold text-[#7c3aed] dark:text-violet-400 text-xs sm:text-sm uppercase tracking-wider">
             AI Engine Settings
           </h3>
         </div>
@@ -74,10 +74,10 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
             <div className="space-y-2">
               <label className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between">
                 <span>{t.custom_prompt_optional}</span>
-                <span className="text-[8px] text-[#4e73df] font-black lowercase pb-0.5 opacity-75">Prompt anchor</span>
+                <span className="text-[8px] text-[#7c3aed] font-black lowercase pb-0.5 opacity-75">Prompt anchor</span>
               </label>
               <textarea 
-                className="w-full p-4 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/80 dark:border-white/5 outline-none text-xs min-h-[90px] text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df]/80 transition-all resize-none font-medium placeholder-slate-400/70" 
+                className="w-full p-4 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/80 dark:border-white/5 outline-none text-xs min-h-[90px] text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-[#7c3aed]/30 focus:border-[#7c3aed]/80 transition-all resize-none font-medium placeholder-slate-400/70" 
                 value={customPrompt} 
                 onChange={(e) => setCustomPrompt(e.target.value)} 
                 placeholder={t.custom_prompt_placeholder}
@@ -100,7 +100,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     setKeywordCount(num);
                   }
                 }} 
-                className="w-14 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-[#4e73df]/30 outline-none shadow-sm" 
+                className="w-14 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[1.5rem] text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-[#7c3aed]/30 outline-none shadow-md shadow-black/5" 
               />
             </div>
 
@@ -120,9 +120,9 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     key={opt.value}
                     type="button"
                     onClick={() => setKeywordMode(opt.value as 'mixed' | 'single' | 'multi')}
-                    className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-xl border transition-all text-center ${
+                    className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center ${
                       keywordMode === opt.value
-                        ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-md shadow-[#4e73df]/20'
+                        ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-md shadow-[#7c3aed]/20'
                         : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -138,7 +138,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                 <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   AI Creativity
                 </label>
-                <span className="px-3 py-1 bg-white dark:bg-slate-800 text-amber-500 dark:text-amber-400 text-[11px] font-black rounded-lg border border-slate-200 dark:border-white/10 shadow-sm min-w-[36px] text-center font-mono tracking-tighter">
+                <span className="px-3 py-1 bg-white dark:bg-slate-800 text-amber-500 dark:text-amber-400 text-[11px] font-black rounded-2xl border border-slate-200 dark:border-white/10 shadow-md shadow-black/5 min-w-[36px] text-center font-mono tracking-tighter">
                   {aiCreativity.toFixed(1)}
                 </span>
               </div>
@@ -150,7 +150,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                   step="0.1"
                   value={aiCreativity}
                   onChange={(e) => setAiCreativity(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#4e73df] focus:outline-none"
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-2xl appearance-none cursor-pointer accent-[#7c3aed] focus:outline-none"
                 />
               </div>
             </div>
@@ -160,9 +160,9 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
         {/* CONTROLS FLOOR */}
         <div className="space-y-3.5 w-full mt-auto">
           {isLoading && progressInfo && (
-            <div className="p-3 bg-blue-500/5 border border-blue-500/10 dark:border-indigo-500/10 rounded-xl animate-in zoom-in-95 duration-200">
+            <div className="p-3 bg-violet-500/5 border border-violet-500/10 dark:border-indigo-500/10 rounded-[1.5rem] animate-in zoom-in-95 duration-200">
                <div className="flex justify-between text-[9px] font-extrabold uppercase tracking-widest mb-1.5">
-                  <span className="text-blue-600 dark:text-blue-400 flex items-center">
+                  <span className="text-violet-600 dark:text-violet-400 flex items-center">
                     <RefreshCcw size={10} className="animate-spin mr-1.5"/> 
                     {activeTool === ToolType.VIDEO ? "Decoding Frames" : activeTool === ToolType.VECTOR ? "Parsing Vector Data" : "Analyzing Visuals"} {progressInfo.current}/{progressInfo.total}
                   </span>
@@ -170,7 +170,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                </div>
                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-[#4e73df] to-indigo-600 transition-all duration-300 shadow animate-pulse" 
+                    className="h-full bg-gradient-to-r from-[#7c3aed] to-indigo-600 transition-all duration-300 shadow animate-pulse" 
                     style={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
                   />
                 </div>
@@ -181,12 +181,12 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
             <button 
               onClick={() => handleGenerateAll(false)} 
               disabled={isLoading || !filesToGenerateCount} 
-              className={`flex-1 py-3 text-white font-black rounded-xl transition-all shadow flex items-center justify-center space-x-2 transform duration-150 active:scale-[0.98] ${
+              className={`flex-1 py-3 text-white font-black rounded-[1.5rem] transition-all shadow flex items-center justify-center space-x-2 transform duration-150 active:scale-[0.98] ${
                 isLoading && !isPaused 
-                  ? 'bg-blue-500 cursor-not-allowed' 
+                  ? 'bg-violet-500 cursor-not-allowed' 
                   : isPaused 
                     ? 'bg-amber-500' 
-                    : 'bg-[#4e73df] hover:bg-blue-605 shadow-blue-500/15'
+                    : 'bg-[#7c3aed] hover:bg-blue-605 shadow-violet-500/15'
               }`}
             >
               {isLoading ? (
@@ -202,7 +202,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
             {isLoading && (
               <button 
                 onClick={handleStopGeneration}
-                className="px-4 py-3 bg-red-500 hover:bg-red-650 text-white font-black rounded-xl transition-all shadow flex items-center justify-center transform active:scale-[0.98] text-[10px] uppercase tracking-wider animate-pulse"
+                className="px-4 py-3 bg-red-500 hover:bg-red-650 text-white font-black rounded-[1.5rem] transition-all shadow flex items-center justify-center transform active:scale-[0.98] text-[10px] uppercase tracking-wider animate-pulse"
                 title="Stop"
               >
                 <span>STOP</span>
@@ -213,7 +213,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
           {filesWithErrorCount > 0 && !isLoading && (
             <button 
               onClick={() => handleGenerateAll(true)} 
-              className="w-full py-2.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/20 font-black rounded-xl transition-all flex items-center justify-center space-x-2 text-[10px] uppercase tracking-wider"
+              className="w-full py-2.5 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/20 font-black rounded-[1.5rem] transition-all flex items-center justify-center space-x-2 text-[10px] uppercase tracking-wider"
             >
               <RefreshCcw size={11} className="mr-1.5" />
               <span>{t.retry_failed} ({filesWithErrorCount})</span>
@@ -230,7 +230,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                   }
                   setMobileTab('review');
                 }}
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-black rounded-xl flex items-center justify-center space-x-1.5 text-xs uppercase tracking-wider shadow active:scale-[0.98] transition-all"
+                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-black rounded-[1.5rem] flex items-center justify-center space-x-1.5 text-xs uppercase tracking-wider shadow active:scale-[0.98] transition-all"
               >
                 <span>Next: Review & Export</span>
                 <ArrowRight size={13} />

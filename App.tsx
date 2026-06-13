@@ -372,7 +372,7 @@ const CopyBox: React.FC<{
         ? 'focus:ring-purple-500/10 focus:border-purple-500/80 dark:focus:border-purple-400/80' 
         : themeColor === 'emerald' 
             ? 'focus:ring-emerald-500/10 focus:border-emerald-500/80 dark:focus:border-emerald-400/80' 
-            : 'focus:ring-blue-500/10 focus:border-blue-500/80 dark:focus:border-blue-400/80';
+            : 'focus:ring-violet-500/10 focus:border-violet-500/80 dark:focus:border-blue-400/80';
 
     const count = value ? value.length : 0;
     let ratingColor = "bg-slate-300 dark:bg-slate-700";
@@ -400,7 +400,7 @@ const CopyBox: React.FC<{
         <div className="space-y-1.5 group/box relative">
             <div className="flex justify-between items-center px-1">
                 <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">{label}</label>
-                <button onClick={handleCopy} className="p-2 sm:p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-blue-500/12 hover:text-blue-500 dark:hover:text-blue-400 transition-all text-slate-400 dark:text-slate-300 hover:scale-105 active:scale-95 min-w-[32px] min-h-[32px] flex items-center justify-center">
+                <button onClick={handleCopy} className="p-2 sm:p-1.5 rounded-[1.5rem] bg-slate-100/80 dark:bg-slate-800/80 hover:bg-violet-500/12 hover:text-violet-500 dark:hover:text-violet-400 transition-all text-slate-400 dark:text-slate-300 hover:scale-105 active:scale-95 min-w-[32px] min-h-[32px] flex items-center justify-center">
                     {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                 </button>
             </div>
@@ -507,9 +507,9 @@ const KeywordList: React.FC<{
       ? 'focus-within:ring-purple-500/10 focus-within:border-purple-500/80 dark:focus-within:border-purple-400/80' 
       : themeColor === 'emerald' 
           ? 'focus-within:ring-emerald-500/10 focus-within:border-emerald-500/80 dark:focus-within:border-emerald-400/80' 
-          : 'focus-within:ring-blue-500/10 focus-within:border-blue-500/80 dark:focus-within:border-blue-400/80';
+          : 'focus-within:ring-violet-500/10 focus-within:border-violet-500/80 dark:focus-within:border-blue-400/80';
 
-  let borderActiveAccent = themeColor === 'purple' ? 'hover:border-purple-500/60' : themeColor === 'emerald' ? 'hover:border-emerald-500/60' : 'hover:border-blue-500/60';
+  let borderActiveAccent = themeColor === 'purple' ? 'hover:border-purple-500/60' : themeColor === 'emerald' ? 'hover:border-emerald-500/60' : 'hover:border-violet-500/60';
 
   const count = keywords.length;
   let ratingText = "Ideal keyword volume range is 25-45. Standard: 10-49.";
@@ -540,7 +540,7 @@ const KeywordList: React.FC<{
     <div className="space-y-1.5 group/box relative">
       <div className="flex justify-between items-center px-1">
           <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">{label} ({keywords.length})</label>
-          <button onClick={handleCopy} className="p-2 sm:p-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-blue-500/12 hover:text-blue-500 dark:hover:text-blue-400 transition-all text-slate-400 dark:text-slate-300 hover:scale-105 active:scale-95 min-w-[32px] min-h-[32px] flex items-center justify-center">
+          <button onClick={handleCopy} className="p-2 sm:p-1.5 rounded-[1.5rem] bg-slate-100/80 dark:bg-slate-800/80 hover:bg-violet-500/12 hover:text-violet-500 dark:hover:text-violet-400 transition-all text-slate-400 dark:text-slate-300 hover:scale-105 active:scale-95 min-w-[32px] min-h-[32px] flex items-center justify-center">
               {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
           </button>
       </div>
@@ -552,7 +552,7 @@ const KeywordList: React.FC<{
             onDragStart={(e) => handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
-            className={`flex items-center space-x-1 px-3 py-1 bg-white/95 dark:bg-slate-800/90 border border-slate-200/60 dark:border-white/5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-grab active:cursor-grabbing transition-all ${draggedIndex === index ? 'opacity-50 scale-95 shadow-lg' : `hover:shadow-md hover:bg-blue-50/10 dark:hover:bg-slate-800 ${borderActiveAccent}`}`}
+            className={`flex items-center space-x-1 px-3 py-1 bg-white/95 dark:bg-slate-800/90 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-grab active:cursor-grabbing transition-all ${draggedIndex === index ? 'opacity-50 scale-95 shadow-lg' : `hover:shadow-md hover:bg-violet-50/10 dark:hover:bg-slate-800 ${borderActiveAccent}`}`}
           >
             <span>{keyword}</span>
             <button 
@@ -571,9 +571,9 @@ const KeywordList: React.FC<{
         />
       </div>
       {count > 0 && (
-          <div className={`mt-1.5 px-3 py-1.5 rounded-xl border text-[9px] font-bold uppercase tracking-wider flex items-center justify-between transition-colors ${ratingBg}`}>
+          <div className={`mt-1.5 px-3 py-1.5 rounded-[1.5rem] border text-[9px] font-bold uppercase tracking-wider flex items-center justify-between transition-colors ${ratingBg}`}>
               <span className={ratingTextColor}>{ratingText}</span>
-              <span className={`font-mono px-1.5 py-0.5 rounded-md ${count > 49 ? 'bg-red-500 text-white' : count >= 25 && count <= 45 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-100/50 dark:bg-white/5 text-slate-500 dark:text-slate-400'}`}>{count} / 49 tags</span>
+              <span className={`font-mono px-1.5 py-0.5 rounded-xl ${count > 49 ? 'bg-red-500 text-white' : count >= 25 && count <= 45 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-100/50 dark:bg-white/5 text-slate-500 dark:text-slate-400'}`}>{count} / 49 tags</span>
           </div>
       )}
     </div>
@@ -599,7 +599,7 @@ const FilePreview: React.FC<{
       <div className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
         <button 
           onClick={onClose}
-          className="absolute -top-12 right-0 p-2 text-white hover:text-blue-400 transition-colors bg-black/50 rounded-full"
+          className="absolute -top-12 right-0 p-2 text-white hover:text-violet-400 transition-colors bg-black/50 rounded-full"
         >
           <X size={24} />
         </button>
@@ -2508,6 +2508,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
+      <div className="flex flex-1 w-full bg-transparent overflow-hidden relative">
       {/* Sidebar Navigation */}
       <Sidebar 
         activeTool={activeTool} 
@@ -2669,8 +2670,8 @@ const App: React.FC = () => {
                   </p>
                 </div>
                 {/* Live active form formats overlay */}
-                <div className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl font-bold text-xs flex items-center space-x-2 text-slate-500 dark:text-slate-400 shadow-sm">
-                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-blue-500`} />
+                <div className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[1.5rem] font-bold text-xs flex items-center space-x-2 text-slate-500 dark:text-slate-400 shadow-md shadow-black/5">
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-violet-500`} />
                   <span>
                     {activeTool === ToolType.IMAGE && "Supports: JPEG, PNG, WEBP"}
                     {activeTool === ToolType.VIDEO && "Supports: MP4, MOV, WEBM"}
@@ -2688,16 +2689,16 @@ const App: React.FC = () => {
               />
 
               {/* Handheld Segment Switches (Hidden on Desktop) */}
-              <div className="flex lg:hidden w-full bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-white/5">
+              <div className="flex lg:hidden w-full bg-slate-100 dark:bg-slate-900 rounded-[1.5rem] p-1 border border-slate-200 dark:border-white/5">
                 {['upload', 'ai', 'review'].map((tab) => {
                   const label = tab === 'upload' ? '1. Upload' : tab === 'ai' ? '2. AI Config' : '3. Queue';
                   return (
                     <button
                       key={tab}
                       onClick={() => setMobileTab(tab as any)}
-                      className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                      className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-2xl transition-all ${
                         mobileTab === tab 
-                          ? 'bg-[#4e73df] text-white shadow-sm' 
+                          ? 'bg-[#7c3aed] text-white shadow-md shadow-black/5' 
                           : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                       }`}
                     >
@@ -2820,10 +2821,10 @@ const App: React.FC = () => {
       {showWelcomeScreen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/5 text-center flex flex-col items-center">
-            <div className="w-12 h-12 mb-4 bg-[#4e73df] rounded-xl flex items-center justify-center shadow animate-pulse">
+            <div className="w-12 h-12 mb-4 bg-[#7c3aed] rounded-[1.5rem] flex items-center justify-center shadow animate-pulse">
               <Zap className="text-white fill-white" size={24} />
             </div>
-            <h2 className="text-sm font-black text-[#4e73df] mb-2 uppercase">{t.welcome_title}</h2>
+            <h2 className="text-sm font-black text-[#7c3aed] mb-2 uppercase">{t.welcome_title}</h2>
             <p className="text-xs text-slate-500 mb-6 font-semibold bg-emerald-500/5 px-2 py-1 rounded">{t.welcome_subtitle}</p>
             <div className="text-left w-full mb-6">
               <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">{t.welcome_features_label}</p>
@@ -2834,7 +2835,7 @@ const App: React.FC = () => {
                 <li>{t.welcome_feature4}</li>
               </ul>
             </div>
-            <button onClick={handleCloseWelcome} className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-lg text-xs uppercase">{t.welcome_get_started}</button>
+            <button onClick={handleCloseWelcome} className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-bold rounded-2xl text-xs uppercase">{t.welcome_get_started}</button>
           </div>
         </div>
       )}
@@ -2844,19 +2845,19 @@ const App: React.FC = () => {
           <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative" onClick={e => e.stopPropagation()}>
             <button onClick={() => setShowInfoModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
             <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5">
-              <span className="p-1.5 bg-blue-500/10 rounded-lg">
-                <Info size={16} className="text-[#4e73df]" />
+              <span className="p-1.5 bg-violet-500/10 rounded-2xl">
+                <Info size={16} className="text-[#7c3aed]" />
               </span>
               <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.info_modal_title}</h2>
             </div>
             
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 text-xs text-slate-600 dark:text-slate-300 font-semibold leading-relaxed scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent">
               <div>
-                <h3 className="font-extrabold text-[#4e73df] dark:text-blue-400 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_operational_guide}</h3>
+                <h3 className="font-extrabold text-[#7c3aed] dark:text-violet-400 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_operational_guide}</h3>
                 <ol className="space-y-2.5 list-decimal pl-4">
                   <li>
                     <strong className="text-slate-800 dark:text-white">{t.info_modal_step1_title}</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step1_desc_p1} <strong className="text-[#4e73df]">Image</strong>, <strong className="text-purple-500">Video</strong>, {t.common_or} <strong className="text-emerald-500">Vector</strong> {t.info_modal_step1_desc_p2}</p>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_step1_desc_p1} <strong className="text-[#7c3aed]">Image</strong>, <strong className="text-purple-500">Video</strong>, {t.common_or} <strong className="text-emerald-500">Vector</strong> {t.info_modal_step1_desc_p2}</p>
                   </li>
                   <li>
                     <strong className="text-slate-800 dark:text-white">{t.info_modal_step2_title}</strong>
@@ -2864,7 +2865,7 @@ const App: React.FC = () => {
                   </li>
                   <li>
                     <strong className="text-slate-800 dark:text-white">{t.info_modal_step3_title}</strong>
-                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-bold italic text-blue-500 bg-blue-500/5 p-1 rounded">{t.info_modal_step3_desc_highlight}</p>
+                    <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5 font-bold italic text-violet-500 bg-violet-500/5 p-1 rounded">{t.info_modal_step3_desc_highlight}</p>
                     <p className="font-medium text-slate-500 dark:text-slate-400 mt-1">{t.info_modal_step3_desc_main}</p>
                   </li>
                   <li>
@@ -2885,11 +2886,11 @@ const App: React.FC = () => {
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
                 <h3 className="font-extrabold text-emerald-500 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_tips_title}</h3>
                 <div className="grid grid-cols-1 gap-2.5">
-                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
+                  <div className="p-2.5 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
                     <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">{t.info_modal_std_mode_title}</span>
                     <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_std_mode_desc}</p>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
+                  <div className="p-2.5 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-white/5">
                     <span className="font-black text-slate-800 dark:text-white text-[10px] uppercase">{t.info_modal_batch_mode_title}</span>
                     <p className="font-medium text-slate-500 dark:text-slate-400 mt-0.5">{t.info_modal_batch_mode_desc}</p>
                   </div>
@@ -2897,7 +2898,7 @@ const App: React.FC = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
-                <h3 className="font-extrabold text-[#4e73df] dark:text-blue-400 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_trial_premium_title}</h3>
+                <h3 className="font-extrabold text-[#7c3aed] dark:text-violet-400 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_trial_premium_title}</h3>
                 <div className="space-y-2 text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
                     <p><strong className="text-slate-800 dark:text-white">{t.info_modal_trial_mode_label}</strong> {t.info_modal_trial_mode_desc}</p>
                     <p><strong className="text-slate-800 dark:text-white">{t.info_modal_premium_mode_label}</strong> {t.info_modal_premium_mode_desc}</p>
@@ -2906,16 +2907,16 @@ const App: React.FC = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-white/5">
-                <h3 className="font-extrabold text-blue-500 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_supported_formats}</h3>
+                <h3 className="font-extrabold text-violet-500 uppercase tracking-wider mb-2 text-[11px]">{t.info_modal_supported_formats}</h3>
                 <ul className="grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase">
-                  <li className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20">JPEG, PNG, WEBP</li>
-                  <li className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20">MP4, MOV, WEBM</li>
-                  <li className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">SVG, EPS, AI</li>
+                  <li className="p-1.5 rounded-2xl bg-violet-500/10 text-violet-500 border border-violet-500/20">JPEG, PNG, WEBP</li>
+                  <li className="p-1.5 rounded-2xl bg-purple-500/10 text-purple-500 border border-purple-500/20">MP4, MOV, WEBM</li>
+                  <li className="p-1.5 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">SVG, EPS, AI</li>
                 </ul>
               </div>
             </div>
             
-            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-lg text-xs uppercase shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all">{t.info_modal_close_button}</button>
+            <button onClick={() => setShowInfoModal(false)} className="mt-6 w-full py-2 bg-gradient-to-r from-violet-500 to-violet-600 text-white font-bold rounded-2xl text-xs uppercase shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all">{t.info_modal_close_button}</button>
           </div>
         </div>
       )}
@@ -2926,8 +2927,8 @@ const App: React.FC = () => {
             <button onClick={() => setShowSettingsModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={14} /></button>
             
             <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5 shrink-0 select-none">
-              <span className="p-1.5 bg-blue-500/10 rounded-lg">
-                <Settings size={16} className="text-[#4e73df] animate-spin-slow" />
+              <span className="p-1.5 bg-violet-500/10 rounded-2xl">
+                <Settings size={16} className="text-[#7c3aed] animate-spin-slow" />
               </span>
               <div className="flex-1 flex items-center justify-between">
                 <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.settings_modal_title}</h2>
@@ -2944,7 +2945,7 @@ const App: React.FC = () => {
                   setSelectedProvider(val);
                   setActiveSettingsTab(val);
                 }}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
               >
                 {[
                   { id: 'gemini', name: 'Gemini', desc: 'Google AI' },
@@ -2966,7 +2967,7 @@ const App: React.FC = () => {
             <select
               value={activeSettingsTab}
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
-              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all mb-4 shadow-sm"
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
               {(['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
@@ -2988,7 +2989,7 @@ const App: React.FC = () => {
                           setSelectedGeminiModel(val);
                           localStorage.setItem('mz_gemini_model', val);
                       }}
-                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
                       <option value="auto">{t.settings_gemini_model_auto}</option>
                       <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
@@ -3019,7 +3020,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3073,13 +3074,13 @@ const App: React.FC = () => {
                         placeholder="API Key Gemini (AIzaSy...)"
                         value={newGeminiKey}
                         onChange={(e) => setNewGeminiKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('gemini')}
                         disabled={!newGeminiKey.trim()}
-                        className="py-2 px-3 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
+                        className="py-2 px-3 bg-[#7c3aed] hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
                       >
                         <Plus size={12} />
                         <span>Tambah</span>
@@ -3112,7 +3113,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3164,12 +3165,12 @@ const App: React.FC = () => {
                         placeholder="API Key OpenAI (sk-proj...)"
                         value={newOpenaiKey}
                         onChange={(e) => setNewOpenaiKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('openai')}
-                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                        className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
                       </button>
@@ -3201,7 +3202,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3253,12 +3254,12 @@ const App: React.FC = () => {
                         placeholder="API Key Open Router (sk-or...)"
                         value={newOpenrouterKey}
                         onChange={(e) => setNewOpenrouterKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('openrouter')}
-                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                        className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
                       </button>
@@ -3290,7 +3291,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3342,12 +3343,12 @@ const App: React.FC = () => {
                         placeholder="API Key Blackbox AI"
                         value={newBlackboxKey}
                         onChange={(e) => setNewBlackboxKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('blackbox')}
-                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                        className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
                       </button>
@@ -3379,7 +3380,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3431,12 +3432,12 @@ const App: React.FC = () => {
                         placeholder="API Key NVIDIA"
                         value={newNvidiaKey}
                         onChange={(e) => setNewNvidiaKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('nvidia')}
-                        className="px-4 py-2 bg-[#4e73df] hover:bg-[#3d5abf] text-white rounded-xl font-bold uppercase text-[10px] transition-all"
+                        className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
                       >
                         Tambah
                       </button>
@@ -3452,7 +3453,7 @@ const App: React.FC = () => {
                         setSelectedNvidiaModel(val);
                         localStorage.setItem('mz_nvidia_model', val);
                       }}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
                       <option value="stepfun-ai/step-3.5-flash">Stepfun 3.5 Flash (New! - Recommended)</option>
                       <option value="nvidia/llama-3.1-nemotron-70b-instruct">Nemotron 70B (Recommended for SEO)</option>
@@ -3481,7 +3482,7 @@ const App: React.FC = () => {
                           setSelectedGroqModel(val);
                           localStorage.setItem('mz_groq_model', val);
                       }}
-                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
                       <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
                       <option value="llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B Instruct</option>
@@ -3505,7 +3506,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3557,13 +3558,13 @@ const App: React.FC = () => {
                         placeholder="API Key Groq (gsk_...)"
                         value={newGroqKey}
                         onChange={(e) => setNewGroqKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('groq')}
                         disabled={!newGroqKey.trim()}
-                        className="py-2 px-3 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
+                        className="py-2 px-3 bg-[#7c3aed] hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
                       >
                         <Plus size={12} />
                         <span>Tambah</span>
@@ -3596,7 +3597,7 @@ const App: React.FC = () => {
                           const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
                           
                           return (
-                            <div key={keyId} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                               <div className="flex items-center space-x-2.5 min-w-0">
                                 <Key size={12} className="text-slate-400 shrink-0" />
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
@@ -3648,13 +3649,13 @@ const App: React.FC = () => {
                         placeholder="API Key Mistral (mX...)"
                         value={newMistralKey}
                         onChange={(e) => setNewMistralKey(e.target.value)}
-                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs text-slate-80 dark:text-slate-100 placeholder-slate-400 focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => handleAddApiKey('mistral')}
                         disabled={!newMistralKey.trim()}
-                        className="py-2 px-3 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
+                        className="py-2 px-3 bg-[#7c3aed] hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-colors flex items-center space-x-1 shrink-0"
                       >
                         <Plus size={12} />
                         <span>Tambah</span>
@@ -3691,9 +3692,9 @@ const App: React.FC = () => {
               )}
 
               {/* Status Penggunaan info footer */}
-              <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-250 dark:border-slate-800">
+              <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-[1.5rem] border border-slate-250 dark:border-slate-800">
                 <span className="text-slate-500 dark:text-slate-400 font-medium">Status Provider Aktif</span>
-                <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-black text-[9px] uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-violet-500/20 text-blue-700 dark:text-blue-300 font-black text-[9px] uppercase tracking-wider">
                   {selectedProvider.toUpperCase()} PROVIDER
                 </span>
               </div>
@@ -3704,14 +3705,14 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleResetKey}
-                  className="px-4 py-2 bg-red-50 dark:bg-red-500/5 hover:bg-red-100 text-red-600 dark:text-red-450 font-semibold rounded-xl text-xs transition-colors border border-red-200/50 dark:border-red-500/10"
+                  className="px-4 py-2 bg-red-50 dark:bg-red-500/5 hover:bg-red-100 text-red-600 dark:text-red-450 font-semibold rounded-[1.5rem] text-xs transition-colors border border-red-200/50 dark:border-red-500/10"
                 >
                   Hapus Semua
                 </button>
               )}
               <button 
                 onClick={handleSaveKey} 
-                className="flex-1 py-1.5 bg-[#4e73df] hover:bg-blue-600 text-white font-bold rounded-xl text-xs uppercase shadow transition-colors"
+                className="flex-1 py-1.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-bold rounded-[1.5rem] text-xs uppercase shadow transition-colors"
               >
                 Simpan & Pasang
               </button>
@@ -3764,7 +3765,7 @@ const App: React.FC = () => {
               <X size={14} />
             </button>
             <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5">
-              <Lock size={15} className="text-[#4e73df]" />
+              <Lock size={15} className="text-[#7c3aed]" />
               <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Owner / Reseller Access</h2>
             </div>
             
@@ -3786,7 +3787,7 @@ const App: React.FC = () => {
                     handleTryUnlockReseller();
                   }
                 }}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#4e73df] dark:text-white transition-all text-slate-900"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#7c3aed] dark:text-white transition-all text-slate-900"
                 autoFocus
               />
               
@@ -3797,7 +3798,7 @@ const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleTryUnlockReseller()}
-                className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 text-white font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-black text-xs uppercase rounded-[1.5rem] transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>Aktifkan Akses</span>
               </button>
@@ -3822,7 +3823,7 @@ const App: React.FC = () => {
             </div>
             
             <h2 className="text-xl font-black text-slate-800 dark:text-white mb-2 uppercase tracking-tight">Limit Tercapai</h2>
-            <p className="text-base font-bold text-[#4e73df] mb-4">Coba Besok lagi ya</p>
+            <p className="text-base font-bold text-[#7c3aed] mb-4">Coba Besok lagi ya</p>
             
             <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl w-full mb-6 border border-slate-100 dark:border-white/5">
               <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
@@ -3836,7 +3837,7 @@ const App: React.FC = () => {
                 setShowLimitModal(false);
                 setShowActivationModal(true);
               }}
-              className="w-full py-4 bg-gradient-to-r from-[#4e73df] to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-black text-sm uppercase rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-95"
+              className="w-full py-4 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-black text-sm uppercase rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-95"
             >
               <Zap size={16} fill="currentColor" />
               <span>Buka Akses Unlimited</span>
@@ -3851,6 +3852,7 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

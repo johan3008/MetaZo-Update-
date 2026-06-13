@@ -234,7 +234,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
           </p>
         </div>
         
-        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-[1.5rem] text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
           <Layers size={12} className="text-emerald-500 animate-bounce" />
           <span>{t.image_studio_version}</span>
         </div>
@@ -243,7 +243,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Left Column: Upload & Config (4 cols) */}
         <div className="xl:col-span-4 space-y-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-5 space-y-6 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-5 space-y-6 shadow-md shadow-black/5">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -298,7 +298,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                   <button
                     key={opt.id}
                     onClick={() => setStyleCategory(opt.id)}
-                    className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-wide border ${
+                    className={`flex items-center justify-between px-4 py-2.5 rounded-[1.5rem] text-[10px] font-black uppercase transition-all tracking-wide border ${
                       styleCategory === opt.id
                         ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/10'
                         : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5'
@@ -315,7 +315,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
             </div>
 
             {globalError && (
-              <div className="flex items-center space-x-2.5 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-[10px] font-bold text-red-500">
+              <div className="flex items-center space-x-2.5 p-3.5 bg-red-500/10 border border-red-500/20 rounded-[1.5rem] text-[10px] font-bold text-red-500">
                 <AlertCircle size={14} />
                 <span>{globalError}</span>
               </div>
@@ -324,7 +324,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
             <button
               onClick={analyzeBatch}
               disabled={loadingBatch || images.filter(img => !img.result).length === 0}
-              className={`w-full py-3.5 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center space-x-3 transition-all duration-300 relative overflow-hidden ${
+              className={`w-full py-3.5 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center space-x-3 transition-all duration-300 relative overflow-hidden ${
                 loadingBatch || images.filter(img => !img.result).length === 0
                   ? 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-white/5' 
                   : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 active:scale-[0.98]'
@@ -353,7 +353,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
 
         {/* Right Column: Results Dashboard (8 cols) */}
         <div className="xl:col-span-8 space-y-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm min-h-[600px] flex flex-col">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-md shadow-black/5 min-h-[600px] flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-black/20">
               <div className="flex items-center gap-3">
                 <Grid size={16} className="text-emerald-500" />
@@ -376,7 +376,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                           .join('\n\n');
                         copyToClipboard(allPrompts, 'all-batch');
                       }}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                         copiedId === 'all-batch'
                           ? 'bg-emerald-500 text-white'
                           : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
@@ -415,7 +415,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                           <img src={item.data} alt={item.name} className="w-full h-full object-cover" />
                           <button 
                             onClick={() => removeImage(item.id)}
-                            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -452,10 +452,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                               {item.result && (
                                 <button
                                   onClick={() => copyToClipboard(item.result!.prompt, item.id)}
-                                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                                     copiedId === item.id 
                                       ? 'bg-emerald-500 text-white' 
-                                      : 'bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-sm'
+                                      : 'bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-md shadow-black/5'
                                   }`}
                                 >
                                   {copiedId === item.id ? <Check size={12} /> : <Copy size={12} />}
@@ -468,10 +468,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                               <div className="space-y-2 animate-pulse">
                                 <div className="h-3 w-full bg-slate-200 dark:bg-white/5 rounded-full" />
                                 <div className="h-3 w-3/4 bg-slate-200 dark:bg-white/5 rounded-full" />
-                                <div className="h-20 w-full bg-slate-200/50 dark:bg-white/5 rounded-xl mt-4" />
+                                <div className="h-20 w-full bg-slate-200/50 dark:bg-white/5 rounded-[1.5rem] mt-4" />
                               </div>
                             ) : item.error ? (
-                              <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-xl text-[10px] font-bold text-red-500 flex items-center gap-2">
+                              <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-[1.5rem] text-[10px] font-bold text-red-500 flex items-center gap-2">
                                 <AlertCircle size={14} />
                                 <span>{item.error}</span>
                               </div>
@@ -485,7 +485,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                                 </div>
                                 <div className="space-y-1.5">
                                   <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">AI Prompt Optimized</label>
-                                  <div className="p-4 bg-white dark:bg-black/40 rounded-xl border border-slate-100 dark:border-white/5 shadow-inner">
+                                  <div className="p-4 bg-white dark:bg-black/40 rounded-[1.5rem] border border-slate-100 dark:border-white/5 shadow-inner">
                                     <code className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 break-words leading-relaxed">
                                       {item.result.prompt}
                                     </code>
@@ -493,7 +493,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
                                 </div>
                               </div>
                             ) : (
-                              <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/5 rounded-xl py-10 opacity-40">
+                              <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[1.5rem] py-10 opacity-40">
                                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Menunggu Antrian...</p>
                               </div>
                             )}
@@ -507,7 +507,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
             </div>
 
             <div className="px-6 py-4 bg-slate-50 dark:bg-black/40 border-t border-slate-100 dark:border-white/5 flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <div className="p-2 bg-emerald-500/10 rounded-2xl">
                 <Sparkles size={14} className="text-emerald-500" />
               </div>
               <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">

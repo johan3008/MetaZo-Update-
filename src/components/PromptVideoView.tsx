@@ -204,19 +204,19 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
               className="absolute bottom-0 left-0 right-0 bg-slate-100 dark:bg-white/5 overflow-hidden"
             >
               <motion.div 
-                className={`h-full transition-all duration-300 ${isGeneratingPrompts ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'}`}
+                className={`h-full transition-all duration-300 ${isGeneratingPrompts ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-violet-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'}`}
                 style={{ width: `${isGeneratingPrompts ? generationProgress : analysisProgress}%` }}
               />
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
+              <div className="p-3 bg-violet-600 rounded-2xl shadow-lg shadow-violet-600/20">
                 <Video className="text-white" size={28} />
               </div>
               <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.video_studio_title}</h1>
@@ -235,7 +235,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder={t.video_studio_keyword_placeholder}
-                  className="w-full sm:w-80 h-12 pl-12 pr-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-800 dark:text-white"
+                  className="w-full sm:w-80 h-12 pl-12 pr-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
                 />
               </div>
               <div className="flex gap-2">
@@ -243,7 +243,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
                   type="button"
                   disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
                   onClick={(e) => { e.preventDefault(); handleAnalyze(); }}
-                  className="h-12 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
+                  className="h-12 px-6 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-violet-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
                 >
                   {isAnalyzing ? (
                     <>
@@ -343,7 +343,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
             {/* Grid Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-white dark:bg-[#1e293b] p-6 rounded-3xl border border-slate-200 dark:border-white/5 flex items-start space-x-4">
-                <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500 shrink-0">
+                <div className="p-3 bg-violet-500/10 rounded-[1.5rem] text-violet-500 shrink-0">
                   <TrendingUp size={20} />
                 </div>
                 <div>
@@ -353,7 +353,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
               </div>
 
               <div className="bg-white dark:bg-[#1e293b] p-6 rounded-3xl border border-slate-200 dark:border-white/5 flex items-start space-x-4">
-                <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 shrink-0">
+                <div className="p-3 bg-purple-500/10 rounded-[1.5rem] text-purple-500 shrink-0">
                   <Target size={20} />
                 </div>
                 <div className="min-w-0 w-full">
@@ -363,7 +363,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
               </div>
 
               <div className="bg-white dark:bg-[#1e293b] p-6 rounded-3xl border border-slate-200 dark:border-white/5 flex items-start space-x-4">
-                <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 shrink-0">
+                <div className="p-3 bg-emerald-500/10 rounded-[1.5rem] text-emerald-500 shrink-0">
                   <Film size={20} />
                 </div>
                 <div>
@@ -378,7 +378,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
               {/* Market Insight */}
               <div className="bg-white dark:bg-[#1e293b] p-8 rounded-3xl border border-slate-200 dark:border-white/5 space-y-4">
                 <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase flex items-center space-x-2">
-                  <Monitor size={14} className="text-blue-500" />
+                  <Monitor size={14} className="text-violet-500" />
                   <span>Market Insight</span>
                 </h3>
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -411,7 +411,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
                       <button 
                         onClick={handleGenerateHollywoodPrompts}
                         disabled={isGeneratingPrompts}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl transition-all flex items-center space-x-2"
+                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase rounded-[1.5rem] transition-all flex items-center space-x-2"
                       >
                         {isGeneratingPrompts ? <Loader2 size={12} className="animate-spin" /> : <Clapperboard size={12} />}
                         <span>AI Director Prompts</span>
@@ -464,7 +464,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-3">
-                          <span className="w-8 h-8 flex items-center justify-center bg-emerald-500/10 text-emerald-500 text-[10px] font-black rounded-xl">
+                          <span className="w-8 h-8 flex items-center justify-center bg-emerald-500/10 text-emerald-500 text-[10px] font-black rounded-[1.5rem]">
                             {idx + 1}
                           </span>
                           <span className="px-3 py-1 bg-emerald-500/10 text-[10px] font-black text-emerald-400 uppercase tracking-widest rounded-full">{prompt.style} shot</span>
@@ -513,7 +513,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
                         <div className="text-[9px] font-black text-slate-500 uppercase mb-2 flex items-center space-x-1.5">
                           <Terminal size={12} /> <span>{t.video_studio_technical_label}</span>
                         </div>
-                        <div className="p-3 bg-black/60 rounded-xl border border-white/5 group-hover:border-emerald-500/20 transition-colors">
+                        <div className="p-3 bg-black/60 rounded-[1.5rem] border border-white/5 group-hover:border-emerald-500/20 transition-colors">
                           <code className="text-xs text-slate-400 font-mono leading-relaxed block overflow-x-auto whitespace-pre-wrap">
                             {getCombinedPrompt(prompt)}
                           </code>
@@ -552,7 +552,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
                 onClick={() => loadFromHistory(item)}
               >
                 <div className="flex items-center space-x-4 min-w-0">
-                  <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                  <div className={`shrink-0 w-8 h-8 rounded-2xl flex items-center justify-center ${
                     item.result.status === 'LAYAK PRODUKSI' ? 'bg-emerald-500' : 'bg-red-500'
                   }`}>
                     {item.result.status === 'LAYAK PRODUKSI' ? (

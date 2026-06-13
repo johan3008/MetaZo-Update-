@@ -357,7 +357,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           </p>
         </div>
         
-        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 rounded-xl text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
           <Sliders size={12} className="text-emerald-500 animate-pulse" />
           <span>{t.prompt_studio_version}</span>
         </div>
@@ -365,13 +365,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
       <div className="space-y-6">
         {/* Interactive Configuration Panel - ALWAYS FULL WIDTH ON TOP */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/5 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/5 rounded-2xl p-5 sm:p-6 space-y-6 shadow-md shadow-black/5">
           <div className="border-b border-slate-100 dark:border-white/5 pb-3 flex justify-between items-center">
             <h3 className="font-extrabold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
               <Sparkles size={14} className="text-emerald-500" />
               {t.prompt_formula_title}
             </h3>
-            <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-md">
+            <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-xl">
               {t.prompt_engine_active}
             </span>
           </div>
@@ -383,7 +383,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 setPromptMode('background');
                 setStyleCategory('Cinematic');
               }}
-              className={`py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
+              className={`py-3.5 px-4 rounded-[1.5rem] text-xs font-semibold uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
                 promptMode === 'background'
                   ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/10'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -397,7 +397,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 setPromptMode('png');
                 setStyleCategory('3D Render');
               }}
-              className={`py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
+              className={`py-3.5 px-4 rounded-[1.5rem] text-xs font-semibold uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
                 promptMode === 'png'
                   ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/10'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -455,7 +455,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder={t.prompt_subject_placeholder}
-                  className="w-full min-h-[140px] rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all font-medium leading-relaxed resize-y"
+                  className="w-full min-h-[140px] rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all font-medium leading-relaxed resize-y"
                 />
               </div>
 
@@ -473,7 +473,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         setSubject(insp.text);
                         setError(null);
                       }}
-                      className="flex flex-col items-start gap-1 p-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-xl text-left hover:border-emerald-500/50 transition-all duration-200 hover:shadow-md hover:shadow-emerald-500/5 cursor-pointer group"
+                      className="flex flex-col items-start gap-1 p-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] text-left hover:border-emerald-500/50 transition-all duration-200 hover:shadow-md hover:shadow-emerald-500/5 cursor-pointer group"
                     >
                       <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 transition-colors">
                         {insp.label}
@@ -501,14 +501,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     value={bgNegativePrompt}
                     onChange={(e) => setBgNegativePrompt(e.target.value)}
                     placeholder="Contoh: blurry, bad anatomy, text, watermark, ugly..."
-                    className="w-full min-h-[90px] rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
+                    className="w-full min-h-[90px] rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
                   />
                 ) : (
                   <textarea
                     value={pngNegativePrompt}
                     onChange={(e) => setPngNegativePrompt(e.target.value)}
                     placeholder="Contoh: scenery, shadow, realistic background, text..."
-                    className="w-full min-h-[90px] rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
+                    className="w-full min-h-[90px] rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
                   />
                 )}
                 <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium leading-relaxed">
@@ -528,7 +528,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <select
                     value={styleCategory}
                     onChange={(e) => setStyleCategory(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
+                    className="w-full rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
                   >
                     {currentStyleOptions.map((opt) => (
                       <option key={opt.id} value={opt.id} className="dark:bg-slate-950 font-medium">
@@ -556,9 +556,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                           key={opt.id}
                           type="button"
                           onClick={() => setStyleCategory(opt.id)}
-                          className={`px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase transition-all duration-200 flex items-center gap-1.5 border cursor-pointer ${
+                          className={`px-3 py-2 rounded-[1.5rem] text-[10px] font-extrabold uppercase transition-all duration-200 flex items-center gap-1.5 border cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-sm font-semibold scale-[1.02]'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-md shadow-black/5 font-semibold scale-[1.02]'
                               : 'bg-slate-50 dark:bg-black/15 text-slate-500 dark:text-slate-400 border-slate-200/60 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5'
                           }`}
                         >
@@ -573,7 +573,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
               {/* PNG Background Dropdown Option - Only visible when promptMode === 'png' */}
               {promptMode === 'png' && (
-                <div className="space-y-3 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-3 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-[1.5rem] animate-in fade-in slide-in-from-top-2 duration-300">
                   <label className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
                     <span>{t.prompt_png_bg_label}</span>
                     <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 rounded font-semibold font-mono">PNG Style</span>
@@ -583,7 +583,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     <select
                       value={pngBgColor}
                       onChange={(e) => setPngBgColor(e.target.value as any)}
-                      className="w-full rounded-xl border border-emerald-550/20 dark:border-emerald-500/30 bg-white dark:bg-slate-950 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
+                      className="w-full rounded-[1.5rem] border border-emerald-550/20 dark:border-emerald-500/30 bg-white dark:bg-slate-950 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
                     >
                       <option value="white">{t.prompt_png_bg_white}</option>
                       <option value="black">{t.prompt_png_bg_black}</option>
@@ -603,10 +603,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               )}
 
               {/* 3. Variation Slider (Determines count of generated prompts: 10 to 150) */}
-              <div className="space-y-3 bg-slate-50/50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
+              <div className="space-y-3 bg-slate-50/50 dark:bg-black/10 p-4 rounded-[1.5rem] border border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                   <span className="text-slate-550 dark:text-slate-400">{t.prompt_variation_label}</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/25 px-2.5 py-1 rounded-md text-xs font-semibold font-mono">
+                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/25 px-2.5 py-1 rounded-xl text-xs font-semibold font-mono">
                     {variation} {t.prompt_variation_unit}
                   </span>
                 </div>
@@ -618,7 +618,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   step="5"
                   value={variation}
                   onChange={(e) => setVariation(parseInt(e.target.value, 10))}
-                  className="w-full h-2 bg-slate-200 dark:bg-zinc-850 rounded-lg appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
+                  className="w-full h-2 bg-slate-200 dark:bg-zinc-850 rounded-2xl appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
                 />
                 
                 <div className="flex justify-between text-[10px] text-slate-450 dark:text-slate-500 font-bold border-t border-slate-100 dark:border-white/5 pt-2 mt-1 items-center">
@@ -634,7 +634,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
 
               {/* 4. Word Count Range Sliders */}
-              <div className="space-y-4 bg-slate-50/50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
+              <div className="space-y-4 bg-slate-50/50 dark:bg-black/10 p-4 rounded-[1.5rem] border border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                   <span className="text-slate-550 dark:text-slate-400">{t.prompt_word_count_label}</span>
                   <div className="flex items-center gap-1.5">
@@ -655,7 +655,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       step="5"
                       value={minWords}
                       onChange={(e) => setMinWords(parseInt(e.target.value, 10))}
-                      className="w-full h-1.5 bg-slate-200 dark:bg-zinc-850 rounded-lg appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
+                      className="w-full h-1.5 bg-slate-200 dark:bg-zinc-850 rounded-2xl appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
                     />
                   </div>
 
@@ -671,7 +671,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       step="5"
                       value={maxWords}
                       onChange={(e) => setMaxWords(parseInt(e.target.value, 10))}
-                      className="w-full h-1.5 bg-slate-200 dark:bg-zinc-850 rounded-lg appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
+                      className="w-full h-1.5 bg-slate-200 dark:bg-zinc-850 rounded-2xl appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -685,7 +685,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
           {/* Display potential error messages */}
           {error && (
-            <div className="flex items-center space-x-2.5 p-3.5 bg-red-550/10 border border-red-500/20 rounded-xl text-xs font-bold text-red-550 dark:text-red-400 animate-bounce">
+            <div className="flex items-center space-x-2.5 p-3.5 bg-red-550/10 border border-red-500/20 rounded-[1.5rem] text-xs font-bold text-red-550 dark:text-red-400 animate-bounce">
               <AlertCircle size={15} />
               <span>{error}</span>
             </div>
@@ -696,7 +696,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
             <button
               onClick={handleGenerate}
               disabled={loading || !subject.trim()}
-              className={`w-full py-4 rounded-xl font-semibold text-xs tracking-wider flex items-center justify-center space-x-2 transition-all duration-300 ${
+              className={`w-full py-4 rounded-[1.5rem] font-semibold text-xs tracking-wider flex items-center justify-center space-x-2 transition-all duration-300 ${
                 loading 
                   ? 'bg-slate-205 dark:bg-white/5 text-slate-400 cursor-not-allowed' 
                   : !subject.trim()
@@ -723,7 +723,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         <div id="prompt-output-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Main prompt output panel */}
-          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 sm:p-6 text-slate-800 dark:text-slate-100 shadow-sm space-y-5">
+          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 sm:p-6 text-slate-800 dark:text-slate-100 shadow-md shadow-black/5 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800 pb-4 gap-3">
               <div>
                 <h3 className="text-sm sm:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
@@ -791,7 +791,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     setCurrentPage(1);
                   }}
                   placeholder={t.prompt_output_search_placeholder}
-                  className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl py-2 pl-9 pr-8 text-xs font-medium text-slate-800 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-550 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-[1.5rem] py-2 pl-9 pr-8 text-xs font-medium text-slate-800 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-550 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono"
                 />
                 {searchQuery && (
                   <button
@@ -830,7 +830,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 <div className="grid grid-cols-1 w-full gap-3 mt-6">
                   {[1, 2, 3].map(i => (
-                    <div key={`prompt-skel-${i}`} className="h-16 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-xl animate-pulse" />
+                    <div key={`prompt-skel-${i}`} className="h-16 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] animate-pulse" />
                   ))}
                 </div>
               </div>
@@ -839,7 +839,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 
                 {/* No filter matching message */}
                 {totalPrompts === 0 && (
-                  <div className="py-12 text-center text-slate-500 space-y-1 border border-dashed border-white/5 rounded-xl">
+                  <div className="py-12 text-center text-slate-500 space-y-1 border border-dashed border-white/5 rounded-[1.5rem]">
                     <Search className="mx-auto text-slate-600 mb-2" size={20} />
                     <p className="text-xs font-bold uppercase tracking-wider">{t.prompt_output_no_match_title}</p>
                     <p className="text-[10px]">{t.prompt_output_no_match_desc.replace('{query}', searchQuery).replace('{count}', result.prompts.length.toString())}</p>
@@ -855,7 +855,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     return (
                       <div 
                         key={globalIdx}
-                        className="bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-white/5 rounded-xl p-4 sm:p-5 hover:border-emerald-500/30 transition-all duration-200 group flex items-start justify-between gap-4"
+                        className="bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] p-4 sm:p-5 hover:border-emerald-500/30 transition-all duration-200 group flex items-start justify-between gap-4"
                       >
                         <p className="text-xs sm:text-xs md:text-sm font-mono font-medium text-slate-700 dark:text-slate-300 leading-relaxed break-words select-all whitespace-pre-wrap group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors flex-1">
                           <span className="text-slate-400 dark:text-slate-500 font-bold mr-2">{globalIdx + 1}.</span>
@@ -864,7 +864,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                         <button
                           onClick={() => copySinglePrompt(promptText, globalIdx)}
-                          className={`p-1.5 rounded-lg transition-all flex items-center justify-center gap-1 text-[10px] font-semibold uppercase cursor-pointer shrink-0 ${
+                          className={`p-1.5 rounded-2xl transition-all flex items-center justify-center gap-1 text-[10px] font-semibold uppercase cursor-pointer shrink-0 ${
                             isCopied 
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                               : 'bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 border border-slate-200 dark:border-white/10'
@@ -881,7 +881,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 {/* Pagination Toolbar */}
                 {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-slate-200/60 dark:border-white/5 gap-3.5">
+                  <div className="flex flex-col sm:flex-row items-center justify-between bg-zinc-50 dark:bg-black/20 p-3 rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 gap-3.5">
                     <div className="flex items-center space-x-2 text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase font-mono">
                       <span>Tampilkan</span>
                       <select
@@ -904,7 +904,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       <button
                         onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
                         disabled={currentPage === 1}
-                        className={`p-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer ${
+                        className={`p-1.5 rounded-2xl border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer ${
                           currentPage === 1 ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''
                         }`}
                       >
@@ -918,7 +918,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       <button
                         onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
                         disabled={currentPage === totalPages}
-                        className={`p-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer ${
+                        className={`p-1.5 rounded-2xl border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer ${
                           currentPage === totalPages ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''
                         }`}
                       >
@@ -948,7 +948,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         <span>{copiedNegative ? 'Copied' : 'Copy'}</span>
                       </button>
                     </div>
-                    <div className="p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-mono leading-relaxed select-all text-slate-600 dark:text-slate-400 max-h-[80px] overflow-y-auto">
+                    <div className="p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-[1.5rem] text-[11px] font-mono leading-relaxed select-all text-slate-600 dark:text-slate-400 max-h-[80px] overflow-y-auto">
                       {result.negativePrompt}
                     </div>
                   </div>
@@ -974,7 +974,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
             ) : (
               <div className="py-32 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-4 text-slate-400 dark:text-slate-500 shadow-sm border border-slate-100 dark:border-white/5">
+                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-4 text-slate-400 dark:text-slate-500 shadow-md shadow-black/5 border border-slate-100 dark:border-white/5">
                   <Sparkles size={24} />
                 </div>
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Awaiting Input</h4>
@@ -986,7 +986,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           </div>
 
           {/* Simple Memory/Local Storage Logs */}
-          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 shadow-md shadow-black/5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2.5">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <RefreshCw size={12} className="text-slate-400" />
@@ -1026,7 +1026,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       setCurrentPage(1);
                       document.getElementById('prompt-output-section')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="p-3 bg-slate-50/50 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-black/45 border border-slate-200/60 dark:border-white/5 rounded-xl cursor-pointer text-left transition-all duration-200 flex justify-between items-start gap-3 hover:scale-[1.01]"
+                    className="p-3 bg-slate-50/50 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-black/45 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] cursor-pointer text-left transition-all duration-200 flex justify-between items-start gap-3 hover:scale-[1.01]"
                   >
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center space-x-1.5">
@@ -1043,7 +1043,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     </div>
                     <button
                       onClick={(e) => handleDeleteHistoryItem(item.id, e)}
-                      className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-red-500 rounded-2xl transition-colors cursor-pointer"
                       title="Hapus riwayat ini"
                     >
                       <Trash2 size={12} />

@@ -114,7 +114,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       
       {/* 1. HERO GRADIENT WELCOME BAR */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#4e73df] via-[#3a5ec5] to-[#224abe] text-white p-6 sm:p-8 shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#7c3aed] via-[#3a5ec5] to-[#224abe] text-white p-6 sm:p-8 shadow-xl">
         <div className="absolute right-0 bottom-0 top-0 w-2/5 opacity-10 pointer-events-none">
           <svg className="w-full h-full text-white" viewBox="0 0 100 100" preserveAspectRatio="none">
             <polygon points="0,100 100,0 100,100" fill="currentColor" />
@@ -139,12 +139,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button 
               onClick={() => setShowInfoModal(true)}
-              className="px-4 py-2 bg-emerald-400 text-slate-900 font-extrabold text-xs rounded-xl shadow-lg hover:bg-emerald-300 hover:scale-[1.03] transition-all flex items-center space-x-1.5 uppercase cursor-pointer"
+              className="px-4 py-2 bg-emerald-400 text-slate-900 font-extrabold text-xs rounded-[1.5rem] shadow-lg hover:bg-emerald-300 hover:scale-[1.03] transition-all flex items-center space-x-1.5 uppercase cursor-pointer"
             >
               <BookOpen size={14} />
               <span>{t.hero_cta_how}</span>
             </button>
-            <div className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 select-none text-white font-extrabold text-xs rounded-xl transition-all flex items-center space-x-1.5 uppercase">
+            <div className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 select-none text-white font-extrabold text-xs rounded-[1.5rem] transition-all flex items-center space-x-1.5 uppercase">
               <ShieldCheck size={14} className="text-emerald-300" />
               <span>{generationMode.toUpperCase()} ({totalFiles} {t.hero_stats_file})</span>
             </div>
@@ -186,7 +186,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/30 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-sm shadow-amber-500/5 select-none">
+        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/30 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-md shadow-black/5 shadow-amber-500/5 select-none">
           {!isLicensed && (
             <div className="flex items-start space-x-4">
               <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-1">
@@ -225,25 +225,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2">
-            <Activity size={16} className="text-[#4e73df]" />
+            <Activity size={16} className="text-[#7c3aed]" />
             <span>{t.workspace_title}</span>
           </h3>
-          <span className="text-[10px] font-black text-[#4e73df] uppercase tracking-widest bg-[#4e73df]/5 border border-[#4e73df]/10 px-2 py-0.5 rounded-md">{t.workspace_modes}</span>
+          <span className="text-[10px] font-black text-[#7c3aed] uppercase tracking-widest bg-[#7c3aed]/5 border border-[#7c3aed]/10 px-2 py-0.5 rounded-xl">{t.workspace_modes}</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           
           {/* Card 1: Image Workspace */}
-          <div className="group bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-white/5 p-5 shadow-sm hover:shadow-xl hover:border-[#4e73df]/30 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+          <div className="group bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-white/5 p-5 shadow-md shadow-black/5 hover:shadow-xl hover:border-[#7c3aed]/30 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
             <div className="absolute right-4 top-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
-              <ImageIcon size={72} className="text-[#4e73df]" />
+              <ImageIcon size={72} className="text-[#7c3aed]" />
             </div>
             
             <div>
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-4 border border-blue-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-[1.5rem] bg-violet-500/10 text-violet-500 flex items-center justify-center mb-4 border border-violet-500/20 group-hover:scale-105 transition-transform">
                 <ImageIcon size={18} />
               </div>
-              <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-[#4e73df] transition-colors">
+              <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-[#7c3aed] transition-colors">
                 {t.image_ws_title}
               </h4>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
@@ -254,10 +254,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>{t.daily_quota}</span>
-                    <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#4e73df]"}>{imageDailyCount}/30</span>
+                    <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#7c3aed]"}>{imageDailyCount}/30</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= 30 ? 'bg-red-550' : 'bg-[#4e73df]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 30) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= 30 ? 'bg-red-550' : 'bg-[#7c3aed]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 30) * 100)}%` }} />
                   </div>
                   {imageDailyCount >= 30 && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
@@ -268,20 +268,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button 
               onClick={() => setActiveTool(ToolType.IMAGE)}
-              className="w-full py-2 bg-[#4e73df] hover:bg-blue-600 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
+              className="w-full py-2 bg-[#7c3aed] hover:bg-violet-600 text-white font-extrabold text-[11px] rounded-[1.5rem] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-black/5 hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
               <span>{t.image_ws_cta}</span>
             </button>
           </div>
 
           {/* Card 2: Video Workspace */}
-          <div className="group bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-white/5 p-5 shadow-sm hover:shadow-xl hover:border-purple-500/30 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+          <div className="group bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-white/5 p-5 shadow-md shadow-black/5 hover:shadow-xl hover:border-purple-500/30 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
             <div className="absolute right-4 top-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
               <Film size={72} className="text-purple-500" />
             </div>
             
             <div>
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4 border border-purple-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-[1.5rem] bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4 border border-purple-500/20 group-hover:scale-105 transition-transform">
                 <Film size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-purple-500 transition-colors">
@@ -309,20 +309,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button 
               onClick={() => setActiveTool(ToolType.VIDEO)}
-              className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
+              className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] rounded-[1.5rem] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-black/5 hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
               <span>{t.video_ws_cta}</span>
             </button>
           </div>
 
           {/* Card 3: Vector Workspace */}
-          <div className="group bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-white/5 p-5 shadow-sm hover:shadow-xl hover:border-emerald-500/30 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+          <div className="group bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-white/5 p-5 shadow-md shadow-black/5 hover:shadow-xl hover:border-emerald-500/30 transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
             <div className="absolute right-4 top-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
               <FileCode size={72} className="text-emerald-500" />
             </div>
             
             <div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-4 border border-emerald-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-[1.5rem] bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-4 border border-emerald-500/20 group-hover:scale-105 transition-transform">
                 <FileCode size={18} />
               </div>
               <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight group-hover:text-emerald-500 transition-colors">
@@ -350,7 +350,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button 
               onClick={() => setActiveTool(ToolType.VECTOR)}
-              className="w-full py-2 bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-sm hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
+              className="w-full py-2 bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-[11px] rounded-[1.5rem] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-black/5 hover:shadow group-hover:translate-x-1 hover:scale-[1.01] cursor-pointer"
             >
               <span>{t.vector_ws_cta}</span>
             </button>
@@ -363,10 +363,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* STATS PANEL */}
-        <div className="lg:col-span-1 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/5 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-1 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/5 rounded-3xl p-5 shadow-md shadow-black/5 flex flex-col justify-between">
           <div>
             <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2 mb-4 pb-2 border-b border-slate-100 dark:border-white/5">
-              <BarChart2 size={15} className="text-blue-500" />
+              <BarChart2 size={15} className="text-violet-500" />
               <span>{t.queue_status_title}</span>
             </h3>
 
@@ -381,7 +381,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
-                  <span className="w-2 h-2 rounded-full bg-[#4e73df]" />
+                  <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
                   <span>{t.status_ready}</span>
                 </div>
                 <span className="text-xs font-black text-slate-850 dark:text-slate-200">{filesToGenerateCount} {t.hero_stats_file}</span>
@@ -418,7 +418,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* FILE DISTRIBUTION GRID */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/5 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-white/5 rounded-3xl p-5 shadow-md shadow-black/5 flex flex-col justify-between">
           <div>
             <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2 mb-4 pb-2 border-b border-slate-100 dark:border-white/5">
               <Zap size={14} className="text-emerald-500 animate-pulse" />
@@ -435,11 +435,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    <span className="flex items-center space-x-2"><ImageIcon size={14} className="text-blue-500" /> <span>{t.dist_image_label}</span></span>
+                    <span className="flex items-center space-x-2"><ImageIcon size={14} className="text-violet-500" /> <span>{t.dist_image_label}</span></span>
                     <span>{imageFilesCount} {t.hero_stats_file} ({Math.round((imageFilesCount / totalFiles) * 100)}%)</span>
                   </div>
-                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-lg transition-all" style={{ width: `${(imageFilesCount / totalFiles) * 100}%` }} />
+                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden">
+                    <div className="h-full bg-violet-500 rounded-2xl transition-all" style={{ width: `${(imageFilesCount / totalFiles) * 100}%` }} />
                   </div>
                 </div>
 
@@ -448,8 +448,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="flex items-center space-x-2"><Film size={14} className="text-purple-500" /> <span>{t.dist_video_label}</span></span>
                     <span>{videoFilesCount} {t.hero_stats_file} ({Math.round((videoFilesCount / totalFiles) * 100)}%)</span>
                   </div>
-                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
-                    <div className="h-full bg-purple-500 rounded-lg transition-all" style={{ width: `${(videoFilesCount / totalFiles) * 100}%` }} />
+                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-2xl transition-all" style={{ width: `${(videoFilesCount / totalFiles) * 100}%` }} />
                   </div>
                 </div>
 
@@ -458,8 +458,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="flex items-center space-x-2"><FileCode size={14} className="text-emerald-500" /> <span>{t.dist_vector_label}</span></span>
                     <span>{vectorFilesCount} {t.hero_stats_file} ({Math.round((vectorFilesCount / totalFiles) * 100)}%)</span>
                   </div>
-                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-lg transition-all" style={{ width: `${(vectorFilesCount / totalFiles) * 100}%` }} />
+                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-2xl transition-all" style={{ width: `${(vectorFilesCount / totalFiles) * 100}%` }} />
                   </div>
                 </div>
               </div>
@@ -469,7 +469,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="grid grid-cols-5 gap-2 pt-4 border-t border-slate-100 dark:border-white/5 text-center">
             {/* Stock portal integration statuses */}
             {['Adobe Stock', 'Shutterstock', 'Freepik', 'Vecteezy', 'Canva'].map((portal, idx) => (
-              <div key={portal} className="p-1 px-1.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5">
+              <div key={portal} className="p-1 px-1.5 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5">
                 <span className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase truncate">{portal}</span>
                 <span className="inline-flex items-center space-x-1 mt-0.5 text-[8px] font-bold text-emerald-500 uppercase">
                   <span className="w-1 h-1 rounded-full bg-emerald-500" />

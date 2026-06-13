@@ -28,7 +28,7 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
   onChange
 }) => {
   const [copied, setCopied] = React.useState(false);
-  const colorClass = themeColor === 'blue' ? 'border-[#4e73df] hover:border-blue-600' : themeColor === 'purple' ? 'border-purple-500 hover:border-purple-650' : 'border-emerald-500 hover:border-emerald-650';
+  const colorClass = themeColor === 'blue' ? 'border-[#7c3aed] hover:border-violet-600' : themeColor === 'purple' ? 'border-purple-500 hover:border-purple-650' : 'border-emerald-500 hover:border-emerald-650';
 
   const handleCopy = async () => {
     const success = await copyToClipboard(value);
@@ -49,21 +49,21 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
         <label>{label}</label>
         <div className="flex items-center space-x-2">
           {showLengthRating && <span className={`${ratingColor} font-black uppercase`}>{len} chars ({ratingText})</span>}
-          <button onClick={handleCopy} className="text-[#4e73df] dark:text-blue-400 font-extrabold hover:underline lowercase">{copied ? 'copied!' : 'copy'}</button>
+          <button onClick={handleCopy} className="text-[#7c3aed] dark:text-violet-400 font-extrabold hover:underline lowercase">{copied ? 'copied!' : 'copy'}</button>
         </div>
       </div>
       {isTextArea ? (
         <textarea
           value={safeValue}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full p-2.5 bg-slate-100/50 dark:bg-black/25 rounded-xl border border-slate-200/85 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-200 transition-all font-semibold resize-none min-h-[65px] focus:ring-2 focus:ring-[#4e73df]/20`}
+          className={`w-full p-2.5 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/85 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-200 transition-all font-semibold resize-none min-h-[65px] focus:ring-2 focus:ring-[#7c3aed]/20`}
         />
       ) : (
         <input
           type="text"
           value={safeValue}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full p-2.5 bg-slate-100/55 dark:bg-black/25 rounded-xl border border-slate-200 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-300 transition-all font-extrabold focus:ring-2 focus:ring-[#4e73df]/20`}
+          className={`w-full p-2.5 bg-slate-100/55 dark:bg-black/25 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-300 transition-all font-extrabold focus:ring-2 focus:ring-[#7c3aed]/20`}
         />
       )}
     </div>
@@ -109,8 +109,8 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     }
   }, [keywords, onChange]);
 
-  const badgeClass = themeColor === 'blue' ? 'bg-blue-500/10 text-[#4e73df]' : themeColor === 'purple' ? 'bg-purple-500/10 text-purple-600' : 'bg-emerald-500/10 text-emerald-600';
-  const buttonColorClass = themeColor === 'blue' ? 'text-[#4e73df] hover:text-blue-600' : themeColor === 'purple' ? 'text-purple-600 hover:text-purple-750' : 'text-emerald-600 hover:text-emerald-700';
+  const badgeClass = themeColor === 'blue' ? 'bg-violet-500/10 text-[#7c3aed]' : themeColor === 'purple' ? 'bg-purple-500/10 text-purple-600' : 'bg-emerald-500/10 text-emerald-600';
+  const buttonColorClass = themeColor === 'blue' ? 'text-[#7c3aed] hover:text-violet-600' : themeColor === 'purple' ? 'text-purple-600 hover:text-purple-750' : 'text-emerald-600 hover:text-emerald-700';
 
   const handleCopy = async () => {
     const success = await copyToClipboard(keywords.join(', '));
@@ -248,7 +248,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           </button>
         </div>
       </div>
-      <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-xl border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
+      <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
         <AnimatePresence mode="popLayout">
           {keywords.map((kw, index) => (
             <motion.span 
@@ -328,15 +328,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
       {[1, 2, 3].map((i) => (
         <div key={`queue-skel-${i}`} className="bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 animate-pulse flex flex-col space-y-4">
           <div className="flex items-start space-x-3">
-            <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-xl shrink-0" />
+            <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-[1.5rem] shrink-0" />
             <div className="flex-1 space-y-2 pt-1">
               <div className="w-1/2 h-3 bg-slate-200 dark:bg-slate-800 rounded-full" />
               <div className="w-1/4 h-2 bg-slate-200 dark:bg-slate-800 rounded-full opacity-50" />
             </div>
           </div>
           <div className="space-y-3 pt-2">
-            <div className="w-full h-10 bg-slate-200 dark:bg-slate-800 rounded-xl" />
-            <div className="w-[85%] h-12 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+            <div className="w-full h-10 bg-slate-200 dark:bg-slate-800 rounded-[1.5rem]" />
+            <div className="w-[85%] h-12 bg-slate-200 dark:bg-slate-800 rounded-[1.5rem]" />
           </div>
         </div>
       ))}
@@ -354,21 +354,21 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   });
 
   return (
-    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-lg shadow-sm overflow-hidden relative ${
+    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 overflow-hidden relative ${
       mobileTab === 'review' ? 'block animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:block'
     }`}>
       {/* HEADER */}
       <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg flex justify-between items-center">
         <div className="flex items-center space-x-2.5">
-          <div className="w-6.5 h-6.5 rounded-lg bg-[#4e73df] text-white flex items-center justify-center font-black text-xs shadow-sm">
+          <div className="w-6.5 h-6.5 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center font-black text-xs shadow-md shadow-black/5">
             3
           </div>
-          <h3 className="m-0 font-extrabold text-[#4e73df] dark:text-blue-400 text-xs sm:text-sm uppercase tracking-wider">
+          <h3 className="m-0 font-extrabold text-[#7c3aed] dark:text-violet-400 text-xs sm:text-sm uppercase tracking-wider">
             Review & Refine Queue
           </h3>
         </div>
         {canDownload && (
-          <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/15 text-[9px] font-black rounded-lg uppercase tracking-wider">
+          <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/15 text-[9px] font-black rounded-2xl uppercase tracking-wider">
             Ready to Export
           </div>
         )}
@@ -380,15 +380,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
         </p>
 
         {searchQuery && (
-          <div className="mb-4 text-[10px] bg-blue-500/5 text-[#4e73df] py-1.5 px-3 rounded-lg border border-blue-500/10 flex items-center justify-between">
+          <div className="mb-4 text-[10px] bg-violet-500/5 text-[#7c3aed] py-1.5 px-3 rounded-2xl border border-violet-500/10 flex items-center justify-between">
             <span>Filtering for &ldquo;<strong>{searchQuery}</strong>&rdquo;</span>
-            <button onClick={() => setSearchQuery('')} className="font-extrabold underline hover:text-blue-600">Clear Search</button>
+            <button onClick={() => setSearchQuery('')} className="font-extrabold underline hover:text-violet-600">Clear Search</button>
           </div>
         )}
 
         {isAllFinished && successfulFilesCount > 0 && (
-          <div className="mb-6 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 flex items-center space-x-3.5 animate-in slide-in-from-top-3 duration-300">
-            <div className="w-9 h-9 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-600">
+          <div className="mb-6 bg-emerald-500/5 border border-emerald-500/20 rounded-[1.5rem] p-4 flex items-center space-x-3.5 animate-in slide-in-from-top-3 duration-300">
+            <div className="w-9 h-9 bg-emerald-500/20 rounded-[1.5rem] flex items-center justify-center text-emerald-600">
               <CheckCircle2 size={16} />
             </div>
             <div>
@@ -409,11 +409,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                 className="space-y-6"
               >
                 {progressInfo && (
-                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 flex flex-col space-y-3 mb-6">
+                  <div className="bg-violet-500/5 border border-violet-500/20 rounded-[1.5rem] p-4 flex flex-col space-y-3 mb-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <Loader2 size={14} className="text-blue-500 animate-spin" />
-                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider">
+                        <Loader2 size={14} className="text-violet-500 animate-spin" />
+                        <span className="text-[10px] font-black uppercase text-violet-500 tracking-wider">
                           Processing Batch {progressInfo.current}/{progressInfo.total}
                         </span>
                       </div>
@@ -423,7 +423,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     </div>
                     <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                       <motion.div 
-                        className="h-full bg-blue-500"
+                        className="h-full bg-violet-500"
                         initial={{ width: 0 }}
                         animate={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
                       />
@@ -469,11 +469,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                   {file.isGenerating && (
                     <div className="absolute inset-0 bg-white/95 dark:bg-[#111827]/95 flex flex-col items-center justify-center z-20 space-y-3 rounded-2xl backdrop-blur-[2px]">
                       <div className="relative">
-                        <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse" />
-                        <Loader2 size={32} className="text-[#4e73df] animate-spin relative" />
+                        <div className="absolute inset-0 bg-violet-500/20 blur-xl rounded-full animate-pulse" />
+                        <Loader2 size={32} className="text-[#7c3aed] animate-spin relative" />
                       </div>
                       <div className="text-center">
-                        <h5 className="text-[10px] font-black text-[#4e73df] dark:text-blue-400 uppercase tracking-[0.2em] animate-pulse">Analyzing Visual Spectrum</h5>
+                        <h5 className="text-[10px] font-black text-[#7c3aed] dark:text-violet-400 uppercase tracking-[0.2em] animate-pulse">Analyzing Visual Spectrum</h5>
                         <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Metagen is identifying semantic identifiers...</p>
                       </div>
                     </div>
@@ -496,15 +496,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     <button
                       onClick={() => handleRegenerateFile(file)}
                       disabled={file.isGenerating || file.isExtracting}
-                      className="p-1.5 bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/15 text-slate-400 hover:text-blue-500 disabled:opacity-40 rounded-lg transition-all border border-slate-200 dark:border-slate-700 hover:border-blue-500/20 focus:outline-none cursor-pointer"
+                      className="p-1.5 bg-slate-100 hover:bg-violet-50 dark:bg-slate-800 dark:hover:bg-blue-950/15 text-slate-400 hover:text-violet-500 disabled:opacity-40 rounded-2xl transition-all border border-slate-200 dark:border-slate-700 hover:border-violet-500/20 focus:outline-none cursor-pointer"
                       title="Regenerate metadata for this asset"
                     >
-                      <Sparkles size={12} className={file.isGenerating ? "animate-spin text-blue-500" : ""} />
+                      <Sparkles size={12} className={file.isGenerating ? "animate-spin text-violet-500" : ""} />
                     </button>
                   )}
                   <button 
                     onClick={() => handleDeleteFile(file.id)}
-                    className="p-1.5 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/15 text-slate-400 hover:text-red-500 rounded-lg transition-all border border-slate-200 dark:border-slate-700 hover:border-red-500/20 focus:outline-none"
+                    className="p-1.5 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/15 text-slate-400 hover:text-red-500 rounded-2xl transition-all border border-slate-200 dark:border-slate-700 hover:border-red-500/20 focus:outline-none"
                     title="Delete asset"
                   >
                     <Trash2 size={12} />
@@ -518,7 +518,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     </div>
                     <div 
                       onClick={() => setPreviewFile(file)}
-                      className={`w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 shrink-0 cursor-pointer hover:ring-2 hover:ring-[#4e73df]/50 hover:scale-[1.02] transition-all shadow-sm ${file.isGenerating || file.isExtracting ? 'opacity-80' : ''}`}
+                      className={`w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 shrink-0 cursor-pointer hover:ring-2 hover:ring-[#7c3aed]/50 hover:scale-[1.02] transition-all shadow-md shadow-black/5 ${file.isGenerating || file.isExtracting ? 'opacity-80' : ''}`}
                     >
                       {file.file.type.startsWith('video/') && file.analysisFrames && file.analysisFrames.length >= 3 ? (
                         <div className="relative w-full h-full">
@@ -549,15 +549,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                       />
                       <div className="mt-1.5 pb-1 flex flex-wrap gap-1.5 items-center">
                         {file.error ? (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-[9px] font-black uppercase tracking-wider rounded-md border border-red-500/20 shadow-sm">
+                          <span className="inline-flex items-center px-2 py-0.5 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-[9px] font-black uppercase tracking-wider rounded-xl border border-red-500/20 shadow-md shadow-black/5">
                             Error: {file.error}
                           </span>
                         ) : file.title ? (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-[#1cc88a]/10 dark:bg-[#1cc88a]/5 text-[#1bd18f] text-[9px] font-black uppercase tracking-wider rounded-md border border-[#1cc88a]/20 shadow-sm">
+                          <span className="inline-flex items-center px-2 py-0.5 bg-[#1cc88a]/10 dark:bg-[#1cc88a]/5 text-[#1bd18f] text-[9px] font-black uppercase tracking-wider rounded-xl border border-[#1cc88a]/20 shadow-md shadow-black/5">
                             Analysis Complete
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-md border border-slate-200 dark:border-white/5 shadow-sm">
+                          <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-xl border border-slate-200 dark:border-white/5 shadow-md shadow-black/5">
                             Waiting Pending
                           </span>
                         )}
@@ -567,15 +567,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         <div className="mt-2 space-y-1">
                           <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Storyboards List (Start, Center, End)</span>
                           <div className="grid grid-cols-3 gap-1.5">
-                            <div className="aspect-video bg-black rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+                            <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
                               <img src={file.analysisFrames[0] || undefined} className="w-full h-full object-cover" alt="Start" />
                               <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[7px] text-white text-center py-0.5 font-bold uppercase">10%</span>
                             </div>
-                            <div className="aspect-video bg-black rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+                            <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
                               <img src={file.analysisFrames[1] || undefined} className="w-full h-full object-cover" alt="Middle" />
                               <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[7px] text-white text-center py-0.5 font-bold uppercase">50%</span>
                             </div>
-                            <div className="aspect-video bg-black rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+                            <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
                               <img src={file.analysisFrames[2] || undefined} className="w-full h-full object-cover" alt="End" />
                               <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[7px] text-white text-center py-0.5 font-bold uppercase">90%</span>
                             </div>
@@ -616,7 +616,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                       <div className="space-y-1 px-0.5">
                         <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.category_adobe_label}</label>
                         <select 
-                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 transition-all appearance-none" 
+                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
                           value={file.adobeCategoryId} 
                           onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, adobeCategoryId: parseInt(e.target.value)} : f))}
                         >
@@ -629,7 +629,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.category_shutterstock_1_label}</label>
                           <select 
-                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 transition-all appearance-none" 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
                             value={file.shutterstockCategory1} 
                             onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, shutterstockCategory1: e.target.value} : f))}
                           >
@@ -642,7 +642,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.category_shutterstock_2_label}</label>
                           <select 
-                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-xl text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 transition-all appearance-none" 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
                             value={file.shutterstockCategory2} 
                             onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, shutterstockCategory2: e.target.value} : f))}
                           >
@@ -660,7 +660,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                           <button
                             onClick={() => handleRegenerateFile(file)}
                             disabled={file.isGenerating || file.isExtracting}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-[#1e3a8a] text-white text-[10px] font-black uppercase tracking-wider rounded-xl hover:from-blue-600 hover:to-blue-900 transition-all flex items-center justify-center space-x-2 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                            className="w-full py-2.5 bg-gradient-to-r from-violet-500 to-[#1e3a8a] text-white text-[10px] font-black uppercase tracking-wider rounded-[1.5rem] hover:from-violet-600 hover:to-blue-900 transition-all flex items-center justify-center space-x-2 shadow-md shadow-black/5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                           >
                             <Sparkles size={13} className={file.isGenerating ? "animate-spin" : "animate-pulse"} />
                             <span>{file.isGenerating ? t.generating : t.regenerate}</span>

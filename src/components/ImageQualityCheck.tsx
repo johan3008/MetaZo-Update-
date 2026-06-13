@@ -49,18 +49,18 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
   const LoadingSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {[1, 2, 3, 4].map((i) => (
-        <div key={`qc-skeleton-${i}`} className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-xl p-5 border border-slate-200 dark:border-white/5 h-[400px] flex flex-col animate-pulse">
+        <div key={`qc-skeleton-${i}`} className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-[1.5rem] p-5 border border-slate-200 dark:border-white/5 h-[400px] flex flex-col animate-pulse">
           <div className="flex items-start justify-between mb-4">
             <div className="w-1/2 h-4 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
             <div className="w-16 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
           </div>
-          <div className="w-full aspect-video bg-slate-200 dark:bg-slate-700/50 rounded-xl mb-4" />
+          <div className="w-full aspect-video bg-slate-200 dark:bg-slate-700/50 rounded-[1.5rem] mb-4" />
           <div className="space-y-3">
             <div className="w-24 h-3 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
             <div className="grid grid-cols-1 gap-2">
-              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg" />
-              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg" />
-              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg" />
+              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-2xl" />
+              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-2xl" />
+              <div className="w-full h-8 bg-slate-200 dark:bg-slate-700/50 rounded-2xl" />
             </div>
           </div>
         </div>
@@ -199,12 +199,12 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
     <div className="w-full space-y-8 animate-in fade-in duration-700">
       {/* Brand Header - Premium Overhaul */}
       <div className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-blue-500/20 to-emerald-500/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-violet-500/20 to-emerald-500/20 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
         <div className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/60 dark:border-white/10 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
           {/* Progress Bar Glow */}
           {loading && (
             <div 
-              className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-blue-500 to-emerald-600 transition-all duration-500 ease-out z-50"
+              className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-emerald-400 via-violet-500 to-emerald-600 transition-all duration-500 ease-out z-50"
               style={{ width: `${progress}%` }}
             />
           )}
@@ -234,7 +234,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
               <button
                 onClick={handleClearAll}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 hover:bg-rose-500/10 text-slate-600 dark:text-slate-400 hover:text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 border border-slate-200 dark:border-white/10"
+                className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/5 hover:bg-rose-500/10 text-slate-600 dark:text-slate-400 hover:text-rose-500 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 border border-slate-200 dark:border-white/10"
               >
                 <Trash2 size={13} />
                 {t.qc_btn_reset}
@@ -243,7 +243,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
             <button
               onClick={handleAnalyze}
               disabled={files.length === 0 || loading}
-              className="relative group/btn flex items-center gap-3 px-8 py-3.5 bg-slate-900 dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-400 text-white dark:text-slate-950 rounded-xl text-[11px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-2xl shadow-slate-900/10 dark:shadow-emerald-500/20"
+              className="relative group/btn flex items-center gap-3 px-8 py-3.5 bg-slate-900 dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-400 text-white dark:text-slate-950 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest disabled:opacity-50 transition-all active:scale-95 shadow-2xl shadow-slate-900/10 dark:shadow-emerald-500/20"
             >
               {loading ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} className="group-hover/btn:animate-bounce" />}
               {loading ? t.qc_btn_analyzing : t.qc_btn_analyze}
@@ -256,13 +256,13 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
         {/* Left Stats & Upload */}
         <div className="xl:col-span-4 space-y-6">
           {/* Tolerance Card */}
-          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-md shadow-black/5">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{t.qc_tolerance_label}</h3>
             <div className="space-y-4">
               <select 
                   value={tolerance} 
                   onChange={(e) => setTolerance(e.target.value as any)}
-                  className="w-full text-[11px] bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-4 outline-none text-slate-800 dark:text-slate-200 font-bold uppercase transition-all focus:ring-2 focus:ring-emerald-500/20 appearance-none cursor-pointer"
+                  className="w-full text-[11px] bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-[1.5rem] px-4 py-4 outline-none text-slate-800 dark:text-slate-200 font-bold uppercase transition-all focus:ring-2 focus:ring-emerald-500/20 appearance-none cursor-pointer"
               >
                   <option value="STRICT">STRICT (Hardcore mode)</option>
                   <option value="MEDIUM">MEDIUM (Standard Adobe)</option>
@@ -304,7 +304,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                   animate={{ height: 'auto', opacity: 1 }}
                   className="px-4 pb-4 space-y-3"
                 >
-                  <div className="flex justify-between items-center bg-slate-100 dark:bg-black/40 px-3 py-2 rounded-xl">
+                  <div className="flex justify-between items-center bg-slate-100 dark:bg-black/40 px-3 py-2 rounded-[1.5rem]">
                     <p className="font-black text-[9px] uppercase text-slate-500 tracking-widest">{t.qc_queue_assets}: {files.length}</p>
                   </div>
                   <div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
@@ -314,9 +314,9 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                         animate={{ x: 0, opacity: 1 }}
                         transition={{ delay: idx * 0.05 }}
                         key={`${file.name}-${idx}`} 
-                        className="flex items-center gap-3 bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 p-2 rounded-xl hover:shadow-lg transition-all group"
+                        className="flex items-center gap-3 bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 p-2 rounded-[1.5rem] hover:shadow-lg transition-all group"
                       >
-                        <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
                           {previews[file.name] && (
                             <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
                           )}
@@ -394,12 +394,12 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                       initial={{ scale: 0.95, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ delay: rIdx * 0.1 }}
-                      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-5 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 flex flex-col"
+                      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-5 shadow-md shadow-black/5 hover:shadow-2xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 flex flex-col"
                     >
                       {/* Card Header */}
                       <div className="flex items-center justify-between mb-5 px-1">
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${isPassed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                          <div className={`p-2 rounded-[1.5rem] flex items-center justify-center shrink-0 ${isPassed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
                             {isPassed ? <CheckCircle size={18} /> : <XCircle size={18} />}
                           </div>
                           <div className="min-w-0">
@@ -441,7 +441,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                                   const colors = {
                                     noise: 'bg-rose-500',
                                     focus: 'bg-amber-500',
-                                    lighting: 'bg-blue-500'
+                                    lighting: 'bg-violet-500'
                                   };
                                   const labels = {
                                     noise: 'Grain/Noise',
@@ -459,7 +459,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                                     >
                                       <div className={`w-12 h-12 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl opacity-80 animate-pulse ${colors[h.type]}`} />
                                       <div className={`w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg cursor-help flex items-center justify-center transition-transform hover:scale-125 pointer-events-auto ${colors[h.type]}`}>
-                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 bg-slate-900 border border-white/20 shadow-2xl px-3 py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover/point:opacity-100 transition-all scale-90 group-hover/point:scale-100 flex flex-col items-center gap-1">
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 bg-slate-900 border border-white/20 shadow-2xl px-3 py-2 rounded-[1.5rem] text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover/point:opacity-100 transition-all scale-90 group-hover/point:scale-100 flex flex-col items-center gap-1">
                                           <div className="flex items-center gap-1.5 border-b border-white/10 pb-1 w-full justify-center">
                                             <span className={`w-1.5 h-1.5 rounded-full ${colors[h.type]}`} />
                                             <span className="whitespace-nowrap">{labels[h.type]}</span>
@@ -479,7 +479,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                           <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                              <button 
                                onClick={() => toggleHeatmap(fileName)}
-                               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
+                               className={`flex items-center gap-2 px-3 py-1.5 rounded-[1.5rem] text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
                              >
                                {showHeatmaps.has(fileName) ? <EyeOff size={14} /> : <Eye size={14} />}
                                {showHeatmaps.has(fileName) ? t.qc_hide_heatmap : t.qc_analyze_heatmap}
@@ -532,7 +532,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                               <p className="text-[10px] font-black uppercase text-slate-400 group-hover/audit:text-emerald-500 transition-colors tracking-[0.1em]">{t.qc_quality_metadata} 🚀</p>
                             </div>
-                            <div className="flex items-center gap-2 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/10 group-hover/audit:bg-emerald-500 group-hover/audit:text-white transition-all">
+                            <div className="flex items-center gap-2 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-[1.5rem] border border-emerald-500/10 group-hover/audit:bg-emerald-500 group-hover/audit:text-white transition-all">
                               {expandedReports.has(fileName) ? t.qc_close : t.qc_view_audit}
                               {expandedReports.has(fileName) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             </div>

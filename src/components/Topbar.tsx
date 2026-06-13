@@ -61,18 +61,18 @@ export const Topbar: React.FC<TopbarProps> = ({
   };
 
   return (
-    <header className="h-16 shrink-0 bg-white dark:bg-[#111827] border-b border-[#e3e6f0]/60 dark:border-white/5 shadow-sm px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 transition-colors duration-300">
+    <header className="h-16 shrink-0 bg-white dark:bg-[#111827] border-b border-[#e3e6f0]/60 dark:border-white/5 shadow-md shadow-black/5 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 transition-colors duration-300">
       {/* LEFT: HAMBURGER & TIME */}
       <div className="flex items-center space-x-3.5 flex-1 min-w-0">
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="md:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none"
+          className="md:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
         >
           <Menu size={20} />
         </button>
 
         {/* TIME DISPLAY */}
-        <div className="hidden sm:flex items-center space-x-3 px-4 py-1.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-white/5 shadow-inner">
+        <div className="hidden sm:flex items-center space-x-3 px-4 py-1.5 bg-slate-50 dark:bg-slate-800/40 rounded-[1.5rem] border border-slate-200/50 dark:border-white/5 shadow-inner">
           <div className="flex flex-col items-start leading-none">
             <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter mb-0.5">
               {t.topbar_system_time}
@@ -126,7 +126,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Language Swapper */}
         <button 
           onClick={() => setUiLanguage(uiLanguage === 'en' ? 'id' : 'en')}
-          className="p-2 flex items-center space-x-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none"
+          className="p-2 flex items-center space-x-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
           title={t.language}
         >
           <Globe size={17} />
@@ -136,7 +136,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Theme Swapper */}
         <button 
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none"
+          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
           title={t.topbar_toggle_theme}
         >
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
@@ -145,7 +145,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Info Dialogue Trigger */}
         <button 
           onClick={() => setShowInfoModal(true)}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none flex items-center space-x-1"
+          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none flex items-center space-x-1"
           title={t.topbar_info_manual}
         >
           <Info size={17} />
@@ -154,7 +154,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Settings Dialogue Trigger */}
         <button 
           onClick={() => setShowSettingsModal(true)}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none flex items-center space-x-1"
+          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none flex items-center space-x-1"
           title={t.topbar_settings_api}
         >
           <Settings size={17} className="animate-hover-spin" />

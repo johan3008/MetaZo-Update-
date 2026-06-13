@@ -560,7 +560,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           <div className="space-y-4 animate-in fade-in duration-200">
             {/* Elegant Header Banner */}
             <div className="relative overflow-hidden bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#0f172a] border border-slate-200 dark:border-white/10 rounded-2xl p-5 text-white shadow-xl">
-              <div className="absolute top-0 right-0 w-44 h-44 bg-[#4e73df]/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-44 h-44 bg-[#7c3aed]/10 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
               
               <div className="relative flex flex-col items-center text-center space-y-3">
@@ -584,8 +584,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
             {/* Feature Capabilities Spotlight Grid (Bento columns) */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-sm">
-                <div className="w-6 h-6 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-md shadow-black/5">
+                <div className="w-6 h-6 bg-violet-500/10 rounded-2xl flex items-center justify-center text-violet-500">
                   <Sparkles size={12} />
                 </div>
                 <h3 className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Whitelabel UI</h3>
@@ -594,8 +594,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-sm">
-                <div className="w-6 h-6 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-md shadow-black/5">
+                <div className="w-6 h-6 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500">
                   <Key size={12} className="rotate-45" />
                 </div>
                 <h3 className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Key Generator</h3>
@@ -604,8 +604,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-sm">
-                <div className="w-6 h-6 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-500">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-md shadow-black/5">
+                <div className="w-6 h-6 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500">
                   <CreditCard size={12} />
                 </div>
                 <h3 className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Pelacak Aktivasi</h3>
@@ -614,8 +614,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-sm">
-                <div className="w-6 h-6 bg-amber-500/10 rounded-lg flex items-center justify-center text-amber-500">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-2xl flex flex-col space-y-1 shadow-md shadow-black/5">
+                <div className="w-6 h-6 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500">
                   <ShieldCheck size={12} />
                 </div>
                 <h3 className="text-[10px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Penyemaian Serial</h3>
@@ -628,7 +628,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             {/* Authentication Gateway Form */}
             <div className="bg-white dark:bg-[#111827] border border-slate-250 dark:border-white/10 rounded-2xl p-4 shadow-md space-y-3">
               <div className="flex items-center space-x-1 text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[8.5px]">
-                <Lock size={12} className="text-[#4e73df]" />
+                <Lock size={12} className="text-[#7c3aed]" />
                 <span>Otorisasi Hak Akses Reseller</span>
               </div>
               
@@ -647,7 +647,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         handleVerifyLandingPasscode();
                       }
                     }}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#4e73df] dark:text-white transition-all text-slate-900 placeholder:text-slate-400"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] pl-9 pr-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#7c3aed] dark:text-white transition-all text-slate-900 placeholder:text-slate-400"
                   />
                   <div className="absolute left-3 top-2.5 text-slate-450 dark:text-slate-500">
                     <Lock size={14} className="mt-1" />
@@ -655,7 +655,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 </div>
 
                 {landingError && (
-                  <div className="text-[9px] text-red-500 font-black uppercase tracking-wide bg-red-550/10 px-2.5 py-1.5 rounded-lg border border-red-500/10 leading-normal">
+                  <div className="text-[9px] text-red-500 font-black uppercase tracking-wide bg-red-550/10 px-2.5 py-1.5 rounded-2xl border border-red-500/10 leading-normal">
                     ⚠️ {landingError}
                   </div>
                 )}
@@ -664,7 +664,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   type="button"
                   onClick={handleVerifyLandingPasscode}
                   disabled={isVerifyingLanding}
-                  className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 active:scale-95 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 active:scale-95 text-white font-extrabold text-xs uppercase rounded-[1.5rem] transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isVerifyingLanding ? (
                     <RefreshCw size={13} className="animate-spin" />
@@ -677,7 +677,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             </div>
 
             {/* Decal Quote Footer */}
-            <div className="text-center bg-slate-100/50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/50 dark:border-transparent">
+            <div className="text-center bg-slate-100/50 dark:bg-white/5 p-3 rounded-[1.5rem] border border-slate-200/50 dark:border-transparent">
               <p className="text-[9px] text-slate-400 font-extrabold uppercase tracking-widest leading-relaxed">
                 "Ubah software menjadi aset penghasil pendapatan mandiri."
               </p>
@@ -685,8 +685,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           </div>
         ) : (
           <div className="space-y-4 animate-in fade-in duration-100">
-            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-2xl p-4">
-              <div className="flex items-center space-x-2 mb-2 text-[#4e73df]">
+            <div className="bg-gradient-to-r from-violet-500/10 to-indigo-500/10 border border-violet-500/20 rounded-2xl p-4">
+              <div className="flex items-center space-x-2 mb-2 text-[#7c3aed]">
                 <Sparkles size={16} className="animate-pulse" />
                 <span className="text-[11px] font-black uppercase tracking-wider">Owner & Reseller Control Hub</span>
               </div>
@@ -699,7 +699,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               {/* BRANDING SETUP GRID */}
               <div className="bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-4">
                 <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200 mb-3">
-                  <Sparkles size={14} className="text-[#4e73df]" />
+                  <Sparkles size={14} className="text-[#7c3aed]" />
                   <span className="text-[10px] font-black uppercase tracking-wider">A. Brand Identity Customization</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -710,7 +710,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       placeholder="Contoh: MetaZo PRO"
                       value={tempAppName}
                       onChange={(e) => setTempAppName(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-bold text-xs focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-bold text-xs focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     />
                   </div>
                   <div className="space-y-1">
@@ -720,7 +720,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       placeholder="Contoh: AI-Powered Metadata Assistant"
                       value={tempAppSubtitle}
                       onChange={(e) => setTempAppSubtitle(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-medium text-xs focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-medium text-xs focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     />
                   </div>
                 </div>
@@ -740,7 +740,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       placeholder="Contoh: Rp 149.000 / Bulan"
                       value={tempPricingTier}
                       onChange={(e) => setTempPricingTier(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-medium text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-emerald-600 dark:text-emerald-400"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-medium text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-emerald-600 dark:text-emerald-400"
                     />
                   </div>
                   <div className="space-y-1">
@@ -750,7 +750,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       placeholder="Contoh: https://wa.me/..."
                       value={tempWhatsApp}
                       onChange={(e) => setTempWhatsApp(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-500"
                     />
                   </div>
                   <div className="space-y-1 md:col-span-2">
@@ -760,7 +760,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       placeholder="Contoh: Transfer Bank BCA 123-xxxx a/n Nama Anda"
                       value={tempPayInfo}
                       onChange={(e) => setTempPayInfo(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none transition-all line-clamp-3"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none transition-all line-clamp-3"
                     />
                   </div>
                 </div>
@@ -780,12 +780,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       placeholder="Contoh: MZPRO-COMMERCIAL-2026"
                       value={tempLicenseSeed}
                       onChange={(e) => setTempLicenseSeed(e.target.value.toUpperCase())}
-                      className="flex-1 bg-amber-500/5 dark:bg-amber-900/10 border border-amber-500/20 dark:border-amber-500/30 rounded-xl px-3 py-2 outline-none font-mono font-bold text-xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                      className="flex-1 bg-amber-500/5 dark:bg-amber-900/10 border border-amber-500/20 dark:border-amber-500/30 rounded-[1.5rem] px-3 py-2 outline-none font-mono font-bold text-xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => handleCopyText(tempLicenseSeed, 'seed')}
-                      className="p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 rounded-xl transition-colors"
+                      className="p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 rounded-[1.5rem] transition-colors"
                       title="Salin Key Validasi"
                     >
                       {copiedKey === 'seed' ? <Check size={14} className="text-amber-600" /> : <Copy size={14} />}
@@ -801,7 +801,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               <div className="border-t border-slate-100 dark:border-white/5 pt-4 space-y-3">
                 <div className="bg-slate-100/60 dark:bg-slate-950/50 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 space-y-1.5">
                   <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200">
-                    <Key size={14} className="text-[#4e73df] animate-pulse" />
+                    <Key size={14} className="text-[#7c3aed] animate-pulse" />
                     <span className="text-[10px] font-black uppercase tracking-wider">🔑 KELOLA SERIAL KEY SATU KALI PAKAI (UNTUK DIJUAL)</span>
                   </div>
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-[10px] leading-relaxed">
@@ -810,7 +810,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 </div>
 
                 {/* Key Maker Generator Input */}
-                <div className="p-3 bg-slate-100/30 dark:bg-slate-950/20 border border-slate-200/40 dark:border-slate-800/40 rounded-xl flex items-center gap-3">
+                <div className="p-3 bg-slate-100/30 dark:bg-slate-950/20 border border-slate-200/40 dark:border-slate-800/40 rounded-[1.5rem] flex items-center gap-3">
                   <div className="space-y-0.5 shrink-0">
                     <label className="text-slate-500 dark:text-slate-400 font-bold text-[9px] uppercase tracking-wider block">Jumlah Key</label>
                     <input
@@ -819,7 +819,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       max="100"
                       value={keysCountToGen}
                       onChange={(e) => setKeysCountToGen(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-center font-bold text-xs outline-none text-slate-800 dark:text-slate-100"
+                      className="w-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-2 py-1 text-center font-bold text-xs outline-none text-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div className="space-y-0.5 min-w-[100px] flex-1">
@@ -827,7 +827,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <select
                       value={selectedDuration}
                       onChange={(e) => setSelectedDuration(e.target.value as '30days' | 'unlimited')}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 font-bold text-xs outline-none text-slate-800 dark:text-slate-100 cursor-pointer"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-2 py-1 font-bold text-xs outline-none text-slate-800 dark:text-slate-100 cursor-pointer"
                     >
                       <option value="30days">30 Hari</option>
                       <option value="unlimited">Unlimited</option>
@@ -837,7 +837,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     type="button"
                     onClick={handleGenerateKeys}
                     disabled={isKeysLoading}
-                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer shrink-0"
+                    className="py-2.5 px-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer shrink-0"
                   >
                     <RefreshCw size={12} className={isKeysLoading ? 'animate-spin' : ''} />
                     <span>{isKeysLoading ? 'Generating...' : 'Generate Key'}</span>
@@ -864,7 +864,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <button 
                       type="button" 
                       onClick={fetchBackendKeys}
-                      className="hover:text-blue-500 transition-colors flex items-center space-x-0.5"
+                      className="hover:text-violet-500 transition-colors flex items-center space-x-0.5"
                       title="Refresh List"
                     >
                       <RefreshCw size={10} className={isKeysLoading ? 'animate-spin' : ''} />
@@ -872,7 +872,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     </button>
                   </div>
 
-                  <div className="max-h-[180px] overflow-y-auto border border-slate-100 dark:border-slate-900 rounded-xl bg-slate-50/50 dark:bg-slate-950/30 custom-scrollbar divide-y divide-slate-100 dark:divide-slate-900 text-xs">
+                  <div className="max-h-[180px] overflow-y-auto border border-slate-100 dark:border-slate-900 rounded-[1.5rem] bg-slate-50/50 dark:bg-slate-950/30 custom-scrollbar divide-y divide-slate-100 dark:divide-slate-900 text-xs">
                     {backendKeys.length === 0 ? (
                       <div className="p-4 text-center text-slate-400 dark:text-slate-500 font-semibold text-[10px]">
                         Belum ada Serial Key satu kali pakai di database. Munculkan dengan generator di atas!
@@ -896,10 +896,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                             
                             {/* Key Activation details */}
                             {kObj.activated ? (
-                              <div className="text-[9px] text-[#4e73df] font-bold flex items-center gap-1.5 flex-wrap">
-                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                              <div className="text-[9px] text-[#7c3aed] font-bold flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
                                 <span className="truncate">Terpakai: {kObj.activatedBy}</span>
-                                <span className="px-1.5 py-0.5 text-[7.5px] bg-blue-500/10 text-blue-600 dark:text-[#4e73df] rounded font-black uppercase tracking-wide">
+                                <span className="px-1.5 py-0.5 text-[7.5px] bg-violet-500/10 text-violet-600 dark:text-[#7c3aed] rounded font-black uppercase tracking-wide">
                                   {kObj.duration === '30days' ? '30 Hari' : 'Unlimited'}
                                 </span>
                               </div>
@@ -973,7 +973,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="px-2 pb-2 overflow-hidden"
                             >
-                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 flex gap-2 shadow-inner">
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 flex gap-2 shadow-inner">
                                 <input 
                                   type="email"
                                   placeholder="Input email penerima..."
@@ -983,7 +983,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   autoFocus
                                 />
                               </div>
-                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 mt-1 shadow-inner">
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 mt-1 shadow-inner">
                                 <textarea 
                                   placeholder="Input caption/pesan..."
                                   value={emailCaption}
@@ -996,7 +996,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   type="button"
                                   onClick={() => handleSendToEmail(kObj.key)}
                                   disabled={isEmailSending}
-                                  className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white text-[9px] font-black uppercase rounded-lg flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition-all"
+                                  className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white text-[9px] font-black uppercase rounded-2xl flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition-all"
                                 >
                                   {isEmailSending ? <RefreshCw size={10} className="animate-spin" /> : <Send size={10} />}
                                   {isEmailSending ? 'Menyiapkan...' : 'Kirim Sekarang'}
@@ -1018,7 +1018,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               <button
                 type="button"
                 onClick={handleSaveResellerSettings}
-                className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1"
+                className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1"
               >
                 <Save size={13} />
                 <span>{saveSuccess ? 'Branding Disimpan!' : 'Simpan Branding'}</span>
@@ -1026,7 +1026,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               <button
                 type="button"
                 onClick={handleResetResellerSettings}
-                className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-550 font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
+                className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-550 font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
                 title="Reset to Factory"
               >
                 <RotateCcw size={13} />
@@ -1042,7 +1042,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       alert("Akses Reseller telah dikunci & disembunyikan!");
                     }
                   }}
-                  className="py-2 px-3 bg-slate-500/10 hover:bg-slate-500/20 text-slate-500 font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
+                  className="py-2 px-3 bg-slate-500/10 hover:bg-slate-500/20 text-slate-500 font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
                   title="Kunci & Sembunyikan Menu Reseller"
                 >
                   <Lock size={13} />
@@ -1086,7 +1086,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
               {/* Header Info */}
               <div className="text-center space-y-2 mb-6">
-                <div className="mx-auto w-12 h-12 bg-blue-500/10 text-[#4e73df] rounded-2xl flex items-center justify-center shadow-inner mb-2 animate-bounce">
+                <div className="mx-auto w-12 h-12 bg-violet-500/10 text-[#7c3aed] rounded-2xl flex items-center justify-center shadow-inner mb-2 animate-bounce">
                   <Key size={22} className="rotate-45" />
                 </div>
                 <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">
@@ -1095,7 +1095,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 <p className="text-xs text-slate-400 uppercase font-extrabold tracking-widest">
                   {t.activation_modal_unlock_premium} {appName}
                 </p>
-                <div className="h-[2px] w-12 bg-gradient-to-r from-blue-500 to-emerald-400 mx-auto rounded-full mt-2" />
+                <div className="h-[2px] w-12 bg-gradient-to-r from-violet-500 to-emerald-400 mx-auto rounded-full mt-2" />
               </div>
 
               {/* Status Display */}
@@ -1114,14 +1114,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         <button
                           type="button"
                           onClick={handleRemoveLicenseKey}
-                          className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                          className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-[10px] rounded-[1.5rem] uppercase tracking-wider transition-all cursor-pointer shadow-md"
                         >
                           {t.activation_btn_stop_yes}
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowCancelConfirm(false)}
-                          className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black text-[10px] rounded-xl uppercase tracking-wider transition-all cursor-pointer"
+                          className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black text-[10px] rounded-[1.5rem] uppercase tracking-wider transition-all cursor-pointer"
                         >
                           {t.activation_btn_stop_no}
                         </button>
@@ -1138,7 +1138,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           {t.activation_key_registered} <code className="font-mono bg-emerald-500/5 text-emerald-600 px-1 border border-emerald-500/10 dark:text-emerald-400">{licenseKey}</code>
                         </p>
                         {subDaysLeft !== undefined && subDaysLeft !== null && (
-                          <div className="mt-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-[10px] py-1 px-1.5 rounded-lg flex items-center justify-center space-x-1">
+                          <div className="mt-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-[10px] py-1 px-1.5 rounded-2xl flex items-center justify-center space-x-1">
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                             <span>{t.activation_subscription_left} {Math.ceil(subDaysLeft)} {t.activation_days_left}</span>
                           </div>
@@ -1150,7 +1150,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       <button 
                         type="button"
                         onClick={() => setShowCancelConfirm(true)}
-                        className="w-full py-2.5 bg-red-650/10 hover:bg-red-600 text-red-600 hover:text-white font-extrabold text-[10px] rounded-xl uppercase tracking-wider transition-all cursor-pointer border border-red-500/20 shadow-sm flex items-center justify-center space-x-1.5"
+                        className="w-full py-2.5 bg-red-650/10 hover:bg-red-600 text-red-600 hover:text-white font-extrabold text-[10px] rounded-[1.5rem] uppercase tracking-wider transition-all cursor-pointer border border-red-500/20 shadow-md shadow-black/5 flex items-center justify-center space-x-1.5"
                       >
                         <span>{t.activation_btn_unsubscribe}</span>
                       </button>
@@ -1186,7 +1186,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block mb-2">{t.language === 'Bahasa' ? 'Pilih Paket' : 'Choose Plan'}</label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       {/* Free Trial */}
-                      <div className="border border-slate-200 dark:border-white/10 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col justify-between transition-all">
+                      <div className="border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-3 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col justify-between transition-all">
                         <div className="space-y-1 text-center">
                           <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-slate-700 dark:text-slate-200">{t.language === 'Bahasa' ? 'Uji Coba' : 'Free Trial'}</h5>
                           <p className="text-slate-600 dark:text-slate-400 font-black text-xs">Gratis</p>
@@ -1198,22 +1198,22 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         </div>
                       </div>
                       {/* 30 Days Plan */}
-                      <div className="border border-[#4e73df] rounded-xl p-3 bg-blue-500/5 flex flex-col justify-between relative shadow-sm hover:scale-[1.02] transition-transform">
+                      <div className="border border-[#7c3aed] rounded-[1.5rem] p-3 bg-violet-500/5 flex flex-col justify-between relative shadow-md shadow-black/5 hover:scale-[1.02] transition-transform">
                         <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/2">
-                          <span className="bg-[#4e73df] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Pro</span>
+                          <span className="bg-[#7c3aed] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Pro</span>
                         </div>
                         <div className="space-y-1 text-center">
-                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-[#4e73df] dark:text-blue-400">30 Days Plan</h5>
-                          <p className="text-[#4e73df] dark:text-blue-300 font-black text-xs">{t.language === 'Bahasa' ? 'Rp 50.000' : '$2'}</p>
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-[#7c3aed] dark:text-violet-400">30 Days Plan</h5>
+                          <p className="text-[#7c3aed] dark:text-blue-300 font-black text-xs">{t.language === 'Bahasa' ? 'Rp 50.000' : '$2'}</p>
                           <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#4e73df]" /><span>Premium AI Engine</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
+                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>Premium AI Engine</span></li>
                           </ul>
                         </div>
                       </div>
                       {/* Unlimited Plan */}
-                      <div className="border border-amber-500 rounded-xl p-3 bg-amber-500/5 flex flex-col justify-between relative shadow-sm hover:scale-[1.02] transition-transform">
+                      <div className="border border-amber-500 rounded-[1.5rem] p-3 bg-amber-500/5 flex flex-col justify-between relative shadow-md shadow-black/5 hover:scale-[1.02] transition-transform">
                         <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/2">
                           <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Best</span>
                         </div>
@@ -1229,12 +1229,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       </div>
                     </div>
                     
-                    <div className="mt-3 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-lg flex items-center justify-between border border-slate-200 dark:border-slate-700">
+                    <div className="mt-3 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl flex items-center justify-between border border-slate-200 dark:border-slate-700">
                       <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center space-x-1.5">
                         <ShoppingCart size={12} className="text-emerald-500" />
                         <span>{t.language === 'Bahasa' ? 'Beli lisensi melalui WhatsApp:' : 'Buy license via WhatsApp:'}</span>
                       </div>
-                      <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-lg flex items-center space-x-1 transition-all shadow-sm">
+                      <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-2xl flex items-center space-x-1 transition-all shadow-md shadow-black/5">
                         <MessageCircle size={10} />
                         <span>WhatsApp</span>
                       </a>
@@ -1253,7 +1253,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           setInputKey(e.target.value.toUpperCase());
                           setActivationError('');
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-2.5 outline-none font-mono font-bold text-xs focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all whitespace-nowrap overflow-x-auto text-slate-800 dark:text-slate-100"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] pl-9 pr-3 py-2.5 outline-none font-mono font-bold text-xs focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all whitespace-nowrap overflow-x-auto text-slate-800 dark:text-slate-100"
                       />
                       <Key size={13} className="text-slate-400 absolute left-3 top-3.5 rotate-45" />
                     </div>
@@ -1279,7 +1279,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     type="button"
                     onClick={handleApplyLicenseKey}
                     disabled={isActivating}
-                    className="w-full py-2.5 bg-[#4e73df] hover:bg-blue-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/10 cursor-pointer"
+                    className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-[1.5rem] uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-violet-500/10 cursor-pointer"
                   >
                     {isActivating ? (
                       <RefreshCw size={14} className="animate-spin" />
@@ -1295,9 +1295,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       {t.activation_no_license_title}
                     </h5>
                     
-                    <div className="p-3 bg-blue-500/5 hover:bg-blue-500/8 border border-blue-500/10 rounded-2xl flex flex-col items-center text-center space-y-1 transition-all">
-                      <ShoppingCart size={16} className="text-[#4e73df] animate-bounce" />
-                      <span className="text-[11px] font-black text-[#4e73df] uppercase tracking-wider">{t.activation_personal_activation}</span>
+                    <div className="p-3 bg-violet-500/5 hover:bg-violet-500/8 border border-violet-500/10 rounded-2xl flex flex-col items-center text-center space-y-1 transition-all">
+                      <ShoppingCart size={16} className="text-[#7c3aed] animate-bounce" />
+                      <span className="text-[11px] font-black text-[#7c3aed] uppercase tracking-wider">{t.activation_personal_activation}</span>
                       <span className="text-[10px] font-bold text-slate-400">{t.activation_license_price} <strong className="text-slate-700 dark:text-white">{pricingTier}</strong></span>
                       <span className="text-[9px] font-semibold text-slate-400 max-w-xs">{tempPayInfo}</span>
                     </div>
@@ -1306,7 +1306,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName)}%20premium.`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10.5px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/10"
+                      className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10.5px] rounded-[1.5rem] uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/10"
                     >
                       <MessageCircle size={14} className="animate-pulse" />
                       <span>{t.activation_buy_whatsapp}</span>

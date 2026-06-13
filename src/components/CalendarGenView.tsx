@@ -66,15 +66,15 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
             </div>
             <div className="w-16 h-6 bg-slate-200 dark:bg-slate-700/50 rounded-full" />
           </div>
-          <div className="w-3/4 h-8 bg-slate-200 dark:bg-slate-700/50 rounded-lg mb-3" />
-          <div className="w-full h-4 bg-slate-200 dark:bg-slate-700/50 rounded-md mb-2" />
-          <div className="w-5/6 h-4 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+          <div className="w-3/4 h-8 bg-slate-200 dark:bg-slate-700/50 rounded-2xl mb-3" />
+          <div className="w-full h-4 bg-slate-200 dark:bg-slate-700/50 rounded-xl mb-2" />
+          <div className="w-5/6 h-4 bg-slate-200 dark:bg-slate-700/50 rounded-xl" />
           <div className="mt-auto pt-4 border-t border-slate-200 dark:border-white/5 space-y-2">
-            <div className="w-24 h-3 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+            <div className="w-24 h-3 bg-slate-200 dark:bg-slate-700/50 rounded-xl" />
             <div className="flex gap-2">
-              <div className="w-12 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
-              <div className="w-16 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
-              <div className="w-14 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-md" />
+              <div className="w-12 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-xl" />
+              <div className="w-16 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-xl" />
+              <div className="w-14 h-5 bg-slate-200 dark:bg-slate-700/50 rounded-xl" />
             </div>
           </div>
         </div>
@@ -101,7 +101,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
     <div className="w-full flex-1 flex flex-col p-4 md:p-8 overflow-y-auto">
       {/* View Title */}
       <div className="w-full max-w-4xl mx-auto mb-6 flex items-center space-x-3">
-        <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+        <div className="p-2.5 bg-emerald-500/10 rounded-[1.5rem] border border-emerald-500/20">
           <Calendar className="text-emerald-500" size={24} />
         </div>
         <div>
@@ -214,12 +214,12 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-emerald-500/10 transition-all flex flex-col h-full"
+                  className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-white/5 shadow-md shadow-black/5 hover:shadow-emerald-500/10 transition-all flex flex-col h-full"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex flex-col">
                       <div className="flex items-center space-x-2 mb-2">
-                        <div className="p-1.5 bg-emerald-500/10 rounded-lg">
+                        <div className="p-1.5 bg-emerald-500/10 rounded-2xl">
                           <Sparkles className="text-emerald-500" size={14} />
                         </div>
                         <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
@@ -286,7 +286,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
               animate={{ opacity: 1 }}
               className="text-center py-20 bg-white/30 dark:bg-slate-900/20 backdrop-blur-sm rounded-[3rem] border border-dashed border-slate-300 dark:border-white/10"
             >
-              <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-emerald-500/20">
+              <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-md shadow-black/5 border border-emerald-500/20">
                 <Calendar size={40} className="text-emerald-400" />
               </div>
               <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-3">Calendar Gen</h2>
