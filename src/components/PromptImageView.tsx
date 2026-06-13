@@ -6,6 +6,10 @@ import {
 interface PromptImageViewProps {
   t: any;
   aiOptions?: any;
+  isLicensed?: boolean;
+  dailyGenCount?: number;
+  incrementDailyCount?: (amount?: number) => void;
+  setShowLimitModal?: (show: boolean) => void;
 }
 import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
@@ -31,7 +35,14 @@ const STYLE_OPTIONS = (t: any) => [
   { id: 'Fine Art', label: t.style_fine_art, icon: '🏛️' }
 ];
 
-export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }) => {
+export const PromptImageView: React.FC<PromptImageViewProps> = ({ 
+  t, 
+  aiOptions,
+  isLicensed = false,
+  dailyGenCount = 0,
+  incrementDailyCount,
+  setShowLimitModal
+}) => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [loadingBatch, setLoadingBatch] = useState(false);
@@ -143,6 +154,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
     const unanalyzed = images.filter(img => !img.result && !img.loading);
     if (unanalyzed.length === 0) return;
 
+    if (!isLicensed && dailyGenCount + unanalyzed.length > 30) {
+      setGlobalError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate, tetapi Anda mencoba memproses ${unanalyzed.length} gambar.`);
+      if (setShowLimitModal) {
+        setShowLimitModal(true);
+      }
+      return;
+    }
+
     setLoadingBatch(true);
     setBatchProgress(0);
     setGlobalError(null);
@@ -190,6 +209,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
         }
         return img;
       }));
+
+      if (incrementDailyCount) {
+        incrementDailyCount(unanalyzed.length);
+      }
     } catch (err: any) {
       console.error("Batch Analysis error:", err);
       setGlobalError(err.message || "Gagal dalam analisis batch.");
@@ -243,6 +266,37 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({ t, aiOptions }
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Left Column: Upload & Config (4 cols) */}
         <div className="xl:col-span-4 space-y-6">
+          {!isLicensed && (
+            <div className="bg-emerald-500/5 dark:bg-black/20 p-4 rounded-2xl border border-emerald-500/15 dark:border-white/5 shadow-inner">
+              <div className="flex justify-between text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  {t.prompt_image_trial_label}
+                </span>
+                <span className={dailyGenCount >= 30 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                  {dailyGenCount}/30 {t.prompt_image_generate_count}
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
+                  }`} 
+                  style={{ width: `${Math.min(100, (dailyGenCount / 30) * 100)}%` }} 
+                />
+              </div>
+              {dailyGenCount >= 30 ? (
+                <span className="text-[10px] text-red-500 font-extrabold block mt-2 leading-tight">
+                  {t.prompt_image_trial_expired}
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-1.5 leading-tight">
+                  {t.prompt_image_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_image_trial_times}</strong>.
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-5 space-y-6 shadow-md shadow-black/5">
             <div className="space-y-4">
               <div className="flex justify-between items-center">

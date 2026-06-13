@@ -13,7 +13,21 @@ interface QualityReport {
   heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
 }
 
-export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, aiOptions }) => {
+export const ImageQualityCheck: React.FC<{ 
+  t: any; 
+  aiOptions?: any;
+  isLicensed?: boolean;
+  dailyGenCount?: number;
+  incrementDailyCount?: (amount?: number) => void;
+  setShowLimitModal?: (show: boolean) => void;
+}> = ({ 
+  t, 
+  aiOptions,
+  isLicensed = false,
+  dailyGenCount = 0,
+  incrementDailyCount,
+  setShowLimitModal
+}) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -156,6 +170,15 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
 
   const handleAnalyze = async () => {
     if (files.length === 0) return;
+
+    if (!isLicensed && dailyGenCount + files.length > 30) {
+      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali audit, tetapi Anda mencoba memproses ${files.length} gambar.`);
+      if (setShowLimitModal) {
+        setShowLimitModal(true);
+      }
+      return;
+    }
+
     setLoading(true);
     setProgress(0);
     setError(null);
@@ -185,6 +208,10 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
         newReports[file.name] = data;
         setReports({ ...newReports });
         
+        if (incrementDailyCount) {
+          incrementDailyCount(1);
+        }
+
         setProgress(startProgress + progressPerFile);
       } catch (err: any) {
         setError(err.message);
@@ -255,6 +282,37 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         {/* Left Stats & Upload */}
         <div className="xl:col-span-4 space-y-6">
+          {!isLicensed && (
+            <div className="bg-emerald-500/5 dark:bg-black/20 p-5 rounded-3xl border border-emerald-500/15 dark:border-white/5 shadow-inner">
+              <div className="flex justify-between text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  {t.image_check_trial_label}
+                </span>
+                <span className={dailyGenCount >= 30 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                  {dailyGenCount}/30 {t.image_check_generate_count}
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
+                  }`} 
+                  style={{ width: `${Math.min(100, (dailyGenCount / 30) * 100)}%` }} 
+                />
+              </div>
+              {dailyGenCount >= 30 ? (
+                <span className="text-[11px] text-red-500 font-extrabold block mt-2.5 leading-tight">
+                  {t.image_check_trial_expired}
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold block mt-2 leading-tight">
+                  {t.image_check_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.image_check_trial_times}</strong>.
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Tolerance Card */}
           <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-md shadow-black/5">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{t.qc_tolerance_label}</h3>

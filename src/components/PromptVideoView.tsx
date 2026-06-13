@@ -37,9 +37,20 @@ import { getHeaders } from '../../services/geminiService';
 interface PromptVideoViewProps {
   t: any;
   aiOptions?: any;
+  isLicensed?: boolean;
+  dailyGenCount?: number;
+  incrementDailyCount?: (amount?: number) => void;
+  setShowLimitModal?: (show: boolean) => void;
 }
 
-export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }) => {
+export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ 
+  t, 
+  aiOptions,
+  isLicensed = false,
+  dailyGenCount = 0,
+  incrementDailyCount,
+  setShowLimitModal
+}) => {
   const [keyword, setKeyword] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -63,6 +74,14 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
   const handleAnalyze = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!keyword.trim() || isAnalyzing) return;
+
+    if (!isLicensed && dailyGenCount >= 30) {
+      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate.`);
+      if (setShowLimitModal) {
+        setShowLimitModal(true);
+      }
+      return;
+    }
 
     setIsAnalyzing(true);
     setAnalysisProgress(0);
@@ -93,6 +112,10 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
       const data = await response.json();
       setAnalysisProgress(100);
       setResult(data);
+
+      if (incrementDailyCount) {
+        incrementDailyCount(1);
+      }
 
       // Save to history
       const newItem: HistoryItem = {
@@ -133,6 +156,14 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
 
   const handleGenerateHollywoodPrompts = async () => {
     if (!keyword.trim() || isGeneratingPrompts) return;
+
+    if (!isLicensed && dailyGenCount >= 30) {
+      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate.`);
+      if (setShowLimitModal) {
+        setShowLimitModal(true);
+      }
+      return;
+    }
     
     setIsGeneratingPrompts(true);
     setGenerationProgress(0);
@@ -161,6 +192,10 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
       const data = await response.json();
       setGenerationProgress(100);
       setHollywoodPrompts(data);
+
+      if (incrementDailyCount) {
+        incrementDailyCount(1);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -191,7 +226,38 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ t, aiOptions }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-20">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+      {!isLicensed && (
+        <div className="bg-emerald-500/5 dark:bg-black/20 p-5 rounded-3xl border border-emerald-500/15 dark:border-white/5 shadow-inner">
+          <div className="flex justify-between text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-2">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {t.prompt_video_trial_label}
+            </span>
+            <span className={dailyGenCount >= 30 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+              {dailyGenCount}/30 {t.prompt_video_generate_count}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
+              }`} 
+              style={{ width: `${Math.min(100, (dailyGenCount / 30) * 100)}%` }} 
+            />
+          </div>
+          {dailyGenCount >= 30 ? (
+            <span className="text-[11px] text-red-500 font-extrabold block mt-2.5 leading-tight">
+              {t.prompt_video_trial_expired}
+            </span>
+          ) : (
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold block mt-2 leading-tight">
+              {t.prompt_video_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_video_trial_times}</strong>.
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Header Section */}
       <section className="bg-white dark:bg-[#1e293b] rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-white/5 relative overflow-hidden">
         {/* Progress Bars */}

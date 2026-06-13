@@ -1173,7 +1173,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <div className="bg-amber-400/5 border border-amber-500/20 rounded-2xl p-4 text-center space-y-1.5">
                       <div className="flex items-center justify-center text-amber-500 space-x-1.5 font-extrabold text-[11px] uppercase tracking-wider">
                         <AlertTriangle size={13} />
-                        <span>{t.activation_trial_active_hero} ({trialDaysLeft !== undefined ? Math.ceil(trialDaysLeft) : 7} {t.activation_trial_active_days})</span>
+                        <span>
+                          {t.activation_trial_active_hero} ({trialDaysLeft !== undefined && trialDaysLeft < 9000 ? `${Math.ceil(trialDaysLeft)} ${t.activation_trial_active_days}` : t.language === 'Bahasa' ? 'Tanpa Batas Hari' : 'No Expiry'})
+                        </span>
                       </div>
                       <p className="text-slate-450 dark:text-slate-400 font-semibold text-[10px] leading-relaxed">
                         {t.activation_trial_active_desc}
@@ -1191,8 +1193,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-slate-700 dark:text-slate-200">{t.language === 'Bahasa' ? 'Uji Coba' : 'Free Trial'}</h5>
                           <p className="text-slate-600 dark:text-slate-400 font-black text-xs">Gratis</p>
                           <ul className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 space-y-1 mt-2 text-left">
-                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Akses 7 Hari' : '7 Days Access'}</span></li>
-                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Hanya Metadata Gen, Prompt Image, Calendar Gen' : 'Metadata Gen, Prompt Image, Calendar Gen only'}</span></li>
+                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Hari' : 'Unlimited Trial Days'}</span></li>
+                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Semua Fitur Terbuka' : 'All Features Unlocked'}</span></li>
                             <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Batas 30 Generasi / Hari' : '30 Generations / Day Limit'}</span></li>
                           </ul>
                         </div>

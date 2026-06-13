@@ -1016,7 +1016,9 @@ const App: React.FC = () => {
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'reseller'>('gemini');
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia'>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia'>(() => {
+    return (localStorage.getItem('ai_provider') || 'gemini') as any;
+  });
 
   // Reseller & License state
   const [isResellerUnlocked, setIsResellerUnlocked] = useState(() => localStorage.getItem('mz_reseller_unlocked') === 'true');
@@ -1100,7 +1102,16 @@ const App: React.FC = () => {
   }, []);
 
   const getTotalDailyCount = useCallback((): number => {
-    const tools = [ToolType.IMAGE, ToolType.VIDEO, ToolType.VECTOR, ToolType.PROMPT_GEN];
+    const tools = [
+      ToolType.IMAGE, 
+      ToolType.VIDEO, 
+      ToolType.VECTOR, 
+      ToolType.PROMPT_GEN,
+      ToolType.PROMPT_IMAGE,
+      ToolType.PROMPT_VIDEO,
+      ToolType.PROMPT_IMAGE_CHECK,
+      ToolType.CALENDAR_GEN
+    ];
     return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
   }, [getDailyCount]);
 
@@ -1113,11 +1124,11 @@ const App: React.FC = () => {
       [ToolType.VECTOR]: getDailyCount(ToolType.VECTOR),
       [ToolType.DASHBOARD]: 0,
       [ToolType.PROMPT_GEN]: getDailyCount(ToolType.PROMPT_GEN),
-      [ToolType.PROMPT_IMAGE]: 0,
-      [ToolType.PROMPT_VIDEO]: 0,
-      [ToolType.PROMPT_IMAGE_CHECK]: 0,
+      [ToolType.PROMPT_IMAGE]: getDailyCount(ToolType.PROMPT_IMAGE),
+      [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
+      [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
       [ToolType.VECTOR_EPS]: 0,
-      [ToolType.CALENDAR_GEN]: 0
+      [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN)
     });
   }, [getDailyCount]);
 
@@ -1132,19 +1143,9 @@ const App: React.FC = () => {
     refreshDailyCounts();
   }, [refreshDailyCounts]);
 
-  // Trial Period tracking (7 Days)
+  // Trial Period tracking (Unlimited Days)
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
-    let startStr = localStorage.getItem('mz_trial_start');
-    if (!startStr) {
-      startStr = new Date().toISOString();
-      localStorage.setItem('mz_trial_start', startStr);
-    }
-    const startTime = new Date(startStr).getTime();
-    const currTime = new Date().getTime();
-    const diffMs = currTime - startTime;
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    const leftRaw = 7 - diffDays;
-    return Math.max(0, leftRaw);
+    return 9999; // Set to very large number so trial never expires in days
   });
 
   // Automatically check trial status on mount or when licensing changes
@@ -1156,25 +1157,7 @@ const App: React.FC = () => {
 
   // Wrapped activeTool setter to enforce trial constraints
   const handleSetActiveTool = (tool: ToolType) => {
-    if (!isMzLicensed) {
-      if (trialDaysLeft <= 0) {
-        setShowActivationModal(true);
-        return;
-      }
-      const allowedTrialTools = [
-        ToolType.DASHBOARD,
-        ToolType.IMAGE,
-        ToolType.VIDEO,
-        ToolType.VECTOR,
-        ToolType.PROMPT_GEN,
-        ToolType.CALENDAR_GEN
-      ];
-      if (!allowedTrialTools.includes(tool)) {
-        alert("Fitur Premium Terkunci!\n\nSelama masa trial 7 hari, Anda hanya dapat mengakses Metadata Gen, Prompt Teks, dan Calendar Gen.\n\nSilakan lakukan aktivasi berbayar untuk membuka fitur ini.");
-        setShowActivationModal(true);
-        return;
-      }
-    }
+    // Free Trial has unlocked all tools ("Semua fiturnya kebuka")
     setActiveTool(tool);
   };
 
@@ -1266,13 +1249,27 @@ const App: React.FC = () => {
     }
   };
 
-  const [geminiKeysList, setGeminiKeysList] = useState<string[]>([]);
-  const [groqKeysList, setGroqKeysList] = useState<string[]>([]);
-  const [mistralKeysList, setMistralKeysList] = useState<string[]>([]);
-  const [openaiKeysList, setOpenaiKeysList] = useState<string[]>([]);
-  const [openrouterKeysList, setOpenrouterKeysList] = useState<string[]>([]);
-  const [blackboxKeysList, setBlackboxKeysList] = useState<string[]>([]);
-  const [nvidiaKeysList, setNvidiaKeysList] = useState<string[]>([]);
+  const [geminiKeysList, setGeminiKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('gemini_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
+  const [groqKeysList, setGroqKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('groq_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
+  const [mistralKeysList, setMistralKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('mistral_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
+  const [openaiKeysList, setOpenaiKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('openai_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
+  const [openrouterKeysList, setOpenrouterKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('openrouter_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
+  const [blackboxKeysList, setBlackboxKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('blackbox_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
+  const [nvidiaKeysList, setNvidiaKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
@@ -1288,7 +1285,25 @@ const App: React.FC = () => {
   const [keyTestingIndex, setKeyTestingIndex] = useState<number | null>(null);
   const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | null>(null);
   const [keyTestResults, setKeyTestResults] = useState<Record<string, { type: 'success' | 'error' | 'quota'; message: string }>>({}); // "provider-index"
-  const [hasCustomKeySaved, setHasCustomKeySaved] = useState(false);
+  const [hasCustomKeySaved, setHasCustomKeySaved] = useState(() => {
+    const geminiSaved = (localStorage.getItem('gemini_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const groqSaved = (localStorage.getItem('groq_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const mistralSaved = (localStorage.getItem('mistral_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const openaiSaved = (localStorage.getItem('openai_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const openrouterSaved = (localStorage.getItem('openrouter_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const blackboxSaved = (localStorage.getItem('blackbox_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const nvidiaSaved = (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    
+    return (
+      geminiSaved.length > 0 ||
+      groqSaved.length > 0 ||
+      mistralSaved.length > 0 ||
+      openaiSaved.length > 0 ||
+      openrouterSaved.length > 0 ||
+      blackboxSaved.length > 0 ||
+      nvidiaSaved.length > 0
+    );
+  });
 
   useEffect(() => {
     if (showSettingsModal) {
@@ -2592,6 +2607,10 @@ const App: React.FC = () => {
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
             <PromptImageView 
               t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE, amount)}
+              setShowLimitModal={setShowLimitModal}
               aiOptions={{
                 provider: selectedProvider,
                 geminiKeys: geminiKeysList,
@@ -2606,6 +2625,10 @@ const App: React.FC = () => {
           ) : activeTool === ToolType.PROMPT_VIDEO ? (
             <PromptVideoView 
               t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_VIDEO] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_VIDEO, amount)}
+              setShowLimitModal={setShowLimitModal}
               aiOptions={{
                 provider: selectedProvider,
                 geminiKeys: geminiKeysList,
@@ -2620,6 +2643,10 @@ const App: React.FC = () => {
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
             <ImageCheckView 
               t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE_CHECK] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE_CHECK, amount)}
+              setShowLimitModal={setShowLimitModal}
               aiOptions={{
                 provider: selectedProvider,
                 geminiKeys: geminiKeysList,
