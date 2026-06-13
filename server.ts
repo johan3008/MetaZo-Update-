@@ -752,13 +752,13 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/check-image-quality', async (req, res) => {
         try {
-            const { image, tolerance } = req.body;
+            const { image, tolerance, language } = req.body;
             if (!image) {
                 console.warn('Server check-image-quality error: Missing image data');
                 return res.status(400).json({ error: 'Missing image data' });
             }
             console.log('Server check-image-quality: Analyzing image...');
-            const data = await checkImageQuality(image, tolerance);
+            const data = await checkImageQuality(image, tolerance, language);
             console.log('Server check-image-quality: Analysis successful');
             res.json(data);
         } catch (e: any) {

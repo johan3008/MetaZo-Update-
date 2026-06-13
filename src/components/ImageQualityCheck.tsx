@@ -178,7 +178,7 @@ export const ImageQualityCheck: React.FC<{ t: any, aiOptions?: any }> = ({ t, ai
         const response = await fetch('/api/check-image-quality', {
           method: 'POST',
           headers: getHeaders(aiOptions),
-          body: JSON.stringify({ image: base64Image, tolerance }),
+          body: JSON.stringify({ image: base64Image, tolerance, language: t.language || 'English' }),
         });
         if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);
         const data = await response.json();

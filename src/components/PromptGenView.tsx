@@ -339,7 +339,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   return (
     <div className="w-full space-y-6">
       {/* Brand Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4 relative overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200/60 dark:border-white/5 pb-4 relative overflow-hidden">
         {/* Progress Bar */}
         {loading && (
           <div 
@@ -348,7 +348,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           />
         )}
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
+          <h2 className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
             <Wand2 className="text-emerald-500 fill-emerald-500/10" size={24} />
             {t.prompt_studio_title}
           </h2>
@@ -357,7 +357,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           </p>
         </div>
         
-        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 rounded-xl text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
           <Sliders size={12} className="text-emerald-500 animate-pulse" />
           <span>{t.prompt_studio_version}</span>
         </div>
@@ -383,7 +383,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 setPromptMode('background');
                 setStyleCategory('Cinematic');
               }}
-              className={`py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
+              className={`py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
                 promptMode === 'background'
                   ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/10'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -397,7 +397,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 setPromptMode('png');
                 setStyleCategory('3D Render');
               }}
-              className={`py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
+              className={`py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-widest flex items-center justify-center space-x-2.5 transition-all duration-300 cursor-pointer ${
                 promptMode === 'png'
                   ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/10'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -410,12 +410,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
           {!isLicensed && (
             <div className="bg-emerald-500/5 dark:bg-black/20 p-4 rounded-2xl border border-emerald-500/15 dark:border-white/5 shadow-inner">
-              <div className="flex justify-between text-[11px] uppercase font-black text-slate-500 dark:text-slate-400 mb-1.5">
+              <div className="flex justify-between text-[11px] uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-550 animate-pulse" />
                   {t.prompt_trial_label}
                 </span>
-                <span className={dailyGenCount >= 30 ? "text-red-500 font-black" : "text-emerald-500 font-black"}>
+                <span className={dailyGenCount >= 30 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
                   {dailyGenCount}/30 {t.prompt_generate_count}
                 </span>
               </div>
@@ -445,7 +445,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* 1. Subject Area */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                     {t.prompt_subject_label}
                   </label>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Bilingual Support</span>
@@ -455,13 +455,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder={t.prompt_subject_placeholder}
-                  className="w-full min-h-[140px] rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/25 p-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all font-medium leading-relaxed resize-y"
+                  className="w-full min-h-[140px] rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all font-medium leading-relaxed resize-y"
                 />
               </div>
 
               {/* Inspiration Presets */}
               <div className="space-y-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block">
                   {t.prompt_inspiration_label}
                 </span>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -473,9 +473,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         setSubject(insp.text);
                         setError(null);
                       }}
-                      className="flex flex-col items-start gap-1 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl text-left hover:border-emerald-500/50 transition-all duration-200 hover:shadow-md hover:shadow-emerald-500/5 cursor-pointer group"
+                      className="flex flex-col items-start gap-1 p-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-xl text-left hover:border-emerald-500/50 transition-all duration-200 hover:shadow-md hover:shadow-emerald-500/5 cursor-pointer group"
                     >
-                      <span className="text-xs font-black text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 transition-colors">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 transition-colors">
                         {insp.label}
                       </span>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
@@ -489,7 +489,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* ----------------- NEGATIVE PROMPT INPUT COLUMN ----------------- */}
               <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                     {t.prompt_negative_label}
                   </label>
@@ -501,14 +501,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     value={bgNegativePrompt}
                     onChange={(e) => setBgNegativePrompt(e.target.value)}
                     placeholder="Contoh: blurry, bad anatomy, text, watermark, ugly..."
-                    className="w-full min-h-[90px] rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/25 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
+                    className="w-full min-h-[90px] rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
                   />
                 ) : (
                   <textarea
                     value={pngNegativePrompt}
                     onChange={(e) => setPngNegativePrompt(e.target.value)}
                     placeholder="Contoh: scenery, shadow, realistic background, text..."
-                    className="w-full min-h-[90px] rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/25 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
+                    className="w-full min-h-[90px] rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
                   />
                 )}
                 <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium leading-relaxed">
@@ -521,14 +521,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
             <div className="space-y-5">
               {/* 2. Style Category Dropdown & Pills */}
               <div className="space-y-3">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                   {t.prompt_style_master_label}
                 </label>
                 <div className="relative">
                   <select
                     value={styleCategory}
                     onChange={(e) => setStyleCategory(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/25 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
+                    className="w-full rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
                   >
                     {currentStyleOptions.map((opt) => (
                       <option key={opt.id} value={opt.id} className="dark:bg-slate-950 font-medium">
@@ -545,7 +545,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 {/* Quick Selection Option Chips */}
                 <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-405 dark:text-slate-550 block">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-405 dark:text-slate-550 block">
                     {t.prompt_style_quick_label}
                   </span>
                   <div className="grid grid-cols-2 xs:flex xs:flex-wrap gap-1.5">
@@ -558,8 +558,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                           onClick={() => setStyleCategory(opt.id)}
                           className={`px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase transition-all duration-200 flex items-center gap-1.5 border cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-sm font-black scale-[1.02]'
-                              : 'bg-slate-50 dark:bg-black/15 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-sm font-semibold scale-[1.02]'
+                              : 'bg-slate-50 dark:bg-black/15 text-slate-500 dark:text-slate-400 border-slate-200/60 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5'
                           }`}
                         >
                           <span>{opt.icon}</span>
@@ -574,9 +574,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* PNG Background Dropdown Option - Only visible when promptMode === 'png' */}
               {promptMode === 'png' && (
                 <div className="space-y-3 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
                     <span>{t.prompt_png_bg_label}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 rounded font-black font-mono">PNG Style</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 rounded font-semibold font-mono">PNG Style</span>
                   </label>
                   
                   <div className="relative">
@@ -603,10 +603,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               )}
 
               {/* 3. Variation Slider (Determines count of generated prompts: 10 to 150) */}
-              <div className="space-y-3 bg-slate-50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
-                <div className="flex justify-between items-center text-xs font-black uppercase tracking-wider">
+              <div className="space-y-3 bg-slate-50/50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
+                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                   <span className="text-slate-550 dark:text-slate-400">{t.prompt_variation_label}</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/25 px-2.5 py-1 rounded-md text-xs font-black font-mono">
+                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/25 px-2.5 py-1 rounded-md text-xs font-semibold font-mono">
                     {variation} {t.prompt_variation_unit}
                   </span>
                 </div>
@@ -634,8 +634,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
 
               {/* 4. Word Count Range Sliders */}
-              <div className="space-y-4 bg-slate-50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
-                <div className="flex justify-between items-center text-xs font-black uppercase tracking-wider">
+              <div className="space-y-4 bg-slate-50/50 dark:bg-black/10 p-4 rounded-xl border border-slate-100 dark:border-white/5">
+                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
                   <span className="text-slate-550 dark:text-slate-400">{t.prompt_word_count_label}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded font-bold">{minWords}-{maxWords} Words</span>
@@ -696,7 +696,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
             <button
               onClick={handleGenerate}
               disabled={loading || !subject.trim()}
-              className={`w-full py-4 rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center space-x-2 transition-all duration-300 ${
+              className={`w-full py-4 rounded-xl font-semibold text-xs tracking-wider flex items-center justify-center space-x-2 transition-all duration-300 ${
                 loading 
                   ? 'bg-slate-205 dark:bg-white/5 text-slate-400 cursor-not-allowed' 
                   : !subject.trim()
@@ -723,7 +723,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         <div id="prompt-output-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Main prompt output panel */}
-          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-5 sm:p-6 text-slate-800 dark:text-slate-100 shadow-sm space-y-5">
+          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 sm:p-6 text-slate-800 dark:text-slate-100 shadow-sm space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800 pb-4 gap-3">
               <div>
                 <h3 className="text-sm sm:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
@@ -734,7 +734,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     <p className="text-[10px] text-slate-400 font-medium font-mono">
                       {t.prompt_output_subtitle}
                     </p>
-                    <span className="text-[9px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black rounded uppercase tracking-wider font-mono">
+                    <span className="text-[9px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold rounded uppercase tracking-wider font-mono">
                       {promptMode === 'png' ? t.prompt_output_badge_png.replace('{color}', pngBgColor.toUpperCase()) : t.prompt_output_badge_scene}
                     </span>
                   </div>
@@ -811,7 +811,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <Loader2 size={48} className="text-emerald-500 animate-spin relative" />
                 </div>
                 <div className="text-center space-y-2 max-w-sm mx-auto px-4">
-                  <h3 className="text-lg font-black text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-emerald-400 uppercase tracking-tighter">
                     {progress < 30 ? t.prompt_loading_step1 : 
                      progress < 60 ? t.prompt_loading_step2 : 
                      progress < 90 ? t.prompt_loading_step3 : t.prompt_loading_step4}
@@ -830,7 +830,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 <div className="grid grid-cols-1 w-full gap-3 mt-6">
                   {[1, 2, 3].map(i => (
-                    <div key={`prompt-skel-${i}`} className="h-16 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl animate-pulse" />
+                    <div key={`prompt-skel-${i}`} className="h-16 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-xl animate-pulse" />
                   ))}
                 </div>
               </div>
@@ -855,7 +855,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     return (
                       <div 
                         key={globalIdx}
-                        className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-xl p-4 sm:p-5 hover:border-emerald-500/30 transition-all duration-200 group flex items-start justify-between gap-4"
+                        className="bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-white/5 rounded-xl p-4 sm:p-5 hover:border-emerald-500/30 transition-all duration-200 group flex items-start justify-between gap-4"
                       >
                         <p className="text-xs sm:text-xs md:text-sm font-mono font-medium text-slate-700 dark:text-slate-300 leading-relaxed break-words select-all whitespace-pre-wrap group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors flex-1">
                           <span className="text-slate-400 dark:text-slate-500 font-bold mr-2">{globalIdx + 1}.</span>
@@ -864,7 +864,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                         <button
                           onClick={() => copySinglePrompt(promptText, globalIdx)}
-                          className={`p-1.5 rounded-lg transition-all flex items-center justify-center gap-1 text-[10px] font-black uppercase cursor-pointer shrink-0 ${
+                          className={`p-1.5 rounded-lg transition-all flex items-center justify-center gap-1 text-[10px] font-semibold uppercase cursor-pointer shrink-0 ${
                             isCopied 
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                               : 'bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 border border-slate-200 dark:border-white/10'
@@ -881,7 +881,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 {/* Pagination Toolbar */}
                 {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-slate-200 dark:border-white/5 gap-3.5">
+                  <div className="flex flex-col sm:flex-row items-center justify-between bg-zinc-50 dark:bg-black/20 p-3 rounded-xl border border-slate-200/60 dark:border-white/5 gap-3.5">
                     <div className="flex items-center space-x-2 text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase font-mono">
                       <span>Tampilkan</span>
                       <select
@@ -890,7 +890,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                           setItemsPerPage(parseInt(e.target.value, 10));
                           setCurrentPage(1);
                         }}
-                        className="bg-slate-100 dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded px-2 py-1 text-slate-800 dark:text-slate-200 cursor-pointer font-black focus:outline-none focus:border-emerald-500"
+                        className="bg-slate-100 dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded px-2 py-1 text-slate-800 dark:text-slate-200 cursor-pointer font-semibold focus:outline-none focus:border-emerald-500"
                       >
                         <option value="5">5</option>
                         <option value="10">10</option>
@@ -911,7 +911,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         <ChevronLeft size={14} />
                       </button>
 
-                      <span className="text-[10px] font-black uppercase text-slate-350 tracking-wider font-mono">
+                      <span className="text-[10px] font-semibold uppercase text-slate-350 tracking-wider font-mono">
                         Halaman {currentPage} / {totalPages}
                       </span>
 
@@ -932,13 +932,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 {result.negativePrompt && (
                   <div className="space-y-2 border-t border-white/5 pt-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                      <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider flex items-center gap-1">
                         <AlertCircle size={10} className="text-red-400 font-mono" />
                         Negative Prompt Global (Gunakan ini untuk hasil bersih)
                       </span>
                       <button
                         onClick={copyNegativeText}
-                        className={`px-2 py-1 rounded text-[9px] font-black uppercase flex items-center space-x-1 transition-all cursor-pointer ${
+                        className={`px-2 py-1 rounded text-[9px] font-semibold uppercase flex items-center space-x-1 transition-all cursor-pointer ${
                           copiedNegative 
                             ? 'bg-emerald-500 text-white animate-pulse' 
                             : 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-500 dark:text-slate-350'
@@ -957,7 +957,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 {/* Style insights details */}
                 {result.styleExplanation && result.styleExplanation.length > 0 && (
                   <div className="border-t border-white/5 pt-4 space-y-2">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1 font-mono">
+                    <span className="text-[10px] font-semibold uppercase text-slate-500 tracking-wider flex items-center gap-1 font-mono">
                       <Info size={11} className="text-slate-400" />
                       Detail Rangkuman Gaya & Keragaman Artistik
                     </span>
@@ -973,20 +973,22 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 )}
               </div>
             ) : (
-              <div className="py-20 text-center">
-                <Wand2 className="mx-auto text-slate-600 bg-black/30 p-4 w-12 h-12 rounded-2xl animate-pulse" />
-                <p className="text-xs font-black uppercase tracking-wider text-slate-400 mt-4 font-mono">Form Isian Visual Prompt Studio</p>
-                <p className="text-[10px] text-slate-500 mt-1 max-w-[280px] mx-auto leading-relaxed">
-                  Isi visual tema, tentukan jumlah prompt variasi di atas (10-150), lalu klik tombol "Generate Prompts" untuk menyaksikan AI memproduksi rangkai variasi unik sekaligus.
+              <div className="py-32 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-4 text-slate-400 dark:text-slate-500 shadow-sm border border-slate-100 dark:border-white/5">
+                  <Sparkles size={24} />
+                </div>
+                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Awaiting Input</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-sm leading-relaxed">
+                  Describe your visual theme and configure variations. AI will generate unique prompt sets tailored for your needs.
                 </p>
               </div>
             )}
           </div>
 
           {/* Simple Memory/Local Storage Logs */}
-          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2.5">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <RefreshCw size={12} className="text-slate-400" />
                 Riwayat Gubahan ({history.length})
               </span>
@@ -1024,14 +1026,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       setCurrentPage(1);
                       document.getElementById('prompt-output-section')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="p-3 bg-slate-50 dark:bg-black/25 hover:bg-slate-100 dark:hover:bg-black/45 border border-slate-200 dark:border-white/5 rounded-xl cursor-pointer text-left transition-all duration-200 flex justify-between items-start gap-3 hover:scale-[1.01]"
+                    className="p-3 bg-slate-50/50 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-black/45 border border-slate-200/60 dark:border-white/5 rounded-xl cursor-pointer text-left transition-all duration-200 flex justify-between items-start gap-3 hover:scale-[1.01]"
                   >
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center space-x-1.5">
-                        <span className="text-[8px] font-black uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded leading-none">
+                        <span className="text-[8px] font-semibold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded leading-none">
                           {item.styleCategory}
                         </span>
-                        <span className="text-[8px] text-slate-455 font-black font-mono">
+                        <span className="text-[8px] text-slate-455 font-semibold font-mono">
                           {item.timestamp} • {item.prompts?.length || item.variation} Prompts
                         </span>
                       </div>

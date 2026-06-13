@@ -369,10 +369,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Sidebar Footer / Toggle */}
-      <div className="p-3 bg-black/10 border-t border-white/5 flex items-center justify-center">
+      <div className="p-3 bg-black/10 border-t border-white/5 flex items-center justify-between">
+        {!sidebarCollapsed && (
+          <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest pl-2">
+            v1.1.1
+          </div>
+        )}
         <button 
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
+          className={`p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all ${sidebarCollapsed ? 'mx-auto' : ''}`}
           title={sidebarCollapsed ? t.sidebar_expand : t.sidebar_collapse}
         >
           {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}

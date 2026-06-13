@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles } from 'lucide-react';
+import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film } from 'lucide-react';
 import { ToolType, FileItem, ProgressInfo } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from '../../constants';
 import { copyToClipboard } from '../utils';
@@ -205,6 +205,12 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     }
   };
 
+  const handleClean = () => {
+    const cleaned = [...new Set(keywords.map(k => k.trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    onChange(cleaned);
+  };
+
   return (
     <div className="space-y-1">
       <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -215,6 +221,9 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
               {suggestError}
             </span>
           )}
+          <button onClick={handleClean} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
+            clean
+          </button>
           <button onClick={handleCopy} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
             {copied ? 'copied!' : 'copy'}
           </button>

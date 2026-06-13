@@ -163,7 +163,7 @@ function getHeuristicCategories(title: string, keywords: string[]): {
   shutterstock_category_1: string;
   shutterstock_category_2: string;
 } {
-  const t = (title || "").toLowerCase();
+  const t = String(title || "").toLowerCase();
   const kList = (keywords || []).map(x => String(x).toLowerCase());
 
   // Helper to count matches in title + keywords
@@ -259,6 +259,7 @@ function getHeuristicCategories(title: string, keywords: string[]): {
 
 function ensureTitleLength(title: string, keywords: string[], description: string): string {
   if (!title) title = "Stock asset";
+  else title = String(title);
   
   // Clean input title: remove all commas, periods, double spaces
   let cleanedTitle = title.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
@@ -932,7 +933,7 @@ export const generateStockMetadata = async (
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English.`;
+  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. Structure keywords to cover the highly searchable categories (they can be mixed or randomized, and highly SEO-optimized):
    - Subject (Main Focus: descriptors of the primary subjects or objects)
@@ -945,10 +946,11 @@ export const generateStockMetadata = async (
 5. Avoid duplicates and keyword stuffing.
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces.`;
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: primary single-word subject descriptors)
@@ -961,9 +963,10 @@ export const generateStockMetadata = async (
 5. Avoid duplicates and keyword stuffing.
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords.`;
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: multi-word subject/object descriptors, e.g. "smartphone device")
@@ -971,12 +974,13 @@ export const generateStockMetadata = async (
    - Context (Environment/Background: multi-word background/location setting phrases)
    - Concept (Abstract Meaning: multi-word metaphorical or conceptual expressions)
    - Industry (Specific/Technical Category: multi-word technical or professional industry terms)
-3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords.
+3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -1137,18 +1141,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
 
 Rules for Titles:
-1. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
+1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
+2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
+3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
    [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-2. CONCEPT-FOCUSED: DO NOT just literally describe the physical asset properties. Instead, capture and describe the underlying abstract concept, metaphorical meaning, mood, or professional theme.
-3. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
-4. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-5. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-6. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
+6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
+3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+4. Limit to 200 characters.
 
 Rules for Keywords:
 ${keywordRulePromptText}
@@ -1219,18 +1226,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
 
 Rules for Titles:
-1. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
+1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
+2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
+3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
    [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-2. CONCEPT-FOCUSED: DO NOT just literally describe the physical asset properties. Instead, capture and describe the underlying abstract concept, metaphorical meaning, mood, or professional theme.
-3. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
-4. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-5. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-6. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
+6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
+3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+4. Limit to 200 characters.
 
 Rules for Keywords:
 ${keywordRulePromptText}
@@ -1417,7 +1427,7 @@ export const generateBatchStockMetadata = async (
   const aiRequestCount = targetCount + 10; 
 
   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English.`;
+  let keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. Structure keywords to cover the highly searchable categories (they can be mixed or randomized, and highly SEO-optimized):
    - Subject (Main Focus: descriptors of the primary subjects or objects)
@@ -1430,10 +1440,11 @@ export const generateBatchStockMetadata = async (
 5. Avoid duplicates and keyword stuffing.
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces.`;
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: primary single-word subject descriptors)
@@ -1446,9 +1457,10 @@ export const generateBatchStockMetadata = async (
 5. Avoid duplicates and keyword stuffing.
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords.`;
+    keywordRuleSchemaDesc = `List of exactly ${aiRequestCount} high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
    - Subject (Main Focus: multi-word subject/object descriptors, e.g. "smartphone device")
@@ -1456,12 +1468,13 @@ export const generateBatchStockMetadata = async (
    - Context (Environment/Background: multi-word background/location setting phrases)
    - Concept (Abstract Meaning: multi-word metaphorical or conceptual expressions)
    - Industry (Specific/Technical Category: multi-word technical or professional industry terms)
-3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords.
+3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
 6. Ensure no IP, brands, trademarks, or names are included.
 7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").`;
+8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   }
 
   const store = apiKeyStorage.getStore();
@@ -1629,18 +1642,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image/video. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
 
 Rules for Titles:
-1. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
+1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
+2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
+3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
    [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-2. CONCEPT-FOCUSED: DO NOT just literally describe the physical asset properties. Instead, capture and describe the underlying abstract concept, metaphorical meaning, mood, or professional theme.
-3. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
-4. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-5. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-6. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
+6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
+3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+4. Limit to 200 characters.
 
 Rules for Keywords:
 ${keywordRulePromptText}
@@ -1676,7 +1692,7 @@ OUTPUT FORMAT:
   ...
 ]`;
 
-  let draftMetadataArray: any[] = [];
+  let draftMetadataArray: any = [];
   try {
     const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
@@ -1728,18 +1744,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image/video. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
 
 Rules for Titles:
-1. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
+1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
+2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
+3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
    [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-2. CONCEPT-FOCUSED: DO NOT just literally describe the physical asset properties. Instead, capture and describe the underlying abstract concept, metaphorical meaning, mood, or professional theme.
-3. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
-4. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-5. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-6. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 150 characters.
+6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
+3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+4. Limit to 200 characters.
 
 Rules for Keywords:
 ${keywordRulePromptText}
@@ -1774,7 +1793,7 @@ OUTPUT FORMAT:
   ...
 ]`;
 
-  let finalMetadataArray: any[] = [];
+  let finalMetadataArray: any = [];
   try {
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
@@ -2855,7 +2874,7 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
     ...p,
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
-}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM') {
+}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa') {
   const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global. Tugas Anda adalah melakukan inspeksi visual "Zero Tolerance" terhadap gambar stok komersial sebelum proses upload.
 
 Tingkat Toleransi Saat Ini: ${tolerance} (Gunakan ini untuk menentukan ambang batas ketegasan Anda).
@@ -2890,6 +2909,12 @@ STATUS & SKOR:
 
 PIXEL HEATMAPS (Untuk visualisasi UI):
 - Identifikasi 3-8 titik koordinat (X, Y dalam 0-100) di mana terdapat masalah teknis atau legal nyata (Noise, Focus, Lighting, atau IP Violations).
+
+ATURAN BAHASA OUTPUT (OUTPUT LANGUAGE RULE):
+Jika parameter bahasa adalah 'Bahasa' / Indonesian, keluarkan nilai feedback dalam Bahasa Indonesia.
+Jika parameter bahasa adalah 'English', keluarkan nilai feedback dalam Bahasa Inggris.
+Current requested language: ${language === 'Bahasa' ? 'Indonesian' : 'English'}
+Seluruh field string (legal_status, technical_issues, strengths, detailed_feedback, raw_value) harus dalam bahasa tersebut.
 
 Respons Anda WAJIB dalam format JSON:
 {
