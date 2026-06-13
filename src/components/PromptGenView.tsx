@@ -38,6 +38,7 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Anime/Manga', label: 'Anime/Manga Illustration', icon: '🌸' },
   { id: 'Watercolor Painting', label: 'Watercolor Painting (Cat Air)', icon: '💧' },
   { id: 'Oil Painting', label: 'Oil Painting (Cat Minyak)', icon: '🖌️' },
+  { id: 'Paper Cut', label: 'Paper Cut (Seni Potong Kertas)', icon: '✂️' },
   { id: 'Abstract', label: 'Abstract (Abstrak)', icon: '⛰️' },
   { id: 'Vintage Photography', label: 'Vintage Photography (Klasik)', icon: '🎞️' },
   { id: 'Cyberpunk', label: 'Cyberpunk (Futuristik Retro)', icon: '⚡' },

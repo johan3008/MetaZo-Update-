@@ -1049,13 +1049,17 @@ Medical mask ≠ doctor
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
+Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 Do not infer hidden context.
 
 Asset Context: ${mediaTypeContext}
 
-CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
+OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
+- Adobe Stock Categories: ${categoriesText}
+- Shutterstock Categories: ${shutterstockCategoriesText}
+
 OUTPUT FORMAT:
 {
   "VISUAL_FACTS": {
@@ -1080,13 +1084,19 @@ OUTPUT FORMAT:
     "visible_text": [],
     "colors": [],
     "actions": [],
-    "composition": []
+    "composition": [],
+    "semantic_category_analysis": {
+      "adobe_id": 8,
+      "shutterstock_category_1": "Abstract",
+      "shutterstock_category_2": "Backgrounds/Textures",
+      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects and context"
+    }
   }
 }`;
 
   const promptText = toolType === ToolType.VIDEO 
-    ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
-    : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+    ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
+    : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
@@ -1112,7 +1122,13 @@ OUTPUT FORMAT:
         visible_text: [],
         colors: ["natural"],
         actions: ["commercial poses"],
-        composition: ["professional"]
+        composition: ["professional"],
+        semantic_category_analysis: {
+          adobe_id: 8,
+          shutterstock_category_1: "Abstract",
+          shutterstock_category_2: "Backgrounds/Textures",
+          reason: "Fallback static categories used."
+        }
       }
     });
   }
@@ -1171,8 +1187,8 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
+2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if they are a perfect fit.
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -1191,7 +1207,8 @@ OUTPUT FORMAT:
   "keywords": [],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
-  "shutterstock_category_2": "Backgrounds/Textures"
+  "shutterstock_category_2": "Backgrounds/Textures",
+  "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
 }`;
 
   let draftMetadata: any = {};
@@ -1265,8 +1282,8 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
+2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if accurate.
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -1289,6 +1306,7 @@ OUTPUT FORMAT:
   "category_id": 0,
   "shutterstock_category_1": "",
   "shutterstock_category_2": "",
+  "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
   "confidence_score": 0.95
 }`;
 
@@ -1421,6 +1439,8 @@ OUTPUT FORMAT:
       }
       data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Backgrounds/Textures");
     }
+    
+    data.category_reason = data.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
     
     return data as StockMetadata;
   } catch (error) {
@@ -1561,13 +1581,17 @@ Medical mask ≠ doctor
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
+Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 Do not infer hidden context.
 
 Asset Context: ${mediaTypeContext}
 
-CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
+OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
+- Adobe Stock Categories: ${categoriesText}
+- Shutterstock Categories: ${shutterstockCategoriesText}
+
 OUTPUT FORMAT:
 {
   "VISUAL_FACTS": {
@@ -1592,13 +1616,19 @@ OUTPUT FORMAT:
     "visible_text": [],
     "colors": [],
     "actions": [],
-    "composition": []
+    "composition": [],
+    "semantic_category_analysis": {
+      "adobe_id": 8,
+      "shutterstock_category_1": "Abstract",
+      "shutterstock_category_2": "Backgrounds/Textures",
+      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects and context"
+    }
   }
 }`;
       
       const promptText = toolType === ToolType.VIDEO 
-        ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
-        : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+        ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
+        : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
       try {
           const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
@@ -1615,12 +1645,11 @@ OUTPUT FORMAT:
           try {
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
           } catch(e) {
-             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [] };
+             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [], semantic_category_analysis: { adobe_id: 8, shutterstock_category_1: "Abstract", shutterstock_category_2: "Backgrounds/Textures", reason: "Fallback default." } };
           }
           parsedVisualFactsList.push(parsedFacts);
       } catch (err: any) {
           console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
-          const assetTypeStr = toolType === ToolType.VIDEO ? "footage video" : toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "vector illustration" : "photograph";
           const fallbackFacts = {
               VISUAL_FACTS: {
                 primary_subjects: [{ name: "main subject", importance: 100 }],
@@ -1629,7 +1658,13 @@ OUTPUT FORMAT:
                 visible_text: [],
                 colors: ["natural"],
                 actions: ["commercial posing"],
-                composition: ["professional"]
+                composition: ["professional"],
+                semantic_category_analysis: {
+                  adobe_id: 8,
+                  shutterstock_category_1: "Abstract",
+                  shutterstock_category_2: "Backgrounds/Textures",
+                  reason: "Fallback static categories used."
+                }
               }
           };
           visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${JSON.stringify(fallbackFacts)}`);
@@ -1686,8 +1721,8 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
+2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -1698,7 +1733,7 @@ ${shutterstockCategoriesText}
 STRICT DEFINING RULES:
 - Return a JSON ARRAY of exactly ${items.length} objects.
 - Order MUST match input items exactly.
-- Base everything 100% on the VISUAL_FACTS provided for each asset.
+- Base everything 100% on the VISUAL_FACTS provided for each asset, including the suggestions inside "semantic_category_analysis".
 
 SOURCE VISUAL_FACTS:
 ${visualDescriptions.join('\n\n')}
@@ -1712,7 +1747,8 @@ OUTPUT FORMAT:
     "keywords": [],
     "category_id": 1,
     "shutterstock_category_1": "Abstract",
-    "shutterstock_category_2": "Backgrounds/Textures"
+    "shutterstock_category_2": "Backgrounds/Textures",
+    "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
   }
 ]`;
 
@@ -1796,8 +1832,8 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 Rules for Categories:
-1. Adobe: Choose carefully from the provided list.
-2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same.
+1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
+2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
 
 Adobe Stock Categories:
 ${categoriesText}
@@ -1821,6 +1857,7 @@ OUTPUT FORMAT:
     "category_id": 0,
     "shutterstock_category_1": "",
     "shutterstock_category_2": "",
+    "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
     "confidence_score": 0.95
   }
 ]`;
@@ -1971,6 +2008,8 @@ OUTPUT FORMAT:
           metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures");
         }
 
+        metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+
         const targetId = items[index] ? items[index].id : (items[0]?.id || 'unknown');
         return { id: targetId, metadata };
     });
@@ -2094,6 +2133,7 @@ export const generateOptimizedPrompt = async (options: {
     "Anime/Manga": ' - Focus on cel-shaded aesthetics, expressive character features, vibrant colors, and classic Japanese hand-drawn illustration styles.',
     "Watercolor Painting": ' - Focus on flowing pigment washes, paper grain textures, organic color bleeds, and delicate artistic strokes.',
     "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.',
+    "Paper Cut": ' - Focus on layered paper textures (lapisan kertas bertumpuk), sharp and clean cut edges (tepi potongan tajam dan rapi), profound 3D depth effects from multiple stacked paper layers, soft drop shadows between layers (bayangan lembut antar lapisan kertas), highly detailed handcrafted papercraft aesthetic, compositions constructed purely from cut paper shapes rather than drawings/paintings, matte paper textures, clean silhouettes, and beautiful solid colors for each stacked layer.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.'
   };
 
@@ -2128,6 +2168,8 @@ ${currentDirective}
 Make sure your generated prompts do not contain these elements or depict them in any form, and include them in the generated negativePrompt value.`;
   }
 
+  const isPhotographic = ['Photorealistic', 'Cinematic', 'Vintage Photography'].includes(styleCategory);
+
   const systemInstruction = `You are an elite AI Image Prompt Designer specializing in text-to-image generators like Midjourney, DALL-E 3, Adobe Firefly, and Stable Diffusion.
 Anda adalah AI Prompt Generator ahli yang bertugas membuat prompt gambar unik dan bervariasi.
 Your job is to translate a raw idea and specific style choices into exactly ${count} highly unique, descriptive, and professional-grade generation prompt variations in English.
@@ -2145,16 +2187,17 @@ ${modeConstraint}
 PROMPT GENERATION PRIORITY (STRICT ORDER):
 1. Theme subject: The core subject MUST remain the dominant focus of the prompt.
 2. Visual characteristics: Describe specific colors, shapes, and the overall aesthetic vibe.
-3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities.
+3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities (e.g., stacked paper layers for Paper Cut, hand-molded clay textures for Claymation, canvas grain/pigments for Oil/Watercolor paintings, clean vector geometry for Vector Art).
 4. Environment: Only introduce environmental details if they naturally fit the theme. Do not introduce unrelated environments.
-5. Lighting: Essential details about mood, shadows, and light sources.
-6. Camera details: Specific lens types, aperture, and camera angles.${styleCategory !== 'Abstract' ? '' : ' EXCLUDE FOR ABSTRACT STYLE.'}
+5. Lighting: Essential details about mood, shadows, and light sources (e.g., soft shadows between layers for Paper Cut, clean solid gradients for Vectors, natural sunlight/fog for photo styles).
+6. ${isPhotographic ? 'Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).' : 'Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${styleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${styleCategory !== 'Abstract' ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional magazine editorial-style description.
-0.1 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
+0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${styleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
+0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
+0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
-2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for commercial photography, use distinct camera settings, lighting, ambient conditions, and include "copy space" (negative space) for text placement.
+2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
 3. WORD COUNT CONSTRAINT: Each generated prompt SHOULD be between ${minWords} and ${maxWords} words long. Adjust the level of detail to strictly match this requested length profile.
 4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property.
 5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).

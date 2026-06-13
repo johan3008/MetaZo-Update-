@@ -654,6 +654,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         </div>
                       </div>
 
+                      {file.categoryReason && (
+                        <div className="mt-2.5 p-3 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/25 border border-indigo-100/40 dark:border-indigo-900/30 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium leading-relaxed flex items-start gap-2">
+                          <Sparkles size={14} className="mt-0.5 text-indigo-500 dark:text-indigo-400 shrink-0 animate-pulse" />
+                          <div>
+                            <span className="font-extrabold text-indigo-800 dark:text-indigo-200">Visual Semantic Reason:</span> {file.categoryReason}
+                          </div>
+                        </div>
+                      )}
+
                       {/* REGENERATE METADATA BUTTON */}
                       {handleRegenerateFile && (
                         <div className="pt-2">

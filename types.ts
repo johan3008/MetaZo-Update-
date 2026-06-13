@@ -29,6 +29,7 @@ export interface StockMetadata {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
+  category_reason?: string;
 }
 
 export interface FileItem {
@@ -43,6 +44,7 @@ export interface FileItem {
   adobeCategoryId: number | '';
   shutterstockCategory1: string;
   shutterstockCategory2: string;
+  categoryReason?: string;
   isGenerating: boolean;
   isExtracting?: boolean;
   error: string | null;

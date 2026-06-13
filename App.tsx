@@ -2004,6 +2004,7 @@ const App: React.FC = () => {
                 adobeCategoryId: metadata.category_id,
                 shutterstockCategory1: metadata.shutterstock_category_1,
                 shutterstockCategory2: metadata.shutterstock_category_2,
+                categoryReason: metadata.category_reason,
                 isGenerating: false,
                 error: null
               } : f));
@@ -2145,6 +2146,7 @@ const App: React.FC = () => {
                             adobeCategoryId: result.metadata.category_id,
                             shutterstockCategory1: result.metadata.shutterstock_category_1,
                             shutterstockCategory2: result.metadata.shutterstock_category_2,
+                            categoryReason: result.metadata.category_reason,
                             isGenerating: false,
                             error: null
                         };
