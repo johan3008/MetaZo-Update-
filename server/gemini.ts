@@ -1119,12 +1119,14 @@ OUTPUT FORMAT:
   // --- TAHAP 2 & 3: PROVIDER 2 (GPT ROLE) & PROVIDER 3 (CLAUDE ROLE) — CONTENT GENERATION ---
   console.log(`[JohMeta Pipeline] Stage 2 & 3: Generating Content (Title, Description, Keywords)...`);
   
+  const customPromptCommand = customPrompt ? `\nCRITICAL TARGET KEYWORD / ANCHOR INSTRUCTION:\nThe user has provided a specific target keyword or anchor prompt: "${customPrompt}"\nABSOLUTE RULE: You MUST heavily prioritize and integrate this exact target keyword/anchor into both the Title and the Keywords list. Formulate the title naturally but prominently around this target keyword.` : "";
+
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
 OUTPUT MUST BE IN ENGLISH for titles and keywords.
 
-${mediaContext}
+${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -1206,7 +1208,7 @@ OUTPUT FORMAT:
 Your goal is to maximize the discoverability of visual assets.
 OUTPUT MUST BE IN ENGLISH for titles and keywords.
 
-${mediaContext}
+${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -1608,11 +1610,14 @@ OUTPUT FORMAT:
   });
 
   const mediaContext = toolType === ToolType.VIDEO ? "CRITICAL: Sequential frames from a single VIDEO. Analyze continuous motion and storyline across frames." : (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "VECTOR illustration preview. Focus on clean layout, graphic elements." : "Photograph or digital artwork.");
+  
+  const customPromptCommand = customPrompt ? `\nCRITICAL TARGET KEYWORD / ANCHOR INSTRUCTION:\nThe user has provided a specific target keyword or anchor prompt: "${customPrompt}"\nABSOLUTE RULE: You MUST heavily prioritize and integrate this exact target keyword/anchor into both the Title and the Keywords list. Formulate the title naturally but prominently around this target keyword.` : "";
+
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
 OUTPUT MUST BE IN ENGLISH for titles and keywords.
 
-${mediaContext}
+${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -1702,7 +1707,7 @@ OUTPUT FORMAT:
 Your goal is to maximize the discoverability of visual assets.
 OUTPUT MUST BE IN ENGLISH for titles and keywords.
 
-${mediaContext}
+${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").

@@ -81,14 +81,20 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
         <div
           className={`flex-grow border-2 border-dashed ${
             isDragging 
-              ? activeTool === ToolType.IMAGE ? 'border-blue-500 bg-blue-500/5' : activeTool === ToolType.VIDEO ? 'border-purple-500 bg-purple-500/5' : 'border-emerald-500 bg-emerald-500/5'
-              : activeTool === ToolType.IMAGE ? 'border-slate-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-slate-600' : activeTool === ToolType.VIDEO ? 'border-slate-300 dark:border-slate-700 hover:border-purple-400 dark:hover:border-slate-600' : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-slate-600'
-          } rounded-2xl p-6 text-center cursor-pointer transition-all duration-350 flex flex-col items-center justify-center min-h-[220px] hover:bg-slate-50/50 dark:hover:bg-slate-800/40 relative group/drop`}
+              ? activeTool === ToolType.IMAGE ? 'border-blue-500 bg-blue-500/10 scale-[1.02] shadow-xl shadow-blue-500/10' : activeTool === ToolType.VIDEO ? 'border-purple-500 bg-purple-500/10 scale-[1.02] shadow-xl shadow-purple-500/10' : 'border-emerald-500 bg-emerald-500/10 scale-[1.02] shadow-xl shadow-emerald-500/10'
+              : 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-white dark:hover:bg-slate-800/40 hover:border-slate-400 dark:hover:border-slate-500 hover:shadow-lg'
+          } rounded-3xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] relative group overflow-hidden`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
           onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileChange({ target: { files: e.dataTransfer.files } }); }}
           onClick={triggerFileInput}
         >
+          {/* Background Ambient Glow */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+            <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl rounded-full ${activeTool === ToolType.IMAGE ? 'bg-blue-400/10' : activeTool === ToolType.VIDEO ? 'bg-purple-400/10' : 'bg-emerald-400/10'}`} />
+            <div className={`absolute bottom-0 left-0 w-32 h-32 blur-3xl rounded-full ${activeTool === ToolType.IMAGE ? 'bg-indigo-400/10' : activeTool === ToolType.VIDEO ? 'bg-fuchsia-400/10' : 'bg-teal-400/10'}`} />
+          </div>
+
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -97,19 +103,26 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             onChange={handleFileChange} 
             className="hidden" 
           />
-          <div className="flex flex-col items-center group/icon relative z-10">
-            <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-4 border border-slate-200/60 dark:border-slate-700 group-hover/drop:scale-105 transition-transform duration-300">
-              {activeTool === ToolType.IMAGE ? <ImageIcon size={24} className="text-blue-500" /> : activeTool === ToolType.VIDEO ? <Film size={24} className="text-purple-500" /> : <FileCode size={24} className="text-emerald-500" />}
+          <div className="flex flex-col items-center group/icon relative z-10 transition-transform duration-300 group-hover:-translate-y-1">
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-lg border transition-all duration-300 ${
+                activeTool === ToolType.IMAGE 
+                  ? 'bg-blue-500/10 border-blue-500/20 text-blue-500 group-hover:bg-blue-500/20 group-hover:scale-110' 
+                  : activeTool === ToolType.VIDEO 
+                    ? 'bg-purple-500/10 border-purple-500/20 text-purple-500 group-hover:bg-purple-500/20 group-hover:scale-110' 
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500/20 group-hover:scale-110'
+              }`}
+            >
+              {activeTool === ToolType.IMAGE ? <ImageIcon size={28} /> : activeTool === ToolType.VIDEO ? <Film size={28} /> : <FileCode size={28} />}
             </div>
-            <p className="text-slate-400 dark:text-slate-500 font-extrabold text-[10px] mb-1 uppercase tracking-wider">{t.drag_drop}</p>
-            <p className={`font-black text-sm ${
+            <p className="text-slate-400 dark:text-slate-500 font-extrabold text-[10px] mb-2 uppercase tracking-widest">{t.drag_drop}</p>
+            <p className={`font-black text-sm tracking-tight ${
               activeTool === ToolType.IMAGE ? 'text-blue-600 dark:text-blue-400' : activeTool === ToolType.VIDEO ? 'text-purple-600 dark:text-purple-400' : 'text-emerald-600 dark:text-emerald-400'
             }`}>{t.click_to_choose}</p>
           </div>
         </div>
 
         {hasFiles && (
-          <div className="mt-4 flex items-center justify-between p-3 rounded-xl border border-[#e3e6f0]/80 dark:border-slate-700/30 bg-[#f8f9fc] dark:bg-slate-900/60">
+          <div className="mt-5 flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm animate-in fade-in duration-300">
             <span className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-wider">
               {files.length} {t.files_selected}
             </span>

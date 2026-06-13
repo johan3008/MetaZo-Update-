@@ -64,27 +64,27 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
       </div>
 
       {/* CARD BODY */}
-      <div className="p-6 flex-grow flex flex-col justify-between">
+      <div className="p-6 flex-grow flex flex-col justify-between relative z-10">
         <div>
-          <p className="text-slate-400 dark:text-slate-500 mb-4 text-xs font-semibold leading-relaxed">
+          <p className="text-slate-400 dark:text-slate-500 mb-5 text-xs font-semibold leading-relaxed">
             {t.generate_desc}
           </p>
 
           <div className="space-y-4 mb-4">
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between">
                 <span>{t.custom_prompt_optional}</span>
-                <span className="text-[8px] text-[#4e73df] font-black lowercase pb-0.5">Prompt anchor</span>
+                <span className="text-[8px] text-[#4e73df] font-black lowercase pb-0.5 opacity-75">Prompt anchor</span>
               </label>
               <textarea 
-                className="w-full p-3 bg-slate-100/50 dark:bg-black/35 rounded-xl border border-slate-200/80 dark:border-slate-800 outline-none text-xs min-h-[85px] text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df]/80 transition-all resize-none font-semibold placeholder-slate-400 dark:placeholder-slate-500" 
+                className="w-full p-4 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/80 dark:border-white/5 outline-none text-xs min-h-[90px] text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df]/80 transition-all resize-none font-medium placeholder-slate-400/70" 
                 value={customPrompt} 
                 onChange={(e) => setCustomPrompt(e.target.value)} 
                 placeholder={t.custom_prompt_placeholder}
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800/80 text-slate-600 dark:text-slate-350 font-bold">
+            <div className="flex items-center justify-between p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
               <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.keyword_count_label}</label>
               <input 
                 type="number" 
@@ -100,17 +100,17 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     setKeywordCount(num);
                   }
                 }} 
-                className="w-14 p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-blue-500/30 outline-none" 
+                className="w-14 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-[#4e73df]/30 outline-none shadow-sm" 
               />
             </div>
 
-            <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800/80">
+            <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
               <div className="flex justify-between items-center mb-1">
                 <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   Keyword Style / Gaya Keyword
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { value: 'mixed', label: 'Mixed' },
                   { value: 'single', label: 'Single' },
@@ -120,10 +120,10 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     key={opt.value}
                     type="button"
                     onClick={() => setKeywordMode(opt.value as 'mixed' | 'single' | 'multi')}
-                    className={`py-1.5 px-2 text-[10px] uppercase font-extrabold rounded-lg border transition-all text-center ${
+                    className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-xl border transition-all text-center ${
                       keywordMode === opt.value
-                        ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-sm shadow-[#4e73df]/15'
-                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200/80 dark:border-slate-700 hover:bg-slate-105 dark:hover:bg-slate-750'
+                        ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-md shadow-[#4e73df]/20'
+                        : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
                     {opt.label}
@@ -132,16 +132,17 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2.5 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800/80">
-              <div className="flex justify-between items-center">
+            <div className="space-y-3 p-4 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="flex justify-between items-center relative z-10">
                 <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                   AI Creativity
                 </label>
-                <span className="px-2.5 py-1 bg-slate-900 dark:bg-black/40 text-white text-xs font-black rounded-lg border border-slate-800 dark:border-white/10 shadow-sm min-w-[36px] text-center font-mono">
+                <span className="px-3 py-1 bg-white dark:bg-slate-800 text-amber-500 dark:text-amber-400 text-[11px] font-black rounded-lg border border-slate-200 dark:border-white/10 shadow-sm min-w-[36px] text-center font-mono tracking-tighter">
                   {aiCreativity.toFixed(1)}
                 </span>
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 relative z-10">
                 <input 
                   type="range"
                   min="0.1"

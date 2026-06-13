@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
-  CreditCard, ShoppingCart, ShieldCheck, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
+  CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
   Trash2, RefreshCw, Download, Mail, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -695,94 +695,110 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               </p>
             </div>
 
-            <div className="space-y-3.5 pr-1 max-h-[460px] overflow-y-auto custom-scrollbar">
-              {/* Brand Name */}
-              <div className="space-y-1">
-                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[9px] block">Customize App Name</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: MetaZo PRO"
-                  value={tempAppName}
-                  onChange={(e) => setTempAppName(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-bold text-xs focus:border-[#4e73df] transition-all"
-                />
-              </div>
-
-              {/* Slogan */}
-              <div className="space-y-1">
-                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[9px] block">App Subtitle / Slogan</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: AI-Powered Metadata Assistant"
-                  value={tempAppSubtitle}
-                  onChange={(e) => setTempAppSubtitle(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-semibold text-xs focus:border-[#4e73df] transition-all"
-                />
-              </div>
-
-              {/* Pricing Text */}
-              <div className="space-y-1">
-                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[9px] block">Active Price Text (Indicates fee to upgrade)</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Rp 149.000 / Bulan atau Rp 499.000 Lifetime"
-                  value={tempPricingTier}
-                  onChange={(e) => setTempPricingTier(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-semibold text-xs focus:border-[#4e73df] transition-all"
-                />
-              </div>
-
-              {/* WhatsApp Support */}
-              <div className="space-y-1">
-                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[9px] block">Creator Support / Purchase link (WA / Telegram)</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: https://wa.me/62812345678"
-                  value={tempWhatsApp}
-                  onChange={(e) => setTempWhatsApp(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs focus:border-[#4e73df] transition-all"
-                />
-              </div>
-
-              {/* Main License Seed Key */}
-              <div className="space-y-1">
-                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[9px] block">Product Validation Serial Key (Passcode seed)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Contoh: MZPRO-COMMERCIAL-2026"
-                    value={tempLicenseSeed}
-                    onChange={(e) => setTempLicenseSeed(e.target.value.toUpperCase())}
-                    className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono font-bold text-xs focus:border-[#4e73df] transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(tempLicenseSeed, 'seed')}
-                    className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 rounded-xl transition-colors"
-                    title="Salin Key Validasi"
-                  >
-                    {copiedKey === 'seed' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                  </button>
+            <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2 pb-4">
+              {/* BRANDING SETUP GRID */}
+              <div className="bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-4">
+                <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200 mb-3">
+                  <Sparkles size={14} className="text-[#4e73df]" />
+                  <span className="text-[10px] font-black uppercase tracking-wider">A. Brand Identity Customization</span>
                 </div>
-                <p className="text-[8.5px] font-semibold text-slate-400 mt-0.5">
-                  💡 Pembeli harus memasukkan kode ini (atau kode format berekstensi <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">MZPRO-xxxx-xxxx-OK</code>) untuk aktivasi premium penuh.
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">App Name</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: MetaZo PRO"
+                      value={tempAppName}
+                      onChange={(e) => setTempAppName(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-bold text-xs focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Subtitle / Slogan</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: AI-Powered Metadata Assistant"
+                      value={tempAppSubtitle}
+                      onChange={(e) => setTempAppSubtitle(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-medium text-xs focus:border-[#4e73df] focus:ring-1 focus:ring-[#4e73df] transition-all"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Pay Info Manual */}
-              <div className="space-y-1">
-                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[9px] block">Payment / Order Transfer Instructions manual</label>
-                <textarea
-                  rows={2}
-                  placeholder="Contoh: Transfer Bank BCA 123-xxxx a/n Nama Anda"
-                  value={tempPayInfo}
-                  onChange={(e) => setTempPayInfo(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs focus:border-[#4e73df] resize-none transition-all line-clamp-3"
-                />
+              {/* COMMERCE SETUP GRID */}
+              <div className="bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-4">
+                <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200 mb-3">
+                  <ShoppingCart size={14} className="text-emerald-500" />
+                  <span className="text-[10px] font-black uppercase tracking-wider">B. Commerce & Purchase Info</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Pricing Text Display</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Rp 149.000 / Bulan"
+                      value={tempPricingTier}
+                      onChange={(e) => setTempPricingTier(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-medium text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-emerald-600 dark:text-emerald-400"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Custom WhatsApp Link / Support</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: https://wa.me/..."
+                      value={tempWhatsApp}
+                      onChange={(e) => setTempWhatsApp(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none font-mono text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-500"
+                    />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Payment / Order Transfer Instructions</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Contoh: Transfer Bank BCA 123-xxxx a/n Nama Anda"
+                      value={tempPayInfo}
+                      onChange={(e) => setTempPayInfo(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none transition-all line-clamp-3"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECURITY SETUP GRID */}
+              <div className="bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-amber-800/20 mb-4">
+                <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200 mb-3">
+                  <Shield size={14} className="text-amber-500" />
+                  <span className="text-[10px] font-black uppercase tracking-wider">C. Core Validation Settings</span>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Product Validation Serial Key (Passcode Seed)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Contoh: MZPRO-COMMERCIAL-2026"
+                      value={tempLicenseSeed}
+                      onChange={(e) => setTempLicenseSeed(e.target.value.toUpperCase())}
+                      className="flex-1 bg-amber-500/5 dark:bg-amber-900/10 border border-amber-500/20 dark:border-amber-500/30 rounded-xl px-3 py-2 outline-none font-mono font-bold text-xs focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(tempLicenseSeed, 'seed')}
+                      className="p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 rounded-xl transition-colors"
+                      title="Salin Key Validasi"
+                    >
+                      {copiedKey === 'seed' ? <Check size={14} className="text-amber-600" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[8.5px] font-semibold text-slate-400 mt-1">
+                    🚨 Pembeli harus memasukkan kode ini untuk mengaktivasi fitur premium secara offline/manual jika tidak memakai fitur single-use serial key.
+                  </p>
+                </div>
               </div>
 
               {/* NEW SERIAL KEY ENGINE FOR SELLING (SINGLE USE) */}
-              <div className="border-t border-slate-100 dark:border-white/5 pt-3.5 mt-2 space-y-3">
+              <div className="border-t border-slate-100 dark:border-white/5 pt-4 space-y-3">
                 <div className="bg-slate-100/60 dark:bg-slate-950/50 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 space-y-1.5">
                   <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200">
                     <Key size={14} className="text-[#4e73df] animate-pulse" />

@@ -501,19 +501,23 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                   </button>
                 </div>
 
-                <div className="flex flex-col space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="text-slate-300 dark:text-slate-600 font-black text-lg pt-1 select-none">
+                <div className="flex flex-col space-y-5">
+                  <div className="flex items-start space-x-4">
+                    <div className="text-slate-300 dark:text-slate-600 font-black text-xl pt-1 select-none">
                       {index + 1}
                     </div>
                     <div 
                       onClick={() => setPreviewFile(file)}
-                      className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-500/55 transition-all shadow-inner"
+                      className={`w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 shrink-0 cursor-pointer hover:ring-2 hover:ring-[#4e73df]/50 hover:scale-[1.02] transition-all shadow-sm ${file.isGenerating || file.isExtracting ? 'opacity-80' : ''}`}
                     >
                       {file.file.type.startsWith('video/') && file.analysisFrames && file.analysisFrames.length >= 3 ? (
-                        <img src={file.analysisFrames[1] || undefined} className="w-full h-full object-cover" alt="Frame" loading="lazy" />
+                        <div className="relative w-full h-full">
+                          <img src={file.analysisFrames[1] || undefined} className="w-full h-full object-cover" alt="Frame" loading="lazy" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                          <Film size={12} className="absolute bottom-1.5 left-1.5 text-white/90" />
+                        </div>
                       ) : file.thumbnail ? (
-                        <img src={file.thumbnail || undefined} className="w-full h-full object-cover" alt="Thumbnail" loading="lazy" />
+                        <img src={file.thumbnail || undefined} className="w-full h-full object-cover hover:rotate-1 hover:scale-105 transition-transform duration-500" alt="Thumbnail" loading="lazy" />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 font-bold text-[9px]">
                           <FileCode size={20} className="mb-0.5" />
@@ -522,7 +526,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                       )}
                     </div>
 
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 py-0.5">
                       <input 
                         type="text" 
                         value={file.customFileName ?? file.file.name}
@@ -530,21 +534,21 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                           const newName = e.target.value;
                           updateFiles(prev => prev.map(f => f.id === file.id ? { ...f, customFileName: newName } : f));
                         }}
-                        className="text-xs font-black text-slate-700 dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 outline-none w-full truncate cursor-text transition-colors pb-0.5"
+                        className="text-xs font-black text-slate-700 dark:text-white bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 outline-none w-full truncate cursor-text transition-colors pb-1"
                         title="Edit Filename"
                       />
-                      <div className="mt-1">
+                      <div className="mt-1.5 pb-1 flex flex-wrap gap-1.5 items-center">
                         {file.error ? (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-red-100 dark:bg-red-950/20 text-red-500 text-[8px] font-black uppercase tracking-wider rounded-md border border-red-500/10">
+                          <span className="inline-flex items-center px-2 py-0.5 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-[9px] font-black uppercase tracking-wider rounded-md border border-red-500/20 shadow-sm">
                             Error: {file.error}
                           </span>
                         ) : file.title ? (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-[#1cc88a]/10 text-[#1cc88a] text-[8px] font-black uppercase tracking-wider rounded-md border border-[#1cc88a]/15">
+                          <span className="inline-flex items-center px-2 py-0.5 bg-[#1cc88a]/10 dark:bg-[#1cc88a]/5 text-[#1bd18f] text-[9px] font-black uppercase tracking-wider rounded-md border border-[#1cc88a]/20 shadow-sm">
                             Analysis Complete
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 text-[8px] font-black uppercase tracking-wider rounded-md border border-slate-200">
-                            Waiting
+                          <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-md border border-slate-200 dark:border-white/5 shadow-sm">
+                            Waiting Pending
                           </span>
                         )}
                       </div>
