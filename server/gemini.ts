@@ -1295,10 +1295,12 @@ OUTPUT FORMAT:
 
   // --- TAHAP 7: FINAL SANITIZATION & RETURN ---
   try {
-    const data = finalMetadataRaw;
+    let data = (finalMetadataRaw && typeof finalMetadataRaw === 'object' && !Array.isArray(finalMetadataRaw)) ? { ...finalMetadataRaw } : {};
     
     // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
-    if (data.keywords && Array.isArray(data.keywords)) {
+    if (!data.keywords || !Array.isArray(data.keywords)) {
+      data.keywords = [];
+    }
       let cleanedKeywords: string[] = [];
       
       data.keywords.forEach((k: any) => {
@@ -1355,7 +1357,6 @@ OUTPUT FORMAT:
         data.category_id,
         keywordMode
       );
-    }
 
     // 1.5. Enforce professional Adobe Stock title length of 70-120 characters strictly
     data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "");
@@ -1695,6 +1696,15 @@ OUTPUT FORMAT:
     );
 
     draftMetadataArray = JSON.parse(extractJSON(typeof genResponse === 'string' ? genResponse : genResponse.text));
+    if (!Array.isArray(draftMetadataArray)) {
+      if (draftMetadataArray && typeof draftMetadataArray === 'object') {
+        if (Array.isArray(draftMetadataArray.metadata)) draftMetadataArray = draftMetadataArray.metadata;
+        else if (Array.isArray(draftMetadataArray.items)) draftMetadataArray = draftMetadataArray.items;
+        else draftMetadataArray = [draftMetadataArray];
+      } else {
+        draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
+      }
+    }
   } catch (err) {
     console.warn("[JohMeta Pipeline - Batch] Generation Stage 2/3 Failed: bypassed:", err.message);
     draftMetadataArray = items.map(() => ({ title: "Commercial stock asset", description: "High quality visual content.", keywords: ["stock"] }));
@@ -1798,11 +1808,29 @@ OUTPUT FORMAT:
   }
 
   try {
-    const dataArray = finalMetadataArray;
+    let dataArray = finalMetadataArray;
+    if (!Array.isArray(dataArray)) {
+      if (dataArray && typeof dataArray === 'object') {
+        if (Array.isArray(dataArray.metadata)) {
+          dataArray = dataArray.metadata;
+        } else if (Array.isArray(dataArray.items)) {
+          dataArray = dataArray.items;
+        } else {
+          dataArray = [dataArray];
+        }
+      } else {
+        dataArray = [];
+      }
+    }
 
-    return dataArray.map((metadata, index) => {
+    return dataArray.map((rawMetadata, index) => {
+        // Ensure metadata is a valid object
+        let metadata: any = (rawMetadata && typeof rawMetadata === 'object' && !Array.isArray(rawMetadata)) ? { ...rawMetadata } : {};
+
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
-        if (metadata.keywords && Array.isArray(metadata.keywords)) {
+        if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
+            metadata.keywords = [];
+        }
             let cleanedKeywords: string[] = [];
             metadata.keywords.forEach((k: any) => {
                 if (typeof k === 'string') {
@@ -1857,7 +1885,6 @@ OUTPUT FORMAT:
               metadata.category_id,
               keywordMode
             );
-        }
 
         // 1.5. Enforce professional Adobe Stock title length of 70-120 characters strictly
         metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "");

@@ -2148,6 +2148,9 @@ const App: React.FC = () => {
                             isGenerating: false,
                             error: null
                         };
+                    } else if (finalItemsToProcess.some(fi => fi.id === f.id)) {
+                        // Mark as failed if it was part of batch but no result was returned
+                        return { ...f, isGenerating: false, error: "Model did not return result for this asset in batch" };
                     }
                     return f;
                 }));
