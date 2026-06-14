@@ -28,6 +28,21 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Key generation moment" }
       },
       "required": ["key", "activated"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Sync profile for user license keys & daily limits",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "The user's account email address" },
+        "displayName": { "type": "string", "description": "User's presentation display name" },
+        "licenseKey": { "type": "string", "description": "The custom active license key string" },
+        "trialStart": { "type": "string", "format": "date-time", "description": "The exact start moment of user's free trial" },
+        "dailyUsage": { "type": "object", "description": "Day-by-day nested mapping tracking processing numbers per type" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account cloud register moment" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last synced moment" }
+      },
+      "required": ["email", "licenseKey"]
     }
   },
   "firestore": {
@@ -38,6 +53,10 @@
     "/keys/{keyId}": {
       "schema": "LicenseKey",
       "description": "Unique key objects. Document ID matches the generated key string itself."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual account state, synced to cloud."
     }
   }
 }

@@ -29,6 +29,7 @@ interface SaaSPortalProps {
   setShowActivation: (show: boolean) => void;
   userEmail?: string;
   onlyModal?: boolean;
+  userId?: string;
 
   // Lock status control
   isResellerUnlocked?: boolean;
@@ -58,6 +59,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   setShowActivation,
   userEmail = 'user@example.com',
   onlyModal = false,
+  userId,
   isResellerUnlocked = false,
   setIsResellerUnlocked,
   trialDaysLeft,
@@ -407,6 +409,18 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
     try {
       const dSnap = await getDoc(keyRef);
+      const syncUserDb = async (key: string) => {
+        if (userId) {
+          const userRef = doc(db, 'users', userId);
+          await setDoc(userRef, {
+            licenseKey: key,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(err => {
+            console.error("Sync to user profile failed:", err);
+          });
+        }
+      };
+
       if (dSnap.exists()) {
         const data = dSnap.data();
         if (data.activated) {
@@ -423,6 +437,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               }
             }
             localStorage.setItem('mz_license_key', targetKeyFormatted);
+            await syncUserDb(targetKeyFormatted);
             setLicenseKey(targetKeyFormatted);
             setActivationSuccess(true);
             setActivationError('');
@@ -437,11 +452,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           // Unactivated single-use key -> activate it!
           await updateDoc(keyRef, {
             activated: true,
-            activatedBy: devId,
+            activatedBy: userEmail || devId,
             activatedAt: new Date().toISOString()
           });
 
           localStorage.setItem('mz_license_key', targetKeyFormatted);
+          await syncUserDb(targetKeyFormatted);
           setLicenseKey(targetKeyFormatted);
           setActivationSuccess(true);
           setActivationError('');
@@ -455,6 +471,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         const isValid = validateKey(inputKey, tempLicenseSeed);
         if (isValid) {
           localStorage.setItem('mz_license_key', targetKeyFormatted);
+          await syncUserDb(targetKeyFormatted);
           setLicenseKey(targetKeyFormatted);
           setActivationSuccess(true);
           setActivationError('');
@@ -469,8 +486,21 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     } catch (err) {
       console.error('Firestore activate check error, testing fallback offline keys:', err);
       const isValid = validateKey(inputKey, tempLicenseSeed);
+      const syncUserDb = async (key: string) => {
+        if (userId) {
+          const userRef = doc(db, 'users', userId);
+          await setDoc(userRef, {
+            licenseKey: key,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(err => {
+            console.error("Sync to user profile failed:", err);
+          });
+        }
+      };
+
       if (isValid) {
         localStorage.setItem('mz_license_key', targetKeyFormatted);
+        await syncUserDb(targetKeyFormatted);
         setLicenseKey(targetKeyFormatted);
         setActivationSuccess(true);
         setActivationError('');
@@ -487,10 +517,22 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
   };
 
-  const handleRemoveLicenseKey = () => {
+  const handleRemoveLicenseKey = async () => {
     localStorage.removeItem('mz_license_key');
     // Fully return to trial mode by resetting the trial period
     localStorage.setItem('mz_trial_start', new Date().toISOString());
+    
+    if (userId) {
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, {
+        licenseKey: '',
+        trialStart: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => {
+        console.error("Failed to clear license in user profile:", err);
+      });
+    }
+
     setLicenseKey('');
     setInputKey('');
     setActivationError('');
