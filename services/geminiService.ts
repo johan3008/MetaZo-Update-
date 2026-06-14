@@ -79,10 +79,31 @@ export const generateStockMetadata = async (
   });
   
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || "Failed to generate metadata via server-side AI");
+    const rawText = await response.text();
+    console.log('[API DEBUG] /api/generate-metadata response not OK:');
+    console.log(`STATUS: ${response.status}`);
+    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
+    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
+    
+    let errData: any = {};
+    try {
+      errData = JSON.parse(rawText);
+    } catch (e) {
+      // Ignored, we already logged the exact HTML or text above
+    }
+    throw new Error(errData.error || `Failed to generate metadata via server-side AI (Status: ${response.status})`);
   }
-  return response.json();
+  
+  const rawText = await response.text();
+  try {
+    return JSON.parse(rawText);
+  } catch(e) {
+    console.log('[API DEBUG] /api/generate-metadata JSON parse error:');
+    console.log(`STATUS: ${response.status}`);
+    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
+    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
+    throw new Error(`Invalid JSON response from server: ${rawText.substring(0, 100)}`);
+  }
 };
 
 export const generateBatchStockMetadata = async (
@@ -108,10 +129,31 @@ export const generateBatchStockMetadata = async (
   });
 
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || "Failed to generate batch metadata via server-side AI");
+    const rawText = await response.text();
+    console.log('[API DEBUG] /api/generate-batch-metadata response not OK:');
+    console.log(`STATUS: ${response.status}`);
+    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
+    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
+    
+    let errData: any = {};
+    try {
+      errData = JSON.parse(rawText);
+    } catch (e) {
+      // Ignored
+    }
+    throw new Error(errData.error || `Failed to generate batch metadata via server-side AI (Status: ${response.status})`);
   }
-  return response.json();
+  
+  const rawText = await response.text();
+  try {
+    return JSON.parse(rawText);
+  } catch(e) {
+    console.log('[API DEBUG] /api/generate-batch-metadata JSON parse error:');
+    console.log(`STATUS: ${response.status}`);
+    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
+    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
+    throw new Error(`Invalid JSON response from server: ${rawText.substring(0, 100)}`);
+  }
 };
 
 export const fetchCalendarEvents = async (month: string, options?: ServiceOptions): Promise<{ events: any[] }> => {

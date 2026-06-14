@@ -658,7 +658,7 @@ async function callOpenAICompatibleWithRetry(params: {
           console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
         }
 
-        const fetchTimeout = provider === 'nvidia' ? 180000 : 180000;
+        const fetchTimeout = provider === 'nvidia' ? 300000 : 180000;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers,
@@ -667,13 +667,24 @@ async function callOpenAICompatibleWithRetry(params: {
           signal: AbortSignal.timeout(fetchTimeout)
         });
 
+        // Safe logging of the response
+        const responseDataRawForLogging = await response.clone().text();
+        console.log(`[NVIDIA DEBUG] Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
+
         if (!response.ok) {
           const errText = await response.text();
           console.warn(`[NVIDIA API FAILURE] Status: ${response.status}, Response: ${errText}`);
           throw new Error(`HTTP ${response.status}: ${errText}`);
         }
 
-        const responseData = await response.json();
+        const responseDataRaw = await response.text();
+        let responseData;
+        try {
+          responseData = JSON.parse(responseDataRaw);
+        } catch (e) {
+          console.error(`[callOpenAICompatibleWithRetry] Failed to parse JSON. Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, RawResponse: ${responseDataRaw.substring(0, 500)}`);
+          throw new Error(`Failed to parse JSON from ${provider}. RawResponse Sample: ${responseDataRaw.substring(0, 200)}`);
+        }
         let answer = responseData.choices?.[0]?.message?.content;
         if (!answer && responseData.choices?.[0]?.message) {
           answer = responseData.choices[0].message.reasoning || responseData.choices[0].message.reasoning_content;
@@ -1209,38 +1220,62 @@ OUTPUT FORMAT:
 {
   "title": "A highly descriptive natural language title representing the core subject",
   "description": "A detailed visual description focusing on subjects, setting, and mood",
-  "keywords": [],
+  "keywords": ["keyword1", "keyword2", "keyword3"],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
   "shutterstock_category_2": "Backgrounds/Textures",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
-}`;
+}
+If generation fails, return {"error": "metadata_generation_failed"}.`;
 
   let draftMetadata: any = {};
   try {
-    const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
-      ? callOpenAICompatibleWithRetry({
-          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
-          contents: genSystemInstruction + `\n\nGenerate draft metadata based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]`,
-          responseMimeType: "application/json",
-          config: { temperature: temperature ?? 0.1, topP: 0.8 },
-          model: activeModel
-        })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
-          parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
-        }, {
-          systemInstruction: genSystemInstruction,
-          responseMimeType: "application/json",
-          temperature: temperature ?? 0.1,
-          topP: 0.8 })
-    );
+    let genResponse: any;
+    // Primary: Try Gemini first
+    try {
+        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
+            parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
+          }, {
+            systemInstruction: genSystemInstruction,
+            responseMimeType: "application/json",
+            temperature: temperature ?? 0.3,
+            topP: 0.9 
+          });
+    } catch (err) {
+        console.warn('[JohMeta Pipeline] Gemini call failed, attempting fallback to NVIDIA/Other:', err);
+        // Fallback: NVIDIA NIM (if configured)
+        if (NON_GEMINI_PROVIDERS.has(provider)) {
+            genResponse = await callOpenAICompatibleWithRetry({
+                systemInstruction: `You are an Adobe Stock Metadata Expert.`,
+                contents: genSystemInstruction + `\n\nGenerate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
+                responseMimeType: "application/json",
+                config: { temperature: temperature ?? 0.3, topP: 0.9 },
+                model: activeModel
+            });
+        } else {
+            throw err;
+        }
+    }
 
     let rawContent = typeof genResponse === 'string' ? genResponse : genResponse.text;
-    console.log('[STAGE 2/3] RAW RESPONSE:');
+    console.log('### RAW RESPONSE CONTENT ###');
     console.log(rawContent);
-    draftMetadata = JSON.parse(extractJSON(rawContent));
+    // Add check to see what rawContent is exactly
+    console.log('Type of rawContent:', typeof rawContent);
+    
+    const extracted = extractJSON(rawContent);
+    console.log('### EXTRACTED JSON ###');
+    console.log(extracted);                
+    
+    // Check if extracted is just an empty object string
+    if (extracted.trim() === '{}') {
+        throw new Error('Model returned empty object string "{}"');
+    }
+
+    draftMetadata = JSON.parse(extracted);
     console.log('[STAGE 2/3] PARSED:');
     console.log(draftMetadata);
+    if (draftMetadata.error) { throw new Error('Model returned error: ' + draftMetadata.error); }
     if (!draftMetadata || typeof draftMetadata !== 'object' || Array.isArray(draftMetadata)) { throw new Error('Model did not return a valid object'); }
     if (!draftMetadata.title && !draftMetadata.description && (!draftMetadata.keywords || draftMetadata.keywords.length === 0)) { throw new Error('Model returned empty object {}'); }
   } catch (err) {
