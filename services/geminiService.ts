@@ -59,6 +59,48 @@ export const getHeaders = (options?: ServiceOptions) => {
   return headers;
 };
 
+const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {
+  let attempt = 0;
+  let delayMs = 1000;
+  
+  while (true) {
+    try {
+      const response = await fetch(url, options);
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok || contentType.includes('text/html')) {
+        const rawText = await response.text();
+        console.warn(`[API WARNING] fetch ${url} attempt ${attempt + 1}/${maxRetries + 1} failed. Status: ${response.status}, Content-Type: ${contentType}`);
+        console.warn(`[API WARNING] Error Body (first 500 chars): ${rawText.substring(0, 500)}`);
+        
+        if (attempt < maxRetries && (!response.ok || contentType.includes('text/html'))) {
+          attempt++;
+          console.log(`[API RETRY] Retrying ${url} in ${delayMs}ms (Attempt ${attempt} of ${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs *= 2; 
+          continue;
+        }
+        
+        let errData: any = {};
+        try {
+          errData = JSON.parse(rawText);
+        } catch (e) {}
+        throw new Error(errData.error || `Failed request to ${url} (Status: ${response.status})`);
+      }
+      return response;
+    } catch (e: any) {
+      if (attempt < maxRetries) {
+        attempt++;
+        console.log(`[API RETRY] Network error on ${url}: ${e.message}. Retrying in ${delayMs}ms (Attempt ${attempt} of ${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        delayMs *= 2;
+        continue;
+      }
+      throw e;
+    }
+  }
+};
+
 export const generateStockMetadata = async (
   frames: string[],
   keywordCount: number | string,
@@ -72,36 +114,18 @@ export const generateStockMetadata = async (
   // Convert any blob: URLs into Base64 data URLs on the client side
   const base64Frames = await Promise.all(frames.map(ensureBase64));
 
-  const response = await fetch('/api/generate-metadata', {
+  const response = await fetchWithRetry('/api/generate-metadata', {
     method: 'POST',
     headers: getHeaders(options),
     body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode })
   });
   
-  if (!response.ok) {
-    const rawText = await response.text();
-    console.log('[API DEBUG] /api/generate-metadata response not OK:');
-    console.log(`STATUS: ${response.status}`);
-    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
-    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
-    
-    let errData: any = {};
-    try {
-      errData = JSON.parse(rawText);
-    } catch (e) {
-      // Ignored, we already logged the exact HTML or text above
-    }
-    throw new Error(errData.error || `Failed to generate metadata via server-side AI (Status: ${response.status})`);
-  }
-  
   const rawText = await response.text();
+  
   try {
     return JSON.parse(rawText);
   } catch(e) {
-    console.log('[API DEBUG] /api/generate-metadata JSON parse error:');
-    console.log(`STATUS: ${response.status}`);
-    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
-    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
+    console.log('[API DEBUG] /api/generate-metadata JSON parse error');
     throw new Error(`Invalid JSON response from server: ${rawText.substring(0, 100)}`);
   }
 };
@@ -122,36 +146,18 @@ export const generateBatchStockMetadata = async (
     return { id: item.id, frames: base64Frames };
   }));
 
-  const response = await fetch('/api/generate-batch-metadata', {
+  const response = await fetchWithRetry('/api/generate-batch-metadata', {
     method: 'POST',
     headers: getHeaders(options),
     body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType, temperature, model, keywordMode })
   });
 
-  if (!response.ok) {
-    const rawText = await response.text();
-    console.log('[API DEBUG] /api/generate-batch-metadata response not OK:');
-    console.log(`STATUS: ${response.status}`);
-    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
-    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
-    
-    let errData: any = {};
-    try {
-      errData = JSON.parse(rawText);
-    } catch (e) {
-      // Ignored
-    }
-    throw new Error(errData.error || `Failed to generate batch metadata via server-side AI (Status: ${response.status})`);
-  }
-  
   const rawText = await response.text();
+  
   try {
     return JSON.parse(rawText);
   } catch(e) {
-    console.log('[API DEBUG] /api/generate-batch-metadata JSON parse error:');
-    console.log(`STATUS: ${response.status}`);
-    console.log(`CONTENT TYPE: ${response.headers.get('content-type')}`);
-    console.log(`BODY (first 200 chars): ${rawText.substring(0, 200)}`);
+    console.log('[API DEBUG] /api/generate-batch-metadata JSON parse error');
     throw new Error(`Invalid JSON response from server: ${rawText.substring(0, 100)}`);
   }
 };

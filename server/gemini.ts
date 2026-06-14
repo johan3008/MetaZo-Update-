@@ -52,7 +52,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   openrouter: 'google/gemini-2.0-flash-001',
   blackbox: 'blackboxai',
-  nvidia: 'stepfun-ai/step-3.5-flash',
+  nvidia: 'meta/llama-3.3-70b-instruct',
 };
 
 const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
@@ -61,11 +61,11 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
   openai: 'gpt-4o',
   openrouter: 'anthropic/claude-3.5-haiku',
   blackbox: 'blackboxai-pro',
-  nvidia: 'stepfun-ai/step-3.5-flash',
+  nvidia: 'meta/llama-3.1-70b-instruct',
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -1231,8 +1231,16 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   let draftMetadata: any = {};
   try {
     let genResponse: any;
-    // Primary: Try Gemini first
-    try {
+    // Check target provider explicitly to avoid double-firing
+    if (NON_GEMINI_PROVIDERS.has(provider)) {
+        genResponse = await callOpenAICompatibleWithRetry({
+            systemInstruction: `You are an Adobe Stock Metadata Expert.`,
+            contents: genSystemInstruction + `\n\nGenerate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
+            responseMimeType: "application/json",
+            config: { temperature: temperature ?? 0.3, topP: 0.9 },
+            model: activeModel
+        });
+    } else {
         genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
             parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
           }, {
@@ -1241,20 +1249,6 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
             temperature: temperature ?? 0.3,
             topP: 0.9 
           });
-    } catch (err) {
-        console.warn('[JohMeta Pipeline] Gemini call failed, attempting fallback to NVIDIA/Other:', err);
-        // Fallback: NVIDIA NIM (if configured)
-        if (NON_GEMINI_PROVIDERS.has(provider)) {
-            genResponse = await callOpenAICompatibleWithRetry({
-                systemInstruction: `You are an Adobe Stock Metadata Expert.`,
-                contents: genSystemInstruction + `\n\nGenerate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
-                responseMimeType: "application/json",
-                config: { temperature: temperature ?? 0.3, topP: 0.9 },
-                model: activeModel
-            });
-        } else {
-            throw err;
-        }
     }
 
     let rawContent = typeof genResponse === 'string' ? genResponse : genResponse.text;
