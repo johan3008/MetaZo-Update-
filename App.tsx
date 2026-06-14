@@ -27,7 +27,7 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { LoginScreen } from './src/components/LoginScreen';
@@ -984,17 +984,41 @@ const App: React.FC = () => {
   const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => (localStorage.getItem('mz_keyword_mode') as 'mixed' | 'single' | 'multi') || 'mixed');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
 
+  // 1. Mark current user as online
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    
+    const markOnline = async () => {
+        try {
+            await updateDoc(userRef, { lastSeen: serverTimestamp() });
+        } catch (e) {
+            console.error('Error marking online:', e);
+        }
+    };
+    
+    markOnline();
+    const interval = setInterval(markOnline, 60000); // 1 minute
+    return () => clearInterval(interval);
+  }, [auth.currentUser]);
+
+  // 2. Fetch truly active (online) users
   useEffect(() => {
     const fetchActiveAccounts = async () => {
         try {
-            const usersRef = collection(db, 'users');
-            const snapshot = await getDocs(usersRef);
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+            const q = query(collection(db, 'users'), where('lastSeen', '>', fiveMinutesAgo));
+            const snapshot = await getDocs(q);
             setActiveAccountsCount(snapshot.size);
         } catch (e) {
-            console.error('Error fetching active accounts:', e);
+            console.error('Error fetching online accounts:', e);
         }
     };
+    
     fetchActiveAccounts();
+    const interval = setInterval(fetchActiveAccounts, 30000); // 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
   const [uiLanguage, setUiLanguage] = useState<AppLanguage>(() => {

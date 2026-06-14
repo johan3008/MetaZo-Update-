@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe, LogOut } from 'lucide-react';
+import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe, LogOut, Plus } from 'lucide-react';
 import { AppLanguage } from '../../constants';
 
 interface TopbarProps {
@@ -288,12 +288,12 @@ export const Topbar: React.FC<TopbarProps> = ({
                     type="button"
                     onClick={() => {
                         setMenuOpen(false);
-                        window.open('https://teer.id/johan3008', '_blank');
+                        onSignOut?.();
                     }}
-                    className="w-full px-2.5 py-1.5 text-left hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-xl flex items-center space-x-2.5 text-xs font-black text-amber-600 dark:text-amber-400 transition-colors mb-1"
+                    className="w-full px-2.5 py-1.5 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-xl flex items-center space-x-2.5 text-xs font-black text-emerald-600 dark:text-emerald-400 transition-colors mb-1"
                   >
-                    <Heart size={14} />
-                    <span>{uiLanguage === 'id' ? 'Dukung (Donate)' : 'Support (Donate)'}</span>
+                    <Plus size={14} />
+                    <span>{uiLanguage === 'id' ? 'Tambah/Ganti Akun' : 'Add/Switch Account'}</span>
                   </button>
 
                   <button
