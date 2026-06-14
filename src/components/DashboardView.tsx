@@ -67,48 +67,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const [currentSlide, setCurrentSlide] = React.useState(0);
 
-  const slides = [
-    {
-      badge: t.language === 'Bahasa' ? "GENERATOR METADATA" : "METADATA GENERATOR",
-      title: <>{t.hero_title_part1} <span className="text-emerald-300">{t.hero_title_part2}</span> {t.hero_title_part3}</>,
-      desc: t.hero_description
-    },
-    {
-      badge: t.language === 'Bahasa' ? "GENERATOR PROMPT AI" : "AI PROMPT GENERATOR",
-      title: <>{t.language === 'Bahasa' ? "OPTIMASI" : "PROMPT"} <span className="text-emerald-300">PROMPT</span> {t.language === 'Bahasa' ? "TEKS" : "OPTIMIZATION"}</>,
-      desc: t.language === 'Bahasa' 
-        ? "Ubah konsep sederhana menjadi prompt visual yang kompleks dan kaya detail untuk platform generative AI." 
-        : "Transform simple concepts into highly detailed and optimized visual prompts for AI generation platforms."
-    },
-    {
-      badge: t.language === 'Bahasa' ? "INSPEKSI KUALITAS" : "QUALITY INSPECTOR",
-      title: <>{t.language === 'Bahasa' ? "AUDIT" : "TECHNICAL"} <span className="text-emerald-300">STANDAR</span> {t.language === 'Bahasa' ? "TEKNIS" : "AUDIT"}</>,
-      desc: t.language === 'Bahasa'
-        ? "Pengecekan dan inspeksi kualitas visual secara otomatis mendeteksi masalah sebelum aset ditolak oleh agensi."
-        : "Automated quality checks and visual inspection to detect issues before assets are rejected by agencies."
-    },
-    {
-      badge: t.language === 'Bahasa' ? "KALENDER KONTEN" : "CONTENT CALENDAR",
-      title: <>{t.language === 'Bahasa' ? "IDE" : "COMMERCIAL"} <span className="text-emerald-300">EVENT</span> {t.language === 'Bahasa' ? "KOMERSIAL" : "IDEAS"}</>,
-      desc: t.language === 'Bahasa'
-        ? "Temukan ide acara, tren lokal, dan liburan global untuk strategi portofolio stock bulanan Anda."
-        : "Discover global events, trending holidays, and seasonal ideas for your monthly stock portfolio strategy."
-    },
-    {
-      badge: t.language === 'Bahasa' ? "AKSES PREMIUM" : "PREMIUM ACCESS",
-      title: <>{t.language === 'Bahasa' ? "PRO" : "UNLIMITED"} <span className="text-amber-300">SUBSCRIPTION</span> {t.language === 'Bahasa' ? "PLAN" : "PLAN"}</>,
-      desc: t.language === 'Bahasa'
-        ? "Berlangganan untuk membuka semua fitur premium, batas bulk process tanpa batas, dan performa AI yang lebih optimal."
-        : "Subscribe to unlock all premium features, unlimited bulk processing, and optimized AI performance."
-    },
-    {
-      badge: "SUPPORT",
-      title: <>SUPPORT <span className="text-amber-300">KAMI</span></>,
-      desc: t.language === 'Bahasa'
-        ? "Dukung perkembangan aplikasi ini dengan berdonasi melalui teer.id/johan3008."
-        : "Support the development of this application by donating via teer.id/johan3008."
+  const slides = React.useMemo(() => {
+    const baseSlides = [
+      {
+        badge: t.language === 'Bahasa' ? "GENERATOR METADATA" : "METADATA GENERATOR",
+        title: <>{t.hero_title_part1} <span className="text-emerald-300">{t.hero_title_part2}</span> {t.hero_title_part3}</>,
+        desc: t.hero_description
+      },
+      {
+        badge: t.language === 'Bahasa' ? "GENERATOR PROMPT AI" : "AI PROMPT GENERATOR",
+        title: <>{t.language === 'Bahasa' ? "OPTIMASI" : "PROMPT"} <span className="text-emerald-300">PROMPT</span> {t.language === 'Bahasa' ? "TEKS" : "OPTIMIZATION"}</>,
+        desc: t.language === 'Bahasa' 
+          ? "Ubah konsep sederhana menjadi prompt visual yang kompleks dan kaya detail untuk platform generative AI." 
+          : "Transform simple concepts into highly detailed and optimized visual prompts for AI generation platforms."
+      },
+      {
+        badge: t.language === 'Bahasa' ? "INSPEKSI KUALITAS" : "QUALITY INSPECTOR",
+        title: <>{t.language === 'Bahasa' ? "AUDIT" : "TECHNICAL"} <span className="text-emerald-300">STANDAR</span> {t.language === 'Bahasa' ? "TEKNIS" : "AUDIT"}</>,
+        desc: t.language === 'Bahasa'
+          ? "Pengecekan dan inspeksi kualitas visual secara otomatis mendeteksi masalah sebelum aset ditolak oleh agensi."
+          : "Automated quality checks and visual inspection to detect issues before assets are rejected by agencies."
+      },
+      {
+        badge: t.language === 'Bahasa' ? "KALENDER KONTEN" : "CONTENT CALENDAR",
+        title: <>{t.language === 'Bahasa' ? "IDE" : "COMMERCIAL"} <span className="text-emerald-300">EVENT</span> {t.language === 'Bahasa' ? "KOMERSIAL" : "IDEAS"}</>,
+        desc: t.language === 'Bahasa'
+          ? "Temukan ide acara, tren lokal, dan liburan global untuk strategi portofolio stock bulanan Anda."
+          : "Discover global events, trending holidays, and seasonal ideas for your monthly stock portfolio strategy."
+      }
+    ];
+
+    if (!isLicensed) {
+      baseSlides.push(
+        {
+          badge: t.language === 'Bahasa' ? "AKSES PREMIUM" : "PREMIUM ACCESS",
+          title: <>{t.language === 'Bahasa' ? "PRO" : "UNLIMITED"} <span className="text-amber-300">SUBSCRIPTION</span> {t.language === 'Bahasa' ? "PLAN" : "PLAN"}</>,
+          desc: t.language === 'Bahasa'
+            ? "Berlangganan untuk membuka semua fitur premium, batas bulk process tanpa batas, dan performa AI yang lebih optimal."
+            : "Subscribe to unlock all premium features, unlimited bulk processing, and optimized AI performance."
+        },
+        {
+          badge: "SUPPORT",
+          title: <>SUPPORT <span className="text-amber-300">KAMI</span></>,
+          desc: t.language === 'Bahasa'
+            ? "Dukung perkembangan aplikasi ini dengan berdonasi melalui teer.id/johan3008."
+            : "Support the development of this application by donating via teer.id/johan3008."
+        }
+      );
     }
-  ];
+    return baseSlides;
+  }, [isLicensed, t]);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
