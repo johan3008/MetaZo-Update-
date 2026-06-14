@@ -100,6 +100,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       desc: t.language === 'Bahasa'
         ? "Berlangganan untuk membuka semua fitur premium, batas bulk process tanpa batas, dan performa AI yang lebih optimal."
         : "Subscribe to unlock all premium features, unlimited bulk processing, and optimized AI performance."
+    },
+    {
+      badge: "SUPPORT",
+      title: <>SUPPORT <span className="text-amber-300">KAMI</span></>,
+      desc: t.language === 'Bahasa'
+        ? "Dukung perkembangan aplikasi ini dengan berdonasi melalui teer.id/johan3008."
+        : "Support the development of this application by donating via teer.id/johan3008."
     }
   ];
 
@@ -124,7 +131,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="absolute left-1/3 bottom-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-xl pointer-events-none" />
 
         <div className="relative z-10 max-w-2xl min-h-[160px] flex flex-col justify-center">
-          <div key={currentSlide} className="animate-in fade-in slide-in-from-right-4 duration-500">
+          <div 
+            key={currentSlide} 
+            className={`animate-in fade-in slide-in-from-right-4 duration-500 ${currentSlide === slides.length - 1 ? 'cursor-pointer' : ''}`}
+            onClick={() => {
+              if (currentSlide === slides.length - 1) {
+                window.open('https://teer.id/johan3008', '_blank');
+              }
+            }}
+          >
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
               <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
               <span>{slides[currentSlide].badge}</span>
@@ -135,22 +150,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="mt-2 text-xs sm:text-sm text-slate-100/90 font-medium leading-relaxed max-w-xl min-h-[40px]">
               {slides[currentSlide].desc}
             </p>
+            {currentSlide === slides.length - 1 && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open('https://teer.id/johan3008', '_blank');
+                }}
+                className="mt-4 px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-[10px] uppercase tracking-wide rounded-full transition-all flex items-center space-x-1.5 shadow-lg"
+              >
+                <span>Dukung Sekarang</span>
+              </button>
+            )}
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button 
-              onClick={() => setShowInfoModal(true)}
-              className="px-4 py-2 bg-emerald-400 text-slate-900 font-extrabold text-xs rounded-[1.5rem] shadow-lg hover:bg-emerald-300 hover:scale-[1.03] transition-all flex items-center space-x-1.5 uppercase cursor-pointer"
-            >
-              <BookOpen size={14} />
-              <span>{t.hero_cta_how}</span>
-            </button>
-            <div className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 select-none text-white font-extrabold text-xs rounded-[1.5rem] transition-all flex items-center space-x-1.5 uppercase">
-              <ShieldCheck size={14} className="text-emerald-300" />
-              <span>{generationMode.toUpperCase()} ({totalFiles} {t.hero_stats_file})</span>
-            </div>
             
             {/* Slide Navigation Pagination */}
-            <div className="ml-4 flex items-center space-x-2 border-l border-white/20 pl-4">
+            <div className="flex items-center space-x-2 border-r border-white/20 pr-4">
               {slides.map((_, i) => (
                 <button
                   key={i}

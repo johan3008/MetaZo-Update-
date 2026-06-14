@@ -346,6 +346,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
+            {/* Banner Support removed */}
+
             <button 
               type="button"
               onClick={() => window.open('https://teer.id/johan3008', '_blank')}
