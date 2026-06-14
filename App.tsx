@@ -27,8 +27,10 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './src/firebase';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { LoginScreen } from './src/components/LoginScreen';
 
 // --- IndexedDB Helper for Auto-Resume ---
 const DB_NAME = 'EPS_Batch_DB';
@@ -1038,6 +1040,189 @@ const App: React.FC = () => {
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
 
+  const [user, setUser] = useState<User | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Daily Asset Generation Tracking for Trial Users
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [cloudDailyCounts, setCloudDailyCounts] = useState<{ [key in ToolType]?: number }>({});
+
+  const getDailyCount = useCallback((type: ToolType): number => {
+    const dateStr = getTodayDateString();
+    const cloudVal = cloudDailyCounts[type];
+    const val = localStorage.getItem(`mz_daily_gen_${type}_${dateStr}`);
+    const localVal = val ? parseInt(val) || 0 : 0;
+    return typeof cloudVal === 'number' ? Math.max(cloudVal, localVal) : localVal;
+  }, [cloudDailyCounts]);
+
+  const getTotalDailyCount = useCallback((): number => {
+    const tools = [
+      ToolType.IMAGE, 
+      ToolType.VIDEO, 
+      ToolType.VECTOR, 
+      ToolType.PROMPT_GEN,
+      ToolType.PROMPT_IMAGE,
+      ToolType.PROMPT_VIDEO,
+      ToolType.PROMPT_IMAGE_CHECK,
+      ToolType.CALENDAR_GEN
+    ];
+    return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
+  }, [getDailyCount]);
+
+  const [dailyGenCounts, setDailyGenCounts] = useState<{ [key in ToolType]?: number }>({});
+
+  const refreshDailyCounts = useCallback(() => {
+    setDailyGenCounts({
+      [ToolType.IMAGE]: getDailyCount(ToolType.IMAGE),
+      [ToolType.VIDEO]: getDailyCount(ToolType.VIDEO),
+      [ToolType.VECTOR]: getDailyCount(ToolType.VECTOR),
+      [ToolType.DASHBOARD]: 0,
+      [ToolType.PROMPT_GEN]: getDailyCount(ToolType.PROMPT_GEN),
+      [ToolType.PROMPT_IMAGE]: getDailyCount(ToolType.PROMPT_IMAGE),
+      [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
+      [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
+      [ToolType.VECTOR_EPS]: 0,
+      [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN)
+    });
+  }, [getDailyCount]);
+
+  const incrementDailyCount = useCallback((type: ToolType, amount: number = 1) => {
+    const dateStr = getTodayDateString();
+    const current = getDailyCount(type);
+    const newVal = current + amount;
+    localStorage.setItem(`mz_daily_gen_${type}_${dateStr}`, String(newVal));
+    
+    if (user) {
+      const userRef = doc(db, 'users', user.uid);
+      updateDoc(userRef, {
+        [`dailyUsage.${dateStr}.${type}`]: newVal,
+        updatedAt: new Date().toISOString()
+      }).catch(err => {
+        // Fallback setDoc
+        setDoc(userRef, {
+          dailyUsage: {
+            [dateStr]: {
+              [type]: newVal
+            }
+          },
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(e => {
+          console.error("Failed to set user cloud document:", e);
+        });
+      });
+    }
+
+    refreshDailyCounts();
+  }, [getDailyCount, refreshDailyCounts, user]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setIsCheckingAuth(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Live real-time sync user profile (license key & subscription/trial status) from Firestore
+  useEffect(() => {
+    if (!user) {
+      setCloudDailyCounts({});
+      return;
+    }
+
+    const dateStr = getTodayDateString();
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        
+        // 1. Sync license key
+        if (data.licenseKey !== undefined) {
+          const cloudKey = data.licenseKey || '';
+          setMzLicenseKey(cloudKey);
+          if (cloudKey) {
+            localStorage.setItem('mz_license_key', cloudKey);
+          } else {
+            localStorage.removeItem('mz_license_key');
+          }
+        }
+
+        // 2. Sync trialStart
+        if (data.trialStart) {
+          localStorage.setItem('mz_trial_start', data.trialStart);
+        }
+
+        // 3. Sync daily gen counts for today
+        if (data.dailyUsage && data.dailyUsage[dateStr]) {
+          const usageToday = data.dailyUsage[dateStr];
+          setCloudDailyCounts(usageToday);
+          // Sync to localStorage for offline access/backup
+          Object.keys(usageToday).forEach((typeKey) => {
+            localStorage.setItem(`mz_daily_gen_${typeKey}_${dateStr}`, String(usageToday[typeKey]));
+          });
+        } else {
+          setCloudDailyCounts({});
+        }
+      } else {
+        // Init cloud user profile if missing
+        const localKey = localStorage.getItem('mz_license_key') || '';
+        const localTrialStart = localStorage.getItem('mz_trial_start') || new Date().toISOString();
+        localStorage.setItem('mz_trial_start', localTrialStart);
+
+        // Prepopulate standard daily counts to cloud if any
+        const initialUsage: any = {};
+        const tools = [
+          ToolType.IMAGE, 
+          ToolType.VIDEO, 
+          ToolType.VECTOR, 
+          ToolType.PROMPT_GEN,
+          ToolType.PROMPT_IMAGE,
+          ToolType.PROMPT_VIDEO,
+          ToolType.PROMPT_IMAGE_CHECK,
+          ToolType.CALENDAR_GEN
+        ];
+        tools.forEach((t) => {
+          const val = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`);
+          if (val) {
+            initialUsage[t] = parseInt(val) || 0;
+          }
+        });
+
+        setDoc(userDocRef, {
+          email: user.email,
+          displayName: user.displayName || '',
+          licenseKey: localKey,
+          trialStart: localTrialStart,
+          dailyUsage: {
+            [dateStr]: initialUsage
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }).catch(err => {
+          console.error("Error bootstrapping cloud user profile:", err);
+          handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+        });
+      }
+    }, (error) => {
+      console.warn("Firestore user load error:", error);
+      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Keep daily counts refreshed when cloudDailyCounts changes
+  useEffect(() => {
+    refreshDailyCounts();
+  }, [cloudDailyCounts, refreshDailyCounts]);
+
   // Live real-time sync branding from Firestore
   useEffect(() => {
     const docRef = doc(db, 'branding', 'main');
@@ -1085,63 +1270,6 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  // Daily Asset Generation Tracking for Trial Users
-  const getTodayDateString = () => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const getDailyCount = useCallback((type: ToolType): number => {
-    const dateStr = getTodayDateString();
-    const val = localStorage.getItem(`mz_daily_gen_${type}_${dateStr}`);
-    return val ? parseInt(val) || 0 : 0;
-  }, []);
-
-  const getTotalDailyCount = useCallback((): number => {
-    const tools = [
-      ToolType.IMAGE, 
-      ToolType.VIDEO, 
-      ToolType.VECTOR, 
-      ToolType.PROMPT_GEN,
-      ToolType.PROMPT_IMAGE,
-      ToolType.PROMPT_VIDEO,
-      ToolType.PROMPT_IMAGE_CHECK,
-      ToolType.CALENDAR_GEN
-    ];
-    return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
-  }, [getDailyCount]);
-
-  const [dailyGenCounts, setDailyGenCounts] = useState<{ [key in ToolType]?: number }>({});
-
-  const refreshDailyCounts = useCallback(() => {
-    setDailyGenCounts({
-      [ToolType.IMAGE]: getDailyCount(ToolType.IMAGE),
-      [ToolType.VIDEO]: getDailyCount(ToolType.VIDEO),
-      [ToolType.VECTOR]: getDailyCount(ToolType.VECTOR),
-      [ToolType.DASHBOARD]: 0,
-      [ToolType.PROMPT_GEN]: getDailyCount(ToolType.PROMPT_GEN),
-      [ToolType.PROMPT_IMAGE]: getDailyCount(ToolType.PROMPT_IMAGE),
-      [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
-      [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
-      [ToolType.VECTOR_EPS]: 0,
-      [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN)
-    });
-  }, [getDailyCount]);
-
-  const incrementDailyCount = useCallback((type: ToolType, amount: number = 1) => {
-    const dateStr = getTodayDateString();
-    const current = getDailyCount(type);
-    localStorage.setItem(`mz_daily_gen_${type}_${dateStr}`, String(current + amount));
-    refreshDailyCounts();
-  }, [getDailyCount, refreshDailyCounts]);
-
-  useEffect(() => {
-    refreshDailyCounts();
-  }, [refreshDailyCounts]);
 
   // Trial Period tracking (Unlimited Days)
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
@@ -2515,6 +2643,31 @@ const App: React.FC = () => {
   };
 
   const t = TRANSLATIONS[uiLanguage];
+
+  if (isCheckingAuth) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
+        <div className="flex flex-col items-center space-y-4 animate-pulse">
+          <Loader2 size={40} className="animate-spin text-[#7c3aed]" />
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Memuat MetaZo PRO...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <LoginScreen 
+        onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} 
+        theme={theme} 
+        setTheme={setTheme} 
+        language={uiLanguage}
+        setLanguage={setUiLanguage}
+        t={t} 
+      />
+    );
+  }
+
   const hasFiles = files.length > 0;
   const filesToGenerateCount = files.filter(f => !f.title && !f.error && !f.isExtracting).length;
   const filesWithErrorCount = files.filter(f => f.error).length;
@@ -2561,6 +2714,14 @@ const App: React.FC = () => {
           isLicensed={!!isMzLicensed}
           uiLanguage={uiLanguage}
           setUiLanguage={setUiLanguage}
+          user={user}
+          onSignOut={async () => {
+            try {
+              await signOut(auth);
+            } catch (err) {
+              console.error("Sign out error", err);
+            }
+          }}
         />
 
         {/* Core Dashboard Stage */}
@@ -3711,7 +3872,8 @@ const App: React.FC = () => {
                   isLicensed={isMzLicensed}
                   showActivation={showActivationModal}
                   setShowActivation={setShowActivationModal}
-                  userEmail="johanchrismant4@gmail.com"
+                  userEmail={user?.email || "johanchrismant4@gmail.com"}
+                  userId={user?.uid}
                   isResellerUnlocked={isResellerUnlocked}
                   setIsResellerUnlocked={setIsResellerUnlocked}
                   trialDaysLeft={trialDaysLeft}
@@ -3767,7 +3929,8 @@ const App: React.FC = () => {
         isLicensed={isMzLicensed}
         showActivation={showActivationModal}
         setShowActivation={setShowActivationModal}
-        userEmail="johanchrismant4@gmail.com"
+        userEmail={user?.email || "johanchrismant4@gmail.com"}
+        userId={user?.uid}
         onlyModal={true}
         trialDaysLeft={trialDaysLeft}
         subDaysLeft={subDaysLeft}

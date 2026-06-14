@@ -880,10 +880,15 @@ const callGeminiWithRetry = async (
            }
         }
         
-        // Dynamically rotate to gemini-3.1-flash-lite if 429 on gemini-3.5-flash to bypass the quota wait time
-        if (statusCode === 429 && attempt === 0 && currentModel !== 'gemini-3.1-flash-lite') {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash-lite to bypass quota limits.`);
+        // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
+        const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
+        if (isQuotaOrLimit && attempt === 0 && currentModel !== 'gemini-3.1-flash-lite') {
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash-lite to bypass quota limits or high demand.`);
              currentModel = 'gemini-3.1-flash-lite';
+             customDelay = 1000; // Reset wait time so we try the new model immediately
+        } else if (isQuotaOrLimit && attempt === 0 && currentModel === 'gemini-3.1-flash-lite') {
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.5-flash to bypass unavailability or quota limits.`);
+             currentModel = 'gemini-3.5-flash';
              customDelay = 1000; // Reset wait time so we try the new model immediately
         } else if (statusCode === 429 && customDelay > 60000) {
              console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel} (Wait time > 60s). Failing fast.`);
@@ -2286,15 +2291,13 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       while (attempts < maxAttempts) {
         try {
           console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attempts + 1}/${maxAttempts})...`);
-          const response = await getAIClient().models.generateContent({
-            model: modelName,
-            contents: { parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }] },
-            config: {
-              systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema,
-              temperature: 0.85
-            }
+          const response = await callGeminiWithRetry(modelName, {
+            parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }]
+          }, {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema,
+            temperature: 0.85
           });
 
           const text = response.text || "{}";
@@ -2872,32 +2875,28 @@ export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysi
 
   Gunakan Bahasa Indonesia profesional yang sangat jujur.`;
 
-  const response = await getAIClient().models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          keyword: { type: Type.STRING },
-          demandPotential: { type: Type.STRING },
-          demandType: { type: Type.STRING },
-          marketInsight: { type: Type.STRING },
-          targetBuyer: { type: Type.STRING },
-          useCase: { type: Type.STRING },
-          recommendedFormat: { type: Type.STRING },
-          formatReason: { type: Type.STRING },
-          competitionLevel: { type: Type.STRING },
-          competitionNotes: { type: Type.STRING },
-          cinematicPotential: { type: Type.STRING },
-          cinematicReason: { type: Type.STRING },
-          status: { type: Type.STRING },
-          conclusion: { type: Type.STRING },
-          solution: { type: Type.STRING },
-        },
-        required: ["keyword", "demandPotential", "demandType", "marketInsight", "targetBuyer", "useCase", "recommendedFormat", "formatReason", "competitionLevel", "competitionNotes", "cinematicPotential", "cinematicReason", "status", "conclusion", "solution"]
+  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', prompt, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        keyword: { type: Type.STRING },
+        demandPotential: { type: Type.STRING },
+        demandType: { type: Type.STRING },
+        marketInsight: { type: Type.STRING },
+        targetBuyer: { type: Type.STRING },
+        useCase: { type: Type.STRING },
+        recommendedFormat: { type: Type.STRING },
+        formatReason: { type: Type.STRING },
+        competitionLevel: { type: Type.STRING },
+        competitionNotes: { type: Type.STRING },
+        cinematicPotential: { type: Type.STRING },
+        cinematicReason: { type: Type.STRING },
+        status: { type: Type.STRING },
+        conclusion: { type: Type.STRING },
+        solution: { type: Type.STRING },
       },
+      required: ["keyword", "demandPotential", "demandType", "marketInsight", "targetBuyer", "useCase", "recommendedFormat", "formatReason", "competitionLevel", "competitionNotes", "cinematicPotential", "cinematicReason", "status", "conclusion", "solution"]
     },
   });
 
@@ -2921,28 +2920,24 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
   
   Return exactly 50 prompts in JSON array format.`;
 
-  const response = await getAIClient().models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            subject: { type: Type.STRING },
-            movement: { type: Type.STRING },
-            environment: { type: Type.STRING },
-            lighting: { type: Type.STRING },
-            camera_angle: { type: Type.STRING },
-            camera_movement: { type: Type.STRING },
-            style: { type: Type.STRING, enum: ["cinematic", "documentary"] },
-          },
-          required: ["subject", "movement", "environment", "lighting", "camera_angle", "camera_movement", "style"]
-        }
+  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', prompt, {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          subject: { type: Type.STRING },
+          movement: { type: Type.STRING },
+          environment: { type: Type.STRING },
+          lighting: { type: Type.STRING },
+          camera_angle: { type: Type.STRING },
+          camera_movement: { type: Type.STRING },
+          style: { type: Type.STRING, enum: ["cinematic", "documentary"] },
+        },
+        required: ["subject", "movement", "environment", "lighting", "camera_angle", "camera_movement", "style"]
       }
-    },
+    }
   });
 
   const parsed = JSON.parse(response.text) as Omit<VideoPrompt, 'id'>[];
@@ -3097,15 +3092,11 @@ Output strictly in JSON format.`;
     required: ["events"]
   };
 
-  const response = await getAIClient().models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from.`,
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature: 0.8
-    }
+  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from.`, {
+    systemInstruction,
+    responseMimeType: "application/json",
+    responseSchema,
+    temperature: 0.8
   });
 
   return JSON.parse(response.text);
@@ -3133,15 +3124,11 @@ Rules:
     required: ["keywords"]
   };
 
-  const response = await getAIClient().models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}`,
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature: 0.8
-    }
+  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}`, {
+    systemInstruction,
+    responseMimeType: "application/json",
+    responseSchema,
+    temperature: 0.8
   });
 
   return JSON.parse(response.text);
@@ -3173,18 +3160,14 @@ Rules:
     required: ["keywords"]
   };
 
-  const response = await getAIClient().models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: `Suggest 5 missing SEO keywords for this asset:
+  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', `Suggest 5 missing SEO keywords for this asset:
 Title: "${title}"
 Description: "${description}"
-Existing Keywords: ${existingKeywords.join(', ')}`,
-    config: {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature: 0.3
-    }
+Existing Keywords: ${existingKeywords.join(', ')}`, {
+    systemInstruction,
+    responseMimeType: "application/json",
+    responseSchema,
+    temperature: 0.3
   });
 
   try {

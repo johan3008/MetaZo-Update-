@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe } from 'lucide-react';
+import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe, LogOut } from 'lucide-react';
 import { AppLanguage } from '../../constants';
 
 interface TopbarProps {
@@ -16,6 +16,8 @@ interface TopbarProps {
   isLicensed?: boolean;
   uiLanguage: AppLanguage;
   setUiLanguage: (lang: AppLanguage) => void;
+  user?: any;
+  onSignOut?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -31,15 +33,31 @@ export const Topbar: React.FC<TopbarProps> = ({
   setShowActivation,
   isLicensed,
   uiLanguage,
-  setUiLanguage
+  setUiLanguage,
+  user,
+  onSignOut
 }) => {
   const [time, setTime] = React.useState(new Date());
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
       setTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const formatTime = (date: Date) => {
@@ -126,7 +144,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Language Swapper */}
         <button 
           onClick={() => setUiLanguage(uiLanguage === 'en' ? 'id' : 'en')}
-          className="p-2 flex items-center space-x-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
+          className="hidden md:flex p-2 items-center space-x-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
           title={t.language}
         >
           <Globe size={17} />
@@ -136,29 +154,150 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Theme Swapper */}
         <button 
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
+          className="hidden md:flex p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none"
           title={t.topbar_toggle_theme}
         >
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
-        {/* Info Dialogue Trigger */}
-        <button 
-          onClick={() => setShowInfoModal(true)}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none flex items-center space-x-1"
-          title={t.topbar_info_manual}
-        >
-          <Info size={17} />
-        </button>
 
-        {/* Settings Dialogue Trigger */}
-        <button 
-          onClick={() => setShowSettingsModal(true)}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors focus:outline-none flex items-center space-x-1"
-          title={t.topbar_settings_api}
-        >
-          <Settings size={17} className="animate-hover-spin" />
-        </button>
+
+        {/* Authenticated User Profile & Sign Out Dropdown */}
+        {user && (
+          <div ref={menuRef} className="relative flex items-center pl-2 border-l border-slate-200/60 dark:border-white/5">
+            <button 
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center space-x-1 focus:outline-none hover:opacity-80 active:scale-95 transition-all p-1 rounded-2xl"
+              title={uiLanguage === 'id' ? 'Menu Akun' : 'Account Menu'}
+            >
+              {user.photoURL ? (
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName || 'Profile'} 
+                  className="w-7 h-7 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" 
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-[10px] font-black uppercase shadow-sm">
+                  {user.email ? user.email.substring(0, 2) : 'MZ'}
+                </div>
+              )}
+            </button>
+
+            {menuOpen && (
+              <div 
+                id="profile-dropdown-menu"
+                className="absolute right-0 top-11 w-64 bg-white dark:bg-[#1f2937] border border-slate-200/80 dark:border-white/5 rounded-2xl shadow-xl py-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+              >
+                {/* User Details */}
+                <div className="px-4 py-2 border-b border-slate-100 dark:border-white/5 mb-1.5">
+                  <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                    {uiLanguage === 'id' ? 'Akun Pengguna' : 'User Account'}
+                  </p>
+                  {user.displayName && (
+                    <p className="text-xs font-black text-slate-800 dark:text-white truncate mt-0.5">
+                      {user.displayName}
+                    </p>
+                  )}
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate leading-tight">
+                    {user.email}
+                  </p>
+                  
+                  {/* License Info inside dropdown */}
+                  <div className="mt-2 flex">
+                    {isLicensed ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8.5px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        {t.topbar_pro_active}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        {t.topbar_trial_eval}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick actions - Mobile & Tablet only (<md screen size) */}
+                <div className="block md:hidden border-b border-slate-100 dark:border-white/5 pb-1.5 mb-1.5">
+                  <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider px-4 mb-1">
+                    {uiLanguage === 'id' ? 'Akses Cepat' : 'Quick Access'}
+                  </p>
+
+                  {/* Language switch */}
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setUiLanguage(uiLanguage === 'en' ? 'id' : 'en');
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Globe size={14} className="text-slate-400" />
+                      <span>{uiLanguage === 'id' ? 'Bahasa Indonesia' : 'English Language'}</span>
+                    </div>
+                    <span className="text-[9px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded font-black text-slate-500">
+                      {uiLanguage.toUpperCaseCustom ? uiLanguage.toUpperCaseCustom() : uiLanguage.toUpperCase()}
+                    </span>
+                  </button>
+
+                  {/* Theme Switch */}
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setTheme(theme === 'dark' ? 'light' : 'dark');
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors"
+                  >
+                    {theme === 'dark' ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-indigo-400" />}
+                    <span>{theme === 'dark' ? (uiLanguage === 'id' ? 'Mode Terang' : 'Light Theme') : (uiLanguage === 'id' ? 'Mode Gelap' : 'Dark Theme')}</span>
+                  </button>
+                </div>
+
+                {/* Modals & Triggers */}
+                <div className="space-y-0.5 pb-1.5 border-b border-slate-100 dark:border-white/5 mb-1">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowInfoModal(true);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center space-x-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors"
+                  >
+                    <Info size={14} className="text-slate-400" />
+                    <span>{t.topbar_info_manual || (uiLanguage === 'id' ? 'Panduan Manual' : 'User Manual')}</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowSettingsModal(true);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center space-x-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors"
+                  >
+                    <Settings size={14} className="text-slate-400" />
+                    <span>{t.topbar_settings_api || (uiLanguage === 'id' ? 'Kunci API & Akses' : 'API License Keys')}</span>
+                  </button>
+                </div>
+
+                {/* Sign Out Action */}
+                <div className="px-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onSignOut?.();
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl flex items-center space-x-2.5 text-xs font-black text-red-600 dark:text-red-400 transition-colors"
+                  >
+                    <LogOut size={14} />
+                    <span>{uiLanguage === 'id' ? 'Keluar Akun' : 'Sign Out Profile'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </header>

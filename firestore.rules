@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global Safety Net & Default Deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Helper functions
     function isValidId(id) { 
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
@@ -25,6 +20,11 @@ service cloud.firestore {
     // 2. Multi-Key License Management
     match /keys/{keyId} {
       allow read, write: if true;
+    }
+
+    // 3. User profiles (License & Limit tracking)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
