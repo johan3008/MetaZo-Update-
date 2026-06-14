@@ -281,7 +281,19 @@ export const Topbar: React.FC<TopbarProps> = ({
                 </div>
 
                 {/* Sign Out Action */}
-                <div className="px-1.5 pt-1">
+                <div className="px-1.5 pt-1 border-t border-slate-100 dark:border-white/5 mt-1.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                        setMenuOpen(false);
+                        window.open('https://teer.id/johan3008', '_blank');
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-xl flex items-center space-x-2.5 text-xs font-black text-amber-600 dark:text-amber-400 transition-colors mb-1"
+                  >
+                    <Heart size={14} />
+                    <span>{uiLanguage === 'id' ? 'Dukung (Donate)' : 'Support (Donate)'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {

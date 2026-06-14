@@ -348,6 +348,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button 
               type="button"
+              onClick={() => window.open('https://teer.id/johan3008', '_blank')}
+              className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-all cursor-pointer mb-1.5"
+            >
+              <Heart size={14} />
+              {!sidebarCollapsed && <span>{t.sidebar_donate || 'Dukung Kami'}</span>}
+            </button>
+
+            <button 
+              type="button"
               onClick={() => setShowActivation?.(true)}
               className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer mb-1.5"
             >

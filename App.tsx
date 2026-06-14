@@ -1271,9 +1271,9 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Trial Period tracking (Unlimited Days)
+  // Trial Period tracking (Unlimited)
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
-    return 9999; // Set to very large number so trial never expires in days
+    return 99999;
   });
 
   // Automatically check trial status on mount or when licensing changes
@@ -2480,7 +2480,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_AdobeStock_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetazoAI_Export_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4026,13 +4026,12 @@ const App: React.FC = () => {
 
             <button
               onClick={() => {
-                setShowLimitModal(false);
-                setShowActivationModal(true);
+                // Placeholder for donation link
+                alert('Terima kasih! Silakan arahkan ke halaman donasi (misal: Saweria/Trakteer).');
               }}
-              className="w-full py-4 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-black text-sm uppercase rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-95"
+              className="w-full py-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
             >
-              <Zap size={16} fill="currentColor" />
-              <span>Buka Akses Unlimited</span>
+              Dukung Kami (Donate)
             </button>
             
             <button
