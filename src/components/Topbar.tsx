@@ -18,6 +18,7 @@ interface TopbarProps {
   setUiLanguage: (lang: AppLanguage) => void;
   user?: any;
   onSignOut?: () => void;
+  activeAccountsCount?: number;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -35,7 +36,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   uiLanguage,
   setUiLanguage,
   user,
-  onSignOut
+  onSignOut,
+  activeAccountsCount = 0
 }) => {
   const [time, setTime] = React.useState(new Date());
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -116,7 +118,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-            {t.topbar_stability_core}
+            {activeAccountsCount} Active Accounts
           </span>
         </div>
 

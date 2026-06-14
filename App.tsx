@@ -27,7 +27,7 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { LoginScreen } from './src/components/LoginScreen';
@@ -982,6 +982,21 @@ const App: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [keywordCount, setKeywordCount] = useState<number | string>('');
   const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => (localStorage.getItem('mz_keyword_mode') as 'mixed' | 'single' | 'multi') || 'mixed');
+  const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchActiveAccounts = async () => {
+        try {
+            const usersRef = collection(db, 'users');
+            const snapshot = await getDocs(usersRef);
+            setActiveAccountsCount(snapshot.size);
+        } catch (e) {
+            console.error('Error fetching active accounts:', e);
+        }
+    };
+    fetchActiveAccounts();
+  }, []);
+
   const [uiLanguage, setUiLanguage] = useState<AppLanguage>(() => {
     try {
       const saved = localStorage.getItem('mz_ui_language');
@@ -2715,6 +2730,7 @@ const App: React.FC = () => {
           uiLanguage={uiLanguage}
           setUiLanguage={setUiLanguage}
           user={user}
+          activeAccountsCount={activeAccountsCount}
           onSignOut={async () => {
             try {
               await signOut(auth);
