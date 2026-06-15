@@ -117,7 +117,7 @@ try {
     console.warn('[WARNING] Cannot create uploadDir on Vercel, using default fallback /tmp:', err);
 }
 
-const localGsPath = path.join(__dirname_safe, 'bin', 'gs');
+const localGsPath = path.join(process.cwd(), 'bin', 'gs');
 const gsExecutable = fs.existsSync(localGsPath) ? localGsPath : 'gs';
 
 const upload = multer({ 
