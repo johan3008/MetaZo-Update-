@@ -1953,104 +1953,113 @@ const App: React.FC = () => {
               reader.readAsDataURL(file);
           });
       } else if (ext === 'eps' || ext === 'ai') {
+          // 1. Try to generate thumbnail JPG/PNG di sisi client
           const clientSidePreview = await extractEPSClientSide(file);
+          
+          // 2. Simpan EPS ke R2 (once, before any ghostscript logic)
+          let uploadedUrl = null;
+          let getUrlData = null;
+          try {
+              const fileExt = file.name.split('.').pop();
+              const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'application/postscript')}`);
+              getUrlData = await getUrlRes.json().catch(() => ({}));
+              
+              if (getUrlRes.ok && getUrlData.uploadUrl && getUrlData.fileUrl) {
+                  console.log('Using presigned URL to upload EPS/AI file to R2:', file.name);
+                  const putRes = await fetch(getUrlData.uploadUrl, {
+                      method: 'PUT',
+                      body: file,
+                      headers: { 'Content-Type': file.type || 'application/postscript' }
+                  });
+                  if (!putRes.ok) throw new Error(`Failed to upload to storage: ${putRes.status}`);
+                  uploadedUrl = getUrlData.fileUrl;
+              } else {
+                  // Try Vercel Blob if S3/R2 fails or is unconfigured
+                  try {
+                      const { upload } = await import('@vercel/blob/client');
+                      const blob = await upload(file.name, file, {
+                          access: 'public',
+                          handleUploadUrl: '/api/upload-vercel-blob'
+                      });
+                      uploadedUrl = blob.url;
+                  } catch (blobErr) {
+                      // Silently fallback to multipart if Vercel Blob isn't configured
+                  }
+              }
+          } catch (uploadErr) {
+              console.warn("Failed to save EPS to R2/Storage:", uploadErr);
+          }
+
+          // If client-side thumbnail succeeded, we just return it to AI Vision!
           if (clientSidePreview) {
               return [clientSidePreview];
-          } else {
-              let retryCount = 0;
-              const maxRetries = 3; // Reduced to 3 retries because if the server OOMs repeatedly, it will never succeed
-              while (retryCount < maxRetries) {
-                  if (stopGenerationRef.current) throw new Error("Cancelled by user");
+          } 
+          
+          // 3. Fallback: If client-side failed, use server-side Ghostscript
+          let retryCount = 0;
+          const maxRetries = 3; // Reduced to 3 retries because if the server OOMs repeatedly, it will never succeed
+          while (retryCount < maxRetries) {
+              if (stopGenerationRef.current) throw new Error("Cancelled by user");
+              
+              try {
+                  let response;
+                  if (uploadedUrl) {
+                      // Now ask the server to process the URL
+                      response = await fetch(`/api/convert-eps-url?t=${Date.now()}_${Math.random()}`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ fileUrl: uploadedUrl, pathKey: getUrlData?.pathKey })
+                      });
+                  } else {
+                      // S3 not configured or failed, fallback to multipart
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      
+                      // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
+                      response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
+                          method: 'POST',
+                          body: formData
+                      });
+                  }
                   
-                  try {
-                      let response;
-                      const fileExt = file.name.split('.').pop();
-                      const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'application/postscript')}`);
-                      const getUrlData = await getUrlRes.json().catch(() => ({}));
-                      
-                      let uploadedUrl = null;
-
-                      if (getUrlRes.ok && getUrlData.uploadUrl && getUrlData.fileUrl) {
-                          // TRICK: S3 is configured, upload linearly via presigned URL to solve "masalah file large"
-                          console.log('Using presigned URL to upload large file:', file.name);
-                          const putRes = await fetch(getUrlData.uploadUrl, {
-                              method: 'PUT',
-                              body: file,
-                              headers: { 'Content-Type': file.type || 'application/postscript' }
-                          });
-                          if (!putRes.ok) throw new Error(`Failed to upload to storage: ${putRes.status}`);
-                          uploadedUrl = getUrlData.fileUrl;
-                      } else {
-                          // Try Vercel Blob if S3 fails or is unconfigured
-                          try {
-                              const { upload } = await import('@vercel/blob/client');
-                              const blob = await upload(file.name, file, {
-                                  access: 'public',
-                                  handleUploadUrl: '/api/upload-vercel-blob'
-                              });
-                              uploadedUrl = blob.url;
-                          } catch (blobErr) {
-                              // Silently fallback to multipart if Vercel Blob isn't configured
-                          }
+                  const contentType = response.headers.get("content-type");
+                  
+                  // TRICK: If the server restarted, Vite might intercept the POST request and return index.html (Status 200).
+                  // We must detect this and throw a specific error to trigger a retry.
+                  if (contentType && contentType.includes("text/html")) {
+                      throw new Error("CONTAINER_RESTARTING: Server returned HTML instead of image");
+                  }
+                  
+                  if (!response.ok) {
+                      // If it's a 413 error, payload is too large
+                      if (response.status === 413) {
+                          const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
+                          const platformLimit = isVercel ? "4.5MB (Vercel limit)" : "500MB (Server limit)";
+                          throw new Error(`File is too large. ${platformLimit} exceeded. Try optimizing your EPS/AI file or deploy to a platform with higher body limits.`);
                       }
-
-                      if (uploadedUrl) {
-                          // Now ask the server to process the URL
-                          response = await fetch(`/api/convert-eps-url?t=${Date.now()}_${Math.random()}`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ fileUrl: uploadedUrl })
-                          });
-                      } else {
-                          // S3 not configured or failed, fallback to multipart
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          
-                          // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
-                          response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
-                              method: 'POST',
-                              body: formData
-                          });
+                      // If it's a 500 error, Ghostscript failed (e.g., memory limit). Don't retry, it will just fail again.
+                      if (response.status === 500) {
+                          const data = await response.json().catch(() => ({}));
+                          throw new Error(`Ghostscript Error: ${data.error || 'Failed to convert'}`);
                       }
-                      
-                      const contentType = response.headers.get("content-type");
-                      
-                      // TRICK: If the server restarted, Vite might intercept the POST request and return index.html (Status 200).
-                      // We must detect this and throw a specific error to trigger a retry.
-                      if (contentType && contentType.includes("text/html")) {
-                          throw new Error("CONTAINER_RESTARTING: Server returned HTML instead of image");
-                      }
-                      
-                      if (!response.ok) {
-                          // If it's a 413 error, payload is too large
-                          if (response.status === 413) {
-                              const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
-                              const platformLimit = isVercel ? "4.5MB (Vercel limit)" : "500MB (Server limit)";
-                              throw new Error(`File is too large. ${platformLimit} exceeded. Try optimizing your EPS/AI file or deploy to a platform with higher body limits.`);
-                          }
-                          // If it's a 500 error, Ghostscript failed (e.g., memory limit). Don't retry, it will just fail again.
-                          if (response.status === 500) {
-                              const data = await response.json().catch(() => ({}));
-                              throw new Error(`Ghostscript Error: ${data.error || 'Failed to convert'}`);
-                          }
-                          throw new Error(`Server error (${response.status})`);
-                      }
-                      
-                      if (contentType && contentType.indexOf("image/jpeg") !== -1) {
-                          const blob = await response.blob();
-                          // TRICK: Use Object URL instead of Data URL (base64) to save massive amounts of browser RAM.
-                          // A 1MB JPEG becomes a 1.3MB base64 string. 100 files = 130MB of strings in React state!
-                          // Object URLs are just pointers to the blob in memory, much more efficient.
-                          const objectUrl = URL.createObjectURL(blob);
-                          return [objectUrl];
-                      } else if (contentType && contentType.indexOf("application/json") !== -1) {
-                          // Fallback in case server returns JSON error
-                          const data = await response.json();
-                          if (data.error) throw new Error(data.error);
-                      }
-                      
-                      const text = await response.text().catch(() => 'no text');
-                      throw new Error(`CONTAINER_RESTARTING_DEBUG: status=${response.status}, type=${contentType}, body=${text.substring(0, 100)}`);
+                      throw new Error(`Server error (${response.status})`);
+                  }
+                  
+                  if (contentType && contentType.indexOf("image/jpeg") !== -1) {
+                      const blob = await response.blob();
+                      // TRICK: Use Object URL instead of Data URL (base64) to save massive amounts of browser RAM.
+                      // A 1MB JPEG becomes a 1.3MB base64 string. 100 files = 130MB of strings in React state!
+                      // Object URLs are just pointers to the blob in memory, much more efficient.
+                      const objectUrl = URL.createObjectURL(blob);
+                      return [objectUrl];
+                  } else if (contentType && contentType.indexOf("application/json") !== -1) {
+                      // Fallback in case server returns JSON error
+                      const data = await response.json();
+                      if (data.error) throw new Error(data.error);
+                  }
+                  
+                  const text = await response.text().catch(() => 'no text');
+                  throw new Error(`CONTAINER_RESTARTING_DEBUG: status=${response.status}, type=${contentType}, body=${text.substring(0, 100)}`);
                   } catch (err: any) {
                       // Only retry on actual network errors or 502/503/504 (container restarting/timeout)
                       const isNetworkOrRestart = err.message.includes('CONTAINER_RESTARTING') || 
@@ -2074,15 +2083,14 @@ const App: React.FC = () => {
                               continue;
                           } else {
                               // TRICK: If we exhausted all retries and it's still restarting, the server is truly stuck or memory is completely fragmented.
-                              console.error("Max retries reached. Server keeps failing.");
-                              throw new Error("Gagal diproses karena kerumitan file. Server secara otomatis memutus koneksi (Out Of Memory). Harap perkecil ukuran/kerumitan EPS Anda sebelum diunggah.");
+                              console.error(`Max retries reached. Server keeps failing. Last error: ${err.message}`);
+                              throw new Error(`Gagal diproses karena kerumitan file. Server secara otomatis memutus koneksi (Out Of Memory). Harap perkecil ukuran/kerumitan EPS Anda sebelum diunggah. Detail: ${err.message}`);
                           }
                       }
                       throw new Error(`Failed to convert Vector (EPS/AI): ${err.message}`);
                   }
               }
               throw new Error("Failed to convert Vector (EPS/AI) after multiple attempts.");
-          }
       }
       throw new Error("Unsupported file format.");
   };

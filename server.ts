@@ -4,7 +4,7 @@ import { exec, spawn } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
@@ -1004,7 +1004,7 @@ app.get('/api/debug-uploads', (req, res) => {
     });
 
     app.post('/api/convert-eps-url', throttleMiddleware, async (req, res) => {
-        const { fileUrl } = req.body;
+        const { fileUrl, pathKey } = req.body;
         if (!fileUrl) {
             return res.status(400).json({ error: 'fileUrl is required' });
         }
@@ -1016,27 +1016,49 @@ app.get('/api/debug-uploads', (req, res) => {
         try {
             fs.mkdirSync(uniqueTmpDir, { recursive: true });
             
-            console.log(`Downloading EPS from ${fileUrl}...`);
-            const fetchRes = await fetch(fileUrl);
-            if (!fetchRes.ok) {
-                throw new Error(`Failed to fetch file: ${fetchRes.status}`);
-            }
-            
-            // Stream the file directly to disk to avoid Out of Memory errors
-            if (fetchRes.body) {
-                const { finished } = await import('stream/promises');
-                const fileStream = fs.createWriteStream(inputPath);
-                // @ts-ignore - fetchRes.body is async iterable in Node 18+
-                for await (const chunk of fetchRes.body) {
+            const { finished } = await import('stream/promises');
+            const fileStream = fs.createWriteStream(inputPath);
+
+            if (pathKey && process.env.S3_BUCKET_NAME) {
+                console.log(`Downloading EPS from S3 with key ${pathKey}...`);
+                const command = new GetObjectCommand({
+                    Bucket: process.env.S3_BUCKET_NAME,
+                    Key: pathKey
+                });
+                const s3Response = await s3Client.send(command);
+                if (!s3Response.Body) throw new Error("No response body from S3 storage");
+                
+                // Stream using Node.js stream pipeline
+                // @ts-ignore - S3 Body is a Readable stream in Node
+                for await (const chunk of s3Response.Body) {
                     if (!fileStream.write(chunk)) {
-                        await new Promise(resolve => fileStream.once('drain', resolve));
+                        await new Promise(resolve => fileStream.once('drain', () => resolve(null)));
                     }
                 }
                 fileStream.end();
                 await finished(fileStream);
-                console.log(`Downloaded EPS to ${inputPath} via async stream`);
+                console.log(`Downloaded EPS to ${inputPath} via S3 stream`);
             } else {
-                throw new Error("No response body from storage");
+                console.log(`Downloading EPS from ${fileUrl}...`);
+                const fetchRes = await fetch(fileUrl);
+                if (!fetchRes.ok) {
+                    throw new Error(`Failed to fetch file: ${fetchRes.status}`);
+                }
+                
+                // Stream the file directly to disk to avoid Out of Memory errors
+                if (fetchRes.body) {
+                    // @ts-ignore - fetchRes.body is async iterable in Node 18+
+                    for await (const chunk of fetchRes.body) {
+                        if (!fileStream.write(chunk)) {
+                            await new Promise(resolve => fileStream.once('drain', () => resolve(null)));
+                        }
+                    }
+                    fileStream.end();
+                    await finished(fileStream);
+                    console.log(`Downloaded EPS to ${inputPath} via async fetch stream`);
+                } else {
+                    throw new Error("No response body from storage");
+                }
             }
 
             // TRICK: Use internal memory limits for GS to avoid OOM
