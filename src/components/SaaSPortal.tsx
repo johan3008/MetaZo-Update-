@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
-  Trash2, RefreshCw, Download, Mail, Send
+  Trash2, RefreshCw, Download, Mail, Send, Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -128,6 +128,27 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [selectedDuration, setSelectedDuration] = useState<'30days' | 'unlimited'>('30days');
   const [isKeysLoading, setIsKeysLoading] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'ready' | 'used'>('ready');
+
+  const filteredKeys = backendKeys.filter(k => {
+    if (filterStatus === 'ready') return !k.activated;
+    if (filterStatus === 'used') return k.activated;
+    return true;
+  });
+
+  // === ADMIN ACCOUNT CONFIG ===
+  const ADMIN_EMAILS = ['johanchrismant4@gmail.com'];
+  const isAdminAccount = userEmail ? ADMIN_EMAILS.includes(userEmail) : false;
+  const showResellerHub = isResellerUnlocked || isAdminAccount;
+  const [portalTab, setPortalTab] = useState<'branding' | 'keys' | 'audit'>('branding');
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  // ============================
+
+  useEffect(() => {
+    const handlePayInfo = (e: any) => setTempPayInfo(e.detail);
+    window.addEventListener('mz_pay_info_updated', handlePayInfo);
+    return () => window.removeEventListener('mz_pay_info_updated', handlePayInfo);
+  }, []);
 
   const fetchBackendKeys = async () => {
     if (onlyModal) return;
@@ -598,7 +619,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     <>
       {/* 1. RESELLER PANEL TAB VIEW FOR OWNER (Wired inside Settings Modal) */}
       {!onlyModal && (
-        !isResellerUnlocked ? (
+        !showResellerHub ? (
           <div className="space-y-4 animate-in fade-in duration-200">
             {/* Elegant Header Banner */}
             <div className="relative overflow-hidden bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#0f172a] border border-slate-200 dark:border-white/10 rounded-2xl p-5 text-white shadow-xl">
@@ -667,55 +688,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               </div>
             </div>
 
-            {/* Authentication Gateway Form */}
-            <div className="bg-white dark:bg-[#111827] border border-slate-250 dark:border-white/10 rounded-2xl p-4 shadow-md space-y-3">
-              <div className="flex items-center space-x-1 text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[8.5px]">
-                <Lock size={12} className="text-[#7c3aed]" />
-                <span>Otorisasi Hak Akses Reseller</span>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="relative">
-                  <input
-                    type="password"
-                    placeholder="Masukkan Passcode Otorisasi Reseller"
-                    value={landingPasscode}
-                    onChange={(e) => {
-                      setLandingPasscode(e.target.value);
-                      if (landingError) setLandingError('');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleVerifyLandingPasscode();
-                      }
-                    }}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] pl-9 pr-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#7c3aed] dark:text-white transition-all text-slate-900 placeholder:text-slate-400"
-                  />
-                  <div className="absolute left-3 top-2.5 text-slate-450 dark:text-slate-500">
-                    <Lock size={14} className="mt-1" />
-                  </div>
-                </div>
-
-                {landingError && (
-                  <div className="text-[9px] text-red-500 font-black uppercase tracking-wide bg-red-550/10 px-2.5 py-1.5 rounded-2xl border border-red-500/10 leading-normal">
-                    ⚠️ {landingError}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleVerifyLandingPasscode}
-                  disabled={isVerifyingLanding}
-                  className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 active:scale-95 text-white font-extrabold text-xs uppercase rounded-[1.5rem] transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isVerifyingLanding ? (
-                    <RefreshCw size={13} className="animate-spin" />
-                  ) : (
-                    <ShieldCheck size={13} />
-                  )}
-                  <span>{isVerifyingLanding ? 'Memverifikasi...' : 'Unlock Panel Komersial'}</span>
-                </button>
-              </div>
+            {/* Notice for non-admins */}
+            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 shadow-md text-center">
+              <span className="text-red-500 font-extrabold uppercase tracking-wider text-[10px] block mb-1">Akses Ditolak</span>
+              <p className="text-slate-600 dark:text-slate-400 font-medium text-[9px] leading-relaxed">
+                Halaman ini hanya dapat diakses oleh akun Administrator (Owner). Anda tidak memiliki otorisasi untuk membuka konfigurasi Reseller. Hubungi owner utama jika merasa ini sebuah kesalahan.
+              </p>
             </div>
 
             {/* Decal Quote Footer */}
@@ -730,20 +708,48 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             <div className="bg-gradient-to-r from-violet-500/10 to-indigo-500/10 border border-violet-500/20 rounded-2xl p-4">
               <div className="flex items-center space-x-2 mb-2 text-[#7c3aed]">
                 <Sparkles size={16} className="animate-pulse" />
-                <span className="text-[11px] font-black uppercase tracking-wider">Owner & Reseller Control Hub</span>
+                <span className="text-[11px] font-black uppercase tracking-wider">Owner & Reseller Control Hub {isAdminAccount && <span className="ml-2 bg-violet-600 text-white px-2 py-0.5 rounded-full text-[9px] shadow-sm">ADMIN MODE</span>}</span>
               </div>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-[10.5px] leading-relaxed">
                 Anda berniat menjual aplikasi ini kembali? Ubah identitas visual, syarat tagih, kontak personal, serta key pembeli secara dinamis sesuai kebutuhan branding Anda.
               </p>
             </div>
 
+            {/* Admin Tabs */}
+            <div className="flex font-semibold text-[10px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setPortalTab('branding')}
+                className={`py-2 px-4 rounded-lg transition-all flex-1 ${portalTab === 'branding' ? 'bg-white dark:bg-slate-900 shadow text-violet-600' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+              >
+                Branding & Payment
+              </button>
+              <button
+                type="button"
+                onClick={() => setPortalTab('keys')}
+                className={`py-2 px-4 rounded-lg transition-all flex-1 ${portalTab === 'keys' ? 'bg-white dark:bg-slate-900 shadow text-violet-600' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+              >
+                Key Generator
+              </button>
+              <button
+                type="button"
+                onClick={() => setPortalTab('audit')}
+                className={`py-2 px-4 rounded-lg transition-all flex-1 ${portalTab === 'audit' ? 'bg-white dark:bg-slate-900 shadow text-emerald-600' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+              >
+                License Audit
+              </button>
+            </div>
+
             <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2 pb-4">
-              {/* BRANDING SETUP GRID */}
-              <div className="bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-4">
-                <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200 mb-3">
-                  <Sparkles size={14} className="text-[#7c3aed]" />
-                  <span className="text-[10px] font-black uppercase tracking-wider">A. Brand Identity Customization</span>
-                </div>
+              
+              {portalTab === 'branding' && (
+                <>
+                  {/* BRANDING SETUP GRID */}
+                  <div className="bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 mb-4">
+                    <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200 mb-3">
+                      <Sparkles size={14} className="text-[#7c3aed]" />
+                      <span className="text-[10px] font-black uppercase tracking-wider">A. Brand Identity Customization</span>
+                    </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">App Name</label>
@@ -838,9 +844,54 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   </p>
                 </div>
               </div>
+              
+              {/* ACTION BUTTONS FOR BRANDING */}
+              <div className="flex items-center space-x-2 mt-4">
+                <button
+                  type="button"
+                  onClick={handleSaveResellerSettings}
+                  disabled={isKeysLoading}
+                  className="flex-1 py-3 px-4 bg-[#7c3aed] hover:bg-violet-600 text-white font-black uppercase tracking-widest rounded-[1.5rem] text-[10px] shadow-lg shadow-violet-500/25 transition-all flex items-center justify-center space-x-2 shrink-0 disabled:opacity-50"
+                  title="Simpan & Terapkan Perubahan Identitas"
+                >
+                  <Save size={13} className={isKeysLoading ? 'animate-pulse' : ''} />
+                  <span>{saveSuccess ? 'Berhasil Disimpan!' : 'Update Label & Save'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetResellerSettings}
+                  disabled={isKeysLoading}
+                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0 disabled:opacity-50"
+                  title="Kembalikan semua teks ke default pabrik"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset</span>
+                </button>
+                {setIsResellerUnlocked && !isAdminAccount && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Kunci dan sembunyikan kembali menu Reseller ini?")) {
+                        setIsResellerUnlocked(false);
+                        localStorage.removeItem('mz_reseller_unlocked');
+                        alert("Akses Reseller telah dikunci & disembunyikan!");
+                      }
+                    }}
+                    className="py-3 px-4 bg-slate-500/10 hover:bg-slate-500/20 text-slate-500 font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
+                    title="Kunci & Sembunyikan Menu Reseller"
+                  >
+                    <Lock size={13} />
+                    <span>Kunci</span>
+                  </button>
+                )}
+              </div>
+              </>
+              )}
 
+              {portalTab === 'keys' && (
+                <>
               {/* NEW SERIAL KEY ENGINE FOR SELLING (SINGLE USE) */}
-              <div className="border-t border-slate-100 dark:border-white/5 pt-4 space-y-3">
+              <div className="border border-slate-100 dark:border-white/5 pt-4 space-y-3 rounded-xl p-3">
                 <div className="bg-slate-100/60 dark:bg-slate-950/50 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 space-y-1.5">
                   <div className="flex items-center space-x-1.5 text-slate-800 dark:text-slate-200">
                     <Key size={14} className="text-[#7c3aed] animate-pulse" />
@@ -848,6 +899,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   </div>
                   <p className="text-slate-500 dark:text-slate-400 font-semibold text-[10px] leading-relaxed">
                     Generate Serial Key acak unik untuk dijual ke pengguna. Setiap key hanya bisa diaktivasi sekali pasca input oleh satu user, mencegah sharing lisensi antar pembeli!
+
                   </p>
                 </div>
 
@@ -914,13 +966,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     </button>
                   </div>
 
+                  <div className="flex bg-slate-100/50 dark:bg-slate-800/50 rounded-lg p-1 text-[10px] font-bold uppercase tracking-wider">
+                    <button type="button" onClick={() => setFilterStatus('all')} className={`flex-1 py-1 rounded transition-colors ${filterStatus === 'all' ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-white' : 'text-slate-500'}`}>Semua</button>
+                    <button type="button" onClick={() => setFilterStatus('ready')} className={`flex-1 py-1 rounded transition-colors ${filterStatus === 'ready' ? 'bg-white dark:bg-slate-700 shadow text-emerald-500 dark:text-emerald-400' : 'text-slate-500'}`}>Tersedia</button>
+                    <button type="button" onClick={() => setFilterStatus('used')} className={`flex-1 py-1 rounded transition-colors ${filterStatus === 'used' ? 'bg-white dark:bg-slate-700 shadow text-violet-500 dark:text-violet-400' : 'text-slate-500'}`}>Terpakai</button>
+                  </div>
+
                   <div className="max-h-[180px] overflow-y-auto border border-slate-100 dark:border-slate-900 rounded-[1.5rem] bg-slate-50/50 dark:bg-slate-950/30 custom-scrollbar divide-y divide-slate-100 dark:divide-slate-900 text-xs">
-                    {backendKeys.length === 0 ? (
+                    {filteredKeys.length === 0 ? (
                       <div className="p-4 text-center text-slate-400 dark:text-slate-500 font-semibold text-[10px]">
-                        Belum ada Serial Key satu kali pakai di database. Munculkan dengan generator di atas!
+                        {backendKeys.length === 0 ? 'Belum ada Serial Key di database. Munculkan dengan generator di atas!' : 'Tidak ada key yang sesuai filter.'}
                       </div>
                     ) : (
-                      backendKeys.map((kObj, i) => (
+                      filteredKeys.map((kObj, i) => (
                         <React.Fragment key={kObj.key}>
                           <div className="p-2 flex items-center justify-between gap-2 hover:bg-slate-100/50 dark:hover:bg-slate-950/50 transition-colors">
                           <div className="space-y-1 min-w-0 flex-1">
@@ -1053,43 +1111,75 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
+              </>
+              )}
 
-            {/* Action buttons */}
-            <div className="pt-2 border-t border-slate-100 dark:border-white/5 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSaveResellerSettings}
-                className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1"
-              >
-                <Save size={13} />
-                <span>{saveSuccess ? 'Branding Disimpan!' : 'Simpan Branding'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleResetResellerSettings}
-                className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-550 font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
-                title="Reset to Factory"
-              >
-                <RotateCcw size={13} />
-                <span>Reset</span>
-              </button>
-              {setIsResellerUnlocked && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm("Kunci dan sembunyikan kembali menu Reseller ini?")) {
-                      setIsResellerUnlocked(false);
-                      localStorage.removeItem('mz_reseller_unlocked');
-                      alert("Akses Reseller telah dikunci & disembunyikan!");
-                    }
-                  }}
-                  className="py-2 px-3 bg-slate-500/10 hover:bg-slate-500/20 text-slate-500 font-extrabold rounded-[1.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0"
-                  title="Kunci & Sembunyikan Menu Reseller"
-                >
-                  <Lock size={13} />
-                  <span>Kunci</span>
-                </button>
+              {portalTab === 'audit' && (
+                <div className="space-y-4">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm uppercase tracking-wider mb-1">License Audit Tracker</h4>
+                      <p className="text-[10px] font-semibold opacity-80 max-w-sm">
+                        Lacak aktivasi kunci produk secara real-time. Anda bisa mencari pengguna atau produk yang telah melakukan validasi dengan menginput email atau key.
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                      <ShieldCheck size={20} />
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Cari email pengguna atau license key..." 
+                      value={auditSearchQuery}
+                      onChange={(e) => setAuditSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-xs font-semibold outline-none focus:border-emerald-500 transition-colors"
+                    />
+                    <Search size={14} className="absolute left-3.5 top-3 text-slate-400" />
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left max-w-full text-xs whitespace-nowrap">
+                      <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                        <tr>
+                          <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">License Key</th>
+                          <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">User Email</th>
+                          <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Activation Date</th>
+                          <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                        {backendKeys
+                          .filter(k => k.activated)
+                          .filter(k => 
+                            k.key.toLowerCase().includes(auditSearchQuery.toLowerCase()) || 
+                            (k.activatedBy || '').toLowerCase().includes(auditSearchQuery.toLowerCase())
+                          )
+                          .map((k, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                              <td className="px-4 py-3 font-mono font-bold text-[10px]">{k.key}</td>
+                              <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">{k.activatedBy}</td>
+                              <td className="px-4 py-3 text-slate-500 text-[10px]">{k.activatedAt ? new Date(k.activatedAt).toLocaleString() : '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest">
+                                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  <span>Active</span>
+                                </span>
+                              </td>
+                            </tr>
+                        ))}
+                        {backendKeys.filter(k => k.activated).filter(k => k.key.toLowerCase().includes(auditSearchQuery.toLowerCase()) || (k.activatedBy || '').toLowerCase().includes(auditSearchQuery.toLowerCase())).length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                              Tidak ada data aktivasi yang sesuai pencarian.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </div>
           </div>

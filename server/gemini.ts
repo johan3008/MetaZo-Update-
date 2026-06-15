@@ -1035,38 +1035,13 @@ ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
 VISUAL ACCURACY RULES:
-1. Never hallucinate.
-2. Never guess.
-3. Never infer hidden information.
-4. Never invent objects, actions, locations, professions, events, or concepts not visually supported.
-5. If uncertain, omit the information.
+1. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
+2. Never hallucinate brands, trademarked logos, or copyrighted characters.
+3. If uncertain, provide the closest accurate generic description.
 
 STRICT PROHIBITIONS:
-Never infer:
-* profession
-* occupation
-* nationality
-* ethnicity
-* religion
-* political affiliation
-* location
-* country
-* city
-* event
-* season
-* relationship
-* emotion
-* brand
-* trademark
-* copyrighted character
-
-Examples:
-Keyboard ≠ programmer
-Blueprint ≠ architect
-Camera ≠ photographer
-Suit ≠ businessman
-Laptop ≠ office worker
-Medical mask ≠ doctor
+* Never include specific brand names or trademarked logos (must be described generically).
+* Never include copyrighted characters.
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
@@ -1185,7 +1160,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
+6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
@@ -1298,7 +1273,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
+6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
@@ -1585,38 +1560,13 @@ ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
 VISUAL ACCURACY RULES:
-1. Never hallucinate.
-2. Never guess.
-3. Never infer hidden information.
-4. Never invent objects, actions, locations, professions, events, or concepts not visually supported.
-5. If uncertain, omit the information.
+1. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
+2. Never hallucinate brands, trademarked logos, or copyrighted characters.
+3. If uncertain, provide the closest accurate generic description.
 
 STRICT PROHIBITIONS:
-Never infer:
-* profession
-* occupation
-* nationality
-* ethnicity
-* religion
-* political affiliation
-* location
-* country
-* city
-* event
-* season
-* relationship
-* emotion
-* brand
-* trademark
-* copyrighted character
-
-Examples:
-Keyboard ≠ programmer
-Blueprint ≠ architect
-Camera ≠ photographer
-Suit ≠ businessman
-Laptop ≠ office worker
-Medical mask ≠ doctor
+* Never include specific brand names or trademarked logos (must be described generically).
+* Never include copyrighted characters.
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
@@ -1737,7 +1687,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image/video. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
+6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
@@ -1848,7 +1798,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO GUESSING OR HALLUCINATION (ZERO TOLERANCE): Describe ONLY what is clearly and literally visible in the image/video. NEVER guess, assume, or infer any hidden information. Do NOT infer or assume professions (e.g. "doctor", "lawyer" - use physical descriptions like "person wearing white lab coat" or "holding clipboard"), exact locations/background countries (do not include specific countries/cities unless visually proven by explicit flag landmarks), ethnicities, religions, seasons, specific events, or relationship emotions unless explicitly proven by visual facts. Every word in the metadata MUST be supported by absolute visible evidence.
+6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.

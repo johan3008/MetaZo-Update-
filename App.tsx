@@ -1302,6 +1302,11 @@ const App: React.FC = () => {
           setMzLicenseSeed(data.licenseSeed);
           localStorage.setItem('mz_reseller_seed', data.licenseSeed);
         }
+        if (data.payInfo) {
+          localStorage.setItem('mz_reseller_pay_info', data.payInfo);
+          // dispatch custom event to notify SaaSPortal
+          window.dispatchEvent(new CustomEvent('mz_pay_info_updated', { detail: data.payInfo }));
+        }
       } else {
         // Init fallback bootstrap
         setDoc(docRef, {
@@ -4018,7 +4023,7 @@ const App: React.FC = () => {
                   isLicensed={isMzLicensed}
                   showActivation={showActivationModal}
                   setShowActivation={setShowActivationModal}
-                  userEmail={user?.email || "johanchrismant4@gmail.com"}
+                  userEmail={user?.email || ""}
                   userId={user?.uid}
                   isResellerUnlocked={isResellerUnlocked}
                   setIsResellerUnlocked={setIsResellerUnlocked}
@@ -4075,7 +4080,7 @@ const App: React.FC = () => {
         isLicensed={isMzLicensed}
         showActivation={showActivationModal}
         setShowActivation={setShowActivationModal}
-        userEmail={user?.email || "johanchrismant4@gmail.com"}
+        userEmail={user?.email || ""}
         userId={user?.uid}
         onlyModal={true}
         trialDaysLeft={trialDaysLeft}
