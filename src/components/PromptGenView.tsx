@@ -5,6 +5,8 @@ import {
   Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2
 } from 'lucide-react';
 
+import { FeatureGuideButton } from './FeatureGuideModal';
+
 interface PromptGenViewProps {
   t: any;
   prefilledSubject?: string;
@@ -358,9 +360,16 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           </p>
         </div>
         
-        <div className="mt-3 md:mt-0 flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-          <Sliders size={12} className="text-emerald-500 animate-pulse" />
-          <span>{t.prompt_studio_version}</span>
+        <div className="mt-3 md:mt-0 flex flex-wrap items-center gap-2">
+          <FeatureGuideButton 
+            title={t.guide_prompt_gen_title} 
+            description={t.guide_prompt_gen_desc} 
+            t={t} 
+          />
+          <div className="flex items-center space-x-2 px-3 py-1.5 bg-slate-50 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+            <Sliders size={12} className="text-emerald-500 animate-pulse" />
+            <span>{t.prompt_studio_version}</span>
+          </div>
         </div>
       </div>
 

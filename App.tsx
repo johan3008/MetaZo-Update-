@@ -13,6 +13,7 @@ import { MetricsRow } from './src/components/MetricsRow';
 import { UploadPanel } from './src/components/UploadPanel';
 import { AiConfigPanel } from './src/components/AiConfigPanel';
 import { ExportPanel } from './src/components/ExportPanel';
+import { FeatureGuideButton } from './src/components/FeatureGuideModal';
 import { ReviewQueue } from './src/components/ReviewQueue';
 import { DashboardView } from './src/components/DashboardView';
 import { PromptGenView } from './src/components/PromptGenView';
@@ -1962,15 +1963,40 @@ const App: React.FC = () => {
                   if (stopGenerationRef.current) throw new Error("Cancelled by user");
                   
                   try {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      
-                      // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
-                      // if the server restarts and Vite middleware intercepts the request.
-                      const response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
-                          method: 'POST',
-                          body: formData
-                      });
+                      let response;
+                      const fileExt = file.name.split('.').pop();
+                      const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'application/postscript')}`);
+                      const getUrlData = await getUrlRes.json().catch(() => ({}));
+
+                      if (getUrlRes.ok && getUrlData.uploadUrl && getUrlData.fileUrl) {
+                          // TRICK: S3 is configured, upload linearly via presigned URL to solve "masalah file large"
+                          console.log('Using presigned URL to upload large file:', file.name);
+                          const putRes = await fetch(getUrlData.uploadUrl, {
+                              method: 'PUT',
+                              body: file,
+                              headers: { 'Content-Type': file.type || 'application/postscript' }
+                          });
+                          if (!putRes.ok) {
+                              throw new Error(`Failed to upload to storage: ${putRes.status}`);
+                          }
+
+                          // Now ask the server to process the URL
+                          response = await fetch(`/api/convert-eps-url?t=${Date.now()}_${Math.random()}`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ fileUrl: getUrlData.fileUrl })
+                          });
+                      } else {
+                          // S3 not configured or failed, fallback to multipart
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          
+                          // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
+                          response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
+                              method: 'POST',
+                              body: formData
+                          });
+                      }
                       
                       const contentType = response.headers.get("content-type");
                       
@@ -2785,6 +2811,7 @@ const App: React.FC = () => {
               videoDailyCount={dailyGenCounts[ToolType.VIDEO] || 0}
               vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
               t={t}
+              userName={user?.displayName || user?.email?.split('@')[0] || ''}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView 
@@ -2890,9 +2917,16 @@ const App: React.FC = () => {
                 )}
                 
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                    {activeTool === ToolType.IMAGE ? "Image AI Workspace" : activeTool === ToolType.VIDEO ? "Video AI Workspace" : "Vector AI Workspace"}
-                  </h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                      {activeTool === ToolType.IMAGE ? "Image AI Workspace" : activeTool === ToolType.VIDEO ? "Video AI Workspace" : "Vector AI Workspace"}
+                    </h2>
+                    <FeatureGuideButton 
+                      title={activeTool === ToolType.IMAGE ? t.guide_image_title : activeTool === ToolType.VIDEO ? t.guide_video_title : t.guide_vector_title}
+                      description={activeTool === ToolType.IMAGE ? t.guide_image_desc : activeTool === ToolType.VIDEO ? t.guide_video_desc : t.guide_vector_desc}
+                      t={t}
+                    />
+                  </div>
                   <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
                     {activeTool === ToolType.IMAGE && "JPG, PNG & WEBP metadata optimizer"}
                     {activeTool === ToolType.VIDEO && "Frame sequential MP4/MOV metadata assistant"}

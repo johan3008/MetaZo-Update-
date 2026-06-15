@@ -698,6 +698,11 @@ async function callOpenAICompatibleWithRetry(params: {
         }
         if (params.responseMimeType === 'application/json') {
           answer = extractJSON(answer);
+          if (answer.replace(/\s/g, '') === '{}') {
+            console.warn(`[callOpenAICompatibleWithRetry] Model hallucinated empty JSON string. Retrying...`);
+            // Add 'quota' to trigger a retry gracefully
+            throw new Error(`Model returned empty json object string {}. Trigger quota rotation/retry.`);
+          }
         }
         return answer;
       } catch (err: any) {

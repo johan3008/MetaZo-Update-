@@ -4,6 +4,8 @@ import { exec, spawn } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords } from './server/gemini.ts';
@@ -930,6 +932,156 @@ app.get('/api/debug-uploads', (req, res) => {
             });
         }
     });
+
+    // =========== START VECTOR LARGE FILE STORAGE UPLOAD ENDPOINTS ===========
+    const s3Client = new S3Client({
+        region: 'auto',
+        endpoint: process.env.S3_ENDPOINT || '',
+        credentials: {
+            accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+            secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        },
+        forcePathStyle: true,
+    });
+
+    app.get('/api/get-upload-url', async (req, res) => {
+        try {
+            const { filename, contentType } = req.query;
+            if (!filename) return res.status(400).json({ error: 'Filename is required' });
+            
+            if (!process.env.S3_ENDPOINT || !process.env.S3_BUCKET_NAME) {
+                return res.status(500).json({ error: 'S3/R2 Storage is not configured in .env' });
+            }
+
+            const uniqueFilename = `eps-uploads/${Date.now()}_${Math.random().toString(36).substring(7)}_${filename.toString().replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+            const bucketName = process.env.S3_BUCKET_NAME;
+
+            const command = new PutObjectCommand({
+                Bucket: bucketName,
+                Key: uniqueFilename,
+                ContentType: contentType ? String(contentType) : 'application/postscript',
+            });
+
+            const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+            let publicUrl = '';
+            
+            if (process.env.S3_PUBLIC_URL) {
+                publicUrl = `${process.env.S3_PUBLIC_URL.replace(/\/$/, '')}/${uniqueFilename}`;
+            } else {
+                // Determine public URL structure based on R2/S3
+                publicUrl = `${process.env.S3_ENDPOINT.replace(/\/$/, '')}/${bucketName}/${uniqueFilename}`;
+            }
+
+            res.json({ uploadUrl, fileUrl: publicUrl, pathKey: uniqueFilename });
+        } catch (error: any) {
+            console.error('Error generating upload URL:', error);
+            res.status(500).json({ error: 'Failed to generate upload URL', details: error.message });
+        }
+    });
+
+    app.post('/api/convert-eps-url', throttleMiddleware, async (req, res) => {
+        const { fileUrl } = req.body;
+        if (!fileUrl) {
+            return res.status(400).json({ error: 'fileUrl is required' });
+        }
+
+        const uniqueTmpDir = path.join(uploadDir, `tmp_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+        const inputPath = path.join(uniqueTmpDir, 'downloaded.eps');
+        const outputPath = `${inputPath}.jpg`;
+
+        try {
+            fs.mkdirSync(uniqueTmpDir, { recursive: true });
+            
+            console.log(`Downloading EPS from ${fileUrl}...`);
+            const fetchRes = await fetch(fileUrl);
+            if (!fetchRes.ok) {
+                throw new Error(`Failed to fetch file: ${fetchRes.status}`);
+            }
+            
+            const arrayBuffer = await fetchRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            fs.writeFileSync(inputPath, buffer);
+            console.log(`Downloaded ${buffer.length} bytes to ${inputPath}`);
+
+            // TRICK: Use internal memory limits for GS to avoid OOM
+            const gsArgs = [
+                '-dSAFER', '-dBATCH', '-dNOPAUSE', 
+                '-dEPSCrop', '-r72', 
+                '-dTextAlphaBits=2', '-dGraphicsAlphaBits=2',
+                '-dJPEGQ=85',
+                '-sDEVICE=jpeg', `-sOutputFile=${outputPath}`,
+                '-dMaxBitmap=5000000', 
+                '-dBufferSpace=2000000', 
+                '-dBandHeight=50', 
+                '-dBandBufferSpace=2000000', 
+                '-dNumRenderingThreads=1', 
+                '-dVMReclaim=1',
+                '-c', '<< /MaxPatternBitmap 500000 >> setuserparams', '-f',
+                inputPath
+            ];
+            
+            const spawnOptions = { 
+                timeout: 30000, 
+                env: { ...process.env, TMPDIR: uniqueTmpDir } 
+            };
+
+            await gsQueue.enqueue(async () => {
+                try {
+                    await spawnAsync(gsExecutable, gsArgs, spawnOptions);
+                } catch (gsError) {
+                    console.warn('Ghostscript failed at 72 DPI, trying 36 DPI...');
+                    const gsArgs36 = gsArgs.map(arg => arg === '-r72' ? '-r36' : arg);
+                    try {
+                        await spawnAsync(gsExecutable, gsArgs36, { ...spawnOptions, timeout: 15000 });
+                    } catch (gsError2) {
+                        console.warn('Ghostscript failed with -dEPSCrop, trying -dEPSFitPage as last resort...');
+                        const gsArgsFit = gsArgs36.map(arg => arg === '-dEPSCrop' ? '-dEPSFitPage' : arg);
+                        await spawnAsync(gsExecutable, gsArgsFit, { ...spawnOptions, timeout: 15000 });
+                    }
+                }
+            });
+
+            try {
+                const stats = await fs.promises.stat(outputPath);
+                if (stats.size === 0) {
+                    throw new Error('Generated JPEG is 0 bytes');
+                }
+            } catch (statErr) {
+                throw new Error('Generated JPEG not found or empty');
+            }
+
+            await new Promise<void>((resolve, reject) => {
+                res.sendFile(outputPath, (err) => {
+                    if (err) {
+                        console.error('Error saat mengirimkan file JPEG:', err);
+                        if (!res.headersSent) res.status(500).json({ error: 'Failed to send file' });
+                        reject(err);
+                    } else resolve();
+                    
+                    setTimeout(() => {
+                        try {
+                            if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+                            if (fs.existsSync(uniqueTmpDir)) fs.rmSync(uniqueTmpDir, { recursive: true, force: true });
+                        } catch (e) {}
+                    }, 500);
+                });
+            });
+
+        } catch (error: any) {
+            console.error('API /convert-eps-url error:', error);
+            if (fs.existsSync(uniqueTmpDir)) {
+                fs.rmSync(uniqueTmpDir, { recursive: true, force: true }).catch(() => {});
+            }
+            if (!res.headersSent) {
+                res.status(error.message.includes('timeout') ? 408 : 500).json({ 
+                    error: 'Gagal mengkonversi vector URL, file mungkin rusak atau terlalu complex.',
+                    details: error.message 
+                });
+            }
+        }
+    });
+    // =========== END VECTOR LARGE FILE STORAGE UPLOAD ENDPOINTS ===========
 
     app.post('/api/convert-eps', throttleMiddleware, upload.single('file'), async (req, res) => {
         if (!req.file) {

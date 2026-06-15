@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
 
+import { FeatureGuideButton } from './FeatureGuideModal';
+
 interface DashboardViewProps {
   files: FileItem[];
   setActiveTool: (tool: ToolType) => void;
@@ -24,6 +26,7 @@ interface DashboardViewProps {
   videoDailyCount?: number;
   vectorDailyCount?: number;
   t: any;
+  userName?: string;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -43,7 +46,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   imageDailyCount = 0,
   videoDailyCount = 0,
   vectorDailyCount = 0,
-  t
+  t,
+  userName = ''
 }) => {
   // Compute some quick statistics
   const totalFiles = files.length;
@@ -148,10 +152,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               }
             }}
           >
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
-              <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
-              <span>{slides[currentSlide].badge}</span>
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
+                <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
+                <span>{slides[currentSlide].badge}</span>
+              </div>
+              <FeatureGuideButton 
+                title={t.guide_dashboard_title} 
+                description={t.guide_dashboard_desc} 
+                t={t} 
+              />
             </div>
+            {userName && (
+              <div className="text-sm sm:text-base font-semibold text-emerald-300 mb-2">
+                Selamat Datang, {userName} 👋
+              </div>
+            )}
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight leading-tight select-none">
               {slides[currentSlide].title}
             </h1>

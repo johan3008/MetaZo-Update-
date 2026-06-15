@@ -13,6 +13,8 @@ interface QualityReport {
   heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
 }
 
+import { FeatureGuideButton } from './FeatureGuideModal';
+
 export const ImageQualityCheck: React.FC<{ 
   t: any; 
   aiOptions?: any;
@@ -244,9 +246,16 @@ export const ImageQualityCheck: React.FC<{
               </div>
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">
-                {t.qc_title} <span className="text-emerald-500">{t.qc_title_check}</span>
-              </h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">
+                  {t.qc_title} <span className="text-emerald-500">{t.qc_title_check}</span>
+                </h2>
+                <FeatureGuideButton 
+                  title={t.guide_image_check_title} 
+                  description={t.guide_image_check_desc} 
+                  t={t} 
+                />
+              </div>
               <div className="flex items-center gap-2 mt-2">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.15em]">

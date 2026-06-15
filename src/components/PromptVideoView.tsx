@@ -25,6 +25,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { VideoAnalysisResult, VideoPrompt } from '../../types';
 import { copyToClipboard as robustCopy } from '../utils';
 
+import { FeatureGuideButton } from './FeatureGuideModal';
+
 interface HistoryItem {
   id: string;
   keyword: string;
@@ -285,7 +287,14 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               <div className="p-3 bg-violet-600 rounded-2xl shadow-lg shadow-violet-600/20">
                 <Video className="text-white" size={28} />
               </div>
-              <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.video_studio_title}</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.video_studio_title}</h1>
+                <FeatureGuideButton 
+                  title={t.guide_video_title} 
+                  description={t.guide_video_desc} 
+                  t={t} 
+                />
+              </div>
             </div>
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
               {t.video_studio_subtitle}

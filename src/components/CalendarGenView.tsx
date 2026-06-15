@@ -9,6 +9,8 @@ interface CalendarGenViewProps {
   aiOptions?: any;
 }
 
+import { FeatureGuideButton } from './FeatureGuideModal';
+
 export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPrompt, aiOptions }) => {
   const MONTHS = [
     t.calendar_months_january, t.calendar_months_february, t.calendar_months_march, 
@@ -105,7 +107,14 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
           <Calendar className="text-emerald-500" size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.calendar_title}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.calendar_title}</h1>
+            <FeatureGuideButton 
+              title={t.guide_calendar_title} 
+              description={t.guide_calendar_desc} 
+              t={t} 
+            />
+          </div>
           <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mt-1">{t.calendar_subtitle}</p>
         </div>
       </div>
