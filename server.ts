@@ -944,6 +944,30 @@ app.get('/api/debug-uploads', (req, res) => {
         forcePathStyle: true,
     });
 
+    app.post('/api/upload-vercel-blob', throttleMiddleware, async (req, res) => {
+        try {
+            const { handleUpload } = await import('@vercel/blob/client');
+            const body = req.body;
+            const jsonResponse = await handleUpload({
+                body,
+                request: req,
+                onBeforeGenerateToken: async (pathname) => {
+                    return {
+                        allowedContentTypes: ['application/postscript', 'application/illustrator', 'image/jpeg', 'image/png'],
+                        tokenPayload: JSON.stringify({}),
+                    };
+                },
+                onUploadCompleted: async ({ blob }) => {
+                    console.log('Blob upload completed', blob.url);
+                },
+            });
+            res.status(200).json(jsonResponse);
+        } catch (error: any) {
+            console.error('API /upload-vercel-blob error:', error);
+            res.status(400).json({ error: error.message });
+        }
+    });
+
     app.get('/api/get-upload-url', async (req, res) => {
         try {
             const { filename, contentType } = req.query;
@@ -998,12 +1022,19 @@ app.get('/api/debug-uploads', (req, res) => {
                 throw new Error(`Failed to fetch file: ${fetchRes.status}`);
             }
             
-            // Stream the file directly to disk to avoid Out of Memory errors on Vercel
+            // Stream the file directly to disk to avoid Out of Memory errors
             if (fetchRes.body) {
-                const { Readable } = require('stream');
+                const { finished } = await import('stream/promises');
                 const fileStream = fs.createWriteStream(inputPath);
-                await require('stream/promises').pipeline(Readable.fromWeb(fetchRes.body), fileStream);
-                console.log(`Downloaded EPS to ${inputPath} via stream`);
+                // @ts-ignore - fetchRes.body is async iterable in Node 18+
+                for await (const chunk of fetchRes.body) {
+                    if (!fileStream.write(chunk)) {
+                        await new Promise(resolve => fileStream.once('drain', resolve));
+                    }
+                }
+                fileStream.end();
+                await finished(fileStream);
+                console.log(`Downloaded EPS to ${inputPath} via async stream`);
             } else {
                 throw new Error("No response body from storage");
             }
@@ -1076,7 +1107,7 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (error: any) {
             console.error('API /convert-eps-url error:', error);
             if (fs.existsSync(uniqueTmpDir)) {
-                fs.rmSync(uniqueTmpDir, { recursive: true, force: true }).catch(() => {});
+                try { fs.rmSync(uniqueTmpDir, { recursive: true, force: true }); } catch (e) {}
             }
             if (!res.headersSent) {
                 res.status(error.message.includes('timeout') ? 408 : 500).json({ 

@@ -1958,7 +1958,7 @@ const App: React.FC = () => {
               return [clientSidePreview];
           } else {
               let retryCount = 0;
-              const maxRetries = 15; // Increased to 15 retries (total ~5 minutes) to handle slow container restarts
+              const maxRetries = 3; // Reduced to 3 retries because if the server OOMs repeatedly, it will never succeed
               while (retryCount < maxRetries) {
                   if (stopGenerationRef.current) throw new Error("Cancelled by user");
                   
@@ -1967,6 +1967,8 @@ const App: React.FC = () => {
                       const fileExt = file.name.split('.').pop();
                       const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'application/postscript')}`);
                       const getUrlData = await getUrlRes.json().catch(() => ({}));
+                      
+                      let uploadedUrl = null;
 
                       if (getUrlRes.ok && getUrlData.uploadUrl && getUrlData.fileUrl) {
                           // TRICK: S3 is configured, upload linearly via presigned URL to solve "masalah file large"
@@ -1976,15 +1978,28 @@ const App: React.FC = () => {
                               body: file,
                               headers: { 'Content-Type': file.type || 'application/postscript' }
                           });
-                          if (!putRes.ok) {
-                              throw new Error(`Failed to upload to storage: ${putRes.status}`);
+                          if (!putRes.ok) throw new Error(`Failed to upload to storage: ${putRes.status}`);
+                          uploadedUrl = getUrlData.fileUrl;
+                      } else {
+                          // Try Vercel Blob if S3 fails or is unconfigured
+                          try {
+                              const { upload } = await import('@vercel/blob/client');
+                              const blob = await upload(file.name, file, {
+                                  access: 'public',
+                                  handleUploadUrl: '/api/upload-vercel-blob'
+                              });
+                              uploadedUrl = blob.url;
+                          } catch (blobErr) {
+                              // Silently fallback to multipart if Vercel Blob isn't configured
                           }
+                      }
 
+                      if (uploadedUrl) {
                           // Now ask the server to process the URL
                           response = await fetch(`/api/convert-eps-url?t=${Date.now()}_${Math.random()}`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ fileUrl: getUrlData.fileUrl })
+                              body: JSON.stringify({ fileUrl: uploadedUrl })
                           });
                       } else {
                           // S3 not configured or failed, fallback to multipart
@@ -2059,9 +2074,8 @@ const App: React.FC = () => {
                               continue;
                           } else {
                               // TRICK: If we exhausted all retries and it's still restarting, the server is truly stuck or memory is completely fragmented.
-                              // We will save the state to IndexedDB and force a hard browser refresh to completely clear all memory and resume.
-                              console.error("Max retries reached. Forcing hard refresh to clear memory and resume...");
-                              throw new Error("FORCE_HARD_REFRESH");
+                              console.error("Max retries reached. Server keeps failing.");
+                              throw new Error("Gagal diproses karena kerumitan file. Server secara otomatis memutus koneksi (Out Of Memory). Harap perkecil ukuran/kerumitan EPS Anda sebelum diunggah.");
                           }
                       }
                       throw new Error(`Failed to convert Vector (EPS/AI): ${err.message}`);
@@ -2244,7 +2258,6 @@ const App: React.FC = () => {
         
         throw new Error("Processing failed after multiple attempts due to API limit.");
     } catch (err: any) {
-        if (err.message === "FORCE_HARD_REFRESH") throw err;
         const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to process file.");
         updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
             ...f, 
@@ -2282,7 +2295,6 @@ const App: React.FC = () => {
                     frames = await extractFramesForFile(fileItem.file, ext);
                     updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, analysisFrames: frames } : f));
                 } catch (err: any) {
-                    if (err.message === "FORCE_HARD_REFRESH") throw err;
                     const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to extract file.");
                     updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, isGenerating: false, error: errMsg } : f));
                     continue;
@@ -2383,7 +2395,6 @@ const App: React.FC = () => {
         }
         throw new Error("Processing failed after multiple attempts.");
     } catch (err: any) {
-         if (err.message === "FORCE_HARD_REFRESH") throw err;
          const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to process file.");
          updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: false, isExtracting: false, error: errMsg } : f));
          return true;
@@ -2459,19 +2470,7 @@ const App: React.FC = () => {
                     }
                 }
             } catch (err: any) {
-                if (err.message === "FORCE_HARD_REFRESH") {
-                    console.log("Saving state to IndexedDB and reloading...");
-                    await saveStateToDB({
-                        files: filesRef.current,
-                        keywordCount,
-                        customPrompt,
-                        activeTool,
-                        generationMode,
-                        keywordMode
-                    });
-                    window.location.reload();
-                    return; // Stop execution
-                }
+                console.error("Batch processing error:", err);
             }
             
             // Update progress info
