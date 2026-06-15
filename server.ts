@@ -998,10 +998,15 @@ app.get('/api/debug-uploads', (req, res) => {
                 throw new Error(`Failed to fetch file: ${fetchRes.status}`);
             }
             
-            const arrayBuffer = await fetchRes.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            fs.writeFileSync(inputPath, buffer);
-            console.log(`Downloaded ${buffer.length} bytes to ${inputPath}`);
+            // Stream the file directly to disk to avoid Out of Memory errors on Vercel
+            if (fetchRes.body) {
+                const { Readable } = require('stream');
+                const fileStream = fs.createWriteStream(inputPath);
+                await require('stream/promises').pipeline(Readable.fromWeb(fetchRes.body), fileStream);
+                console.log(`Downloaded EPS to ${inputPath} via stream`);
+            } else {
+                throw new Error("No response body from storage");
+            }
 
             // TRICK: Use internal memory limits for GS to avoid OOM
             const gsArgs = [

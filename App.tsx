@@ -2098,13 +2098,11 @@ const App: React.FC = () => {
         if (!isValid) continue; // Skip unsupported files silently or handle validation but since it's forced * we skip.
 
         // File Size Validation
-        const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
         const isVector = allowedVectorExts.includes(ext);
-        const maxVectorSize = isVercel ? 4.5 * 1024 * 1024 : 500 * 1024 * 1024;
+        const maxVectorSize = 500 * 1024 * 1024; // 500MB for everyone since we use Cloud Storage
         
         if (isVector && file.size > maxVectorSize) {
-            const limitStr = isVercel ? "4.5MB (Vercel limit)" : "500MB";
-            errorMsg = `File too large. Maximum ${limitStr} for Vector (EPS/AI). Please optimize your file below ${limitStr}.`;
+            errorMsg = `File too large. Maximum 500MB for Vector (EPS/AI). Please optimize your file below 500MB.`;
         }
 
         let thumbnail = null;
