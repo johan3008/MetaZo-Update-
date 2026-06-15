@@ -4,7 +4,7 @@ import { exec, spawn } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
@@ -934,14 +934,39 @@ app.get('/api/debug-uploads', (req, res) => {
     });
 
     // =========== START VECTOR LARGE FILE STORAGE UPLOAD ENDPOINTS ===========
-    const s3Client = new S3Client({
-        region: 'auto',
-        endpoint: process.env.S3_ENDPOINT || '',
-        credentials: {
-            accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-            secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
-        },
-        forcePathStyle: true,
+
+    // Lazy S3/R2 client — only created when credentials are actually present.
+    // This prevents a crash on startup when the env vars are not yet set.
+    const isR2Configured = () =>
+        !!(process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
+
+    let _s3ClientInstance: S3Client | null = null;
+    const getS3Client = (): S3Client => {
+        if (!isR2Configured()) throw new Error('Cloudflare R2 is not configured in environment variables.');
+        if (!_s3ClientInstance) {
+            _s3ClientInstance = new S3Client({
+                region: 'auto',
+                endpoint: process.env.S3_ENDPOINT!,
+                credentials: {
+                    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+                    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+                },
+                forcePathStyle: true,
+            });
+        }
+        return _s3ClientInstance;
+    };
+
+    // Convenience alias kept for backwards-compat with existing usages below
+    const s3Client = { send: (cmd: any) => getS3Client().send(cmd) };
+
+    // Endpoint for the frontend to check if R2 is configured (no credentials exposed)
+    app.get('/api/r2-status', (req, res) => {
+        res.json({
+            configured: isR2Configured(),
+            bucketName: isR2Configured() ? process.env.S3_BUCKET_NAME : null,
+            publicUrl: process.env.S3_PUBLIC_URL || null,
+        });
     });
 
     app.post('/api/upload-vercel-blob', throttleMiddleware, async (req, res) => {
@@ -973,30 +998,31 @@ app.get('/api/debug-uploads', (req, res) => {
             const { filename, contentType } = req.query;
             if (!filename) return res.status(400).json({ error: 'Filename is required' });
             
-            if (!process.env.S3_ENDPOINT || !process.env.S3_BUCKET_NAME) {
-                return res.status(500).json({ error: 'S3/R2 Storage is not configured in .env' });
+            if (!isR2Configured()) {
+                return res.status(503).json({ error: 'S3/R2 Storage is not configured in environment variables. Add S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, and S3_BUCKET_NAME to your .env / Vercel project settings.' });
             }
 
-            const uniqueFilename = `eps-uploads/${Date.now()}_${Math.random().toString(36).substring(7)}_${filename.toString().replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-            const bucketName = process.env.S3_BUCKET_NAME;
+            const sanitizedName = filename.toString().replace(/[^a-zA-Z0-9._-]/g, '_');
+            const uniqueFilename = `eps-uploads/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitizedName}`;
+            const bucketName = process.env.S3_BUCKET_NAME!;
+            const resolvedContentType = contentType ? String(contentType) : 'application/postscript';
 
             const command = new PutObjectCommand({
                 Bucket: bucketName,
                 Key: uniqueFilename,
-                ContentType: contentType ? String(contentType) : 'application/postscript',
+                ContentType: resolvedContentType,
             });
 
-            const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+            const uploadUrl = await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
             let publicUrl = '';
             
             if (process.env.S3_PUBLIC_URL) {
                 publicUrl = `${process.env.S3_PUBLIC_URL.replace(/\/$/, '')}/${uniqueFilename}`;
             } else {
-                // Determine public URL structure based on R2/S3
-                publicUrl = `${process.env.S3_ENDPOINT.replace(/\/$/, '')}/${bucketName}/${uniqueFilename}`;
+                publicUrl = `${process.env.S3_ENDPOINT!.replace(/\/$/, '')}/${bucketName}/${uniqueFilename}`;
             }
 
-            res.json({ uploadUrl, fileUrl: publicUrl, pathKey: uniqueFilename });
+            res.json({ uploadUrl, fileUrl: publicUrl, pathKey: uniqueFilename, contentType: resolvedContentType });
         } catch (error: any) {
             console.error('Error generating upload URL:', error);
             res.status(500).json({ error: 'Failed to generate upload URL', details: error.message });
@@ -1116,12 +1142,26 @@ app.get('/api/debug-uploads', (req, res) => {
                         reject(err);
                     } else resolve();
                     
-                    setTimeout(() => {
+                    setTimeout(async () => {
+                        // Local temp cleanup
                         try {
                             if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
                             if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
                             if (fs.existsSync(uniqueTmpDir)) fs.rmSync(uniqueTmpDir, { recursive: true, force: true });
                         } catch (e) {}
+
+                        // 🧹 R2 CLEANUP: Delete EPS from R2 after Ghostscript is done to avoid ongoing storage costs
+                        if (pathKey && isR2Configured()) {
+                            try {
+                                await getS3Client().send(new DeleteObjectCommand({
+                                    Bucket: process.env.S3_BUCKET_NAME!,
+                                    Key: pathKey,
+                                }));
+                                console.log(`[R2 CLEANUP] Deleted: ${pathKey}`);
+                            } catch (deleteErr) {
+                                console.warn(`[R2 CLEANUP] Failed to delete ${pathKey}:`, deleteErr);
+                            }
+                        }
                     }, 500);
                 });
             });
