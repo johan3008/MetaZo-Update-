@@ -1983,6 +1983,7 @@ const App: React.FC = () => {
                       });
                       uploadedUrl = blob.url;
                   } catch (blobErr) {
+                      console.warn("Vercel Blob failed:", blobErr);
                       // Silently fallback to multipart if Vercel Blob isn't configured
                   }
               }

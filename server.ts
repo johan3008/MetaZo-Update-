@@ -951,9 +951,9 @@ app.get('/api/debug-uploads', (req, res) => {
             const jsonResponse = await handleUpload({
                 body,
                 request: req,
+                token: process.env.BLOB_READ_WRITE_TOKEN,
                 onBeforeGenerateToken: async (pathname) => {
                     return {
-                        allowedContentTypes: ['application/postscript', 'application/illustrator', 'image/jpeg', 'image/png'],
                         tokenPayload: JSON.stringify({}),
                     };
                 },
