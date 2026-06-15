@@ -383,7 +383,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
         {!sidebarCollapsed && (
           <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest pl-2">
-            v1.1.1
+            v1.2.1
           </div>
         )}
         <button 

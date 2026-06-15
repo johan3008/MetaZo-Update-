@@ -3141,7 +3141,7 @@ const App: React.FC = () => {
         </main>
 
         <footer className="text-center py-6 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest border-t border-slate-200 dark:border-white/5 bg-white dark:bg-[#090d16] mt-auto">
-          <p>{t.footer_text} | v1.1.1 PRO</p>
+          <p>{t.footer_text} | v1.2.1 PRO</p>
         </footer>
       </div>
 
