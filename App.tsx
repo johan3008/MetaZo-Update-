@@ -2018,24 +2018,36 @@ const App: React.FC = () => {
               
               try {
                   let response;
-                  if (uploadedUrl) {
-                      // Now ask the server to process the URL
-                      response = await fetch(`/api/convert-eps-url?t=${Date.now()}_${Math.random()}`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ fileUrl: uploadedUrl, pathKey: getUrlData?.pathKey })
-                      });
-                  } else {
-                      // S3 not configured or failed, fallback to multipart
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      
-                      // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
-                      response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
-                          method: 'POST',
-                          body: formData
-                      });
-                  }
+                    if (uploadedUrl) {
+                        // Now ask the server to process the URL
+                        response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fileUrl: uploadedUrl, pathKey: getUrlData?.pathKey })
+                        });
+                    } else {
+                        // R2/S3 failed or unconfigured. 
+                        // If we are on Vercel and file is > 4.5MB, this fallback will crash with 413 FUNCTION_PAYLOAD_TOO_LARGE.
+                        // Throw specifically here to help user debug Cloudflare CORS / setup:
+                        const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
+                        if (isVercel && file.size > 4.5 * 1024 * 1024) {
+                            throw new Error(
+                                `Upload ke Cloudflare R2 gagal, dan file ini (${(file.size/1024/1024).toFixed(1)}MB) terlalu besar untuk Vercel Fallback (Max 4.5MB).\n\n` +
+                                `Cek CONSOLE BROWSER (F12) untuk melihat error 'PUT'. ` +
+                                `Jika Anda melihat error CORS, pastikan Anda telah mengatur CORS di setting Bucket Cloudflare R2 Anda.`
+                            );
+                        }
+
+                        // S3 not configured or failed, fallback to multipart
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        // TRICK: Append a cache-buster to prevent the proxy from caching a 200 OK HTML response
+                        response = await fetch(`/api/convert-eps-multipart?t=${Date.now()}_${Math.random()}`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                    }
                   
                   const contentType = response.headers.get("content-type");
                   

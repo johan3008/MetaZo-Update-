@@ -1029,7 +1029,7 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
-    app.post('/api/convert-eps-url', throttleMiddleware, async (req, res) => {
+    app.post('/api/convert-eps', throttleMiddleware, async (req, res) => {
         const { fileUrl, pathKey } = req.body;
         if (!fileUrl) {
             return res.status(400).json({ error: 'fileUrl is required' });
@@ -1051,7 +1051,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     Bucket: process.env.S3_BUCKET_NAME,
                     Key: pathKey
                 });
-                const s3Response = await s3Client.send(command);
+                const s3Response = await s3Client.send(command) as any;
                 if (!s3Response.Body) throw new Error("No response body from S3 storage");
                 
                 // Stream using Node.js stream pipeline
@@ -1181,7 +1181,7 @@ app.get('/api/debug-uploads', (req, res) => {
     });
     // =========== END VECTOR LARGE FILE STORAGE UPLOAD ENDPOINTS ===========
 
-    app.post('/api/convert-eps', throttleMiddleware, upload.single('file'), async (req, res) => {
+    app.post('/api/convert-eps-multipart', throttleMiddleware, upload.single('file'), async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
