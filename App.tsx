@@ -1038,6 +1038,19 @@ const App: React.FC = () => {
     localStorage.setItem('mz_keyword_mode', keywordMode);
   }, [keywordMode]);
 
+  // Cek status R2 saat user membuka tool Vector (EPS/AI)
+  useEffect(() => {
+    if (activeTool === ToolType.VECTOR) {
+      // Hanya cek sekali, atau jika status belum diketahui
+      if (r2Status === null) {
+        fetch('/api/r2-status')
+          .then(r => r.json())
+          .then(data => setR2Status(!!data.configured))
+          .catch(() => setR2Status(false));
+      }
+    }
+  }, [activeTool]); // eslint-disable-line
+
   const [aiCreativity, setAiCreativity] = useState<number>(0.7);
   const [generationMode, setGenerationMode] = useState<GenerationMode>(GenerationMode.STANDARD);
   const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
@@ -1770,6 +1783,7 @@ const App: React.FC = () => {
   
   const [autoDownloadCSV, setAutoDownloadCSVState] = useState(false);
   const [mobileTab, setMobileTab] = useState<'upload' | 'ai' | 'review'>('upload');
+  const [r2Status, setR2Status] = useState<boolean | null>(null); // null = belum dicek, true = OK, false = belum dikonfigurasi
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -2035,8 +2049,20 @@ const App: React.FC = () => {
                       // If it's a 413 error, payload is too large
                       if (response.status === 413) {
                           const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
-                          const platformLimit = isVercel ? "4.5MB (Vercel limit)" : "500MB (Server limit)";
-                          throw new Error(`File is too large. ${platformLimit} exceeded. Try optimizing your EPS/AI file or deploy to a platform with higher body limits.`);
+                          if (isVercel) {
+                              throw new Error(
+                                  `File terlalu besar — Vercel menolak body > 4.5MB.\n\n` +
+                                  `✅ SOLUSI: Tambahkan Cloudflare R2 ke Vercel Environment Variables:\n` +
+                                  `  S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com\n` +
+                                  `  S3_ACCESS_KEY_ID=...\n` +
+                                  `  S3_SECRET_ACCESS_KEY=...\n` +
+                                  `  S3_BUCKET_NAME=...\n` +
+                                  `  S3_PUBLIC_URL=...\n\n` +
+                                  `Setelah redeploy, file EPS/AI akan diupload langsung ke R2 (tanpa melalui Vercel). ` +
+                                  `Lihat CLOUDFLARE_R2_SETUP.md atau cek /api/r2-status.`
+                              );
+                          }
+                          throw new Error(`File is too large (>500MB Server limit). Please optimize your EPS/AI file.`);
                       }
                       // If it's a 500 error, Ghostscript failed (e.g., memory limit). Don't retry, it will just fail again.
                       if (response.status === 500) {
@@ -2957,6 +2983,34 @@ const App: React.FC = () => {
                 filesToGenerateCount={filesToGenerateCount} 
                 filesWithErrorCount={filesWithErrorCount} 
               />
+
+              {/* ⚠️ R2 WARNING BANNER — muncul hanya di tool Vector jika R2 belum dikonfigurasi */}
+              {activeTool === ToolType.VECTOR && r2Status === false && (
+                <div className="flex items-start gap-3 px-4 py-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+                  </svg>
+                  <div className="text-xs leading-relaxed">
+                    <span className="font-black uppercase tracking-wide">Cloudflare R2 belum dikonfigurasi.</span>
+                    {" "}File EPS/AI lebih dari <span className="font-bold">4.5MB</span> akan ditolak oleh Vercel.{" "}
+                    <span className="font-semibold">
+                      Tambahkan <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono text-[10px]">S3_ENDPOINT</code>,{" "}
+                      <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono text-[10px]">S3_ACCESS_KEY_ID</code>,{" "}
+                      <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono text-[10px]">S3_SECRET_ACCESS_KEY</code>,{" "}
+                      <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono text-[10px]">S3_BUCKET_NAME</code>{" "}
+                      ke Vercel Environment Variables lalu redeploy.
+                    </span>{" "}
+                    Lihat <span className="font-mono font-bold underline cursor-pointer" onClick={() => window.open('/api/r2-status', '_blank')}>
+                      /api/r2-status
+                    </span> untuk cek konfigurasi.
+                  </div>
+                  <button
+                    onClick={() => setR2Status(null)}
+                    className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
+                    title="Tutup"
+                  >×</button>
+                </div>
+              )}
 
               {/* Handheld Segment Switches (Hidden on Desktop) */}
               <div className="flex lg:hidden w-full bg-slate-100 dark:bg-slate-900 rounded-[1.5rem] p-1 border border-slate-200 dark:border-white/5">
