@@ -152,16 +152,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               }
             }}
           >
-            <div className="flex items-center justify-between">
+            <div>
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
                 <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
                 <span>{slides[currentSlide].badge}</span>
               </div>
-              <FeatureGuideButton 
-                title={t.guide_dashboard_title} 
-                description={t.guide_dashboard_desc} 
-                t={t} 
-              />
             </div>
             {userName && (
               <div className="text-sm sm:text-base font-semibold text-emerald-300 mb-2">

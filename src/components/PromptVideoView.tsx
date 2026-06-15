@@ -261,13 +261,13 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       )}
 
       {/* Header Section */}
-      <section className="bg-white dark:bg-[#1e293b] rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-white/5 relative overflow-hidden">
-        {/* Progress Bars */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-1 border-b border-slate-200 dark:border-white/5 pb-4 relative overflow-hidden">
+        {/* Progress Bar */}
         <AnimatePresence>
           {(isAnalyzing || isGeneratingPrompts) && (
             <motion.div 
               initial={{ height: 0 }}
-              animate={{ height: 3 }}
+              animate={{ height: 4 }}
               exit={{ height: 0 }}
               className="absolute bottom-0 left-0 right-0 bg-slate-100 dark:bg-white/5 overflow-hidden"
             >
@@ -278,52 +278,55 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-
-        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
         
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-3 bg-violet-600 rounded-2xl shadow-lg shadow-violet-600/20">
-                <Video className="text-white" size={28} />
-              </div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{t.video_studio_title}</h1>
-                <FeatureGuideButton 
-                  title={t.guide_video_title} 
-                  description={t.guide_video_desc} 
-                  t={t} 
-                />
-              </div>
-            </div>
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
-              {t.video_studio_subtitle}
-            </p>
-          </div>
-          
-          <form onSubmit={handleAnalyze} className="w-full md:w-auto relative">
-                <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-grow">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2.5">
+            <Video className="text-violet-500" size={24} />
+            {t.video_studio_title}
+          </h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
+            {t.video_studio_subtitle}
+          </p>
+        </div>
+        
+        <div className="mt-3 md:mt-0 flex flex-wrap items-center gap-2">
+          <FeatureGuideButton 
+            title={t.guide_video_title} 
+            description={t.guide_video_desc} 
+            t={t} 
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Form & Config (4 cols) */}
+        <div className="xl:col-span-4 space-y-6">
+          {/* Form */}
+          <form onSubmit={handleAnalyze} className="bg-white dark:bg-[#1e293b] rounded-[2rem] p-6 shadow-xl border border-slate-200 dark:border-white/5 space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none"></div>
+            
+            <div className="space-y-4">
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder={t.video_studio_keyword_placeholder}
-                  className="w-full sm:w-80 h-12 pl-12 pr-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                  className="w-full h-14 pl-12 pr-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
                   onClick={(e) => { e.preventDefault(); handleAnalyze(); }}
-                  className="h-12 px-6 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-violet-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
+                  className="h-12 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-violet-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
                 >
                   {isAnalyzing ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
-                      <span>{Math.round(analysisProgress)}% {t.video_studio_btn_analyzing}</span>
+                      <span>{Math.round(analysisProgress)}%</span>
                     </>
                   ) : (
                     <>
@@ -336,12 +339,12 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
                   type="button"
                   disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
                   onClick={(e) => { e.preventDefault(); handleGenerateHollywoodPrompts(); }}
-                  className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
+                  className="h-12 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
                 >
                   {isGeneratingPrompts ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
-                      <span>{Math.round(generationProgress)}% Mastery</span>
+                      <span>{Math.round(generationProgress)}%</span>
                     </>
                   ) : (
                     <>
@@ -354,29 +357,29 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
             </div>
           </form>
         </div>
-      </section>
 
-      {/* Results Section */}
-      <AnimatePresence mode="wait">
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center space-x-4"
-          >
-            <AlertCircle className="text-red-500 shrink-0" size={24} />
-            <p className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>
-          </motion.div>
-        )}
+        {/* Right Column: Results Section (8 cols) */}
+        <div className="xl:col-span-8 flex flex-col min-h-0 space-y-6">
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center space-x-4 shrink-0"
+              >
+                <AlertCircle className="text-red-500 shrink-0" size={24} />
+                <p className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>
+              </motion.div>
+            )}
 
-        {result && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            {/* Status Card */}
+            {result && (
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Status Card */}
             <div className={`p-8 rounded-3xl border shadow-xl relative overflow-hidden ${
               result.status === 'LAYAK PRODUKSI' 
                 ? 'bg-emerald-500/5 border-emerald-500/20' 
@@ -681,6 +684,9 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
           </div>
         </div>
       )}
+
+        </div>
+      </div>
     </div>
   );
 };

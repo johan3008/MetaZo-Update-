@@ -92,11 +92,11 @@ export const FeatureGuideButton: React.FC<{
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="group relative flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800/50 dark:hover:bg-indigo-500/10 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-500/20 rounded-full transition-all text-[10px] font-bold uppercase tracking-wider overflow-hidden active:scale-95"
+        className="group relative flex items-center shrink-0 space-x-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800/50 dark:hover:bg-indigo-500/10 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-500/20 rounded-full transition-all text-[10px] font-bold uppercase tracking-wider overflow-hidden active:scale-95"
         title={t.guide_btn_title}
       >
         <HelpCircle size={14} className="transition-transform group-hover:scale-110" />
-        <span className="hidden sm:inline-block">{t.guide_btn_title}</span>
+        <span className="hidden sm:inline-block whitespace-nowrap">{t.guide_btn_title}</span>
       </button>
 
       <FeatureGuideModal
