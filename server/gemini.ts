@@ -339,12 +339,34 @@ function ensureKeywordCount(
             // Split multi-words into individual single words
             const pieces = clean.split(/\s+/);
             pieces.forEach(p => {
-              if (p.length > 1 && !isProhibitedKeyword(p) && !uniqueKeywords.includes(p)) {
-                uniqueKeywords.push(p);
+              if (p.length > 1 && !isProhibitedKeyword(p)) {
+                // Check for exact and near duplicates (plurals/singulars)
+                const isDuplicate = uniqueKeywords.some(existing => 
+                  existing === p || 
+                  existing === p + 's' || 
+                  p === existing + 's' || 
+                  existing === p + 'es' || 
+                  p === existing + 'es' ||
+                  existing.replace(/ies$/, 'y') === p ||
+                  p.replace(/ies$/, 'y') === existing
+                );
+                if (!isDuplicate) {
+                  uniqueKeywords.push(p);
+                }
               }
             });
           } else {
-            if (!uniqueKeywords.includes(clean)) {
+            // Check for exact and near duplicates (plurals/singulars)
+            const isDuplicate = uniqueKeywords.some(existing => 
+              existing === clean || 
+              existing === clean + 's' || 
+              clean === existing + 's' || 
+              existing === clean + 'es' || 
+              clean === existing + 'es' ||
+              existing.replace(/ies$/, 'y') === clean ||
+              clean.replace(/ies$/, 'y') === existing
+            );
+            if (!isDuplicate) {
               uniqueKeywords.push(clean);
             }
           }
@@ -903,8 +925,8 @@ const callGeminiWithRetry = async (
              currentModel = 'gemini-3.1-flash-lite';
              customDelay = 1000; // Reset wait time so we try the new model immediately
         } else if (isQuotaOrLimit && attempt === 0 && currentModel === 'gemini-3.1-flash-lite') {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.5-flash to bypass unavailability or quota limits.`);
-             currentModel = 'gemini-3.5-flash';
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash to bypass unavailability or quota limits.`);
+             currentModel = 'gemini-3.1-flash';
              customDelay = 1000; // Reset wait time so we try the new model immediately
         } else if (statusCode === 429 && customDelay > 60000) {
              console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel} (Wait time > 60s). Failing fast.`);
@@ -1221,7 +1243,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
             model: activeModel
         });
     } else {
-        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
+        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
             parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
           }, {
             systemInstruction: genSystemInstruction,
@@ -1334,7 +1356,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
           parts: [{ text: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
@@ -1751,7 +1773,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
           parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: genSystemInstruction,
@@ -1861,7 +1883,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
           parts: [{ text: `Audit and validate the Draft Metadata array for ${items.length} assets based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
@@ -3121,14 +3143,15 @@ Rules:
 export async function suggestKeywords(
   title: string,
   description: string,
-  existingKeywords: string[]
+  existingKeywords: string[],
+  requestCount: number = 5
 ): Promise<string[]> {
   const systemInstruction = `You are a professional SEO and Adobe Stock Keyword Specialist.
-Your task is to analyze the existing title, description, and list of keywords of an asset, and suggest exactly 5 high-volume, generic, relevant keywords or short conceptual phrases that are currently missing from the user's list.
+Your task is to analyze the existing title, description, and list of keywords of an asset, and suggest exactly ${requestCount} high-volume, generic, relevant keywords or short conceptual phrases that are currently missing from the user's list.
 These suggested keywords must be highly searchable, commercial, and directly related to the visual subject and context described in the title and description, while not repeating any existing keywords.
 
 Rules:
-1. Suggest EXACTLY 5 new, unique, generic keywords. Do not suggest more, do not suggest less.
+1. Suggest EXACTLY ${requestCount} new, unique, generic keywords. Do not suggest more, do not suggest less.
 2. The suggested keywords must NOT be in the existing keywords list: ${JSON.stringify(existingKeywords)}.
 3. Keep the suggested keywords in lowercase, clean, single-word or short phrases (typically 1-2 words).
 4. Strictly return your answer as a JSON array of strings under the property "keywords".`;

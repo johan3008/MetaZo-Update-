@@ -530,8 +530,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           setShowActivation(false);
         }, 2500);
       } else {
-        setActivationError(t.activation_error_offline);
-        handleFirestoreError(err, OperationType.GET, `keys/${targetKeyFormatted}`);
+        setActivationError('Sistem sedang offline. Mohon periksa internet Anda atau pastikan kunci lisensi Anda valid secara offline.');
+        // Bypass offline crash
+        console.error('License validator offline error:', err);
       }
     } finally {
       setIsActivating(false);

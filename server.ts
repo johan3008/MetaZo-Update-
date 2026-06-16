@@ -185,7 +185,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // We place this BEFORE multer upload.single() so that we reject the request
 // instantly and gracefully before Node.js even starts buffering the massive file to disk/RAM.
 let activeEpsConversions = 0;
-const MAX_CONCURRENT_EPS = 5; // Reduced to 5 to prevent Multer from buffering too many large files on disk.
+const MAX_CONCURRENT_EPS = 1; // Reduced to 1 to prevent Multer from buffering too many large files on disk and OOMing.
 
 const throttleMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (activeEpsConversions >= MAX_CONCURRENT_EPS) {
@@ -825,11 +825,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/smart-suggest-keywords', async (req, res) => {
         try {
-            const { title, description, existingKeywords } = req.body;
+            const { title, description, existingKeywords, requestCount } = req.body;
             if (!title) {
                 return res.status(400).json({ error: 'Missing title field or asset context' });
             }
-            const data = await suggestKeywords(title, description || '', existingKeywords || []);
+            const data = await suggestKeywords(title, description || '', existingKeywords || [], requestCount);
             res.json({ keywords: data });
         } catch (e: any) {
             console.warn('Server smart-suggest-keywords error:', e);
@@ -1090,7 +1090,7 @@ app.get('/api/debug-uploads', (req, res) => {
             // TRICK: Use internal memory limits for GS to avoid OOM
             const gsArgs = [
                 '-dSAFER', '-dBATCH', '-dNOPAUSE', 
-                '-dEPSCrop', '-r72', 
+                '-dEPSFitPage', '-dPDFFitPage', '-dDEVICEWIDTHPOINTS=768', '-dDEVICEHEIGHTPOINTS=768', 
                 '-dTextAlphaBits=2', '-dGraphicsAlphaBits=2',
                 '-dJPEGQ=85',
                 '-sDEVICE=jpeg', `-sOutputFile=${outputPath}`,
@@ -1109,20 +1109,9 @@ app.get('/api/debug-uploads', (req, res) => {
                 env: { ...process.env, TMPDIR: uniqueTmpDir } 
             };
 
+            // Remove fallback logic
             await gsQueue.enqueue(async () => {
-                try {
-                    await spawnAsync(gsExecutable, gsArgs, spawnOptions);
-                } catch (gsError) {
-                    console.warn('Ghostscript failed at 72 DPI, trying 36 DPI...');
-                    const gsArgs36 = gsArgs.map(arg => arg === '-r72' ? '-r36' : arg);
-                    try {
-                        await spawnAsync(gsExecutable, gsArgs36, { ...spawnOptions, timeout: 15000 });
-                    } catch (gsError2) {
-                        console.warn('Ghostscript failed with -dEPSCrop, trying -dEPSFitPage as last resort...');
-                        const gsArgsFit = gsArgs36.map(arg => arg === '-dEPSCrop' ? '-dEPSFitPage' : arg);
-                        await spawnAsync(gsExecutable, gsArgsFit, { ...spawnOptions, timeout: 15000 });
-                    }
-                }
+                await spawnAsync(gsExecutable, gsArgs, spawnOptions);
             });
 
             try {
@@ -1207,7 +1196,7 @@ app.get('/api/debug-uploads', (req, res) => {
             // MUST INJECT memory limits here to enforce banding and prevent OOM.
             const gsArgs = [
                 '-dSAFER', '-dBATCH', '-dNOPAUSE', 
-                '-dEPSCrop', '-r72', 
+                '-dEPSFitPage', '-dPDFFitPage', '-dDEVICEWIDTHPOINTS=768', '-dDEVICEHEIGHTPOINTS=768', 
                 '-dTextAlphaBits=2', '-dGraphicsAlphaBits=2',
                 '-dJPEGQ=85', // Optimize file size without losing much quality
                 '-sDEVICE=jpeg', `-sOutputFile=${outputPath}`,
@@ -1227,22 +1216,9 @@ app.get('/api/debug-uploads', (req, res) => {
                 env: { ...process.env, TMPDIR: uniqueTmpDir } // Force Ghostscript to use disk instead of RAM for temp files
             };
 
+            // Remove fallback logic since we are already fitting to 768x768 safely
             await gsQueue.enqueue(async () => {
-                try {
-                    await spawnAsync(gsExecutable, gsArgs, spawnOptions);
-                } catch (gsError) {
-                    console.warn('Ghostscript failed at 72 DPI, trying 36 DPI...');
-                    // Fallback to lower resolution
-                    const gsArgs36 = gsArgs.map(arg => arg === '-r72' ? '-r36' : arg);
-                    try {
-                        await spawnAsync(gsExecutable, gsArgs36, { ...spawnOptions, timeout: 15000 });
-                    } catch (gsError2) {
-                        console.warn('Ghostscript failed with -dEPSCrop, trying -dEPSFitPage as last resort...');
-                        // Last resort: try -dEPSFitPage with very low resolution
-                        const gsArgsFit = gsArgs36.map(arg => arg === '-dEPSCrop' ? '-dEPSFitPage' : arg);
-                        await spawnAsync(gsExecutable, gsArgsFit, { ...spawnOptions, timeout: 15000 });
-                    }
-                }
+                await spawnAsync(gsExecutable, gsArgs, spawnOptions);
             });
 
             console.log(`Conversion successful for ${req.file.originalname}`);

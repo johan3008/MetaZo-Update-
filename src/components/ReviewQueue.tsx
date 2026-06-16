@@ -95,6 +95,35 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   const [suggestError, setSuggestError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
 
+  const getNearDuplicates = React.useCallback((kws: string[]) => {
+    const normalized = kws.map(k => k.toLowerCase().trim());
+    const toRemove = new Set<string>();
+    
+    for (let i = 0; i < normalized.length; i++) {
+        const a = normalized[i];
+        if (!a) continue;
+        for (let j = i + 1; j < normalized.length; j++) {
+            const b = normalized[j];
+            if (!b) continue;
+            if (a === b) {
+                toRemove.add(kws[j]);
+                continue;
+            }
+            
+            // Plural/singular stemming approximations
+            if (a === b + 's' || b === a + 's' || 
+                a === b + 'es' || b === a + 'es' ||
+                a.replace(/ies$/, 'y') === b || b.replace(/ies$/, 'y') === a) {
+                if (a.length > b.length) toRemove.add(kws[i]);
+                else toRemove.add(kws[j]);
+            }
+        }
+    }
+    return Array.from(toRemove);
+  }, []);
+
+  const nearDuplicates = React.useMemo(() => getNearDuplicates(keywords), [keywords, getNearDuplicates]);
+
   React.useEffect(() => {
     const seen = new Set<string>();
     const uniqueKeywords = keywords.filter(k => {
@@ -248,6 +277,43 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           </button>
         </div>
       </div>
+      {nearDuplicates.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-600 dark:text-rose-400 text-[10px] mb-2 font-bold gap-2">
+          <span className="truncate" title={nearDuplicates.join(', ')}>
+            ⚠️ Near-duplicates detected (e.g. {nearDuplicates.slice(0, 3).join(', ')})
+          </span>
+          <div className="flex space-x-2 shrink-0">
+            <button 
+              onClick={async () => {
+                const initialCleaned = keywords.filter(k => !nearDuplicates.includes(k));
+                if (!title) {
+                  onChange(initialCleaned);
+                  return;
+                }
+                setIsSuggesting(true);
+                try {
+                  const res = await fetch('/api/smart-suggest-keywords', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description, existingKeywords: initialCleaned, requestCount: nearDuplicates.length })
+                  });
+                  if (!res.ok) throw new Error();
+                  const data = await res.json();
+                  onChange([...initialCleaned, ...(data.keywords || [])]);
+                } catch (e) {
+                  onChange(initialCleaned);
+                } finally {
+                  setIsSuggesting(false);
+                }
+              }} 
+              disabled={isSuggesting}
+              className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 rounded disabled:opacity-50 flex items-center gap-1"
+            >
+              {isSuggesting && <span className="animate-spin text-rose-500">❖</span>} Fix this file
+            </button>
+          </div>
+        </div>
+      )}
       <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
         <AnimatePresence mode="popLayout">
           {keywords.map((kw, index) => (
