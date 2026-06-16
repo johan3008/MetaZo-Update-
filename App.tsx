@@ -3114,7 +3114,7 @@ const App: React.FC = () => {
   const isAllFinished = hasFiles && !isAnythingGenerating && files.every(f => f.title || f.error);
 
   return (
-    <div className={`min-h-screen flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden`}>
+    <div className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden`}>
       {/* Immersive background decoration: Animated glowing mesh blobs & high-fidelity alignment grid */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
         <div className="absolute top-[8%] left-[4%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 dark:bg-purple-900/15 blur-[120px] animate-blob-1" />
@@ -3146,7 +3146,7 @@ const App: React.FC = () => {
       />
 
       {/* Main Content Area Container */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-y-auto">
         {/* Topbar Header */}
         <Topbar 
           searchQuery={searchQuery} 

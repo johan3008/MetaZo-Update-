@@ -90,7 +90,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   
   // UI helpers
-  const [isMobileListOpen, setIsMobileListOpen] = useState(true);
+  const [isMobileListOpen, setIsMobileListOpen] = useState(false);
   const [loading, setLoading] = useState({ users: true, global: true, direct: false });
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -352,21 +352,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const isDirectMode = activeTab === 'direct';
 
   return (
-    <div id="mz-account-chat-view" className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-115px)] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden relative shadow-lg">
+    <div id="mz-account-chat-view" className="flex flex-col h-[calc(100dvh-120px)] md:h-[calc(100vh-110px)] rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden relative shadow-lg">
       
       {/* 2. CHAT CONTAINER LAYOUT */}
       <div className="flex flex-1 overflow-hidden relative">
         
         {/* LEFT COLUMN: NAVIGATION, ACTIVE THREADS AND USER DISCOVERY */}
         <div className={`w-full md:w-80 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50/50 dark:bg-slate-900/30 dynamic-sidebar ${
-          !isMobileListOpen && isDirectMode && selectedPeer ? 'hidden md:flex' : 'flex'
+          !isMobileListOpen ? 'hidden md:flex' : 'flex'
         }`}>
           {/* Tabs header */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl">
               <button
                 type="button"
-                onClick={() => { setActiveTab('global'); setSelectedPeer(null); onPeerChange?.(null); }}
+                onClick={() => { setActiveTab('global'); setSelectedPeer(null); onPeerChange?.(null); setIsMobileListOpen(false); }}
                 className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-xl text-xs font-black transition-all ${
                   activeTab === 'global' 
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
@@ -538,21 +538,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         {/* RIGHT COLUMN: INTERACTIVE MESSAGING CHAT FEED */}
         <div className={`flex-1 flex flex-col overflow-hidden bg-slate-50/20 dark:bg-slate-900/10 ${
-          isMobileListOpen && isDirectMode && !selectedPeer ? 'hidden md:flex' : 'flex'
+          isMobileListOpen ? 'hidden md:flex' : 'flex'
         }`}>
           
           {/* Header Bar */}
           <div className="h-14 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm z-10">
             <div className="flex items-center space-x-3 min-w-0">
-              {/* Back Button for mobile peer-chat */}
-              {isDirectMode && selectedPeer && (
-                <button
-                  onClick={() => { setIsMobileListOpen(true); setSelectedPeer(null); onPeerChange?.(null); }}
-                  className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white md:hidden mr-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
-                >
-                  <ArrowLeft size={16} />
-                </button>
-              )}
+              {/* Back Button for mobile */}
+              <button
+                onClick={() => { setIsMobileListOpen(true); }}
+                className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white md:hidden hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all border border-slate-200 dark:border-slate-800 shrink-0"
+              >
+                <ArrowLeft size={16} />
+              </button>
 
               {isDirectMode && selectedPeer ? (
                 <>
@@ -571,21 +569,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <div className="w-8 h-8 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-lg flex items-center justify-center shrink-0 shadow-md">
                     <Globe size={14} className="text-white animate-pulse" />
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-900 dark:text-white">{uiLanguage === 'id' ? 'Chat Global' : 'Global Discussion Channel'}</h3>
-                    <p className="text-[9px] text-emerald-400 font-extrabold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      {uiLanguage === 'id' ? 'Mendukung Komunikasi Real-Time' : 'Live Multi-Account Room'}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[11px] md:text-xs font-black text-slate-900 dark:text-white truncate">{uiLanguage === 'id' ? 'Chat Global' : 'Global Discussion Channel'}</h3>
+                    <p className="text-[9px] text-emerald-400 font-extrabold flex items-center gap-1 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                      <span className="truncate">{uiLanguage === 'id' ? 'Mendukung Komunikasi Real-Time' : 'Live Multi-Account Room'}</span>
                     </p>
                   </div>
                 </>
               )}
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-600 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded-md flex items-center gap-1">
-                <Sparkles size={10} className="text-amber-500" />
-                {activeTab === 'global' ? 'Broadcasting' : 'Secure P2P'}
+            <div className="flex items-center space-x-2 shrink-0 ml-2">
+              <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 dark:text-slate-600 bg-slate-100 dark:bg-slate-900 px-1.5 sm:px-2 py-1 rounded-md flex items-center gap-1 shrink-0">
+                <Sparkles size={10} className="text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">{activeTab === 'global' ? 'Broadcasting' : 'Secure P2P'}</span>
               </span>
             </div>
           </div>

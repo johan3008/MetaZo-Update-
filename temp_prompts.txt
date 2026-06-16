@@ -1,0 +1,312 @@
+src/components/LoginScreen.tsx:39:        prompt: 'select_account'
+src/components/Sidebar.tsx:46:  const [promptGenOpen, setPromptGenOpen] = useState(true);
+src/components/Sidebar.tsx:78:  const isPromptGenActive = activeTool === ToolType.PROMPT_GEN || activeTool === ToolType.PROMPT_IMAGE || activeTool === ToolType.PROMPT_VIDEO;
+src/components/Sidebar.tsx:189:            {/* Prompt Gen Button/Dropdown */}
+src/components/Sidebar.tsx:195:                    setPromptGenOpen(true);
+src/components/Sidebar.tsx:197:                    setPromptGenOpen(!promptGenOpen);
+src/components/Sidebar.tsx:201:                  isPromptGenActive 
+src/components/Sidebar.tsx:207:                  <Wand2 size={16} className={isPromptGenActive ? "text-slate-900 dark:text-white rotate-12 transition-transform" : "text-slate-400"} />
+src/components/Sidebar.tsx:208:                  {!sidebarCollapsed && <span>{t.sidebar_prompt_gen}</span>}
+src/components/Sidebar.tsx:213:                    className={`text-slate-400 transition-transform duration-300 ${promptGenOpen ? 'rotate-180' : ''}`} 
+src/components/Sidebar.tsx:218:              {/* Sub-items list for Prompt Gen */}
+src/components/Sidebar.tsx:219:              {promptGenOpen && !sidebarCollapsed && (
+src/components/Sidebar.tsx:222:                    onClick={() => handleNavClick(ToolType.PROMPT_GEN)}
+src/components/Sidebar.tsx:224:                      activeTool === ToolType.PROMPT_GEN 
+src/components/Sidebar.tsx:229:                    <Type size={14} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:230:                    <span>{t.sidebar_prompt_text}</span>
+src/components/Sidebar.tsx:234:                    onClick={() => handleNavClick(ToolType.PROMPT_IMAGE)}
+src/components/Sidebar.tsx:236:                      activeTool === ToolType.PROMPT_IMAGE 
+src/components/Sidebar.tsx:241:                    <ImageIcon size={14} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:242:                    <span>{t.sidebar_prompt_image}</span>
+src/components/Sidebar.tsx:246:                    onClick={() => handleNavClick(ToolType.PROMPT_VIDEO)}
+src/components/Sidebar.tsx:248:                      activeTool === ToolType.PROMPT_VIDEO 
+src/components/Sidebar.tsx:253:                    <Film size={14} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:254:                    <span>{t.sidebar_prompt_video}</span>
+src/components/Sidebar.tsx:261:              onClick={() => handleNavClick(ToolType.PROMPT_IMAGE_CHECK)}
+src/components/Sidebar.tsx:263:                activeTool === ToolType.PROMPT_IMAGE_CHECK 
+src/components/Sidebar.tsx:268:              <CheckCircle size={16} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:550:                    {/* Prompt Gen Dropdown for Mobile */}
+src/components/Sidebar.tsx:553:                        onClick={() => setPromptGenOpen(!promptGenOpen)}
+src/components/Sidebar.tsx:555:                          isPromptGenActive 
+src/components/Sidebar.tsx:561:                          <Wand2 size={14} className={isPromptGenActive ? "text-slate-900 dark:text-white" : "text-slate-400"} />
+src/components/Sidebar.tsx:562:                          <span>{t.sidebar_prompt_gen}</span>
+src/components/Sidebar.tsx:566:                          className={`text-slate-400 transition-transform duration-300 ${promptGenOpen ? 'rotate-180' : ''}`} 
+src/components/Sidebar.tsx:571:                      {promptGenOpen && (
+src/components/Sidebar.tsx:574:                            onClick={() => { setActiveTool(ToolType.PROMPT_GEN); setSidebarOpen(false); }}
+src/components/Sidebar.tsx:576:                              activeTool === ToolType.PROMPT_GEN 
+src/components/Sidebar.tsx:581:                            <Type size={12} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:582:                            <span>{t.sidebar_prompt_text}</span>
+src/components/Sidebar.tsx:586:                            onClick={() => { setActiveTool(ToolType.PROMPT_IMAGE); setSidebarOpen(false); }}
+src/components/Sidebar.tsx:588:                              activeTool === ToolType.PROMPT_IMAGE 
+src/components/Sidebar.tsx:593:                            <ImageIcon size={12} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:594:                            <span>{t.sidebar_prompt_image}</span>
+src/components/Sidebar.tsx:598:                            onClick={() => { setActiveTool(ToolType.PROMPT_VIDEO); setSidebarOpen(false); }}
+src/components/Sidebar.tsx:600:                              activeTool === ToolType.PROMPT_VIDEO 
+src/components/Sidebar.tsx:605:                            <Film size={12} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
+src/components/Sidebar.tsx:606:                            <span>{t.sidebar_prompt_video}</span>
+src/components/Sidebar.tsx:613:                      onClick={() => { setActiveTool(ToolType.PROMPT_IMAGE_CHECK); setSidebarOpen(false); }}
+src/components/Sidebar.tsx:615:                        activeTool === ToolType.PROMPT_IMAGE_CHECK 
+src/components/Sidebar.tsx:620:                      <CheckCircle size={14} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-400"} />
+src/components/CalendarGenView.tsx:8:  onSendToPrompt?: (text: string) => void;
+src/components/CalendarGenView.tsx:14:export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPrompt, aiOptions }) => {
+src/components/CalendarGenView.tsx:268:                            onClick={() => onSendToPrompt?.(event.name + ": " + eventKeywords[event.name].join(", "))}
+src/components/CalendarGenView.tsx:271:                            Copy Prompt
+src/components/CalendarGenView.tsx:280:                            onClick={() => onSendToPrompt?.(`${event.name}: ${topic}`)}
+src/components/AiConfigPanel.tsx:7:  customPrompt: string;
+src/components/AiConfigPanel.tsx:8:  setCustomPrompt: (p: string) => void;
+src/components/AiConfigPanel.tsx:30:  customPrompt,
+src/components/AiConfigPanel.tsx:31:  setCustomPrompt,
+src/components/AiConfigPanel.tsx:76:                <span>{t.custom_prompt_optional}</span>
+src/components/AiConfigPanel.tsx:77:                <span className="text-[8px] text-[#7c3aed] font-black lowercase pb-0.5 opacity-75">Prompt anchor</span>
+src/components/AiConfigPanel.tsx:81:                value={customPrompt} 
+src/components/AiConfigPanel.tsx:82:                onChange={(e) => setCustomPrompt(e.target.value)} 
+src/components/AiConfigPanel.tsx:83:                placeholder={t.custom_prompt_placeholder}
+src/components/DashboardView.tsx:82:        badge: t.language === 'Bahasa' ? "GENERATOR PROMPT AI" : "AI PROMPT GENERATOR",
+src/components/DashboardView.tsx:83:        title: <>{t.language === 'Bahasa' ? "OPTIMASI" : "PROMPT"} <span className="text-emerald-300">PROMPT</span> {t.language === 'Bahasa' ? "TEKS" : "OPTIMIZATION"}</>,
+src/components/DashboardView.tsx:85:          ? "Ubah konsep sederhana menjadi prompt visual yang kompleks dan kaya detail untuk platform generative AI." 
+src/components/DashboardView.tsx:86:          : "Transform simple concepts into highly detailed and optimized visual prompts for AI generation platforms."
+src/components/PromptImageView.tsx:7:interface PromptImageViewProps {
+src/components/PromptImageView.tsx:24:    prompt: string;
+src/components/PromptImageView.tsx:39:export const PromptImageView: React.FC<PromptImageViewProps> = ({ 
+src/components/PromptImageView.tsx:188:      const response = await fetch('/api/analyze-batch-image-to-prompt', {
+src/components/PromptImageView.tsx:263:            title={t.guide_prompt_image_title} 
+src/components/PromptImageView.tsx:264:            description={t.guide_prompt_image_desc} 
+src/components/PromptImageView.tsx:282:                  {t.prompt_image_trial_label}
+src/components/PromptImageView.tsx:285:                  {dailyGenCount}/30 {t.prompt_image_generate_count}
+src/components/PromptImageView.tsx:298:                  {t.prompt_image_trial_expired}
+src/components/PromptImageView.tsx:302:                  {t.prompt_image_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_image_trial_times}</strong>.
+src/components/PromptImageView.tsx:435:                        const allPrompts = images
+src/components/PromptImageView.tsx:437:                          .map(img => `--- ${img.name} ---\n${img.result?.prompt}`)
+src/components/PromptImageView.tsx:439:                        copyToClipboard(allPrompts, 'all-batch');
+src/components/PromptImageView.tsx:516:                                  onClick={() => copyToClipboard(item.result!.prompt, item.id)}
+src/components/PromptImageView.tsx:549:                                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">AI Prompt Optimized</label>
+src/components/PromptImageView.tsx:552:                                      {item.result.prompt}
+src/components/PromptImageView.tsx:576:                <span className="font-black text-slate-800 dark:text-slate-200">Tips:</span> Gunakan mode batch untuk memproses ribuan referensi visual ke dalam prompt AI yang sangat presisi dalam hitungan detik. Semua hasil dioptimasi untuk <span className="underline decoration-emerald-500 underline-offset-2">Midjourney</span>, <span className="underline decoration-emerald-500 underline-offset-2">DALL-E 3</span>, dan <span className="underline decoration-emerald-500 underline-offset-2">Adobe Firefly</span>.
+src/components/PromptGenView.tsx:10:interface PromptGenViewProps {
+src/components/PromptGenView.tsx:20:interface PromptHistoryItem {
+src/components/PromptGenView.tsx:26:  prompts: string[];
+src/components/PromptGenView.tsx:27:  negativePrompt: string;
+src/components/PromptGenView.tsx:29:  promptMode?: 'background' | 'png';
+src/components/PromptGenView.tsx:65:export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
+src/components/PromptGenView.tsx:89:  const [promptMode, setPromptMode] = useState<'background' | 'png'>('background');
+src/components/PromptGenView.tsx:91:  const [bgNegativePrompt, setBgNegativePrompt] = useState('blurry, low quality, worst quality, text, watermark, signature, bad proportions, bad anatomy');
+src/components/PromptGenView.tsx:92:  const [pngNegativePrompt, setPngNegativePrompt] = useState('scenery, context backdrop, ground shadow, drop shadow, ambient background, blurry, watermark, text');
+src/components/PromptGenView.tsx:94:  const currentStyleOptions = promptMode === 'background' ? BACKGROUND_STYLE_OPTIONS : PNG_STYLE_OPTIONS;
+src/components/PromptGenView.tsx:97:    prompts: string[];
+src/components/PromptGenView.tsx:98:    negativePrompt: string;
+src/components/PromptGenView.tsx:132:  const [history, setHistory] = useState<PromptHistoryItem[]>([]);
+src/components/PromptGenView.tsx:137:      const stored = localStorage.getItem('metazo_prompt_history_simple');
+src/components/PromptGenView.tsx:143:            prompts: item.prompts || (item.optimizedPrompt ? [item.optimizedPrompt] : [item.subject])
+src/components/PromptGenView.tsx:149:      console.warn("Could not load prompt history:", e);
+src/components/PromptGenView.tsx:153:  const saveToHistory = (newItem: PromptHistoryItem) => {
+src/components/PromptGenView.tsx:157:      localStorage.setItem('metazo_prompt_history_simple', JSON.stringify(updated));
+src/components/PromptGenView.tsx:164:      localStorage.removeItem('metazo_prompt_history_simple');
+src/components/PromptGenView.tsx:173:      localStorage.setItem('metazo_prompt_history_simple', JSON.stringify(updated));
+src/components/PromptGenView.tsx:179:      setError(t.prompt_error_trial);
+src/components/PromptGenView.tsx:184:      setError(t.prompt_error_empty);
+src/components/PromptGenView.tsx:205:      document.getElementById('prompt-output-section')?.scrollIntoView({ behavior: 'smooth' });
+src/components/PromptGenView.tsx:209:      const response = await fetch('/api/generate-prompt', {
+src/components/PromptGenView.tsx:216:          promptMode,
+src/components/PromptGenView.tsx:220:          userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim()
+src/components/PromptGenView.tsx:248:      const historyItem: PromptHistoryItem = {
+src/components/PromptGenView.tsx:249:        id: `prompt-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+src/components/PromptGenView.tsx:254:        prompts: data.prompts || [],
+src/components/PromptGenView.tsx:255:        negativePrompt: data.negativePrompt || '',
+src/components/PromptGenView.tsx:257:        promptMode,
+src/components/PromptGenView.tsx:263:      console.error("Failed generating prompt variations:", err);
+src/components/PromptGenView.tsx:271:  const copySinglePrompt = async (text: string, index: number) => {
+src/components/PromptGenView.tsx:281:  const copyAllPromptsText = async () => {
+src/components/PromptGenView.tsx:282:    if (!result || !result.prompts || result.prompts.length === 0) return;
+src/components/PromptGenView.tsx:283:    const allText = result.prompts.join('\n\n');
+src/components/PromptGenView.tsx:292:    if (!result || !result.negativePrompt) return;
+src/components/PromptGenView.tsx:293:    const success = await robustCopy(result.negativePrompt);
+src/components/PromptGenView.tsx:301:    if (!result || !result.prompts || result.prompts.length === 0) return;
+src/components/PromptGenView.tsx:302:    const header = `=== PROMPT SPECIFICATION SHEET ===\nTema Visual: ${subject}\nGaya Kategori: ${styleCategory}\nJumlah Variasi: ${result.prompts.length}\nNegative Prompt: ${result.negativePrompt}\n\n==================================\n`;
+src/components/PromptGenView.tsx:303:    const listBody = result.prompts.map((p, i) => `PROMPT #${i + 1}\n--------------------------\n${p}\n`).join('\n');
+src/components/PromptGenView.tsx:309:    link.download = `Prompts_${subject.substring(0, 20).replace(/\s+/g, '_')}_${styleCategory}.txt`;
+src/components/PromptGenView.tsx:314:  // Filter prompts based on search query
+src/components/PromptGenView.tsx:315:  const filteredPrompts = result?.prompts 
+src/components/PromptGenView.tsx:316:    ? result.prompts.map((p, originalIdx) => ({ text: p, globalIdx: originalIdx }))
+src/components/PromptGenView.tsx:321:  const totalPrompts = filteredPrompts.length;
+src/components/PromptGenView.tsx:322:  const totalPages = Math.max(1, Math.ceil(totalPrompts / itemsPerPage));
+src/components/PromptGenView.tsx:326:  const currentItems = filteredPrompts.slice(indexOfFirstItem, indexOfLastItem);
+src/components/PromptGenView.tsx:331:  let presetLevelSummary = t.prompt_preset_lite;
+src/components/PromptGenView.tsx:335:    presetLevelSummary = t.prompt_preset_artistic;
+src/components/PromptGenView.tsx:339:    presetLevelSummary = t.prompt_preset_ultra;
+src/components/PromptGenView.tsx:356:            {t.prompt_studio_title}
+src/components/PromptGenView.tsx:359:            {t.prompt_studio_subtitle}
+src/components/PromptGenView.tsx:365:            title={t.guide_prompt_text_title} 
+src/components/PromptGenView.tsx:366:            description={t.guide_prompt_text_desc} 
+src/components/PromptGenView.tsx:371:            <span>{t.prompt_studio_version}</span>
+src/components/PromptGenView.tsx:382:              {t.prompt_formula_title}
+src/components/PromptGenView.tsx:385:              {t.prompt_engine_active}
+src/components/PromptGenView.tsx:393:                setPromptMode('background');
+src/components/PromptGenView.tsx:397:                promptMode === 'background'
+src/components/PromptGenView.tsx:403:              <span>{t.prompt_tab_background}</span>
+src/components/PromptGenView.tsx:407:                setPromptMode('png');
+src/components/PromptGenView.tsx:411:                promptMode === 'png'
+src/components/PromptGenView.tsx:417:              <span>{t.prompt_tab_png}</span>
+src/components/PromptGenView.tsx:426:                  {t.prompt_trial_label}
+src/components/PromptGenView.tsx:429:                  {dailyGenCount}/30 {t.prompt_generate_count}
+src/components/PromptGenView.tsx:442:                  {t.prompt_trial_expired}
+src/components/PromptGenView.tsx:446:                  {t.prompt_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_trial_times}</strong>.
+src/components/PromptGenView.tsx:459:                    {t.prompt_subject_label}
+src/components/PromptGenView.tsx:467:                  placeholder={t.prompt_subject_placeholder}
+src/components/PromptGenView.tsx:475:                  {t.prompt_inspiration_label}
+src/components/PromptGenView.tsx:499:              {/* ----------------- NEGATIVE PROMPT INPUT COLUMN ----------------- */}
+src/components/PromptGenView.tsx:504:                    {t.prompt_negative_label}
+src/components/PromptGenView.tsx:506:                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{t.prompt_negative_subtitle}</span>
+src/components/PromptGenView.tsx:509:                {promptMode === 'background' ? (
+src/components/PromptGenView.tsx:511:                    value={bgNegativePrompt}
+src/components/PromptGenView.tsx:512:                    onChange={(e) => setBgNegativePrompt(e.target.value)}
+src/components/PromptGenView.tsx:518:                    value={pngNegativePrompt}
+src/components/PromptGenView.tsx:519:                    onChange={(e) => setPngNegativePrompt(e.target.value)}
+src/components/PromptGenView.tsx:525:                  {t.prompt_negative_desc}
+src/components/PromptGenView.tsx:535:                  {t.prompt_style_master_label}
+src/components/PromptGenView.tsx:559:                    {t.prompt_style_quick_label}
+src/components/PromptGenView.tsx:584:              {/* PNG Background Dropdown Option - Only visible when promptMode === 'png' */}
+src/components/PromptGenView.tsx:585:              {promptMode === 'png' && (
+src/components/PromptGenView.tsx:588:                    <span>{t.prompt_png_bg_label}</span>
+src/components/PromptGenView.tsx:598:                      <option value="white">{t.prompt_png_bg_white}</option>
+src/components/PromptGenView.tsx:599:                      <option value="black">{t.prompt_png_bg_black}</option>
+src/components/PromptGenView.tsx:600:                      <option value="transparent">{t.prompt_png_bg_transparent}</option>
+src/components/PromptGenView.tsx:610:                    {t.prompt_png_bg_desc}
+src/components/PromptGenView.tsx:615:              {/* 3. Variation Slider (Determines count of generated prompts: 10 to 150) */}
+src/components/PromptGenView.tsx:618:                  <span className="text-slate-550 dark:text-slate-400">{t.prompt_variation_label}</span>
+src/components/PromptGenView.tsx:620:                    {variation} {t.prompt_variation_unit}
+src/components/PromptGenView.tsx:649:                  <span className="text-slate-550 dark:text-slate-400">{t.prompt_word_count_label}</span>
+src/components/PromptGenView.tsx:690:                  {t.prompt_word_count_desc}
+src/components/PromptGenView.tsx:720:                  <span>{t.prompt_btn_synthesizing.replace('{count}', variation.toString())}</span>
+src/components/PromptGenView.tsx:725:                  <span>{t.prompt_btn_synthesize.replace('{count}', variation.toString())}</span>
+src/components/PromptGenView.tsx:733:        <div id="prompt-output-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+src/components/PromptGenView.tsx:735:          {/* Main prompt output panel */}
+src/components/PromptGenView.tsx:740:                  {t.prompt_output_title} {result && `(${totalPrompts !== (result?.prompts?.length || 0) ? `${totalPrompts} of ${result?.prompts?.length || 0}` : `${totalPrompts}`})`}
+src/components/PromptGenView.tsx:745:                      {t.prompt_output_subtitle}
+src/components/PromptGenView.tsx:748:                      {promptMode === 'png' ? t.prompt_output_badge_png.replace('{color}', pngBgColor.toUpperCase()) : t.prompt_output_badge_scene}
+src/components/PromptGenView.tsx:754:              {result && result.prompts && result.prompts.length > 0 && (
+src/components/PromptGenView.tsx:757:                    onClick={copyAllPromptsText}
+src/components/PromptGenView.tsx:765:                    <span>{copiedAll ? t.prompt_output_btn_copied : t.prompt_output_btn_copy_all}</span>
+src/components/PromptGenView.tsx:773:                    <span>{t.prompt_output_btn_download}</span>
+src/components/PromptGenView.tsx:786:                    <span>{t.prompt_output_btn_clear}</span>
+src/components/PromptGenView.tsx:793:            {result && result.prompts && result.prompts.length > 0 && (
+src/components/PromptGenView.tsx:803:                  placeholder={t.prompt_output_search_placeholder}
+src/components/PromptGenView.tsx:825:                    {progress < 30 ? t.prompt_loading_step1 : 
+src/components/PromptGenView.tsx:826:                     progress < 60 ? t.prompt_loading_step2 : 
+src/components/PromptGenView.tsx:827:                     progress < 90 ? t.prompt_loading_step3 : t.prompt_loading_step4}
+src/components/PromptGenView.tsx:843:                    <div key={`prompt-skel-${i}`} className="h-16 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] animate-pulse" />
+src/components/PromptGenView.tsx:847:            ) : result && result.prompts && result.prompts.length > 0 ? (
+src/components/PromptGenView.tsx:851:                {totalPrompts === 0 && (
+src/components/PromptGenView.tsx:854:                    <p className="text-xs font-bold uppercase tracking-wider">{t.prompt_output_no_match_title}</p>
+src/components/PromptGenView.tsx:855:                    <p className="text-[10px]">{t.prompt_output_no_match_desc.replace('{query}', searchQuery).replace('{count}', result.prompts.length.toString())}</p>
+src/components/PromptGenView.tsx:863:                    const promptText = item.text;
+src/components/PromptGenView.tsx:872:                          {promptText}
+src/components/PromptGenView.tsx:876:                          onClick={() => copySinglePrompt(promptText, globalIdx)}
+src/components/PromptGenView.tsx:882:                          title="Salin prompt tunggal ini"
+src/components/PromptGenView.tsx:941:                {/* Consolidated Negative Prompt Panel */}
+src/components/PromptGenView.tsx:942:                {result.negativePrompt && (
+src/components/PromptGenView.tsx:947:                        Negative Prompt Global (Gunakan ini untuk hasil bersih)
+src/components/PromptGenView.tsx:962:                      {result.negativePrompt}
+src/components/PromptGenView.tsx:992:                  Describe your visual theme and configure variations. AI will generate unique prompt sets tailored for your needs.
+src/components/PromptGenView.tsx:1029:                      setPromptMode(item.promptMode || 'background');
+src/components/PromptGenView.tsx:1032:                        prompts: item.prompts || [],
+src/components/PromptGenView.tsx:1033:                        negativePrompt: item.negativePrompt,
+src/components/PromptGenView.tsx:1037:                      document.getElementById('prompt-output-section')?.scrollIntoView({ behavior: 'smooth' });
+src/components/PromptGenView.tsx:1047:                          {item.timestamp} • {item.prompts?.length || item.variation} Prompts
+src/components/PromptVideoView.tsx:25:import { VideoAnalysisResult, VideoPrompt } from '../../types';
+src/components/PromptVideoView.tsx:39:interface PromptVideoViewProps {
+src/components/PromptVideoView.tsx:48:export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ 
+src/components/PromptVideoView.tsx:59:  const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
+src/components/PromptVideoView.tsx:62:  const [hollywoodPrompts, setHollywoodPrompts] = useState<VideoPrompt[]>([]);
+src/components/PromptVideoView.tsx:91:    setHollywoodPrompts([]);
+src/components/PromptVideoView.tsx:155:    setHollywoodPrompts([]);
+src/components/PromptVideoView.tsx:159:  const handleGenerateHollywoodPrompts = async () => {
+src/components/PromptVideoView.tsx:160:    if (!keyword.trim() || isGeneratingPrompts) return;
+src/components/PromptVideoView.tsx:170:    setIsGeneratingPrompts(true);
+src/components/PromptVideoView.tsx:182:      const response = await fetch('/api/generate-hollywood-prompts', {
+src/components/PromptVideoView.tsx:191:        throw new Error('Gagal menghasilkan Hollywood prompts. Coba lagi nanti.');
+src/components/PromptVideoView.tsx:196:      setHollywoodPrompts(data);
+src/components/PromptVideoView.tsx:204:      setTimeout(() => setIsGeneratingPrompts(false), 300);
+src/components/PromptVideoView.tsx:208:  const getCombinedPrompt = (p: VideoPrompt) => {
+src/components/PromptVideoView.tsx:219:  const downloadPrompts = () => {
+src/components/PromptVideoView.tsx:220:    const content = hollywoodPrompts.map((p, i) => `${i + 1}. ${getCombinedPrompt(p)}`).join('\n\n');
+src/components/PromptVideoView.tsx:225:    a.download = `hollywood_prompts_${keyword.replace(/\s+/g, '_')}.txt`;
+src/components/PromptVideoView.tsx:237:              {t.prompt_video_trial_label}
+src/components/PromptVideoView.tsx:240:              {dailyGenCount}/30 {t.prompt_video_generate_count}
+src/components/PromptVideoView.tsx:253:              {t.prompt_video_trial_expired}
+src/components/PromptVideoView.tsx:257:              {t.prompt_video_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_video_trial_times}</strong>.
+src/components/PromptVideoView.tsx:267:          {(isAnalyzing || isGeneratingPrompts) && (
+src/components/PromptVideoView.tsx:275:                className={`h-full transition-all duration-300 ${isGeneratingPrompts ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-violet-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'}`}
+src/components/PromptVideoView.tsx:276:                style={{ width: `${isGeneratingPrompts ? generationProgress : analysisProgress}%` }}
+src/components/PromptVideoView.tsx:294:            title={t.guide_prompt_video_title} 
+src/components/PromptVideoView.tsx:295:            description={t.guide_prompt_video_desc} 
+src/components/PromptVideoView.tsx:322:                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
+src/components/PromptVideoView.tsx:340:                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
+src/components/PromptVideoView.tsx:341:                  onClick={(e) => { e.preventDefault(); handleGenerateHollywoodPrompts(); }}
+src/components/PromptVideoView.tsx:344:                  {isGeneratingPrompts ? (
+src/components/PromptVideoView.tsx:488:                    {hollywoodPrompts.length === 0 && (
+src/components/PromptVideoView.tsx:490:                        onClick={handleGenerateHollywoodPrompts}
+src/components/PromptVideoView.tsx:491:                        disabled={isGeneratingPrompts}
+src/components/PromptVideoView.tsx:494:                        {isGeneratingPrompts ? <Loader2 size={12} className="animate-spin" /> : <Clapperboard size={12} />}
+src/components/PromptVideoView.tsx:495:                        <span>AI Director Prompts</span>
+src/components/PromptVideoView.tsx:509:        {/* Hollywood Prompts Section */}
+src/components/PromptVideoView.tsx:510:        {hollywoodPrompts.length > 0 && (
+src/components/PromptVideoView.tsx:528:                  onClick={downloadPrompts}
+src/components/PromptVideoView.tsx:538:                  {hollywoodPrompts.map((prompt, idx) => (
+src/components/PromptVideoView.tsx:540:                      key={`${prompt.id}-${idx}`}
+src/components/PromptVideoView.tsx:548:                          <span className="px-3 py-1 bg-emerald-500/10 text-[10px] font-black text-emerald-400 uppercase tracking-widest rounded-full">{prompt.style} shot</span>
+src/components/PromptVideoView.tsx:551:                          onClick={() => handleCopy(getCombinedPrompt(prompt))}
+src/components/PromptVideoView.tsx:555:                          <span className="text-[9px] font-black uppercase">Copy Prompt</span>
+src/components/PromptVideoView.tsx:565:                            <p className="text-sm font-bold text-white">{prompt.subject}. {prompt.movement}.</p>
+src/components/PromptVideoView.tsx:571:                            <p className="text-sm font-medium text-slate-300">{prompt.environment}</p>
+src/components/PromptVideoView.tsx:579:                            <p className="text-sm font-medium text-slate-300">{prompt.lighting}</p>
+src/components/PromptVideoView.tsx:585:                            <p className="text-sm font-bold text-emerald-400">{prompt.camera_angle}, {prompt.camera_movement}</p>
+src/components/PromptVideoView.tsx:596:                            {getCombinedPrompt(prompt)}
+App.tsx:19:import { PromptGenView } from './src/components/PromptGenView';
+App.tsx:20:import { PromptImageView } from './src/components/PromptImageView';
+App.tsx:21:import { PromptVideoView } from './src/components/PromptVideoView';
+App.tsx:958:  [ToolType.PROMPT_GEN]: '/SeoTextPrompt',
+App.tsx:959:  [ToolType.PROMPT_IMAGE]: '/ImageToPrompt',
+App.tsx:960:  [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
+App.tsx:961:  [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
+App.tsx:974:    case 'seotextprompt': return ToolType.PROMPT_GEN;
+App.tsx:975:    case 'imagetoprompt': return ToolType.PROMPT_IMAGE;
+App.tsx:976:    case 'videokeywordanalyzer': return ToolType.PROMPT_VIDEO;
+App.tsx:977:    case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
+App.tsx:1021:  const [customPrompt, setCustomPrompt] = useState('');
+App.tsx:1370:      ToolType.PROMPT_GEN,
+App.tsx:1371:      ToolType.PROMPT_IMAGE,
+App.tsx:1372:      ToolType.PROMPT_VIDEO,
+App.tsx:1373:      ToolType.PROMPT_IMAGE_CHECK,
+App.tsx:1387:      [ToolType.PROMPT_GEN]: getDailyCount(ToolType.PROMPT_GEN),
+App.tsx:1388:      [ToolType.PROMPT_IMAGE]: getDailyCount(ToolType.PROMPT_IMAGE),
+App.tsx:1389:      [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
+App.tsx:1390:      [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
+App.tsx:1485:          ToolType.PROMPT_GEN,
+App.tsx:1486:          ToolType.PROMPT_IMAGE,
+App.tsx:1487:          ToolType.PROMPT_VIDEO,
+App.tsx:1488:          ToolType.PROMPT_IMAGE_CHECK,
+App.tsx:2170:                  setCustomPrompt(state.customPrompt);
+App.tsx:2592:              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions);
+App.tsx:2728:                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions);
+App.tsx:3037:      // Freepik CSV Format: File name;Title;Keywords;Prompt;Model
+App.tsx:3038:      const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
+App.tsx:3051:              '', // Prompt
+App.tsx:3199:          ) : activeTool === ToolType.PROMPT_GEN ? (
+App.tsx:3200:            <PromptGenView 
+App.tsx:3205:              dailyGenCount={dailyGenCounts[ToolType.PROMPT_GEN] || 0}
+App.tsx:3206:              incrementDailyCount={() => incrementDailyCount(ToolType.PROMPT_GEN)}
+App.tsx:3218:          ) : activeTool === ToolType.PROMPT_IMAGE ? (
+App.tsx:3219:            <PromptImageView 
+App.tsx:3222:              dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE] || 0}
+App.tsx:3223:              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE, amount)}
+App.tsx:3236:          ) : activeTool === ToolType.PROMPT_VIDEO ? (
+App.tsx:3237:            <PromptVideoView 
+App.tsx:3240:              dailyGenCount={dailyGenCounts[ToolType.PROMPT_VIDEO] || 0}
+App.tsx:3241:              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_VIDEO, amount)}
+App.tsx:3254:          ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
+App.tsx:3258:              dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE_CHECK] || 0}
+App.tsx:3259:              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE_CHECK, amount)}
+App.tsx:3275:              onSendToPrompt={(text) => {
+App.tsx:3277:                handleSetActiveTool(ToolType.PROMPT_GEN);
+App.tsx:3413:                  customPrompt={customPrompt} 
+App.tsx:3414:                  setCustomPrompt={setCustomPrompt} 

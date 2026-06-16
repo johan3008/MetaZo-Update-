@@ -1,0 +1,49 @@
+import { PromptGenView } from './src/components/PromptGenView';
+import { PromptImageView } from './src/components/PromptImageView';
+import { PromptVideoView } from './src/components/PromptVideoView';
+  [ToolType.PROMPT_GEN]: '/SeoTextPrompt',
+  [ToolType.PROMPT_IMAGE]: '/ImageToPrompt',
+  [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
+  [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
+    case 'seotextprompt': return ToolType.PROMPT_GEN;
+    case 'imagetoprompt': return ToolType.PROMPT_IMAGE;
+    case 'videokeywordanalyzer': return ToolType.PROMPT_VIDEO;
+    case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
+  const [customPrompt, setCustomPrompt] = useState('');
+      ToolType.PROMPT_GEN,
+      ToolType.PROMPT_IMAGE,
+      ToolType.PROMPT_VIDEO,
+      ToolType.PROMPT_IMAGE_CHECK,
+      [ToolType.PROMPT_GEN]: getDailyCount(ToolType.PROMPT_GEN),
+      [ToolType.PROMPT_IMAGE]: getDailyCount(ToolType.PROMPT_IMAGE),
+      [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
+      [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
+          ToolType.PROMPT_GEN,
+          ToolType.PROMPT_IMAGE,
+          ToolType.PROMPT_VIDEO,
+          ToolType.PROMPT_IMAGE_CHECK,
+                  setCustomPrompt(state.customPrompt);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions);
+      // Freepik CSV Format: File name;Title;Keywords;Prompt;Model
+      const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
+              '', // Prompt
+          ) : activeTool === ToolType.PROMPT_GEN ? (
+            <PromptGenView 
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_GEN] || 0}
+              incrementDailyCount={() => incrementDailyCount(ToolType.PROMPT_GEN)}
+          ) : activeTool === ToolType.PROMPT_IMAGE ? (
+            <PromptImageView 
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE, amount)}
+          ) : activeTool === ToolType.PROMPT_VIDEO ? (
+            <PromptVideoView 
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_VIDEO] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_VIDEO, amount)}
+          ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE_CHECK] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE_CHECK, amount)}
+              onSendToPrompt={(text) => {
+                handleSetActiveTool(ToolType.PROMPT_GEN);
+                  customPrompt={customPrompt} 
+                  setCustomPrompt={setCustomPrompt} 

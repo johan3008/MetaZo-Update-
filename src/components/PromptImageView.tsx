@@ -28,12 +28,14 @@ interface ImageItem {
 }
 
 const STYLE_OPTIONS = (t: any) => [
-  { id: 'Photorealistic', label: t.style_photorealistic, icon: '📷' },
-  { id: 'Cinematic', label: t.style_cinematic, icon: '🎬' },
-  { id: 'Adobe Stock', label: t.style_adobe_stock, icon: '💎' },
-  { id: 'Editorial', label: t.style_editorial, icon: '📖' },
-  { id: 'Lifestyle', label: t.style_lifestyle, icon: '✨' },
-  { id: 'Fine Art', label: t.style_fine_art, icon: '🏛️' }
+  { id: 'Photorealistic', label: t.style_photorealistic || 'Photorealistic', icon: '📷', desc: 'Realism' },
+  { id: 'Cinematic', label: t.style_cinematic || 'Cinematic', icon: '🎬', desc: 'Movie light' },
+  { id: 'Adobe Stock', label: t.style_adobe_stock || 'Adobe Stock', icon: '💎', desc: 'Commercial' },
+  { id: 'Editorial', label: t.style_editorial || 'Editorial', icon: '📖', desc: 'Magazine' },
+  { id: 'Lifestyle', label: t.style_lifestyle || 'Lifestyle', icon: '✨', desc: 'Natural' },
+  { id: 'Fine Art', label: t.style_fine_art || 'Fine Art', icon: '🏛️', desc: 'Artistic' },
+  { id: '3D Render', label: '3D Render', icon: '🧊', desc: 'Octane Engine' },
+  { id: 'Anime', label: 'Anime', icon: '🌸', desc: 'Japanese' },
 ];
 
 export const PromptImageView: React.FC<PromptImageViewProps> = ({ 
@@ -355,22 +357,23 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
               <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {t.image_studio_target_label}
               </label>
-              <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-2 gap-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                 {currentStyleOptions.map((opt: any) => (
                   <button
                     key={opt.id}
                     onClick={() => setStyleCategory(opt.id)}
-                    className={`flex items-center justify-between px-4 py-2.5 rounded-[1.5rem] text-[10px] font-black uppercase transition-all tracking-wide border ${
+                    className={`flex flex-col items-start justify-center p-3 rounded-[1.2rem] text-left transition-all border ${
                       styleCategory === opt.id
-                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/10'
-                        : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5'
+                        ? 'bg-emerald-500/10 border-emerald-500 shadow-sm shadow-emerald-500/10'
+                        : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-emerald-500/30'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 mb-1.5 w-full">
                       <span className="text-sm">{opt.icon}</span>
-                      <span>{opt.label}</span>
+                      <span className={`text-[10px] font-black uppercase truncate flex-1 ${styleCategory === opt.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
+                      {styleCategory === opt.id && <Check size={12} className="text-emerald-500" />}
                     </div>
-                    {styleCategory === opt.id && <Check size={12} />}
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium truncate w-full">{opt.desc}</span>
                   </button>
                 ))}
               </div>
@@ -454,36 +457,45 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
 
             <div className="flex-1 p-6 overflow-y-auto max-h-[800px] custom-scrollbar">
               {images.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-20 grayscale opacity-40">
-                  <div className="p-8 bg-slate-100 dark:bg-white/5 rounded-full border-4 border-dashed border-slate-200 dark:border-white/10">
-                    <Wand2 size={48} className="text-slate-300 dark:text-slate-700" />
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-5 py-20 transition-all">
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <div className="p-8 bg-white dark:bg-slate-800/50 rounded-full border border-slate-200 dark:border-white/10 shadow-xl shadow-black/5 relative z-10 transition-transform duration-500 group-hover:scale-110">
+                      <ImageIcon size={48} className="text-emerald-500/80 drop-shadow-md" />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest italic">{t.image_studio_empty_title}</p>
-                    <p className="text-xs text-slate-400 font-medium max-w-xs leading-relaxed">
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest">{t.image_studio_empty_title}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs leading-relaxed">
                       {t.image_studio_empty_desc}
                     </p>
+                  </div>
+                  <div className="flex gap-2 items-center justify-center pt-2 opacity-60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6">
                   {images.map((item) => (
-                    <div key={item.id} className={`group relative bg-slate-50 dark:bg-black/30 border rounded-2xl overflow-hidden transition-all duration-300 ${
-                      item.loading ? 'border-emerald-500/50 ring-1 ring-emerald-500/20' : 'border-slate-100 dark:border-white/5'
+                    <div key={item.id} className={`group relative bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${
+                      item.loading ? 'border-emerald-500/50 shadow-emerald-500/10 ring-1 ring-emerald-500/20' : 'border-slate-200 dark:border-white/10 hover:border-emerald-500/30'
                     }`}>
-                      <div className="flex flex-col md:flex-row min-h-[160px]">
+                      <div className="flex flex-col md:flex-row min-h-[200px]">
                         {/* Image Preview Thumb */}
-                        <div className="w-full md:w-48 h-48 md:h-auto relative bg-black shrink-0">
-                          <img src={item.data} alt={item.name} className="w-full h-full object-cover" />
+                        <div className="w-full md:w-56 h-48 md:h-auto relative bg-slate-100 dark:bg-black shrink-0 border-b md:border-b-0 md:border-r border-slate-100 dark:border-white/5">
+                          <img src={item.data} alt={item.name} className="w-full h-full object-cover md:absolute inset-0" />
                           <button 
                             onClick={() => removeImage(item.id)}
-                            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-3 left-3 p-2 bg-black/60 hover:bg-red-500 text-white rounded-xl backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Trash2 size={14} />
                           </button>
                           {item.loading && (
-                            <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-[2px] flex items-center justify-center">
-                              <RefreshCw size={24} className="text-white animate-spin" />
+                            <div className="absolute inset-0 bg-emerald-900/40 backdrop-blur-sm flex flex-col items-center justify-center space-y-3">
+                              <RefreshCw size={28} className="text-emerald-400 animate-spin" />
+                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Processing...</span>
                             </div>
                           )}
                         </div>
@@ -495,17 +507,17 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                               <div className="space-y-1">
                                 <h4 className="text-[11px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate max-w-[200px]">{item.name}</h4>
                                 {item.result ? (
-                                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-emerald-500 tracking-wider">
+                                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
                                     <Check size={10} />
                                     <span>{styleCategory} Success</span>
                                   </div>
                                 ) : item.loading ? (
-                                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-amber-500 tracking-wider animate-pulse">
+                                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 tracking-wider">
                                     <RefreshCw size={10} className="animate-spin" />
                                     <span>AI Processing...</span>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-500/10 text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
                                     <Layers size={10} />
                                     <span>Queued</span>
                                   </div>
@@ -538,19 +550,29 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                 <span>{item.error}</span>
                               </div>
                             ) : item.result ? (
-                              <div className="space-y-4 animate-in fade-in duration-300">
-                                <div className="space-y-1.5">
+                              <div className="space-y-4 animate-in fade-in duration-500">
+                                <div className="space-y-2">
                                   <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Caption Deskripsi</label>
-                                  <p className="text-xs font-bold text-slate-600 dark:text-slate-400 leading-relaxed italic border-l-2 border-slate-200 dark:border-white/10 pl-3">
-                                    "{item.result.description}"
+                                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed border-l-2 border-emerald-500 pl-3">
+                                    {item.result.description}
                                   </p>
                                 </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">AI Prompt Optimized</label>
-                                  <div className="p-4 bg-white dark:bg-black/40 rounded-[1.5rem] border border-slate-100 dark:border-white/5 shadow-inner">
-                                    <code className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 break-words leading-relaxed">
-                                      {item.result.prompt}
-                                    </code>
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">AI Prompt Optimized</label>
+                                  </div>
+                                  <div className="relative group/copy">
+                                    <div className="p-4 bg-slate-50 dark:bg-black/40 rounded-2xl border border-slate-200 dark:border-white/5 group-hover/copy:border-emerald-500/30 transition-colors">
+                                      <code className="text-[11px] font-mono font-medium text-slate-800 dark:text-slate-300 break-words leading-relaxed select-all">
+                                        {item.result.prompt}
+                                      </code>
+                                    </div>
+                                    <button
+                                      onClick={() => copyToClipboard(item.result!.prompt, item.id)}
+                                      className="absolute top-2 right-2 p-2.5 bg-white dark:bg-slate-800 rounded-xl hover:bg-emerald-500 hover:text-white text-slate-400 hover:border-emerald-500 shadow-sm opacity-0 group-hover/copy:opacity-100 transition-all border border-slate-100 dark:border-white/5"
+                                    >
+                                      {copiedId === item.id ? <Check size={14} className="text-white" /> : <Copy size={14} />}
+                                    </button>
                                   </div>
                                 </div>
                               </div>
