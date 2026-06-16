@@ -291,16 +291,16 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
         
         <div className="mt-3 md:mt-0 flex flex-wrap items-center gap-2">
           <FeatureGuideButton 
-            title={t.guide_video_title} 
-            description={t.guide_video_desc} 
+            title={t.guide_prompt_video_title} 
+            description={t.guide_prompt_video_desc} 
             t={t} 
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Form & Config (4 cols) */}
-        <div className="xl:col-span-4 space-y-6">
+      <div className="flex flex-col space-y-8">
+        {/* Top Section: Form */}
+        <div className="w-full max-w-2xl mx-auto space-y-6">
           {/* Form */}
           <form onSubmit={handleAnalyze} className="bg-white dark:bg-[#1e293b] rounded-[2rem] p-6 shadow-xl border border-slate-200 dark:border-white/5 space-y-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none"></div>
@@ -358,8 +358,8 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
           </form>
         </div>
 
-        {/* Right Column: Results Section (8 cols) */}
-        <div className="xl:col-span-8 flex flex-col min-h-0 space-y-6">
+        {/* Bottom Section: Results */}
+        <div className="w-full flex flex-col min-h-0 space-y-6">
           <AnimatePresence mode="wait">
             {error && (
               <motion.div

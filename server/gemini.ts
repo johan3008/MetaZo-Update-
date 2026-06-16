@@ -189,7 +189,7 @@ function getHeuristicCategories(title: string, keywords: string[]): {
     5: ['environment', 'eco', 'recycle', 'green', 'sustainability', 'recycle', 'conservation', 'earth', 'planet', 'wind', 'solar', 'climate', 'environmental', 'organic'],
     6: ['emotion', 'mood', 'feeling', 'happy', 'sad', 'angry', 'conceptual', 'thought', 'brain', 'mind', 'stress', 'focus', 'psychology', 'attitude', 'behavior', 'expression', 'abstract', 'idea', 'sensation'],
     7: ['food', 'dish', 'meal', 'kitchen', 'restaurant', 'dining', 'plate', 'chef', 'fruit', 'vegetable', 'meat', 'dessert', 'cake', 'bread', 'pancake', 'pizza', 'burger', 'fast food', 'dinner', 'breakfast', 'lunch', 'sweet', 'cream', 'baked', 'cookies', 'sugar', 'cuisine', 'gourmet', 'culinary', 'recipe', 'diet'],
-    8: ['vector', 'graphic', 'design', 'illustration', 'logo', 'icon', 'frame', 'template', 'banner', 'layout', 'sticker', 'elements', 'background', 'wallpaper', 'texture', 'pattern', 'asset', 'flat', 'backdrop', 'seamless'],
+    8: ['logo', 'icon', 'frame', 'template', 'banner', 'layout', 'sticker', 'elements', 'background', 'wallpaper', 'texture', 'pattern', 'asset', 'backdrop', 'seamless', 'infographic', 'chart', 'presentation'],
     9: ['hobby', 'leisure', 'play', 'game', 'guitar', 'music', 'movie', 'craft', 'book', 'read', 'garden', 'recreation', 'activity', 'fun', 'pastime', 'indoor', 'enjoyment'],
     10: ['industrial', 'factory', 'manufacturing', 'machine', 'worker', 'equipment', 'facility', 'metal', 'power', 'warehouse', 'technical', 'automated', 'construction', 'engineering', 'machinery'],
     11: ['landscape', 'mountain', 'sea', 'beach', 'ocean', 'lake', 'river', 'forest', 'desert', 'valley', 'sunrise', 'sunset', 'nature', 'view', 'panorama', 'scenery', 'scenic', 'vista', 'sky', 'horizon'],
@@ -1022,7 +1022,7 @@ export const generateStockMetadata = async (
   if (toolType === ToolType.VIDEO) {
     mediaTypeContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.";
   } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-    mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility. Generate natural, smooth descriptions.";
+    mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
   }
 
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : 'gemini-3.1-flash-lite';
@@ -1082,9 +1082,9 @@ OUTPUT FORMAT:
     "actions": [],
     "composition": [],
     "semantic_category_analysis": {
-      "adobe_id": 8,
-      "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures",
+      "adobe_id": 0,
+      "shutterstock_category_1": "",
+      "shutterstock_category_2": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects and context"
     }
   }
@@ -1120,9 +1120,9 @@ OUTPUT FORMAT:
         actions: ["commercial poses"],
         composition: ["professional"],
         semantic_category_analysis: {
-          adobe_id: 8,
-          shutterstock_category_1: "Abstract",
-          shutterstock_category_2: "Backgrounds/Textures",
+          adobe_id: 0,
+          shutterstock_category_1: "",
+          shutterstock_category_2: "",
           reason: "Fallback static categories used."
         }
       }
@@ -1549,7 +1549,7 @@ export const generateBatchStockMetadata = async (
       if (toolType === ToolType.VIDEO) {
         mediaTypeContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.";
       } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-        mediaTypeContext = "The provided image is a VECTOR illustration preview. Focus on clean layout, graphic elements, main concept, and decorative commercial utility. Generate natural, smooth descriptions.";
+        mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
       }
 
       const visionSystemInstruction = `ROLE:
@@ -1607,9 +1607,9 @@ OUTPUT FORMAT:
     "actions": [],
     "composition": [],
     "semantic_category_analysis": {
-      "adobe_id": 8,
-      "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures",
+      "adobe_id": 0,
+      "shutterstock_category_1": "",
+      "shutterstock_category_2": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects and context"
     }
   }
@@ -1634,7 +1634,7 @@ OUTPUT FORMAT:
           try {
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
           } catch(e) {
-             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [], semantic_category_analysis: { adobe_id: 8, shutterstock_category_1: "Abstract", shutterstock_category_2: "Backgrounds/Textures", reason: "Fallback default." } };
+             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [], semantic_category_analysis: { adobe_id: 0, shutterstock_category_1: "", shutterstock_category_2: "", reason: "Fallback default." } };
           }
           parsedVisualFactsList.push(parsedFacts);
       } catch (err: any) {
@@ -1649,9 +1649,9 @@ OUTPUT FORMAT:
                 actions: ["commercial posing"],
                 composition: ["professional"],
                 semantic_category_analysis: {
-                  adobe_id: 8,
-                  shutterstock_category_1: "Abstract",
-                  shutterstock_category_2: "Backgrounds/Textures",
+                  adobe_id: 0,
+                  shutterstock_category_1: "",
+                  shutterstock_category_2: "",
                   reason: "Fallback static categories used."
                 }
               }
@@ -1671,7 +1671,7 @@ OUTPUT FORMAT:
       ].filter((item: any) => item.importance >= 50).map((item: any) => item.name);
   });
 
-  const mediaContext = toolType === ToolType.VIDEO ? "CRITICAL: Sequential frames from a single VIDEO. Analyze continuous motion and storyline across frames." : (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "VECTOR illustration preview. Focus on clean layout, graphic elements." : "Photograph or digital artwork.");
+  const mediaContext = toolType === ToolType.VIDEO ? "CRITICAL: Sequential frames from a single VIDEO. Analyze continuous motion and storyline across frames." : (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "VECTOR illustration. Focus on ACTUAL SUBJECT MATTER explicitly visible inside the illustration for categorization." : "Photograph or digital artwork.");
   
   const customPromptCommand = customPrompt ? `\nCRITICAL TARGET KEYWORD / ANCHOR INSTRUCTION:\nThe user has provided a specific target keyword or anchor prompt: "${customPrompt}"\nABSOLUTE RULE: You MUST heavily prioritize and integrate this exact target keyword/anchor into both the Title and the Keywords list. Formulate the title naturally but prominently around this target keyword.` : "";
 
