@@ -925,8 +925,8 @@ const callGeminiWithRetry = async (
              currentModel = 'gemini-3.1-flash-lite';
              customDelay = 1000; // Reset wait time so we try the new model immediately
         } else if (isQuotaOrLimit && attempt === 0 && currentModel === 'gemini-3.1-flash-lite') {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash to bypass unavailability or quota limits.`);
-             currentModel = 'gemini-3.1-flash';
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.5-flash to bypass unavailability or quota limits.`);
+             currentModel = 'gemini-3.5-flash';
              customDelay = 1000; // Reset wait time so we try the new model immediately
         } else if (statusCode === 429 && customDelay > 60000) {
              console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel} (Wait time > 60s). Failing fast.`);
@@ -984,12 +984,12 @@ export const generateStockMetadata = async (
   // Rules for keywords depending on keywordMode
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. Structure keywords to cover the highly searchable categories (they can be mixed or randomized, and highly SEO-optimized):
-   - Subject (Main Focus: descriptors of the primary subjects or objects)
-   - Action (Activity: descriptors of the movements, actions, or activities happening)
-   - Context (Environment/Background: descriptors of setting, backdrop, or location context)
-   - Concept (Abstract Meaning: metaphors, ideas, emotions, or concepts represented)
-   - Industry (Specific/Technical Category: specialized terms, professional domains, or specific industries)
+2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
+   - Subject (Main Focus: descriptors of the primary subjects or objects matching buyer search queries)
+   - Action (Activity: descriptors of movements, actions, or commercial activities happening)
+   - Context (Environment/Background: setting, backdrop, location context, atmosphere, season)
+   - Search Intent & Commercial Concept (Abstract Purpose: target terms representing why a buyer would search for this asset, commercial utility, industrial purpose, psychological mood, emotional intent, business solutions, and symbolic metaphor representation)
+   - Industry (Specific/Technical Category: specialized corporate or consumer domains, professional categories)
 3. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
@@ -1002,11 +1002,11 @@ export const generateStockMetadata = async (
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
+2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: primary single-word subject descriptors)
    - Action (Activity: single-word action/movement descriptors)
    - Context (Environment/Background: single-word background or location setting terms)
-   - Concept (Abstract Meaning: single-word conceptual, metaphorical, or emotional terms)
+   - Search Intent & Commercial Concept (Abstract Purpose: single-word terms representing buyer search intent, commercial purpose, utility, symbolic concept, or emotional mood)
    - Industry (Specific/Technical Category: single-word technical or industry-specific terms)
 3. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
 4. Prioritize highly searchable buyer terms.
@@ -1019,11 +1019,11 @@ export const generateStockMetadata = async (
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
-   - Subject (Main Focus: multi-word subject/object descriptors, e.g. "smartphone device")
-   - Action (Activity: multi-word motion/action phrases, e.g. "walking outdoor")
-   - Context (Environment/Background: multi-word background/location setting phrases)
-   - Concept (Abstract Meaning: multi-word metaphorical or conceptual expressions)
+2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
+   - Subject (Main Focus: multi-word subject/object descriptors matching buyer searches, e.g., "smartphone device")
+   - Action (Activity: multi-word motion or commercial action phrases)
+   - Context (Environment/Background: multi-word background or location setting phrases)
+   - Search Intent & Commercial Concept (Abstract Purpose: multi-word phrases representing the buyer's target intent, commercial use cases, digital trends, emotional concepts, or symbolic metaphors)
    - Industry (Specific/Technical Category: multi-word technical or professional industry terms)
 3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 4. Prioritize highly searchable buyer terms.
@@ -1067,10 +1067,10 @@ STRICT PROHIBITIONS:
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
+Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
 Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
-Do not infer hidden context.
 
 Asset Context: ${mediaTypeContext}
 
@@ -1103,11 +1103,12 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
+    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
       "shutterstock_category_2": "",
-      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects and context"
+      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
 }`;
@@ -1187,9 +1188,18 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
 2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
-   [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
+4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
+   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+   Where:
+   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
+   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
+   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   Examples of this template combination:
+   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
+   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
+   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
+   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
 5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
 6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
@@ -1243,7 +1253,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
             model: activeModel
         });
     } else {
-        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
+        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
             parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
           }, {
             systemInstruction: genSystemInstruction,
@@ -1300,9 +1310,18 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
 2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
-   [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
+4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
+   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+   Where:
+   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
+   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
+   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   Examples of this template combination:
+   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
+   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
+   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
+   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
 5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
 6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
@@ -1356,7 +1375,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
@@ -1505,12 +1524,12 @@ export const generateBatchStockMetadata = async (
   // Rules for keywords depending on keywordMode for batch
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. Structure keywords to cover the highly searchable categories (they can be mixed or randomized, and highly SEO-optimized):
-   - Subject (Main Focus: descriptors of the primary subjects or objects)
-   - Action (Activity: descriptors of the movements, actions, or activities happening)
-   - Context (Environment/Background: descriptors of setting, backdrop, or location context)
-   - Concept (Abstract Meaning: metaphors, ideas, emotions, or concepts represented)
-   - Industry (Specific/Technical Category: specialized terms, professional domains, or specific industries)
+2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
+   - Subject (Main Focus: descriptors of the primary subjects or objects matching buyer search queries)
+   - Action (Activity: descriptors of movements, actions, or commercial activities happening)
+   - Context (Environment/Background: setting, backdrop, location context, atmosphere, season)
+   - Search Intent & Commercial Concept (Abstract Purpose: target terms representing why a buyer would search for this asset, commercial utility, industrial purpose, psychological mood, emotional intent, business solutions, and symbolic metaphor representation)
+   - Industry (Specific/Technical Category: specialized corporate or consumer domains, professional categories)
 3. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
@@ -1523,11 +1542,11 @@ export const generateBatchStockMetadata = async (
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
+2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: primary single-word subject descriptors)
    - Action (Activity: single-word action/movement descriptors)
    - Context (Environment/Background: single-word background or location setting terms)
-   - Concept (Abstract Meaning: single-word conceptual, metaphorical, or emotional terms)
+   - Search Intent & Commercial Concept (Abstract Purpose: single-word terms representing buyer search intent, commercial purpose, utility, symbolic concept, or emotional mood)
    - Industry (Specific/Technical Category: single-word technical or industry-specific terms)
 3. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
 4. Prioritize highly searchable buyer terms.
@@ -1540,11 +1559,11 @@ export const generateBatchStockMetadata = async (
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. Structure keywords to cover the highly searchable categories (can be mixed, randomized, and highly SEO-optimized):
-   - Subject (Main Focus: multi-word subject/object descriptors, e.g. "smartphone device")
-   - Action (Activity: multi-word motion/action phrases, e.g. "walking outdoor")
-   - Context (Environment/Background: multi-word background/location setting phrases)
-   - Concept (Abstract Meaning: multi-word metaphorical or conceptual expressions)
+2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
+   - Subject (Main Focus: multi-word subject/object descriptors matching buyer searches, e.g., "smartphone device")
+   - Action (Activity: multi-word motion or commercial action phrases)
+   - Context (Environment/Background: multi-word background or location setting phrases)
+   - Search Intent & Commercial Concept (Abstract Purpose: multi-word phrases representing the buyer's target intent, commercial use cases, digital trends, emotional concepts, or symbolic metaphors)
    - Industry (Specific/Technical Category: multi-word technical or professional industry terms)
 3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 4. Prioritize highly searchable buyer terms.
@@ -1592,10 +1611,10 @@ STRICT PROHIBITIONS:
 
 PRIMARY OBJECTIVE:
 Detect every visible subject, action, color, visible text, and composition detail.
+Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
 Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
-Do not infer hidden context.
 
 Asset Context: ${mediaTypeContext}
 
@@ -1628,11 +1647,12 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
+    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
       "shutterstock_category_2": "",
-      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects and context"
+      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
 }`;
@@ -1714,9 +1734,18 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
 2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
-   [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
+4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
+   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+   Where:
+   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
+   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
+   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   Examples of this template combination:
+   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
+   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
+   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
+   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
 5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
 6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
@@ -1773,7 +1802,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: genSystemInstruction,
@@ -1825,9 +1854,18 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
 2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. Title MUST strictly follow this exact template structure (do not include any bracket symbols in the final output):
-   [Main Subject/Object] + [Action/Activity being done] + [Location/Background Setting] + [Additional Details/Atmosphere] + Concept + Search Intent
-4. LITERAL-FOCUSED: Focus on what is literally visible in the image. Do NOT overstuff with abstract concepts, metaphorical meanings, or overly dramatic interpretations. Describe practical, physical elements while maintaining a natural, everyday vocabulary.
+3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
+4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
+   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+   Where:
+   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
+   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
+   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   Examples of this template combination:
+   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
+   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
+   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
+   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
 5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
 6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
@@ -1883,7 +1921,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Audit and validate the Draft Metadata array for ${items.length} assets based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
