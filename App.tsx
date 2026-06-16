@@ -4,7 +4,7 @@ import {
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
-  Plus, Key, Lock
+  Plus, Key, Lock, MessageCircle
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -21,6 +21,7 @@ import { PromptImageView } from './src/components/PromptImageView';
 import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { CalendarGenView } from './src/components/CalendarGenView';
+import { ChatView } from './src/components/ChatView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { TRANSLATIONS, AppLanguage, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
@@ -28,7 +29,7 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { LoginScreen } from './src/components/LoginScreen';
@@ -959,7 +960,8 @@ const toolToPath: Record<ToolType, string> = {
   [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
   [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
   [ToolType.VECTOR_EPS]: '/EpsConverter',
-  [ToolType.CALENDAR_GEN]: '/NicheCalendar'
+  [ToolType.CALENDAR_GEN]: '/NicheCalendar',
+  [ToolType.CHAT]: '/Chat'
 };
 
 const getToolFromPath = (path: string): ToolType | null => {
@@ -975,6 +977,7 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
     case 'epsconverter': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
+    case 'chat': return ToolType.CHAT;
     default: return null;
   }
 };
@@ -1130,6 +1133,215 @@ const App: React.FC = () => {
 
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // --- Real-time Chat Notifications, Chime Synthesizer & Toasting Stack ---
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [preselectedChatPeer, setPreselectedChatPeer] = useState<any>(null);
+  const [chatToasts, setChatToasts] = useState<Array<{
+    id: string;
+    senderName: string;
+    text: string;
+    isGlobal: boolean;
+    peerId?: string;
+    peerEmail?: string;
+  }>>([]);
+
+  const sessionStartTime = useRef<number>(Date.now());
+  const notifiedMessageIds = useRef<Set<string>>(new Set());
+
+  // Load last read timestamps from local storage
+  const [lastReadGlobal, setLastReadGlobal] = useState<number>(() => {
+    const val = localStorage.getItem('mz_last_read_global');
+    return val ? parseInt(val) || 0 : Date.now();
+  });
+  
+  const [lastReadRooms, setLastReadRooms] = useState<{[roomId: string]: number}>(() => {
+    const val = localStorage.getItem('mz_last_read_rooms');
+    try {
+      return val ? JSON.parse(val) || {} : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Reset or mark read handler
+  const handleMarkRead = useCallback((type: 'global' | 'direct', peerId?: string) => {
+    const now = Date.now();
+    if (type === 'global') {
+      localStorage.setItem('mz_last_read_global', now.toString());
+      setLastReadGlobal(now);
+    } else if (type === 'direct' && peerId) {
+      setLastReadRooms(prev => {
+        const updated = { ...prev, [peerId]: now };
+        localStorage.setItem('mz_last_read_rooms', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  }, []);
+
+  // Standard crystal-clear procedural sound synthesizer
+  const playNotificationChime = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playTone = (frequency: number, startTime: number, duration: number) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.12, startTime + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      
+      const now = audioCtx.currentTime;
+      playTone(587.33, now, 0.12); // D5
+      playTone(698.46, now + 0.06, 0.18); // F5
+    } catch (e) {
+      console.warn("Audio Context blocked or not supported", e);
+    }
+  }, []);
+
+  // Toast dispatcher helper
+  const pushNotificationToast = useCallback((msg: {
+    id: string;
+    senderName: string;
+    text: string;
+    isGlobal: boolean;
+    peerId?: string;
+    peerEmail?: string;
+  }) => {
+    setChatToasts(prev => {
+      if (prev.some(t => t.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+    setTimeout(() => {
+      setChatToasts(prev => prev.filter(t => t.id !== msg.id));
+    }, 6000);
+  }, []);
+
+  // Master real-time listeners for unread counts & toast dispatch
+  useEffect(() => {
+    if (!user) {
+      setUnreadChatCount(0);
+      return;
+    }
+
+    sessionStartTime.current = Date.now();
+    const unreadCounts: { [channel: string]: number } = {};
+
+    const updateCombinedCount = () => {
+      const total = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+      setUnreadChatCount(total);
+    };
+
+    // 1. Subscribe to Global Messages
+    const globalMessagesRef = collection(db, 'global_messages');
+    const globalQuery = query(globalMessagesRef, orderBy('timestamp', 'desc'), limit(30));
+    
+    const unsubscribeGlobal = onSnapshot(globalQuery, (snapshot) => {
+      let globalUnread = 0;
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        const msgId = docSnap.id;
+        const timestamp = d.timestamp?.toDate ? d.timestamp.toDate().getTime() : (d.timestamp || Date.now());
+        
+        if (d.senderUid !== user.uid) {
+          if (timestamp > lastReadGlobal) {
+            globalUnread++;
+            
+            if (timestamp > sessionStartTime.current && !notifiedMessageIds.current.has(msgId)) {
+              notifiedMessageIds.current.add(msgId);
+              playNotificationChime();
+              pushNotificationToast({
+                id: msgId,
+                senderName: d.senderName || d.senderEmail?.split('@')[0] || 'User',
+                text: d.text || '',
+                isGlobal: true
+              });
+            }
+          }
+        }
+      });
+      
+      unreadCounts['global'] = globalUnread;
+      updateCombinedCount();
+    });
+
+    // 2. Subscribe to user DM Rooms where user is a participant
+    const roomsQuery1 = query(collection(db, 'chats'), where('user1', '==', user.uid));
+    const roomsQuery2 = query(collection(db, 'chats'), where('user2', '==', user.uid));
+    
+    const activeSubscribers: { [roomId: string]: () => void } = {};
+
+    const monitorRoomMessages = (roomId: string, partnerId: string, partnerEmail: string, partnerName: string) => {
+      if (activeSubscribers[roomId]) return;
+
+      const q = query(collection(db, 'chats', roomId, 'messages'), orderBy('timestamp', 'desc'), limit(20));
+      activeSubscribers[roomId] = onSnapshot(q, (snapshot) => {
+        let roomUnread = 0;
+        
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          const msgId = docSnap.id;
+          const timestamp = d.timestamp?.toDate ? d.timestamp.toDate().getTime() : (d.timestamp || Date.now());
+          
+          if (d.senderUid !== user.uid) {
+            const lastReadTime = lastReadRooms[partnerId] || 0;
+            if (timestamp > lastReadTime) {
+              roomUnread++;
+              
+              if (timestamp > sessionStartTime.current && !notifiedMessageIds.current.has(msgId)) {
+                notifiedMessageIds.current.add(msgId);
+                playNotificationChime();
+                pushNotificationToast({
+                  id: msgId,
+                  senderName: d.senderName || d.senderEmail?.split('@')[0] || partnerName || 'User',
+                  text: d.text || '',
+                  isGlobal: false,
+                  peerId: partnerId,
+                  peerEmail: partnerEmail
+                });
+              }
+            }
+          }
+        });
+        
+        unreadCounts[roomId] = roomUnread;
+        updateCombinedCount();
+      });
+    };
+
+    const processRoomDocs = (snapshot: any) => {
+      snapshot.forEach((docSnap: any) => {
+        const d = docSnap.data();
+        const roomId = docSnap.id;
+        const isUser1 = d.user1 === user.uid;
+        const partnerId = isUser1 ? d.user2 : d.user1;
+        const partnerEmail = isUser1 ? d.user2Email : d.user1Email;
+        const partnerName = isUser1 ? d.user2Name : d.user1Name;
+        
+        monitorRoomMessages(roomId, partnerId, partnerEmail, partnerName);
+      });
+    };
+
+    const unsubscribeRooms1 = onSnapshot(roomsQuery1, processRoomDocs);
+    const unsubscribeRooms2 = onSnapshot(roomsQuery2, processRoomDocs);
+
+    return () => {
+      unsubscribeGlobal();
+      unsubscribeRooms1();
+      unsubscribeRooms2();
+      Object.values(activeSubscribers).forEach(unsub => unsub());
+    };
+  }, [user, lastReadGlobal, lastReadRooms, playNotificationChime, pushNotificationToast]);
 
   // Daily Asset Generation Tracking for Trial Users
   const getTodayDateString = () => {
@@ -2930,6 +3142,7 @@ const App: React.FC = () => {
         setShowActivation={setShowActivationModal}
         onUnlockReseller={() => setShowResellerUnlockInput(true)}
         appName={mzAppName}
+        unreadChatCount={unreadChatCount}
       />
 
       {/* Main Content Area Container */}
@@ -3073,6 +3286,15 @@ const App: React.FC = () => {
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList
               }}
+            />
+          ) : activeTool === ToolType.CHAT ? (
+            <ChatView 
+              t={t}
+              uiLanguage={uiLanguage}
+              currentUser={user}
+              preselectedPeer={preselectedChatPeer}
+              onPeerChange={(peer) => setPreselectedChatPeer(peer)}
+              onMarkRead={handleMarkRead}
             />
           ) : (
             <>
@@ -4314,6 +4536,89 @@ const App: React.FC = () => {
               Mungkin Nanti
             </button>
           </div>
+        </div>
+      )}
+      
+      {/* Floating Chat Notification Toasts Stack */}
+      {chatToasts.length > 0 && (
+        <div id="mz-notification-overlay" className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+          {chatToasts.map((toast) => (
+            <div
+              key={toast.id}
+              className="bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border border-slate-200 dark:border-violet-500/25 p-4 rounded-3xl shadow-2xl flex flex-col gap-2.5 pointer-events-auto cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] border-l-4 border-l-violet-500 animate-in slide-in-from-right-10 overflow-hidden relative"
+              style={{ boxShadow: '0 12px 40px -12px rgba(124, 58, 237, 0.2)' }}
+            >
+              {/* Pulse ambient background glow */}
+              <div className="absolute top-0 right-0 w-16 h-16 bg-violet-500/5 rounded-full blur-xl animate-pulse" />
+              
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
+                  </span>
+                  <p className="text-[10px] font-black text-violet-500 dark:text-violet-400 uppercase tracking-widest leading-none">
+                    {toast.isGlobal ? 'Pesan Chat Global' : 'Pesan Masuk (DM)'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setChatToasts(prev => prev.filter(t => t.id !== toast.id));
+                  }}
+                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                  {toast.senderName}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-350 line-clamp-2 mt-0.5 font-medium leading-normal">
+                  {toast.text}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setChatToasts(prev => prev.filter(t => t.id !== toast.id));
+                  }}
+                  className="px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors uppercase tracking-wider"
+                >
+                  {uiLanguage === 'id' ? 'Abaikan' : 'Dismiss'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setChatToasts(prev => prev.filter(t => t.id !== toast.id));
+                    
+                    if (!toast.isGlobal && toast.peerId) {
+                      setPreselectedChatPeer({
+                        id: toast.peerId,
+                        email: toast.peerEmail || '',
+                        displayName: toast.senderName
+                      });
+                    } else {
+                      setPreselectedChatPeer(null);
+                    }
+                    
+                    handleSetActiveTool(ToolType.CHAT);
+                  }}
+                  className="px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black rounded-lg transition-colors shadow-sm uppercase tracking-wider flex items-center gap-1.5"
+                >
+                  <MessageCircle size={10} />
+                  <span>{uiLanguage === 'id' ? 'Buka Chat' : 'Open Chat'}</span>
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
       </div>

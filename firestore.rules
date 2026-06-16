@@ -10,5 +10,14 @@ service cloud.firestore {
     match /keys/{keyId} {
       allow read, write: if true;
     }
+    match /global_messages/{messageId} {
+      allow read, write: if true;
+    }
+    match /chats/{chatId} {
+      allow read, write: if true;
+    }
+    match /chats/{chatId}/messages/{messageId} {
+      allow read, write: if true;
+    }
   }
 }
