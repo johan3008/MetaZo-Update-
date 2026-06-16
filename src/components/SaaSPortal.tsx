@@ -1146,6 +1146,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         <tr>
                           <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">License Key</th>
                           <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">User Email</th>
+                          <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Type</th>
+                          <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Duration</th>
                           <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Activation Date</th>
                           <th className="px-4 py-3 font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Status</th>
                         </tr>
@@ -1161,6 +1163,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                             <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
                               <td className="px-4 py-3 font-mono font-bold text-[10px]">{k.key}</td>
                               <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">{k.activatedBy}</td>
+                              <td className="px-4 py-3 font-semibold text-[10px] text-slate-600 dark:text-slate-300">
+                                {k.duration === 'unlimited' ? 'Unlimited PRO' : (k.duration === '30days' ? '30 Days PRO' : `${k.duration} PRO`)}
+                              </td>
+                              <td className="px-4 py-3 text-slate-500 text-[10px]">
+                                {k.duration === 'unlimited' ? 'Lifetime' : (k.duration === '30days' ? '30 Hari' : `${k.duration}`)}
+                              </td>
                               <td className="px-4 py-3 text-slate-500 text-[10px]">{k.activatedAt ? new Date(k.activatedAt).toLocaleString() : '-'}</td>
                               <td className="px-4 py-3">
                                 <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest">
@@ -1172,7 +1180,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         ))}
                         {backendKeys.filter(k => k.activated).filter(k => k.key.toLowerCase().includes(auditSearchQuery.toLowerCase()) || (k.activatedBy || '').toLowerCase().includes(auditSearchQuery.toLowerCase())).length === 0 && (
                           <tr>
-                            <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                               Tidak ada data aktivasi yang sesuai pencarian.
                             </td>
                           </tr>

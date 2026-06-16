@@ -993,7 +993,7 @@ export const generateStockMetadata = async (
 3. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
-6. Ensure no IP, brands, trademarks, or names are included.
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
@@ -1011,7 +1011,7 @@ export const generateStockMetadata = async (
 3. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
-6. Ensure no IP, brands, trademarks, or names are included.
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
@@ -1028,7 +1028,7 @@ export const generateStockMetadata = async (
 3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
-6. Ensure no IP, brands, trademarks, or names are included.
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
@@ -1173,35 +1173,42 @@ OUTPUT FORMAT:
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be highly SEO optimized, front-loaded with primary commercial keywords, and have at least 10-15 descriptive words to ensure maximum visibility on stock platforms. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
+   - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
+   - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
+   - NEVER include specific, identifiable car brands/models or manufacturers (e.g., "Porsche 911", "Ferrari", "Tesla Model 3"). Use generic descriptors (e.g., "modern sports car", "electric sedan", "luxury racing automobile").
+   - NEVER include names of protected landmarks, private venues, parks, or architectural works that have strict intellectual property/trademark rights on their names (e.g., do NOT use "Disneyland", "Eiffel Tower", "Empire State Building", "Sydney Opera House", "Taj Mahal", "Louvre Museum", "Burj Khalifa", "Colosseum", "Stonehenge"). Instead, refer to them generically where possible (e.g., "famous amusement park", "historic European wrought iron tower", "art deco skyscraper", "iconic harbor opera house", "ancient white marble mausoleum").
+   - NEVER include names of fictional characters, intellectual franchises, films, games, or books (e.g., "Harry Potter", "Spider-Man", "Mickey Mouse", "Pokémon", "Minecraft"). Use generic visual descriptions (e.g., "wizard characters", "superhero figure", "cartoon mouse", "pocket monsters design", "pixel block game style").
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles:
-1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
-2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
-4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
-   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
+1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
+2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
+3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural human phrasing with strong, specific microstock keywords.
+4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
+   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
    Where:
-   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
-   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
-   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
+   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
+   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
    Examples of this template combination:
-   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
-   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
-   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
-   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
-5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
+   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
+   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
+   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
+5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
+6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
@@ -1300,30 +1307,37 @@ OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE T
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
+   - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
+   - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
+   - NEVER include specific, identifiable car brands/models or manufacturers (e.g., "Porsche 911", "Ferrari", "Tesla Model 3"). Use generic descriptors (e.g., "modern sports car", "electric sedan", "luxury racing automobile").
+   - NEVER include names of protected landmarks, private venues, parks, or architectural works that have strict intellectual property/trademark rights on their names (e.g., do NOT use "Disneyland", "Eiffel Tower", "Empire State Building", "Sydney Opera House", "Taj Mahal", "Louvre Museum", "Burj Khalifa", "Colosseum", "Stonehenge"). Instead, refer to them generically where possible (e.g., "famous amusement park", "historic European wrought iron tower", "art deco skyscraper", "iconic harbor opera house", "ancient white marble mausoleum").
+   - NEVER include names of fictional characters, intellectual franchises, films, games, or books (e.g., "Harry Potter", "Spider-Man", "Mickey Mouse", "Pokémon", "Minecraft"). Use generic visual descriptions (e.g., "wizard characters", "superhero figure", "cartoon mouse", "pocket monsters design", "pixel block game style").
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles:
-1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
-2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
-4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
-   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
+1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
+2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
+3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural phrasing with strong, specific microstock keywords.
+4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
+   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
    Where:
-   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
-   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
-   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
+   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
+   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
    Examples of this template combination:
-   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
-   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
-   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
-   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
-5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
+   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
+   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
+   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
+5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
+6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
@@ -1533,7 +1547,7 @@ export const generateBatchStockMetadata = async (
 3. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
-6. Ensure no IP, brands, trademarks, or names are included.
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
@@ -1551,7 +1565,7 @@ export const generateBatchStockMetadata = async (
 3. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
-6. Ensure no IP, brands, trademarks, or names are included.
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
@@ -1568,7 +1582,7 @@ export const generateBatchStockMetadata = async (
 3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 4. Prioritize highly searchable buyer terms.
 5. Avoid duplicates and keyword stuffing.
-6. Ensure no IP, brands, trademarks, or names are included.
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
@@ -1719,35 +1733,42 @@ OUTPUT FORMAT:
 
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be highly SEO optimized, front-loaded with primary commercial keywords, and have at least 10-15 descriptive words to ensure maximum visibility on stock platforms.
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
+   - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
+   - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
+   - NEVER include specific, identifiable car brands/models or manufacturers (e.g., "Porsche 911", "Ferrari", "Tesla Model 3"). Use generic descriptors (e.g., "modern sports car", "electric sedan", "luxury racing automobile").
+   - NEVER include names of protected landmarks, private venues, parks, or architectural works that have strict intellectual property/trademark rights on their names (e.g., do NOT use "Disneyland", "Eiffel Tower", "Empire State Building", "Sydney Opera House", "Taj Mahal", "Louvre Museum", "Burj Khalifa", "Colosseum", "Stonehenge"). Instead, refer to them generically where possible (e.g., "famous amusement park", "historic European wrought iron tower", "art deco skyscraper", "iconic harbor opera house", "ancient white marble mausoleum").
+   - NEVER include names of fictional characters, intellectual franchises, films, games, or books (e.g., "Harry Potter", "Spider-Man", "Mickey Mouse", "Pokémon", "Minecraft"). Use generic visual descriptions (e.g., "wizard characters", "superhero figure", "cartoon mouse", "pocket monsters design", "pixel block game style").
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles:
-1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
-2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
-4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
-   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
+1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
+2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
+3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural phrasing with strong, specific microstock keywords.
+4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
+   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
    Where:
-   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
-   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
-   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
+   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
+   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
    Examples of this template combination:
-   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
-   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
-   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
-   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
-5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
+   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
+   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
+   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
+5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
+6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
@@ -1844,30 +1865,37 @@ OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE T
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
+   - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
+   - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
+   - NEVER include specific, identifiable car brands/models or manufacturers (e.g., "Porsche 911", "Ferrari", "Tesla Model 3"). Use generic descriptors (e.g., "modern sports car", "electric sedan", "luxury racing automobile").
+   - NEVER include names of protected landmarks, private venues, parks, or architectural works that have strict intellectual property/trademark rights on their names (e.g., do NOT use "Disneyland", "Eiffel Tower", "Empire State Building", "Sydney Opera House", "Taj Mahal", "Louvre Museum", "Burj Khalifa", "Colosseum", "Stonehenge"). Instead, refer to them generically where possible (e.g., "famous amusement park", "historic European wrought iron tower", "art deco skyscraper", "iconic harbor opera house", "ancient white marble mausoleum").
+   - NEVER include names of fictional characters, intellectual franchises, films, games, or books (e.g., "Harry Potter", "Spider-Man", "Mickey Mouse", "Pokémon", "Minecraft"). Use generic visual descriptions (e.g., "wizard characters", "superhero figure", "cartoon mouse", "pocket monsters design", "pixel block game style").
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles:
-1. Title MUST be a natural, descriptive sentence that is easily readable by humans (kalimat deskriptif yang natural dan mudah dibaca manusia). Write perfectly in natural, everyday language (bahasa keseharian) just like a human writing. Keep the phrasing conversational and perfectly natural. DO NOT use robotic sentences, awkward phrasing, or strange synonyms.
-2. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Make the title highly SEO Friendly for microstock platforms. Prioritize high-volume commercial search terms over generic words when describing literal elements (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "sunlight" instead of just "window"). Combine natural phrasing with strong, specific microstock keywords.
-3. COMBINATION OF DESCRIPTION & CONCEPT (KOMBINASI DESKRIPSI + KONSEP): The title MUST be a cohesive template-based blend of physical description of the asset and its deeper artistic concept or symbolic metaphor.
-4. Title MUST strictly follow this exact template/formula structure (do not include any bracket symbols or mathematical plus signs in the final output):
-   [Main Subject (SEO)] + [Key Details Action/Style] + [Context Usage]
+Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
+1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
+2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
+3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural phrasing with strong, specific microstock keywords.
+4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
+   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
    Where:
-   - [Main Subject (SEO)]: The primary physical focus, object, person, or theme using highly optimized, high-volume SEO search terms that microstock buyers look for (e.g., "Young green business seedling growing in dark soil", "Professional executive business leaders team handshake", "Minimalist warm light bulb glowing", "Vibrant cyber neon light path wet asphalt")
-   - [Key Details Action/Style]: The actions being done, specific camera angles, framing, lighting, elements of style, or art design rendering types (e.g., "glowing with warm ambient light resting on table", "shaking hands in modern sunlit corporate boardroom", "captured in high-contrast macro zoom", "gleaming rainy evening in futuristic digital city")
-   - [Context Usage]: The real-world application, industry context, conceptual utility, target mood, or symbolic solution of the asset (e.g., "representing bio-organic hope and sustainable development", "symbolizing corporate trust and partnership success", "evoking creative ideas, brainstorming, and thoughtful isolation", "delivering futuristic cyberpunk retro wave vibes")
+   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
+   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
+   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
    Examples of this template combination:
-   - "Young green business seedling growing in fertile soil in organic garden representing biological hope and sustainable development"
-   - "Professional business leaders shaking hands in sunlit corporate boardroom representing collaborative trust and financial success"
-   - "A single warm glowing light bulb resting on dark rustic wood table cozy night evoking creative idea generation and thoughtful isolation"
-   - "Vibrant cyber neon light path gleaming on wet asphalt futuristic city rainy evening delivering futuristic cyberpunk retro wave vibes"
-5. LENGTH: Do not make it too short. Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
+   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
+   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
+   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
+5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
+6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
 7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
 
@@ -2991,28 +3019,33 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
 }export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa') {
-  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global. Tugas Anda adalah melakukan inspeksi visual yang konsisten dan akurat terhadap gambar stok komersial sebelum proses upload.
+  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global dengan performa ultra-akurat, teliti, dan bermata elang. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar stok komersial sebelum proses upload. Anda harus memeriksa setiap sudut gambar hingga ke level piksel untuk menemukan cacat sekecil apa pun.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
-- STRICT: "Zero Tolerance". Sekecil apapun cacat teknis, artifak AI, atau pelanggaran IP = FAIL.
-- MEDIUM: Cacat minor (seperti sedikit noise atau blur di latar belakang) bisa ditoleransi. Fokus pada pelanggaran IP dan artifak AI di subjek utama.
-- LOOSE: Loloskan selama gambar dapat digunakan secara komersial. Hanya cacat teknis sangat fatal atau pelanggaran merek dagang mencolok yang menyebabkan FAIL.
+- STRICT: "Zero Tolerance" mutlak. Sekecil apapun cacat teknis, sedikit noise, sedikit blur di latar belakang, artifak AI, atau indikasi pelanggaran IP sekecil apa pun = FAIL secara instan (Skor maksimal 0-59).
+- MEDIUM: Cacat teknis minor yang tidak mengganggu subjek utama bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, merek dagang, logo, atau artifak AI merusak pada subjek utama = FAIL secara instan (Skor maksimal 0-65).
+- LOOSE: Loloskan selama gambar dapat digunakan secara komersial tanpa tuntutan hukum. Hanya cacat teknis yang sangat fatal/merusak atau pelanggaran merek dagang mencolok yang menyebabkan FAIL (Skor 0-69).
 
-A. CEK LIST PEMBATALAN (Known Restrictions)
-Berdasarkan kebijakan Adobe Stock, Anda wajib menandai FAIL jika mendeteksi pelanggaran IP, arsitektur yang dilindungi, atau merek dagang yang tanpa izin (contoh: Menara Eiffel malam hari, Apple, Adidas, karakter Disney).
+A. CEK LIST PEMBATALAN (Known Restrictions / Adobe Stock Intellectual Property Refusal Compliance)
+Berdasarkan kebijakan Adobe Stock, Anda wajib mendeteksi dan menandai FAIL jika mendeteksi pelanggaran IP, arsitektur yang dilindungi, atau merek dagang tanpa izin tertulis (Model/Property Release) sesuai dengan 5 kategori utama:
+1. TRADEMARKS, BRANDS, AND LOGOS: Logo perusahaan lama/baru, nama merek, atau trademark apa pun yang terlihat (misal: gigitan Apple, centang Nike, strip Adidas, kancing LEGO, GoPro, ikon media sosial seperti Instagram/Facebook, Google, Coca-Cola, Pepsi, Starbucks, dsb).
+2. PROPRIETARY DESIGNS AND PRODUCTS: Desain bentuk fisik produk yang terpatenkan atau sangat ikonik, bahkan tanpa logo yang terlihat (misal: bentuk fisik bodi iPhone/iPad dengan poni/kamera belakang khas, kepingan LEGO, bodi Vespa, grille 7-slot Jeep, kubus Rubik, sol merah sepatu Louboutin, sepatu Converse Chuck Taylor, botol kontur Coca-Cola, dsb).
+3. PROTECTED LANDMARKS AND ARCHITECTURE: Arsitektur atau monumen berhak cipta (misal: Menara Eiffel malam hari saat lampu menyala, kastil Disneyland/Disney, Sydney Opera House, Burj Al Arab, Burj Khalifa, bagian dalam Grand Central Terminal, Chrysler Building, Flatiron Building, Louvre Pyramid, Atomium Brussels, patung Christ the Redeemer, Hollywood Sign, Taj Mahal dari sudut terproteksi, dsb).
+4. FICTIONAL CHARACTERS & COPYRIGHTED WORK: Karakter fiksi berhak cipta (Mickey Mouse, Pikachu/Pokémon, Marvel/DC heroes, Minecraft, Lego minifigures), screenshot video game, buku/film berhak cipta, lukisan/patung modern, perangko, mata uang kertas/koin secara ilegal.
+5. SPORTS TEAMS & EVENTS: Logo olimpiade (Olympic Rings), trofi Piala Dunia, logo/jersey klub olahraga populer (NBA, NFL, Premier League, La Liga, dsb).
 
 B. KRITERIA EVALUASI TEKNIS & LEGAL
-- IP & Merek Dagang: Cari logo kecil atau nama merek.
-- Kebersihan Konten (Clean Content): Hindari teks buatan, metadata visual, garis koordinat.
-- Kualitas AI (Artifacts): Perhatikan artifak kulit 'plastik', jari berlebih, garis tidak konsisten.
+- IP & Merek Dagang: Cari logo kecil, nama merek, atau desain benda terproteksi pada latar belakang maupun subjek utama.
+- Kebersihan Konten (Clean Content): Hindari teks buatan (gibberish text), metadata visual, tanda air (watermark), timestamp, atau garis koordinat.
+- Kualitas AI (Artifacts): Perhatikan artifak kulit 'plastik', jari berlebih/menyatu, proporsi tubuh tidak konsisten, detail wajah miring, distorsi objek simetris.
 
 STATUS & SKOR (KONSISTENSI MUTLAK):
-- PASS: Gambar komersial yang layak jual sesuai tingkat toleransi. Anda WAJIB memberikan skor antara 75 - 100.
-- FAIL: Gambar ditolak sesuai tingkat toleransi. Anda WAJIB memberikan skor di bawah 70 (0 - 69).
+- PASS: Gambar komersial yang layak jual bebas dari pelanggaran IP/trademark sesuai tingkat toleransi. Anda WAJIB memberikan skor antara 75 - 100.
+- FAIL: Gambar ditolak karena terindikasi melanggaran kekayaan intelektual (IP Refusal) atau cacat teknis berat sesuai tingkat toleransi. Anda WAJIB memberikan skor di bawah 70 (0 - 69).
 Jangan pernah memberikan skor 70+ jika FAIL, dan jangan berikan skor <75 jika PASS, agar pengguna tidak bingung.
 
 PIXEL HEATMAPS (Untuk visualisasi UI):
-- Identifikasi 3-8 titik koordinat (X, Y dalam 0-100) di mana terdapat masalah spesifik (Noise, Focus, Lighting, dll).
+- Identifikasi 3-8 titik koordinat (X, Y dalam 0-100) di mana terdapat masalah spesifik (Noise, Focus, Lighting, IP/Trademark Issue, atau AI Artifact).
 
 ATURAN BAHASA OUTPUT (OUTPUT LANGUAGE RULE):
 Jika parameter bahasa adalah 'Bahasa' / Indonesian, keluarkan nilai feedback dalam Bahasa Indonesia.
@@ -3024,12 +3057,12 @@ Respons Anda WAJIB dalam format JSON:
 {
   "recommendation": "PASS" atau "FAIL",
   "overall_score": [0-100],
-  "legal_status": "Status legal singkat (misal: 'CLEAN' atau 'IP VIOLATION: Merek terdeteksi')",
-  "technical_issues": ["list masalah teknis/isue spesifik"],
+  "legal_status": "Status legal singkat (misal: 'CLEAN' atau 'IP VIOLATION: Terdeteksi produk Jeep grille / logo Apple / karakter Pikachu tanpa rilis resmi')",
+  "technical_issues": ["list masalah teknis/isue spesifik / temuan pelanggaran IP"],
   "strengths": ["list kekuatan visual gambar"],
-  "detailed_feedback": "Penjelasan spesifik dan objektif mengenai alasan penilaian",
+  "detailed_feedback": "Penjelasan spesifik, bernada kurator, objektif mengenai alasan penilaian dan pelanggaran IP/cacat yang ditemukan",
   "heatmaps": [
-    { "type": "noise" | "focus" | "lighting", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail spesifik temuan" }
+    { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail spesifik temuan" }
   ]
 }
 `;
@@ -3048,7 +3081,7 @@ Respons Anda WAJIB dalam format JSON:
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    type: { type: Type.STRING, enum: ["noise", "focus", "lighting"] },
+                    type: { type: Type.STRING, enum: ["noise", "focus", "lighting", "ip_violation", "artifact"] },
                     x: { type: Type.INTEGER },
                     y: { type: Type.INTEGER },
                     intensity: { type: Type.NUMBER },
@@ -3063,7 +3096,7 @@ Respons Anda WAJIB dalam format JSON:
 
   const imagePart = processFrameServer(image);
   
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 

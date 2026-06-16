@@ -10,7 +10,7 @@ interface QualityReport {
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
-  heatmaps?: { type: "noise" | "focus" | "lighting"; x: number; y: number; intensity: number; raw_value: string }[];
+  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact"; x: number; y: number; intensity: number; raw_value: string }[];
 }
 
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -338,6 +338,29 @@ export const ImageQualityCheck: React.FC<{
             </div>
           </div>
 
+          {/* Adobe Stock IP Refusal Notice Card */}
+          <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 rounded-2xl p-5 space-y-3 shadow-sm">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+              <AlertCircle size={14} className="shrink-0" />
+              <h4 className="text-[10px] font-black tracking-wider uppercase">
+                {t.language === 'Bahasa' ? 'PATUH REKAYASA IP ADOBE' : 'ADOBE IP REFUSAL COMPLIANCE'}
+              </h4>
+            </div>
+            <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+              {t.language === 'Bahasa' 
+                ? 'Audit memindai pelanggaran logo merek, merk dagang, desain terproteksi (grille Jeep, bodi iPhone, LEGO), arsitektur terproteksi (Eiffel malam, Disney), karakter fiksi, serta klub olahraga.'
+                : 'Audit scans for brand logos, trademarks, proprietary designs (Jeep grille, iPhone body shape, LEGO), protected architecture (Eiffel nighttime lights, Disney), fictional characters, and sports teams.'
+              }
+            </p>
+            <div className="flex flex-wrap gap-1 pt-1.5 border-t border-slate-100 dark:border-white/5">
+              {['Brands', 'Designs', 'Landmarks', 'Characters'].map((tag) => (
+                <span key={tag} className="text-[8px] font-bold uppercase text-amber-600 dark:text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+
           {/* Upload Hub */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-2 shadow-2xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
             <div className="p-4 border-b border-slate-100 dark:border-white/5">
@@ -508,12 +531,16 @@ export const ImageQualityCheck: React.FC<{
                                   const colors = {
                                     noise: 'bg-rose-500',
                                     focus: 'bg-amber-500',
-                                    lighting: 'bg-violet-500'
+                                    lighting: 'bg-violet-500',
+                                    ip_violation: 'bg-red-500',
+                                    artifact: 'bg-orange-500'
                                   };
                                   const labels = {
-                                    noise: 'Grain/Noise',
-                                    focus: 'Soft Focus',
-                                    lighting: 'Lighting Issue'
+                                    noise: t.language === 'Bahasa' ? 'Grain & Noise' : 'Grain & Noise',
+                                    focus: t.language === 'Bahasa' ? 'Fokus Kurang' : 'Soft Focus',
+                                    lighting: t.language === 'Bahasa' ? 'Masalah Cahaya' : 'Lighting Issue',
+                                    ip_violation: t.language === 'Bahasa' ? 'Pelanggaran IP' : 'IP Violation',
+                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact'
                                   };
                                   return (
                                     <motion.div
