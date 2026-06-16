@@ -70,6 +70,33 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
   );
 };
 
+export const getNearDuplicates = (kws: string[]): string[] => {
+  const normalized = kws.map(k => k.toLowerCase().trim());
+  const toRemove = new Set<string>();
+  
+  for (let i = 0; i < normalized.length; i++) {
+      const a = normalized[i];
+      if (!a) continue;
+      for (let j = i + 1; j < normalized.length; j++) {
+          const b = normalized[j];
+          if (!b) continue;
+          if (a === b) {
+              toRemove.add(kws[j]);
+              continue;
+          }
+          
+          // Plural/singular stemming approximations
+          if (a === b + 's' || b === a + 's' || 
+              a === b + 'es' || b === a + 'es' ||
+              a.replace(/ies$/, 'y') === b || b.replace(/ies$/, 'y') === a) {
+              if (a.length > b.length) toRemove.add(kws[i]);
+              else toRemove.add(kws[j]);
+          }
+      }
+  }
+  return Array.from(toRemove);
+};
+
 interface KeywordListProps {
   label: string;
   keywords: string[];
@@ -78,6 +105,8 @@ interface KeywordListProps {
   title?: string;
   description?: string;
   aiOptions?: any;
+  keywordCount?: number | string;
+  hideIndividualFix?: boolean;
 }
 
 const ProjectKeywordList: React.FC<KeywordListProps> = ({
@@ -87,7 +116,9 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   onChange,
   title,
   description,
-  aiOptions
+  aiOptions,
+  keywordCount,
+  hideIndividualFix = false
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
@@ -95,34 +126,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   const [suggestError, setSuggestError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
 
-  const getNearDuplicates = React.useCallback((kws: string[]) => {
-    const normalized = kws.map(k => k.toLowerCase().trim());
-    const toRemove = new Set<string>();
-    
-    for (let i = 0; i < normalized.length; i++) {
-        const a = normalized[i];
-        if (!a) continue;
-        for (let j = i + 1; j < normalized.length; j++) {
-            const b = normalized[j];
-            if (!b) continue;
-            if (a === b) {
-                toRemove.add(kws[j]);
-                continue;
-            }
-            
-            // Plural/singular stemming approximations
-            if (a === b + 's' || b === a + 's' || 
-                a === b + 'es' || b === a + 'es' ||
-                a.replace(/ies$/, 'y') === b || b.replace(/ies$/, 'y') === a) {
-                if (a.length > b.length) toRemove.add(kws[i]);
-                else toRemove.add(kws[j]);
-            }
-        }
-    }
-    return Array.from(toRemove);
-  }, []);
-
-  const nearDuplicates = React.useMemo(() => getNearDuplicates(keywords), [keywords, getNearDuplicates]);
+  const nearDuplicates = React.useMemo(() => getNearDuplicates(keywords), [keywords]);
 
   React.useEffect(() => {
     const seen = new Set<string>();
@@ -277,7 +281,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           </button>
         </div>
       </div>
-      {nearDuplicates.length > 0 && (
+      {nearDuplicates.length > 0 && !hideIndividualFix && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-600 dark:text-rose-400 text-[10px] mb-2 font-bold gap-2">
           <span className="truncate" title={nearDuplicates.join(', ')}>
             ⚠️ Near-duplicates detected (e.g. {nearDuplicates.slice(0, 3).join(', ')})
@@ -285,21 +289,36 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           <div className="flex space-x-2 shrink-0">
             <button 
               onClick={async () => {
+                const targetCount = Number(keywordCount) || 40;
                 const initialCleaned = keywords.filter(k => !nearDuplicates.includes(k));
+                
+                if (initialCleaned.length >= targetCount) {
+                  onChange(initialCleaned.slice(0, targetCount));
+                  return;
+                }
+                
                 if (!title) {
                   onChange(initialCleaned);
                   return;
                 }
+                
                 setIsSuggesting(true);
                 try {
                   const res = await fetch('/api/smart-suggest-keywords', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, description, existingKeywords: initialCleaned, requestCount: nearDuplicates.length })
+                    headers: getHeaders(aiOptions),
+                    body: JSON.stringify({ 
+                      title, 
+                      description, 
+                      existingKeywords: initialCleaned, 
+                      requestCount: targetCount - initialCleaned.length 
+                    })
                   });
                   if (!res.ok) throw new Error();
                   const data = await res.json();
-                  onChange([...initialCleaned, ...(data.keywords || [])]);
+                  const suggested = data.keywords || [];
+                  const merged = [...initialCleaned, ...suggested].slice(0, targetCount);
+                  onChange(merged);
                 } catch (e) {
                   onChange(initialCleaned);
                 } finally {
@@ -366,6 +385,7 @@ interface ReviewQueueProps {
   isLoading?: boolean;
   progressInfo?: ProgressInfo | null;
   aiOptions?: any;
+  keywordCount?: number | string;
 }
 
 export const ReviewQueue: React.FC<ReviewQueueProps> = ({
@@ -385,9 +405,66 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   canDownload,
   isLoading,
   progressInfo,
-  aiOptions
+  aiOptions,
+  keywordCount
 }) => {
   const hasFiles = files.length > 0;
+  const [isFixingBatch, setIsFixingBatch] = React.useState(false);
+
+  const filesWithDuplicates = React.useMemo(() => {
+    return files.filter(f => f.title && getNearDuplicates(f.keywords).length > 0);
+  }, [files]);
+
+  const handleFixBatch = async () => {
+    if (filesWithDuplicates.length === 0) return;
+    setIsFixingBatch(true);
+    try {
+      const targetCount = Number(keywordCount) || 40;
+      const promises = filesWithDuplicates.map(async (file) => {
+        const dups = getNearDuplicates(file.keywords);
+        const initialCleaned = file.keywords.filter(k => !dups.includes(k));
+        
+        if (initialCleaned.length >= targetCount) {
+          return { id: file.id, keywords: initialCleaned.slice(0, targetCount) };
+        }
+        
+        try {
+          const res = await fetch('/api/smart-suggest-keywords', {
+            method: 'POST',
+            headers: getHeaders(aiOptions),
+            body: JSON.stringify({
+              title: file.title,
+              description: file.description || '',
+              existingKeywords: initialCleaned,
+              requestCount: targetCount - initialCleaned.length
+            })
+          });
+          if (!res.ok) {
+            return { id: file.id, keywords: initialCleaned };
+          }
+          const data = await res.json();
+          const suggested = data.keywords || [];
+          const merged = [...initialCleaned, ...suggested].slice(0, targetCount);
+          return { id: file.id, keywords: merged };
+        } catch (e) {
+          console.error("Failed to suggest of file", file.id, e);
+          return { id: file.id, keywords: initialCleaned };
+        }
+      });
+      const results = await Promise.all(promises);
+      updateFiles(prev => prev.map(f => {
+        const r = results.find(res => res.id === f.id);
+        if (r) {
+          return { ...f, keywords: r.keywords };
+        }
+        return f;
+      }));
+    } catch (err) {
+      console.error("Batch fix error:", err);
+    } finally {
+      setIsFixingBatch(false);
+    }
+  };
 
   const LoadingSkeleton = () => (
     <div className="space-y-6">
@@ -461,6 +538,36 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
               <h4 className="text-emerald-700 dark:text-emerald-400 font-extrabold text-xs sm:text-sm uppercase">Processing Complete!</h4>
               <p className="text-slate-400 text-xs font-medium mt-0.5">{successfulFilesCount} files ready for compiled download.</p>
             </div>
+          </div>
+        )}
+
+        {files.length > 1 && filesWithDuplicates.length > 0 && (
+          <div className="mb-6 p-4 bg-rose-500/5 border border-rose-500/20 rounded-[1.5rem] flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3 duration-300">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wilder flex items-center gap-1.5">
+                ⚠️ Duplikat / Kata Kunci Tidak Sesuai ({filesWithDuplicates.length} file)
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-bold">
+                Ada beberapa file dengan kata kunci duplikat atau jumlah tidak sesuai target ({Number(keywordCount) || 40} kata kunci). Perbaiki semua file sekaligus!
+              </p>
+            </div>
+            <button
+              onClick={handleFixBatch}
+              disabled={isFixingBatch}
+              className="px-4 py-2 bg-rose-500 hover:bg-rose-600 font-extrabold text-white text-[10px] uppercase rounded-[1.5rem] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-rose-500/10 shrink-0"
+            >
+              {isFixingBatch ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Fixing Batch...</span>
+                </>
+              ) : (
+                <span>⚙️ Perbaiki Semua Files ({filesWithDuplicates.length})</span>
+              )}
+            </button>
           </div>
         )}
 
@@ -677,6 +784,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         themeColor={activeTool === ToolType.IMAGE ? 'blue' : activeTool === ToolType.VIDEO ? 'purple' : 'emerald'} 
                         onChange={(newKeywords) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, keywords: newKeywords} : f))} 
                         aiOptions={aiOptions}
+                        keywordCount={keywordCount}
+                        hideIndividualFix={files.length > 1}
                       />
 
                       <div className="space-y-1 px-0.5">

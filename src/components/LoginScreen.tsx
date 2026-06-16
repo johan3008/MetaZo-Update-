@@ -8,6 +8,7 @@ import { signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
 import { auth } from '../firebase';
 import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
 import { AppLanguage } from '../../constants';
+import { Meteors } from './Meteors';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
@@ -118,6 +119,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         
         {/* Grid Overlay Line Pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] dark:bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)]" />
+        
+        {/* Shooting stars background effect */}
+        <Meteors number={12} />
       </div>
 
       {/* 2. HEADER BAR (Control center) */}

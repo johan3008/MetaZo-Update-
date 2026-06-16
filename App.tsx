@@ -32,6 +32,7 @@ import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query,
 import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { LoginScreen } from './src/components/LoginScreen';
+import { Meteors } from './src/components/Meteors';
 
 // --- IndexedDB Helper for Auto-Resume ---
 const DB_NAME = 'EPS_Batch_DB';
@@ -948,6 +949,36 @@ const extractVideoHybrid = async (file: File): Promise<string[]> => {
     }
 };
 
+const toolToPath: Record<ToolType, string> = {
+  [ToolType.DASHBOARD]: '/Dashboard',
+  [ToolType.IMAGE]: '/GenMetadataGambar',
+  [ToolType.VIDEO]: '/GenMetadataVideo',
+  [ToolType.VECTOR]: '/GenMetadataVektor',
+  [ToolType.PROMPT_GEN]: '/SeoTextPrompt',
+  [ToolType.PROMPT_IMAGE]: '/ImageToPrompt',
+  [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
+  [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
+  [ToolType.VECTOR_EPS]: '/EpsConverter',
+  [ToolType.CALENDAR_GEN]: '/NicheCalendar'
+};
+
+const getToolFromPath = (path: string): ToolType | null => {
+  const normalized = path.toLowerCase().replace(/^\/+/g, '').trim();
+  switch (normalized) {
+    case 'dashboard': return ToolType.DASHBOARD;
+    case 'genmetadatagambar': return ToolType.IMAGE;
+    case 'genmetadatavideo': return ToolType.VIDEO;
+    case 'genmetadatavektor': return ToolType.VECTOR;
+    case 'seotextprompt': return ToolType.PROMPT_GEN;
+    case 'imagetoprompt': return ToolType.PROMPT_IMAGE;
+    case 'videokeywordanalyzer': return ToolType.PROMPT_VIDEO;
+    case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
+    case 'epsconverter': return ToolType.VECTOR_EPS;
+    case 'nichecalendar': return ToolType.CALENDAR_GEN;
+    default: return null;
+  }
+};
+
 const toSentenceCase = (text: string) => {
     if (!text) return text;
     const trimmed = text.trim();
@@ -962,7 +993,11 @@ const App: React.FC = () => {
     } catch (e) {}
     return 'light';
   });
-  const [activeTool, setActiveTool] = useState<ToolType>(ToolType.DASHBOARD);
+  const [activeTool, setActiveTool] = useState<ToolType>(() => {
+    const currentPath = window.location.pathname;
+    const matchingTool = getToolFromPath(currentPath);
+    return matchingTool || ToolType.DASHBOARD;
+  });
   const [prefilledSubject, setPrefilledSubject] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const filesRef = useRef<FileItem[]>([]);
@@ -1341,11 +1376,73 @@ const App: React.FC = () => {
     }
   }, [isMzLicensed, trialDaysLeft]);
 
-  // Wrapped activeTool setter to enforce trial constraints
+  // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
-    // Free Trial has unlocked all tools ("Semua fiturnya kebuka")
     setActiveTool(tool);
+    const path = toolToPath[tool] || '/Dashboard';
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+    }
   };
+
+  // Sync route path state, auth redirection, and listen for back/forward navigation popstate events
+  useEffect(() => {
+    if (isCheckingAuth) return;
+
+    const currentPath = window.location.pathname;
+
+    if (!user) {
+      if (currentPath !== '/Login') {
+        const tool = getToolFromPath(currentPath);
+        if (tool && tool !== ToolType.DASHBOARD) {
+          localStorage.setItem('mz_redirect_after_login', currentPath);
+        }
+        window.history.replaceState(null, '', '/Login');
+      }
+    } else {
+      if (currentPath === '/Login' || currentPath === '/' || currentPath === '') {
+        const savedRedirect = localStorage.getItem('mz_redirect_after_login');
+        localStorage.removeItem('mz_redirect_after_login');
+        const redirectTool = savedRedirect ? getToolFromPath(savedRedirect) : null;
+        
+        if (redirectTool) {
+          setActiveTool(redirectTool);
+          window.history.replaceState(null, '', toolToPath[redirectTool]);
+        } else {
+          setActiveTool(ToolType.DASHBOARD);
+          window.history.replaceState(null, '', '/Dashboard');
+        }
+      } else {
+        const tool = getToolFromPath(currentPath);
+        if (tool && tool !== activeTool) {
+          setActiveTool(tool);
+        }
+      }
+    }
+
+    const handlePopState = () => {
+      if (!user) {
+        if (window.location.pathname !== '/Login') {
+          window.history.replaceState(null, '', '/Login');
+        }
+        return;
+      }
+      const tool = getToolFromPath(window.location.pathname);
+      if (tool) {
+        setActiveTool(tool);
+      } else {
+        setActiveTool(ToolType.DASHBOARD);
+        if (window.location.pathname !== '/Dashboard') {
+          window.history.replaceState(null, '', '/Dashboard');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [activeTool, user, isCheckingAuth]);
 
   useEffect(() => {
     const k = mzLicenseKey.trim().toUpperCase();
@@ -2805,8 +2902,18 @@ const App: React.FC = () => {
   const isAllFinished = hasFiles && !isAnythingGenerating && files.every(f => f.title || f.error);
 
   return (
-    <div className={`min-h-screen flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
-      <div className="flex flex-1 w-full bg-transparent overflow-hidden relative">
+    <div className={`min-h-screen flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden`}>
+      {/* Immersive background decoration: Animated glowing mesh blobs & high-fidelity alignment grid */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
+        <div className="absolute top-[8%] left-[4%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 dark:bg-purple-900/15 blur-[120px] animate-blob-1" />
+        <div className="absolute bottom-[12%] right-[6%] w-[600px] h-[600px] rounded-full bg-emerald-400/8 dark:bg-pink-950/10 blur-[140px] animate-blob-2" />
+        <div className="absolute top-[40%] left-[30%] w-[450px] h-[450px] rounded-full bg-rose-400/8 dark:bg-blue-950/15 blur-[130px] animate-blob-3" />
+        <div className="absolute inset-0 grid-bg opacity-70"></div>
+        {/* Custom luxury shooting star effect */}
+        <Meteors number={16} />
+      </div>
+
+      <div className="flex flex-1 w-full bg-transparent overflow-hidden relative z-10">
       {/* Sidebar Navigation */}
       <Sidebar 
         activeTool={activeTool} 
@@ -3121,6 +3228,7 @@ const App: React.FC = () => {
                 canDownload={canDownload}
                 isLoading={isLoading}
                 progressInfo={progressInfo}
+                keywordCount={keywordCount}
                 aiOptions={{
                   provider: selectedProvider,
                   geminiKeys: geminiKeysList,
