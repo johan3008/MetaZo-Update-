@@ -72,6 +72,32 @@
         "lastMessageTime": { "type": "string", "format": "date-time", "description": "Latest update timestamp of room" }
       },
       "required": ["user1", "user2"]
+    },
+    "PromoCode": {
+      "title": "PromoCode",
+      "description": "Marketing promotion and discount vouchers",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Voucher identifier such as PROMO50" },
+        "type": { "type": "string", "enum": ["free_premium", "discount"], "description": "Type of benefits offered" },
+        "value": { "type": "number", "description": "Discount percent number or days counter for premium" },
+        "maxUses": { "type": "number", "description": "Highest allows redeem count" },
+        "usedCount": { "type": "number", "description": "Counter indicating total successfully claimed events" },
+        "description": { "type": "string", "description": "Marketing details, notes, or titles" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Moment of creation" }
+      },
+      "required": ["code", "type", "value", "maxUses", "usedCount"]
+    },
+    "FeedbackMessage": {
+      "title": "FeedbackMessage",
+      "description": "User suggestions and troubleshooting requests",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "description": "The description written by the user" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the feedback was sent" },
+        "userEmail": { "type": "string", "description": "Email address of the sender" }
+      },
+      "required": ["message", "timestamp", "userEmail"]
     }
   },
   "firestore": {
@@ -98,6 +124,14 @@
     "/chats/{chatId}/messages/{messageId}": {
       "schema": "ChatMessage",
       "description": "Specific messages inside a direct peer-to-peer chat thread."
+    },
+    "/promos/{promoId}": {
+      "schema": "PromoCode",
+      "description": "Promo codes created by reseller/admin for discounts or free premium access."
+    },
+    "/feedback/{feedbackId}": {
+      "schema": "FeedbackMessage",
+      "description": "User feedback reports and suggestions."
     }
   }
 }

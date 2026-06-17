@@ -1192,25 +1192,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
-1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
-2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
-3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural human phrasing with strong, specific microstock keywords.
-4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
-   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
-   Where:
-   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
-   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
-   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
-   Examples of this template combination:
-   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
-   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
-   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
-   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
-5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+Rules for Titles:
+- Use clear natural English.
+- Length between 60-120 characters.
+- Describe only visible elements in the image.
+- Put the main subject at the beginning of the title.
+- Include important commercial keywords naturally.
+- Do not use keyword stuffing.
+- Do not use brand names, trademarks, company names, or copyrighted terms.
+- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
+- Do not use articles unless necessary (a, an, the).
+- Focus on subject + action + environment + concept.
+- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Use sentence case.
+- Output only one title.
+- Do not include explanations, labels, quotation marks, or numbering.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -1321,25 +1317,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
-1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
-2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
-3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural phrasing with strong, specific microstock keywords.
-4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
-   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
-   Where:
-   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
-   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
-   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
-   Examples of this template combination:
-   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
-   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
-   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
-   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
-5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+Rules for Titles:
+- Use clear natural English.
+- Length between 60-120 characters.
+- Describe only visible elements in the image.
+- Put the main subject at the beginning of the title.
+- Include important commercial keywords naturally.
+- Do not use keyword stuffing.
+- Do not use brand names, trademarks, company names, or copyrighted terms.
+- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
+- Do not use articles unless necessary (a, an, the).
+- Focus on subject + action + environment + concept.
+- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Use sentence case.
+- Output only one title.
+- Do not include explanations, labels, quotation marks, or numbering.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -1752,25 +1744,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
-1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
-2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
-3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural phrasing with strong, specific microstock keywords.
-4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
-   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
-   Where:
-   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
-   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
-   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
-   Examples of this template combination:
-   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
-   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
-   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
-   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
-5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+Rules for Titles:
+- Use clear natural English.
+- Length between 60-120 characters.
+- Describe only visible elements in the image.
+- Put the main subject at the beginning of the title.
+- Include important commercial keywords naturally.
+- Do not use keyword stuffing.
+- Do not use brand names, trademarks, company names, or copyrighted terms.
+- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
+- Do not use articles unless necessary (a, an, the).
+- Focus on subject + action + environment + concept.
+- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Use sentence case.
+- Output only one title.
+- Do not include explanations, labels, quotation marks, or numbering.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -1879,25 +1867,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
-Rules for Titles (MUST BE HIGHLY SEO-FRIENDLY & PORTAL-OPTIMIZED):
-1. MANDATORY KEYWORD PLACEMENT: Place the primary, highest-value, most-searched commercial keywords at the very beginning of the title (the first 3 to 5 words). This is critical for search engine visibility (SEO priority).
-2. NO ABSTRACT FLUFF OR METAPHORS: Never use abstract, poetic, or flowery filler phrases like "representing...", "symbolizing...", "evoking...", "a metaphor for...", "delivering ... vibes", or "restoring feelings of...". Adobe Stock reviewers and buyers reject or ignore these. Instead of abstract metaphors, use direct, searchable, and commercial concepts/themes (e.g., "for business concept", "financial growth background", "wellness and home decoration", "creative design background").
-3. SEO-FRIENDLY & OPTIMIZED VOCABULARY: Prioritize high-volume commercial keywords over generic words (e.g., use "abandoned building" instead of "room", "worn work glove" instead of "single work glove", "warm sunlight" instead of "window"). Combine natural phrasing with strong, specific microstock keywords.
-4. Title MUST strictly follow this exact template/formula structure (no brackets or plus signs in final output):
-   [Primary Subject with High-Volume Keywords (First 3-5 Words)] + [Key Actions, Styling, Style Render, & Setting] + [Commercial Application / Practical Concept]
-   Where:
-   - [Primary Subject with High-Volume Keywords (First 3-5 Words)]: e.g., "Young green seedling growing", "Business partners shaking hands", "Glowing light bulb on table", "Cyberpunk neon lights on road"
-   - [Key Actions, Styling, Style Render, & Setting]: e.g., "in dark organic garden soil outdoors", "in modern sunlit corporate office boardroom", "in cozy dark room with warm light", "on wet asphalt street in futuristic night city scene"
-   - [Commercial Application / Practical Concept]: e.g., "for agriculture and growth concept", "for corporate trust and negotiation background", "for creative brainstorm and idea generation concept", "for retro sci-fi video game background"
-   Examples of this template combination:
-   - "Young green seedling growing in dark organic garden soil for agriculture and development concept"
-   - "Business partners handshake in modern sunlit office boardroom for corporate trust and deal concept"
-   - "Glowing vintage light bulb on dark rustic wood table for creative brainstorm and idea concept"
-   - "Cyberpunk neon lights on wet asphalt road in futuristic night city scene for tech background"
-5. LENGTH: Make it highly descriptive and rich, but strictly limit the total length to a MAXIMUM of 100 characters.
-6. Crucial: The title MUST NOT start with general terms like "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
-7. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-8. DO NOT treat the title like a list of keywords. No commas separating words. No periods at the end.
+Rules for Titles:
+- Use clear natural English.
+- Length between 60-120 characters.
+- Describe only visible elements in the image.
+- Put the main subject at the beginning of the title.
+- Include important commercial keywords naturally.
+- Do not use keyword stuffing.
+- Do not use brand names, trademarks, company names, or copyrighted terms.
+- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
+- Do not use articles unless necessary (a, an, the).
+- Focus on subject + action + environment + concept.
+- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Use sentence case.
+- Output only one title.
+- Do not include explanations, labels, quotation marks, or numbering.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.

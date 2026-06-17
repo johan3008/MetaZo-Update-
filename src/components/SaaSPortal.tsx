@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
-  Trash2, RefreshCw, Download, Mail, Send, Search
+  Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -75,6 +75,45 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [tempPayInfo, setTempPayInfo] = useState(() => localStorage.getItem('mz_reseller_pay_info') || 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Dynamic Subscription Pricing State Definitions
+  const [price30Days, setPrice30Days] = useState(() => localStorage.getItem('mz_price_30_days') || 'Rp 50.000');
+  const [price30DaysUSD, setPrice30DaysUSD] = useState(() => localStorage.getItem('mz_price_30_days_usd') || '$2');
+  const [priceUnlimited, setPriceUnlimited] = useState(() => localStorage.getItem('mz_price_unlimited') || 'Rp 250.000');
+  const [priceUnlimitedUSD, setPriceUnlimitedUSD] = useState(() => localStorage.getItem('mz_price_unlimited_usd') || '$14');
+  
+  const [tempPrice30Days, setTempPrice30Days] = useState(() => localStorage.getItem('mz_price_30_days') || 'Rp 50.000');
+  const [tempPrice30DaysUSD, setTempPrice30DaysUSD] = useState(() => localStorage.getItem('mz_price_30_days_usd') || '$2');
+  const [tempPriceUnlimited, setTempPriceUnlimited] = useState(() => localStorage.getItem('mz_price_unlimited') || 'Rp 250.000');
+  const [tempPriceUnlimitedUSD, setTempPriceUnlimitedUSD] = useState(() => localStorage.getItem('mz_price_unlimited_usd') || '$14');
+
+  // Promo Code States
+  interface PromoCode {
+    id: string;
+    code: string;
+    type: 'free_premium' | 'discount';
+    value: number;
+    maxUses: number;
+    usedCount: number;
+    description: string;
+    createdAt?: string;
+  }
+  const [promos, setPromos] = useState<PromoCode[]>([]);
+  const [isPromosLoading, setIsPromosLoading] = useState(false);
+  const [newPromoCode, setNewPromoCode] = useState('');
+  const [newPromoType, setNewPromoType] = useState<'free_premium' | 'discount'>('free_premium');
+  const [newPromoValue, setNewPromoValue] = useState(30);
+  const [newPromoMaxUses, setNewPromoMaxUses] = useState(100);
+  const [newPromoDesc, setNewPromoDesc] = useState('');
+  const [promoSuccessMsg, setPromoSuccessMsg] = useState('');
+  const [promoErrorMsg, setPromoErrorMsg] = useState('');
+
+  // Applied User Promo Code States
+  const [appliedPromoInput, setAppliedPromoInput] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [promoApplySuccess, setPromoApplySuccess] = useState('');
+  const [promoApplyError, setPromoApplyError] = useState('');
+  const [activePromo, setActivePromo] = useState<PromoCode | null>(null);
+
   // Reseller Landing Gateway State
   const [landingPasscode, setLandingPasscode] = useState('');
   const [landingError, setLandingError] = useState('');
@@ -140,7 +179,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const ADMIN_EMAILS = ['johanchrismant4@gmail.com'];
   const isAdminAccount = userEmail ? ADMIN_EMAILS.includes(userEmail) : false;
   const showResellerHub = isResellerUnlocked || isAdminAccount;
-  const [portalTab, setPortalTab] = useState<'branding' | 'keys' | 'audit'>('branding');
+  const [portalTab, setPortalTab] = useState<'branding' | 'keys' | 'promo' | 'audit'>('branding');
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   // ============================
 
@@ -176,9 +215,96 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
   };
 
+  const fetchPromosFromDb = async () => {
+    setIsPromosLoading(true);
+    setPromoErrorMsg('');
+    try {
+      const querySnapshot = await getDocs(collection(db, 'promos'));
+      const list: PromoCode[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          code: data.code || docSnap.id,
+          type: data.type || 'free_premium',
+          value: Number(data.value || 0),
+          maxUses: Number(data.maxUses || 0),
+          usedCount: Number(data.usedCount || 0),
+          description: data.description || '',
+          createdAt: data.createdAt || ''
+        });
+      });
+      setPromos(list);
+    } catch (e: any) {
+      console.error("Error loading promo codes:", e);
+      setPromoErrorMsg('Gagal mengambil daftar promo.');
+    } finally {
+      setIsPromosLoading(false);
+    }
+  };
+
+  const handleCreatePromoCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPromoErrorMsg('');
+    setPromoSuccessMsg('');
+
+    const code = newPromoCode.trim().toUpperCase();
+    if (!code) {
+      setPromoErrorMsg('Kode promo tidak boleh kosong.');
+      return;
+    }
+
+    try {
+      setIsPromosLoading(true);
+      const promoObj = {
+        code,
+        type: newPromoType,
+        value: Number(newPromoValue),
+        maxUses: Number(newPromoMaxUses),
+        usedCount: 0,
+        description: newPromoDesc.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      // save to Firestore
+      await setDoc(doc(db, 'promos', code), promoObj);
+      setPromoSuccessMsg(`Kode promo ${code} berhasil dibuat!`);
+      
+      // Reset form
+      setNewPromoCode('');
+      setNewPromoDesc('');
+      
+      // reload directory
+      await fetchPromosFromDb();
+    } catch (e: any) {
+      console.error("Failed to create promo:", e);
+      setPromoErrorMsg('Gagal membuat kode promo.');
+    } finally {
+      setIsPromosLoading(false);
+    }
+  };
+
+  const handleDeletePromoCode = async (promoId: string) => {
+    if (!window.confirm(`Hapus kode promo ${promoId}?`)) return;
+    setPromoErrorMsg('');
+    setPromoSuccessMsg('');
+    try {
+      setIsPromosLoading(true);
+      await deleteDoc(doc(db, 'promos', promoId));
+      setPromoSuccessMsg('Kode promo berhasil dihapus.');
+      await fetchPromosFromDb();
+    } catch (e: any) {
+      console.error("Failed to delete promo:", e);
+      setPromoErrorMsg('Gagal menghapus kode promo.');
+    } finally {
+      setIsPromosLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!onlyModal) {
       fetchBackendKeys();
+      fetchPromosFromDb();
     }
   }, [onlyModal]);
 
@@ -322,6 +448,37 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     setTempLicenseSeed(licenseSeed);
   }, [appName, appSubtitle, whatsAppLink, pricingTier, licenseSeed]);
 
+  useEffect(() => {
+    const fetchBrandingPrices = async () => {
+      try {
+        const docRef = doc(db, 'branding', 'main');
+        const dSnap = await getDoc(docRef);
+        if (dSnap.exists()) {
+          const data = dSnap.data();
+          if (data.price30Days) {
+            setPrice30Days(data.price30Days);
+            setTempPrice30Days(data.price30Days);
+          }
+          if (data.price30DaysUSD) {
+            setPrice30DaysUSD(data.price30DaysUSD);
+            setTempPrice30DaysUSD(data.price30DaysUSD);
+          }
+          if (data.priceUnlimited) {
+            setPriceUnlimited(data.priceUnlimited);
+            setTempPriceUnlimited(data.priceUnlimited);
+          }
+          if (data.priceUnlimitedUSD) {
+            setPriceUnlimitedUSD(data.priceUnlimitedUSD);
+            setTempPriceUnlimitedUSD(data.priceUnlimitedUSD);
+          }
+        }
+      } catch (err) {
+        console.warn('Silent pricing load fail:', err);
+      }
+    };
+    fetchBrandingPrices();
+  }, []);
+
   const handleSaveResellerSettings = async () => {
     setIsKeysLoading(true);
     try {
@@ -332,6 +489,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         pricingTier: tempPricingTier.trim() || 'Rp 149.000 / Bulan',
         licenseSeed: tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026',
         payInfo: tempPayInfo.trim(),
+        price30Days: tempPrice30Days.trim() || 'Rp 50.000',
+        price30DaysUSD: tempPrice30DaysUSD.trim() || '$2',
+        priceUnlimited: tempPriceUnlimited.trim() || 'Rp 250.000',
+        priceUnlimitedUSD: tempPriceUnlimitedUSD.trim() || '$14',
         updatedAt: new Date().toISOString()
       });
 
@@ -341,12 +502,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       localStorage.setItem('mz_reseller_price', tempPricingTier.trim() || 'Rp 149.000 / Bulan');
       localStorage.setItem('mz_reseller_seed', tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026');
       localStorage.setItem('mz_reseller_pay_info', tempPayInfo.trim());
+      localStorage.setItem('mz_price_30_days', tempPrice30Days.trim() || 'Rp 50.000');
+      localStorage.setItem('mz_price_30_days_usd', tempPrice30DaysUSD.trim() || '$2');
+      localStorage.setItem('mz_price_unlimited', tempPriceUnlimited.trim() || 'Rp 250.000');
+      localStorage.setItem('mz_price_unlimited_usd', tempPriceUnlimitedUSD.trim() || '$14');
 
       setAppName(tempAppName.trim() || 'MetaZo PRO');
       setAppSubtitle(tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant');
       setWhatsAppLink(tempWhatsApp.trim() || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
       setPricingTier(tempPricingTier.trim() || 'Rp 149.000 / Bulan');
       setLicenseSeed(tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026');
+      setPrice30Days(tempPrice30Days.trim() || 'Rp 50.000');
+      setPrice30DaysUSD(tempPrice30DaysUSD.trim() || '$2');
+      setPriceUnlimited(tempPriceUnlimited.trim() || 'Rp 250.000');
+      setPriceUnlimitedUSD(tempPriceUnlimitedUSD.trim() || '$14');
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -370,6 +539,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           pricingTier: 'Rp 149.000 / Bulan',
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
           payInfo: 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant',
+          price30Days: 'Rp 50.000',
+          price30DaysUSD: '$2',
+          priceUnlimited: 'Rp 250.000',
+          priceUnlimitedUSD: '$14',
           updatedAt: new Date().toISOString()
         });
 
@@ -379,6 +552,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         localStorage.removeItem('mz_reseller_price');
         localStorage.removeItem('mz_reseller_seed');
         localStorage.removeItem('mz_reseller_pay_info');
+        localStorage.removeItem('mz_price_30_days');
+        localStorage.removeItem('mz_price_30_days_usd');
+        localStorage.removeItem('mz_price_unlimited');
+        localStorage.removeItem('mz_price_unlimited_usd');
 
         setAppName('MetaZo PRO');
         setAppSubtitle('AI-Powered Metadata Assistant');
@@ -386,6 +563,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         setPricingTier('Rp 149.000 / Bulan');
         setLicenseSeed('MZPRO-COMMERCIAL-2026');
         setTempPayInfo('Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant');
+        setPrice30Days('Rp 50.000');
+        setPrice30DaysUSD('$2');
+        setPriceUnlimited('Rp 250.000');
+        setPriceUnlimitedUSD('$14');
+        setTempPrice30Days('Rp 50.000');
+        setTempPrice30DaysUSD('$2');
+        setTempPriceUnlimited('Rp 250.000');
+        setTempPriceUnlimitedUSD('$14');
 
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 1500);
@@ -408,6 +593,141 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
     if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
     return false;
+  };
+
+  // Helper to calculate discounted pricing text dynamically
+  const getDiscountedPrice = (priceStr: string, discountPercent: number) => {
+    if (!discountPercent || discountPercent <= 0) return priceStr;
+    
+    // Extract numbers from the price string
+    const cleanNumStr = priceStr.replace(/[^0-9]/g, '');
+    const originalVal = parseInt(cleanNumStr, 10);
+    if (isNaN(originalVal)) return priceStr; 
+    
+    const discountedVal = Math.round(originalVal * (1 - discountPercent / 100));
+    
+    // Format based on currency type
+    if (priceStr.startsWith('Rp')) {
+      const formatted = new Intl.NumberFormat('id-ID').format(discountedVal);
+      return `Rp ${formatted}`;
+    } else if (priceStr.includes('$')) {
+      return `$${discountedVal}`;
+    }
+    return `${discountedVal}`;
+  };
+
+  // Apply user-submitted promo code inside user-facing interface
+  const handleApplyUserPromoCode = async () => {
+    setPromoApplyError('');
+    setPromoApplySuccess('');
+    
+    const cleanPromo = appliedPromoInput.trim().toUpperCase();
+    if (!cleanPromo) {
+      setPromoApplyError('Masukkan kode promo terlebih dahulu.');
+      return;
+    }
+
+    setIsApplyingPromo(true);
+    try {
+      const promoRef = doc(db, 'promos', cleanPromo);
+      const docSnap = await getDoc(promoRef);
+      
+      if (!docSnap.exists()) {
+        setPromoApplyError('Kode promo salah atau tidak valid.');
+        setIsApplyingPromo(false);
+        return;
+      }
+
+      const pData = docSnap.data();
+      const usedCount = Number(pData.usedCount) || 0;
+      const maxUses = Number(pData.maxUses) || 99999;
+      
+      if (usedCount >= maxUses) {
+        setPromoApplyError('Kode promo sudah melebihi batas penggunaan.');
+        setIsApplyingPromo(false);
+        return;
+      }
+
+      // If it's a discount type promo
+      if (pData.type === 'discount') {
+        const discountPromo: PromoCode = {
+          id: docSnap.id,
+          code: docSnap.id,
+          type: 'discount',
+          value: Number(pData.value) || 0,
+          maxUses,
+          usedCount,
+          description: pData.description || ''
+        };
+        setActivePromo(discountPromo);
+        setPromoApplySuccess(`Kode promo ${cleanPromo} diterapkan! Potongan harga ${pData.value}%!`);
+        
+        // Track promo usage increment
+        await updateDoc(promoRef, {
+          usedCount: usedCount + 1
+        }).catch(e => console.warn(e));
+        
+      } else if (pData.type === 'free_premium') {
+        // Direct Activation Key Generation!
+        const durationDays = Number(pData.value) || 30;
+        const durationStr = durationDays === 30 ? '30days' : `${durationDays}days`;
+        
+        // Generate a localized unique claimed key
+        const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const generatedLicenseKey = `PROMO-${cleanPromo}-${randomStr}`;
+        
+        let devId = localStorage.getItem('mz_device_id');
+        if (!devId) {
+          devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
+          localStorage.setItem('mz_device_id', devId);
+        }
+
+        const generatedKeyRef = doc(db, 'keys', generatedLicenseKey);
+        
+        // Write standard key document structure
+        await setDoc(generatedKeyRef, {
+          key: generatedLicenseKey,
+          activated: true,
+          activatedBy: userEmail || devId,
+          activatedAt: new Date().toISOString(),
+          duration: durationStr,
+          promoCode: cleanPromo,
+          createdAt: new Date().toISOString()
+        });
+
+        // Sync with db user model if userId exists
+        if (userId) {
+          const userRef = doc(db, 'users', userId);
+          await setDoc(userRef, {
+            licenseKey: generatedLicenseKey,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(err => {
+            console.error("Sync to user profile failed:", err);
+          });
+        }
+
+        // Apply immediately inside the client
+        localStorage.setItem('mz_license_key', generatedLicenseKey);
+        setLicenseKey(generatedLicenseKey);
+        
+        // Increment use counter
+        await updateDoc(promoRef, {
+          usedCount: usedCount + 1
+        }).catch(e => console.warn(e));
+
+        setPromoApplySuccess(`Promo berhasil! Premium ${durationDays} Hari diaktifkan gratis!`);
+        alert(`Selamat! Anda mendapatkan akses PREMIUM ${durationDays} Hari secara gratis menggunakan kode promo: ${cleanPromo}.`);
+        
+        setTimeout(() => {
+          setShowActivation(false);
+        }, 1500);
+      }
+    } catch (err) {
+      console.error('Apply promo error:', err);
+      setPromoApplyError('Terjadi kesalahan saat menerapkan kode promo.');
+    } finally {
+      setIsApplyingPromo(false);
+    }
   };
 
   const handleApplyLicenseKey = async () => {
@@ -723,7 +1043,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 onClick={() => setPortalTab('branding')}
                 className={`py-2 px-4 rounded-lg transition-all flex-1 ${portalTab === 'branding' ? 'bg-white dark:bg-slate-900 shadow text-violet-600' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
               >
-                Branding & Payment
+                Branding & Prices
               </button>
               <button
                 type="button"
@@ -731,6 +1051,13 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 className={`py-2 px-4 rounded-lg transition-all flex-1 ${portalTab === 'keys' ? 'bg-white dark:bg-slate-900 shadow text-violet-600' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
               >
                 Key Generator
+              </button>
+              <button
+                type="button"
+                onClick={() => setPortalTab('promo')}
+                className={`py-2 px-4 rounded-lg transition-all flex-1 ${portalTab === 'promo' ? 'bg-white dark:bg-slate-900 shadow text-violet-600' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+              >
+                Promo Codes
               </button>
               <button
                 type="button"
@@ -811,6 +1138,53 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       onChange={(e) => setTempPayInfo(e.target.value)}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none transition-all line-clamp-3"
                     />
+                  </div>
+                </div>
+
+                {/* Subcription Price Editor */}
+                <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/70">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 block mb-2">Adjust Subscription Plan Prices</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">30 Days (IDR)</label>
+                      <input
+                        type="text"
+                        placeholder="Rp 50.000"
+                        value={tempPrice30Days}
+                        onChange={(e) => setTempPrice30Days(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-bold text-[10px] focus:ring-1 focus:ring-emerald-500 transition-all text-emerald-600 dark:text-emerald-400"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">30 Days (USD)</label>
+                      <input
+                        type="text"
+                        placeholder="$2"
+                        value={tempPrice30DaysUSD}
+                        onChange={(e) => setTempPrice30DaysUSD(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-bold text-[10px] focus:ring-1 focus:ring-emerald-500 transition-all text-[#7c3aed]"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Unlimited (IDR)</label>
+                      <input
+                        type="text"
+                        placeholder="Rp 250.000"
+                        value={tempPriceUnlimited}
+                        onChange={(e) => setTempPriceUnlimited(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-bold text-[10px] focus:ring-1 focus:ring-emerald-500 transition-all text-emerald-600 dark:text-emerald-400"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Unlimited (USD)</label>
+                      <input
+                        type="text"
+                        placeholder="$14"
+                        value={tempPriceUnlimitedUSD}
+                        onChange={(e) => setTempPriceUnlimitedUSD(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-bold text-[10px] focus:ring-1 focus:ring-emerald-500 transition-all text-[#7c3aed]"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1115,6 +1489,209 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               </>
               )}
 
+              {portalTab === 'promo' && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  {/* Promo Code Info Banner */}
+                  <div className="bg-gradient-to-r from-violet-500/15 via-purple-500/10 to-transparent border border-violet-500/20 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm uppercase tracking-wider text-violet-600 dark:text-violet-400 mb-1 flex items-center space-x-2">
+                        <Sparkles size={16} className="animate-pulse" />
+                        <span>Promo & Discount Code Center</span>
+                      </h4>
+                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed">
+                        Buat kode voucher diskon untuk memotong biaya langganan, atau buat kode promo premium gratis untuk kampanye marketing Anda.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dual Grid: Create Promo on Left, List on Right */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Create form */}
+                    <div className="space-y-3 bg-slate-50/50 dark:bg-slate-900/30 p-3.5 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 md:col-span-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+                        <Plus size={12} className="text-violet-500" />
+                        <span>Buat Promo Baru</span>
+                      </span>
+
+                      <form onSubmit={handleCreatePromoCode} className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Kode Promo</label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: MERDEKA88"
+                            value={newPromoCode}
+                            onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())}
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 outline-none font-mono font-black text-xs uppercase focus:ring-1 focus:ring-violet-500 transition-all text-violet-700 dark:text-violet-400"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Tipe Promo</label>
+                          <select
+                            value={newPromoType}
+                            onChange={(e) => {
+                              const typeVal = e.target.value as 'free_premium' | 'discount';
+                              setNewPromoType(typeVal);
+                              setNewPromoValue(typeVal === 'free_premium' ? 30 : 20);
+                            }}
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-bold text-xs focus:ring-1 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                          >
+                            <option value="free_premium" className="bg-white dark:bg-slate-900">Akses Premium Gratis</option>
+                            <option value="discount" className="bg-white dark:bg-slate-900">Potongan Harga (%)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">
+                            {newPromoType === 'free_premium' ? 'Durasi Akses Gratis' : 'Persentase Diskon'}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="1"
+                              max={newPromoType === 'discount' ? 100 : 365}
+                              value={newPromoValue}
+                              onChange={(e) => setNewPromoValue(Number(e.target.value))}
+                              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-2.5 pr-8 py-1.5 outline-none font-bold text-xs focus:ring-1 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                              required
+                            />
+                            <span className="absolute right-3 top-2 text-[9px] font-black text-slate-400 uppercase">
+                              {newPromoType === 'free_premium' ? 'Hari' : '%'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Batas Jumlah Penggunaan</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={newPromoMaxUses}
+                            onChange={(e) => setNewPromoMaxUses(Number(e.target.value))}
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 outline-none font-bold text-xs focus:ring-1 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Deskripsi / Catatan</label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: Diskon 20% Promo Lebaran"
+                            value={newPromoDesc}
+                            onChange={(e) => setNewPromoDesc(e.target.value)}
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 outline-none font-medium text-xs focus:ring-1 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                          />
+                        </div>
+
+                        {promoErrorMsg && (
+                          <p className="text-[9px] font-bold text-red-500 dark:text-red-400">
+                            ⚠️ {promoErrorMsg}
+                          </p>
+                        )}
+                        {promoSuccessMsg && (
+                          <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                            🎉 {promoSuccessMsg}
+                          </p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={isPromosLoading}
+                          className="w-full py-2 bg-[#7c3aed] hover:bg-violet-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-colors cursor-pointer flex items-center justify-center space-x-1.5 disabled:opacity-50"
+                        >
+                          <Plus size={10} />
+                          <span>Buat Kode Promo</span>
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Promos Directory list */}
+                    <div className="space-y-3 md:col-span-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+                          <ListFilter size={12} className="text-slate-400" />
+                          <span>Daftar Kode Promo Aktif</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={fetchPromosFromDb}
+                          className="text-[9px] font-bold text-[#7c3aed] hover:underline flex items-center space-x-1"
+                          title="Refresh"
+                        >
+                          <RefreshCw size={10} className={isPromosLoading ? 'animate-spin' : ''} />
+                          <span>Refresh</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
+                        {isPromosLoading && promos.length === 0 ? (
+                          <p className="text-center text-[10px] text-slate-400 py-6 font-semibold animate-pulse">Memuat kode promo...</p>
+                        ) : promos.length === 0 ? (
+                          <div className="text-center border border-slate-200 dark:border-white/5 py-12 rounded-2xl bg-slate-50/20 dark:bg-slate-900/10">
+                            <Gift size={24} className="text-slate-300 dark:text-slate-700 mx-auto mb-2" />
+                            <p className="text-[10px] text-slate-400 font-bold">Belum ada kode promo terdaftar.</p>
+                          </div>
+                        ) : (
+                          promos.map((p) => {
+                            const isExpired = p.usedCount >= p.maxUses;
+                            return (
+                              <div
+                                key={p.id}
+                                className={`p-3 border rounded-2xl flex items-center justify-between transition-all ${
+                                  isExpired 
+                                    ? 'bg-slate-100/50 dark:bg-slate-950/20 border-slate-200/40 dark:border-white/5 opacity-55' 
+                                    : 'bg-white dark:bg-slate-950 border-slate-100 dark:border-white/5 hover:border-violet-500/20 dark:hover:border-violet-500/20 shadow-sm'
+                                }`}
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-mono font-black text-xs text-slate-800 dark:text-white tracking-wide bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                                      {p.code}
+                                    </span>
+                                    <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${
+                                      p.type === 'free_premium' 
+                                        ? 'bg-violet-100 dark:bg-violet-500/10 text-[#7c3aed]' 
+                                        : 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600'
+                                    }`}>
+                                      {p.type === 'free_premium' ? 'Free Access' : 'Discount'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400">
+                                    {p.description || 'Tanpa catatan'} • {p.type === 'free_premium' ? `${p.value} Hari PREMIUM` : `Potongan ${p.value}%`}
+                                  </p>
+                                  <div className="flex items-center space-x-1">
+                                    <span className="text-[8px] font-semibold text-slate-400">Penggunaan:</span>
+                                    <span className={`text-[8.5px] font-black ${isExpired ? 'text-red-500' : 'text-slate-600 dark:text-slate-350'}`}>
+                                      {p.usedCount} / {p.maxUses}
+                                    </span>
+                                    <div className="h-1 w-16 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden ml-1">
+                                      <div 
+                                        className={`h-full ${isExpired ? 'bg-red-500' : 'bg-violet-500'}`}
+                                        style={{ width: `${Math.min(100, (p.usedCount / p.maxUses) * 100)}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePromoCode(p.id)}
+                                  className="p-2 bg-red-500/5 hover:bg-red-500 hover:text-white text-red-500 rounded-xl transition-all cursor-pointer"
+                                  title="Hapus Promo"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {portalTab === 'audit' && (
                 <div className="space-y-4">
                   <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 p-4 rounded-xl flex items-center justify-between">
@@ -1347,7 +1924,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         </div>
                         <div className="space-y-1 text-center">
                           <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-[#7c3aed] dark:text-violet-400">30 Days Plan</h5>
-                          <p className="text-[#7c3aed] dark:text-blue-300 font-black text-xs">{t.language === 'Bahasa' ? 'Rp 50.000' : '$2'}</p>
+                          <p className="text-[#7c3aed] dark:text-blue-300 font-black text-xs flex flex-col justify-center items-center">
+                            {activePromo?.type === 'discount' && (
+                              <span className="text-[9px] text-slate-400 line-through">
+                                {t.language === 'Bahasa' ? price30Days : price30DaysUSD}
+                              </span>
+                            )}
+                            <span>
+                              {t.language === 'Bahasa' 
+                                ? (activePromo?.type === 'discount' ? getDiscountedPrice(price30Days, activePromo.value) : price30Days) 
+                                : (activePromo?.type === 'discount' ? getDiscountedPrice(price30DaysUSD, activePromo.value) : price30DaysUSD)
+                              }
+                            </span>
+                          </p>
                           <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
                             <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
                             <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
@@ -1362,7 +1951,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         </div>
                         <div className="space-y-1 text-center">
                           <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-amber-600 dark:text-amber-400">Unlimited</h5>
-                          <p className="text-amber-600 dark:text-amber-400 font-black text-xs">{t.language === 'Bahasa' ? 'Rp 250.000' : '$14'}</p>
+                          <p className="text-amber-600 dark:text-amber-400 font-black text-xs flex flex-col justify-center items-center">
+                            {activePromo?.type === 'discount' && (
+                              <span className="text-[9px] text-slate-400 line-through">
+                                {t.language === 'Bahasa' ? priceUnlimited : priceUnlimitedUSD}
+                              </span>
+                            )}
+                            <span>
+                              {t.language === 'Bahasa' 
+                                ? (activePromo?.type === 'discount' ? getDiscountedPrice(priceUnlimited, activePromo.value) : priceUnlimited) 
+                                : (activePromo?.type === 'discount' ? getDiscountedPrice(priceUnlimitedUSD, activePromo.value) : priceUnlimitedUSD)
+                              }
+                            </span>
+                          </p>
                           <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
                             <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Akses Selamanya' : 'Lifetime Access'}</span></li>
                             <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas' : 'Unlimited Limits'}</span></li>
@@ -1382,6 +1983,63 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                         <span>WhatsApp</span>
                       </a>
                     </div>
+                  </div>
+
+                  {/* Promo Input Section */}
+                  <div className="bg-[#7c3aed]/5 dark:bg-slate-900/40 p-3 rounded-2xl border border-violet-500/10 space-y-2 mt-3 shadow-sm">
+                    <div className="flex items-center space-x-1.5 text-[#7c3aed] dark:text-violet-400">
+                      <Sparkles size={12} className="animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-wider">{t.language === 'Bahasa' ? 'Miliki Kode Promo / Diskon?' : 'Have a Promo / Discount Code?'}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Contoh: PROMO50"
+                        value={appliedPromoInput}
+                        onChange={(e) => {
+                          setAppliedPromoInput(e.target.value.toUpperCase());
+                          setPromoApplyError('');
+                          setPromoApplySuccess('');
+                        }}
+                        className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3.5 py-2 outline-none font-mono font-bold text-xs focus:border-[#7c3aed] transition-all uppercase text-[#7c3aed] dark:text-violet-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyUserPromoCode}
+                        disabled={isApplyingPromo}
+                        className="px-4 py-2 bg-[#7c3aed] text-white font-black text-[10px] uppercase tracking-wider rounded-[1.5rem] hover:bg-violet-600 transition-colors shrink-0 cursor-pointer disabled:opacity-50 shadow-md shadow-violet-500/10"
+                      >
+                        {isApplyingPromo ? t.language === 'Bahasa' ? 'Memproses' : 'Processing' : t.language === 'Bahasa' ? 'Klaim' : 'Redeem'}
+                      </button>
+                    </div>
+
+                    {promoApplyError && (
+                      <p className="text-[9.5px] font-bold text-red-500 dark:text-red-400 pl-1.5 border-l-2 border-red-550">
+                        ⚠️ {promoApplyError}
+                      </p>
+                    )}
+
+                    {promoApplySuccess && (
+                      <p className="text-[9.5px] font-extrabold text-emerald-600 dark:text-emerald-400 pl-1.5 border-l-2 border-emerald-500 animate-bounce">
+                        🎉 {promoApplySuccess}
+                      </p>
+                    )}
+
+                    {activePromo && (
+                      <div className="flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-300 bg-emerald-500/10 dark:bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/20">
+                        <span>Aktif: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold uppercase">{activePromo.code}</strong> {activePromo.type === 'discount' ? `(Potongan ${activePromo.value}%)` : `(Akses Premium ${activePromo.value} Hari!)`}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivePromo(null);
+                            setPromoApplySuccess('');
+                          }}
+                          className="bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white font-extrabold px-2 py-1 rounded-lg text-[8px] tracking-wide transition uppercase cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Activation input */}
