@@ -285,11 +285,11 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
     }
   }
 
-  // Limit to 100 characters. If too long, truncate nicely at word boundary
-  if (cleanedTitle.length > 100) {
-    let truncated = cleanedTitle.substring(0, 100);
+  // Limit to 200 characters. If too long, truncate nicely at word boundary
+  if (cleanedTitle.length > 200) {
+    let truncated = cleanedTitle.substring(0, 200);
     const lastSpace = truncated.lastIndexOf(' ');
-    if (lastSpace > 50) {
+    if (lastSpace > 100) {
       truncated = truncated.substring(0, lastSpace);
     }
     cleanedTitle = truncated.trim();
@@ -539,7 +539,7 @@ async function callOpenAICompatibleWithRetry(params: {
     if (!apiKey && provider === 'nvidia') {
       console.warn('NVIDIA key missing. Fallback to Gemini.');
       const fallbackResult = await getAIClient().models.generateContent({
-        model: 'gemini-3.1-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: params.contents,
         config: params.config
       });
@@ -920,14 +920,16 @@ const callGeminiWithRetry = async (
         
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
-        if (isQuotaOrLimit && attempt === 0 && currentModel !== 'gemini-3.1-flash-lite') {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash-lite to bypass quota limits or high demand.`);
+        if (isQuotaOrLimit) {
+          if (currentModel !== 'gemini-3.1-flash-lite') {
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash-lite to bypass unavailability, quota limits or high demand (attempt ${attempt + 1}).`);
              currentModel = 'gemini-3.1-flash-lite';
-             customDelay = 1000; // Reset wait time so we try the new model immediately
-        } else if (isQuotaOrLimit && attempt === 0 && currentModel === 'gemini-3.1-flash-lite') {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.5-flash to bypass unavailability or quota limits.`);
+             if (!customDelay && attempt === 0) customDelay = 1000; // Reset wait time so we try the new model immediately
+          } else {
+             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.5-flash to bypass unavailability or quota limits (attempt ${attempt + 1}).`);
              currentModel = 'gemini-3.5-flash';
-             customDelay = 1000; // Reset wait time so we try the new model immediately
+             if (!customDelay && attempt === 0) customDelay = 1000; // Reset wait time so we try the new model immediately
+          }
         } else if (statusCode === 429 && customDelay > 60000) {
              console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel} (Wait time > 60s). Failing fast.`);
              throw err;
@@ -1047,7 +1049,7 @@ export const generateStockMetadata = async (
     mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
   }
 
-  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : 'gemini-3.1-flash-lite';
+  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : 'gemini-3.5-flash';
   
   const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
@@ -1587,6 +1589,7 @@ export const generateBatchStockMetadata = async (
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
+  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : 'gemini-3.5-flash';
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
@@ -1668,7 +1671,7 @@ OUTPUT FORMAT:
         : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
       try {
-          const visionResponse = await callGeminiWithRetry('gemini-3.1-flash-lite', { 
+          const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
             parts: [...imageParts, { text: promptText }] 
           }, {
             systemInstruction: visionSystemInstruction,
@@ -2310,7 +2313,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -2786,7 +2789,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -2866,7 +2869,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -2931,7 +2934,7 @@ export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysi
 
   Gunakan Bahasa Indonesia profesional yang sangat jujur.`;
 
-  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', prompt, {
+  const response = await callGeminiWithRetry('gemini-3.5-flash', prompt, {
     responseMimeType: "application/json",
     responseSchema: {
       type: Type.OBJECT,
@@ -2976,7 +2979,7 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
   
   Return exactly 50 prompts in JSON array format.`;
 
-  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', prompt, {
+  const response = await callGeminiWithRetry('gemini-3.5-flash', prompt, {
     responseMimeType: "application/json",
     responseSchema: {
       type: Type.ARRAY,
@@ -3153,7 +3156,7 @@ Output strictly in JSON format.`;
     required: ["events"]
   };
 
-  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from.`, {
+  const response = await callGeminiWithRetry('gemini-3.5-flash', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from.`, {
     systemInstruction,
     responseMimeType: "application/json",
     responseSchema,
@@ -3185,7 +3188,7 @@ Rules:
     required: ["keywords"]
   };
 
-  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}`, {
+  const response = await callGeminiWithRetry('gemini-3.5-flash', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}`, {
     systemInstruction,
     responseMimeType: "application/json",
     responseSchema,
@@ -3222,7 +3225,7 @@ Rules:
     required: ["keywords"]
   };
 
-  const response = await callGeminiWithRetry('gemini-3.1-flash-lite', `Suggest 5 missing SEO keywords for this asset:
+  const response = await callGeminiWithRetry('gemini-3.5-flash', `Suggest 5 missing SEO keywords for this asset:
 Title: "${title}"
 Description: "${description}"
 Existing Keywords: ${existingKeywords.join(', ')}`, {

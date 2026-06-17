@@ -417,7 +417,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             });
             const response = await testClient.models.generateContent({
-                model: 'gemini-3.1-flash-lite',
+                model: 'gemini-3.5-flash',
                 contents: 'Respond with exactly the word "VALID"',
             });
             if (response && response.text) {

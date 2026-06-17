@@ -56,6 +56,7 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
         <textarea
           value={safeValue}
           onChange={(e) => onChange(e.target.value)}
+          maxLength={label.toLowerCase().includes('title') || label.toLowerCase().includes('judul') ? 200 : undefined}
           className={`w-full p-2.5 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/85 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-200 transition-all font-semibold resize-none min-h-[65px] focus:ring-2 focus:ring-[#7c3aed]/20`}
         />
       ) : (
@@ -63,6 +64,7 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
           type="text"
           value={safeValue}
           onChange={(e) => onChange(e.target.value)}
+          maxLength={label.toLowerCase().includes('title') || label.toLowerCase().includes('judul') ? 200 : undefined}
           className={`w-full p-2.5 bg-slate-100/55 dark:bg-black/25 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-300 transition-all font-extrabold focus:ring-2 focus:ring-[#7c3aed]/20`}
         />
       )}
@@ -107,6 +109,7 @@ interface KeywordListProps {
   aiOptions?: any;
   keywordCount?: number | string;
   hideIndividualFix?: boolean;
+  t?: any;
 }
 
 const ProjectKeywordList: React.FC<KeywordListProps> = ({
@@ -118,7 +121,8 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   description,
   aiOptions,
   keywordCount,
-  hideIndividualFix = false
+  hideIndividualFix = false,
+  t
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
@@ -240,13 +244,25 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   };
 
   const handleClean = () => {
-    const cleaned = [...new Set(keywords.map(k => k.trim()).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b));
+    // Deduplicate while preserving original order (crucial for search relevance ranking)
+    const cleaned: string[] = [];
+    const seen = new Set<string>();
+    
+    keywords.forEach(k => {
+      const trimmed = k.trim();
+      if (!trimmed) return;
+      const normalized = trimmed.toLowerCase();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        cleaned.push(trimmed);
+      }
+    });
+
     onChange(cleaned);
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5 font-sans">
       <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
         <label>{label} ({keywords.length}/49)</label>
         <div className="flex items-center space-x-3">
@@ -280,6 +296,15 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             )}
           </button>
         </div>
+      </div>
+
+      <div className="text-[9.5px]/tight text-[#7c3aed] dark:text-violet-400 font-bold flex items-center gap-1 py-1 px-2.5 bg-violet-500/5 dark:bg-violet-500/10 rounded-lg border border-violet-500/10">
+        <span className="shrink-0 select-none">💡</span>
+        <span>
+          {t && t.language === 'Bahasa' 
+            ? "Urutan kata kunci menentukan relevansi pencarian Adobe Stock. Keyword #1 adalah yang TERPENTING! Seret untuk mengurutkan." 
+            : "Keyword order determines search relevance in Adobe Stock. Keyword #1 is the most CRITICAL! Drag & drop to sort."}
+        </span>
       </div>
       {nearDuplicates.length > 0 && !hideIndividualFix && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-600 dark:text-rose-400 text-[10px] mb-2 font-bold gap-2">
@@ -335,24 +360,42 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
       )}
       <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
         <AnimatePresence mode="popLayout">
-          {keywords.map((kw, index) => (
-            <motion.span 
-              key={`${kw}-${index}`} 
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragEnd={handleDragEnd}
-              initial={{ scale: 0.6, opacity: 0, y: 8 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.7, opacity: 0, y: -4, transition: { duration: 0.15 } }}
-              transition={{ type: "spring", stiffness: 500, damping: 28 }}
-              layout
-              className={`inline-flex cursor-grab items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass} ${draggedIndex === index ? 'opacity-50' : ''}`}
-            >
-              <span>{kw}</span>
-              <button onClick={() => handleRemove(kw)} className="ml-1 text-[9px] text-rose-500 font-extrabold cursor-pointer">×</button>
-            </motion.span>
-          ))}
+          {keywords.map((kw, index) => {
+            const isFirst = index === 0;
+            const isTop5 = index > 0 && index < 5;
+            let currentBadgeClass = badgeClass;
+            
+            if (isFirst) {
+              currentBadgeClass = "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/5";
+            } else if (isTop5) {
+              currentBadgeClass = "bg-violet-500/15 text-[#7c3aed] dark:text-violet-400 border border-violet-500/20";
+            } else {
+              currentBadgeClass = `${badgeClass} border border-transparent`;
+            }
+
+            return (
+              <motion.span 
+                key={`${kw}-${index}`} 
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                initial={{ scale: 0.6, opacity: 0, y: 8 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.7, opacity: 0, y: -4, transition: { duration: 0.15 } }}
+                transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                layout
+                className={`inline-flex cursor-grab items-center px-2 py-0.5 rounded text-[10px] font-bold select-none ${currentBadgeClass} ${draggedIndex === index ? 'opacity-50' : ''}`}
+                title={isFirst ? "Keyword #1 - Paling Menentukan Relevansi (👑 Utama)" : isTop5 ? `Keyword #${index + 1} - Sangat Penting (Prioritas Tinggi)` : `Keyword #${index + 1}`}
+              >
+                <span className="opacity-65 mr-1 text-[8.5px] font-black font-mono tracking-tighter bg-black/5 dark:bg-white/5 px-1 py-0.2 rounded shrink-0">
+                  {isFirst ? '👑 1' : index + 1}
+                </span>
+                <span className="truncate max-w-[120px]">{kw}</span>
+                <button onClick={() => handleRemove(kw)} className="ml-1 text-[9px] text-rose-500 hover:text-rose-600 font-extrabold cursor-pointer">×</button>
+              </motion.span>
+            );
+          })}
         </AnimatePresence>
         <input
           type="text"
@@ -786,6 +829,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         aiOptions={aiOptions}
                         keywordCount={keywordCount}
                         hideIndividualFix={files.length > 1}
+                        t={t}
                       />
 
                       <div className="space-y-1 px-0.5">
