@@ -1457,6 +1457,7 @@ const App: React.FC = () => {
         // 2. Sync trialStart
         if (data.trialStart) {
           localStorage.setItem('mz_trial_start', data.trialStart);
+          setTrialDaysLeft(99999);
         }
 
         // 3. Sync daily gen counts for today
@@ -1475,6 +1476,7 @@ const App: React.FC = () => {
         const localKey = localStorage.getItem('mz_license_key') || '';
         const localTrialStart = localStorage.getItem('mz_trial_start') || new Date().toISOString();
         localStorage.setItem('mz_trial_start', localTrialStart);
+        setTrialDaysLeft(99999);
 
         // Prepopulate standard daily counts to cloud if any
         const initialUsage: any = {};
@@ -1576,7 +1578,7 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Trial Period tracking (Unlimited)
+  // Trial Period tracking (Unlimited Trial Days)
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
     return 99999;
   });
