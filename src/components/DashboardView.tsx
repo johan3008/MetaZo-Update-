@@ -2,11 +2,25 @@ import React from 'react';
 import { 
   Sparkles, ImageIcon, Film, FileCode, Zap, BookOpen, 
   ArrowRight, ShieldCheck, Activity, BarChart2, CheckCircle, 
-  AlertTriangle, Clock, HelpCircle, Key
+  AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
+import { db } from '../firebase';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
+
+interface DashboardPromoCode {
+  id: string;
+  code: string;
+  type: string;
+  value: number;
+  maxUses: number;
+  usedCount: number;
+  description: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 interface DashboardViewProps {
   files: FileItem[];
@@ -70,6 +84,70 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }).length;
 
   const [currentSlide, setCurrentSlide] = React.useState(0);
+  const [promoCodes, setPromoCodes] = React.useState<DashboardPromoCode[]>([]);
+  const [isLoadingPromos, setIsLoadingPromos] = React.useState(false);
+  const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    const fetchPromos = async () => {
+      setIsLoadingPromos(true);
+      try {
+        const qSnap = await getDocs(query(collection(db, 'promos'), limit(5)));
+        if (!active) return;
+        const list: DashboardPromoCode[] = [];
+        const now = new Date();
+        qSnap.forEach((doc) => {
+          const d = doc.data();
+          const usedCount = Number(d.usedCount || 0);
+          const maxUses = Number(d.maxUses || 0);
+          
+          // Filter out expired by uses
+          if (usedCount >= maxUses) return;
+
+          // Filter out which hasn't started yet
+          if (d.startDate) {
+            const start = new Date(d.startDate);
+            if (now < start) return;
+          }
+
+          // Filter out which has ended
+          if (d.endDate) {
+            const endStr = d.endDate;
+            const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
+            if (now > end) return;
+          }
+
+          list.push({
+            id: doc.id,
+            code: d.code || doc.id,
+            type: d.type || 'free_premium',
+            value: Number(d.value || 0),
+            maxUses,
+            usedCount,
+            description: d.description || '',
+            startDate: d.startDate || '',
+            endDate: d.endDate || '',
+          });
+        });
+        setPromoCodes(list);
+      } catch (error) {
+        console.warn("Failed to load promos for dashboard view:", error);
+      } finally {
+        if (active) setIsLoadingPromos(false);
+      }
+    };
+    fetchPromos();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleCopy = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
 
   const slides = React.useMemo(() => {
     const baseSlides = [
@@ -122,6 +200,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return baseSlides;
   }, [isLicensed, t]);
 
+  const safeCurrentSlide = currentSlide >= slides.length ? 0 : currentSlide;
+  const activeSlide = slides[safeCurrentSlide] || { badge: "", title: "", desc: "" };
+
+  React.useEffect(() => {
+    if (currentSlide >= slides.length) {
+      setCurrentSlide(0);
+    }
+  }, [slides.length, currentSlide]);
+
   React.useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide(prev => (prev + 1) % slides.length);
@@ -144,10 +231,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="relative z-10 max-w-2xl min-h-[160px] flex flex-col justify-center">
           <div 
-            key={currentSlide} 
-            className={`animate-in fade-in slide-in-from-right-4 duration-500 ${currentSlide === slides.length - 1 ? 'cursor-pointer' : ''}`}
+            key={safeCurrentSlide} 
+            className={`animate-in fade-in slide-in-from-right-4 duration-500 ${safeCurrentSlide === slides.length - 1 ? 'cursor-pointer' : ''}`}
             onClick={() => {
-              if (currentSlide === slides.length - 1) {
+              if (safeCurrentSlide === slides.length - 1) {
                 window.open('https://teer.id/johan3008', '_blank');
               }
             }}
@@ -155,7 +242,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
                 <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
-                <span>{slides[currentSlide].badge}</span>
+                <span>{activeSlide.badge}</span>
               </div>
             </div>
             {userName && (
@@ -164,12 +251,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             )}
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight leading-tight select-none">
-              {slides[currentSlide].title}
+              {activeSlide.title}
             </h1>
             <p className="mt-2 text-xs sm:text-sm text-slate-100/90 font-medium leading-relaxed max-w-xl min-h-[40px]">
-              {slides[currentSlide].desc}
+              {activeSlide.desc}
             </p>
-            {currentSlide === slides.length - 1 && (
+            {safeCurrentSlide === slides.length - 1 && (
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -189,7 +276,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <button
                   key={i}
                   onClick={() => setCurrentSlide(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${i === currentSlide ? 'w-6 bg-emerald-300' : 'w-2 bg-white/30 hover:bg-white/50'}`}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${i === safeCurrentSlide ? 'w-6 bg-emerald-300' : 'w-2 bg-white/30 hover:bg-white/50'}`}
                 />
               ))}
             </div>
@@ -251,6 +338,105 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               {t.trial_cta_admin}
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* PROMO / VOUCHER HIGHLIGHT BANNER */}
+      {!isLicensed && (isLoadingPromos || promoCodes.length > 0) && (
+        <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-violet-500/30 text-slate-800 dark:text-white p-6 shadow-lg shadow-black/5 dark:shadow-violet-950/15">
+          {/* Background glow effects */}
+          <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 dark:bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute left-10 bottom-0 -ml-16 -mb-16 w-48 h-48 bg-emerald-500/5 dark:bg-emerald-600/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="flex items-center space-x-4">
+              <div className="relative p-4 bg-gradient-to-tr from-violet-600 to-indigo-600 rounded-3xl text-white shadow-lg shrink-0 scale-95 sm:scale-100">
+                <Gift size={28} className="text-amber-300" />
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+                </span>
+              </div>
+              <div>
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-[9px] font-black uppercase tracking-widest mb-1.5">
+                  <Ticket size={10} />
+                  <span>{t.language === 'Bahasa' ? "KUPON PROMO SPESIAL" : "ACTIVE COUPON CODES"}</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">
+                  {t.language === 'Bahasa' ? "Dapatkan Potongan Harga & Akses Premium Gratis!" : "Get Direct Discounts & Free Premium Access!"}
+                </h3>
+                <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-xl mt-1">
+                  {t.language === 'Bahasa' 
+                    ? "Gunakan kupon promo aktif di bawah ini untuk mengaktifkan fitur unggulan PRO secara instan tanpa biaya tambahan."
+                    : "Copy and utilize any of our active vouchers inside the activation form to unlock high-tier priority metadata pipelines."}
+                </p>
+              </div>
+            </div>
+
+            <div className="w-full lg:w-auto shrink-0 flex flex-col gap-2.5 min-w-[280px]">
+              {isLoadingPromos ? (
+                <div className="flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 rounded-2xl">
+                  <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mr-2" />
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Memuat info promo...</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-violet-700 dark:text-violet-400 block mb-0.5">
+                    {t.language === 'Bahasa' ? "Salin Voucher Aktif:" : "Copy Active Vouchers:"}
+                  </span>
+                  <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-800">
+                    {promoCodes.map((p) => (
+                      <div 
+                        key={p.id}
+                        className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-950/60 hover:bg-slate-100 dark:hover:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-violet-300 dark:hover:border-violet-500/50 rounded-xl transition-all group/item"
+                      >
+                        <div className="flex flex-col min-w-[120px] max-w-[175px]">
+                          <div className="flex items-center space-x-1 flex-wrap">
+                            <span className="text-xs font-black text-[#7c3aed] dark:text-amber-300 tracking-wider uppercase">
+                              {p.code}
+                            </span>
+                            {p.endDate && (
+                              <span className="text-[7.5px] bg-red-100 dark:bg-red-950/60 text-red-750 dark:text-red-400 font-extrabold px-1 py-0.2 rounded shrink-0" title={`Berakhir ${p.endDate}`}>
+                                Exp: {p.endDate}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold truncate">
+                            {p.description || (p.type === 'free_premium' ? `${p.value} Hari Premium` : `Diskon ${p.value}%`)}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleCopy(p.code)}
+                          className={`px-3 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center space-x-1.5 shrink-0 select-none ${copiedCode === p.code ? 'bg-emerald-600 dark:bg-emerald-650 text-white dark:text-emerald-100' : 'bg-violet-100 dark:bg-violet-605/30 hover:bg-violet-600 hover:text-white text-violet-700 dark:text-violet-300'}`}
+                        >
+                          {copiedCode === p.code ? (
+                            <>
+                              <CheckCircle size={10} className="text-emerald-400 fill-emerald-400/20" />
+                              <span>Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={10} />
+                              <span>Salin</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Apply Action Trigger */}
+              <button
+                onClick={() => setShowActivation?.(true)}
+                className="w-full py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 active:scale-[0.99] text-white font-extrabold text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg hover:shadow-violet-600/20 flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <span>{t.language === 'Bahasa' ? "Buka Menu Aktivasi Promo" : "Open Promo Claim Menu"}</span>
+                <ArrowRight size={12} />
+              </button>
+            </div>
           </div>
         </div>
       )}

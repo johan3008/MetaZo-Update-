@@ -96,6 +96,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     usedCount: number;
     description: string;
     createdAt?: string;
+    startDate?: string;
+    endDate?: string;
   }
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [isPromosLoading, setIsPromosLoading] = useState(false);
@@ -104,6 +106,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [newPromoValue, setNewPromoValue] = useState(30);
   const [newPromoMaxUses, setNewPromoMaxUses] = useState(100);
   const [newPromoDesc, setNewPromoDesc] = useState('');
+  const [newPromoStartDate, setNewPromoStartDate] = useState('');
+  const [newPromoEndDate, setNewPromoEndDate] = useState('');
   const [promoSuccessMsg, setPromoSuccessMsg] = useState('');
   const [promoErrorMsg, setPromoErrorMsg] = useState('');
 
@@ -231,7 +235,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           maxUses: Number(data.maxUses || 0),
           usedCount: Number(data.usedCount || 0),
           description: data.description || '',
-          createdAt: data.createdAt || ''
+          createdAt: data.createdAt || '',
+          startDate: data.startDate || '',
+          endDate: data.endDate || ''
         });
       });
       setPromos(list);
@@ -263,7 +269,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         maxUses: Number(newPromoMaxUses),
         usedCount: 0,
         description: newPromoDesc.trim(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        startDate: newPromoStartDate || null,
+        endDate: newPromoEndDate || null
       };
 
       // save to Firestore
@@ -273,6 +281,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       // Reset form
       setNewPromoCode('');
       setNewPromoDesc('');
+      setNewPromoStartDate('');
+      setNewPromoEndDate('');
       
       // reload directory
       await fetchPromosFromDb();
@@ -642,6 +652,26 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       const usedCount = Number(pData.usedCount) || 0;
       const maxUses = Number(pData.maxUses) || 99999;
       
+      const now = new Date();
+      if (pData.startDate) {
+        const start = new Date(pData.startDate);
+        if (now < start) {
+          setPromoApplyError(`Kode promo belum aktif. Promo ini mulai berlaku tanggal ${pData.startDate}.`);
+          setIsApplyingPromo(false);
+          return;
+        }
+      }
+
+      if (pData.endDate) {
+        const endStr = pData.endDate;
+        const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
+        if (now > end) {
+          setPromoApplyError('Kode promo ini sudah kedaluwarsa (expired).');
+          setIsApplyingPromo(false);
+          return;
+        }
+      }
+
       if (usedCount >= maxUses) {
         setPromoApplyError('Kode promo sudah melebihi batas penggunaan.');
         setIsApplyingPromo(false);
@@ -1574,6 +1604,27 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           />
                         </div>
 
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Mulai Promo</label>
+                            <input
+                              type="date"
+                              value={newPromoStartDate}
+                              onChange={(e) => setNewPromoStartDate(e.target.value)}
+                              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-medium text-xs focus:ring-1 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Selesai Promo</label>
+                            <input
+                              type="date"
+                              value={newPromoEndDate}
+                              onChange={(e) => setNewPromoEndDate(e.target.value)}
+                              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-1.5 outline-none font-medium text-xs focus:ring-1 focus:ring-violet-500 transition-all text-slate-800 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
                         <div className="space-y-1">
                           <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[8px] block">Deskripsi / Catatan</label>
                           <input
@@ -1661,6 +1712,11 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400">
                                     {p.description || 'Tanpa catatan'} • {p.type === 'free_premium' ? `${p.value} Hari PREMIUM` : `Potongan ${p.value}%`}
                                   </p>
+                                  {(p.startDate || p.endDate) && (
+                                    <p className="text-[8.5px] font-semibold text-violet-600 dark:text-violet-400">
+                                      🗓️ Periode: {p.startDate || 'Mulai Sekarang'} s/d {p.endDate || 'Seterusnya'}
+                                    </p>
+                                  )}
                                   <div className="flex items-center space-x-1">
                                     <span className="text-[8px] font-semibold text-slate-400">Penggunaan:</span>
                                     <span className={`text-[8.5px] font-black ${isExpired ? 'text-red-500' : 'text-slate-600 dark:text-slate-350'}`}>
