@@ -51,6 +51,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorHeader, setErrorHeader] = useState('');
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -250,12 +251,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           {/* Right Block: Elegant Login Gating Card (6 columns, shifted) */}
-          <div className="lg:col-span-6 flex justify-center lg:justify-end">
+          <div className="lg:col-span-6 flex justify-center lg:justify-end relative">
+
+            {/* Mascot Character Animation */}
+            <motion.div
+              className="absolute -top-20 sm:-top-24 right-8 sm:right-16 z-0 hidden lg:flex flex-col items-center pointer-events-none"
+              initial={{ y: 80, opacity: 0, rotate: 10 }}
+              animate={isHovered ? { y: 0, opacity: 1, rotate: 0 } : { y: 80, opacity: 0, rotate: 10 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            >
+               {/* Speech Bubble */}
+               <div className="bg-[#7c3aed] text-white px-3 py-2 rounded-t-2xl rounded-bl-2xl shadow-lg relative flex items-center justify-center translate-x-8
+                               before:content-[''] before:absolute before:-bottom-2 before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-[#7c3aed]">
+                  <span className="text-[11px] font-bold tracking-wide whitespace-nowrap">
+                    {language === 'id' ? 'Klik ini yuk! 👇' : 'Click here! 👇'}
+                  </span>
+               </div>
+               <div className="text-6xl mt-2 drop-shadow-2xl select-none origin-bottom" style={{ textShadow: "0 10px 20px rgba(0,0,0,0.3)" }}>
+                 🤖
+               </div>
+            </motion.div>
+
             <motion.div 
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="w-full max-w-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/5 p-8 sm:p-10 shadow-2xl shadow-violet-500/5 relative overflow-hidden group"
+              className="w-full max-w-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/5 p-8 sm:p-10 shadow-2xl shadow-violet-500/5 relative overflow-hidden group z-10"
             >
               {/* Dynamic top focus border accent */}
               <div className="absolute top-0 left-0 w-full h-[4px] bg-gradient-to-r from-violet-600 via-[#7c3aed] to-indigo-600" />

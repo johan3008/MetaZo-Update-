@@ -463,7 +463,6 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'Gagal mendapatkan respon dari AI. Silakan periksa kembali key Anda.' });
             }
         } catch (e: any) {
-            console.error('Test API Key error:', e);
             const errTextJoined = (
                 (e.message ? String(e.message) : "") + " " +
                 (e.status ? String(e.status) : "") + " " +
@@ -471,12 +470,14 @@ app.get('/api/debug-uploads', (req, res) => {
                 (typeof e === 'object' ? JSON.stringify(e) : String(e))
             ).toLowerCase();
             if (errTextJoined.includes('429') || errTextJoined.includes('resource_exhausted') || errTextJoined.includes('quota') || errTextJoined.includes('exceeded')) {
-                return res.json({
+                 console.warn('Test API Key returned 429 Quota Exceeded (successfully handled as valid key but empty quota).');
+                 return res.json({
                     success: true,
                     quotaExceeded: true,
                     message: 'API Key valid & sukses terotentikasi! Namun kuota gratis / kredit akun Google AI Studio Anda habis (Quota Exceeded / RESOURCE_EXHAUSTED). Anda tetap bisa menyimpannya, namun pastikan untuk menambah limit/tagihan di Google AI Studio Anda agar bisa digunakan.'
                 });
             }
+            console.error('Test API Key error:', e);
             res.status(500).json({ error: e.message || 'Error testing API Key' });
         }
     });

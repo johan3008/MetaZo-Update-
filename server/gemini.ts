@@ -640,9 +640,9 @@ async function callOpenAICompatibleWithRetry(params: {
     }
 
     if (params.responseMimeType === 'application/json') {
-      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested). DO NOT write any introductory or concluding text. DO NOT use markdown code blocks. The response MUST be a valid JSON object.';
+      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested). DO NOT write any introductory or concluding text. DO NOT use markdown code blocks. The response MUST be a valid JSON object or array.';
       if (provider === 'nvidia') {
-        schemaInstruction = '\n\nOutput only a valid JSON object. Do not include any explanation or markdown formatting. The JSON must start with { and end with }.';
+        schemaInstruction = '\n\nOutput only a valid JSON. Do not include any explanation or markdown formatting. The JSON must directly start with { or [ and end with } or ].';
       }
       if (params.responseSchema) {
         schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
@@ -922,11 +922,15 @@ const callGeminiWithRetry = async (
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
           const rotationModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
-          // Let's pick the next one in the cycle, or random to avoid all concurrent requests flocking to the exact same fallback
-          let nextModel = rotationModels[(attempt + 1) % rotationModels.length];
-          if (nextModel === currentModel) nextModel = rotationModels[(attempt + 2) % rotationModels.length];
+          const currentIndex = rotationModels.indexOf(currentModel);
+          const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
+          let nextModel = rotationModels[nextIndex];
           
-          console.warn(`[callGeminiWithRetry] Quota/Limit hit. Rotating from ${currentModel} to ${nextModel} (attempt ${attempt + 1}).`);
+          if (nextModel === currentModel) { // Fallback if somehow stuck
+              nextModel = rotationModels[currentIndex === 0 ? 1 : 0];
+          }
+          
+          console.warn(`[callGeminiWithRetry] Quota/Limit hit on ${currentModel}. Rotating to ${nextModel} for attempt ${attempt + 2}.`);
           currentModel = nextModel;
           customDelay = attempt === 0 ? 2000 : 5000; // Reset wait time to try new model quickly
         } else if (statusCode === 429 && customDelay > 60000) {
@@ -1247,15 +1251,27 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   let draftMetadata: any = {};
   try {
     let genResponse: any;
-    // Check target provider explicitly to avoid double-firing
     if (NON_GEMINI_PROVIDERS.has(provider)) {
-        genResponse = await callOpenAICompatibleWithRetry({
-            systemInstruction: `You are an Adobe Stock Metadata Expert.`,
-            contents: genSystemInstruction + `\n\nGenerate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
-            responseMimeType: "application/json",
-            config: { temperature: temperature ?? 0.3, topP: 0.9 },
-            model: activeModel
-        });
+        try {
+            genResponse = await callOpenAICompatibleWithRetry({
+                systemInstruction: genSystemInstruction,
+                contents: `Generate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
+                responseMimeType: "application/json",
+                config: { temperature: temperature ?? 0.3, topP: 0.9 },
+                model: activeModel
+            });
+        } catch (providerError: any) {
+             console.warn(`[JohMeta Pipeline] ${provider.toUpperCase()} failed completely:`, providerError.message);
+             console.warn(`[JohMeta Pipeline] Falling back to Gemini as absolute failsafe...`);
+             genResponse = await callGeminiWithRetry('gemini-3.5-flash', { 
+                  parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
+                }, {
+                  systemInstruction: genSystemInstruction,
+                  responseMimeType: "application/json",
+                  temperature: temperature ?? 0.3,
+                  topP: 0.9 
+                });
+        }
     } else {
         genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
             parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
@@ -1376,8 +1392,8 @@ OUTPUT FORMAT:
   try {
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
-          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
-          contents: validatorSystemInstruction + `\n\nAudit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
+          systemInstruction: validatorSystemInstruction,
+          contents: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
@@ -1805,22 +1821,36 @@ OUTPUT FORMAT:
 
   let draftMetadataArray: any = [];
   try {
-    const genResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
-      ? callOpenAICompatibleWithRetry({
-          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
-          contents: genSystemInstruction + `\n\nGenerate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
+    let genResponse;
+    if (NON_GEMINI_PROVIDERS.has(provider)) {
+      try {
+        genResponse = await callOpenAICompatibleWithRetry({
+          systemInstruction: genSystemInstruction,
+          contents: `Generate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
-        })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
+        });
+      } catch (providerError: any) {
+        console.warn(`[JohMeta Pipeline - Batch] ${provider.toUpperCase()} failed completely:`, providerError.message);
+        console.warn(`[JohMeta Pipeline - Batch] Falling back to Gemini as absolute failsafe...`);
+        genResponse = await callGeminiWithRetry('gemini-3.5-flash', { 
+            parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
+          }, {
+            systemInstruction: genSystemInstruction,
+            responseMimeType: "application/json",
+            temperature: temperature ?? 0.1,
+            topP: 0.8 });
+      }
+    } else {
+      genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.5-flash', { 
           parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: genSystemInstruction,
           responseMimeType: "application/json",
           temperature: temperature ?? 0.1,
-          topP: 0.8 })
-    );
+          topP: 0.8 });
+    }
 
     let rawContent = typeof genResponse === 'string' ? genResponse : genResponse.text;
     console.log('[STAGE 2/3 BATCH] RAW RESPONSE:');
@@ -1929,8 +1959,8 @@ OUTPUT FORMAT:
   try {
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
-          systemInstruction: `You are an Adobe Stock Metadata Expert.`,
-          contents: validatorSystemInstruction + `\n\nAudit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
+          systemInstruction: validatorSystemInstruction,
+          contents: `Audit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
