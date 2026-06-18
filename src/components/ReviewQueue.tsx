@@ -28,17 +28,29 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
   onChange
 }) => {
   const [copied, setCopied] = React.useState(false);
+  const [localValue, setLocalValue] = React.useState(value || '');
+  
+  React.useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  const handleBlur = () => {
+    if (localValue !== value) {
+      onChange(localValue);
+    }
+  };
+
   const colorClass = themeColor === 'blue' ? 'border-[#7c3aed] hover:border-violet-600' : themeColor === 'purple' ? 'border-purple-500 hover:border-purple-650' : 'border-emerald-500 hover:border-emerald-650';
 
   const handleCopy = async () => {
-    const success = await copyToClipboard(value);
+    const success = await copyToClipboard(localValue);
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const safeValue = value || '';
+  const safeValue = localValue || '';
   const len = safeValue.length;
   const minLen = label.toLowerCase().includes('title') ? 15 : 50; const ratingText = len < minLen ? 'Too short' : len <= 200 ? 'Optimal' : 'Too long';
   const ratingColor = len < minLen ? 'text-rose-500' : len <= 200 ? 'text-emerald-500' : 'text-amber-500';
@@ -55,7 +67,8 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
       {isTextArea ? (
         <textarea
           value={safeValue}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={handleBlur}
           maxLength={label.toLowerCase().includes('title') || label.toLowerCase().includes('judul') ? 200 : undefined}
           className={`w-full p-2.5 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/85 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-200 transition-all font-semibold resize-none min-h-[65px] focus:ring-2 focus:ring-[#7c3aed]/20`}
         />
@@ -63,7 +76,8 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
         <input
           type="text"
           value={safeValue}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={handleBlur}
           maxLength={label.toLowerCase().includes('title') || label.toLowerCase().includes('judul') ? 200 : undefined}
           className={`w-full p-2.5 bg-slate-100/55 dark:bg-black/25 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 outline-none text-xs text-slate-700 dark:text-slate-300 transition-all font-extrabold focus:ring-2 focus:ring-[#7c3aed]/20`}
         />
@@ -431,6 +445,34 @@ interface ReviewQueueProps {
   keywordCount?: number | string;
 }
 
+const FileNameInput: React.FC<{
+  initialName: string;
+  onNameChange: (newName: string) => void;
+}> = ({ initialName, onNameChange }) => {
+  const [localName, setLocalName] = React.useState(initialName);
+  
+  React.useEffect(() => {
+    setLocalName(initialName);
+  }, [initialName]);
+
+  const handleBlur = () => {
+    if (localName !== initialName) {
+      onNameChange(localName);
+    }
+  };
+
+  return (
+    <input 
+      type="text" 
+      value={localName}
+      onChange={(e) => setLocalName(e.target.value)}
+      onBlur={handleBlur}
+      className="text-xs font-black text-slate-700 dark:text-white bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 outline-none w-full truncate cursor-text transition-colors pb-1"
+      title="Edit Filename"
+    />
+  );
+};
+
 export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   files,
   activeTool,
@@ -539,10 +581,19 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
     return name.includes(term) || title.includes(term) || desc.includes(term) || keywords.includes(term);
   });
 
+  const isGenerating = isLoading && files.some(f => f.isGenerating || f.isExtracting);
+
   return (
-    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 overflow-hidden relative ${
-      mobileTab === 'review' ? 'block animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:block'
-    }`}>
+    <div 
+      id="review-queue-section"
+      className={`bg-white dark:bg-[#111827] border rounded-2xl shadow-md overflow-hidden relative transition-all duration-350 ${
+        isGenerating
+          ? 'border-[#7c3aed] ring-2 ring-[#7c3aed]/20 dark:ring-[#7c3aed]/30 shadow-[#7c3aed]/5' 
+          : 'border-[#e3e6f0]/80 dark:border-white/5 shadow-black/5'
+      } ${
+        mobileTab === 'review' ? 'block animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:block'
+      }`}
+    >
       {/* HEADER */}
       <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg flex justify-between items-center">
         <div className="flex items-center space-x-2.5">
@@ -676,6 +727,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                 <motion.div 
                   layout
                   key={file.id} 
+                  id={`file-card-${file.id}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className={`relative bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 transition-all duration-300 ${
@@ -753,15 +805,11 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     </div>
 
                     <div className="flex-1 min-w-0 py-0.5">
-                      <input 
-                        type="text" 
-                        value={file.customFileName ?? file.file.name}
-                        onChange={(e) => {
-                          const newName = e.target.value;
+                      <FileNameInput
+                        initialName={file.customFileName ?? file.file.name}
+                        onNameChange={(newName) => {
                           updateFiles(prev => prev.map(f => f.id === file.id ? { ...f, customFileName: newName } : f));
                         }}
-                        className="text-xs font-black text-slate-700 dark:text-white bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 outline-none w-full truncate cursor-text transition-colors pb-1"
-                        title="Edit Filename"
                       />
                       <div className="mt-1.5 pb-1 flex flex-wrap gap-1.5 items-center">
                         {file.error ? (

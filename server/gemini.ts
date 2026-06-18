@@ -921,15 +921,14 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          if (currentModel !== 'gemini-3.1-flash-lite') {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.1-flash-lite to bypass unavailability, quota limits or high demand (attempt ${attempt + 1}).`);
-             currentModel = 'gemini-3.1-flash-lite';
-             if (!customDelay && attempt === 0) customDelay = 1000; // Reset wait time so we try the new model immediately
-          } else {
-             console.warn(`[callGeminiWithRetry] Rotating from ${currentModel} to gemini-3.5-flash to bypass unavailability or quota limits (attempt ${attempt + 1}).`);
-             currentModel = 'gemini-3.5-flash';
-             if (!customDelay && attempt === 0) customDelay = 1000; // Reset wait time so we try the new model immediately
-          }
+          const rotationModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+          // Let's pick the next one in the cycle, or random to avoid all concurrent requests flocking to the exact same fallback
+          let nextModel = rotationModels[(attempt + 1) % rotationModels.length];
+          if (nextModel === currentModel) nextModel = rotationModels[(attempt + 2) % rotationModels.length];
+          
+          console.warn(`[callGeminiWithRetry] Quota/Limit hit. Rotating from ${currentModel} to ${nextModel} (attempt ${attempt + 1}).`);
+          currentModel = nextModel;
+          customDelay = attempt === 0 ? 2000 : 5000; // Reset wait time to try new model quickly
         } else if (statusCode === 429 && customDelay > 60000) {
              console.warn(`[callGeminiWithRetry] Hard quota limit hit on ${currentModel} (Wait time > 60s). Failing fast.`);
              throw err;

@@ -4,7 +4,7 @@ import {
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
-  Plus, Key, Lock, MessageCircle
+  Plus, Key, Lock, MessageCircle, Monitor, Palette
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -364,10 +364,21 @@ const CopyBox: React.FC<{
     showLengthRating?: boolean 
 }> = ({ label, value, onChange, isTextArea = false, themeColor = 'blue', showLengthRating = false }) => {
     const [copied, setCopied] = useState(false);
+    const [localValue, setLocalValue] = useState(value || '');
+
+    useEffect(() => {
+        setLocalValue(value || '');
+    }, [value]);
+
+    const handleBlur = () => {
+        if (localValue !== value) {
+            onChange(localValue);
+        }
+    };
 
     const handleCopy = async () => {
-        if (!value) return;
-        const success = await copyToClipboard(value);
+        if (!localValue) return;
+        const success = await copyToClipboard(localValue);
         if (success) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -380,7 +391,7 @@ const CopyBox: React.FC<{
             ? 'focus:ring-emerald-500/10 focus:border-emerald-500/80 dark:focus:border-emerald-400/80' 
             : 'focus:ring-violet-500/10 focus:border-violet-500/80 dark:focus:border-blue-400/80';
 
-    const count = value ? value.length : 0;
+    const count = localValue ? localValue.length : 0;
     let ratingColor = "bg-slate-300 dark:bg-slate-700";
     let ratingText = "";
     let ratingTextColor = "text-slate-400 dark:text-slate-500";
@@ -413,18 +424,20 @@ const CopyBox: React.FC<{
             {isTextArea ? (
                 <textarea 
                     className={`w-full p-4 bg-white/50 dark:bg-slate-900/40 border border-slate-300/50 dark:border-white/10 rounded-2xl text-[12px] leading-relaxed outline-none focus:ring-4 ${focusRingClass} focus:border-blue-400 dark:focus:border-blue-700/50 transition-all min-h-[90px] resize-none font-medium text-slate-700 dark:text-slate-200 shadow-inner`} 
-                    value={value} 
-                    onChange={(e) => onChange(e.target.value)} 
+                    value={localValue} 
+                    onChange={(e) => setLocalValue(e.target.value)} 
+                    onBlur={handleBlur}
                 />
             ) : (
                 <input 
                     type="text" 
                     className={`w-full p-4 bg-white/50 dark:bg-slate-900/40 border border-slate-300/50 dark:border-white/10 rounded-2xl text-[12px] outline-none focus:ring-4 ${focusRingClass} focus:border-blue-400 dark:focus:border-blue-700/50 transition-all font-semibold text-slate-700 dark:text-slate-200 shadow-inner`} 
-                    value={value} 
-                    onChange={(e) => onChange(e.target.value)} 
+                    value={localValue} 
+                    onChange={(e) => setLocalValue(e.target.value)} 
+                    onBlur={handleBlur}
                 />
             )}
-            {showLengthRating && value && (
+            {showLengthRating && localValue && (
                 <div className="mt-1 px-1 space-y-1 animate-in fade-in duration-300">
                     <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-wider">
                         <span className={ratingTextColor}>{ratingText}</span>
@@ -586,6 +599,31 @@ const KeywordList: React.FC<{
   );
 };
 
+const FileNameInputRefined: React.FC<{
+  initialName: string;
+  onNameChange: (newName: string) => void;
+}> = ({ initialName, onNameChange }) => {
+  const [localName, setLocalName] = React.useState(initialName);
+  React.useEffect(() => { setLocalName(initialName); }, [initialName]);
+
+  const handleBlur = () => {
+    if (localName !== initialName) {
+      onNameChange(localName);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      value={localName}
+      onChange={(e) => setLocalName(e.target.value)}
+      onBlur={handleBlur}
+      className="bg-transparent border-b border-transparent hover:border-slate-500 focus:border-white outline-none w-full truncate cursor-text transition-colors pb-0 text-center"
+      title="Edit Filename"
+    />
+  );
+};
+
 const FilePreview: React.FC<{ 
   fileItem: FileItem, 
   onClose: () => void,
@@ -631,16 +669,12 @@ const FilePreview: React.FC<{
           </div>
         )}
         <div className="mt-4 text-white font-bold tracking-wide text-sm bg-black/80 px-4 py-2 rounded-full flex items-center max-w-[90%]">
-          <input
-            type="text"
-            value={fileItem.customFileName ?? fileItem.file.name}
-            onChange={(e) => {
-              const newName = e.target.value;
+          <FileNameInputRefined
+            initialName={fileItem.customFileName ?? fileItem.file.name}
+            onNameChange={(newName) => {
               setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, customFileName: newName } : f));
               setPreviewFile(prev => prev ? { ...prev, customFileName: newName } : null);
             }}
-            className="bg-transparent border-b border-transparent hover:border-slate-500 focus:border-white outline-none w-full truncate cursor-text transition-colors pb-0 text-center"
-            title="Edit Filename"
           />
         </div>
       </div>
@@ -990,13 +1024,32 @@ const toSentenceCase = (text: string) => {
 };
 
 const App: React.FC = () => {
+  const [matchSystemTheme, setMatchSystemTheme] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('match_system_theme');
+      return saved === 'true';
+    } catch (e) {}
+    return false;
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
+      const savedMatch = localStorage.getItem('match_system_theme');
+      if (savedMatch === 'true') {
+        if (typeof window !== 'undefined' && window.matchMedia) {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+      }
       const saved = localStorage.getItem('theme');
       if (saved === 'dark' || saved === 'light') return saved;
     } catch (e) {}
     return 'light';
   });
+
+  const handleSetTheme = (newTheme: 'light' | 'dark') => {
+    setMatchSystemTheme(false);
+    setTheme(newTheme);
+  };
+
   const [activeTool, setActiveTool] = useState<ToolType>(() => {
     const currentPath = window.location.pathname;
     const matchingTool = getToolFromPath(currentPath);
@@ -1110,7 +1163,7 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'reseller'>('gemini');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'reseller'>('gemini');
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia'>(() => {
     return (localStorage.getItem('ai_provider') || 'gemini') as any;
   });
@@ -2115,6 +2168,22 @@ const App: React.FC = () => {
   
   const [autoDownloadCSV, setAutoDownloadCSVState] = useState(false);
   const [mobileTab, setMobileTab] = useState<'upload' | 'ai' | 'review'>('upload');
+  const [returnToStartCountdown, setReturnToStartCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (returnToStartCountdown === null) return;
+    if (returnToStartCountdown <= 0) {
+      setReturnToStartCountdown(null);
+      setMobileTab('upload');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const timer = setTimeout(() => {
+      setReturnToStartCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [returnToStartCountdown]);
+
   const [r2Status, setR2Status] = useState<boolean | null>(null); // null = belum dicek, true = OK, false = belum dikonfigurasi
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -2140,6 +2209,7 @@ const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stopGenerationRef = useRef(false);
+  const isProcessingLoopRef = useRef(false);
 
   // Auto-Resume from IndexedDB
   useEffect(() => {
@@ -2201,6 +2271,35 @@ const App: React.FC = () => {
           handleExport();
       }
   }, [triggerAutoDownload]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('match_system_theme', String(matchSystemTheme));
+    } catch (e) {}
+  }, [matchSystemTheme]);
+
+  useEffect(() => {
+    if (!matchSystemTheme) return;
+    
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setTheme(e.matches ? 'dark' : 'light');
+    };
+
+    // Apply initially
+    handleSystemThemeChange(mediaQuery);
+
+    // Listen for changes
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleSystemThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    } else {
+      mediaQuery.addListener(handleSystemThemeChange);
+      return () => mediaQuery.removeListener(handleSystemThemeChange);
+    }
+  }, [matchSystemTheme]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -2554,6 +2653,14 @@ const App: React.FC = () => {
 
         updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isGenerating: true } : f));
         
+        // Auto scroll to active file card smoothly
+        setTimeout(() => {
+          const el = document.getElementById(`file-card-${fileItem.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 120);
+        
         let analysisFrames = fileItem.analysisFrames;
         
         if (!analysisFrames || analysisFrames.length === 0) {
@@ -2662,6 +2769,16 @@ const App: React.FC = () => {
 
         // 1. Mark as extracting/generating
         updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: true } : f));
+
+        // Auto scroll to the first active card in the batch smoothly
+        setTimeout(() => {
+          if (chunk && chunk.length > 0) {
+            const el = document.getElementById(`file-card-${chunk[0].id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }, 120);
 
         // 2. Extract frames for those that need it
         const itemsToProcess: { id: string, frames: string[] }[] = [];
@@ -2799,40 +2916,52 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     setMobileTab('review');
+    setReturnToStartCountdown(null);
     startTabKeepAlive();
+    
+    // Smoothly scroll to the processing section (Queue) on desktop and mobile
+    setTimeout(() => {
+      const queueEl = document.getElementById('review-queue-section');
+      if (queueEl) {
+        queueEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
     stopGenerationRef.current = false;
     const startTime = Date.now();
     
     // Extracted loop so we can wrap it in Web Locks API
     const processingLoop = async () => {
+        if (isProcessingLoopRef.current) return;
+        isProcessingLoopRef.current = true;
         let processedInThisRun = 0;
 
-        while (!stopGenerationRef.current) {
-            const currentFiles = filesRef.current;
-            
-            // What needs processing?
-            const pending = isRetry
-                ? currentFiles.filter(f => f.error && !f.isExtracting) // If retry, only retry failed ones that aren't extracting // If retry, only retry failed ones that aren't extracting // If retry, only retry failed ones that aren't extracting
-                : currentFiles.filter(f => !f.title && !f.error); // If normal, process un-generated, un-errored ones // If normal, process un-generated, un-errored ones // If normal, process un-generated, un-errored ones
+        try {
+            while (!stopGenerationRef.current) {
+                const currentFiles = filesRef.current;
                 
-            if (pending.length === 0) {
-                break; // All done!
-            }
+                // What needs processing?
+                const pending = isRetry
+                    ? currentFiles.filter(f => f.error && !f.isExtracting)
+                    : currentFiles.filter(f => !f.title && !f.error);
+                    
+                if (pending.length === 0) {
+                    break; // All done!
+                }
 
-            // Which ones are ready right now?
-            const ready = pending.filter(f => !f.isExtracting && !f.isGenerating);
-            
-            if (ready.length === 0) {
-                // Some files are still extracting or generating. Wait and poll.
-                await backgroundSafeTimeout(500);
-                continue;
-            }
+                // Which ones are ready right now?
+                const ready = pending.filter(f => !f.isExtracting && !f.isGenerating);
+                
+                if (ready.length === 0) {
+                    // Some files are still extracting or generating. Wait and poll.
+                    await backgroundSafeTimeout(500);
+                    continue;
+                }
 
-            // Process a chunk
-            // Increase batch size to 10 for images to save massive amounts of API calls!
-            let maxBatch = 10;
-            if (activeTool === ToolType.VIDEO) maxBatch = 3;
-            else if (activeTool === ToolType.VECTOR) maxBatch = 5;
+            // Reduce batch size to avoid hitting aggressive 429 TPM/RPM quota limits
+            let maxBatch = 5;
+            if (activeTool === ToolType.VIDEO) maxBatch = 2;
+            else if (activeTool === ToolType.VECTOR) maxBatch = 3;
             
             const chunkSize = generationMode === GenerationMode.BATCH ? maxBatch : 1;
             const chunk = ready.slice(0, chunkSize);
@@ -2841,11 +2970,15 @@ const App: React.FC = () => {
                 if (generationMode === GenerationMode.BATCH) {
                     await processBatchFiles(chunk);
                     processedInThisRun += chunk.length;
+                    // Add a small delay between batches to respect rate limits
+                    await backgroundSafeTimeout(2000);
                 } else {
                     for (const file of chunk) {
                         if (stopGenerationRef.current) break;
                         await processOneFile(file);
                         processedInThisRun++;
+                        // Add a small delay
+                        await backgroundSafeTimeout(1500);
                     }
                 }
             } catch (err: any) {
@@ -2872,8 +3005,23 @@ const App: React.FC = () => {
         setIsLoading(false);
         setIsPaused(false);
         stopTabKeepAlive();
+        
+        // If successfully completed processing (not stopped) and processed files
+        if (!stopGenerationRef.current && processedInThisRun > 0) {
+            setReturnToStartCountdown(5); // Start a 5-second countdown to return to beginning
+        }
+        
         stopGenerationRef.current = false;
         setTimeout(() => setProgressInfo(null), 5000);
+      } catch (err) {
+          console.error("Processing loop error:", err);
+          setIsLoading(false);
+          setIsPaused(false);
+          stopTabKeepAlive();
+          stopGenerationRef.current = false;
+      } finally {
+          isProcessingLoopRef.current = false;
+      }
     };
 
     // --- TRICK 3: WEB LOCKS API ---
@@ -2895,6 +3043,7 @@ const App: React.FC = () => {
       stopGenerationRef.current = true;
       setIsLoading(false);
       setIsPaused(false);
+      setReturnToStartCountdown(null);
       stopTabKeepAlive();
       // Clean up any files that were stuck in "generating" state
       updateFiles(prev => prev.map(f => f.isGenerating ? { ...f, isGenerating: false, error: "Cancelled by user" } : f));
@@ -3079,8 +3228,11 @@ const App: React.FC = () => {
   };
 
   const handleRegenerateFile = async (fileItem: FileItem) => {
-    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, error: null, isGenerating: true } : f));
-    await processOneFile({ ...fileItem, error: null });
+    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, error: null, title: '', isGenerating: false, isExtracting: false } : f));
+    // Start queue so we pick it up safely
+    setTimeout(() => {
+        handleGenerateAll();
+    }, 100);
   };
 
   const t = TRANSLATIONS[uiLanguage];
@@ -3101,7 +3253,7 @@ const App: React.FC = () => {
       <LoginScreen 
         onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} 
         theme={theme} 
-        setTheme={setTheme} 
+        setTheme={handleSetTheme} 
         language={uiLanguage}
         setLanguage={setUiLanguage}
         t={t} 
@@ -3157,7 +3309,7 @@ const App: React.FC = () => {
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery} 
           theme={theme} 
-          setTheme={setTheme} 
+          setTheme={handleSetTheme} 
           sidebarOpen={sidebarOpen} 
           setSidebarOpen={setSidebarOpen} 
           setShowInfoModal={setShowInfoModal} 
@@ -3659,15 +3811,101 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => (
+              {(['appearance', 'gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'reseller' ? '💻 Reseller Portal' : `${tab.toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : `${tab.toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
 
             {/* Tab Content */}
             <div className="space-y-4 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
+              {activeSettingsTab === 'appearance' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    {uiLanguage === 'id' 
+                      ? "Sesuaikan tampilan antarmuka MetaZo PRO sesuai kenyamanan visual Anda secara manual atau otomatis." 
+                      : "Customize the interface appearance of MetaZo PRO to your visual comfort manually or automatically."}
+                  </p>
+
+                  <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">
+                          {uiLanguage === 'id' ? "Cocokkan Tema Sistem" : "Match System Theme"}
+                        </label>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-tight block mt-0.5">
+                          {uiLanguage === 'id' 
+                            ? "Gunakan preferensi tema terang/gelap dari sistem operasi perangkat Anda secara dinamis." 
+                            : "Dynamically use the light/dark theme preference from your device's operating system."}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newVal = !matchSystemTheme;
+                          setMatchSystemTheme(newVal);
+                          if (newVal) {
+                            if (typeof window !== 'undefined' && window.matchMedia) {
+                              const matchesDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                              setTheme(matchesDark ? 'dark' : 'light');
+                            }
+                          }
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          matchSystemTheme ? 'bg-[#7c3aed]' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            matchSystemTheme ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">
+                      {uiLanguage === 'id' ? "Pilih Tema Secara Manual" : "Select Theme Manually"}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSetTheme('light')}
+                        className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-[1.25rem] border font-bold text-xs transition-all ${
+                          !matchSystemTheme && theme === 'light'
+                            ? 'bg-white dark:bg-slate-950 border-[#7c3aed] text-[#7c3aed] shadow-sm'
+                            : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <Sun size={12} className={!matchSystemTheme && theme === 'light' ? 'text-[#7c3aed]' : 'text-slate-400'} />
+                        <span>{uiLanguage === 'id' ? "Mode Terang" : "Light Mode"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetTheme('dark')}
+                        className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-[1.25rem] border font-bold text-xs transition-all ${
+                          !matchSystemTheme && theme === 'dark'
+                            ? 'bg-white dark:bg-slate-950 border-[#7c3aed] text-[#7c3aed] shadow-sm'
+                            : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <Moon size={12} className={!matchSystemTheme && theme === 'dark' ? 'text-[#7c3aed]' : 'text-slate-400'} />
+                        <span>{uiLanguage === 'id' ? "Mode Gelap" : "Dark Mode"}</span>
+                      </button>
+                    </div>
+                    {matchSystemTheme && (
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide block mt-1 text-center">
+                        {uiLanguage === 'id' 
+                          ? "⚠️ Mengubah tema manual akan mematikan 'Cocokkan Tema Sistem'." 
+                          : "⚠️ Selecting a manual theme will turn off 'Match System Theme'."}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {activeSettingsTab === 'gemini' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
                   <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner">
@@ -4544,6 +4782,31 @@ const App: React.FC = () => {
         </div>
       )}
       
+      {/* Return to Start Countdown float message */}
+      {returnToStartCountdown !== null && (
+        <div className="fixed bottom-6 left-6 z-[9999] animate-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-slate-900/95 dark:bg-slate-950/98 text-white backdrop-blur border border-white/10 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3.5 max-w-sm" style={{ boxShadow: '0 20px 50px -12px rgba(124, 58, 237, 0.3)' }}>
+            <div className="w-8 h-8 rounded-full bg-[#7c3aed] flex items-center justify-center font-black text-sm text-white animate-pulse shrink-0">
+              {returnToStartCountdown}
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-extrabold tracking-widest uppercase text-[9px] text-[#7c3aed] dark:text-violet-400">PROSES SELESAI!</p>
+              <p className="text-slate-300 text-xs font-bold leading-normal mt-0.5">
+                {uiLanguage === 'id' 
+                  ? `Kembali ke awal dalam ${returnToStartCountdown} detik...` 
+                  : `Returning to start in ${returnToStartCountdown} seconds...`}
+              </p>
+            </div>
+            <button
+              onClick={() => setReturnToStartCountdown(null)}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/15 border border-white/5 font-black text-[9px] uppercase rounded-xl transition-all cursor-pointer select-none"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <AboutModal 
         isOpen={showAboutModal} 
         onClose={() => setShowAboutModal(false)} 

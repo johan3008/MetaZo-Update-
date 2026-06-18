@@ -433,8 +433,19 @@ app.get('/api/debug-uploads', (req, res) => {
                     }
                 } catch (err: any) {
                     lastError = err;
-                    const errStr = String(err.message || err.status || err.details || "").toLowerCase();
+                    const errStr = (
+                        (err.message ? String(err.message) : "") + " " +
+                        (err.status ? String(err.status) : "") + " " +
+                        (err.code ? String(err.code) : "") + " " +
+                        (typeof err === 'object' ? JSON.stringify(err) : String(err))
+                    ).toLowerCase();
                     const statusCode = err.status || err.code;
+                    
+                    // If it's a quota exceeded / rate limit error (429), the API key is indeed valid (authenticated), but out of quota.
+                    // We can immediately throw this error so that it bypasses other model trials and goes straight to the quota handling catch block.
+                    if (statusCode === 429 || errStr.includes('429') || errStr.includes('resource_exhausted') || errStr.includes('quota') || errStr.includes('exceeded')) {
+                        throw err;
+                    }
                     
                     // If it's a structural key issue (invalid key or unauthorized) and NOT transient like 503 or 429, fail fast
                     if (statusCode === 400 && (errStr.includes('api_key_invalid') || errStr.includes('invalid') || errStr.includes('not found') || errStr.includes('unregistered') || errStr.includes('api key'))) {
@@ -453,8 +464,13 @@ app.get('/api/debug-uploads', (req, res) => {
             }
         } catch (e: any) {
             console.error('Test API Key error:', e);
-            const errStr = String(e.message || e);
-            if (errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('quota') || errStr.includes('Quota exceeded')) {
+            const errTextJoined = (
+                (e.message ? String(e.message) : "") + " " +
+                (e.status ? String(e.status) : "") + " " +
+                (e.code ? String(e.code) : "") + " " +
+                (typeof e === 'object' ? JSON.stringify(e) : String(e))
+            ).toLowerCase();
+            if (errTextJoined.includes('429') || errTextJoined.includes('resource_exhausted') || errTextJoined.includes('quota') || errTextJoined.includes('exceeded')) {
                 return res.json({
                     success: true,
                     quotaExceeded: true,
