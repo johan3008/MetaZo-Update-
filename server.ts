@@ -416,12 +416,38 @@ app.get('/api/debug-uploads', (req, res) => {
                     }
                 }
             });
-            const response = await testClient.models.generateContent({
-                model: 'gemini-3.5-flash',
-                contents: 'Respond with exactly the word "VALID"',
-            });
+            
+            // Try different models to avoid temporary unavailability, deprecation or high demand (503)
+            const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+            let lastError: any = null;
+            let response: any = null;
+            
+            for (const testModel of modelsToTry) {
+                try {
+                    response = await testClient.models.generateContent({
+                        model: testModel,
+                        contents: 'Respond with exactly the word "VALID"',
+                    });
+                    if (response && response.text) {
+                        break; // Success!
+                    }
+                } catch (err: any) {
+                    lastError = err;
+                    const errStr = String(err.message || err.status || err.details || "").toLowerCase();
+                    const statusCode = err.status || err.code;
+                    
+                    // If it's a structural key issue (invalid key or unauthorized) and NOT transient like 503 or 429, fail fast
+                    if (statusCode === 400 && (errStr.includes('api_key_invalid') || errStr.includes('invalid') || errStr.includes('not found') || errStr.includes('unregistered') || errStr.includes('api key'))) {
+                        throw err;
+                    }
+                    console.warn(`[test-gemini-key] Failed testing model ${testModel}, trying next model if available. Error: ${err.message}`);
+                }
+            }
+            
             if (response && response.text) {
                 return res.json({ success: true, message: 'API Key valid!' });
+            } else if (lastError) {
+                throw lastError;
             } else {
                 return res.status(400).json({ error: 'Gagal mendapatkan respon dari AI. Silakan periksa kembali key Anda.' });
             }
