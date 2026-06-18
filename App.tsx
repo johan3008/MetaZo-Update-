@@ -34,6 +34,7 @@ import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { LoginScreen } from './src/components/LoginScreen';
 import { Meteors } from './src/components/Meteors';
+import { AboutModal } from './src/components/AboutModal';
 
 // --- IndexedDB Helper for Auto-Resume ---
 const DB_NAME = 'EPS_Batch_DB';
@@ -1105,6 +1106,7 @@ const App: React.FC = () => {
       return !sessionStorage.getItem('vixer_welcomed');
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -3145,6 +3147,7 @@ const App: React.FC = () => {
         onUnlockReseller={() => setShowResellerUnlockInput(true)}
         appName={mzAppName}
         unreadChatCount={unreadChatCount}
+        onShowAbout={() => setShowAboutModal(true)}
       />
 
       {/* Main Content Area Container */}
@@ -4540,6 +4543,13 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      
+      <AboutModal 
+        isOpen={showAboutModal} 
+        onClose={() => setShowAboutModal(false)} 
+        theme={theme} 
+        t={t} 
+      />
       
       {/* Floating Chat Notification Toasts Stack */}
       {chatToasts.length > 0 && (

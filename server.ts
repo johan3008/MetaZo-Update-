@@ -8,7 +8,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { GoogleGenAI } from '@google/genai';
 
 // TRICK: Strict Queue to prevent Server OOM.
@@ -640,6 +640,20 @@ app.get('/api/debug-uploads', (req, res) => {
         if (provider === 'nvidia') return 'NVIDIA';
         return 'Gemini';
     };
+
+    app.post('/api/adobe-research', async (req, res) => {
+        try {
+            const { keyword } = req.body;
+            if (!keyword || typeof keyword !== 'string') {
+                return res.status(400).json({ error: 'Keyword is required and must be a string' });
+            }
+            const results = await searchAdobeStockWithBypass(keyword);
+            res.json(results);
+        } catch (e: any) {
+            console.warn('Server /api/adobe-research error:', e);
+            res.status(500).json({ error: e.message || 'Error executing Adobe Stock search' });
+        }
+    });
 
     app.post('/api/generate-metadata', async (req, res) => {
         try {

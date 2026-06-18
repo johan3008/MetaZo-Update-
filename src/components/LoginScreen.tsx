@@ -10,6 +10,28 @@ import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
 import { AppLanguage } from '../../constants';
 import { Meteors } from './Meteors';
 
+const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-lg" }) => {
+  const chars = name.split('');
+  return (
+    <div className="flex items-center flex-wrap select-none font-black tracking-tight leading-none uppercase">
+      {chars.map((char, index) => (
+        <motion.span
+          key={index}
+          className={`inline-block text-slate-950 dark:text-white hover:text-[#7c3aed] dark:hover:text-[#a78bfa] transition-colors duration-150 ${fontSizeClass}`}
+          whileHover={{
+            y: -4,
+            scale: 1.15,
+            transition: { type: 'spring', stiffness: 400, damping: 10 }
+          }}
+          style={{ display: 'inline-block', originY: 1 }}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </motion.span>
+      ))}
+    </div>
+  );
+};
+
 interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
   theme: 'light' | 'dark';
@@ -126,13 +148,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* 2. HEADER BAR (Control center) */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-9 h-9 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.25rem] flex items-center justify-center shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover animate-pulse" />
-          </div>
-          <span className="font-black text-lg tracking-tight text-slate-950 dark:text-white uppercase">
-            MetaZo <span className="text-[#7c3aed]">PRO</span>
-          </span>
+        <div className="flex items-center space-x-2.5 select-none">
+          <motion.div 
+            whileHover={{ rotate: 360, scale: 1.15 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="w-9 h-9 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.25rem] flex items-center justify-center shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden cursor-pointer"
+          >
+            <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover scale-[1.05]" />
+          </motion.div>
+          <AnimatedAppName name="MetaZo PRO" fontSizeClass="text-lg" />
         </div>
 
         <div className="flex items-center space-x-3">
@@ -238,11 +263,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <div className="flex flex-col items-center text-center space-y-6">
                 
                 {/* MetaZo Pro Glow Circle */}
-                <div className="relative">
+                <div className="relative select-none">
                   <div className="absolute inset-0 bg-gradient-to-tr from-[#7c3aed] to-[#224abe] rounded-full blur-md opacity-25 scale-110" />
-                  <div className="relative w-16 h-16 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.75rem] flex items-center justify-center shadow-xl border border-white/10 dark:border-slate-800 overflow-hidden">
+                  <motion.div 
+                    whileHover={{ rotate: 360, scale: 1.15 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                    className="relative w-16 h-16 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.75rem] flex items-center justify-center shadow-xl border border-white/10 dark:border-slate-800 overflow-hidden cursor-pointer"
+                  >
                     <img src={LogoImage} alt="MetaZo Logo Large" className="w-full h-full object-cover scale-[1.05]" />
-                  </div>
+                  </motion.div>
                 </div>
 
                 <div className="space-y-1">

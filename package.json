@@ -28,6 +28,7 @@
     "multer": "^2.1.1",
     "nodemailer": "^8.0.10",
     "pdfjs-dist": "^5.5.207",
+    "playwright-chromium": "^1.61.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "utif": "^3.1.0"

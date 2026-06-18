@@ -1,11 +1,34 @@
 import React, { useState } from 'react';
 import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
+import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard
+  Calendar, CreditCard, Info
 } from 'lucide-react';
 import { ToolType, GenerationMode } from '../../types';
+
+const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-base" }) => {
+  const chars = name.split('');
+  return (
+    <div className="flex items-center flex-wrap select-none font-black tracking-tight leading-none">
+      {chars.map((char, index) => (
+        <motion.span
+          key={index}
+          className={`inline-block text-slate-900 dark:text-white hover:text-[#7c3aed] dark:hover:text-[#a78bfa] transition-colors duration-150 ${fontSizeClass}`}
+          whileHover={{
+            y: -4,
+            scale: 1.15,
+            transition: { type: 'spring', stiffness: 400, damping: 10 }
+          }}
+          style={{ display: 'inline-block', originY: 1 }}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </motion.span>
+      ))}
+    </div>
+  );
+};
 
 interface SidebarProps {
   activeTool: ToolType;
@@ -23,6 +46,7 @@ interface SidebarProps {
   onUnlockReseller?: () => void;
   appName?: string;
   unreadChatCount?: number;
+  onShowAbout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -40,7 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setShowActivation,
   onUnlockReseller,
   appName,
-  unreadChatCount = 0
+  unreadChatCount = 0,
+  onShowAbout
 }) => {
   const [metadataGenOpen, setMetadataGenOpen] = useState(true);
   const [promptGenOpen, setPromptGenOpen] = useState(true);
@@ -85,13 +110,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className="flex items-center space-x-3 px-4 py-5 border-b border-slate-200 dark:border-slate-800 cursor-pointer select-none active:scale-[0.99] transition-all"
         title="MetaZo PRO Stock Assistant"
       >
-        <div className="w-9 h-9 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.5rem] flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 transition-all overflow-hidden border border-slate-200 dark:border-slate-800">
-          <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover" />
-        </div>
+        <motion.div 
+          whileHover={{ rotate: 360, scale: 1.15 }}
+          whileTap={{ scale: 0.95 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="w-9 h-9 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.5rem] flex items-center justify-center shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden cursor-pointer shrink-0"
+        >
+          <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover scale-[1.05]" />
+        </motion.div>
         {!sidebarCollapsed && (
           <div className="flex flex-col select-none">
-            <span className="font-black text-base tracking-tight text-slate-900 dark:text-white leading-none">{customAppName}</span>
-            <span className="text-[9px] font-extrabold text-slate-400 h-[24px] uppercase tracking-widest mt-1">STOCK ASSISTANT</span>
+            <AnimatedAppName name={customAppName} fontSizeClass="text-base" />
+            <motion.span 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 flex items-center"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse shrink-0" />
+              STOCK ASSISTANT
+            </motion.span>
           </div>
         )}
       </div>
@@ -394,6 +432,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_subscription_plan}</span>}
             </button>
 
+            <button 
+              type="button"
+              onClick={onShowAbout}
+              className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer mb-1.5 animate-none"
+            >
+              <Info size={14} className="text-[#7c3aed]" />
+              {!sidebarCollapsed && <span>{t.sidebar_about || 'Tentang MetaZo PRO'}</span>}
+            </button>
+
             <a 
               href={t.whatsapp_link} 
               target="_blank" 
@@ -455,14 +502,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex-1 flex flex-col h-full select-none">
               <div 
                 onClick={handleLogoClick}
-                className="flex items-center space-x-3 px-1 py-5 border-b border-slate-200 dark:border-slate-800 cursor-pointer active:scale-[0.99] transition-all animate-none"
+                className="flex items-center space-x-3 px-1 py-5 border-b border-slate-200 dark:border-slate-800 cursor-pointer select-none active:scale-[0.99] transition-all"
               >
-                <div className="w-9 h-9 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.5rem] flex items-center justify-center shadow overflow-hidden border border-slate-200 dark:border-slate-800">
-                  <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white leading-none">{customAppName}</span>
-                  <span className="text-[8px] font-extrabold text-slate-400 h-[24px] uppercase tracking-widest mt-1">STOCK ASSISTANT</span>
+                <motion.div 
+                  whileHover={{ rotate: 360, scale: 1.15 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                  className="w-9 h-9 bg-gradient-to-br from-[#7c3aed] to-[#224abe] rounded-[1.5rem] flex items-center justify-center shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden cursor-pointer shrink-0"
+                >
+                  <img src={LogoImage} alt="MetaZo PRO Logo" className="w-full h-full object-cover scale-[1.05]" />
+                </motion.div>
+                <div className="flex flex-col select-none">
+                  <AnimatedAppName name={customAppName} fontSizeClass="text-sm" />
+                  <motion.span 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="text-[8px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 flex items-center"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse shrink-0" />
+                    STOCK ASSISTANT
+                  </motion.span>
                 </div>
               </div>
               
@@ -673,6 +733,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             
             <div className="space-y-2 mt-4">
+              <button 
+                onClick={() => { onShowAbout?.(); setSidebarOpen(false); }}
+                className="w-full text-center py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-[1.5rem] flex items-center justify-center space-x-2 cursor-pointer mb-1.5"
+              >
+                <Info size={14} />
+                <span>{t.sidebar_about || 'Tentang MetaZo PRO'}</span>
+              </button>
+
               <a href={t.whatsapp_link} target="_blank" rel="noopener noreferrer" className="w-full text-center py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 dark:text-white text-xs font-black rounded-[1.5rem] flex items-center justify-center space-x-2">
                 <MessageCircle size={14} />
                 <span>{t.help_button}</span>
