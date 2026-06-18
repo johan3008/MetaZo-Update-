@@ -10,6 +10,10 @@ interface AiConfigPanelProps {
   setKeywordCount: (c: number | string) => void;
   keywordMode: 'mixed' | 'single' | 'multi';
   setKeywordMode: (mode: 'mixed' | 'single' | 'multi') => void;
+  titleLength: 'short' | 'medium' | 'long';
+  setTitleLength: (length: 'short' | 'medium' | 'long') => void;
+  metadataLanguage: string;
+  setMetadataLanguage: (lang: string) => void;
   aiCreativity: number;
   setAiCreativity: (val: number) => void;
   isLoading: boolean;
@@ -33,6 +37,10 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   setKeywordCount,
   keywordMode,
   setKeywordMode,
+  titleLength,
+  setTitleLength,
+  metadataLanguage,
+  setMetadataLanguage,
   aiCreativity,
   setAiCreativity,
   isLoading,
@@ -48,7 +56,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   hasFiles
 }) => {
   return (
-    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 flex flex-col justify-between min-h-[460px] relative overflow-hidden ${
+    <div className={`bg-white dark:bg-[#111827] border-[2px] border-[#e3e6f0]/80 dark:border-white/5 rounded-[2rem] shadow-xl shadow-black/5 flex flex-col justify-between min-h-[460px] relative overflow-hidden transition-all duration-300 hover:shadow-2xl ${
       mobileTab === 'ai' ? 'flex animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:flex'
     }`}>
       {/* CARD HEADER */}
@@ -130,6 +138,58 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  Title Length / Panjang Title
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'short', label: 'Short' },
+                  { value: 'medium', label: 'Medium' },
+                  { value: 'long', label: 'Long' }
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setTitleLength(opt.value as 'short' | 'medium' | 'long')}
+                    className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center ${
+                      titleLength === opt.value
+                        ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-md shadow-[#7c3aed]/20'
+                        : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  Metadata Language
+                </label>
+              </div>
+              <select
+                value={metadataLanguage}
+                onChange={(e) => setMetadataLanguage(e.target.value)}
+                className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 font-medium"
+              >
+                <option value="en">English (Default)</option>
+                <option value="id">Indonesian / Bahasa 🇮🇩</option>
+                <option value="es">Spanish / Español</option>
+                <option value="fr">French / Français</option>
+                <option value="de">German / Deutsch</option>
+                <option value="it">Italian / Italiano</option>
+                <option value="pt">Portuguese / Português</option>
+                <option value="ja">Japanese / 日本語</option>
+                <option value="ko">Korean / 한국어</option>
+                <option value="ru">Russian / Русский</option>
+              </select>
             </div>
 
             <div className="space-y-3 p-4 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5 relative overflow-hidden">

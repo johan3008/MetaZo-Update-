@@ -1075,6 +1075,8 @@ const App: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [keywordCount, setKeywordCount] = useState<number | string>('');
   const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => (localStorage.getItem('mz_keyword_mode') as 'mixed' | 'single' | 'multi') || 'mixed');
+  const [titleLength, setTitleLength] = useState<'short' | 'medium' | 'long'>(() => (localStorage.getItem('mz_title_length') as 'short' | 'medium' | 'long') || 'medium');
+  const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
 
   // 1. Mark current user as online
@@ -1129,6 +1131,14 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('mz_keyword_mode', keywordMode);
   }, [keywordMode]);
+
+  useEffect(() => {
+    localStorage.setItem('mz_title_length', titleLength);
+  }, [titleLength]);
+
+  useEffect(() => {
+    localStorage.setItem('mz_metadata_language', metadataLanguage);
+  }, [metadataLanguage]);
 
   // Cek status R2 saat user membuka tool Vector (EPS/AI)
   useEffect(() => {
@@ -1837,7 +1847,7 @@ const App: React.FC = () => {
     return (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
   });
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
-  const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
 
   const [newGeminiKey, setNewGeminiKey] = useState('');
@@ -2700,7 +2710,7 @@ const App: React.FC = () => {
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList
               };
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -2846,7 +2856,7 @@ const App: React.FC = () => {
                   nvidiaKeys: nvidiaKeysList,
                   blackboxKeys: blackboxKeysList
                 };
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -3466,9 +3476,36 @@ const App: React.FC = () => {
                 )}
                 
                 <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                      {activeTool === ToolType.IMAGE ? "Image AI Workspace" : activeTool === ToolType.VIDEO ? "Video AI Workspace" : "Vector AI Workspace"}
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+                      {activeTool === ToolType.IMAGE ? (
+                        <>
+                          <div className="w-10 h-10 rounded-[1.25rem] bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-500/20 flex items-center justify-center shadow-lg shadow-violet-500/10">
+                            <ImageIcon className="text-violet-500 dark:text-violet-400" size={20} strokeWidth={2.5} />
+                          </div>
+                          <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400">
+                            Image AI Workspace
+                          </span>
+                        </>
+                      ) : activeTool === ToolType.VIDEO ? (
+                        <>
+                          <div className="w-10 h-10 rounded-[1.25rem] bg-gradient-to-br from-purple-500/20 to-fuchsia-500/20 border border-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10">
+                            <Film className="text-purple-500 dark:text-purple-400" size={20} strokeWidth={2.5} />
+                          </div>
+                          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-fuchsia-600 dark:from-purple-400 dark:to-fuchsia-400">
+                            Video AI Workspace
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 rounded-[1.25rem] bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                            <FileCode className="text-emerald-500 dark:text-emerald-400" size={20} strokeWidth={2.5} />
+                          </div>
+                          <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400">
+                            Vector AI Workspace
+                          </span>
+                        </>
+                      )}
                     </h2>
                     <FeatureGuideButton 
                       title={activeTool === ToolType.IMAGE ? t.guide_image_title : activeTool === ToolType.VIDEO ? t.guide_video_title : t.guide_vector_title}
@@ -3476,7 +3513,7 @@ const App: React.FC = () => {
                       t={t}
                     />
                   </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-wider">
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-extrabold mt-1.5 uppercase tracking-widest ml-[52px]">
                     {activeTool === ToolType.IMAGE && "JPG, PNG & WEBP metadata optimizer"}
                     {activeTool === ToolType.VIDEO && "Frame sequential MP4/MOV metadata assistant"}
                     {activeTool === ToolType.VECTOR && "EPS, SVG & AI graphic indexing assistant"}
@@ -3573,6 +3610,10 @@ const App: React.FC = () => {
                   setKeywordCount={setKeywordCount} 
                   keywordMode={keywordMode}
                   setKeywordMode={setKeywordMode}
+                  titleLength={titleLength}
+                  setTitleLength={setTitleLength}
+                  metadataLanguage={metadataLanguage}
+                  setMetadataLanguage={setMetadataLanguage}
                   aiCreativity={aiCreativity}
                   setAiCreativity={setAiCreativity}
                   isLoading={isLoading} 
@@ -3923,6 +3964,9 @@ const App: React.FC = () => {
                       <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
                       <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
                       <option value="gemini-3-flash">Gemini 3 Flash</option>
+                      <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                      <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
                       <option value="gemma-4-31b-it">Gemma 4 31B IT (Free RPD 1.5K)</option>
                     </select>
                   </div>

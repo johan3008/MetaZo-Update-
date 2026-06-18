@@ -257,7 +257,7 @@ function getHeuristicCategories(title: string, keywords: string[]): {
   };
 }
 
-function ensureTitleLength(title: string, keywords: string[], description: string): string {
+function ensureTitleLength(title: string, keywords: string[], description: string, titleLength?: string): string {
   if (!title || title.trim() === "" || title.includes("Write a descriptive title here") || title.includes("<generate a") || title.includes("A highly descriptive") || title.includes("A detailed")) {
     if (description && description.trim().length > 10 && !description.includes("Write a detailed description here") && !description.includes("<generate a") && !description.includes("A highly descriptive") && !description.includes("A detailed")) title = description;
     else if (keywords && keywords.length >= 3) title = keywords.slice(0, 5).join(' ');
@@ -285,11 +285,15 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
     }
   }
 
-  // Limit to 200 characters. If too long, truncate nicely at word boundary
-  if (cleanedTitle.length > 200) {
-    let truncated = cleanedTitle.substring(0, 200);
+  // Limit bounds based on titleLength
+  let upperLimit = 200;
+  if (titleLength === 'short') upperLimit = 65;
+  if (titleLength === 'long') upperLimit = 200;
+
+  if (cleanedTitle.length > upperLimit) {
+    let truncated = cleanedTitle.substring(0, upperLimit);
     const lastSpace = truncated.lastIndexOf(' ');
-    if (lastSpace > 100) {
+    if (lastSpace > Math.floor(upperLimit / 2)) {
       truncated = truncated.substring(0, lastSpace);
     }
     cleanedTitle = truncated.trim();
@@ -318,6 +322,35 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
 
   return cleanedTitle;
 }
+
+const getTitleLengthRule = (titleLength?: string) => {
+  if (titleLength === 'short') {
+    return "Title MUST be highly SEO optimized but kept VERY SHORT and concise (around 3 to 7 words maximum). Just state the core subject briefly.";
+  } else if (titleLength === 'long') {
+    return "Title MUST be highly SEO optimized, extremely detailed, and have at least 15-25 descriptive words to ensure maximum long-tail visibility on stock platforms. Capture all elements.";
+  }
+  return "Title MUST be highly SEO optimized, front-loaded with primary commercial keywords, and have at least 10-15 descriptive words to ensure maximum visibility on stock platforms.";
+};
+
+const getLanguageName = (code?: string) => {
+  const map: Record<string, string> = {
+    'en': 'ENGLISH',
+    'id': 'INDONESIAN (BAHASA INDONESIA)',
+    'es': 'SPANISH',
+    'fr': 'FRENCH',
+    'de': 'GERMAN',
+    'it': 'ITALIAN',
+    'pt': 'PORTUGUESE',
+    'ja': 'JAPANESE',
+    'ko': 'KOREAN',
+    'ru': 'RUSSIAN',
+    'th': 'THAI',
+    'tr': 'TURKISH',
+    'nl': 'DUTCH',
+    'pl': 'POLISH'
+  };
+  return map[code || 'en'] || 'ENGLISH';
+};
 
 function ensureKeywordCount(
   keywords: string[],
@@ -921,7 +954,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+          const rotationModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -944,7 +977,7 @@ const callGeminiWithRetry = async (
             backoff = Math.min(30000, backoff); 
         }
 
-        console.warn(`Gemini Error ${statusCode} on ${currentModel}, retrying in ${backoff / 1000}s (attempt ${attempt + 1}/${maxAttempts})...`);
+        console.log(`[Gemini Retry] Received ${statusCode} on ${currentModel}, retrying in ${backoff / 1000}s (attempt ${attempt + 1}/${maxAttempts})...`);
         await new Promise(resolve => setTimeout(resolve, backoff));
         continue;
       }
@@ -971,9 +1004,11 @@ export const generateStockMetadata = async (
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
   model?: string,
-  keywordMode?: 'mixed' | 'single' | 'multi'
+  keywordMode?: 'mixed' | 'single' | 'multi',
+  titleLength?: 'short' | 'medium' | 'long',
+  metadataLanguage?: string
 ): Promise<StockMetadata> => {
-  const activeModel = model === 'gemini-3-flash' ? 'gemini-3-flash-preview' : model;
+  const activeModel = model === 'gemini-3.5-flash' ? 'gemini-3.5-flash' : model;
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
   
@@ -987,7 +1022,7 @@ export const generateStockMetadata = async (
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: descriptors of the primary subjects or objects matching buyer search queries)
@@ -1005,7 +1040,7 @@ export const generateStockMetadata = async (
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: primary single-word subject descriptors)
@@ -1022,7 +1057,7 @@ export const generateStockMetadata = async (
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: multi-word subject/object descriptors matching buyer searches, e.g., "smartphone device")
@@ -1178,13 +1213,13 @@ OUTPUT FORMAT:
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be highly SEO optimized, front-loaded with primary commercial keywords, and have at least 10-15 descriptive words to ensure maximum visibility on stock platforms. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
+OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
-   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive terms!
    - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
    - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
    - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
@@ -1198,7 +1233,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural English.
+- Use clear natural language.
 - Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
@@ -1315,13 +1350,13 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
 
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words.
+OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
-   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive terms!
    - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
    - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
    - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
@@ -1335,7 +1370,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural English.
+- Use clear natural language.
 - Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
@@ -1484,8 +1519,8 @@ OUTPUT FORMAT:
         keywordMode
       );
 
-    // 1.5. Enforce professional Adobe Stock title length of 70-100 characters strictly
-    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "");
+    // 1.5. Enforce professional title length strictly
+    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength);
 
     // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
     const parsedCategoryId = parseInt(String(data.category_id), 10);
@@ -1534,9 +1569,11 @@ export const generateBatchStockMetadata = async (
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
   model?: string,
-  keywordMode?: 'mixed' | 'single' | 'multi'
+  keywordMode?: 'mixed' | 'single' | 'multi',
+  titleLength?: 'short' | 'medium' | 'long',
+  metadataLanguage?: string
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
-  const activeModel = model === 'gemini-3-flash' ? 'gemini-3-flash-preview' : model;
+  const activeModel = model === 'gemini-3.5-flash' ? 'gemini-3.5-flash' : model;
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
@@ -1545,7 +1582,7 @@ export const generateBatchStockMetadata = async (
   const aiRequestCount = targetCount + 10; 
 
   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in English. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: descriptors of the primary subjects or objects matching buyer search queries)
@@ -1563,7 +1600,7 @@ export const generateBatchStockMetadata = async (
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in English. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: primary single-word subject descriptors)
@@ -1580,7 +1617,7 @@ export const generateBatchStockMetadata = async (
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in English. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. Detail and elaborate keywords to fully align with the buyer's Search Intent (menjabarkan sedetail mungkin kata kunci sesuai Search Intent atau maksud pencarian komersial pembeli):
    - Subject (Main Focus: multi-word subject/object descriptors matching buyer searches, e.g., "smartphone device")
@@ -1743,13 +1780,13 @@ OUTPUT FORMAT:
 
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be highly SEO optimized, front-loaded with primary commercial keywords, and have at least 10-15 descriptive words to ensure maximum visibility on stock platforms.
+OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
-   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive terms!
    - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
    - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
    - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
@@ -1763,7 +1800,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural English.
+- Use clear natural language.
 - Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
@@ -1880,13 +1917,13 @@ OUTPUT FORMAT:
 
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. Title MUST be descriptive and have at least 6-8 words.
+OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
-   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive English terms!
+   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive terms!
    - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
    - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
    - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
@@ -1900,7 +1937,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural English.
+- Use clear natural language.
 - Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
@@ -2067,8 +2104,8 @@ OUTPUT FORMAT:
               keywordMode
             );
 
-        // 1.5. Enforce professional Adobe Stock title length of 70-100 characters strictly
-        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "");
+        // 1.5. Enforce professional title length strictly
+        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength);
 
         // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
         const parsedCategoryId = parseInt(String(metadata.category_id), 10);
@@ -2342,7 +2379,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -2818,7 +2855,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -2898,7 +2935,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
 
@@ -3127,7 +3164,7 @@ Respons Anda WAJIB dalam format JSON:
 
   const imagePart = processFrameServer(image);
   
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
 

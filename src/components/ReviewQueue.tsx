@@ -728,10 +728,13 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                   layout
                   key={file.id} 
                   id={`file-card-${file.id}`}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`relative bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 transition-all duration-300 ${
-                    file.error ? 'border-red-500/20 bg-red-500/2' : file.title ? 'border-emerald-500/15 dark:border-emerald-500/10 hover:border-emerald-500/40' : 'border-slate-200/80 dark:border-white/5'
+                  initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  whileHover={{ scale: 1.005, y: -2 }}
+                  className={`relative bg-white dark:bg-slate-900 border rounded-[1.5rem] p-5 transition-all duration-300 hover:shadow-2xl ${
+                    file.error ? 'border-red-500/30 bg-red-50/30 dark:bg-red-950/10 shadow-red-500/5 hover:border-red-500/50' 
+                    : file.title ? 'border-emerald-500/20 dark:border-emerald-500/10 hover:border-emerald-500/40 shadow-emerald-500/5' 
+                    : 'border-slate-200/80 dark:border-white/5 hover:border-violet-500/20 shadow-black/5'
                   }`}
                 >
                   {file.isGenerating && (

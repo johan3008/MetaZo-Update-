@@ -418,7 +418,7 @@ app.get('/api/debug-uploads', (req, res) => {
             });
             
             // Try different models to avoid temporary unavailability, deprecation or high demand (503)
-            const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+            const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
             let lastError: any = null;
             let response: any = null;
             
@@ -451,7 +451,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     if (statusCode === 400 && (errStr.includes('api_key_invalid') || errStr.includes('invalid') || errStr.includes('not found') || errStr.includes('unregistered') || errStr.includes('api key'))) {
                         throw err;
                     }
-                    console.warn(`[test-gemini-key] Failed testing model ${testModel}, trying next model if available. Error: ${err.message}`);
+                    console.log(`[test-gemini-key] Failed testing model ${testModel}, trying next model if available. Error: ${err.message}`);
                 }
             }
             
@@ -470,11 +470,18 @@ app.get('/api/debug-uploads', (req, res) => {
                 (typeof e === 'object' ? JSON.stringify(e) : String(e))
             ).toLowerCase();
             if (errTextJoined.includes('429') || errTextJoined.includes('resource_exhausted') || errTextJoined.includes('quota') || errTextJoined.includes('exceeded')) {
-                 console.warn('Test API Key returned 429 Quota Exceeded (successfully handled as valid key but empty quota).');
+                 console.log('Test API Key returned 429 Quota Exceeded (successfully handled as valid key but empty quota).');
                  return res.json({
                     success: true,
                     quotaExceeded: true,
                     message: 'API Key valid & sukses terotentikasi! Namun kuota gratis / kredit akun Google AI Studio Anda habis (Quota Exceeded / RESOURCE_EXHAUSTED). Anda tetap bisa menyimpannya, namun pastikan untuk menambah limit/tagihan di Google AI Studio Anda agar bisa digunakan.'
+                });
+            } else if (errTextJoined.includes('503') || errTextJoined.includes('unavailable') || errTextJoined.includes('high demand') || errTextJoined.includes('overloaded')) {
+                 console.log('Test API Key returned 503 High Demand (successfully handled as valid key).');
+                 return res.json({
+                    success: true,
+                    quotaExceeded: false,
+                    message: 'API Key valid & sukses terotentikasi! Server Gemini sedang tinggi permintaan (503 High Demand), namun key Anda dapat digunakan.'
                 });
             }
             console.error('Test API Key error:', e);
@@ -700,12 +707,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-metadata', async (req, res) => {
         try {
-            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode } = req.body;
+            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage } = req.body;
             if (!frames || !Array.isArray(frames)) {
                 return res.status(400).json({ error: 'Missing or invalid frames' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode);
+            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage);
             res.json(metadata);
         } catch (e: any) {
             console.warn('Server generate-metadata error:', e);
@@ -719,12 +726,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-batch-metadata', async (req, res) => {
         try {
-            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode } = req.body;
+            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage } = req.body;
             if (!items || !Array.isArray(items)) {
                 return res.status(400).json({ error: 'Missing or invalid items' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode);
+            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage);
             res.json(batchMetadata);
         } catch (e: any) {
             console.warn('Server generate-batch-metadata error:', e);
