@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Sparkles, Key, Image as ImageIcon, Film, FileText, Layers, 
-  ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle
+  ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle, Mail, Lock
 } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
 import { AppLanguage } from '../../constants';
@@ -52,6 +52,69 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorHeader, setErrorHeader] = useState('');
   const [isHovered, setIsHovered] = useState(false);
+  
+  // Email/Password states
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState('');
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setErrorHeader(language === 'id' ? "Silakan masukkan alamat email Anda terlebih dahulu di kotak input." : "Please enter your email address in the input field first.");
+      setResetSuccessMessage('');
+      return;
+    }
+    
+    setIsLoading(true);
+    setErrorHeader('');
+    setResetSuccessMessage('');
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSuccessMessage(language === 'id' ? "Email pemulihan kata sandi telah dikirim! Silakan periksa kotak masuk Anda." : "Password reset email has been sent! Please check your inbox.");
+    } catch (err: any) {
+      console.error("Password reset error:", err);
+      let errMsg = err.message;
+      if (err.code === "auth/invalid-email") {
+        errMsg = language === 'id' ? "Format email tidak valid." : "Invalid email format.";
+      } else if (err.code === "auth/user-not-found") {
+        errMsg = language === 'id' ? "Email tidak terdaftar." : "Email address not found.";
+      }
+      setErrorHeader(errMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailLoginOrRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    
+    setIsLoading(true);
+    setErrorHeader('');
+    try {
+      if (isRegisterMode) {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        if (result.user) onLoginSuccess(result.user);
+      } else {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        if (result.user) onLoginSuccess(result.user);
+      }
+    } catch (err: any) {
+      console.error("Email Auth Error:", err);
+      let errMsg = err.message;
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        errMsg = language === 'id' ? "Email atau kata sandi salah." : "Invalid email or password.";
+      } else if (err.code === "auth/email-already-in-use") {
+        errMsg = language === 'id' ? "Email sudah terdaftar." : "Email is already registered.";
+      } else if (err.code === "auth/weak-password") {
+        errMsg = language === 'id' ? "Kata sandi terlalu lemah (minimal 6 karakter)." : "Password should be at least 6 characters.";
+      }
+      setErrorHeader(errMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -321,18 +384,107 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   >
                     <AlertCircle size={15} className="shrink-0 mt-0.5" />
                     <div className="text-[10px] font-bold leading-normal">
-                      <span className="uppercase block tracking-wide">{language === 'id' ? 'Gagal Masuk' : 'Authentication Error'}</span>
+                      <span className="uppercase block tracking-wide">{language === 'id' ? 'Pemberitahuan' : 'Notification'}</span>
                       <span className="font-semibold block normal-case mt-0.5 text-slate-800 dark:text-red-300/90">{errorHeader}</span>
                     </div>
                   </motion.div>
                 )}
+
+                {/* Reset Password Success Banner */}
+                {resetSuccessMessage && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="w-full p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-left text-emerald-600 dark:text-emerald-400 flex items-start space-x-2 shadow-sm"
+                  >
+                    <ShieldCheck size={15} className="shrink-0 mt-0.5" />
+                    <div className="text-[10px] font-bold leading-normal">
+                      <span className="uppercase block tracking-wide">{language === 'id' ? 'Sukses' : 'Success'}</span>
+                      <span className="font-semibold block normal-case mt-0.5 text-slate-800 dark:text-emerald-300/90">{resetSuccessMessage}</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Email / Password Form */}
+                <form className="w-full space-y-4" onSubmit={handleEmailLoginOrRegister}>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <input 
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder={language === 'id' ? "Email / Gmail" : "Email / Gmail"}
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#7c3aed] text-slate-900 dark:text-white placeholder:text-slate-400"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <Lock className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <input 
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder={language === 'id' ? "Kata Sandi" : "Password"}
+                          className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#7c3aed] text-slate-900 dark:text-white placeholder:text-slate-400"
+                          required={!isRegisterMode || password.length > 0}
+                        />
+                      </div>
+                      
+                      {!isRegisterMode && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={handleForgotPassword}
+                            className="text-[10px] text-slate-500 dark:text-slate-400 font-bold hover:text-[#7c3aed] dark:hover:text-[#a78bfa] transition-colors cursor-pointer"
+                          >
+                            {language === 'id' ? 'Lupa Kata Sandi?' : 'Forgot Password?'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3.5 bg-[#7c3aed] hover:bg-[#6d28d9] active:scale-[0.98] text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all disabled:opacity-75"
+                  >
+                    {isLoading ? <Loader2 size={16} className="animate-spin mx-auto" /> : (
+                      isRegisterMode 
+                        ? (language === 'id' ? 'Daftar' : 'Register')
+                        : (language === 'id' ? 'Masuk dengan Email' : 'Sign In with Email')
+                    )}
+                  </button>
+                </form>
+
+                {/* Toggle Register/Login */}
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterMode(!isRegisterMode)}
+                  className="text-[10px] text-slate-500 dark:text-slate-400 font-bold hover:text-[#7c3aed] dark:hover:text-[#a78bfa] transition-colors"
+                >
+                  {isRegisterMode 
+                    ? (language === 'id' ? 'Sudah punya akun? Masuk' : 'Already have an account? Sign in')
+                    : (language === 'id' ? 'Belum punya akun? Daftar' : "Don't have an account? Register")}
+                </button>
+
+                <div className="flex items-center w-full">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                  <span className="px-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">{language === 'id' ? 'Atau' : 'Or'}</span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+                </div>
 
                 {/* Main Action Google Sign-In Button */}
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={isLoading}
-                  className="w-full py-4 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl hover:shadow-2xl transition-all cursor-pointer flex items-center justify-center space-x-3.5 disabled:opacity-75 disabled:cursor-not-allowed group/btn"
+                  className="w-full py-3.5 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg hover:shadow-xl transition-all cursor-pointer flex items-center justify-center space-x-3.5 disabled:opacity-75 disabled:cursor-not-allowed group/btn"
                 >
                   {isLoading ? (
                     <Loader2 size={16} className="animate-spin text-violet-500 dark:text-slate-900" />

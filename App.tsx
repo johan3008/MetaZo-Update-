@@ -4,7 +4,7 @@ import {
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
-  Plus, Key, Lock, MessageCircle, Monitor, Palette
+  Plus, Key, Lock, MessageCircle, Monitor, Palette, Gift, Tag
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -1196,6 +1196,12 @@ const App: React.FC = () => {
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
 
+  // Promo Window States
+  const [showPromoWindow, setShowPromoWindow] = useState(false);
+  const [hasSyncedProfile, setHasSyncedProfile] = useState(false);
+  const [promoCodesForModal, setPromoCodesForModal] = useState<any[]>([]);
+  const [copiedCodeInModal, setCopiedCodeInModal] = useState<string | null>(null);
+
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -1497,6 +1503,7 @@ const App: React.FC = () => {
 
   // Live real-time sync user profile (license key & subscription/trial status) from Firestore
   useEffect(() => {
+    setHasSyncedProfile(false);
     if (!user) {
       setCloudDailyCounts({});
       return;
@@ -1505,6 +1512,7 @@ const App: React.FC = () => {
     const dateStr = getTodayDateString();
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+      setHasSyncedProfile(true);
       if (snapshot.exists()) {
         const data = snapshot.data();
         
@@ -1654,6 +1662,35 @@ const App: React.FC = () => {
       setShowActivationModal(true);
     }
   }, [isMzLicensed, trialDaysLeft]);
+
+  // Fetch active promo codes for the Login Promo modal
+  useEffect(() => {
+    if (!user) return;
+    getDocs(query(collection(db, 'promos'), limit(5)))
+      .then((qSnap) => {
+        const list: any[] = [];
+        qSnap.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setPromoCodesForModal(list);
+      })
+      .catch((err) => {
+        console.warn("Failed to load promos for modal:", err);
+      });
+  }, [user]);
+
+  // Trigger login promo modal if user is on a free trial account
+  useEffect(() => {
+    if (user && hasSyncedProfile && !isCheckingAuth) {
+      if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
+        sessionStorage.removeItem('mz_just_logged_in_promo');
+        // If the synced profile reveals they are NOT licensed (free trial account)
+        if (!isMzLicensed) {
+          setShowPromoWindow(true);
+        }
+      }
+    }
+  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth]);
 
   // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
@@ -3261,7 +3298,10 @@ const App: React.FC = () => {
   if (!user) {
     return (
       <LoginScreen 
-        onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} 
+        onLoginSuccess={(loggedInUser) => {
+          sessionStorage.setItem('mz_just_logged_in_promo', 'true');
+          setUser(loggedInUser);
+        }} 
         theme={theme} 
         setTheme={handleSetTheme} 
         language={uiLanguage}
@@ -4688,6 +4728,204 @@ const App: React.FC = () => {
                 className="flex-1 py-1.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-bold rounded-[1.5rem] text-xs uppercase shadow transition-colors"
               >
                 Simpan & Pasang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- LOGIN PROMO MODAL OVERLAY ----------------- */}
+      {showPromoWindow && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={() => setShowPromoWindow(false)}>
+          <div 
+            className="bg-white dark:bg-[#0f172a] rounded-[2rem] max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 dark:border-white/10 flex flex-col relative animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top Close Button */}
+            <button 
+              onClick={() => setShowPromoWindow(false)} 
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white bg-slate-50 dark:bg-slate-800 rounded-full transition-colors cursor-pointer z-10"
+              aria-label="Close Promo"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Header with Visual Glow */}
+            <div className="p-6 sm:p-8 bg-gradient-to-br from-violet-600 via-indigo-700 to-red-600 text-white relative">
+              <div className="absolute right-4 bottom-0 opacity-10 pointer-events-none scale-150">
+                <Gift size={160} />
+              </div>
+              
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-white/20 text-white border border-white/30 text-[9px] font-black uppercase tracking-widest mb-3 animate-bounce">
+                <Sparkles size={11} className="text-amber-300 animate-pulse" />
+                <span>{uiLanguage === 'id' ? "PENAWARAN TERBATAS" : "LIMITED OFFER FOR YOU"}</span>
+              </div>
+              
+              <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none mb-2">
+                {uiLanguage === 'id' ? "Akun Anda: Free Trial" : "Your Account: Free Trial"}
+              </h2>
+              <p className="text-xs text-slate-100 font-medium leading-relaxed">
+                {uiLanguage === 'id' 
+                  ? "Dapatkan potongan harga khusus & aktifkan fitur premium penuh untuk mendominasi pasar microstock!"
+                  : "Grab direct discount coupons below & activate high-speed pipelines today!"}
+              </p>
+            </div>
+
+            {/* Promo Codes & Features */}
+            <div className="p-6 sm:p-8 space-y-5 overflow-y-auto max-h-[400px]">
+              {/* Highlight Perks */}
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                  {uiLanguage === 'id' ? "Kenapa Harus Upgrade ke PRO?" : "Why Upgrade to PRO?"}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-start space-x-2 p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                    <Zap size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                        {uiLanguage === 'id' ? "Tanpa Batasan" : "Unlimited Pipeline"}
+                      </p>
+                      <p className="text-[9px] text-slate-500 line-clamp-1">
+                        {uiLanguage === 'id' ? "Batch generator tanpa limit harian" : "Process bulk images without limits"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                        {uiLanguage === 'id' ? "Metadata Presisi" : "Perfect Microstock SEO"}
+                      </p>
+                      <p className="text-[9px] text-slate-500 line-clamp-1">
+                        {uiLanguage === 'id' ? "Keyword teroptimasi standar industri" : "Rank higher on Adobe Stock & Freepik"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Promo list */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    {uiLanguage === 'id' ? "Voucher Diskon Siap Pakai" : "Ready-to-Use Coupon Codes"}
+                  </span>
+                  <span className="text-[9px] bg-red-100 dark:bg-red-950 text-red-655 dark:text-red-400 font-extrabold px-1.5 py-0.5 rounded-lg">
+                    {uiLanguage === 'id' ? "Diskon s/d 50%" : "Save up to 50%"}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {promoCodesForModal.length === 0 ? (
+                    // Fallback promo code if firebase collection is empty
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-violet-500/10 to-red-500/10 border border-violet-200/50 dark:border-violet-500/20 rounded-2xl transition-all">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-[#7c3aed]/10 rounded-xl text-[#7c3aed]">
+                          <Tag size={16} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-[#7c3aed] dark:text-violet-400 tracking-wider uppercase">MZPROMO2026</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                            {uiLanguage === 'id' ? "Potongan 50% untuk Langganan Pertama" : "50% Discount on First Purchase"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          try {
+                            navigator.clipboard.writeText("MZPROMO2026");
+                            setCopiedCodeInModal("MZPROMO2026");
+                            setTimeout(() => setCopiedCodeInModal(null), 2000);
+                          } catch (err) {}
+                        }}
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center space-x-1 ${copiedCodeInModal === "MZPROMO2026" ? "bg-emerald-600 text-white cursor-default" : "bg-[#7c3aed] hover:bg-violet-600 text-white shadow-sm cursor-pointer"}`}
+                      >
+                        {copiedCodeInModal === "MZPROMO2026" ? (
+                          <>
+                            <Check size={12} />
+                            <span>Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={12} />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    promoCodesForModal.map((p) => (
+                      <div 
+                        key={p.id}
+                        className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 hover:border-violet-200 dark:hover:border-violet-500/30 rounded-2xl transition-all"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-violet-100 dark:bg-violet-550/15 rounded-xl text-violet-650 dark:text-violet-405 shrink-0">
+                            <Tag size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-xs font-black text-[#7c3aed] dark:text-violet-400 tracking-wider uppercase truncate">
+                                {p.code}
+                              </span>
+                              {p.endDate && (
+                                <span className="text-[7.5px] bg-red-100 dark:bg-red-950/60 text-red-750 dark:text-red-400 font-extrabold px-1 py-0.2 rounded shrink-0">
+                                  Berakhir {p.endDate}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block truncate">
+                              {p.description || (p.type === 'free_premium' ? `${p.value} Hari Premium` : `Diskon ${p.value}%`)}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            try {
+                              navigator.clipboard.writeText(p.code);
+                              setCopiedCodeInModal(p.code);
+                              setTimeout(() => setCopiedCodeInModal(null), 2000);
+                            } catch (err) {}
+                          }}
+                          className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center space-x-1 shrink-0 ${copiedCodeInModal === p.code ? "bg-emerald-600 text-white cursor-default" : "bg-[#7c3aed]/10 text-[#7c3aed] hover:bg-[#7c3aed] hover:text-white dark:bg-violet-500/20 dark:text-violet-350 cursor-pointer"}`}
+                        >
+                          {copiedCodeInModal === p.code ? (
+                            <>
+                              <Check size={12} />
+                              <span>Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              <span>Salin</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions Panel */}
+            <div className="p-6 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-100 dark:border-white/5 flex flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  setShowPromoWindow(false);
+                  setShowActivationModal(true);
+                }}
+                className="w-full py-4 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition-all text-center cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <Key size={14} />
+                <span>{uiLanguage === 'id' ? "Gunakan Voucher / Lisensi Sekarang" : "Redeem License Key / Voucher"}</span>
+              </button>
+              
+              <button
+                onClick={() => setShowPromoWindow(false)}
+                className="w-full py-2.5 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase rounded-xl transition-all text-center cursor-pointer"
+              >
+                {uiLanguage === 'id' ? "Selesaikan Uji Coba (Lanjut)" : "Continue Free Trial"}
               </button>
             </div>
           </div>

@@ -373,9 +373,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Interactive Configuration Panel - ALWAYS FULL WIDTH ON TOP */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/5 rounded-2xl p-5 sm:p-6 space-y-6 shadow-md shadow-black/5">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 rounded-[1.5rem] p-5 sm:p-7 space-y-7 shadow-xl shadow-black/5 relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 opacity-80" />
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 blur-3xl rounded-full" />
           <div className="border-b border-slate-100 dark:border-white/5 pb-3 flex justify-between items-center">
             <h3 className="font-extrabold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
               <Sparkles size={14} className="text-emerald-500" />
@@ -453,28 +455,33 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
             {/* Left side within the input panel */}
             <div className="space-y-4">
               {/* 1. Subject Area */}
-              <div className="space-y-2">
+              <div className="space-y-2 group">
                 <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlignLeft size={14} className="text-emerald-500" />
                     {t.prompt_subject_label}
                   </label>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Bilingual Support</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">Bilingual Support</span>
                 </div>
                 
-                <textarea
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder={t.prompt_subject_placeholder}
-                  className="w-full min-h-[140px] rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all font-medium leading-relaxed resize-y"
-                />
+                <div className="relative">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/30 to-teal-500/30 rounded-[1.5rem] blur opacity-0 group-hover:opacity-100 transition duration-500 ease-in-out"></div>
+                  <textarea
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder={t.prompt_subject_placeholder}
+                    className="relative w-full min-h-[140px] rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all font-medium leading-relaxed resize-y shadow-inner z-10"
+                  />
+                </div>
               </div>
 
               {/* Inspiration Presets */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-emerald-500" />
                   {t.prompt_inspiration_label}
                 </span>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                   {inspirations.map((insp) => (
                     <button
                       key={`${insp.label}-${insp.text.slice(0, 20)}`}
@@ -483,12 +490,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         setSubject(insp.text);
                         setError(null);
                       }}
-                      className="flex flex-col items-start gap-1 p-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] text-left hover:border-emerald-500/50 transition-all duration-200 hover:shadow-md hover:shadow-emerald-500/5 cursor-pointer group"
+                      className="flex flex-col items-start gap-1 p-3 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl text-left hover:border-emerald-500/50 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/5 hover:-translate-y-0.5 cursor-pointer group relative overflow-hidden"
                     >
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 transition-colors">
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-500 transition-colors relative z-10 flex items-center justify-between w-full">
                         {insp.label}
+                        <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-500" />
                       </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight relative z-10">
                         {insp.text}
                       </span>
                     </button>
@@ -499,8 +508,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* ----------------- NEGATIVE PROMPT INPUT COLUMN ----------------- */}
               <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-white/5">
                 <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                     {t.prompt_negative_label}
                   </label>
                   <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{t.prompt_negative_subtitle}</span>
@@ -511,51 +520,50 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     value={bgNegativePrompt}
                     onChange={(e) => setBgNegativePrompt(e.target.value)}
                     placeholder="Contoh: blurry, bad anatomy, text, watermark, ugly..."
-                    className="w-full min-h-[90px] rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
+                    className="w-full min-h-[90px] rounded-[1.5rem] border border-rose-500/10 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
                   />
                 ) : (
                   <textarea
                     value={pngNegativePrompt}
                     onChange={(e) => setPngNegativePrompt(e.target.value)}
                     placeholder="Contoh: scenery, shadow, realistic background, text..."
-                    className="w-full min-h-[90px] rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
+                    className="w-full min-h-[90px] rounded-[1.5rem] border border-rose-500/10 dark:border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5 p-3 px-3.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:bg-white dark:focus:bg-slate-900/40 transition-all leading-relaxed resize-y"
                   />
                 )}
-                <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium leading-relaxed">
+                <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium leading-relaxed italic">
                   {t.prompt_negative_desc}
                 </p>
               </div>
             </div>
 
             {/* Right side within the input panel */}
-            <div className="space-y-5">
+            <div className="space-y-6">
               {/* 2. Style Category Dropdown & Pills */}
               <div className="space-y-3">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 block">
                   {t.prompt_style_master_label}
                 </label>
-                <div className="relative">
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-[1.5rem] blur opacity-0 group-hover:opacity-100 transition duration-500 ease-in-out"></div>
                   <select
                     value={styleCategory}
                     onChange={(e) => setStyleCategory(e.target.value)}
-                    className="w-full rounded-[1.5rem] border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
+                    className="relative w-full rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none shadow-sm transition-all z-10"
                   >
                     {currentStyleOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id} className="dark:bg-slate-950 font-medium">
+                      <option key={opt.id} value={opt.id} className="dark:bg-slate-900 font-medium text-slate-800 dark:text-slate-200">
                         {opt.icon} &nbsp; {opt.label}
                       </option>
                     ))}
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2500/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                    </svg>
+                  <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-emerald-500 z-20">
+                    <ChevronRight className="rotate-90" size={16} />
                   </div>
                 </div>
 
                 {/* Quick Selection Option Chips */}
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-405 dark:text-slate-550 block">
+                <div className="space-y-2 pt-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                     {t.prompt_style_quick_label}
                   </span>
                   <div className="grid grid-cols-2 xs:flex xs:flex-wrap gap-1.5">
@@ -613,10 +621,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               )}
 
               {/* 3. Variation Slider (Determines count of generated prompts: 10 to 150) */}
-              <div className="space-y-3 bg-slate-50/50 dark:bg-black/10 p-4 rounded-[1.5rem] border border-slate-100 dark:border-white/5">
-                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                  <span className="text-slate-550 dark:text-slate-400">{t.prompt_variation_label}</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/25 px-2.5 py-1 rounded-xl text-xs font-semibold font-mono">
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 p-4 rounded-[1.5rem]">
+                <div className="flex justify-between items-center text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                  <span>{t.prompt_variation_label}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-[1.5rem] p-4 font-mono shadow-sm">
                     {variation} {t.prompt_variation_unit}
                   </span>
                 </div>
@@ -628,10 +636,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   step="5"
                   value={variation}
                   onChange={(e) => setVariation(parseInt(e.target.value, 10))}
-                  className="w-full h-2 bg-slate-200 dark:bg-zinc-850 rounded-2xl appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-2xl appearance-none cursor-pointer accent-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
                 />
                 
-                <div className="flex justify-between text-[10px] text-slate-450 dark:text-slate-500 font-bold border-t border-slate-100 dark:border-white/5 pt-2 mt-1 items-center">
+                <div className="flex justify-between text-[10px] text-slate-450 dark:text-slate-500 font-bold border-t border-slate-200/60 dark:border-white/10 pt-3 mt-2 items-center">
                   <div className="flex items-center space-x-1">
                     <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${presetLevelColor}`}>
                       {presetLevelInfo}
@@ -644,17 +652,17 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
 
               {/* 4. Word Count Range Sliders */}
-              <div className="space-y-4 bg-slate-50/50 dark:bg-black/10 p-4 rounded-[1.5rem] border border-slate-100 dark:border-white/5">
-                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                  <span className="text-slate-550 dark:text-slate-400">{t.prompt_word_count_label}</span>
+              <div className="space-y-4 bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 p-4 rounded-[1.5rem]">
+                <div className="flex justify-between items-center text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                  <span>{t.prompt_word_count_label}</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded font-bold">{minWords}-{maxWords} Words</span>
+                    <span className="text-[10px] px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-[1.5rem] font-bold shadow-sm">{minWords}-{maxWords} Words</span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <span>Minimum</span>
                       <span>{minWords}</span>
                     </div>
@@ -702,27 +710,28 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           )}
 
           {/* Actions line */}
-          <div className="border-t border-slate-100 dark:border-white/5 pt-4">
+          <div className="border-t border-slate-200/60 dark:border-white/10 pt-5 relative z-10">
             <button
               onClick={handleGenerate}
               disabled={loading || !subject.trim()}
-              className={`w-full py-4 rounded-[1.5rem] font-semibold text-xs tracking-wider flex items-center justify-center space-x-2 transition-all duration-300 ${
+              className={`w-full py-4 sm:py-5 rounded-[1.5rem] font-bold text-xs sm:text-sm tracking-wider flex items-center justify-center space-x-2.5 transition-all duration-300 relative overflow-hidden ${
                 loading 
-                  ? 'bg-slate-205 dark:bg-white/5 text-slate-400 cursor-not-allowed' 
+                  ? 'bg-slate-200 dark:bg-white/5 text-slate-400 cursor-not-allowed' 
                   : !subject.trim()
-                    ? 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed border border-dashed border-slate-200/60 dark:border-white/5'
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/10 hover:shadow-lg active:scale-[0.99] cursor-pointer'
+                    ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed border border-dashed border-slate-300 dark:border-slate-700'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] cursor-pointer cursor-pulse border border-emerald-400/20'
               }`}
             >
               {loading ? (
                 <>
-                  <RefreshCw className="animate-spin" size={14} />
-                  <span>{t.prompt_btn_synthesizing.replace('{count}', variation.toString())}</span>
+                  <RefreshCw className="animate-spin relative z-10" size={16} />
+                  <span className="relative z-10">{t.prompt_btn_synthesizing.replace('{count}', variation.toString())}</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={13} className="fill-white animate-pulse" />
-                  <span>{t.prompt_btn_synthesize.replace('{count}', variation.toString())}</span>
+                  <Sparkles size={16} className="fill-white animate-pulse relative z-10" />
+                  <span className="relative z-10 drop-shadow-sm">{t.prompt_btn_synthesize.replace('{count}', variation.toString())}</span>
+                  {!subject.trim() || loading ? null : <div className="absolute inset-0 bg-white/20 blur-md rounded-full animate-beam opacity-0 group-hover:opacity-100 transition-opacity"></div>}
                 </>
               )}
             </button>
@@ -733,8 +742,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         <div id="prompt-output-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Main prompt output panel */}
-          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 sm:p-6 text-slate-800 dark:text-slate-100 shadow-md shadow-black/5 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800 pb-4 gap-3">
+          <div className="lg:col-span-8 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 rounded-3xl p-5 sm:p-7 text-slate-800 dark:text-slate-100 shadow-xl shadow-black/5 space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 blur-3xl rounded-full" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/60 dark:border-slate-800 pb-5 gap-3 relative z-10">
               <div>
                 <h3 className="text-sm sm:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
                   {t.prompt_output_title} {result && `(${totalPrompts !== (result?.prompts?.length || 0) ? `${totalPrompts} of ${result?.prompts?.length || 0}` : `${totalPrompts}`})`}
@@ -996,16 +1006,16 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           </div>
 
           {/* Simple Memory/Local Storage Logs */}
-          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/5 rounded-2xl p-5 shadow-md shadow-black/5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <RefreshCw size={12} className="text-slate-400" />
+          <div className="lg:col-span-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 rounded-3xl p-5 sm:p-7 shadow-xl shadow-black/5 space-y-5 sticky top-6">
+            <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-white/10 pb-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <RefreshCw size={14} className="text-emerald-500" />
                 Riwayat Gubahan ({history.length})
               </span>
               {history.length > 0 && (
                 <button
                   onClick={handleClearHistory}
-                  className="text-[10px] font-extrabold text-red-500 dark:text-red-400 uppercase tracking-widest hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-500/10 px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Trash2 size={10} />
                   Hapus
@@ -1014,11 +1024,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
             </div>
 
             {history.length === 0 ? (
-              <div className="py-12 text-center text-[10px] text-slate-450 dark:text-slate-510 italic font-bold uppercase tracking-wider">
-                Belum ada riwayat pembuatan
+              <div className="py-12 flex flex-col justify-center items-center text-center space-y-3 opacity-50">
+                <RefreshCw size={24} className="text-slate-400" />
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                  Belum ada riwayat
+                </span>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 select-none scrollbar-thin">
+              <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-white/10 scrollbar-track-transparent">
                 {history.map((item) => (
                   <div
                     key={item.id}
@@ -1036,24 +1049,25 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       setCurrentPage(1);
                       document.getElementById('prompt-output-section')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="p-3 bg-slate-50/50 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-black/45 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] cursor-pointer text-left transition-all duration-200 flex justify-between items-start gap-3 hover:scale-[1.01]"
+                    className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-white/10 rounded-2xl cursor-pointer text-left transition-all duration-200 flex justify-between items-start gap-4 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 group relative overflow-hidden"
                   >
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-[8px] font-semibold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded leading-none">
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="space-y-2 min-w-0 flex-1 relative z-10">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[9px] font-bold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full leading-none">
                           {item.styleCategory}
                         </span>
-                        <span className="text-[8px] text-slate-455 font-semibold font-mono">
-                          {item.timestamp} • {item.prompts?.length || item.variation} Prompts
+                        <span className="text-[9px] text-slate-400 font-semibold font-mono">
+                          {item.timestamp} • {item.prompts?.length || item.variation} Vars
                         </span>
                       </div>
-                      <p className="text-xs font-bold text-slate-750 dark:text-slate-300 truncate font-mono">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-2">
                         {item.subject}
                       </p>
                     </div>
                     <button
                       onClick={(e) => handleDeleteHistoryItem(item.id, e)}
-                      className="p-1 text-slate-400 hover:text-red-500 rounded-2xl transition-colors cursor-pointer"
+                      className="p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all hover:scale-110 relative z-10"
                       title="Hapus riwayat ini"
                     >
                       <Trash2 size={12} />

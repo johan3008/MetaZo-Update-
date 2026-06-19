@@ -55,65 +55,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onPeerChange,
   onMarkRead
 }) => {
-  // Active Tab: 'global' | 'direct' | 'adobe'
-  const [activeTab, setActiveTab] = useState<'global' | 'direct' | 'adobe'>('global');
-  
-  // Adobe Research Gen States
-  const [adobeKeyword, setAdobeKeyword] = useState('');
-  const [adobeResults, setAdobeResults] = useState<any[]>([]);
-  const [adobeLoading, setAdobeLoading] = useState(false);
-  const [adobeError, setAdobeError] = useState<string | null>(null);
-  const [adobeHistory, setAdobeHistory] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('adobe_search_history');
-      return saved ? JSON.parse(saved) : ['neon background', 'cats', 'abstract design', 'indonesia mountain', 'business model'];
-    } catch (e) {
-      return ['neon background', 'cats', 'abstract design', 'indonesia mountain', 'business model'];
-    }
-  });
-
-  const saveKeywordToHistory = (kw: string) => {
-    if (!kw) return;
-    const clean = kw.trim();
-    if (!clean) return;
-    setAdobeHistory(prev => {
-      const filtered = prev.filter(x => x.toLowerCase() !== clean.toLowerCase());
-      const next = [clean, ...filtered].slice(0, 8);
-      try {
-        localStorage.setItem('adobe_search_history', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  };
-
-  const handleAdobeSearch = async (kw: string) => {
-    if (!kw || !kw.trim()) return;
-    setAdobeLoading(true);
-    setAdobeError(null);
-    saveKeywordToHistory(kw);
-    try {
-      const response = await fetch('/api/adobe-research', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ keyword: kw.trim() })
-      });
-      if (!response.ok) {
-        throw new Error(uiLanguage === 'id' ? 'Gagal mengambil data dari Adobe Stock.' : 'Failed to fetch data from Adobe Stock.');
-      }
-      const data = await response.json();
-      setAdobeResults(data);
-      if (data.length === 0) {
-        setAdobeError(uiLanguage === 'id' ? 'Tidak ada hasil yang ditemukan untuk kata kunci ini.' : 'No results found for this keyword.');
-      }
-    } catch (err: any) {
-      console.error('Adobe Stock search error:', err);
-      setAdobeError(err.message || 'Error fetching Adobe Stock popular data');
-    } finally {
-      setAdobeLoading(false);
-    }
-  };
+  // Active Tab: 'global' | 'direct'
+  const [activeTab, setActiveTab] = useState<'global' | 'direct'>('global');
   
   // All registered users (excluding current user)
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -445,18 +388,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <Users size={11} />
                 <span>{uiLanguage === 'id' ? 'Langsung' : 'Direct'}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => { setActiveTab('adobe'); setIsMobileListOpen(false); }}
-                className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-xl text-[10px] font-black transition-all ${
-                  activeTab === 'adobe' 
-                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-red-500 dark:hover:text-red-400'
-                }`}
-              >
-                <Sparkles size={11} className={activeTab === 'adobe' ? 'text-amber-500' : 'text-red-500'} />
-                <span>Stock</span>
-              </button>
             </div>
 
             {/* Quick search */}
@@ -578,53 +509,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   )}
                 </div>
               </>
-            ) : activeTab === 'adobe' ? (
-              <div className="px-2 space-y-4 bg-slate-50/20 dark:bg-transparent rounded-xl p-2">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                    {uiLanguage === 'id' ? 'Pencarian Terbaru' : 'Recent Searches'}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {adobeHistory.map((kw, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => { setAdobeKeyword(kw); handleAdobeSearch(kw); }}
-                        className="text-[10px] px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-850 rounded-xl text-slate-650 dark:text-slate-350 hover:bg-red-500 hover:text-white dark:hover:bg-red-650 transition-all font-bold"
-                      >
-                        {kw}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-800/60">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                    {uiLanguage === 'id' ? 'Inspirasi Topik' : 'Topic Inspirations'}
-                  </p>
-                  <div className="space-y-1">
-                    {[
-                      { word: 'ramadan lantern', desc: 'Festival, lampu hias' },
-                      { word: 'indonesia landscape', desc: 'Indahnya sawah gunung' },
-                      { word: 'retro wave cyber', desc: 'Synthwave futuristic' },
-                      { word: 'indonesian food', desc: 'Kuliner nusantara real' },
-                      { word: 'organic healthcare', desc: 'Herbal dan kecantikan cosm' }
-                    ].map((item, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => { setAdobeKeyword(item.word); handleAdobeSearch(item.word); }}
-                        className="w-full text-left flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 transition-all group"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-red-500 dark:group-hover:text-red-400">
-                            {item.word}
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate">{item.desc}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
             ) : (
               // GLOBAL TAB Side panel: simply lists active online accounts
               <div className="px-2">
@@ -668,20 +552,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <ArrowLeft size={16} />
               </button>
 
-              {activeTab === 'adobe' ? (
-                <>
-                  <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-amber-500 rounded-lg flex items-center justify-center shrink-0 shadow-md">
-                    <Sparkles size={14} className="text-white animate-pulse" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-[11px] md:text-xs font-black text-slate-900 dark:text-white truncate">Adobe Research Gen</h3>
-                    <p className="text-[9px] text-red-500 dark:text-red-400 font-extrabold flex items-center gap-1 truncate">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping shrink-0" />
-                      <span className="truncate">{uiLanguage === 'id' ? 'Gambar Unduhan Terbanyak & Riwayat' : 'Most Downloaded Assets Search'}</span>
-                    </p>
-                  </div>
-                </>
-              ) : isDirectMode && selectedPeer ? (
+              {isDirectMode && selectedPeer ? (
                 <>
                   <div className="w-8 h-8 bg-violet-600/10 dark:bg-violet-400/10 border border-violet-500/10 rounded-lg flex items-center justify-center shrink-0">
                     <User size={14} className="text-violet-500" />
@@ -719,153 +590,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
           {/* Messages Feed View */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {activeTab === 'adobe' ? (
-              <div className="h-full flex flex-col space-y-4">
-                {/* Visual Header Search Box inside feed */}
-                <div className="p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-slate-950 to-red-950 text-white rounded-3xl border border-red-950/20 shadow-lg relative overflow-hidden shrink-0">
-                  <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none scale-150">
-                    <Sparkles size={160} />
-                  </div>
-                  <h4 className="text-xs sm:text-sm font-black tracking-wider uppercase text-red-400 mb-1 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-amber-400 animate-pulse" />
-                    Adobe Stock Best Sellers
-                  </h4>
-                  <p className="text-[11px] sm:text-xs text-slate-300 leading-normal mb-4">
-                    {uiLanguage === 'id' 
-                      ? 'Cari asset visual terlaris / download terbanyak di Adobe Stock secara live. Masukkan kata kunci pencari Anda di bawah ini.'
-                      : 'Search the most downloaded visual assets on Adobe Stock live. Enter your keyword below.'}
-                  </p>
-                  
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder={uiLanguage === 'id' ? 'Masukkan kata kunci (misal: cat, landscape, ramadan)...' : 'Enter keyword (e.g., cat, landscape, ramadan)...'}
-                      value={adobeKeyword}
-                      onChange={(e) => setAdobeKeyword(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAdobeSearch(adobeKeyword); }}
-                      className="flex-1 px-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-[11px] font-semibold text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
-                    />
-                    <button
-                      onClick={() => handleAdobeSearch(adobeKeyword)}
-                      aria-label="Submit Search"
-                      className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-2xl text-xs font-black transition-all flex items-center gap-1"
-                    >
-                      <Search size={14} />
-                      <span className="hidden sm:inline">{uiLanguage === 'id' ? 'Cari' : 'Search'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Error Banner */}
-                {adobeError && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-xs font-medium flex items-center gap-2">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <span>{adobeError}</span>
-                  </div>
-                )}
-
-                {/* Loading State */}
-                {adobeLoading && (
-                  <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-3">
-                    <div className="relative w-12 h-12">
-                      <div className="absolute inset-0 border-4 border-red-500/10 rounded-full" />
-                      <div className="absolute inset-0 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs font-black text-slate-850 dark:text-white">
-                        {uiLanguage === 'id' ? 'Menghubungi Adobe Stock...' : 'Contacting Adobe Stock...'}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        {uiLanguage === 'id' ? 'Sedang menelusuri data aset paling banyak diunduh' : 'Retrieving high-download asset metadata...'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Results Grid */}
-                {!adobeLoading && !adobeError && (
-                  adobeResults.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-16 text-center opacity-60">
-                      <Search size={40} className="text-slate-300 dark:text-slate-800 mb-2 animate-bounce" />
-                      <p className="text-slate-450 dark:text-slate-300 text-xs italic font-medium">
-                        {uiLanguage === 'id' 
-                          ? 'Belum ada hasil pencarian. Masukkan kata kunci atau klik rekomendasi di sebelah kiri.' 
-                          : 'No query made yet. Enter a keyword or click on a quick rec on the left.'}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {adobeResults.map((item, index) => (
-                        <div
-                          key={(item.id || '') + index}
-                          className="group border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950 overflow-hidden hover:scale-[1.01] transition-all hover:shadow-md flex flex-col"
-                        >
-                          {/* Image Thumbnail Preview */}
-                          <div className="aspect-[4/3] bg-slate-100 dark:bg-slate-900 overflow-hidden relative border-b border-slate-200 dark:border-slate-800">
-                            <img
-                              src={item.imageUrl}
-                              alt={item.title}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                              onError={(e) => {
-                                // Fallback image if broken or blocked
-                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600&auto=format&fit=crop';
-                              }}
-                            />
-                            {/* Demand level Badge */}
-                            <div className="absolute top-2 left-2 flex gap-1">
-                              <span className="text-[9px] font-black bg-slate-950/85 text-white backdrop-blur-sm px-2 py-1 rounded-lg border border-slate-850">
-                                {item.category.toUpperCase()}
-                              </span>
-                              <span className="text-[9px] font-black bg-gradient-to-r from-red-600/95 to-amber-600/95 text-white backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
-                                <Sparkles size={8} />
-                                {uiLanguage === 'id' ? `Dl: ${item.downloads}` : `Dl: ${item.downloads}`}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Info Sheet */}
-                          <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                            <div className="space-y-1">
-                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
-                                {item.title || `${item.category.toUpperCase()} Asset`}
-                              </p>
-                              <div className="flex items-center gap-1">
-                                <span className="text-[9px] font-mono text-slate-400">ID:</span>
-                                <span className="text-[10px] font-mono font-bold text-slate-650 dark:text-slate-350 select-all">{item.id}</span>
-                              </div>
-                            </div>
-
-                            {/* Actions button */}
-                            <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  try {
-                                    navigator.clipboard.writeText(item.id);
-                                  } catch (err) {}
-                                }}
-                                className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-[10px] font-black text-slate-750 dark:text-slate-300 transition-all cursor-pointer shrink-0"
-                              >
-                                {uiLanguage === 'id' ? 'Salin ID' : 'Copy ID'}
-                              </button>
-                              <a
-                                href={item.detailUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 text-center py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl text-[10px] font-black transition-all block tracking-wide"
-                              >
-                                {uiLanguage === 'id' ? 'Lihat Detail' : 'View Stock'}
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                )}
-              </div>
-            ) : isDirectMode && !selectedPeer ? (
+            {isDirectMode && !selectedPeer ? (
               // DM Select account placeholder
               <div className="h-full flex flex-col items-center justify-center text-center p-8">
                 <MessageCircle size={48} className="text-slate-300 dark:text-slate-800 mb-3 animate-bounce" />
@@ -941,7 +666,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
 
           {/* Messages Send Box */}
-          {activeTab !== 'adobe' && (!isDirectMode || selectedPeer) && (
+          {(!isDirectMode || selectedPeer) && (
             <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0 flex items-center gap-2">
               <input
                 type="text"
