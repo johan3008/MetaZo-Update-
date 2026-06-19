@@ -145,6 +145,11 @@ export const ImageQualityCheck: React.FC<{
     setReports({});
     setError(null);
     setIsDragging(false);
+
+    // Auto-trigger analysis for selected/dropped files immediately
+    if (fileArray.length > 0) {
+      await handleAnalyze(fileArray);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,11 +175,12 @@ export const ImageQualityCheck: React.FC<{
     }
   };
 
-  const handleAnalyze = async () => {
-    if (files.length === 0) return;
+  const handleAnalyze = async (filesToAnalyze?: File[]) => {
+    const targetFiles = filesToAnalyze || files;
+    if (targetFiles.length === 0) return;
 
-    if (!isLicensed && dailyGenCount + files.length > 30) {
-      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali audit, tetapi Anda mencoba memproses ${files.length} gambar.`);
+    if (!isLicensed && dailyGenCount + targetFiles.length > 30) {
+      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali audit, tetapi Anda mencoba memproses ${targetFiles.length} gambar.`);
       if (setShowLimitModal) {
         setShowLimitModal(true);
       }
@@ -187,10 +193,10 @@ export const ImageQualityCheck: React.FC<{
     setReports({}); // Clear previous
     const newReports: Record<string, QualityReport> = {};
 
-    const progressPerFile = 100 / files.length;
+    const progressPerFile = 100 / targetFiles.length;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < targetFiles.length; i++) {
+      const file = targetFiles[i];
       const startProgress = i * progressPerFile;
       
       try {

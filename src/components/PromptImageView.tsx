@@ -120,8 +120,13 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
       }
     }
 
-    setImages(prev => [...prev, ...newItems]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (newItems.length > 0) {
+      setImages(prev => [...prev, ...newItems]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      // Auto trigger batch analysis for the newly added items automatically!
+      await analyzeBatch(newItems);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,8 +158,8 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     setGlobalError(null);
   };
 
-  const analyzeBatch = async () => {
-    const unanalyzed = images.filter(img => !img.result && !img.loading);
+  const analyzeBatch = async (itemsToAnalyze?: ImageItem[]) => {
+    const unanalyzed = itemsToAnalyze || images.filter(img => !img.result && !img.loading);
     if (unanalyzed.length === 0) return;
 
     if (!isLicensed && dailyGenCount + unanalyzed.length > 30) {
