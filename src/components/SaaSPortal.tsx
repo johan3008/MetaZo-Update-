@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
-  Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift
+  Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -1842,89 +1842,89 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             }}
           >
             <motion.div 
-              initial={{ scale: 0.9, y: 15, opacity: 0 }}
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.9, y: 15, opacity: 0 }}
-              className="bg-white dark:bg-[#111827] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative max-h-[90vh] overflow-y-auto"
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="bg-white dark:bg-[#0f172a] rounded-[2.5rem] p-6 sm:p-10 max-w-2xl w-full shadow-2xl border border-slate-100 dark:border-white/10 flex flex-col relative max-h-[90vh] overflow-y-auto transition-all"
               onClick={e => e.stopPropagation()}
             >
               {/* Close Button - Hide if trial expired and not licensed */}
               {(!(trialDaysLeft !== undefined && trialDaysLeft <= 0 && !isLicensed)) && (
                 <button 
                   onClick={() => setShowActivation(false)}
-                  className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full cursor-pointer"
+                  className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-705 rounded-full cursor-pointer transition-colors z-20"
                 >
-                  &times;
+                  <X size={15} />
                 </button>
               )}
 
               {/* Header Info */}
-              <div className="text-center space-y-2 mb-6">
-                <div className="mx-auto w-12 h-12 bg-violet-500/10 text-[#7c3aed] rounded-2xl flex items-center justify-center shadow-inner mb-2 animate-bounce">
-                  <Key size={22} className="rotate-45" />
+              <div className="text-center space-y-2 mb-8 relative">
+                <div className="mx-auto w-14 h-14 bg-gradient-to-tr from-violet-500/10 via-violet-500/5 to-amber-500/10 text-[#7c3aed] dark:text-violet-400 rounded-2xl flex items-center justify-center shadow-sm mb-4 animate-in fade-in zoom-in duration-300">
+                  <Key size={24} className="rotate-45" />
                 </div>
-                <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
                   {trialDaysLeft !== undefined && trialDaysLeft <= 0 && !isLicensed ? t.activation_modal_title_trial_expired : t.activation_modal_title_normal}
                 </h3>
-                <p className="text-xs text-slate-400 uppercase font-extrabold tracking-widest">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-widest leading-none">
                   {t.activation_modal_unlock_premium} {appName}
                 </p>
-                <div className="h-[2px] w-12 bg-gradient-to-r from-violet-500 to-emerald-400 mx-auto rounded-full mt-2" />
+                <div className="h-[3px] w-14 bg-gradient-to-r from-violet-600 via-[#7c3aed] to-amber-500 mx-auto rounded-full mt-4" />
               </div>
 
               {/* Status Display */}
               {isLicensed ? (
-                <div className="bg-emerald-550/10 border border-emerald-500/20 text-emerald-500 rounded-2xl p-4 text-center space-y-3 mb-6">
+                <div className="bg-emerald-555/5 dark:bg-emerald-500/5 border border-emerald-500/20 text-emerald-650 dark:text-emerald-400 rounded-3xl p-5 sm:p-6 text-center space-y-4 mb-6">
                   {showCancelConfirm ? (
-                    <div className="space-y-3 p-1">
-                      <div className="text-red-500 flex justify-center">
-                        <AlertTriangle size={24} className="animate-bounce" />
+                    <div className="space-y-4 p-1">
+                      <div className="text-red-550 flex justify-center">
+                        <AlertTriangle size={28} className="animate-bounce" />
                       </div>
                       <h4 className="font-extrabold uppercase text-xs tracking-wider text-red-500">{t.activation_confirm_stop_title}</h4>
-                      <p className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400 leading-normal">
+                      <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
                         {t.activation_confirm_stop_desc}
                       </p>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2.5 pt-2">
                         <button
                           type="button"
                           onClick={handleRemoveLicenseKey}
-                          className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-black text-[10px] rounded-[1.5rem] uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                          className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-[10px] rounded-2xl uppercase tracking-wider transition-all cursor-pointer shadow-md"
                         >
                           {t.activation_btn_stop_yes}
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowCancelConfirm(false)}
-                          className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black text-[10px] rounded-[1.5rem] uppercase tracking-wider transition-all cursor-pointer"
+                          className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black text-[10px] rounded-2xl uppercase tracking-wider transition-all cursor-pointer"
                         >
                           {t.activation_btn_stop_no}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div className="flex justify-center">
-                        <CheckCircle2 size={32} className="text-emerald-500 animate-pulse" />
+                        <CheckCircle2 size={36} className="text-emerald-500 animate-pulse" />
                       </div>
                       <div>
-                        <h4 className="font-extrabold uppercase text-xs tracking-wider text-emerald-500">{t.activation_active_status}</h4>
-                        <p className="text-[10px] font-semibold text-slate-455 mt-1">
-                          {t.activation_key_registered} <code className="font-mono bg-emerald-500/5 text-emerald-600 px-1 border border-emerald-500/10 dark:text-emerald-400">{licenseKey}</code>
+                        <h4 className="font-black uppercase text-xs tracking-widest text-emerald-500">{t.activation_active_status}</h4>
+                        <p className="text-[11px] font-semibold text-slate-650 dark:text-slate-300 mt-2">
+                          {t.activation_key_registered} <code className="font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20 dark:text-emerald-400 select-all font-bold">{licenseKey}</code>
                         </p>
                         {subDaysLeft !== undefined && subDaysLeft !== null && (
-                          <div className="mt-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-[10px] py-1 px-1.5 rounded-2xl flex items-center justify-center space-x-1">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          <div className="mt-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-[10px] py-1.5 px-3 rounded-2xl flex items-center justify-center space-x-1.5 mx-auto w-fit">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
                             <span>{t.activation_subscription_left} {Math.ceil(subDaysLeft)} {t.activation_days_left}</span>
                           </div>
                         )}
-                        <p className="text-[9px] font-bold text-slate-400 mt-2">
+                        <p className="text-[10px] font-medium text-slate-450 dark:text-slate-500 mt-3 leading-relaxed">
                           {t.activation_commercial_notice}
                         </p>
                       </div>
                       <button 
                         type="button"
                         onClick={() => setShowCancelConfirm(true)}
-                        className="w-full py-2.5 bg-red-650/10 hover:bg-red-600 text-red-600 hover:text-white font-extrabold text-[10px] rounded-[1.5rem] uppercase tracking-wider transition-all cursor-pointer border border-red-500/20 shadow-md shadow-black/5 flex items-center justify-center space-x-1.5"
+                        className="w-full py-3 bg-red-650/10 hover:bg-red-600 hover:text-white text-red-600 font-black text-[10px] rounded-2xl uppercase tracking-wider transition-all cursor-pointer border border-red-500/20 shadow-sm flex items-center justify-center space-x-1.5"
                       >
                         <span>{t.activation_btn_unsubscribe}</span>
                       </button>
@@ -1932,120 +1932,122 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {trialDaysLeft !== undefined && trialDaysLeft <= 0 ? (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center space-y-1.5 animate-pulse">
-                      <div className="flex items-center justify-center text-red-500 space-x-1.5 font-extrabold text-[11px] uppercase tracking-wider">
-                        <AlertTriangle size={13} className="text-red-500" />
+                    <div className="bg-red-500/5 border border-red-500/20 rounded-3xl p-5 text-center space-y-1.5 shadow-sm animate-pulse">
+                      <div className="flex items-center justify-center text-red-505 space-x-1.5 font-black text-[11px] uppercase tracking-wider">
+                        <AlertTriangle size={15} className="text-red-500" />
                         <span>{t.activation_trial_expired_hero}</span>
                       </div>
-                      <p className="text-slate-500 dark:text-slate-450 font-semibold text-[10px] leading-relaxed">
+                      <p className="text-slate-500 dark:text-slate-400 font-semibold text-[10.5px] leading-relaxed">
                         {t.activation_trial_expired_desc}
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-amber-400/5 border border-amber-500/20 rounded-2xl p-4 text-center space-y-1.5">
-                      <div className="flex items-center justify-center text-amber-500 space-x-1.5 font-extrabold text-[11px] uppercase tracking-wider">
-                        <AlertTriangle size={13} />
+                    <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/20 rounded-3xl p-5 text-center space-y-1.5 shadow-sm">
+                      <div className="flex items-center justify-center text-amber-600 dark:text-amber-400 space-x-2 font-black text-[11px] uppercase tracking-widest text-center">
+                        <AlertTriangle size={14} className="animate-bounce" />
                         <span>
                           {t.activation_trial_active_hero} ({trialDaysLeft !== undefined && trialDaysLeft < 9000 ? `${Math.ceil(trialDaysLeft)} ${t.activation_trial_active_days}` : t.language === 'Bahasa' ? 'Tanpa Batas Hari' : 'No Expiry'})
                         </span>
                       </div>
-                      <p className="text-slate-450 dark:text-slate-400 font-semibold text-[10px] leading-relaxed">
+                      <p className="text-slate-500 dark:text-slate-400 font-medium text-[10.5px] leading-relaxed">
                         {t.activation_trial_active_desc}
                       </p>
                     </div>
                   )}
 
                   {/* Subscription Plans */}
-                  <div className="space-y-2 mt-4 mb-4">
-                    <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block mb-2">{t.language === 'Bahasa' ? 'Pilih Paket' : 'Choose Plan'}</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="space-y-3 mt-4 mb-4">
+                    <label className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest text-[10px] block text-center sm:text-left">{t.language === 'Bahasa' ? 'PILIH PAKET' : 'CHOOSE PLAN'}</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Free Trial */}
-                      <div className="border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-3 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col justify-between transition-all">
-                        <div className="space-y-1 text-center">
-                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-slate-700 dark:text-slate-200">{t.language === 'Bahasa' ? 'Uji Coba' : 'Free Trial'}</h5>
-                          <p className="text-slate-600 dark:text-slate-400 font-black text-xs">Gratis</p>
-                          <ul className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 space-y-1 mt-2 text-left">
-                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Hari' : 'Unlimited Trial Days'}</span></li>
-                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Semua Fitur Terbuka' : 'All Features Unlocked'}</span></li>
-                            <li className="flex items-start space-x-1"><Check size={8} className="text-slate-400 mt-0.5 shrink-0" /><span>{t.language === 'Bahasa' ? 'Batas 30 Generasi / Hari' : '30 Generations / Day Limit'}</span></li>
+                      <div className="border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-[2rem] p-4 bg-slate-50/20 dark:bg-slate-900/10 flex flex-col justify-between transition-all">
+                        <div className="space-y-2 text-center">
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-widest text-slate-400 dark:text-slate-500 leading-none">{t.language === 'Bahasa' ? 'UJI COBA' : 'FREE TRIAL'}</h5>
+                          <p className="text-slate-800 dark:text-slate-200 font-black text-sm tracking-tight">{t.language === 'Bahasa' ? 'Gratis' : 'Free'}</p>
+                          <ul className="text-[9.5px] font-semibold text-slate-500 dark:text-slate-400 space-y-2 mt-4 text-left border-t border-slate-150 dark:border-slate-800/80 pt-3">
+                            <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Hari' : 'Unlimited Trial Days'}</span></li>
+                            <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? 'Semua Fitur Terbuka' : 'All Features Unlocked'}</span></li>
+                            <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? 'Batas 30 Generasi / Hari' : '30 Generations / Day Limit'}</span></li>
                           </ul>
                         </div>
                       </div>
                       {/* 30 Days Plan */}
-                      <div className="border border-[#7c3aed] rounded-[1.5rem] p-3 bg-violet-500/5 flex flex-col justify-between relative shadow-md shadow-black/5 hover:scale-[1.02] transition-transform">
-                        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/2">
-                          <span className="bg-[#7c3aed] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Pro</span>
+                      <div className="border border-[#7c3aed]/50 hover:border-[#7c3aed] rounded-[2rem] p-4 bg-gradient-to-b from-violet-500/[0.04] to-transparent flex flex-col justify-between relative shadow-lg shadow-violet-500/[0.03] hover:scale-[1.02] transition-transform duration-300">
+                        <div className="absolute top-0 right-4 transform -translate-y-1/2">
+                          <span className="bg-[#7c3aed] text-white text-[8px] font-black uppercase px-2.5 py-1 rounded-full shadow-md tracking-wider">Pro</span>
                         </div>
-                        <div className="space-y-1 text-center">
-                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-[#7c3aed] dark:text-violet-400">30 Days Plan</h5>
-                          <p className="text-[#7c3aed] dark:text-blue-300 font-black text-xs flex flex-col justify-center items-center">
+                        <div className="space-y-2 text-center">
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-widest text-[#7c3aed] dark:text-violet-400 leading-none">30 DAYS PLAN</h5>
+                          <p className="text-[#7c3aed] dark:text-blue-200 font-black text-sm tracking-tight flex flex-col justify-center items-center">
                             {activePromo?.type === 'discount' && (
-                              <span className="text-[9px] text-slate-400 line-through">
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 line-through tracking-tight">
                                 {t.language === 'Bahasa' ? price30Days : price30DaysUSD}
                               </span>
                             )}
-                            <span>
+                            <span className="text-[#7c3aed] dark:text-violet-300 font-black">
                               {t.language === 'Bahasa' 
                                 ? (activePromo?.type === 'discount' ? getDiscountedPrice(price30Days, activePromo.value) : price30Days) 
                                 : (activePromo?.type === 'discount' ? getDiscountedPrice(price30DaysUSD, activePromo.value) : price30DaysUSD)
                               }
                             </span>
                           </p>
-                          <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-[#7c3aed]" /><span>Premium AI Engine</span></li>
+                          <ul className="text-[9.5px] font-bold text-slate-650 dark:text-slate-350 space-y-2 mt-4 text-left border-t border-violet-100 dark:border-violet-950/40 pt-3">
+                            <li className="flex items-center space-x-1.5"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Akses 30 Hari' : '30 Days Access'}</span></li>
+                            <li className="flex items-center space-x-1.5"><Check size={8} className="text-[#7c3aed]" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Harian' : 'Unlimited Limits'}</span></li>
+                            <li className="flex items-center space-x-1.5"><Check size={8} className="text-[#7c3aed]" /><span>Premium AI Engine</span></li>
                           </ul>
                         </div>
                       </div>
                       {/* Unlimited Plan */}
-                      <div className="border border-amber-500 rounded-[1.5rem] p-3 bg-amber-500/5 flex flex-col justify-between relative shadow-md shadow-black/5 hover:scale-[1.02] transition-transform">
-                        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/2">
-                          <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">Best</span>
+                      <div className="border border-amber-500/40 hover:border-amber-500 rounded-[2rem] p-4 bg-gradient-to-b from-amber-500/[0.04] to-transparent flex flex-col justify-between relative shadow-lg shadow-amber-500/[0.02] hover:scale-[1.02] transition-transform duration-300">
+                        <div className="absolute top-0 right-4 transform -translate-y-1/2">
+                          <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[8px] font-black uppercase px-2.5 py-1 rounded-full shadow-md tracking-wider">Best</span>
                         </div>
-                        <div className="space-y-1 text-center">
-                          <h5 className="font-extrabold text-[11px] uppercase tracking-wide text-amber-600 dark:text-amber-400">Unlimited</h5>
-                          <p className="text-amber-600 dark:text-amber-400 font-black text-xs flex flex-col justify-center items-center">
+                        <div className="space-y-2 text-center">
+                          <h5 className="font-extrabold text-[11px] uppercase tracking-widest text-amber-600 dark:text-amber-400 leading-none">UNLIMITED</h5>
+                          <p className="text-amber-650 dark:text-amber-400 font-black text-sm tracking-tight flex flex-col justify-center items-center">
                             {activePromo?.type === 'discount' && (
-                              <span className="text-[9px] text-slate-400 line-through">
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 line-through tracking-tight">
                                 {t.language === 'Bahasa' ? priceUnlimited : priceUnlimitedUSD}
                               </span>
                             )}
-                            <span>
+                            <span className="text-amber-600 dark:text-amber-400 font-black">
                               {t.language === 'Bahasa' 
                                 ? (activePromo?.type === 'discount' ? getDiscountedPrice(priceUnlimited, activePromo.value) : priceUnlimited) 
                                 : (activePromo?.type === 'discount' ? getDiscountedPrice(priceUnlimitedUSD, activePromo.value) : priceUnlimitedUSD)
                               }
                             </span>
                           </p>
-                          <ul className="text-[9px] font-bold text-slate-600 dark:text-slate-300 space-y-1 mt-2 text-left">
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Akses Selamanya' : 'Lifetime Access'}</span></li>
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas' : 'Unlimited Limits'}</span></li>
-                            <li className="flex items-center space-x-1"><Check size={8} className="text-amber-500" /><span>Prioritas Support</span></li>
+                          <ul className="text-[9.5px] font-bold text-slate-650 dark:text-slate-350 space-y-2 mt-4 text-left border-t border-amber-100 dark:border-amber-950/40 pt-3">
+                            <li className="flex items-center space-x-1.5"><Check size={8} className="text-amber-550 dark:text-amber-450" /><span>{t.language === 'Bahasa' ? 'Akses Selamanya' : 'Lifetime Access'}</span></li>
+                            <li className="flex items-center space-x-1.5"><Check size={8} className="text-amber-550 dark:text-amber-450" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas' : 'Unlimited Limits'}</span></li>
+                            <li className="flex items-center space-x-1.5"><Check size={8} className="text-amber-555 dark:text-amber-450" /><span>Prioritas Support</span></li>
                           </ul>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="mt-3 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl flex items-center justify-between border border-slate-200 dark:border-slate-700">
-                      <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center space-x-1.5">
-                        <ShoppingCart size={12} className="text-emerald-500" />
-                        <span>{t.language === 'Bahasa' ? 'Beli lisensi melalui WhatsApp:' : 'Buy license via WhatsApp:'}</span>
+                    <div className="mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div className="text-[10.5px] font-bold text-slate-600 dark:text-slate-350 flex items-center space-x-2">
+                        <div className="w-5 h-5 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 shrink-0">
+                          <MessageCircle size={12} />
+                        </div>
+                        <span>{t.language === 'Bahasa' ? 'Beli Lisensi Via WhatsApp:' : 'Buy License via WhatsApp:'}</span>
                       </div>
-                      <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-2xl flex items-center space-x-1 transition-all shadow-md shadow-black/5">
-                        <MessageCircle size={10} />
-                        <span>WhatsApp</span>
+                      <a href={whatsAppLink} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#20ba56] text-white text-[9.5px] font-black uppercase tracking-wider px-4 py-2 rounded-xl flex items-center space-x-1.5 transition-all shadow-sm shadow-[#25D366]/10">
+                        <MessageCircle size={11} className="fill-white" />
+                        <span>WHATSAPP</span>
                       </a>
                     </div>
                   </div>
 
                   {/* Promo Input Section */}
-                  <div className="bg-[#7c3aed]/5 dark:bg-slate-900/40 p-3 rounded-2xl border border-violet-500/10 space-y-2 mt-3 shadow-sm">
-                    <div className="flex items-center space-x-1.5 text-[#7c3aed] dark:text-violet-400">
-                      <Sparkles size={12} className="animate-pulse" />
-                      <span className="text-[10px] font-black uppercase tracking-wider">{t.language === 'Bahasa' ? 'Miliki Kode Promo / Diskon?' : 'Have a Promo / Discount Code?'}</span>
+                  <div className="bg-[#7c3aed]/5 dark:bg-slate-900/30 p-4 rounded-[2rem] border border-violet-500/10 space-y-3 mt-3 shadow-sm">
+                    <div className="flex items-center space-x-2 text-[#7c3aed] dark:text-violet-405">
+                      <Sparkles size={13} className="animate-pulse text-amber-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">{t.language === 'Bahasa' ? 'Miliki Kode Promo / Diskon?' : 'Have a Promo / Discount Code?'}</span>
                     </div>
                     <div className="flex gap-2">
                       <input
@@ -2057,40 +2059,40 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           setPromoApplyError('');
                           setPromoApplySuccess('');
                         }}
-                        className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3.5 py-2 outline-none font-mono font-bold text-xs focus:border-[#7c3aed] transition-all uppercase text-[#7c3aed] dark:text-violet-400"
+                        className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none font-mono font-bold text-xs focus:ring-1 focus:ring-[#7c3aed] focus:border-[#7c3aed] transition-all uppercase text-[#7c3aed] dark:text-violet-400 placeholder:text-slate-400"
                       />
                       <button
                         type="button"
                         onClick={handleApplyUserPromoCode}
                         disabled={isApplyingPromo}
-                        className="px-4 py-2 bg-[#7c3aed] text-white font-black text-[10px] uppercase tracking-wider rounded-[1.5rem] hover:bg-violet-600 transition-colors shrink-0 cursor-pointer disabled:opacity-50 shadow-md shadow-violet-500/10"
+                        className="px-5 py-2.5 bg-[#7c3aed] text-white font-black text-[10px] uppercase tracking-wider rounded-xl hover:bg-[#6d28d9] transition-colors shrink-0 cursor-pointer disabled:opacity-50 shadow-md shadow-violet-550/10"
                       >
-                        {isApplyingPromo ? t.language === 'Bahasa' ? 'Memproses' : 'Processing' : t.language === 'Bahasa' ? 'Klaim' : 'Redeem'}
+                        {isApplyingPromo ? t.language === 'Bahasa' ? 'Memproses' : 'Processing' : t.language === 'Bahasa' ? 'Terapkan' : 'Apply'}
                       </button>
                     </div>
 
                     {promoApplyError && (
-                      <p className="text-[9.5px] font-bold text-red-500 dark:text-red-400 pl-1.5 border-l-2 border-red-550">
+                      <p className="text-[10px] font-bold text-red-500 dark:text-red-400 pl-2 border-l-2 border-red-500">
                         ⚠️ {promoApplyError}
                       </p>
                     )}
 
                     {promoApplySuccess && (
-                      <p className="text-[9.5px] font-extrabold text-emerald-600 dark:text-emerald-400 pl-1.5 border-l-2 border-emerald-500 animate-bounce">
+                      <p className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 pl-2 border-l-2 border-emerald-500 animate-bounce">
                         🎉 {promoApplySuccess}
                       </p>
                     )}
 
                     {activePromo && (
-                      <div className="flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-300 bg-emerald-500/10 dark:bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/20">
-                        <span>Aktif: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold uppercase">{activePromo.code}</strong> {activePromo.type === 'discount' ? `(Potongan ${activePromo.value}%)` : `(Akses Premium ${activePromo.value} Hari!)`}</span>
+                      <div className="flex items-center justify-between text-[10.5px] text-slate-700 dark:text-slate-300 bg-emerald-500/10 dark:bg-emerald-500/5 p-2.5 rounded-xl border border-emerald-500/20">
+                        <span>Aktif: <strong className="text-emerald-600 dark:text-emerald-400 font-black uppercase text-xs">{activePromo.code}</strong> {activePromo.type === 'discount' ? `(Potongan ${activePromo.value}%)` : `(Akses Premium ${activePromo.value} Hari!)`}</span>
                         <button
                           type="button"
                           onClick={() => {
                             setActivePromo(null);
                             setPromoApplySuccess('');
                           }}
-                          className="bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white font-extrabold px-2 py-1 rounded-lg text-[8px] tracking-wide transition uppercase cursor-pointer"
+                          className="bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white font-black px-2.5 py-1.5 rounded-lg text-[9px] tracking-wide transition uppercase cursor-pointer"
                         >
                           Batal
                         </button>
@@ -2099,8 +2101,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   </div>
 
                   {/* Activation input */}
-                  <div className="space-y-1.5 mt-2">
-                    <label className="text-slate-700 dark:text-slate-300 font-extrabold uppercase tracking-wider text-[10px] block">{t.activation_input_label}</label>
+                  <div className="space-y-2 mt-2 border-t border-slate-100 dark:border-[#1e293b] pt-4">
+                    <label className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest text-[10px] block text-center sm:text-left">{t.activation_input_label}</label>
                     <div className="relative">
                       <input
                         type="text"
@@ -2110,13 +2112,13 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           setInputKey(e.target.value.toUpperCase());
                           setActivationError('');
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] pl-9 pr-3 py-2.5 outline-none font-mono font-bold text-xs focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all whitespace-nowrap overflow-x-auto text-slate-800 dark:text-slate-100"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 outline-none font-mono font-bold text-xs focus:ring-1 focus:ring-[#7c3aed] focus:border-[#7c3aed] transition-all whitespace-nowrap overflow-x-auto text-slate-900 dark:text-slate-103 text-center tracking-wider placeholder:text-slate-40o"
                       />
-                      <Key size={13} className="text-slate-400 absolute left-3 top-3.5 rotate-45" />
+                      <Key size={14} className="text-slate-400 absolute left-3 w-4 h-4 top-[14px] rotate-45" />
                     </div>
                     
                     {activationError && (
-                      <p className="text-[10px] font-bold text-red-550 border-l-2 border-red-500 pl-1.5 mt-1.5 uppercase transition-all">
+                      <p className="text-[10px] font-extrabold text-red-550 border-l-2 border-red-500 pl-2 mt-1.5 uppercase transition-all">
                         ⚠️ {activationError}
                       </p>
                     )}
@@ -2125,7 +2127,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       <motion.p 
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="text-[10px] font-black text-emerald-500 border-l-2 border-emerald-500 pl-1.5 mt-1.5 uppercase transition-all"
+                        className="text-[10px] font-black text-emerald-500 border-l-2 border-emerald-500 pl-2 mt-1.5 uppercase transition-all"
                       >
                         {t.activation_success_waiting}
                       </motion.p>
@@ -2136,7 +2138,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     type="button"
                     onClick={handleApplyLicenseKey}
                     disabled={isActivating}
-                    className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-[1.5rem] uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-violet-500/10 cursor-pointer"
+                    className="w-full py-3.5 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2 shadow-lg shadow-violet-550/10 cursor-pointer"
                   >
                     {isActivating ? (
                       <RefreshCw size={14} className="animate-spin" />
@@ -2147,25 +2149,25 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   </button>
 
                   {/* Need support details */}
-                  <div className="pt-4 border-t border-slate-100 dark:border-white/5 space-y-3">
-                    <h5 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">
+                  <div className="pt-4 border-t border-slate-100 dark:border-[#1e293b] space-y-3">
+                    <h5 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
                       {t.activation_no_license_title}
                     </h5>
                     
-                    <div className="p-3 bg-violet-500/5 hover:bg-violet-500/8 border border-violet-500/10 rounded-2xl flex flex-col items-center text-center space-y-1 transition-all">
-                      <ShoppingCart size={16} className="text-[#7c3aed] animate-bounce" />
-                      <span className="text-[11px] font-black text-[#7c3aed] uppercase tracking-wider">{t.activation_personal_activation}</span>
-                      <span className="text-[10px] font-bold text-slate-400">{t.activation_license_price} <strong className="text-slate-700 dark:text-white">{pricingTier}</strong></span>
-                      <span className="text-[9px] font-semibold text-slate-400 max-w-xs">{tempPayInfo}</span>
+                    <div className="p-4 bg-violet-500/[0.03] hover:bg-violet-500/[0.05] border border-violet-500/10 rounded-2xl flex flex-col items-center text-center space-y-1.5 transition-all">
+                      <Gift size={18} className="text-[#7c3aed] animate-bounce" />
+                      <span className="text-[11px] font-black text-[#7c3aed] dark:text-violet-400 uppercase tracking-widest">{t.activation_personal_activation}</span>
+                      <span className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400">{t.activation_license_price} <strong className="text-slate-800 dark:text-white">{pricingTier}</strong></span>
+                      <span className="text-[9.5px] font-semibold text-slate-400 dark:text-slate-500 max-w-sm leading-relaxed">{tempPayInfo}</span>
                     </div>
 
                     <a
                       href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName)}%20premium.`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10.5px] rounded-[1.5rem] uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/10"
+                      className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/15"
                     >
-                      <MessageCircle size={14} className="animate-pulse" />
+                      <MessageCircle size={15} className="animate-pulse" />
                       <span>{t.activation_buy_whatsapp}</span>
                     </a>
                   </div>
