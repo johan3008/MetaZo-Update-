@@ -140,6 +140,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     const customOpenRouterKey = req.headers['x-openrouter-key'];
     const customNvidiaKey = req.headers['x-nvidia-key'];
     const customBlackboxKey = req.headers['x-blackbox-key'];
+    const customBluesmindsKey = req.headers['x-bluesminds-key'];
     const provider = req.headers['x-ai-provider'] || 'gemini';
 
     const getKeys = (headerVal: any) => {
@@ -156,7 +157,8 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
         openai: { keys: getKeys(customOpenAIKey), activeIndex: 0 },
         openrouter: { keys: getKeys(customOpenRouterKey), activeIndex: 0 },
         nvidia: { keys: getKeys(customNvidiaKey), activeIndex: 0 },
-        blackbox: { keys: getKeys(customBlackboxKey), activeIndex: 0 }
+        blackbox: { keys: getKeys(customBlackboxKey), activeIndex: 0 },
+        bluesminds: { keys: getKeys(customBluesmindsKey), activeIndex: 0 }
     }, () => {
         next();
     });
@@ -679,6 +681,81 @@ app.get('/api/debug-uploads', (req, res) => {
             res.status(500).json({ error: 'Internal Server Error' });
         }
     });
+
+    app.post('/api/test-bluesminds-key', async (req, res) => {
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            let testUri = (process.env.BLUESMINDS_API_ENDPOINT || 'https://api.bluesminds.com/v1/chat/completions').trim();
+            if (!testUri.endsWith('/chat/completions')) {
+                if (testUri.endsWith('/chat/completions/')) {
+                    testUri = testUri.slice(0, -1);
+                } else if (testUri.endsWith('/v1')) {
+                    testUri = `${testUri}/chat/completions`;
+                } else if (testUri.endsWith('/v1/')) {
+                    testUri = `${testUri}chat/completions`;
+                } else if (testUri.endsWith('/')) {
+                    testUri = `${testUri}v1/chat/completions`;
+                } else {
+                    testUri = `${testUri}/v1/chat/completions`;
+                }
+            }
+
+            let attempts = 0;
+            let success = false;
+            let lastStatus = 0;
+            let lastText = '';
+
+            while (attempts < 4 && !success) {
+                attempts++;
+                try {
+                    const testResponse = await fetch(testUri, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey.trim()}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: 'gpt-4o',
+                            messages: [{role: 'user', content: 'test'}],
+                            max_tokens: 16
+                        })
+                    });
+
+                    lastStatus = testResponse.status;
+                    lastText = await testResponse.text();
+
+                    if (testResponse.ok) {
+                        success = true;
+                    } else {
+                        // If it's a client authentication issue (e.g. 401/403 or specific token error), abort retries
+                        const lowerText = lastText.toLowerCase();
+                        if ((lastStatus === 401 || lastStatus === 403) || (lastStatus === 400 && lowerText.includes('invalid') && !lowerText.includes('extra data'))) {
+                            break;
+                        }
+                        console.warn(`[test-bluesminds-key] Attempt ${attempts} failed with status ${lastStatus}. Retrying after delay...`);
+                        await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+                    }
+                } catch (fetchErr: any) {
+                    console.warn(`[test-bluesminds-key] Attempt ${attempts} fetch exception:`, fetchErr.message);
+                    lastStatus = 500;
+                    lastText = fetchErr.message;
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+
+            if (success) {
+                return res.json({ success: true, message: 'Bluesminds API Key valid! (GPT-4o active)' });
+            } else {
+                return res.status(400).json({ error: `Gagal verifikasi Bluesminds API (Status ${lastStatus}): ${lastText}` });
+            }
+        } catch (e: any) {
+            console.warn('Test Bluesminds API Key error exception:', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    });
     const getProviderName = (): string => {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
@@ -688,6 +765,7 @@ app.get('/api/debug-uploads', (req, res) => {
         if (provider === 'openrouter') return 'OpenRouter';
         if (provider === 'blackbox') return 'Blackbox AI';
         if (provider === 'nvidia') return 'NVIDIA';
+        if (provider === 'bluesminds') return 'Bluesminds';
         return 'Gemini';
     };
 
@@ -1030,6 +1108,19 @@ app.get('/api/debug-uploads', (req, res) => {
             configured: isR2Configured(),
             bucketName: isR2Configured() ? process.env.S3_BUCKET_NAME : null,
             publicUrl: process.env.S3_PUBLIC_URL || null,
+        });
+    });
+
+    app.get('/api/provider-status', (req, res) => {
+        res.json({
+            gemini: !!process.env.GEMINI_API_KEY,
+            groq: !!process.env.GROQ_API_KEY,
+            mistral: !!process.env.MISTRAL_API_KEY,
+            openai: !!process.env.OPENAI_API_KEY,
+            openrouter: !!process.env.OPENROUTER_API_KEY,
+            nvidia: !!process.env.NVIDIA_API_KEY,
+            blackbox: !!process.env.BLACKBOX_API_KEY,
+            bluesminds: !!process.env.BLUESMINDS_API_KEY
         });
     });
 

@@ -4,7 +4,7 @@ import {
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
-  Plus, Key, Lock, MessageCircle, Monitor, Palette, Gift, Tag
+  Plus, Key, Lock, MessageCircle, Monitor, Palette, Gift, Tag, ExternalLink
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -1173,8 +1173,8 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'reseller'>('gemini');
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia'>(() => {
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'reseller'>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds'>(() => {
     return (localStorage.getItem('ai_provider') || 'gemini') as any;
   });
 
@@ -1883,6 +1883,9 @@ const App: React.FC = () => {
   const [nvidiaKeysList, setNvidiaKeysList] = useState<string[]>(() => {
     return (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
   });
+  const [bluesmindsKeysList, setBluesmindsKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('bluesminds_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
@@ -1894,9 +1897,11 @@ const App: React.FC = () => {
   const [newOpenrouterKey, setNewOpenrouterKey] = useState('');
   const [newBlackboxKey, setNewBlackboxKey] = useState('');
   const [newNvidiaKey, setNewNvidiaKey] = useState('');
+  const [newBluesmindsKey, setNewBluesmindsKey] = useState('');
 
+  const [serverKeysStatus, setServerKeysStatus] = useState<Record<string, boolean>>({});
   const [keyTestingIndex, setKeyTestingIndex] = useState<number | null>(null);
-  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | null>(null);
+  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | null>(null);
   const [keyTestResults, setKeyTestResults] = useState<Record<string, { type: 'success' | 'error' | 'quota'; message: string }>>({}); // "provider-index"
   const [hasCustomKeySaved, setHasCustomKeySaved] = useState(() => {
     const geminiSaved = (localStorage.getItem('gemini_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
@@ -1906,6 +1911,7 @@ const App: React.FC = () => {
     const openrouterSaved = (localStorage.getItem('openrouter_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     const blackboxSaved = (localStorage.getItem('blackbox_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     const nvidiaSaved = (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const bluesmindsSaved = (localStorage.getItem('bluesminds_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     
     return (
       geminiSaved.length > 0 ||
@@ -1914,12 +1920,19 @@ const App: React.FC = () => {
       openaiSaved.length > 0 ||
       openrouterSaved.length > 0 ||
       blackboxSaved.length > 0 ||
-      nvidiaSaved.length > 0
+      nvidiaSaved.length > 0 ||
+      bluesmindsSaved.length > 0
     );
   });
 
   useEffect(() => {
     if (showSettingsModal) {
+      // Fetch server key configuration status
+      fetch('/api/provider-status')
+        .then(r => r.json())
+        .then(data => setServerKeysStatus(data))
+        .catch(err => console.warn('Gagal memuat status provider bawaan server:', err));
+
       const gSaved = localStorage.getItem('gemini_api_key') || '';
       const grSaved = localStorage.getItem('groq_api_key') || '';
       const mSaved = localStorage.getItem('mistral_api_key') || '';
@@ -1927,7 +1940,8 @@ const App: React.FC = () => {
       const orSaved = localStorage.getItem('openrouter_api_key') || '';
       const bSaved = localStorage.getItem('blackbox_api_key') || '';
       const nSaved = localStorage.getItem('nvidia_api_key') || '';
-      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia';
+      const blSaved = localStorage.getItem('bluesminds_api_key') || '';
+      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds';
 
       const gParsed = gSaved.split(',').map(k => k.trim()).filter(Boolean);
       const grParsed = grSaved.split(',').map(k => k.trim()).filter(Boolean);
@@ -1936,6 +1950,7 @@ const App: React.FC = () => {
       const orParsed = orSaved.split(',').map(k => k.trim()).filter(Boolean);
       const bParsed = bSaved.split(',').map(k => k.trim()).filter(Boolean);
       const nParsed = nSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const blParsed = blSaved.split(',').map(k => k.trim()).filter(Boolean);
 
       setGeminiKeysList(gParsed);
       setGroqKeysList(grParsed);
@@ -1944,6 +1959,7 @@ const App: React.FC = () => {
       setOpenrouterKeysList(orParsed);
       setBlackboxKeysList(bParsed);
       setNvidiaKeysList(nParsed);
+      setBluesmindsKeysList(blParsed);
       
       setNewGeminiKey('');
       setNewGroqKey('');
@@ -1952,6 +1968,7 @@ const App: React.FC = () => {
       setNewOpenrouterKey('');
       setNewBlackboxKey('');
       setNewNvidiaKey('');
+      setNewBluesmindsKey('');
 
       setSelectedProvider(pSaved);
       setHasCustomKeySaved(
@@ -1961,7 +1978,8 @@ const App: React.FC = () => {
         oParsed.length > 0 ||
         orParsed.length > 0 ||
         bParsed.length > 0 ||
-        nParsed.length > 0
+        nParsed.length > 0 ||
+        blParsed.length > 0
       );
       setKeyTestingIndex(null);
       setKeyTestProvider(null);
@@ -1969,7 +1987,7 @@ const App: React.FC = () => {
     }
   }, [showSettingsModal]);
 
-  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia', index: number, keyValue: string) => {
+  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds', index: number, keyValue: string) => {
     if (!keyValue.trim()) return;
     setKeyTestingIndex(index);
     setKeyTestProvider(provider);
@@ -1988,6 +2006,7 @@ const App: React.FC = () => {
     if (provider === 'openrouter') endpoint = '/api/test-openrouter-key';
     if (provider === 'blackbox') endpoint = '/api/test-blackbox-key';
     if (provider === 'nvidia') endpoint = '/api/test-nvidia-key';
+    if (provider === 'bluesminds') endpoint = '/api/test-bluesminds-key';
 
     try {
       const response = await fetch(endpoint, {
@@ -2025,7 +2044,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia') => {
+  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds') => {
     let key = '';
     let currentList: string[] = [];
     
@@ -2050,6 +2069,9 @@ const App: React.FC = () => {
     } else if (provider === 'nvidia') {
       key = newNvidiaKey.trim();
       currentList = nvidiaKeysList;
+    } else if (provider === 'bluesminds') {
+      key = newBluesmindsKey.trim();
+      currentList = bluesmindsKeysList;
     }
 
     if (!key) return;
@@ -2079,10 +2101,13 @@ const App: React.FC = () => {
     } else if (provider === 'nvidia') {
       setNvidiaKeysList(prev => [...prev, key]);
       setNewNvidiaKey('');
+    } else if (provider === 'bluesminds') {
+      setBluesmindsKeysList(prev => [...prev, key]);
+      setNewBluesmindsKey('');
     }
   };
 
-  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia', index: number) => {
+  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds', index: number) => {
     let listSetter: any;
     let list: string[] = [];
 
@@ -2107,6 +2132,9 @@ const App: React.FC = () => {
     } else if (provider === 'nvidia') {
       listSetter = setNvidiaKeysList;
       list = nvidiaKeysList;
+    } else if (provider === 'bluesminds') {
+      listSetter = setBluesmindsKeysList;
+      list = bluesmindsKeysList;
     }
 
     listSetter((prev: string[]) => prev.filter((_, i) => i !== index));
@@ -2138,6 +2166,7 @@ const App: React.FC = () => {
     const cleanOpenrouter = openrouterKeysList.map(k => k.trim()).filter(Boolean);
     const cleanBlackbox = blackboxKeysList.map(k => k.trim()).filter(Boolean);
     const cleanNvidia = nvidiaKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanBluesminds = bluesmindsKeysList.map(k => k.trim()).filter(Boolean);
 
     if (cleanGemini.length > 0) {
       localStorage.setItem('gemini_api_key', cleanGemini.join(','));
@@ -2181,6 +2210,12 @@ const App: React.FC = () => {
       localStorage.removeItem('nvidia_api_key');
     }
 
+    if (cleanBluesminds.length > 0) {
+      localStorage.setItem('bluesminds_api_key', cleanBluesminds.join(','));
+    } else {
+      localStorage.removeItem('bluesminds_api_key');
+    }
+
     localStorage.setItem('ai_provider', selectedProvider);
     setHasCustomKeySaved(
       cleanGemini.length > 0 || 
@@ -2189,7 +2224,8 @@ const App: React.FC = () => {
       cleanOpenai.length > 0 || 
       cleanOpenrouter.length > 0 || 
       cleanBlackbox.length > 0 || 
-      cleanNvidia.length > 0
+      cleanNvidia.length > 0 ||
+      cleanBluesminds.length > 0
     );
     setShowSettingsModal(false);
   };
@@ -2198,11 +2234,21 @@ const App: React.FC = () => {
     localStorage.removeItem('gemini_api_key');
     localStorage.removeItem('groq_api_key');
     localStorage.removeItem('mistral_api_key');
+    localStorage.removeItem('openai_api_key');
+    localStorage.removeItem('openrouter_api_key');
+    localStorage.removeItem('blackbox_api_key');
+    localStorage.removeItem('nvidia_api_key');
+    localStorage.removeItem('bluesminds_api_key');
     localStorage.removeItem('ai_provider');
     
     setGeminiKeysList([]);
     setGroqKeysList([]);
     setMistralKeysList([]);
+    setOpenaiKeysList([]);
+    setOpenrouterKeysList([]);
+    setBlackboxKeysList([]);
+    setNvidiaKeysList([]);
+    setBluesmindsKeysList([]);
     setSelectedProvider('gemini');
     setHasCustomKeySaved(false);
     setKeyTestResults({});
@@ -2745,7 +2791,8 @@ const App: React.FC = () => {
                 openaiKeys: openaiKeysList,
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
-                blackboxKeys: blackboxKeysList
+                blackboxKeys: blackboxKeysList,
+                bluesmindsKeys: bluesmindsKeysList
               };
               const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage);
               
@@ -2891,7 +2938,8 @@ const App: React.FC = () => {
                   openaiKeys: openaiKeysList,
                   openrouterKeys: openrouterKeysList,
                   nvidiaKeys: nvidiaKeysList,
-                  blackboxKeys: blackboxKeysList
+                  blackboxKeys: blackboxKeysList,
+                  bluesmindsKeys: bluesmindsKeysList
                 };
                 const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage);
 
@@ -3419,7 +3467,8 @@ const App: React.FC = () => {
                 openaiKeys: openaiKeysList,
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
-                blackboxKeys: blackboxKeysList
+                blackboxKeys: blackboxKeysList,
+                bluesmindsKeys: bluesmindsKeysList
               }}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
@@ -3437,7 +3486,8 @@ const App: React.FC = () => {
                 openaiKeys: openaiKeysList,
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
-                blackboxKeys: blackboxKeysList
+                blackboxKeys: blackboxKeysList,
+                bluesmindsKeys: bluesmindsKeysList
               }}
             />
           ) : activeTool === ToolType.PROMPT_VIDEO ? (
@@ -3455,7 +3505,8 @@ const App: React.FC = () => {
                 openaiKeys: openaiKeysList,
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
-                blackboxKeys: blackboxKeysList
+                blackboxKeys: blackboxKeysList,
+                bluesmindsKeys: bluesmindsKeysList
               }}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
@@ -3473,7 +3524,8 @@ const App: React.FC = () => {
                 openaiKeys: openaiKeysList,
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
-                blackboxKeys: blackboxKeysList
+                blackboxKeys: blackboxKeysList,
+                bluesmindsKeys: bluesmindsKeysList
               }}
             />
           ) : activeTool === ToolType.CALENDAR_GEN ? (
@@ -3491,7 +3543,8 @@ const App: React.FC = () => {
                 openaiKeys: openaiKeysList,
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
-                blackboxKeys: blackboxKeysList
+                blackboxKeys: blackboxKeysList,
+                bluesmindsKeys: bluesmindsKeysList
               }}
             />
           ) : activeTool === ToolType.CHAT ? (
@@ -3697,7 +3750,8 @@ const App: React.FC = () => {
                   openaiKeys: openaiKeysList,
                   openrouterKeys: openrouterKeysList,
                   nvidiaKeys: nvidiaKeysList,
-                  blackboxKeys: blackboxKeysList
+                  blackboxKeys: blackboxKeysList,
+                  bluesmindsKeys: bluesmindsKeysList
                 }}
               />
 
@@ -3877,7 +3931,8 @@ const App: React.FC = () => {
                   { id: 'openai', name: 'OpenAI', desc: 'GPT-4o / DALL-E' },
                   { id: 'openrouter', name: 'Open Router', desc: 'Multi-LLM access' },
                   { id: 'blackbox', name: 'Blackbox AI', desc: 'Code specialized' },
-                  { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' }
+                  { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' },
+                  { id: 'bluesminds', name: 'Bluesminds', desc: 'GPT-4o model' }
                 ].map(prov => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name} - {prov.desc}
@@ -3892,9 +3947,9 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['appearance', 'gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'reseller'] as const).map(tab => (
+              {(['appearance', 'gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : `${tab.toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : `${tab.toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
@@ -4015,6 +4070,22 @@ const App: React.FC = () => {
                     {t.settings_gemini_desc}
                   </p>
 
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key Gemini resmi gratis Anda di " : "Get your official free Gemini API Key at "}{' '}
+                      <a
+                        href="https://aistudio.google.com/app/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Google AI Studio
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">{t.settings_gemini_key_list} ({geminiKeysList.length})</label>
                     
@@ -4108,6 +4179,22 @@ const App: React.FC = () => {
                     Simpan API Key OpenAI pribadi Anda untuk mengakses kemampuan GPT-4o dan DALL-E.
                   </p>
 
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key OpenAI Anda di " : "Get your OpenAI API Key at "}{' '}
+                      <a
+                        href="https://platform.openai.com/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        OpenAI Platform
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key OpenAI ({openaiKeysList.length})</label>
                     
@@ -4196,6 +4283,22 @@ const App: React.FC = () => {
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
                     Simpan API Key Open Router Anda untuk mengakses berbagai model LLM.
                   </p>
+
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key OpenRouter Anda di " : "Get your OpenRouter API Key at "}{' '}
+                      <a
+                        href="https://openrouter.ai/settings/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        OpenRouter Console
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
 
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Open Router ({openrouterKeysList.length})</label>
@@ -4286,6 +4389,22 @@ const App: React.FC = () => {
                     Simpan API Key Blackbox AI Anda untuk kemampuan coding yang terspesialisasi.
                   </p>
 
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Kunjungi situs resmi Blackbox AI di " : "Visit the official Blackbox AI website at "}{' '}
+                      <a
+                        href="https://www.blackbox.ai"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Blackbox AI
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Blackbox AI ({blackboxKeysList.length})</label>
                     
@@ -4375,13 +4494,43 @@ const App: React.FC = () => {
                     Simpan API Key NVIDIA Anda untuk mengakses NVIDIA NIM.
                   </p>
 
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key NVIDIA Anda di " : "Get your NVIDIA API Key at "}{' '}
+                      <a
+                        href="https://build.nvidia.com/settings/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        NVIDIA NIM Platform
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key NVIDIA ({nvidiaKeysList.length})</label>
                     
                     {nvidiaKeysList.length === 0 ? (
-                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-dashed border-slate-200 dark:border-slate-800">
-                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
-                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key NVIDIA ditambahkan.</p>
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                        {serverKeysStatus.nvidia ? (
+                          <>
+                            <div className="flex items-center justify-center space-x-1.5 text-emerald-600 dark:text-emerald-400 mb-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Default Server Aktif</span>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 font-semibold text-[11px] leading-relaxed">
+                              Sistem mendeteksi API Key NVIDIA bawaan di server backend Anda. Anda tidak wajib menginput key di bawah kecuali jika ingin memakai key pribadi.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                            <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key NVIDIA ditambahkan.</p>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
@@ -4479,11 +4628,156 @@ const App: React.FC = () => {
                 </div>
               )}
 
+              {activeSettingsTab === 'bluesminds' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key Bluesminds Anda untuk mengakses model super cepat GPT-4o.
+                  </p>
+
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key Bluesminds Anda di " : "Get your Bluesminds API Key at "}{' '}
+                      <a
+                        href="https://api.bluesminds.com/console/token"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Bluesminds Console
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Daftar Key Bluesminds</label>
+                    {bluesmindsKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                        {serverKeysStatus.bluesminds ? (
+                          <>
+                            <div className="flex items-center justify-center space-x-1.5 text-emerald-600 dark:text-emerald-400 mb-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Default Server Aktif</span>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 font-semibold text-[11px] leading-relaxed">
+                              Sistem mendeteksi API Key bawaan di server backend Anda (Aktif &amp; Siap digunakan). Anda tidak wajib menginput key di bawah kecuali jika ingin menimpa dengan key pribadi.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                            <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Bluesminds ditambahkan.</p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {bluesmindsKeysList.map((key, index) => {
+                          const keyId = `bluesminds-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`bluesminds-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'bluesminds';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('bluesminds', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('bluesminds', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Bluesminds</label>
+                    <div className="flex gap-2">
+                       <input
+                         type="password"
+                         placeholder="API Key Bluesminds"
+                         value={newBluesmindsKey}
+                         onChange={(e) => setNewBluesmindsKey(e.target.value)}
+                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => handleAddApiKey('bluesminds')}
+                         className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
+                       >
+                         Tambah
+                       </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Model Aktif</label>
+                    <select
+                      disabled
+                      value="gpt-4o"
+                      className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-500 dark:text-slate-450 cursor-not-allowed"
+                    >
+                      <option value="gpt-4o">GPT-4o (Active - Default)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {activeSettingsTab === 'groq' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
                     Masukkan API Key Groq Anda. Gunakan model tercepat untuk pemrosesan metadata.
                   </p>
+
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key Groq Anda di " : "Get your Groq API Key at "}{' '}
+                      <a
+                        href="https://console.groq.com/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Groq Console
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
 
                   <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">Pilih Model Groq</label>
@@ -4591,6 +4885,22 @@ const App: React.FC = () => {
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
                     Masukkan API Key Mistral Anda. Model-model Mistral (<code className="font-mono text-[10px]">mistral-large-latest</code> dan <code className="font-mono text-[10px]">pixtral-12b</code>) memiliki akurasi kosa kata yang luar biasa, puitis, dan didesain khusus untuk optimasi metadata kelas atas.
                   </p>
+
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key Mistral Anda di " : "Get your Mistral API Key at "}{' '}
+                      <a
+                        href="https://console.mistral.ai/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Mistral Console
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
 
                   <div className="space-y-2">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Mistral ({mistralKeysList.length})</label>

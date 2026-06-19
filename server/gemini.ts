@@ -37,6 +37,30 @@ try {
 // Initialize lazy backend Google GenAI SDK.
 let aiClient: GoogleGenAI | null = null;
 
+const getBluesmindsEndpoint = (): string => {
+  const envVal = process.env.BLUESMINDS_API_ENDPOINT;
+  if (!envVal || !envVal.trim()) {
+    return 'https://api.bluesminds.com/v1/chat/completions';
+  }
+  let base = envVal.trim();
+  if (base.endsWith('/chat/completions')) {
+    return base;
+  }
+  if (base.endsWith('/chat/completions/')) {
+    return base.slice(0, -1);
+  }
+  if (base.endsWith('/v1')) {
+    return `${base}/chat/completions`;
+  }
+  if (base.endsWith('/v1/')) {
+    return `${base}chat/completions`;
+  }
+  if (base.endsWith('/')) {
+    return `${base}v1/chat/completions`;
+  }
+  return `${base}/v1/chat/completions`;
+};
+
 const PROVIDER_ENDPOINTS: Record<string, string> = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   mistral: 'https://api.mistral.ai/v1/chat/completions',
@@ -44,6 +68,7 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   blackbox: 'https://api.blackbox.ai/v1/chat/completions',
   nvidia: 'https://integrate.api.nvidia.com/v1/chat/completions',
+  bluesminds: getBluesmindsEndpoint(),
 };
 
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
@@ -53,6 +78,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   openrouter: 'google/gemini-2.0-flash-001',
   blackbox: 'blackboxai',
   nvidia: 'meta/llama-3.3-70b-instruct',
+  bluesminds: 'gpt-4o',
 };
 
 const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
@@ -62,10 +88,11 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
   openrouter: 'anthropic/claude-3.5-haiku',
   blackbox: 'blackboxai-pro',
   nvidia: 'meta/llama-3.1-70b-instruct',
+  bluesminds: 'gpt-4o',
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'bluesminds']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -74,9 +101,10 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   openrouter: 'OPENROUTER_API_KEY',
   blackbox: 'BLACKBOX_API_KEY',
   nvidia: 'NVIDIA_API_KEY',
+  bluesminds: 'BLUESMINDS_API_KEY',
 };
 
-const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia']);
+const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds']);
 
 /**
  * Ekstrak JSON yang valid dari teks response, toleran terhadap:
@@ -668,7 +696,7 @@ async function callOpenAICompatibleWithRetry(params: {
       payload.response_format = { type: "json_object" };
     }
 
-    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
+    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'bluesminds') {
       payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
     }
 
@@ -724,11 +752,11 @@ async function callOpenAICompatibleWithRetry(params: {
 
         // Safe logging of the response
         const responseDataRawForLogging = await response.clone().text();
-        console.log(`[NVIDIA DEBUG] Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
+        console.log(`[${provider.toUpperCase()} DEBUG] Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
 
         if (!response.ok) {
           const errText = await response.text();
-          console.warn(`[NVIDIA API FAILURE] Status: ${response.status}, Response: ${errText}`);
+          console.warn(`[${provider.toUpperCase()} API FAILURE] Status: ${response.status}, Response: ${errText}`);
           throw new Error(`HTTP ${response.status}: ${errText}`);
         }
 
@@ -747,7 +775,7 @@ async function callOpenAICompatibleWithRetry(params: {
         if (!answer) {
           console.warn(`[callOpenAICompatibleWithRetry] Empty answer received from ${provider}. Response payload:`, JSON.stringify(responseData));
           if (responseData.error) {
-            throw new Error(`NVIDIA API Error: ${responseData.error.message || JSON.stringify(responseData.error)} (Code: ${responseData.error.code || 'unknown'})`);
+            throw new Error(`${provider.toUpperCase()} API Error: ${responseData.error.message || JSON.stringify(responseData.error)} (Code: ${responseData.error.code || 'unknown'})`);
           }
           throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
         }
@@ -762,10 +790,8 @@ async function callOpenAICompatibleWithRetry(params: {
         return answer;
       } catch (err: any) {
         console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
-        if (provider === 'nvidia') {
-          const status = err.status || (err.message && err.message.includes('HTTP ') ? err.message.split(' ')[1].replace(':', '') : 'unknown');
-          console.warn(`[NVIDIA ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
-        }
+        const status = err.status || (err.message && err.message.includes('HTTP ') ? err.message.split(' ')[1].replace(':', '') : 'unknown');
+        console.warn(`[${provider.toUpperCase()} ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
         lastErr = err;
 
         const errorMsg = String(err.message || "").toLowerCase();
@@ -792,7 +818,15 @@ async function callOpenAICompatibleWithRetry(params: {
         // Automatic model fallback and exponential backoff
         tryCount++;
         const fallback = PROVIDER_FALLBACK_MODELS[provider];
-        const isRateLimitOrTimeout = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('timeout') || errorMsg.includes('exceeded') || errorMsg.includes('fetch failed');
+        const isRetryableError = errorMsg.includes('429') || 
+                                 errorMsg.includes('quota') || 
+                                 errorMsg.includes('limit') || 
+                                 errorMsg.includes('timeout') || 
+                                 errorMsg.includes('exceeded') || 
+                                 errorMsg.includes('fetch failed') ||
+                                 errorMsg.includes('500') ||
+                                 errorMsg.includes('extra data') ||
+                                 errorMsg.includes('bad_response_status_code');
 
         if (tryCount === 1 && fallback && fallback !== model) {
           model = fallback;
@@ -801,9 +835,9 @@ async function callOpenAICompatibleWithRetry(params: {
           continue;
         }
 
-        if (tryCount < 6 && isRateLimitOrTimeout) {
+        if (tryCount < 6 && isRetryableError) {
           const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error due to rate limit/timeout. Waiting ${backoff / 1000}s (attempt ${tryCount + 1}/6)...`);
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/6) after ${backoff / 1000}s...`);
           await new Promise(resolve => setTimeout(resolve, backoff));
           continue;
         }

@@ -23,6 +23,7 @@ export interface ServiceOptions {
   openrouterKeys?: string | string[];
   nvidiaKeys?: string | string[];
   blackboxKeys?: string | string[];
+  bluesmindsKeys?: string | string[];
 }
 
 export const getHeaders = (options?: ServiceOptions) => {
@@ -55,6 +56,9 @@ export const getHeaders = (options?: ServiceOptions) => {
 
     const bKey = joinKeys(options.blackboxKeys);
     if (bKey) headers['x-blackbox-key'] = bKey;
+
+    const blKey = joinKeys(options.bluesmindsKeys);
+    if (blKey) headers['x-bluesminds-key'] = blKey;
   }
   return headers;
 };
