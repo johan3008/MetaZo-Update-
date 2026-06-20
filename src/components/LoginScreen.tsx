@@ -521,7 +521,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         <div className="flex items-center space-x-4">
           <a 
-            href={t?.whatsapp_link || 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr?s=cl&p=a&ilr=4'} 
+            href={t?.whatsapp_link || 'https://wa.me/+6282275408171'} 
             target="_blank" 
             rel="noopener noreferrer" 
             className="text-[10px] font-black uppercase text-slate-500 hover:text-[#7c3aed] dark:text-slate-400 dark:hover:text-amber-50 tracking-wider transition-colors"

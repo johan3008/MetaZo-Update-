@@ -55,7 +55,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   isLicensed = false,
   appName = 'MetaZo PRO',
   pricingTier = 'Rp 149.000 / Bulan',
-  whatsAppLink = 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
+  whatsAppLink = 'https://wa.me/+6282275408171',
   setShowActivation,
   imageDailyCount = 0,
   videoDailyCount = 0,

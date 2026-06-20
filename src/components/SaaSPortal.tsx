@@ -495,7 +495,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       await setDoc(doc(db, 'branding', 'main'), {
         appName: tempAppName.trim() || 'MetaZo PRO',
         appSubtitle: tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant',
-        whatsAppLink: tempWhatsApp.trim() || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
+        whatsAppLink: tempWhatsApp.trim() || 'https://wa.me/+6282275408171',
         pricingTier: tempPricingTier.trim() || 'Rp 149.000 / Bulan',
         licenseSeed: tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026',
         payInfo: tempPayInfo.trim(),
@@ -508,7 +508,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
       localStorage.setItem('mz_reseller_app_name', tempAppName.trim() || 'MetaZo PRO');
       localStorage.setItem('mz_reseller_app_subtitle', tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant');
-      localStorage.setItem('mz_reseller_whatsapp', tempWhatsApp.trim() || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
+      localStorage.setItem('mz_reseller_whatsapp', tempWhatsApp.trim() || 'https://wa.me/+6282275408171');
       localStorage.setItem('mz_reseller_price', tempPricingTier.trim() || 'Rp 149.000 / Bulan');
       localStorage.setItem('mz_reseller_seed', tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026');
       localStorage.setItem('mz_reseller_pay_info', tempPayInfo.trim());
@@ -519,7 +519,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
       setAppName(tempAppName.trim() || 'MetaZo PRO');
       setAppSubtitle(tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant');
-      setWhatsAppLink(tempWhatsApp.trim() || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
+      setWhatsAppLink(tempWhatsApp.trim() || 'https://wa.me/+6282275408171');
       setPricingTier(tempPricingTier.trim() || 'Rp 149.000 / Bulan');
       setLicenseSeed(tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026');
       setPrice30Days(tempPrice30Days.trim() || 'Rp 50.000');
@@ -545,7 +545,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await setDoc(doc(db, 'branding', 'main'), {
           appName: 'MetaZo PRO',
           appSubtitle: 'AI-Powered Metadata Assistant',
-          whatsAppLink: 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
+          whatsAppLink: 'https://wa.me/+6282275408171',
           pricingTier: 'Rp 149.000 / Bulan',
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
           payInfo: 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant',
@@ -569,7 +569,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
         setAppName('MetaZo PRO');
         setAppSubtitle('AI-Powered Metadata Assistant');
-        setWhatsAppLink('https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
+        setWhatsAppLink('https://wa.me/+6282275408171');
         setPricingTier('Rp 149.000 / Bulan');
         setLicenseSeed('MZPRO-COMMERCIAL-2026');
         setTempPayInfo('Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant');
@@ -1153,10 +1153,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Custom WhatsApp Link / Support</label>
                     <input
                       type="text"
+                      readOnly
                       placeholder="Contoh: https://wa.me/..."
-                      value={tempWhatsApp}
-                      onChange={(e) => setTempWhatsApp(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-500"
+                      value="https://wa.me/+6282275408171"
+                      className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs opacity-60 cursor-not-allowed text-slate-500"
                     />
                   </div>
                   <div className="space-y-1 md:col-span-2">

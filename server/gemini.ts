@@ -3246,7 +3246,7 @@ Rules:
    - date: Date or date range.
    - location: Country name or "Global/World".
    - commercial_potential: A detailed explanation of why stock buyers need content for this (e.g., "High demand for authentic family dinner photos").
-   - suggested_topics: 5-8 specific keywords or subjects.
+   - suggested_topics: 5-8 specific short keywords or subjects (max 1-3 words each, e.g., "family dinner", "fireworks", "traditional dress"). DO NOT use long sentences.
 
 Output strictly in JSON format.`;
 
@@ -3271,12 +3271,23 @@ Output strictly in JSON format.`;
     required: ["events"]
   };
 
-  const response = await callGeminiWithRetry('gemini-3.5-flash', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from.`, {
-    systemInstruction,
-    responseMimeType: "application/json",
-    responseSchema,
-    temperature: 0.8
-  });
+  let response;
+  try {
+    response = await callGeminiWithRetry('gemini-3.5-flash', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      systemInstruction,
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.8
+    }, 1);
+  } catch (err: any) {
+    response = await callGeminiWithRetry('gemini-3.5-flash', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.8
+    });
+  }
 
   return JSON.parse(response.text);
 }
@@ -3287,7 +3298,7 @@ Your job is to generate a list of highly commercial, descriptive, and specific k
 These keywords should be optimized for AI Image Generation prompts.
 
 Rules:
-1. Provide 15-20 varied keywords or short phrases.
+1. Provide 15-20 varied keywords or short phrases. ALL keywords MUST be short (maximum 1-3 words each). DO NOT use long sentences or descriptions.
 2. Mix subjects, settings, lighting, and mood related to the event.
 3. Focus on what stock buyers are actually looking for.
 4. Return the result as a JSON array of strings called "keywords".`;
@@ -3303,12 +3314,23 @@ Rules:
     required: ["keywords"]
   };
 
-  const response = await callGeminiWithRetry('gemini-3.5-flash', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}`, {
-    systemInstruction,
-    responseMimeType: "application/json",
-    responseSchema,
-    temperature: 0.8
-  });
+  let response;
+  try {
+    response = await callGeminiWithRetry('gemini-3.5-flash', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+      systemInstruction,
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.8
+    }, 1);
+  } catch (err: any) {
+    response = await callGeminiWithRetry('gemini-3.5-flash', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.8
+    });
+  }
 
   return JSON.parse(response.text);
 }

@@ -1187,7 +1187,7 @@ const App: React.FC = () => {
 
   const [mzAppName, setMzAppName] = useState(() => localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO');
   const [mzAppSubtitle, setMzAppSubtitle] = useState(() => localStorage.getItem('mz_reseller_app_subtitle') || 'AI-Powered Metadata Assistant');
-  const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H');
+  const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://wa.me/+6282275408171');
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
@@ -1634,7 +1634,7 @@ const App: React.FC = () => {
         setDoc(docRef, {
           appName: 'MetaZo PRO',
           appSubtitle: 'AI-Powered Metadata Assistant',
-          whatsAppLink: 'https://chat.whatsapp.com/L7pY6H8Y6H8Y6H8Y6H8Y6H',
+          whatsAppLink: 'https://wa.me/+6282275408171',
           pricingTier: 'Rp 149.000 / Bulan',
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
           payInfo: 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant',

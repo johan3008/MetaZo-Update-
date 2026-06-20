@@ -274,7 +274,7 @@ export const CalendarGenView: React.FC<CalendarGenViewProps> = ({ t, onSendToPro
                       </div>
 
                       <div className="flex flex-wrap gap-1">
-                        {(eventKeywords[event.name] || event.suggested_topics)?.slice(0, 8).map((topic: string) => (
+                        {(eventKeywords[event.name] || event.suggested_topics)?.map((topic: string) => (
                           <button
                             key={topic}
                             onClick={() => onSendToPrompt?.(`${event.name}: ${topic}`)}
