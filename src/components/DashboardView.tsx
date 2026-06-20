@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, ImageIcon, Film, FileCode, Zap, BookOpen, 
   ArrowRight, ShieldCheck, Activity, BarChart2, CheckCircle, 
@@ -84,6 +85,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }).length;
 
   const [currentSlide, setCurrentSlide] = React.useState(0);
+  const [touchStart, setTouchStart] = React.useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = React.useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEndHandler = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) {
+      setCurrentSlide(prev => (prev + 1) % slides.length);
+    }
+    if (isRightSwipe) {
+      setCurrentSlide(prev => (prev === 0 ? slides.length - 1 : prev - 1));
+    }
+  };
   const [promoCodes, setPromoCodes] = React.useState<DashboardPromoCode[]>([]);
   const [isLoadingPromos, setIsLoadingPromos] = React.useState(false);
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
@@ -220,7 +248,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       
       {/* 1. HERO GRADIENT WELCOME BAR */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#7c3aed] via-[#3a5ec5] to-[#224abe] text-white p-6 sm:p-8 shadow-xl">
+      <div 
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#7c3aed] via-[#3a5ec5] to-[#224abe] text-white p-6 sm:p-8 shadow-xl touch-pan-y"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEndHandler}
+      >
         <div className="absolute right-0 bottom-0 top-0 w-2/5 opacity-10 pointer-events-none">
           <svg className="w-full h-full text-white" viewBox="0 0 100 100" preserveAspectRatio="none">
             <polygon points="0,100 100,0 100,100" fill="currentColor" />
@@ -229,16 +262,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute left-1/3 bottom-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-2xl min-h-[160px] flex flex-col justify-center">
-          <div 
-            key={safeCurrentSlide} 
-            className={`animate-in fade-in slide-in-from-right-4 duration-500 ${safeCurrentSlide === slides.length - 1 ? 'cursor-pointer' : ''}`}
-            onClick={() => {
-              if (safeCurrentSlide === slides.length - 1) {
-                window.open('https://teer.id/johan3008', '_blank');
-              }
-            }}
-          >
+        <div className="relative z-10 max-w-2xl min-h-[160px] overflow-hidden flex flex-col justify-center">
+          <AnimatePresence mode="wait">
+            <motion.div 
+              key={safeCurrentSlide} 
+              initial={{ opacity: 0, x: 20, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -20, scale: 0.95 }}
+              transition={{ duration: 0.4, ease: "backOut" }}
+              className={`${safeCurrentSlide === slides.length - 1 ? 'cursor-pointer' : ''}`}
+              onClick={() => {
+                if (safeCurrentSlide === slides.length - 1) {
+                  window.open('https://teer.id/johan3008', '_blank');
+                }
+              }}
+            >
             <div>
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/15 text-white border border-white/10 text-[10px] font-black uppercase tracking-widest mb-4">
                 <Sparkles size={12} className="text-amber-400 fill-amber-400/25" />
@@ -267,7 +305,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span>Dukung Sekarang</span>
               </button>
             )}
-          </div>
+            </motion.div>
+          </AnimatePresence>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             
             {/* Slide Navigation Pagination */}
