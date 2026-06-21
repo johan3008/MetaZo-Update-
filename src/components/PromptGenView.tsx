@@ -1,3 +1,4 @@
+import { getDailyLimit } from '../../constants';
 import React, { useState, useEffect } from 'react';
 import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
@@ -175,7 +176,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   };
 
   const handleGenerate = async () => {
-    if (!isLicensed && dailyGenCount >= 30) {
+    if (!isLicensed && dailyGenCount >= getDailyLimit()) {
       setError(t.prompt_error_trial);
       return;
     }
@@ -427,25 +428,25 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <span className="w-2 h-2 rounded-full bg-emerald-550 animate-pulse" />
                   {t.prompt_trial_label}
                 </span>
-                <span className={dailyGenCount >= 30 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
-                  {dailyGenCount}/30 {t.prompt_generate_count}
+                <span className={dailyGenCount >= getDailyLimit() ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                  {dailyGenCount}/{getDailyLimit()} {t.prompt_generate_count}
                 </span>
               </div>
               <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ease-out ${
-                    dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
+                    dailyGenCount >= getDailyLimit() ? 'bg-red-500' : 'bg-emerald-500'
                   }`} 
-                  style={{ width: `${Math.min(100, (dailyGenCount / 30) * 100)}%` }} 
+                  style={{ width: `${Math.min(100, (dailyGenCount / getDailyLimit()) * 100)}%` }} 
                 />
               </div>
-              {dailyGenCount >= 30 ? (
+              {dailyGenCount >= getDailyLimit() ? (
                 <span className="text-[10px] text-red-500 font-extrabold block mt-2 leading-tight">
                   {t.prompt_trial_expired}
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-1.5 leading-tight">
-                  {t.prompt_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_trial_times}</strong>.
+                  {t.prompt_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, getDailyLimit() - dailyGenCount)} {t.prompt_trial_times}</strong>.
                 </span>
               )}
             </div>

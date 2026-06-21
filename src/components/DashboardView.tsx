@@ -1,3 +1,4 @@
+import { getDailyLimit } from '../../constants';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -513,12 +514,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>{t.daily_quota}</span>
-                    <span className={imageDailyCount >= 30 ? "text-red-500" : "text-[#7c3aed]"}>{imageDailyCount}/30</span>
+                    <span className={imageDailyCount >= getDailyLimit() ? "text-red-500" : "text-[#7c3aed]"}>{imageDailyCount}/{getDailyLimit()}</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= 30 ? 'bg-red-550' : 'bg-[#7c3aed]'}`} style={{ width: `${Math.min(100, (imageDailyCount / 30) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${imageDailyCount >= getDailyLimit() ? 'bg-red-550' : 'bg-[#7c3aed]'}`} style={{ width: `${Math.min(100, (imageDailyCount / getDailyLimit()) * 100)}%` }} />
                   </div>
-                  {imageDailyCount >= 30 && (
+                  {imageDailyCount >= getDailyLimit() && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
                   )}
                 </div>
@@ -554,12 +555,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>{t.daily_quota}</span>
-                    <span className={videoDailyCount >= 30 ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/30</span>
+                    <span className={videoDailyCount >= getDailyLimit() ? "text-red-500" : "text-purple-500"}>{videoDailyCount}/{getDailyLimit()}</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${videoDailyCount >= 30 ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / 30) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${videoDailyCount >= getDailyLimit() ? 'bg-red-550' : 'bg-purple-555'}`} style={{ width: `${Math.min(100, (videoDailyCount / getDailyLimit()) * 100)}%` }} />
                   </div>
-                  {videoDailyCount >= 30 && (
+                  {videoDailyCount >= getDailyLimit() && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
                   )}
                 </div>
@@ -595,12 +596,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                   <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
                     <span>{t.daily_quota}</span>
-                    <span className={vectorDailyCount >= 30 ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/30</span>
+                    <span className={vectorDailyCount >= getDailyLimit() ? "text-red-500" : "text-emerald-500"}>{vectorDailyCount}/{getDailyLimit()}</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${vectorDailyCount >= 30 ? 'bg-red-550' : 'bg-emerald-600'}`} style={{ width: `${Math.min(100, (vectorDailyCount / 30) * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-all ${vectorDailyCount >= getDailyLimit() ? 'bg-red-550' : 'bg-emerald-600'}`} style={{ width: `${Math.min(100, (vectorDailyCount / getDailyLimit()) * 100)}%` }} />
                   </div>
-                  {vectorDailyCount >= 30 && (
+                  {vectorDailyCount >= getDailyLimit() && (
                     <span className="text-[9px] text-red-500 font-black block mt-1.5 leading-none">{t.quota_exhausted}</span>
                   )}
                 </div>

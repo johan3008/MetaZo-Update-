@@ -23,7 +23,7 @@ import { ImageCheckView } from './src/components/ImageCheckView';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { ChatView } from './src/components/ChatView';
 import { SaaSPortal } from './src/components/SaaSPortal';
-import { TRANSLATIONS, AppLanguage, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
+import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
@@ -2738,7 +2738,7 @@ const App: React.FC = () => {
     try {
         if (!isMzLicensed) {
             const totalToday = getTotalDailyCount();
-            if (totalToday >= 30) {
+            if (totalToday >= getDailyLimit()) {
                 setShowLimitModal(true);
                 throw new Error("Limit harian telah habis.");
             }
@@ -2855,7 +2855,7 @@ const App: React.FC = () => {
     try {
         if (!isMzLicensed) {
             const totalToday = getTotalDailyCount();
-            if (totalToday >= 30) {
+            if (totalToday >= getDailyLimit()) {
                 setShowLimitModal(true);
                 throw new Error("Limit harian telah habis.");
             }
@@ -2995,7 +2995,7 @@ const App: React.FC = () => {
   const handleGenerateAll = async (isRetry = false) => {
     if (!isMzLicensed) {
       const totalToday = getTotalDailyCount();
-      if (totalToday >= 30) {
+      if (totalToday >= getDailyLimit()) {
         setShowLimitModal(true);
         return;
       }
@@ -5349,7 +5349,7 @@ const App: React.FC = () => {
             
             <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl w-full mb-6 border border-slate-100 dark:border-white/5">
               <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
-                Limit harian telah habis. Anda telah memproses <span className="text-slate-800 dark:text-white font-black">30 aset</span> hari ini. 
+                Limit harian telah habis. Anda telah memproses <span className="text-slate-800 dark:text-white font-black">{getDailyLimit()} aset</span> hari ini. 
                 Sila kembali besok atau aktifkan akun PRO untuk memproses tanpa batas.
               </p>
             </div>

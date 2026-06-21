@@ -1,3 +1,4 @@
+import { getDailyLimit } from '../../constants';
 import React, { useState, useRef } from 'react';
 import { 
   ImageIcon, Upload, Wand2, Copy, Check, AlertCircle, RefreshCw, X, Sliders, Sparkles, Trash2, Layers, Grid
@@ -162,8 +163,8 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     const unanalyzed = itemsToAnalyze || images.filter(img => !img.result && !img.loading);
     if (unanalyzed.length === 0) return;
 
-    if (!isLicensed && dailyGenCount + unanalyzed.length > 30) {
-      setGlobalError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate, tetapi Anda mencoba memproses ${unanalyzed.length} gambar.`);
+    if (!isLicensed && dailyGenCount + unanalyzed.length > getDailyLimit()) {
+      setGlobalError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali generate, tetapi Anda mencoba memproses ${unanalyzed.length} gambar.`);
       if (setShowLimitModal) {
         setShowLimitModal(true);
       }
@@ -288,25 +289,25 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   {t.prompt_image_trial_label}
                 </span>
-                <span className={dailyGenCount >= 30 ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
-                  {dailyGenCount}/30 {t.prompt_image_generate_count}
+                <span className={dailyGenCount >= getDailyLimit() ? "text-red-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                  {dailyGenCount}/{getDailyLimit()} {t.prompt_image_generate_count}
                 </span>
               </div>
               <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ease-out ${
-                    dailyGenCount >= 30 ? 'bg-red-500' : 'bg-emerald-500'
+                    dailyGenCount >= getDailyLimit() ? 'bg-red-500' : 'bg-emerald-500'
                   }`} 
-                  style={{ width: `${Math.min(100, (dailyGenCount / 30) * 100)}%` }} 
+                  style={{ width: `${Math.min(100, (dailyGenCount / getDailyLimit()) * 100)}%` }} 
                 />
               </div>
-              {dailyGenCount >= 30 ? (
+              {dailyGenCount >= getDailyLimit() ? (
                 <span className="text-[10px] text-red-500 font-extrabold block mt-2 leading-tight">
                   {t.prompt_image_trial_expired}
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block mt-1.5 leading-tight">
-                  {t.prompt_image_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, 30 - dailyGenCount)} {t.prompt_image_trial_times}</strong>.
+                  {t.prompt_image_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, getDailyLimit() - dailyGenCount)} {t.prompt_image_trial_times}</strong>.
                 </span>
               )}
             </div>
