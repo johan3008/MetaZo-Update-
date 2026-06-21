@@ -153,10 +153,18 @@
         .gold-border {
             border-image: linear-gradient(to right, #3b82f6, #6366f1, #ec4899) 1;
         }
+        
+        /* Subtle cross-fade transition effect for theme switching */
+        ::view-transition-old(root),
+        ::view-transition-new(root) {
+            animation-duration: 0.4s;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            mix-blend-mode: normal;
+        }
     </style>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 transition-colors duration-500">
+<body class="bg-slate-100 dark:bg-slate-950">
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
 </body>

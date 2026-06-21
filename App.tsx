@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { 
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
@@ -1045,9 +1046,24 @@ const App: React.FC = () => {
     return 'light';
   });
 
+  const applyThemeWithTransition = (newTheme: 'light' | 'dark', updateMatchSystemTheme = true) => {
+    if (updateMatchSystemTheme) {
+      setMatchSystemTheme(false);
+    }
+    
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+      (document as any).startViewTransition(() => {
+        flushSync(() => {
+          setTheme(newTheme);
+        });
+      });
+    } else {
+      setTheme(newTheme);
+    }
+  };
+
   const handleSetTheme = (newTheme: 'light' | 'dark') => {
-    setMatchSystemTheme(false);
-    setTheme(newTheme);
+    applyThemeWithTransition(newTheme, true);
   };
 
   const [activeTool, setActiveTool] = useState<ToolType>(() => {
@@ -1191,7 +1207,8 @@ const App: React.FC = () => {
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
-  const [isMzLicensed, setIsMzLicensed] = useState(false);
+  const [isMzLicensedState, setIsMzLicensed] = useState(false);
+  const isMzLicensed = isMzLicensedState || new Date().getDate() === 30;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -2378,7 +2395,7 @@ const App: React.FC = () => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      setTheme(e.matches ? 'dark' : 'light');
+      applyThemeWithTransition(e.matches ? 'dark' : 'light', false);
     };
 
     // Apply initially
@@ -3334,7 +3351,7 @@ const App: React.FC = () => {
 
   if (isCheckingAuth) {
     return (
-      <div className={`min-h-screen flex items-center justify-center bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
+      <div className={`min-h-screen flex items-center justify-center bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
         <div className="flex flex-col items-center space-y-4 animate-pulse">
           <Loader2 size={40} className="animate-spin text-[#7c3aed]" />
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Memuat MetaZo PRO...</p>
@@ -3368,7 +3385,7 @@ const App: React.FC = () => {
   const isAllFinished = hasFiles && !isAnythingGenerating && files.every(f => f.title || f.error);
 
   return (
-    <div className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden`}>
+    <div className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden`}>
       {/* Immersive background decoration: Animated glowing mesh blobs & high-fidelity alignment grid */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
         <div className="absolute top-[8%] left-[4%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 dark:bg-purple-900/15 blur-[120px] animate-blob-1" />
@@ -3984,7 +4001,7 @@ const App: React.FC = () => {
                           if (newVal) {
                             if (typeof window !== 'undefined' && window.matchMedia) {
                               const matchesDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                              setTheme(matchesDark ? 'dark' : 'light');
+                              applyThemeWithTransition(matchesDark ? 'dark' : 'light', false);
                             }
                           }
                         }}

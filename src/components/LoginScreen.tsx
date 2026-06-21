@@ -195,7 +195,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const tc = loginTranslations[language] || loginTranslations.en;
 
   return (
-    <div className={`min-h-screen w-full flex flex-col justify-between overflow-x-hidden relative bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className={`min-h-screen w-full flex flex-col justify-between overflow-x-hidden relative bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
       
       {/* 1. BACKGROUND GLOW EFFECTS (Cosmic Theme) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
