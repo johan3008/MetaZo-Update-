@@ -72,7 +72,15 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [tempWhatsApp, setTempWhatsApp] = useState(whatsAppLink);
   const [tempPricingTier, setTempPricingTier] = useState(pricingTier);
   const [tempLicenseSeed, setTempLicenseSeed] = useState(licenseSeed);
-  const [tempPayInfo, setTempPayInfo] = useState(() => localStorage.getItem('mz_reseller_pay_info') || 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant');
+  const [tempPayInfo, setTempPayInfo] = useState(() => {
+    const saved = localStorage.getItem('mz_reseller_pay_info');
+    if (saved && saved.includes('BCA 817')) {
+      const newVal = 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom';
+      localStorage.setItem('mz_reseller_pay_info', newVal);
+      return newVal;
+    }
+    return saved || 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom';
+  });
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Dynamic Subscription Pricing State Definitions
@@ -548,7 +556,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           whatsAppLink: 'https://wa.me/+6282275408171',
           pricingTier: 'Rp 149.000 / Bulan',
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
-          payInfo: 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant',
+          payInfo: 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom',
           price30Days: 'Rp 50.000',
           price30DaysUSD: '$2',
           priceUnlimited: 'Rp 250.000',
@@ -572,7 +580,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         setWhatsAppLink('https://wa.me/+6282275408171');
         setPricingTier('Rp 149.000 / Bulan');
         setLicenseSeed('MZPRO-COMMERCIAL-2026');
-        setTempPayInfo('Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant');
+        setTempPayInfo('Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom');
         setPrice30Days('Rp 50.000');
         setPrice30DaysUSD('$2');
         setPriceUnlimited('Rp 250.000');
@@ -1163,7 +1171,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Payment / Order Transfer Instructions</label>
                     <textarea
                       rows={2}
-                      placeholder="Contoh: Transfer Bank BCA 123-xxxx a/n Nama Anda"
+                      placeholder="Contoh: Bank Neo Commerce ... a/n Nama Anda"
                       value={tempPayInfo}
                       onChange={(e) => setTempPayInfo(e.target.value)}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none transition-all line-clamp-3"

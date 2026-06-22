@@ -2369,15 +2369,16 @@ Rules for the Generated Prompts:
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
 8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney). Each prompt variation must read like a gorgeous, professional image description, not a database search query.
 9. CRITICAL: Conform exactly to the requested JSON schema.
-10. ATURAN KETAT ANTI-KEMIRIPAN (ANTI-SIMILARITY RULE):
-    Setiap kali user melakukan generate ulang pada tema atau style yang sama, Anda WAJIB merombak total elemen-elemen berikut agar hasil gambar berikutnya tidak mirip (completely distinct):
-    1. Rombak Pose & Aksi Subjek: Jika sebelumnya subjek sedang diam/menghadap kamera, ubah menjadi sedang beraksi, berbalik badan, atau melihat ke arah lain.
-    2. Rombak Komposisi & Sudut Kamera: Acak secara ekstrem (misal: dari close-up fokus detail, ubah total menjadi wide-shot yang memperlihatkan seluruh lingkungan).
-    3. Rombak Latar Belakang (Background): Ganti suasana lingkungan. Jika sebelumnya di dalam ruangan (indoor), ubah menjadi di luar ruangan (outdoor), atau ganti elemen interiornya secara total.
-    4. Rombak Pencahayaan & Warna: Ubah palet warna dominan dan waktu (misal: dari terang benderang siang hari menjadi siluet malam hari dengan kontras tinggi).
-    5. Tambahkan Detail Konseptual Baru: Masukkan satu elemen atau properti unik yang tidak ada di prompt sebelumnya untuk membedakan cerita di dalam gambar.
-    6. Elemen Kejutan: Setiap kali membuat prompt, tambahkan satu detail kecil atau objek pendukung secara acak yang relevan dengan tema, namun sering terabaikan (misalnya: menambahkan efek cuaca, partikel debu yang melayang, pantulan cermin, embun pagi, atau interaksi unik dengan benda di sekitar). Manfaatkan "Suntikan Variasi Acak" yang diberikan sebagai pemicu kreativitas untuk detail ini.
-    Dilarang keras mengulang pola kalimat atau struktur prompt yang mirip dari iterasi sebelumnya. Hasil akhir harus berupa deskripsi visual yang segar dan unik.
+10. STRICT ADOBE NO SIMILAR CONTENT RULE (CRITICAL FOR ADOBE STOCK COMPLIANCE):
+    You MUST adhere exactly to Adobe Stock's "Similar vs. Spamming" guidelines. Adobe Stock rejects content with the reason: "During our review, we found that your submission closely resembles content already available on Adobe Stock... we refuse content that is too repetitive so customers can easily find distinct and relevant content."
+    To ensure acceptance, EVERY SINGLE PROMPT in the batch MUST be clearly differentiated from the others.
+    Our moderators look for noticeable differences. You must inject extreme variation across:
+    - Composition & Camera Angle (e.g., wide shot vs. extreme close-up vs. bird's-eye view).
+    - Color Palette & Lighting (e.g., golden hour vs. neon nights vs. monochromatic blue).
+    - Expression & Pose (e.g., looking away, intense action, dynamic movement, subtle micro-expressions).
+    - Scenario & Environment (e.g., changing the background entirely, indoors vs. outdoors).
+    - Do NOT just create minimal variations (e.g., just changing a shirt color or moving a prop slightly). Each prompt must be a visually distinct and standalone masterpiece.
+    - Share your best, most varied work.
 11. ADOBE STOCK CONTENT STRATEGY (MUST FOLLOW STRICTLY):
 You are an Adobe Stock content strategist. Before generating prompts, avoid concepts that are already heavily saturated on Adobe Stock.
 - Avoid concepts that belong to the top 20% most common Adobe Stock categories.
@@ -2469,6 +2470,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           lastError = err;
           attempts++;
           console.warn(`Error on ${modelName} on attempt ${attempts}:`, err.message || err);
+          if (err.message && err.message.includes('API_KEY')) throw err;
           if (attempts < maxAttempts) {
             const backoffTime = attempts * 1500;
             await new Promise(resolve => setTimeout(resolve, backoffTime));
@@ -2904,12 +2906,13 @@ CRITICAL RULES:
     } catch (err: any) {
       lastError = err;
       console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      if (err.message && err.message.includes('API_KEY')) throw err;
     }
   }
 
   if (!response) {
     console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
-    throw new Error("Failed to analyze image. Please try again.");
+    throw lastError || new Error("Failed to analyze image. Please try again.");
   }
 
   try {
@@ -2984,12 +2987,13 @@ Return a JSON array of objects, each with "prompt" and "description".`;
     } catch (err: any) {
       lastError = err;
       console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      if (err.message && err.message.includes('API_KEY')) throw err;
     }
   }
 
   if (!response) {
     console.warn("analyzeBatchImageToPrompt bypassed:", lastError?.message);
-    throw new Error("Failed to analyze images in batch.");
+    throw lastError || new Error("Failed to analyze images in batch.");
   }
 
   try {
@@ -3214,6 +3218,7 @@ Respons Anda WAJIB dalam format JSON:
     } catch (err: any) {
       lastError = err;
       console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
+      if (err.message && err.message.includes('API_KEY')) throw err;
     }
   }
 

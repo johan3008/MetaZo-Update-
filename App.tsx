@@ -1642,9 +1642,14 @@ const App: React.FC = () => {
           localStorage.setItem('mz_reseller_seed', data.licenseSeed);
         }
         if (data.payInfo) {
-          localStorage.setItem('mz_reseller_pay_info', data.payInfo);
+          let payInfoToSave = data.payInfo;
+          if (payInfoToSave.includes('BCA 817')) {
+            payInfoToSave = 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom';
+            setDoc(docRef, { payInfo: payInfoToSave }, { merge: true }).catch(console.error);
+          }
+          localStorage.setItem('mz_reseller_pay_info', payInfoToSave);
           // dispatch custom event to notify SaaSPortal
-          window.dispatchEvent(new CustomEvent('mz_pay_info_updated', { detail: data.payInfo }));
+          window.dispatchEvent(new CustomEvent('mz_pay_info_updated', { detail: payInfoToSave }));
         }
       } else {
         // Init fallback bootstrap
@@ -1654,7 +1659,7 @@ const App: React.FC = () => {
           whatsAppLink: 'https://wa.me/+6282275408171',
           pricingTier: 'Rp 149.000 / Bulan',
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
-          payInfo: 'Transfer Bank Manual: BCA 817-092-3659 a/n Johan Chrismant',
+          payInfo: 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom',
           updatedAt: new Date().toISOString()
         }).catch(err => {
           console.error('Bootstrap branding error:', err);
