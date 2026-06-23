@@ -16,6 +16,8 @@ interface AiConfigPanelProps {
   setMetadataLanguage: (lang: string) => void;
   aiCreativity: number;
   setAiCreativity: (val: number) => void;
+  aiModelPerformance?: 'speed' | 'detail';
+  setAiModelPerformance?: (val: 'speed' | 'detail') => void;
   isLoading: boolean;
   progressInfo: ProgressInfo | null;
   isPaused: boolean;
@@ -43,6 +45,8 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   setMetadataLanguage,
   aiCreativity,
   setAiCreativity,
+  aiModelPerformance = 'detail',
+  setAiModelPerformance = (val: 'speed' | 'detail') => {},
   isLoading,
   progressInfo,
   isPaused,
@@ -190,6 +194,33 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                 <option value="ko">Korean / 한국어</option>
                 <option value="ru">Russian / Русский</option>
               </select>
+            </div>
+
+            <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  AI Model Performance
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'speed', label: 'Speed (Faster)' },
+                  { value: 'detail', label: 'Detail (High-Context)' }
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setAiModelPerformance?.(opt.value as 'speed' | 'detail')}
+                    className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center ${
+                      aiModelPerformance === opt.value
+                        ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-md shadow-[#7c3aed]/20'
+                        : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-3 p-4 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5 relative overflow-hidden">

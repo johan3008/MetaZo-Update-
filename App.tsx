@@ -1170,6 +1170,7 @@ const App: React.FC = () => {
   }, [activeTool]); // eslint-disable-line
 
   const [aiCreativity, setAiCreativity] = useState<number>(0.7);
+  const [aiModelPerformance, setAiModelPerformance] = useState<'speed' | 'detail'>('detail');
   const [generationMode, setGenerationMode] = useState<GenerationMode>(GenerationMode.STANDARD);
   const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
@@ -2816,7 +2817,7 @@ const App: React.FC = () => {
                 blackboxKeys: blackboxKeysList,
                 bluesmindsKeys: bluesmindsKeysList
               };
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -2963,7 +2964,7 @@ const App: React.FC = () => {
                   blackboxKeys: blackboxKeysList,
                   bluesmindsKeys: bluesmindsKeysList
                 };
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -3731,6 +3732,8 @@ const App: React.FC = () => {
                   setMetadataLanguage={setMetadataLanguage}
                   aiCreativity={aiCreativity}
                   setAiCreativity={setAiCreativity}
+                  aiModelPerformance={aiModelPerformance}
+                  setAiModelPerformance={setAiModelPerformance}
                   isLoading={isLoading} 
                   progressInfo={progressInfo} 
                   isPaused={isPaused} 

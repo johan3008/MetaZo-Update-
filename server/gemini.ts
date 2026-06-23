@@ -1040,9 +1040,13 @@ export const generateStockMetadata = async (
   model?: string,
   keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
-  metadataLanguage?: string
+  metadataLanguage?: string,
+  aiModelPerformance?: 'speed' | 'detail'
 ): Promise<StockMetadata> => {
-  const activeModel = model === 'gemini-3.5-flash' ? 'gemini-3.5-flash' : model;
+  let activeModel = model;
+  if (!activeModel || activeModel === 'gemini-3.5-flash' || activeModel === 'gemini-3.1-flash-lite') {
+    activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite' : 'gemini-3.5-flash';
+  }
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
   
@@ -1605,9 +1609,13 @@ export const generateBatchStockMetadata = async (
   model?: string,
   keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
-  metadataLanguage?: string
+  metadataLanguage?: string,
+  aiModelPerformance?: 'speed' | 'detail'
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
-  const activeModel = model === 'gemini-3.5-flash' ? 'gemini-3.5-flash' : model;
+  let activeModel = model;
+  if (!activeModel || activeModel === 'gemini-3.5-flash' || activeModel === 'gemini-3.1-flash-lite') {
+    activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite' : 'gemini-3.5-flash';
+  }
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
