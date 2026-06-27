@@ -720,7 +720,7 @@ app.get('/api/debug-uploads', (req, res) => {
                         body: JSON.stringify({
                             model: 'gpt-4o',
                             messages: [{role: 'user', content: 'test'}],
-                            max_tokens: 16
+                            stream: false
                         })
                     });
 
@@ -747,7 +747,7 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             if (success) {
-                return res.json({ success: true, message: 'Bluesminds API Key valid! (GPT-4o active)' });
+                return res.json({ success: true, message: 'Bluesminds API Key valid! (gpt-4o active)' });
             } else {
                 return res.status(400).json({ error: `Gagal verifikasi Bluesminds API (Status ${lastStatus}): ${lastText}` });
             }

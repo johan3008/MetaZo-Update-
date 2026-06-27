@@ -3957,7 +3957,7 @@ const App: React.FC = () => {
                   { id: 'openrouter', name: 'Open Router', desc: 'Multi-LLM access' },
                   { id: 'blackbox', name: 'Blackbox AI', desc: 'Code specialized' },
                   { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' },
-                  { id: 'bluesminds', name: 'Bluesminds', desc: 'GPT-4o model' }
+                  { id: 'bluesminds', name: 'Bluesminds', desc: 'Fast Proxy' }
                 ].map(prov => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name} - {prov.desc}
@@ -4656,7 +4656,7 @@ const App: React.FC = () => {
               {activeSettingsTab === 'bluesminds' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
-                    Simpan API Key Bluesminds Anda untuk mengakses model super cepat GPT-4o.
+                    Simpan API Key Bluesminds Anda untuk mengakses layanan ini.
                   </p>
 
                   <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
@@ -4776,7 +4776,7 @@ const App: React.FC = () => {
                       value="gpt-4o"
                       className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-500 dark:text-slate-450 cursor-not-allowed"
                     >
-                      <option value="gpt-4o">GPT-4o (Active - Default)</option>
+                      <option value="gpt-4o">gpt-4o (Active - Default)</option>
                     </select>
                   </div>
                 </div>
