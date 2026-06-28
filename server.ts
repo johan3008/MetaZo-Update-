@@ -718,7 +718,7 @@ app.get('/api/debug-uploads', (req, res) => {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            model: 'gpt-4o',
+                            model: 'gpt-4o-mini',
                             messages: [{role: 'user', content: 'test'}],
                             stream: false
                         })
@@ -747,8 +747,21 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             if (success) {
-                return res.json({ success: true, message: 'Bluesminds API Key valid! (gpt-4o active)' });
+                return res.json({ success: true, message: 'Bluesminds API Key valid! (gpt-4o-mini active)' });
             } else {
+                const lowerText = lastText.toLowerCase();
+                const isOutOfCredits = lastStatus === 402 || lowerText.includes('credits') || lowerText.includes('balance') || lowerText.includes('payment') || lowerText.includes('extra data') || lowerText.includes('bad_response_status_code');
+                const isRateLimited = lastStatus === 429 || lowerText.includes('too many requests') || lowerText.includes('rate limit');
+                
+                if (isOutOfCredits || isRateLimited) {
+                    return res.json({ 
+                        success: true, 
+                        quotaExceeded: true, 
+                        message: isOutOfCredits 
+                            ? 'Bluesminds API Key valid, tetapi Saldo/Credit Habis (Insufficient Balance).'
+                            : 'Bluesminds API Key valid, tetapi terkena Rate Limit (Too Many Requests). Silakan coba lagi nanti.'
+                    });
+                }
                 return res.status(400).json({ error: `Gagal verifikasi Bluesminds API (Status ${lastStatus}): ${lastText}` });
             }
         } catch (e: any) {

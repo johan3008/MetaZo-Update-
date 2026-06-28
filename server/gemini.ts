@@ -78,7 +78,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   openrouter: 'google/gemini-2.0-flash-001',
   blackbox: 'blackboxai',
   nvidia: 'meta/llama-3.3-70b-instruct',
-  bluesminds: 'gpt-4o',
+  bluesminds: 'gpt-4o-mini',
 };
 
 const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
@@ -88,7 +88,7 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
   openrouter: 'anthropic/claude-3.5-haiku',
   blackbox: 'blackboxai-pro',
   nvidia: 'meta/llama-3.1-70b-instruct',
-  bluesminds: 'gpt-4o',
+  bluesminds: 'gpt-4o-mini',
 };
 
 // Provider yang reliable mendukung response_format: json_object
@@ -825,7 +825,7 @@ async function callOpenAICompatibleWithRetry(params: {
           }
         }
 
-        if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit') || errorMsg.includes('timeout') || errorMsg.includes('fetch failed')) {
+        if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('402') || errorMsg.includes('credits') || errorMsg.includes('balance') || errorMsg.includes('payment') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit') || errorMsg.includes('timeout') || errorMsg.includes('fetch failed') || errorMsg.includes('extra data') || errorMsg.includes('bad_response_status_code')) {
           if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
             const prevIdx = providerState.activeIndex;
             providerState.activeIndex++;
@@ -838,6 +838,10 @@ async function callOpenAICompatibleWithRetry(params: {
         tryCount++;
         const fallback = PROVIDER_FALLBACK_MODELS[provider];
         const isRetryableError = errorMsg.includes('429') || 
+                                 errorMsg.includes('402') ||
+                                 errorMsg.includes('credits') ||
+                                 errorMsg.includes('balance') ||
+                                 errorMsg.includes('payment') ||
                                  errorMsg.includes('quota') || 
                                  errorMsg.includes('limit') || 
                                  errorMsg.includes('timeout') || 
@@ -1090,13 +1094,14 @@ export const generateStockMetadata = async (
    - Search Intent & Commercial Concept (Abstract Purpose: target terms representing why a buyer would search for this asset, commercial utility, industrial purpose, psychological mood, emotional intent, business solutions, and symbolic metaphor representation)
    - Industry (Specific/Technical Category: specialized corporate or consumer domains, professional categories)
 3. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
-4. Prioritize highly searchable buyer terms.
+4. DOMINATE SEARCH ALGORITHMS: Select keywords designed to dominate search algorithms on microstock platforms (Adobe Stock, Shutterstock, Freepik). Prioritize highly searched commercial keywords, buyers' top search queries, and high-converting commercial tags.
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. DOMINATE SEARCH ALGORITHMS: Every generated keyword and title must be engineered to dominate search algorithms, guaranteeing maximum discoverability, high search ranking, and search engine optimization (SEO) superiority.`;
 
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -1108,13 +1113,14 @@ export const generateStockMetadata = async (
    - Search Intent & Commercial Concept (Abstract Purpose: single-word terms representing buyer search intent, commercial purpose, utility, symbolic concept, or emotional mood)
    - Industry (Specific/Technical Category: single-word technical or industry-specific terms)
 3. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-4. Prioritize highly searchable buyer terms.
+4. DOMINATE SEARCH ALGORITHMS: Select single-word keywords designed to dominate search algorithms on microstock platforms (Adobe Stock, Shutterstock, Freepik). Prioritize highly searched commercial keywords, buyers' top search queries, and high-converting commercial tags.
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. DOMINATE SEARCH ALGORITHMS: Every generated keyword and title must be engineered to dominate search algorithms, guaranteeing maximum discoverability, high search ranking, and search engine optimization (SEO) superiority.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
@@ -1125,13 +1131,14 @@ export const generateStockMetadata = async (
    - Search Intent & Commercial Concept (Abstract Purpose: multi-word phrases representing the buyer's target intent, commercial use cases, digital trends, emotional concepts, or symbolic metaphors)
    - Industry (Specific/Technical Category: multi-word technical or professional industry terms)
 3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-4. Prioritize highly searchable buyer terms.
+4. DOMINATE SEARCH ALGORITHMS: Select keyword phrases designed to dominate search algorithms on microstock platforms (Adobe Stock, Shutterstock, Freepik). Prioritize highly searched commercial keywords, buyers' top search queries, and high-converting commercial tags.
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. DOMINATE SEARCH ALGORITHMS: Every generated keyword and title must be engineered to dominate search algorithms, guaranteeing maximum discoverability, high search ranking, and search engine optimization (SEO) superiority.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -1298,6 +1305,7 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
+- DOMINATE SEARCH ALGORITHMS: The title must be strategically engineered to dominate search algorithms and maximize discoverability. Use high-ranking, high-volume commercial keywords and search-friendly structures that align perfectly with user search intent.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
@@ -1435,6 +1443,7 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
+- DOMINATE SEARCH ALGORITHMS: The title must be strategically engineered to dominate search algorithms and maximize discoverability. Use high-ranking, high-volume commercial keywords and search-friendly structures that align perfectly with user search intent.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
@@ -1654,13 +1663,14 @@ export const generateBatchStockMetadata = async (
    - Search Intent & Commercial Concept (Abstract Purpose: target terms representing why a buyer would search for this asset, commercial utility, industrial purpose, psychological mood, emotional intent, business solutions, and symbolic metaphor representation)
    - Industry (Specific/Technical Category: specialized corporate or consumer domains, professional categories)
 3. Include both single-word and/or multi-word phrases (1-3 words) when relevant.
-4. Prioritize highly searchable buyer terms.
+4. DOMINATE SEARCH ALGORITHMS: Select keywords designed to dominate search algorithms on microstock platforms (Adobe Stock, Shutterstock, Freepik). Prioritize highly searched commercial keywords, buyers' top search queries, and high-converting commercial tags.
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. DOMINATE SEARCH ALGORITHMS: Every generated keyword and title must be engineered to dominate search algorithms, guaranteeing maximum discoverability, high search ranking, and search engine optimization (SEO) superiority.`;
 
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -1672,13 +1682,14 @@ export const generateBatchStockMetadata = async (
    - Search Intent & Commercial Concept (Abstract Purpose: single-word terms representing buyer search intent, commercial purpose, utility, symbolic concept, or emotional mood)
    - Industry (Specific/Technical Category: single-word technical or industry-specific terms)
 3. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-4. Prioritize highly searchable buyer terms.
+4. DOMINATE SEARCH ALGORITHMS: Select single-word keywords designed to dominate search algorithms on microstock platforms (Adobe Stock, Shutterstock, Freepik). Prioritize highly searched commercial keywords, buyers' top search queries, and high-converting commercial tags.
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. DOMINATE SEARCH ALGORITHMS: Every generated keyword and title must be engineered to dominate search algorithms, guaranteeing maximum discoverability, high search ranking, and search engine optimization (SEO) superiority.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
@@ -1689,13 +1700,14 @@ export const generateBatchStockMetadata = async (
    - Search Intent & Commercial Concept (Abstract Purpose: multi-word phrases representing the buyer's target intent, commercial use cases, digital trends, emotional concepts, or symbolic metaphors)
    - Industry (Specific/Technical Category: multi-word technical or professional industry terms)
 3. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-4. Prioritize highly searchable buyer terms.
+4. DOMINATE SEARCH ALGORITHMS: Select keyword phrases designed to dominate search algorithms on microstock platforms (Adobe Stock, Shutterstock, Freepik). Prioritize highly searched commercial keywords, buyers' top search queries, and high-converting commercial tags.
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. DOMINATE SEARCH ALGORITHMS: Every generated keyword and title must be engineered to dominate search algorithms, guaranteeing maximum discoverability, high search ranking, and search engine optimization (SEO) superiority.`;
   }
 
   const store = apiKeyStorage.getStore();
@@ -1869,6 +1881,7 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
+- DOMINATE SEARCH ALGORITHMS: The title must be strategically engineered to dominate search algorithms and maximize discoverability. Use high-ranking, high-volume commercial keywords and search-friendly structures that align perfectly with user search intent.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
@@ -2011,6 +2024,7 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
+- DOMINATE SEARCH ALGORITHMS: The title must be strategically engineered to dominate search algorithms and maximize discoverability. Use high-ranking, high-volume commercial keywords and search-friendly structures that align perfectly with user search intent.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
