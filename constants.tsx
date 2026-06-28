@@ -41,7 +41,7 @@ export const TRANSLATIONS = {
     
     help_button: "WhatsApp Group & Support",
     donate_button: "Donate / Support",
-    whatsapp_link: "https://wa.me/+6282275408171", 
+    whatsapp_link: "https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr", 
     footer_text: "🔐 Developed with dedication @2026.",
 
     image_tool: "Image",
@@ -445,7 +445,7 @@ export const TRANSLATIONS = {
     
     help_button: "Grup WhatsApp & Bantuan",
     donate_button: "Donasi / Dukungan",
-    whatsapp_link: "https://wa.me/+6282275408171", 
+    whatsapp_link: "https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr", 
     footer_text: "🔐 Dikembangkan dengan dedikasi @2026.",
 
     image_tool: "Gambar",

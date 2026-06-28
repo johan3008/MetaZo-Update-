@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
@@ -1204,7 +1205,7 @@ const App: React.FC = () => {
 
   const [mzAppName, setMzAppName] = useState(() => localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO');
   const [mzAppSubtitle, setMzAppSubtitle] = useState(() => localStorage.getItem('mz_reseller_app_subtitle') || 'AI-Powered Metadata Assistant');
-  const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://wa.me/+6282275408171');
+  const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr');
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
@@ -1657,7 +1658,7 @@ const App: React.FC = () => {
         setDoc(docRef, {
           appName: 'MetaZo PRO',
           appSubtitle: 'AI-Powered Metadata Assistant',
-          whatsAppLink: 'https://wa.me/+6282275408171',
+          whatsAppLink: 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr',
           pricingTier: 'Rp 149.000 / Bulan',
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
           payInfo: 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom',
@@ -3391,7 +3392,7 @@ const App: React.FC = () => {
   const isAllFinished = hasFiles && !isAnythingGenerating && files.every(f => f.title || f.error);
 
   return (
-    <div className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden`}>
+    <div className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden transition-colors duration-500`}>
       {/* Immersive background decoration: Animated glowing mesh blobs & high-fidelity alignment grid */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
         <div className="absolute top-[8%] left-[4%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 dark:bg-purple-900/15 blur-[120px] animate-blob-1" />
@@ -3452,9 +3453,18 @@ const App: React.FC = () => {
         />
 
         {/* Core Dashboard Stage */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
-          {activeTool === ToolType.DASHBOARD ? (
-            <DashboardView 
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTool}
+              initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="w-full h-full"
+            >
+              {activeTool === ToolType.DASHBOARD ? (
+                <DashboardView 
               files={files}
               setActiveTool={handleSetActiveTool}
               setShowInfoModal={setShowInfoModal}
@@ -3804,6 +3814,8 @@ const App: React.FC = () => {
               )}
             </>
           )}
+          </motion.div>
+        </AnimatePresence>
         </main>
 
         <footer className="text-center py-6 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest border-t border-slate-200 dark:border-white/5 bg-white dark:bg-[#090d16] mt-auto">
