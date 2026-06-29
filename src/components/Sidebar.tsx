@@ -318,8 +318,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Calendar size={16} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
             </button>
-
-
           </nav>
         </div>
 
@@ -668,8 +666,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Calendar size={14} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
                       <span>{t.sidebar_calendar_gen}</span>
                     </button>
-
-
                   </nav>
                 </div>
 

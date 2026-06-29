@@ -61,30 +61,6 @@ const getBluesmindsEndpoint = (): string => {
   return `${base}/v1/chat/completions`;
 };
 
-const getCustomEndpoint = (): string => {
-  const envVal = process.env.CUSTOM_API_ENDPOINT;
-  if (!envVal || !envVal.trim()) {
-    return 'https://api.aivene.com/v1/chat/completions';
-  }
-  let base = envVal.trim();
-  if (base.endsWith('/chat/completions')) {
-    return base;
-  }
-  if (base.endsWith('/chat/completions/')) {
-    return base.slice(0, -1);
-  }
-  if (base.endsWith('/v1')) {
-    return `${base}/chat/completions`;
-  }
-  if (base.endsWith('/v1/')) {
-    return `${base}chat/completions`;
-  }
-  if (base.endsWith('/')) {
-    return `${base}v1/chat/completions`;
-  }
-  return `${base}/v1/chat/completions`;
-};
-
 const PROVIDER_ENDPOINTS: Record<string, string> = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   mistral: 'https://api.mistral.ai/v1/chat/completions',
@@ -93,7 +69,7 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   blackbox: 'https://api.blackbox.ai/v1/chat/completions',
   nvidia: 'https://integrate.api.nvidia.com/v1/chat/completions',
   bluesminds: getBluesmindsEndpoint(),
-  custom: getCustomEndpoint(),
+  aivene: 'https://api.aivene.com/v1/chat/completions',
 };
 
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
@@ -104,7 +80,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   blackbox: 'blackboxai',
   nvidia: 'meta/llama-3.3-70b-instruct',
   bluesminds: 'gpt-4o',
-  custom: 'gpt-4o-mini',
+  aivene: 'gpt-4o-mini',
 };
 
 const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
@@ -115,11 +91,11 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
   blackbox: 'blackboxai-pro',
   nvidia: 'meta/llama-3.1-70b-instruct',
   bluesminds: 'gpt-4o',
-  custom: 'gpt-4o',
+  aivene: 'gpt-4o-mini',
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'custom']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'aivene']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -129,10 +105,10 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   blackbox: 'BLACKBOX_API_KEY',
   nvidia: 'NVIDIA_API_KEY',
   bluesminds: 'BLUESMINDS_API_KEY',
-  custom: 'CUSTOM_API_KEY',
+  aivene: 'AIVENE_API_KEY',
 };
 
-const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'custom']);
+const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene']);
 
 /**
  * Ekstrak JSON yang valid dari teks response, toleran terhadap:
@@ -721,7 +697,7 @@ async function callOpenAICompatibleWithRetry(params: {
 
     // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
     // (artinya caller belum sempat resolve), pakai default provider ini.
-    if (provider !== 'custom' && (model?.startsWith('gemini-') || model?.startsWith('gemma-'))) {
+    if (model?.startsWith('gemini-') || model?.startsWith('gemma-')) {
       model = PROVIDER_DEFAULT_MODELS[provider];
     }
 
@@ -740,7 +716,7 @@ async function callOpenAICompatibleWithRetry(params: {
       payload.response_format = { type: "json_object" };
     }
 
-    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'custom') {
+    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
       payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
     } else if (provider === 'bluesminds') {
       // Do not send max_tokens to avoid pre-check reservation failures on limited balance
@@ -1037,7 +1013,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+          const rotationModels = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -3189,63 +3165,35 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
     ...p,
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
-}
-
-export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa') {
-  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar resmi Adobe Stock Global (Contributor Moderation Quality & Technical Standards) dengan performa ultra-akurat, teliti, dan bermata elang. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar stok komersial sebelum proses upload. Anda harus memeriksa setiap sudut gambar hingga ke level piksel untuk menemukan cacat sekecil apa pun.
+}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa') {
+  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global dengan performa ultra-akurat, teliti, dan bermata elang. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar stok komersial sebelum proses upload. Anda harus memeriksa setiap sudut gambar hingga ke level piksel untuk menemukan cacat sekecil apa pun.
+Jangan pernah menebak-nebak (no hallucination). Lakukan pemindaian visual mendalam sebelum memberikan vonis.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 - STRICT: "Zero Tolerance" mutlak. Sekecil apapun cacat teknis, sedikit noise, sedikit blur di latar belakang, artifak AI, atau indikasi pelanggaran IP sekecil apa pun = FAIL secara instan (Skor maksimal 0-59).
 - MEDIUM: Cacat teknis minor yang tidak mengganggu subjek utama bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, merek dagang, logo, atau artifak AI merusak pada subjek utama = FAIL secara instan (Skor maksimal 0-65).
 - LOOSE: Loloskan selama gambar dapat digunakan secara komersial tanpa tuntutan hukum. Hanya cacat teknis yang sangat fatal/merusak atau pelanggaran merek dagang mencolok yang menyebabkan FAIL (Skor 0-69).
 
-A. DAFTAR EVALUASI PENOLAKAN KUALITAS & TEKNIS ADOBE STOCK (REFUSAL RUBRIC)
-Berdasarkan dokumen panduan "Quality and Technical Standards Reasons for Content Refusal" dari Adobe Stock helpx, Anda wajib melakukan audit menyeluruh terhadap 8 kategori utama berikut:
+A. CEK LIST PEMBATALAN (Known Restrictions / Adobe Stock Intellectual Property Refusal Compliance)
+Berdasarkan kebijakan Adobe Stock, Anda wajib mendeteksi dan menandai FAIL jika mendeteksi pelanggaran IP, arsitektur yang dilindungi, atau merek dagang tanpa izin tertulis (Model/Property Release) sesuai dengan 5 kategori utama:
+1. TRADEMARKS, BRANDS, AND LOGOS: Logo perusahaan lama/baru, nama merek, atau trademark apa pun yang terlihat (misal: gigitan Apple, centang Nike, strip Adidas, kancing LEGO, GoPro, ikon media sosial seperti Instagram/Facebook, Google, Coca-Cola, Pepsi, Starbucks, dsb).
+2. PROPRIETARY DESIGNS AND PRODUCTS: Desain bentuk fisik produk yang terpatenkan atau sangat ikonik, bahkan tanpa logo yang terlihat (misal: bentuk fisik bodi iPhone/iPad dengan poni/kamera belakang khas, kepingan LEGO, bodi Vespa, grille 7-slot Jeep, kubus Rubik, sol merah sepatu Louboutin, sepatu Converse Chuck Taylor, botol kontur Coca-Cola, dsb).
+3. PROTECTED LANDMARKS AND ARCHITECTURE: Arsitektur atau monumen berhak cipta (misal: Menara Eiffel malam hari saat lampu menyala, kastil Disneyland/Disney, Sydney Opera House, Burj Al Arab, Burj Khalifa, bagian dalam Grand Central Terminal, Chrysler Building, Flatiron Building, Louvre Pyramid, Atomium Brussels, patung Christ the Redeemer, Hollywood Sign, Taj Mahal dari sudut terproteksi, dsb).
+4. FICTIONAL CHARACTERS & COPYRIGHTED WORK: Karakter fiksi berhak cipta (Mickey Mouse, Pikachu/Pokémon, Marvel/DC heroes, Minecraft, Lego minifigures), screenshot video game, buku/film berhak cipta, lukisan/patung modern, perangko, mata uang kertas/koin secara ilegal.
+5. SPORTS TEAMS & EVENTS: Logo olimpiade (Olympic Rings), trofi Piala Dunia, logo/jersey klub olahraga populer (NBA, NFL, Premier League, La Liga, dsb).
 
-1. FOKUS & BURAM GAMBAR (Focus / Out of Focus / Soft Focus / Depth of Field Issues):
-   - Subjek utama wajib dalam fokus tajam dan jernih (sharp and clear focus).
-   - Penolakan mutlak untuk foto dengan motion blur (kabur gerakan), camera shake (goyangan kamera), atau "missed focus" (fokus meleset dari subjek utama).
-   - Efek kedalaman bidang (depth of field) artistik diperbolehkan, namun jika keburaman latar belakang merembes ke tepi subjek utama dan membuatnya "soft", gambar harus ditolak (FAIL).
-
-2. EKSPOSUR & PENCAHAYAAN (Exposure and Lighting Issues):
-   - Underexposure berat: Area bayangan yang terlalu gelap ("crushed shadows" atau kehilangan detail di bagian hitam).
-   - Overexposure berat: Highlight pecah ("blown-out highlights" di mana detail warna putih hilang sepenuhnya).
-   - Cahaya yang terlalu keras (harsh lighting) yang merusak komposisi wajah/subjek, contrast tidak seimbang, pencahayaan datar, atau ketidakseimbangan White Balance yang parah (color cast biru/hijau/merah yang tidak wajar).
-
-3. NOISE, BINTIK, & GRAIN (Noise and Grain):
-   - Noise luminance atau bintik warna kasar (chromatic/color noise), terutama di area berbayang atau gradasi halus (seperti area langit atau warna solid). Sering kali disebabkan oleh pengaturan ISO kamera terlalu tinggi atau sensor kurang sensitif.
-
-4. ARTIFAK KOMPRESI & PIKSELASI (Artifacts / Compression Issues):
-   - Haloing (lingkaran cahaya di tepi kontras tinggi), chromatic aberration (fringing ungu/hijau di perbatasan objek terang-gelap), posterisasi (color banding), dan artifak kompresi JPEG yang membuat pikselasi kasar di sekitar detail halus.
-
-5. STANDAR KUALITAS AI GENERATIF (Generative AI Quality Issues):
-   - Cacat Anatomi: Detail jari tangan/kaki berlebih (polidaktili), jari menyatu, bentuk mata asimetris/meleleh, bibir terdistorsi, proporsi fisik manusia/hewan yang tidak logis atau menakutkan.
-   - Tekstur "Plastik/Lilin" (Smudged / Waxy skin/textures): Kehilangan detail pori-pori kulit asli karena upscaling AI murahan atau denoising berlebih.
-   - Inkonsistensi Logika: Objek melayang yang tidak logis, simetri arsitektur yang terdistorsi, atau bayangan yang arahnya bertabrakan secara tidak realistis.
-   - Gibberish Text: Keberadaan karakter/tulisan acak tanpa makna yang dihasilkan AI pada gambar.
-
-6. KEKAYAAN INTELEKTUAL & MEREK DAGANG (Intellectual Property / Trademark Refusal):
-   - Merek Dagang & Logo: Logo korporat terlihat (Apple, Samsung, Nike, Adidas, LEGO, Disney, dsb.), nama merek, atau trademark apa pun.
-   - Desain Produk Terpatenkan: Desain fisik ikonik tanpa logo (misal: tonjolan kamera khas iPhone, bodi Vespa, kancing LEGO, grille 7-slot Jeep, kubus Rubik, sol merah Louboutin, sepatu Converse Chuck Taylor, dsb).
-   - Landmark & Arsitektur Terproteksi: Desain bangunan modern berhak cipta atau bangunan bersejarah yang dilindungi (Eiffel menyala malam hari, kastil Disney, Sydney Opera House, Burj Khalifa, interior Grand Central Terminal, Chrysler Building, Louvre Pyramid, patung Christ the Redeemer, Hollywood Sign, dsb).
-   - Karya Hak Cipta & Fiksi: Karakter fiksi berhak cipta (Mickey Mouse, Pokémon/Pikachu, Marvel/DC, Minecraft, Lego minifigures), screenshot video game, perangko, mata uang koin/kertas tanpa aturan khusus.
-   - Tim Olahraga & Event: Logo klub olahraga (NBA, NFL, dsb), Trofi Piala Dunia, atau ring Olimpiade.
-
-7. WATERMARK, TEKS, DAN TANDA TANGAN (Watermarks / Text Overlays):
-   - Penolakan instan terhadap segala bentuk tanda air (watermark), tanda tangan fotografer (signature), label tanggal/waktu (timestamp), koordinat GPS, atau teks promosi/judul yang disisipkan secara manual pada piksel gambar.
-
-8. KOMPOSISI & KEBERSIHAN SENSOR (Composition and Sensor Dust):
-   - Horizon miring/tilted tanpa alasan artistik yang jelas.
-   - Pembingkaian buruk (cropping canggung yang memotong bagian vital subjek).
-   - Keberadaan bintik debu sensor kamera (sensor dust spots) atau noda lensa (lens smudges) berupa bulatan abu-abu samar yang mengganggu latar belakang datar seperti langit.
+B. KRITERIA EVALUASI TEKNIS & LEGAL
+- IP & Merek Dagang: Cari logo kecil, nama merek, atau desain benda terproteksi pada latar belakang maupun subjek utama.
+- Kebersihan Konten (Clean Content): Hindari teks buatan (gibberish text), metadata visual, tanda air (watermark), timestamp, atau garis koordinat.
+- Kualitas AI (Artifacts): Perhatikan artifak kulit 'plastik', jari berlebih/menyatu, proporsi tubuh tidak konsisten, detail wajah miring, distorsi objek simetris.
 
 STATUS & SKOR (KONSISTENSI MUTLAK):
 - PASS: Gambar komersial yang layak jual bebas dari pelanggaran IP/trademark sesuai tingkat toleransi. Anda WAJIB memberikan skor antara 75 - 100.
-- FAIL: Gambar ditolak karena terindikasi melanggar kekayaan intelektual (IP Refusal) atau cacat teknis berat sesuai tingkat toleransi. Anda WAJIB memberikan skor di bawah 70 (0 - 69).
+- FAIL: Gambar ditolak karena terindikasi melanggaran kekayaan intelektual (IP Refusal) atau cacat teknis berat sesuai tingkat toleransi. Anda WAJIB memberikan skor di bawah 70 (0 - 69).
 Jangan pernah memberikan skor 70+ jika FAIL, dan jangan berikan skor <75 jika PASS, agar pengguna tidak bingung.
 
 PIXEL HEATMAPS (Untuk visualisasi UI) - SANGAT KETAT & HARUS RELEVANKAN DENGAN KOORDINAT GAMBAR:
-Anda WAJIB memberikan 3-8 titik koordinat heatmap yang sangat spesifik dan realistis di mana cacat pixel/hukum tersebut berada pada gambar:
+Anda WAJIB memberikan 3-8 titik koordinat heatmap yang sangat spesifik dan realistis di mana cacat pixel/hukum tersebut berada pada gambar. Jangan menebak acak, perhatikan letak asli benda/cacat di dalam komposisi foto:
 - x: Koordinat horizontal dari kiri (0) hingga kanan (100).
 - y: Koordinat vertikal dari atas (0) hingga bawah (100).
 
@@ -3254,22 +3202,23 @@ Setiap objek dalam array 'heatmaps' wajib mencakup:
 - "x": integer 0-100
 - "y": integer 0-100
 - "intensity": desimal 0.1 s/d 1.0 (tingkat keparahan cacat di piksel tersebut)
-- "raw_value": deskripsi singkat, padat, sangat presisi mengenai apa yang salah di titik koordinat tersebut dalam bahasa yang diminta. Contoh: "Tanda air samar atau teks digital di pinggiran gambar", "Noise bintik kasar pada bagian gelap bayangan", "Fokus tidak tajam pada area mata subjek utama", "Artifak distorsi jari atau bentuk anatomi meleleh", "Pelanggaran kekayaan intelektual: terlihat desain fisik kancing LEGO / logo terproteksi".
+- "raw_value": deskripsi singkat, padat, sangat presisi mengenai apa yang salah di titik koordinat tersebut dalam bahasa yang diminta. Contoh: "Teks digital atau tanda air samar di pinggiran gambar", "Noise kasar pada bagian bayangan", "Fokus tidak tajam pada subjek utama", "Artifak distorsi jari pada karakter".
 
 ATURAN BAHASA OUTPUT (OUTPUT LANGUAGE RULE):
 Jika parameter bahasa adalah 'Bahasa' / Indonesian, keluarkan nilai feedback dalam Bahasa Indonesia.
 Jika parameter bahasa adalah 'English', keluarkan nilai feedback dalam Bahasa Inggris.
 Current requested language: ${language === 'Bahasa' ? 'Indonesian' : 'English'}
-Seluruh field string (legal_status, technical_issues, strengths, detailed_feedback, raw_value) harus dalam bahasa tersebut secara konsisten.
+Seluruh field string (visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, raw_value) harus dalam bahasa tersebut.
 
-Respons Anda WAJIB dalam format JSON yang valid tanpa markdown tambahan di sekitarnya:
+Respons Anda WAJIB dalam format JSON:
 {
+  "visual_scan_analysis": "Lakukan analisa visual secara teliti di sini terlebih dahulu sebelum menyimpulkan. Apa saja yang Anda temukan di tiap kuadran gambar?",
   "recommendation": "PASS" atau "FAIL",
   "overall_score": [0-100],
-  "legal_status": "Status legal singkat (misal: 'CLEAN' atau 'IP VIOLATION: Terdeteksi produk Jeep grille / logo Apple / karakter Pikachu tanpa rilis resmi')",
-  "technical_issues": ["list masalah teknis/isu spesifik / temuan pelanggaran IP berdasarkan rubrik di atas"],
+  "legal_status": "Status legal singkat",
+  "technical_issues": ["list masalah teknis/isue spesifik / temuan pelanggaran IP"],
   "strengths": ["list kekuatan visual gambar"],
-  "detailed_feedback": "Penjelasan spesifik, bernada kurator profesional, objektif mengenai alasan penilaian dan pelanggaran IP/cacat yang ditemukan berdasarkan standar kurasi Adobe Stock",
+  "detailed_feedback": "Penjelasan spesifik, bernada kurator, objektif mengenai alasan penilaian dan pelanggaran IP/cacat yang ditemukan",
   "heatmaps": [
     { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail spesifik temuan" }
   ]
@@ -3279,6 +3228,7 @@ Respons Anda WAJIB dalam format JSON yang valid tanpa markdown tambahan di sekit
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
+        visual_scan_analysis: { type: Type.STRING },
         legal_status: { type: Type.STRING },
         technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
         strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -3300,51 +3250,12 @@ Respons Anda WAJIB dalam format JSON yang valid tanpa markdown tambahan di sekit
             }
         }
     },
-    required: ["legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "heatmaps"]
   };
 
   const imagePart = processFrameServer(image);
   
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
-
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    let visionModel = PROVIDER_DEFAULT_MODELS[provider];
-    if (provider === 'groq') {
-      visionModel = 'llama-3.2-11b-vision-preview';
-    } else if (provider === 'nvidia') {
-      visionModel = 'stepfun-ai/step-3.5-flash';
-    } else if (provider === 'openai') {
-      visionModel = 'gpt-4o-mini';
-    } else if (provider === 'bluesminds') {
-      visionModel = 'gpt-4o-mini';
-    } else if (provider === 'custom') {
-      visionModel = 'gpt-4o-mini';
-    }
-
-    try {
-      console.log(`[checkImageQuality] Delegating to non-Gemini provider: ${provider} with model ${visionModel}`);
-      const text = await callOpenAICompatibleWithRetry({
-        systemInstruction,
-        contents: [
-          imagePart,
-          { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }
-        ],
-        responseMimeType: "application/json",
-        responseSchema,
-        model: visionModel,
-        config: { temperature: 0.1 }
-      });
-      console.log('Provider raw response:', text);
-      return JSON.parse(text);
-    } catch (e: any) {
-      console.warn(`[checkImageQuality] Failed with non-Gemini provider ${provider}:`, e.message || e);
-      throw e;
-    }
-  }
-
-  // Cleaned up deprecated models to avoid errors, prioritized gemini-3.5-flash as default, with fallback to gemini-flash-latest and gemini-3.1 pro models
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
 
