@@ -1916,6 +1916,7 @@ const App: React.FC = () => {
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
+  const [selectedCustomModel, setSelectedCustomModel] = useState<string>(() => localStorage.getItem('mz_custom_model') || 'gpt-4o-mini');
 
   const [newGeminiKey, setNewGeminiKey] = useState('');
   const [newGroqKey, setNewGroqKey] = useState('');
@@ -2044,11 +2045,16 @@ const App: React.FC = () => {
     if (provider === 'bluesminds') endpoint = '/api/test-bluesminds-key';
     if (provider === 'custom') endpoint = '/api/test-custom-key';
 
+    const reqBody: any = { apiKey: keyValue.trim() };
+    if (provider === 'custom') {
+      reqBody.model = selectedCustomModel;
+    }
+
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: keyValue.trim() })
+        body: JSON.stringify(reqBody)
       });
       const data = await response.json();
       if (response.ok && data.success) {
@@ -2837,6 +2843,8 @@ const App: React.FC = () => {
                   modelParam = selectedGroqModel;
               } else if (selectedProvider === 'nvidia') {
                   modelParam = selectedNvidiaModel;
+              } else if (selectedProvider === 'custom') {
+                  modelParam = selectedCustomModel;
               }
               const aiOptions = {
                 provider: selectedProvider,
@@ -2985,6 +2993,8 @@ const App: React.FC = () => {
                     modelParam = selectedGroqModel;
                 } else if (selectedProvider === 'nvidia') {
                     modelParam = selectedNvidiaModel;
+                } else if (selectedProvider === 'custom') {
+                    modelParam = selectedCustomModel;
                 }
                 const aiOptions = {
                   provider: selectedProvider,
@@ -4845,12 +4855,12 @@ const App: React.FC = () => {
                     <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                       {uiLanguage === 'id' ? "Dapatkan API Key Custom Anda di " : "Get your Custom API Key at "}{' '}
                       <a
-                        href="https://api.aivene.com"
+                        href="https://platform.aivene.com/api-keys"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
                       >
-                        Aivene Console
+                        Aivene Platform
                         <ExternalLink size={10} />
                       </a>
                     </span>
@@ -4952,13 +4962,41 @@ const App: React.FC = () => {
 
                   <div className="space-y-1.5">
                     <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Model Aktif</label>
-                    <select
-                      disabled
-                      value="gpt-4o-mini"
-                      className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-500 dark:text-slate-450 cursor-not-allowed"
-                    >
-                      <option value="gpt-4o-mini">gpt-4o-mini (Active - Default)</option>
-                    </select>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={['gpt-4o-mini', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'].includes(selectedCustomModel) ? selectedCustomModel : 'other'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== 'other') {
+                            setSelectedCustomModel(val);
+                            localStorage.setItem('mz_custom_model', val);
+                          } else {
+                            setSelectedCustomModel('gemini-3.1-flash-lite');
+                            localStorage.setItem('mz_custom_model', 'gemini-3.1-flash-lite');
+                          }
+                        }}
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
+                      >
+                        <option value="gpt-4o-mini">gpt-4o-mini</option>
+                        <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+                        <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+                        <option value="other">Ketik Model Custom...</option>
+                      </select>
+
+                      {(!['gpt-4o-mini', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'].includes(selectedCustomModel)) && (
+                        <input
+                          type="text"
+                          placeholder="Nama model (misal: gemini-3.1-flash-lite)"
+                          value={selectedCustomModel}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedCustomModel(val);
+                            localStorage.setItem('mz_custom_model', val);
+                          }}
+                          className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

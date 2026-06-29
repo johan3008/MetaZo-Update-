@@ -721,7 +721,7 @@ async function callOpenAICompatibleWithRetry(params: {
 
     // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
     // (artinya caller belum sempat resolve), pakai default provider ini.
-    if (model?.startsWith('gemini-') || model?.startsWith('gemma-')) {
+    if (provider !== 'custom' && (model?.startsWith('gemini-') || model?.startsWith('gemma-'))) {
       model = PROVIDER_DEFAULT_MODELS[provider];
     }
 
