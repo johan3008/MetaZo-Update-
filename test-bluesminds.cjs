@@ -12,7 +12,10 @@ async function test() {
         model: model,
         messages: [{
           role: "user", 
-          content: "Hi"
+          content: [
+            { type: "text", text: "Part 1 " },
+            { type: "text", text: "Part 2" }
+          ]
         }],
         stream: false
       })

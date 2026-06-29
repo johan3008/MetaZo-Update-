@@ -1,7 +1,7 @@
 import { getDailyLimit } from '../../constants';
 import React, { useState } from 'react';
 import { getHeaders } from '../../services/geminiService';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
@@ -42,6 +42,7 @@ export const ImageQualityCheck: React.FC<{
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
+  const [activeComplianceTab, setActiveComplianceTab] = useState<string | null>(null);
 
   const toggleHeatmap = (fileName: string) => {
     const next = new Set(showHeatmaps);
@@ -94,6 +95,23 @@ export const ImageQualityCheck: React.FC<{
     setShowHeatmaps(new Set());
   };
 
+  const handleRemoveReport = (fileName: string) => {
+    setReports(prev => {
+      const next = { ...prev };
+      delete next[fileName];
+      return next;
+    });
+    setFiles(prev => prev.filter(f => f.name !== fileName));
+    setPreviews(prev => {
+      const next = { ...prev };
+      if (next[fileName]) {
+        URL.revokeObjectURL(next[fileName]);
+        delete next[fileName];
+      }
+      return next;
+    });
+  };
+
   const resizeAndProcess = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -131,26 +149,30 @@ export const ImageQualityCheck: React.FC<{
   };
 
   const handleFilesSelected = async (selectedFiles: FileList | File[]) => {
-    // Revoke old object URLs
-    Object.keys(previews).forEach(key => URL.revokeObjectURL(previews[key]));
-
     const fileArray = Array.from(selectedFiles);
-    setFiles(fileArray);
+    if (fileArray.length === 0) return;
+
+    // Filter out duplicate files by name to ensure clean state
+    const existingNames = new Set(files.map(f => f.name));
+    const newFiles = fileArray.filter(f => !existingNames.has(f.name));
+
+    if (newFiles.length === 0) return;
+
+    // Append new files to existing files
+    setFiles(prev => [...prev, ...newFiles]);
     
-    const newPreviews: Record<string, string> = {};
-    fileArray.forEach(file => {
-      newPreviews[file.name] = URL.createObjectURL(file);
+    // Append new previews to existing previews
+    const updatedPreviews = { ...previews };
+    newFiles.forEach(file => {
+      updatedPreviews[file.name] = URL.createObjectURL(file);
     });
-    setPreviews(newPreviews);
+    setPreviews(updatedPreviews);
     
-    setReports({});
     setError(null);
     setIsDragging(false);
 
-    // Auto-trigger analysis for selected/dropped files immediately
-    if (fileArray.length > 0) {
-      await handleAnalyze(fileArray);
-    }
+    // Auto-trigger analysis for newly added files immediately
+    await handleAnalyze(newFiles);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,8 +198,8 @@ export const ImageQualityCheck: React.FC<{
     }
   };
 
-  const handleAnalyze = async (filesToAnalyze?: File[]) => {
-    const targetFiles = filesToAnalyze || files;
+  const handleAnalyze = async (filesToAnalyze?: any) => {
+    const targetFiles = Array.isArray(filesToAnalyze) ? filesToAnalyze : files;
     if (targetFiles.length === 0) return;
 
     if (!isLicensed && dailyGenCount + targetFiles.length > getDailyLimit()) {
@@ -191,8 +213,9 @@ export const ImageQualityCheck: React.FC<{
     setLoading(true);
     setProgress(0);
     setError(null);
-    setReports({}); // Clear previous
-    const newReports: Record<string, QualityReport> = {};
+    
+    // Merge new analysis reports into existing reports!
+    const updatedReports = { ...reports };
 
     const progressPerFile = 100 / targetFiles.length;
 
@@ -212,10 +235,13 @@ export const ImageQualityCheck: React.FC<{
           headers: getHeaders(aiOptions),
           body: JSON.stringify({ image: base64Image, tolerance, language: t.language || 'English' }),
         });
-        if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to analyze ${file.name}`);
+        }
         const data = await response.json();
-        newReports[file.name] = data;
-        setReports({ ...newReports });
+        updatedReports[file.name] = data;
+        setReports({ ...updatedReports });
         
         if (incrementDailyCount) {
           incrementDailyCount(1);
@@ -329,66 +355,32 @@ export const ImageQualityCheck: React.FC<{
             </div>
           )}
 
-          {/* Tolerance Card */}
-          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-md shadow-black/5">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{t.qc_tolerance_label}</h3>
-            <div className="space-y-4">
-              <select 
-                  value={tolerance} 
-                  onChange={(e) => setTolerance(e.target.value as any)}
-                  className="w-full text-[11px] bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-[1.5rem] px-4 py-4 outline-none text-slate-800 dark:text-slate-200 font-bold uppercase transition-all focus:ring-2 focus:ring-emerald-500/20 appearance-none cursor-pointer"
-              >
-                  <option value="STRICT">STRICT (Hardcore mode)</option>
-                  <option value="MEDIUM">MEDIUM (Standard Adobe)</option>
-                  <option value="LOOSE">LOOSE (AI Playground)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Adobe Stock IP Refusal Notice Card */}
-          <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
-              <AlertCircle size={14} className="shrink-0" />
-              <h4 className="text-[10px] font-black tracking-wider uppercase">
-                {t.language === 'Bahasa' ? 'PATUH REKAYASA IP ADOBE' : 'ADOBE IP REFUSAL COMPLIANCE'}
-              </h4>
-            </div>
-            <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-              {t.language === 'Bahasa' 
-                ? 'Audit memindai pelanggaran logo merek, merk dagang, desain terproteksi (grille Jeep, bodi iPhone, LEGO), arsitektur terproteksi (Eiffel malam, Disney), karakter fiksi, serta klub olahraga.'
-                : 'Audit scans for brand logos, trademarks, proprietary designs (Jeep grille, iPhone body shape, LEGO), protected architecture (Eiffel nighttime lights, Disney), fictional characters, and sports teams.'
-              }
-            </p>
-            <div className="flex flex-wrap gap-1 pt-1.5 border-t border-slate-100 dark:border-white/5">
-              {['Brands', 'Designs', 'Landmarks', 'Characters'].map((tag) => (
-                <span key={tag} className="text-[8px] font-bold uppercase text-amber-600 dark:text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Upload Hub */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-2 shadow-2xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-white/5">
+          {/* Upload Hub - Now Placed Prominently at the Top */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-2 shadow-xl overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t.qc_upload_hub}</h3>
+              {files.length > 0 && (
+                <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  {files.length} {t.language === 'Bahasa' ? 'Aset' : 'Assets'}
+                </span>
+              )}
             </div>
             
             <label 
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 ${isDragging ? 'border-emerald-500 bg-emerald-500/5 scale-[0.98]' : 'border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50'}`}
+              className={`group m-4 h-36 md:h-44 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-3 transition-all duration-500 ${isDragging ? 'border-emerald-500 bg-emerald-500/5 scale-[0.98]' : 'border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50'}`}
             >
-              <div className={`p-4 rounded-2xl bg-white dark:bg-white/5 shadow-xl transition-transform duration-500 group-hover:scale-110 ${isDragging ? 'rotate-12' : ''}`}>
-                <Upload className="text-emerald-500" size={32} />
+              <div className={`p-3 rounded-2xl bg-white dark:bg-white/5 shadow-md transition-transform duration-500 group-hover:scale-110 ${isDragging ? 'rotate-12' : ''}`}>
+                <Upload className="text-emerald-500" size={24} />
               </div>
               <div className="text-center px-4">
                 <span className="block text-xs font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight">
                   {isDragging ? t.qc_release_images : t.qc_drop_images_here}
                 </span>
-                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 flex items-center justify-center gap-2">
-                  <FileImage size={12} /> {t.qc_multiple_upload}
+                <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 flex items-center justify-center gap-1.5">
+                  <FileImage size={11} /> {t.qc_multiple_upload}
                 </span>
               </div>
               <input type="file" accept="image/*" onChange={handleFileChange} multiple className="hidden" />
@@ -404,30 +396,173 @@ export const ImageQualityCheck: React.FC<{
                   <div className="flex justify-between items-center bg-slate-100 dark:bg-black/40 px-3 py-2 rounded-[1.5rem]">
                     <p className="font-black text-[9px] uppercase text-slate-500 tracking-widest">{t.qc_queue_assets}: {files.length}</p>
                   </div>
-                  <div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+                  <div className="max-h-[250px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {files.map((file, idx) => (
                       <motion.div 
                         initial={{ x: -20, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
                         transition={{ delay: idx * 0.05 }}
                         key={`${file.name}-${idx}`} 
-                        className="flex items-center gap-3 bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 p-2 rounded-[1.5rem] hover:shadow-lg transition-all group"
+                        className="flex items-center gap-3 bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 p-2 rounded-2xl hover:shadow-md transition-all group"
                       >
-                        <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
                           {previews[file.name] && (
                             <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex-1 min-w-0 pr-1">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
-                          <p className="text-[9px] text-slate-400 font-black uppercase">{t.qc_pending_audit}</p>
+                          <p className="text-[8px] text-slate-400 font-black uppercase">{t.qc_pending_audit}</p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveReport(file.name);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
+                          title={t.language === 'Bahasa' ? 'Hapus' : 'Remove'}
+                        >
+                          <X size={12} />
+                        </button>
                       </motion.div>
                     ))}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          {/* Tolerance Card - Interactive Pill Selector */}
+          <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-3xl p-5 shadow-sm">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">{t.qc_tolerance_label}</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'STRICT', label: t.language === 'Bahasa' ? 'Ketat' : 'Strict', sub: t.language === 'Bahasa' ? 'Presisi' : 'Hardcore' },
+                { value: 'MEDIUM', label: t.language === 'Bahasa' ? 'Sedang' : 'Medium', sub: t.language === 'Bahasa' ? 'Standar' : 'Standard' },
+                { value: 'LOOSE', label: t.language === 'Bahasa' ? 'Longgar' : 'Loose', sub: t.language === 'Bahasa' ? 'Uji Coba' : 'Playground' }
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTolerance(opt.value as any)}
+                  className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all duration-200 active:scale-95 ${
+                    tolerance === opt.value
+                      ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20 font-black'
+                      : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 font-semibold'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase leading-none">{opt.label}</span>
+                  <span className={`text-[8px] mt-1 font-bold opacity-75 uppercase tracking-tighter ${tolerance === opt.value ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                    {opt.sub}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Adobe Stock IP Refusal & Quality Compliance Guide - Placed Below Controls */}
+          <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 rounded-3xl p-5 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+              <AlertCircle size={15} className="shrink-0 animate-pulse" />
+              <h4 className="text-[11px] font-black tracking-wider uppercase">
+                {t.language === 'Bahasa' ? 'KETERANGAN PENOLAKAN KUALITAS & IP ADOBE' : 'ADOBE QUALITY & IP REFUSAL COMPLIANCE'}
+              </h4>
+            </div>
+            <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+              {t.language === 'Bahasa' 
+                ? 'Panduan kepatuhan visual resmi Adobe Stock untuk menghindari penolakan karena masalah kekayaan intelektual (IP Refusal) atau cacat kualitas teknis.'
+                : 'Official Adobe Stock visual compliance guide to prevent rejections due to Intellectual Property (IP Refusal) or technical quality issues.'
+              }
+            </p>
+
+            <div className="space-y-2">
+              {[
+                {
+                  id: 'brands',
+                  title: t.language === 'Bahasa' ? '1. Merek Dagang & Logo' : '1. Trademarks & Logos',
+                  desc: t.language === 'Bahasa' 
+                    ? 'Penolakan mutlak jika terdapat logo, nama produk, atau grafis identitas yang dilindungi hak cipta (misalnya logo centang Nike, logo Apple, Starbucks, dll) di pakaian, perangkat, atau latar belakang.'
+                    : 'Absolute rejection if there are brand logos, trademarked names, or proprietary graphic design elements (e.g. Nike Swoosh, Apple logo, Starbucks) visible on clothing, screens, or backgrounds.',
+                  examples: 'Nike, Adidas, Apple, Starbucks, Samsung, Coca-Cola'
+                },
+                {
+                  id: 'designs',
+                  title: t.language === 'Bahasa' ? '2. Desain Produk Khas' : '2. Proprietary Product Designs',
+                  desc: t.language === 'Bahasa' 
+                    ? 'Bentuk fisik produk yang sangat ikonik dilindungi secara hukum. Hindari menampilkan bentuk bodi iPhone utuh, pola grille depan mobil Jeep, bentuk boneka LEGO / Brick LEGO, mainan Rubik, sol sepatu Adidas 3 strip.'
+                    : 'Uniquely recognizable physical product designs are legally protected. Avoid depicting full iPhone body shapes, Jeep front grilles, LEGO minifigures/bricks, Rubik\'s cubes, or Adidas 3-stripes shoes.',
+                  examples: 'LEGO, Rubik, Jeep Grille, iPhone Body, Vespa'
+                },
+                {
+                  id: 'landmarks',
+                  title: t.language === 'Bahasa' ? '3. Bangunan & Karya Seni' : '3. Protected Landmarks',
+                  desc: t.language === 'Bahasa' 
+                    ? 'Arsitektur modern tertentu melarang penggunaan komersial tanpa izin. Menara Eiffel pada malam hari dilarang karena lampu hiasnya dipatenkan. Begitu juga Gedung Opera Sydney, piramida kaca Louvre, Kastil Disney, dan Burj Al Arab.'
+                    : 'Certain modern structures prohibit commercial usage. The Eiffel Tower illuminated at night is forbidden as its lights are patented. Similarly, Sydney Opera House, Louvre Pyramid, Disney Castle, and Burj Al Arab.',
+                  examples: 'Eiffel (Night), Disney Castle, Sydney Opera House, Louvre Pyramid'
+                },
+                {
+                  id: 'characters',
+                  title: t.language === 'Bahasa' ? '4. Karakter & Klub Olahraga' : '4. Characters & Sports Clubs',
+                  desc: t.language === 'Bahasa' 
+                    ? 'Karakter fiksi dari komik, film, atau kartun (Mickey Mouse, Hello Kitty, anime) serta logo klub olahraga profesional, seragam tim, dan trofi piala resmi tidak boleh diunggah sebagai konten komersial.'
+                    : 'Fictional characters from comics, movies, or cartoons (Mickey Mouse, Hello Kitty, anime), along with sports team logos, official uniforms, and trophies, cannot be uploaded for commercial stock.',
+                  examples: 'Mickey Mouse, Hello Kitty, Barca/Madrid Logos, World Cup'
+                },
+                {
+                  id: 'tech_issues',
+                  title: t.language === 'Bahasa' ? '5. Kualitas Teknis & AI' : '5. Tech Quality & AI Artifacts',
+                  desc: t.language === 'Bahasa' 
+                    ? 'Karya Generative AI sangat ketat dipantau. Penolakan terjadi jika ada cacat anatomi (jari kelebihan/aneh, mata ganda), noda noise piksel, distorsi teks tulisan tidak bermakna, blur di area utama, atau resolusi kurang tajam.'
+                    : 'Generative AI content is strictly scrutinized. Rejections occur for anatomical deformities (6 fingers, distorted faces), pixel noise artifacts, illegible/mangled text, out-of-focus subjects, or low resolution upscale issues.',
+                  examples: 'Anatomical Glitches, Text Gibberish, Noise, Soft Focus'
+                }
+              ].map((item) => {
+                const isOpen = activeComplianceTab === item.id;
+                return (
+                  <div key={item.id} className="border border-slate-200/50 dark:border-white/5 rounded-xl bg-white/40 dark:bg-black/20 overflow-hidden transition-all duration-300">
+                    <button
+                      onClick={() => setActiveComplianceTab(isOpen ? null : item.id)}
+                      className="w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-amber-500/5 transition-colors"
+                    >
+                      <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">
+                        {item.title}
+                      </span>
+                      <ChevronDown 
+                        size={13} 
+                        className={`text-slate-400 transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180 text-amber-500' : ''}`} 
+                      />
+                    </button>
+                    
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="px-3 pb-3 pt-1 border-t border-slate-100 dark:border-white/5 text-[10px] space-y-2 bg-amber-500/[0.01]"
+                        >
+                          <p className="text-slate-600 dark:text-slate-400 font-bold leading-relaxed">
+                            {item.desc}
+                          </p>
+                          <div className="bg-slate-100 dark:bg-black/30 p-2 rounded-lg flex flex-col gap-1">
+                            <span className="text-[8px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-wider">
+                              {t.language === 'Bahasa' ? 'CONTOH KASUS PENOLAKAN:' : 'REJECTION CASES EXAMPLES:'}
+                            </span>
+                            <span className="text-slate-500 dark:text-slate-400 font-bold font-mono text-[9px] leading-tight">
+                              {item.examples}
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -509,9 +644,19 @@ export const ImageQualityCheck: React.FC<{
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end shrink-0 ml-3">
-                           <p className={`text-[18px] font-black leading-none ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>{r.overall_score}</p>
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1 whitespace-nowrap">{t.qc_score_label}</p>
+                        <div className="flex items-center gap-3 shrink-0 ml-3">
+                          <div className="flex flex-col items-end">
+                             <p className={`text-[18px] font-black leading-none ${isPassed ? 'text-emerald-500' : 'text-rose-500'}`}>{r.overall_score}</p>
+                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1 whitespace-nowrap">{t.qc_score_label}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveReport(fileName)}
+                            className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                            title={t.language === 'Bahasa' ? 'Hapus Analisis' : 'Remove Analysis'}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
 

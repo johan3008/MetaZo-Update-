@@ -141,6 +141,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     const customNvidiaKey = req.headers['x-nvidia-key'];
     const customBlackboxKey = req.headers['x-blackbox-key'];
     const customBluesmindsKey = req.headers['x-bluesminds-key'];
+    const customCustomKey = req.headers['x-custom-key'];
     const provider = req.headers['x-ai-provider'] || 'gemini';
 
     const getKeys = (headerVal: any) => {
@@ -158,7 +159,8 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
         openrouter: { keys: getKeys(customOpenRouterKey), activeIndex: 0 },
         nvidia: { keys: getKeys(customNvidiaKey), activeIndex: 0 },
         blackbox: { keys: getKeys(customBlackboxKey), activeIndex: 0 },
-        bluesminds: { keys: getKeys(customBluesmindsKey), activeIndex: 0 }
+        bluesminds: { keys: getKeys(customBluesmindsKey), activeIndex: 0 },
+        custom: { keys: getKeys(customCustomKey), activeIndex: 0 }
     }, () => {
         next();
     });
@@ -718,7 +720,7 @@ app.get('/api/debug-uploads', (req, res) => {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            model: 'gpt-4o-mini',
+                            model: 'gpt-4o',
                             messages: [{role: 'user', content: 'test'}],
                             stream: false
                         })
@@ -747,21 +749,8 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             if (success) {
-                return res.json({ success: true, message: 'Bluesminds API Key valid! (gpt-4o-mini active)' });
+                return res.json({ success: true, message: 'Bluesminds API Key valid! (gpt-4o active)' });
             } else {
-                const lowerText = lastText.toLowerCase();
-                const isOutOfCredits = lastStatus === 402 || lowerText.includes('credits') || lowerText.includes('balance') || lowerText.includes('payment') || lowerText.includes('extra data') || lowerText.includes('bad_response_status_code');
-                const isRateLimited = lastStatus === 429 || lowerText.includes('too many requests') || lowerText.includes('rate limit');
-                
-                if (isOutOfCredits || isRateLimited) {
-                    return res.json({ 
-                        success: true, 
-                        quotaExceeded: true, 
-                        message: isOutOfCredits 
-                            ? 'Bluesminds API Key valid, tetapi Saldo/Credit Habis (Insufficient Balance).'
-                            : 'Bluesminds API Key valid, tetapi terkena Rate Limit (Too Many Requests). Silakan coba lagi nanti.'
-                    });
-                }
                 return res.status(400).json({ error: `Gagal verifikasi Bluesminds API (Status ${lastStatus}): ${lastText}` });
             }
         } catch (e: any) {
@@ -769,6 +758,69 @@ app.get('/api/debug-uploads', (req, res) => {
             res.status(500).json({ error: 'Internal Server Error' });
         }
     });
+
+    app.post('/api/test-custom-key', async (req, res) => {
+        try {
+            const { apiKey, model } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            const testUri = 'https://api.aivene.com/v1/chat/completions';
+            const testModel = model || 'gpt-4o-mini';
+
+            let attempts = 0;
+            let success = false;
+            let lastStatus = 0;
+            let lastText = '';
+
+            while (attempts < 4 && !success) {
+                attempts++;
+                try {
+                    const testResponse = await fetch(testUri, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey.trim()}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: testModel,
+                            messages: [{role: 'user', content: 'test'}],
+                            stream: false
+                        })
+                    });
+
+                    lastStatus = testResponse.status;
+                    lastText = await testResponse.text();
+
+                    if (testResponse.ok) {
+                        success = true;
+                    } else {
+                        const lowerText = lastText.toLowerCase();
+                        if ((lastStatus === 401 || lastStatus === 403) || (lastStatus === 400 && lowerText.includes('invalid') && !lowerText.includes('extra data'))) {
+                            break;
+                        }
+                        console.warn(`[test-custom-key] Attempt ${attempts} failed with status ${lastStatus}. Retrying after delay...`);
+                        await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+                    }
+                } catch (fetchErr: any) {
+                    console.warn(`[test-custom-key] Attempt ${attempts} fetch exception:`, fetchErr.message);
+                    lastStatus = 500;
+                    lastText = fetchErr.message;
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+
+            if (success) {
+                return res.json({ success: true, message: `Custom Provider API Key valid! (${testModel} active)` });
+            } else {
+                return res.status(lastStatus || 400).json({ error: `Gagal verifikasi Custom Provider API (Status ${lastStatus}): ${lastText}` });
+            }
+        } catch (e: any) {
+            console.warn('Test Custom API Key error exception:', e);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    });
+
     const getProviderName = (): string => {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
@@ -779,6 +831,7 @@ app.get('/api/debug-uploads', (req, res) => {
         if (provider === 'blackbox') return 'Blackbox AI';
         if (provider === 'nvidia') return 'NVIDIA';
         if (provider === 'bluesminds') return 'Bluesminds';
+        if (provider === 'custom') return 'Custom Provider';
         return 'Gemini';
     };
 
@@ -1133,7 +1186,8 @@ app.get('/api/debug-uploads', (req, res) => {
             openrouter: !!process.env.OPENROUTER_API_KEY,
             nvidia: !!process.env.NVIDIA_API_KEY,
             blackbox: !!process.env.BLACKBOX_API_KEY,
-            bluesminds: !!process.env.BLUESMINDS_API_KEY
+            bluesminds: !!process.env.BLUESMINDS_API_KEY,
+            custom: !!process.env.CUSTOM_API_KEY
         });
     });
 

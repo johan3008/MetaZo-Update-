@@ -24,6 +24,7 @@ export interface ServiceOptions {
   nvidiaKeys?: string | string[];
   blackboxKeys?: string | string[];
   bluesmindsKeys?: string | string[];
+  customKeys?: string | string[];
 }
 
 export const getHeaders = (options?: ServiceOptions) => {
@@ -59,6 +60,9 @@ export const getHeaders = (options?: ServiceOptions) => {
 
     const blKey = joinKeys(options.bluesmindsKeys);
     if (blKey) headers['x-bluesminds-key'] = blKey;
+
+    const cKey = joinKeys(options.customKeys);
+    if (cKey) headers['x-custom-key'] = cKey;
   }
   return headers;
 };

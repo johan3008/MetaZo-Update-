@@ -319,31 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
             </button>
 
-            <button 
-              onClick={() => handleNavClick(ToolType.CHAT)}
-              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 relative ${
-                activeTool === ToolType.CHAT 
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
-                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <div className="relative">
-                <MessageCircle size={16} className={activeTool === ToolType.CHAT ? "text-violet-500 animate-pulse" : "text-slate-400"} />
-                {sidebarCollapsed && unreadChatCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white dark:border-slate-900 animate-pulse" />
-                )}
-              </div>
-              {!sidebarCollapsed && (
-                <div className="flex-1 flex items-center justify-between min-w-0">
-                  <span className="truncate">{t.sidebar_chat}</span>
-                  {unreadChatCount > 0 && (
-                    <span id="mz-desktop-unread-badge" className="bg-rose-500 text-white text-[10px] leading-none font-black px-1.5 py-0.5 rounded-full shadow-sm animate-bounce min-w-[18px] text-center">
-                      {unreadChatCount}
-                    </span>
-                  )}
-                </div>
-              )}
-            </button>
+
           </nav>
         </div>
 
@@ -693,24 +669,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>{t.sidebar_calendar_gen}</span>
                     </button>
 
-                    <button 
-                      onClick={() => { setActiveTool(ToolType.CHAT); setSidebarOpen(false); }}
-                      className={`w-full text-left flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-                        activeTool === ToolType.CHAT 
-                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-violet-500" 
-                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <MessageCircle size={14} className={activeTool === ToolType.CHAT ? "text-violet-500 animate-pulse" : "text-slate-400"} />
-                        <span className="truncate">{t.sidebar_chat}</span>
-                      </div>
-                      {unreadChatCount > 0 && (
-                        <span id="mz-mobile-unread-badge" className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm animate-pulse shrink-0 ml-2">
-                          {unreadChatCount}
-                        </span>
-                      )}
-                    </button>
+
                   </nav>
                 </div>
 

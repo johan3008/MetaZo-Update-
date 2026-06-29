@@ -1191,8 +1191,8 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'reseller'>('gemini');
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds'>(() => {
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'custom' | 'reseller'>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'custom'>(() => {
     return (localStorage.getItem('ai_provider') || 'gemini') as any;
   });
 
@@ -1910,6 +1910,9 @@ const App: React.FC = () => {
   const [bluesmindsKeysList, setBluesmindsKeysList] = useState<string[]>(() => {
     return (localStorage.getItem('bluesminds_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
   });
+  const [customKeysList, setCustomKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('custom_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
@@ -1922,10 +1925,11 @@ const App: React.FC = () => {
   const [newBlackboxKey, setNewBlackboxKey] = useState('');
   const [newNvidiaKey, setNewNvidiaKey] = useState('');
   const [newBluesmindsKey, setNewBluesmindsKey] = useState('');
+  const [newCustomKey, setNewCustomKey] = useState('');
 
   const [serverKeysStatus, setServerKeysStatus] = useState<Record<string, boolean>>({});
   const [keyTestingIndex, setKeyTestingIndex] = useState<number | null>(null);
-  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | null>(null);
+  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'custom' | null>(null);
   const [keyTestResults, setKeyTestResults] = useState<Record<string, { type: 'success' | 'error' | 'quota'; message: string }>>({}); // "provider-index"
   const [hasCustomKeySaved, setHasCustomKeySaved] = useState(() => {
     const geminiSaved = (localStorage.getItem('gemini_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
@@ -1936,6 +1940,7 @@ const App: React.FC = () => {
     const blackboxSaved = (localStorage.getItem('blackbox_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     const nvidiaSaved = (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     const bluesmindsSaved = (localStorage.getItem('bluesminds_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const customSaved = (localStorage.getItem('custom_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     
     return (
       geminiSaved.length > 0 ||
@@ -1945,7 +1950,8 @@ const App: React.FC = () => {
       openrouterSaved.length > 0 ||
       blackboxSaved.length > 0 ||
       nvidiaSaved.length > 0 ||
-      bluesmindsSaved.length > 0
+      bluesmindsSaved.length > 0 ||
+      customSaved.length > 0
     );
   });
 
@@ -1965,7 +1971,8 @@ const App: React.FC = () => {
       const bSaved = localStorage.getItem('blackbox_api_key') || '';
       const nSaved = localStorage.getItem('nvidia_api_key') || '';
       const blSaved = localStorage.getItem('bluesminds_api_key') || '';
-      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds';
+      const cSaved = localStorage.getItem('custom_api_key') || '';
+      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as any;
 
       const gParsed = gSaved.split(',').map(k => k.trim()).filter(Boolean);
       const grParsed = grSaved.split(',').map(k => k.trim()).filter(Boolean);
@@ -1975,6 +1982,7 @@ const App: React.FC = () => {
       const bParsed = bSaved.split(',').map(k => k.trim()).filter(Boolean);
       const nParsed = nSaved.split(',').map(k => k.trim()).filter(Boolean);
       const blParsed = blSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const cParsed = cSaved.split(',').map(k => k.trim()).filter(Boolean);
 
       setGeminiKeysList(gParsed);
       setGroqKeysList(grParsed);
@@ -1984,6 +1992,7 @@ const App: React.FC = () => {
       setBlackboxKeysList(bParsed);
       setNvidiaKeysList(nParsed);
       setBluesmindsKeysList(blParsed);
+      setCustomKeysList(cParsed);
       
       setNewGeminiKey('');
       setNewGroqKey('');
@@ -1993,6 +2002,7 @@ const App: React.FC = () => {
       setNewBlackboxKey('');
       setNewNvidiaKey('');
       setNewBluesmindsKey('');
+      setNewCustomKey('');
 
       setSelectedProvider(pSaved);
       setHasCustomKeySaved(
@@ -2003,7 +2013,8 @@ const App: React.FC = () => {
         orParsed.length > 0 ||
         bParsed.length > 0 ||
         nParsed.length > 0 ||
-        blParsed.length > 0
+        blParsed.length > 0 ||
+        cParsed.length > 0
       );
       setKeyTestingIndex(null);
       setKeyTestProvider(null);
@@ -2011,7 +2022,7 @@ const App: React.FC = () => {
     }
   }, [showSettingsModal]);
 
-  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds', index: number, keyValue: string) => {
+  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'custom', index: number, keyValue: string) => {
     if (!keyValue.trim()) return;
     setKeyTestingIndex(index);
     setKeyTestProvider(provider);
@@ -2031,6 +2042,7 @@ const App: React.FC = () => {
     if (provider === 'blackbox') endpoint = '/api/test-blackbox-key';
     if (provider === 'nvidia') endpoint = '/api/test-nvidia-key';
     if (provider === 'bluesminds') endpoint = '/api/test-bluesminds-key';
+    if (provider === 'custom') endpoint = '/api/test-custom-key';
 
     try {
       const response = await fetch(endpoint, {
@@ -2068,7 +2080,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds') => {
+  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'custom') => {
     let key = '';
     let currentList: string[] = [];
     
@@ -2096,6 +2108,9 @@ const App: React.FC = () => {
     } else if (provider === 'bluesminds') {
       key = newBluesmindsKey.trim();
       currentList = bluesmindsKeysList;
+    } else if (provider === 'custom') {
+      key = newCustomKey.trim();
+      currentList = customKeysList;
     }
 
     if (!key) return;
@@ -2128,10 +2143,13 @@ const App: React.FC = () => {
     } else if (provider === 'bluesminds') {
       setBluesmindsKeysList(prev => [...prev, key]);
       setNewBluesmindsKey('');
+    } else if (provider === 'custom') {
+      setCustomKeysList(prev => [...prev, key]);
+      setNewCustomKey('');
     }
   };
 
-  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds', index: number) => {
+  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'custom', index: number) => {
     let listSetter: any;
     let list: string[] = [];
 
@@ -2159,6 +2177,9 @@ const App: React.FC = () => {
     } else if (provider === 'bluesminds') {
       listSetter = setBluesmindsKeysList;
       list = bluesmindsKeysList;
+    } else if (provider === 'custom') {
+      listSetter = setCustomKeysList;
+      list = customKeysList;
     }
 
     listSetter((prev: string[]) => prev.filter((_, i) => i !== index));
@@ -2191,6 +2212,7 @@ const App: React.FC = () => {
     const cleanBlackbox = blackboxKeysList.map(k => k.trim()).filter(Boolean);
     const cleanNvidia = nvidiaKeysList.map(k => k.trim()).filter(Boolean);
     const cleanBluesminds = bluesmindsKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanCustom = customKeysList.map(k => k.trim()).filter(Boolean);
 
     if (cleanGemini.length > 0) {
       localStorage.setItem('gemini_api_key', cleanGemini.join(','));
@@ -2240,6 +2262,12 @@ const App: React.FC = () => {
       localStorage.removeItem('bluesminds_api_key');
     }
 
+    if (cleanCustom.length > 0) {
+      localStorage.setItem('custom_api_key', cleanCustom.join(','));
+    } else {
+      localStorage.removeItem('custom_api_key');
+    }
+
     localStorage.setItem('ai_provider', selectedProvider);
     setHasCustomKeySaved(
       cleanGemini.length > 0 || 
@@ -2249,7 +2277,8 @@ const App: React.FC = () => {
       cleanOpenrouter.length > 0 || 
       cleanBlackbox.length > 0 || 
       cleanNvidia.length > 0 ||
-      cleanBluesminds.length > 0
+      cleanBluesminds.length > 0 ||
+      cleanCustom.length > 0
     );
     setShowSettingsModal(false);
   };
@@ -2263,6 +2292,7 @@ const App: React.FC = () => {
     localStorage.removeItem('blackbox_api_key');
     localStorage.removeItem('nvidia_api_key');
     localStorage.removeItem('bluesminds_api_key');
+    localStorage.removeItem('custom_api_key');
     localStorage.removeItem('ai_provider');
     
     setGeminiKeysList([]);
@@ -2273,6 +2303,7 @@ const App: React.FC = () => {
     setBlackboxKeysList([]);
     setNvidiaKeysList([]);
     setBluesmindsKeysList([]);
+    setCustomKeysList([]);
     setSelectedProvider('gemini');
     setHasCustomKeySaved(false);
     setKeyTestResults({});
@@ -2816,7 +2847,8 @@ const App: React.FC = () => {
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
-                bluesmindsKeys: bluesmindsKeysList
+                bluesmindsKeys: bluesmindsKeysList,
+                customKeys: customKeysList
               };
               const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
               
@@ -2963,7 +2995,8 @@ const App: React.FC = () => {
                   openrouterKeys: openrouterKeysList,
                   nvidiaKeys: nvidiaKeysList,
                   blackboxKeys: blackboxKeysList,
-                  bluesmindsKeys: bluesmindsKeysList
+                  bluesmindsKeys: bluesmindsKeysList,
+                  customKeys: customKeysList
                 };
                 const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
 
@@ -3501,7 +3534,8 @@ const App: React.FC = () => {
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
-                bluesmindsKeys: bluesmindsKeysList
+                bluesmindsKeys: bluesmindsKeysList,
+                customKeys: customKeysList
               }}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
@@ -3520,7 +3554,8 @@ const App: React.FC = () => {
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
-                bluesmindsKeys: bluesmindsKeysList
+                bluesmindsKeys: bluesmindsKeysList,
+                customKeys: customKeysList
               }}
             />
           ) : activeTool === ToolType.PROMPT_VIDEO ? (
@@ -3539,7 +3574,8 @@ const App: React.FC = () => {
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
-                bluesmindsKeys: bluesmindsKeysList
+                bluesmindsKeys: bluesmindsKeysList,
+                customKeys: customKeysList
               }}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
@@ -3558,7 +3594,8 @@ const App: React.FC = () => {
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
-                bluesmindsKeys: bluesmindsKeysList
+                bluesmindsKeys: bluesmindsKeysList,
+                customKeys: customKeysList
               }}
             />
           ) : activeTool === ToolType.CALENDAR_GEN ? (
@@ -3577,7 +3614,8 @@ const App: React.FC = () => {
                 openrouterKeys: openrouterKeysList,
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
-                bluesmindsKeys: bluesmindsKeysList
+                bluesmindsKeys: bluesmindsKeysList,
+                customKeys: customKeysList
               }}
             />
           ) : activeTool === ToolType.CHAT ? (
@@ -3786,7 +3824,8 @@ const App: React.FC = () => {
                   openrouterKeys: openrouterKeysList,
                   nvidiaKeys: nvidiaKeysList,
                   blackboxKeys: blackboxKeysList,
-                  bluesmindsKeys: bluesmindsKeysList
+                  bluesmindsKeys: bluesmindsKeysList,
+                  customKeys: customKeysList
                 }}
               />
 
@@ -3969,7 +4008,8 @@ const App: React.FC = () => {
                   { id: 'openrouter', name: 'Open Router', desc: 'Multi-LLM access' },
                   { id: 'blackbox', name: 'Blackbox AI', desc: 'Code specialized' },
                   { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' },
-                  { id: 'bluesminds', name: 'Bluesminds', desc: 'Fast Proxy' }
+                  { id: 'bluesminds', name: 'Bluesminds', desc: 'Fast Proxy' },
+                  { id: 'custom', name: 'Custom Provider', desc: 'api.aivene.com' }
                 ].map(prov => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name} - {prov.desc}
@@ -3984,9 +4024,9 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['appearance', 'gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'reseller'] as const).map(tab => (
+              {(['appearance', 'gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'custom', 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : `${tab.toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'custom' ? 'Custom Provider' : `${tab.toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
@@ -4789,6 +4829,135 @@ const App: React.FC = () => {
                       className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-500 dark:text-slate-450 cursor-not-allowed"
                     >
                       <option value="gpt-4o">gpt-4o (Active - Default)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'custom' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key Custom Provider Anda untuk mengakses layanan ini. Endpoint yang digunakan adalah <code className="px-1 py-0.5 bg-slate-100 dark:bg-slate-900 rounded font-mono text-[10px] text-[#7c3aed]">https://api.aivene.com/v1</code>.
+                  </p>
+
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key Custom Anda di " : "Get your Custom API Key at "}{' '}
+                      <a
+                        href="https://api.aivene.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Aivene Console
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Daftar Key Custom</label>
+                    {customKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                        {serverKeysStatus.custom ? (
+                          <>
+                            <div className="flex items-center justify-center space-x-1.5 text-emerald-600 dark:text-emerald-400 mb-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Default Server Aktif</span>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 font-semibold text-[11px] leading-relaxed">
+                              Sistem mendeteksi API Key bawaan di server backend Anda (Aktif &amp; Siap digunakan). Anda tidak wajib menginput key di bawah kecuali jika ingin menimpa dengan key pribadi.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                            <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Custom ditambahkan.</p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {customKeysList.map((key, index) => {
+                          const keyId = `custom-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`custom-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'custom';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                    }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('custom', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('custom', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Custom</label>
+                    <div className="flex gap-2">
+                       <input
+                         type="password"
+                         placeholder="API Key Custom Provider"
+                         value={newCustomKey}
+                         onChange={(e) => setNewCustomKey(e.target.value)}
+                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => handleAddApiKey('custom')}
+                         className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
+                       >
+                         Tambah
+                       </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Model Aktif</label>
+                    <select
+                      disabled
+                      value="gpt-4o-mini"
+                      className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-500 dark:text-slate-450 cursor-not-allowed"
+                    >
+                      <option value="gpt-4o-mini">gpt-4o-mini (Active - Default)</option>
                     </select>
                   </div>
                 </div>
