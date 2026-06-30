@@ -4964,6 +4964,7 @@ const App: React.FC = () => {
                       <option value="gpt-4o-mini">gpt-4o-mini (Active - Default)</option>
                       <option value="gpt-5.4-nano">gpt-5.4-nano (Aivene Endpoint)</option>
                       <option value="gpt-5.4-mini">gpt-5.4-mini (Aivene Endpoint)</option>
+                      <option value="mimo-v2.5">mimo-v2.5 (Aivene Endpoint)</option>
                       <option value="gemini-3.5-flash">gemini-3.5-flash (Aivene Endpoint)</option>
                       <option value="gemini-3-flash">gemini-3-flash (Aivene Endpoint)</option>
                       <option value="deepseek-v4-flash">deepseek-v4-flash (Aivene Endpoint)</option>
