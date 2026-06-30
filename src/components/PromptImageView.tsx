@@ -198,7 +198,8 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         headers: getHeaders(aiOptions),
         body: JSON.stringify({
           images: pendingImages,
-          styleCategory
+          styleCategory,
+          model: aiOptions?.model
         })
       });
 

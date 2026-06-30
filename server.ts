@@ -775,7 +775,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'gpt-5.4-nano',
+                    model: 'mimo-v2.5',
                     messages: [{role: 'user', content: 'test'}],
                     stream: false
                 })
@@ -913,11 +913,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/analyze-batch-image-to-prompt', async (req, res) => {
         try {
-            const { images, styleCategory } = req.body;
+            const { images, styleCategory, model } = req.body;
             if (!images || !Array.isArray(images)) {
                 return res.status(400).json({ error: 'Missing images data' });
             }
-            const data = await analyzeBatchImageToPrompt(images, styleCategory);
+            const data = await analyzeBatchImageToPrompt(images, styleCategory, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-batch-image-to-prompt error:', e);
@@ -927,11 +927,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/analyze-video-keyword', async (req, res) => {
         try {
-            const { keyword } = req.body;
+            const { keyword, model } = req.body;
             if (!keyword) {
                 return res.status(400).json({ error: 'Missing keyword' });
             }
-            const data = await analyzeVideoKeyword(keyword);
+            const data = await analyzeVideoKeyword(keyword, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-video-keyword error:', e);
@@ -945,13 +945,13 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/check-image-quality', async (req, res) => {
         try {
-            const { image, tolerance, language } = req.body;
+            const { image, tolerance, language, model } = req.body;
             if (!image) {
                 console.warn('Server check-image-quality error: Missing image data');
                 return res.status(400).json({ error: 'Missing image data' });
             }
             console.log('Server check-image-quality: Analyzing image...');
-            const data = await checkImageQuality(image, tolerance, language);
+            const data = await checkImageQuality(image, tolerance, language, model);
             console.log('Server check-image-quality: Analysis successful');
             res.json(data);
         } catch (e: any) {
@@ -962,11 +962,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-hollywood-prompts', async (req, res) => {
         try {
-            const { keyword } = req.body;
+            const { keyword, model } = req.body;
             if (!keyword) {
                 return res.status(400).json({ error: 'Missing keyword' });
             }
-            const prompts = await generateHollywoodPrompts(keyword);
+            const prompts = await generateHollywoodPrompts(keyword, model);
             res.json(prompts);
         } catch (e: any) {
             console.warn('Server generate-hollywood-prompts error:', e);
@@ -980,11 +980,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-calendar-events', async (req, res) => {
         try {
-            const { month } = req.body;
+            const { month, model } = req.body;
             if (!month) {
                 return res.status(400).json({ error: 'Missing month field' });
             }
-            const events = await generateCalendarEvents(month);
+            const events = await generateCalendarEvents(month, model);
             res.json(events);
         } catch (e: any) {
             console.warn('Server generate-calendar-events error:', e);
@@ -998,11 +998,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-event-keywords', async (req, res) => {
         try {
-            const { eventName, eventDetails } = req.body;
+            const { eventName, eventDetails, model } = req.body;
             if (!eventName) {
                 return res.status(400).json({ error: 'Missing eventName field' });
             }
-            const data = await generateEventKeywords(eventName, eventDetails || '');
+            const data = await generateEventKeywords(eventName, eventDetails || '', model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server generate-event-keywords error:', e);
@@ -1016,11 +1016,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/smart-suggest-keywords', async (req, res) => {
         try {
-            const { title, description, existingKeywords, requestCount } = req.body;
+            const { title, description, existingKeywords, requestCount, model } = req.body;
             if (!title) {
                 return res.status(400).json({ error: 'Missing title field or asset context' });
             }
-            const data = await suggestKeywords(title, description || '', existingKeywords || [], requestCount);
+            const data = await suggestKeywords(title, description || '', existingKeywords || [], requestCount, model);
             res.json({ keywords: data });
         } catch (e: any) {
             console.warn('Server smart-suggest-keywords error:', e);

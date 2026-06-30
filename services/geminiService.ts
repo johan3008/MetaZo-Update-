@@ -16,6 +16,7 @@ const ensureBase64 = async (frame: string): Promise<string> => {
 
 export interface ServiceOptions {
   provider?: string;
+  model?: string;
   geminiKeys?: string | string[];
   groqKeys?: string | string[];
   mistralKeys?: string | string[];
@@ -180,7 +181,7 @@ export const fetchCalendarEvents = async (month: string, options?: ServiceOption
   const response = await fetch('/api/generate-calendar-events', {
     method: 'POST',
     headers: getHeaders(options),
-    body: JSON.stringify({ month })
+    body: JSON.stringify({ month, model: options?.model })
   });
 
   if (!response.ok) {
@@ -194,7 +195,7 @@ export const fetchEventKeywords = async (eventName: string, eventDetails: string
   const response = await fetch('/api/generate-event-keywords', {
     method: 'POST',
     headers: getHeaders(options),
-    body: JSON.stringify({ eventName, eventDetails })
+    body: JSON.stringify({ eventName, eventDetails, model: options?.model })
   });
 
   if (!response.ok) {

@@ -95,7 +95,7 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'aivene']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -2315,7 +2315,7 @@ export const generateOptimizedPrompt = async (options: {
     userNegativePrompt = '',
     minWords = 10,
     maxWords = 70,
-    model
+    model = undefined
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
@@ -2472,7 +2472,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = model && model.startsWith('gemini-') ? [model] : ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -2483,42 +2483,27 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences. \n\nCRITICAL: Return a valid JSON object with the following keys:\n- "prompts": an array of strings containing the generated prompts.\n- "negativePrompt": a string containing the negative prompt.\n- "styleExplanation": an array of strings containing 3 bullet points.`,
+          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
           config: { temperature: 0.85 },
           model
         });
         
-        let parsed;
-        try {
-          parsed = JSON.parse(extractJSON(text));
-        } catch (e) {
-          throw new Error('Failed to parse AI response into JSON. Raw: ' + text.substring(0, 200));
+        const parsed = JSON.parse(text);
+        let promptArray = [];
+        if (parsed && Array.isArray(parsed.prompts)) {
+            promptArray = parsed.prompts;
+        } else if (Array.isArray(parsed)) {
+            promptArray = parsed;
+        } else if (parsed && Array.isArray(parsed.variations)) {
+            promptArray = parsed.variations;
         }
         
-        let promptsArray = parsed?.prompts;
-        if (!Array.isArray(promptsArray)) {
-           if (Array.isArray(parsed)) {
-             promptsArray = parsed;
-             parsed = { prompts: promptsArray, negativePrompt: '', styleExplanation: [] };
-           } else {
-             // Fallback: look for any array in the object that has strings
-             for (const key of Object.keys(parsed || {})) {
-               if (Array.isArray(parsed[key]) && typeof parsed[key][0] === 'string' && key !== 'styleExplanation') {
-                 promptsArray = parsed[key];
-                 break;
-               }
-             }
-           }
+        if (promptArray.length > 0) {
+            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt);
         }
-        
-        if (Array.isArray(promptsArray) && promptsArray.length > 0) {
-           parsed.prompts = promptsArray;
-           return processPromptResults(parsed, count, subject, userNegativePrompt);
-        }
-        console.warn(`[generateOptimizedPrompt] Missing prompts in JSON. Parsed object:`, JSON.stringify(parsed).substring(0, 300));
-        throw new Error('Missing or empty prompts array in JSON response. Returned keys: ' + Object.keys(parsed || {}).join(', '));
+        throw new Error('Missing or empty prompts array in JSON response');
       } catch (err: any) {
         lastError = err;
         attempts++;
@@ -2527,7 +2512,9 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       }
     }
   } else {
-    for (const modelName of modelsToTry) {
+    // If user explicitly provided a Gemini model via `model`, use it as primary, else default fallback chain
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    for (const modelName of modelsToTryList) {
       let attempts = 0;
       const maxAttempts = 2;
       while (attempts < maxAttempts) {
@@ -2543,35 +2530,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           });
 
           const text = response.text || "{}";
-          let parsed;
-          try {
-            parsed = JSON.parse(extractJSON(text));
-          } catch (e) {
-            throw new Error('Failed to parse AI response into JSON. Raw: ' + text.substring(0, 200));
-          }
-          
-          let promptsArray = parsed?.prompts;
-          if (!Array.isArray(promptsArray)) {
-             if (Array.isArray(parsed)) {
-               promptsArray = parsed;
-               parsed = { prompts: promptsArray, negativePrompt: '', styleExplanation: [] };
-             } else {
-               // Fallback: look for any array in the object that has strings
-               for (const key of Object.keys(parsed || {})) {
-                 if (Array.isArray(parsed[key]) && typeof parsed[key][0] === 'string' && key !== 'styleExplanation') {
-                   promptsArray = parsed[key];
-                   break;
-                 }
-               }
-             }
-          }
-          
-          if (Array.isArray(promptsArray) && promptsArray.length > 0) {
-            parsed.prompts = promptsArray;
+          const parsed = JSON.parse(text);
+          if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
             return processPromptResults(parsed, count, subject, userNegativePrompt);
           }
-          console.warn(`[generateOptimizedPrompt Gemini] Missing prompts in JSON. Parsed object:`, JSON.stringify(parsed).substring(0, 300));
-          throw new Error('Missing or empty prompts array in JSON response. Returned keys: ' + Object.keys(parsed || {}).join(', '));
+          throw new Error('Missing or empty prompts array in JSON response');
         } catch (err: any) {
           lastError = err;
           attempts++;
@@ -3038,8 +3001,12 @@ CRITICAL RULES:
 
 export const analyzeBatchImageToPrompt = async (
   images: string[],
-  styleCategory: string = 'Cinematic'
+  styleCategory: string = 'Cinematic',
+  model?: string
 ): Promise<{ prompt: string; description: string }[]> => {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
 
@@ -3079,31 +3046,55 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
   const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
-  let response;
+  let responseText = "";
   let lastError;
 
-  for (const modelName of modelsToTry) {
-    try {
-      response = await callGeminiWithRetry(modelName, { parts }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema
-      });
-      break;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
-    }
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+      let attempts = 0;
+      while(attempts < 2) {
+          try {
+              responseText = await callOpenAICompatibleWithRetry({
+                  systemInstruction,
+                  contents: parts,
+                  responseMimeType: "application/json",
+                  responseSchema,
+                  config: { temperature: 0.8 },
+                  model
+              });
+              break;
+          } catch(err: any) {
+              lastError = err;
+              attempts++;
+              console.warn(`[analyzeBatchImageToPrompt] ${provider.toUpperCase()} failed attempt ${attempts}:`, err.message);
+              if (attempts < 2) await new Promise(r => setTimeout(r, 1000));
+          }
+      }
+  } else {
+      const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+      for (const modelName of modelsToTryList) {
+        try {
+          const res = await callGeminiWithRetry(modelName, { parts }, {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema
+          });
+          responseText = res.text || "[]";
+          break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
+          if (err.message && err.message.includes('API_KEY')) throw err;
+        }
+      }
   }
 
-  if (!response) {
+  if (!responseText) {
     console.warn("analyzeBatchImageToPrompt bypassed:", lastError?.message);
     throw lastError || new Error("Failed to analyze images in batch.");
   }
 
   try {
-    let text = response.text || "[]";
+    let text = responseText;
     if (text.includes("```")) {
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     }
@@ -3111,12 +3102,15 @@ Return a JSON array of objects, each with "prompt" and "description".`;
     const data = JSON.parse(text);
     return data as { prompt: string; description: string }[];
   } catch (error) {
-    console.warn("Gemini Parse Error:", error, response.text);
+    console.warn("Gemini Parse Error:", error, responseText);
     throw new Error("Failed to parse AI response. Please try again.");
   }
 };
 
-export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysisResult> => {
+export const analyzeVideoKeyword = async (keyword: string, model?: string): Promise<VideoAnalysisResult> => {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
   const prompt = `Anda adalah Senior Adobe Stock Demand Analyst yang BRUTAL DAN JUJUR. 
   Tugas Anda adalah menilai apakah keyword "${keyword}" benar-benar layak diproduksi sebagai footage video stok.
   
@@ -3144,9 +3138,7 @@ export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysi
 
   Gunakan Bahasa Indonesia profesional yang sangat jujur.`;
 
-  const response = await callGeminiWithRetry('gemini-3.1-pro-preview', prompt, {
-    responseMimeType: "application/json",
-    responseSchema: {
+  const responseSchema = {
       type: Type.OBJECT,
       properties: {
         keyword: { type: Type.STRING },
@@ -3166,13 +3158,32 @@ export const analyzeVideoKeyword = async (keyword: string): Promise<VideoAnalysi
         solution: { type: Type.STRING },
       },
       required: ["keyword", "demandPotential", "demandType", "marketInsight", "targetBuyer", "useCase", "recommendedFormat", "formatReason", "competitionLevel", "competitionNotes", "cinematicPotential", "cinematicReason", "status", "conclusion", "solution"]
-    },
-  });
+  };
 
-  return JSON.parse(response.text) as VideoAnalysisResult;
+  let responseText = "";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    responseText = await callOpenAICompatibleWithRetry({
+      contents: prompt,
+      responseMimeType: "application/json",
+      responseSchema,
+      config: { temperature: 0.7 },
+      model
+    });
+  } else {
+    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+      responseMimeType: "application/json",
+      responseSchema
+    });
+    responseText = response.text || "{}";
+  }
+
+  return JSON.parse(responseText) as VideoAnalysisResult;
 };
 
-export async function generateHollywoodPrompts(keyword: string): Promise<VideoPrompt[]> {
+export async function generateHollywoodPrompts(keyword: string, model?: string): Promise<VideoPrompt[]> {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
   const prompt = `Act as a world-class Hollywood Director. Create 50 high-end, cinematic text-to-video prompts for: "${keyword}".
   
   BEST PROMPT STRUCTURE (MANDATORY):
@@ -3189,9 +3200,7 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
   
   Return exactly 50 prompts in JSON array format.`;
 
-  const response = await callGeminiWithRetry('gemini-3.1-pro-preview', prompt, {
-    responseMimeType: "application/json",
-    responseSchema: {
+  const responseSchema = {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
@@ -3206,71 +3215,105 @@ export async function generateHollywoodPrompts(keyword: string): Promise<VideoPr
         },
         required: ["subject", "movement", "environment", "lighting", "camera_angle", "camera_movement", "style"]
       }
-    }
-  });
+  };
 
-  const parsed = JSON.parse(response.text) as Omit<VideoPrompt, 'id'>[];
+  let responseText = "";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    responseText = await callOpenAICompatibleWithRetry({
+      contents: prompt,
+      responseMimeType: "application/json",
+      responseSchema,
+      config: { temperature: 0.8 },
+      model
+    });
+  } else {
+    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+      responseMimeType: "application/json",
+      responseSchema
+    });
+    responseText = response.text || "[]";
+  }
+
+  let parsed;
+  try {
+     parsed = JSON.parse(responseText) as Omit<VideoPrompt, 'id'>[];
+  } catch(e) {
+     console.warn("Parse error for hollywood prompts:", e);
+     parsed = [];
+  }
+  
   const timestamp = Date.now();
-  return parsed.map((p, index) => ({
+  return (Array.isArray(parsed) ? parsed : []).map((p, index) => ({
     ...p,
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
-}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa') {
-  const systemInstruction = `Anda adalah Agen Quality Assurance (QA) Senior yang dilatih khusus berdasarkan standar Adobe Stock Global dengan performa ultra-akurat, teliti, dan bermata elang. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar stok komersial sebelum proses upload. Anda harus memeriksa setiap sudut gambar hingga ke level piksel untuk menemukan cacat sekecil apa pun.
-Jangan pernah menebak-nebak (no hallucination). Lakukan pemindaian visual mendalam sebelum memberikan vonis.
+}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string) {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
+  const systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
+JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION). Lakukan pemindaian visual mendalam pada piksel gambar sebelum memberikan vonis.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
-- STRICT: "Zero Tolerance" mutlak. Sekecil apapun cacat teknis, sedikit noise, sedikit blur di latar belakang, artifak AI, atau indikasi pelanggaran IP sekecil apa pun = FAIL secara instan (Skor maksimal 0-59).
-- MEDIUM: Cacat teknis minor yang tidak mengganggu subjek utama bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, merek dagang, logo, atau artifak AI merusak pada subjek utama = FAIL secara instan (Skor maksimal 0-65).
-- LOOSE: Loloskan selama gambar dapat digunakan secara komersial tanpa tuntutan hukum. Hanya cacat teknis yang sangat fatal/merusak atau pelanggaran merek dagang mencolok yang menyebabkan FAIL (Skor 0-69).
+- STRICT: "Zero Tolerance" mutlak. Sedikit noise, soft focus, chromatic aberration, sensor dust, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59).
+- MEDIUM: Cacat minor di background bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure pada subjek, out-of-focus pada subjek utama, atau gen-AI anomaly = FAIL (Skor maksimal 0-65).
+- LOOSE: Loloskan selama gambar memiliki nilai estetika dan komposisi baik. Hanya cacat teknis fatal, gen-AI anomaly yang sangat jelas, atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
 
-A. CEK LIST PEMBATALAN (Known Restrictions / Adobe Stock Intellectual Property Refusal Compliance)
-Berdasarkan kebijakan Adobe Stock, Anda wajib mendeteksi dan menandai FAIL jika mendeteksi pelanggaran IP, arsitektur yang dilindungi, atau merek dagang tanpa izin tertulis (Model/Property Release) sesuai dengan 5 kategori utama:
-1. TRADEMARKS, BRANDS, AND LOGOS: Logo perusahaan lama/baru, nama merek, atau trademark apa pun yang terlihat (misal: gigitan Apple, centang Nike, strip Adidas, kancing LEGO, GoPro, ikon media sosial seperti Instagram/Facebook, Google, Coca-Cola, Pepsi, Starbucks, dsb).
-2. PROPRIETARY DESIGNS AND PRODUCTS: Desain bentuk fisik produk yang terpatenkan atau sangat ikonik, bahkan tanpa logo yang terlihat (misal: bentuk fisik bodi iPhone/iPad dengan poni/kamera belakang khas, kepingan LEGO, bodi Vespa, grille 7-slot Jeep, kubus Rubik, sol merah sepatu Louboutin, sepatu Converse Chuck Taylor, botol kontur Coca-Cola, dsb).
-3. PROTECTED LANDMARKS AND ARCHITECTURE: Arsitektur atau monumen berhak cipta (misal: Menara Eiffel malam hari saat lampu menyala, kastil Disneyland/Disney, Sydney Opera House, Burj Al Arab, Burj Khalifa, bagian dalam Grand Central Terminal, Chrysler Building, Flatiron Building, Louvre Pyramid, Atomium Brussels, patung Christ the Redeemer, Hollywood Sign, Taj Mahal dari sudut terproteksi, dsb).
-4. FICTIONAL CHARACTERS & COPYRIGHTED WORK: Karakter fiksi berhak cipta (Mickey Mouse, Pikachu/Pokémon, Marvel/DC heroes, Minecraft, Lego minifigures), screenshot video game, buku/film berhak cipta, lukisan/patung modern, perangko, mata uang kertas/koin secara ilegal.
-5. SPORTS TEAMS & EVENTS: Logo olimpiade (Olympic Rings), trofi Piala Dunia, logo/jersey klub olahraga populer (NBA, NFL, Premier League, La Liga, dsb).
+A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standards)
+Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi berikut:
+1. Out of Focus: Subjek utama tidak tajam (soft). Blur karena guncangan kamera (motion blur) atau noise reduction yang terlalu agresif (menghaluskan detail tekstur). Jika ada manusia/hewan, mata WAJIB fokus tajam.
+2. Artifacts / Noise: 
+   - Digital noise/grain berlebihan di area gelap (shadows).
+   - Chromatic aberration (color fringing/viola atau hijau di pinggiran objek dengan kontras tinggi).
+   - Sensor dust / bintik kotor pada area datar seperti langit.
+   - Compression artifacts / pixelation (kotak-kotak jpeg).
+   - Color banding pada langit atau gradasi halus.
+3. Lighting / Exposure: 
+   - Blown-out highlights (putih pekat kehilangan detail) atau crushed shadows (hitam pekat kehilangan detail).
+   - Flat lighting, kontras yang sangat buruk, atau lighting terlalu keras tanpa alasan artistik.
+4. Composition: Cropping yang canggung (memotong persendian manusia), horizon/cakrawala yang miring (crooked).
+5. Over-processing: Sharpening yang berlebihan memunculkan halo, saturasi warna ekstrem, filter murahan yang merusak kualitas asli gambar.
+6. Generative AI Artifacts (SANGAT PENTING): 
+   - Anatomi cacat: jari berlebih/kurang, anggota tubuh menyatu, mata tidak simetris.
+   - Teks/Huruf kacau (gibberish/alien text).
+   - Geometri mustahil: objek yang menyatu (merged objects), arsitektur tidak masuk akal, tekstur seperti plastik (plastic skin).
 
-B. KRITERIA EVALUASI TEKNIS & LEGAL
-- IP & Merek Dagang: Cari logo kecil, nama merek, atau desain benda terproteksi pada latar belakang maupun subjek utama.
-- Kebersihan Konten (Clean Content): Hindari teks buatan (gibberish text), metadata visual, tanda air (watermark), timestamp, atau garis koordinat.
-- Kualitas AI (Artifacts): Perhatikan artifak kulit 'plastik', jari berlebih/menyatu, proporsi tubuh tidak konsisten, detail wajah miring, distorsi objek simetris.
+B. INTELLECTUAL PROPERTY (IP) & TRADEMARK REFUSAL
+Tolak (FAIL) secara instan jika mendeteksi:
+1. Logo merek komersial (Apple, Nike, tulisan merek di baju/topi, grill mobil yang dikenali).
+2. Desain hak cipta (pakaian/sepatu ikonik bermerek).
+3. Bangunan/Lokasi terproteksi (Eiffel malam hari, Disney, Tokyo Skytree, dll).
+4. Karakter fiksi/kartun (Disney, Marvel, dsb).
 
 STATUS & SKOR (KONSISTENSI MUTLAK):
-- PASS: Gambar komersial yang layak jual bebas dari pelanggaran IP/trademark sesuai tingkat toleransi. Anda WAJIB memberikan skor antara 75 - 100.
-- FAIL: Gambar ditolak karena terindikasi melanggaran kekayaan intelektual (IP Refusal) atau cacat teknis berat sesuai tingkat toleransi. Anda WAJIB memberikan skor di bawah 70 (0 - 69).
-Jangan pernah memberikan skor 70+ jika FAIL, dan jangan berikan skor <75 jika PASS, agar pengguna tidak bingung.
+- PASS: Lulus standar Adobe Stock, bebas cacat teknis, IP, dan gen-AI anomaly sesuai toleransi. Skor WAJIB 75 - 100.
+- FAIL: Gambar ditolak karena salah satu kriteria A atau B di atas. Skor WAJIB di bawah 70 (0 - 69).
+Jangan berikan skor 70-74. Hanya <70 atau >=75.
 
-PIXEL HEATMAPS (Untuk visualisasi UI) - SANGAT KETAT & HARUS RELEVANKAN DENGAN KOORDINAT GAMBAR:
-Anda WAJIB memberikan 3-8 titik koordinat heatmap yang sangat spesifik dan realistis di mana cacat pixel/hukum tersebut berada pada gambar. Jangan menebak acak, perhatikan letak asli benda/cacat di dalam komposisi foto:
-- x: Koordinat horizontal dari kiri (0) hingga kanan (100).
-- y: Koordinat vertikal dari atas (0) hingga bawah (100).
+PIXEL HEATMAPS (SANGAT KETAT & HARUS BENAR-BENAR ADA DI GAMBAR):
+Berikan koordinat titik area spesifik yang bermasalah (jangan mengarang, cari lokasi aktual cacat tersebut):
+- x: Horizontal dari kiri (0) ke kanan (100).
+- y: Vertikal dari atas (0) ke bawah (100).
+"type": pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
+"raw_value": deskripsi jelas dari temuan (Misal: "Chromatic aberration hijau di pinggir daun", "Jari tangan menyatu (Gen-AI)", "Logo terdeteksi pada botol", "Highlight terbakar di dahi").
 
-Setiap objek dalam array 'heatmaps' wajib mencakup:
-- "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact"
-- "x": integer 0-100
-- "y": integer 0-100
-- "intensity": desimal 0.1 s/d 1.0 (tingkat keparahan cacat di piksel tersebut)
-- "raw_value": deskripsi singkat, padat, sangat presisi mengenai apa yang salah di titik koordinat tersebut dalam bahasa yang diminta. Contoh: "Teks digital atau tanda air samar di pinggiran gambar", "Noise kasar pada bagian bayangan", "Fokus tidak tajam pada subjek utama", "Artifak distorsi jari pada karakter".
-
-ATURAN BAHASA OUTPUT (OUTPUT LANGUAGE RULE):
-Jika parameter bahasa adalah 'Bahasa' / Indonesian, keluarkan nilai feedback dalam Bahasa Indonesia.
-Jika parameter bahasa adalah 'English', keluarkan nilai feedback dalam Bahasa Inggris.
+ATURAN BAHASA OUTPUT:
+Jika 'Bahasa', gunakan Bahasa Indonesia profesional.
+Jika 'English', gunakan Bahasa Inggris.
 Current requested language: ${language === 'Bahasa' ? 'Indonesian' : 'English'}
-Seluruh field string (visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, raw_value) harus dalam bahasa tersebut.
+Seluruh respon text JSON wajib menggunakan bahasa tersebut.
 
 Respons Anda WAJIB dalam format JSON:
 {
-  "visual_scan_analysis": "Lakukan analisa visual secara teliti di sini terlebih dahulu sebelum menyimpulkan. Apa saja yang Anda temukan di tiap kuadran gambar?",
+  "visual_scan_analysis": "Analisa visual tiap kuadran gambar (Pencahayaan, Fokus, Komposisi, Noise, IP).",
   "recommendation": "PASS" atau "FAIL",
   "overall_score": [0-100],
-  "legal_status": "Status legal singkat",
-  "technical_issues": ["list masalah teknis/isue spesifik / temuan pelanggaran IP"],
-  "strengths": ["list kekuatan visual gambar"],
-  "detailed_feedback": "Penjelasan spesifik, bernada kurator, objektif mengenai alasan penilaian dan pelanggaran IP/cacat yang ditemukan",
+  "legal_status": "Aman dari IP atau Terindikasi IP/Trademark Violation",
+  "technical_issues": ["list masalah spesifik: over-exposed, sensor dust, blurry, dsb"],
+  "strengths": ["list keunggulan: komposisi kuat, pencahayaan dramatis, dsb"],
+  "detailed_feedback": "Penjelasan spesifik, bernada Kurator Senior, mengapa lolos/ditolak.",
   "heatmaps": [
-    { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail spesifik temuan" }
+    { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail temuan spesifik di koordinat ini" }
   ]
 }
 `;
@@ -3306,38 +3349,61 @@ Respons Anda WAJIB dalam format JSON:
   const imagePart = processFrameServer(image);
   
   const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
-  let response;
+  let responseText = "";
   let lastError;
 
-  for (const modelName of modelsToTry) {
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
+      const res = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        contents: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }],
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.1
+        config: { temperature: 0.1 },
+        model
       });
-      break;
+      responseText = res;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
+      console.warn(`[checkImageQuality] Failed with ${provider.toUpperCase()}:`, err.message || err);
       if (err.message && err.message.includes('API_KEY')) throw err;
+    }
+  } else {
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    for (const modelName of modelsToTryList) {
+      try {
+        const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.1
+        });
+        responseText = res.text || "{}";
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
+        if (err.message && err.message.includes('API_KEY')) throw err;
+      }
     }
   }
 
-  if (!response) throw lastError;
+  if (!responseText) throw lastError;
   
   try {
-    const text = response.text || "{}";
-    console.log('Gemini raw response:', text);
+    const text = responseText;
+    console.log('QA raw response:', text);
     return JSON.parse(text);
   } catch(e) {
-    console.warn("Gemini Parse Error:", response?.text);
+    console.warn("Parse Error:", responseText);
     throw e;
   }
 }
 
-export async function generateCalendarEvents(month: string) {
+export async function generateCalendarEvents(month: string, model?: string) {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
   const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
 Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month. 
 
@@ -3379,28 +3445,46 @@ Output strictly in JSON format.`;
     required: ["events"]
   };
 
-  let response;
-  try {
-    response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+  let responseText = "";
+
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      tools: [{ googleSearch: {} }],
+      contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
       responseMimeType: "application/json",
       responseSchema,
-      temperature: 0.8
-    }, 1);
-  } catch (err: any) {
-    response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature: 0.8
+      config: { temperature: 0.8 },
+      model
     });
+    responseText = res;
+  } else {
+    try {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+        systemInstruction,
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.8
+      }, 1);
+      responseText = res.text || "{}";
+    } catch (err: any) {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.8
+      });
+      responseText = res.text || "{}";
+    }
   }
 
-  return JSON.parse(response.text);
+  return JSON.parse(responseText);
 }
 
-export async function generateEventKeywords(eventName: string, eventDetails: string) {
+export async function generateEventKeywords(eventName: string, eventDetails: string, model?: string) {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
   const systemInstruction = `You are an expert AI Stock Photographer and Keyword Specialist. 
 Your job is to generate a list of highly commercial, descriptive, and specific keywords/subjects for a given event.
 These keywords should be optimized for AI Image Generation prompts.
@@ -3422,33 +3506,51 @@ Rules:
     required: ["keywords"]
   };
 
-  let response;
-  try {
-    response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+  let responseText = "";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      tools: [{ googleSearch: {} }],
+      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`,
       responseMimeType: "application/json",
       responseSchema,
-      temperature: 0.8
-    }, 1);
-  } catch (err: any) {
-    response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
-      systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema,
-      temperature: 0.8
+      config: { temperature: 0.8 },
+      model
     });
+    responseText = res;
+  } else {
+    try {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+        systemInstruction,
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.8
+      }, 1);
+      responseText = res.text || "{}";
+    } catch (err: any) {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.8
+      });
+      responseText = res.text || "{}";
+    }
   }
 
-  return JSON.parse(response.text);
+  return JSON.parse(responseText);
 }
 
 export async function suggestKeywords(
   title: string,
   description: string,
   existingKeywords: string[],
-  requestCount: number = 5
+  requestCount: number = 5,
+  model?: string
 ): Promise<string[]> {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
   const systemInstruction = `You are a professional SEO and Adobe Stock Keyword Specialist.
 Your task is to analyze the existing title, description, and list of keywords of an asset, and suggest exactly ${requestCount} high-volume, generic, relevant keywords or short conceptual phrases that are currently missing from the user's list.
 These suggested keywords must be highly searchable, commercial, and directly related to the visual subject and context described in the title and description, while not repeating any existing keywords.
@@ -3470,18 +3572,33 @@ Rules:
     required: ["keywords"]
   };
 
-  const response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Suggest 5 missing SEO keywords for this asset:
+  const promptContents = `Suggest ${requestCount} missing SEO keywords for this asset:
 Title: "${title}"
 Description: "${description}"
-Existing Keywords: ${existingKeywords.join(', ')}`, {
-    systemInstruction,
-    responseMimeType: "application/json",
-    responseSchema,
-    temperature: 0.3
-  });
+Existing Keywords: ${existingKeywords.join(', ')}`;
+
+  let responseText = "";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    responseText = await callOpenAICompatibleWithRetry({
+      systemInstruction,
+      contents: promptContents,
+      responseMimeType: "application/json",
+      responseSchema,
+      config: { temperature: 0.3 },
+      model
+    });
+  } else {
+    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', promptContents, {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.3
+    });
+    responseText = res.text || "{}";
+  }
 
   try {
-    const parsed = JSON.parse(response.text);
+    const parsed = JSON.parse(responseText);
     return parsed.keywords || [];
   } catch (err) {
     console.warn("Failed to parse suggested keywords:", err);

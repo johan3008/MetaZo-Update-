@@ -103,7 +103,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       const response = await fetch('/api/analyze-video-keyword', {
         method: 'POST',
         headers: getHeaders(aiOptions),
-        body: JSON.stringify({ keyword: keyword.trim() }),
+        body: JSON.stringify({ keyword: keyword.trim(), model: aiOptions?.model }),
       });
 
       clearInterval(progressInterval);
@@ -183,7 +183,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       const response = await fetch('/api/generate-hollywood-prompts', {
         method: 'POST',
         headers: getHeaders(aiOptions),
-        body: JSON.stringify({ keyword: keyword.trim() }),
+        body: JSON.stringify({ keyword: keyword.trim(), model: aiOptions?.model }),
       });
 
       clearInterval(progressInterval);
