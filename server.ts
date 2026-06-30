@@ -871,7 +871,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-prompt', async (req, res) => {
         try {
-            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords } = req.body;
+            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model } = req.body;
             if (!subject) {
                 return res.status(400).json({ error: 'Missing subject field' });
             }
@@ -883,7 +883,8 @@ app.get('/api/debug-uploads', (req, res) => {
                 pngBgColor,
                 userNegativePrompt,
                 minWords,
-                maxWords
+                maxWords,
+                model
             });
             res.json(promptData);
         } catch (e: any) {

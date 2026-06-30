@@ -2304,6 +2304,7 @@ export const generateOptimizedPrompt = async (options: {
   userNegativePrompt?: string;
   minWords?: number;
   maxWords?: number;
+  model?: string;
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -2313,7 +2314,8 @@ export const generateOptimizedPrompt = async (options: {
     pngBgColor = 'white', 
     userNegativePrompt = '',
     minWords = 10,
-    maxWords = 70
+    maxWords = 70,
+    model
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
@@ -2470,7 +2472,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = model && model.startsWith('gemini-') ? [model] : ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -2481,18 +2483,42 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
+          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences. \n\nCRITICAL: Return a valid JSON object with the following keys:\n- "prompts": an array of strings containing the generated prompts.\n- "negativePrompt": a string containing the negative prompt.\n- "styleExplanation": an array of strings containing 3 bullet points.`,
           responseMimeType: "application/json",
           responseSchema,
-          config: { temperature: 0.85 }
+          config: { temperature: 0.85 },
+          model
         });
         
-        const parsed = JSON.parse(text);
-        if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
-           // Reuse the validation/padding logic by breaking out and returning
+        let parsed;
+        try {
+          parsed = JSON.parse(extractJSON(text));
+        } catch (e) {
+          throw new Error('Failed to parse AI response into JSON. Raw: ' + text.substring(0, 200));
+        }
+        
+        let promptsArray = parsed?.prompts;
+        if (!Array.isArray(promptsArray)) {
+           if (Array.isArray(parsed)) {
+             promptsArray = parsed;
+             parsed = { prompts: promptsArray, negativePrompt: '', styleExplanation: [] };
+           } else {
+             // Fallback: look for any array in the object that has strings
+             for (const key of Object.keys(parsed || {})) {
+               if (Array.isArray(parsed[key]) && typeof parsed[key][0] === 'string' && key !== 'styleExplanation') {
+                 promptsArray = parsed[key];
+                 break;
+               }
+             }
+           }
+        }
+        
+        if (Array.isArray(promptsArray) && promptsArray.length > 0) {
+           parsed.prompts = promptsArray;
            return processPromptResults(parsed, count, subject, userNegativePrompt);
         }
-        throw new Error('Missing or empty prompts array in JSON response');
+        console.warn(`[generateOptimizedPrompt] Missing prompts in JSON. Parsed object:`, JSON.stringify(parsed).substring(0, 300));
+        throw new Error('Missing or empty prompts array in JSON response. Returned keys: ' + Object.keys(parsed || {}).join(', '));
       } catch (err: any) {
         lastError = err;
         attempts++;
@@ -2517,11 +2543,35 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           });
 
           const text = response.text || "{}";
-          const parsed = JSON.parse(text);
-          if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
+          let parsed;
+          try {
+            parsed = JSON.parse(extractJSON(text));
+          } catch (e) {
+            throw new Error('Failed to parse AI response into JSON. Raw: ' + text.substring(0, 200));
+          }
+          
+          let promptsArray = parsed?.prompts;
+          if (!Array.isArray(promptsArray)) {
+             if (Array.isArray(parsed)) {
+               promptsArray = parsed;
+               parsed = { prompts: promptsArray, negativePrompt: '', styleExplanation: [] };
+             } else {
+               // Fallback: look for any array in the object that has strings
+               for (const key of Object.keys(parsed || {})) {
+                 if (Array.isArray(parsed[key]) && typeof parsed[key][0] === 'string' && key !== 'styleExplanation') {
+                   promptsArray = parsed[key];
+                   break;
+                 }
+               }
+             }
+          }
+          
+          if (Array.isArray(promptsArray) && promptsArray.length > 0) {
+            parsed.prompts = promptsArray;
             return processPromptResults(parsed, count, subject, userNegativePrompt);
           }
-          throw new Error('Missing or empty prompts array in JSON response');
+          console.warn(`[generateOptimizedPrompt Gemini] Missing prompts in JSON. Parsed object:`, JSON.stringify(parsed).substring(0, 300));
+          throw new Error('Missing or empty prompts array in JSON response. Returned keys: ' + Object.keys(parsed || {}).join(', '));
         } catch (err: any) {
           lastError = err;
           attempts++;

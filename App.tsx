@@ -3542,7 +3542,11 @@ const App: React.FC = () => {
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
                 bluesmindsKeys: bluesmindsKeysList,
-                aiveneKeys: aiveneKeysList
+                aiveneKeys: aiveneKeysList,
+                model: selectedProvider === 'gemini' ? (selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel) : 
+                       selectedProvider === 'groq' ? selectedGroqModel : 
+                       selectedProvider === 'nvidia' ? selectedNvidiaModel : 
+                       selectedProvider === 'aivene' ? selectedAiveneModel : undefined
               }}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE ? (

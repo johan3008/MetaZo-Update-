@@ -218,7 +218,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           pngBgColor,
           minWords,
           maxWords,
-          userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim()
+          userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim(),
+          model: aiOptions?.model
         })
       });
 
