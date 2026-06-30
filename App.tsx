@@ -1207,7 +1207,7 @@ const App: React.FC = () => {
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
   const [isMzLicensedState, setIsMzLicensed] = useState(false);
-  const isMzLicensed = isMzLicensedState || new Date().getDate() === 30;
+  const isMzLicensed = isMzLicensedState;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -1560,79 +1560,6 @@ const App: React.FC = () => {
         } else {
           setCloudDailyCounts({});
         }
-
-        // 4. Sync Settings
-        if (data.settings) {
-          let settingsChanged = false;
-          
-          const syncKey = (cloudValue: string | undefined, localKey: string, setterList: any) => {
-            if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                if (cloudValue === '') {
-                  localStorage.removeItem(localKey);
-                  setterList([]);
-                } else {
-                  localStorage.setItem(localKey, cloudValue);
-                  setterList(cloudValue.split(',').map((k:string)=>k.trim()).filter(Boolean));
-                }
-                settingsChanged = true;
-              }
-            }
-          };
-
-          syncKey(data.settings.gemini_api_key, 'gemini_api_key', setGeminiKeysList);
-          syncKey(data.settings.groq_api_key, 'groq_api_key', setGroqKeysList);
-          syncKey(data.settings.mistral_api_key, 'mistral_api_key', setMistralKeysList);
-          syncKey(data.settings.openai_api_key, 'openai_api_key', setOpenaiKeysList);
-          syncKey(data.settings.openrouter_api_key, 'openrouter_api_key', setOpenrouterKeysList);
-          syncKey(data.settings.blackbox_api_key, 'blackbox_api_key', setBlackboxKeysList);
-          syncKey(data.settings.nvidia_api_key, 'nvidia_api_key', setNvidiaKeysList);
-          syncKey(data.settings.bluesminds_api_key, 'bluesminds_api_key', setBluesmindsKeysList);
-          syncKey(data.settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
-
-          if (data.settings.ai_provider !== undefined) {
-            const localProvider = localStorage.getItem('ai_provider') || 'gemini';
-            if (data.settings.ai_provider !== localProvider) {
-              localStorage.setItem('ai_provider', data.settings.ai_provider);
-              setSelectedProvider(data.settings.ai_provider as any);
-              settingsChanged = true;
-            }
-          }
-
-          const syncModel = (cloudValue: string | undefined, localKey: string, setter: any) => {
-            if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                if (cloudValue === '') {
-                  localStorage.removeItem(localKey);
-                } else {
-                  localStorage.setItem(localKey, cloudValue);
-                  setter(cloudValue);
-                }
-              }
-            }
-          };
-
-          syncModel(data.settings.mz_gemini_model, 'mz_gemini_model', setSelectedGeminiModel);
-          syncModel(data.settings.mz_groq_model, 'mz_groq_model', setSelectedGroqModel);
-          syncModel(data.settings.mz_nvidia_model, 'mz_nvidia_model', setSelectedNvidiaModel);
-          syncModel(data.settings.mz_aivene_model, 'mz_aivene_model', setSelectedAiveneModel);
-
-          if (settingsChanged) {
-             setHasCustomKeySaved(
-                (localStorage.getItem('gemini_api_key') || '').length > 0 ||
-                (localStorage.getItem('groq_api_key') || '').length > 0 ||
-                (localStorage.getItem('mistral_api_key') || '').length > 0 ||
-                (localStorage.getItem('openai_api_key') || '').length > 0 ||
-                (localStorage.getItem('openrouter_api_key') || '').length > 0 ||
-                (localStorage.getItem('blackbox_api_key') || '').length > 0 ||
-                (localStorage.getItem('nvidia_api_key') || '').length > 0 ||
-                (localStorage.getItem('bluesminds_api_key') || '').length > 0 ||
-                (localStorage.getItem('aivene_api_key') || '').length > 0
-             );
-          }
-        }
       } else {
         // Init cloud user profile if missing
         const localKey = localStorage.getItem('mz_license_key') || '';
@@ -1659,24 +1586,6 @@ const App: React.FC = () => {
           }
         });
 
-        // Prepopulate settings to cloud
-        const initialSettings = {
-           gemini_api_key: localStorage.getItem('gemini_api_key') || '',
-           groq_api_key: localStorage.getItem('groq_api_key') || '',
-           mistral_api_key: localStorage.getItem('mistral_api_key') || '',
-           openai_api_key: localStorage.getItem('openai_api_key') || '',
-           openrouter_api_key: localStorage.getItem('openrouter_api_key') || '',
-           blackbox_api_key: localStorage.getItem('blackbox_api_key') || '',
-           nvidia_api_key: localStorage.getItem('nvidia_api_key') || '',
-           bluesminds_api_key: localStorage.getItem('bluesminds_api_key') || '',
-           aivene_api_key: localStorage.getItem('aivene_api_key') || '',
-           ai_provider: localStorage.getItem('ai_provider') || 'gemini',
-           mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
-           mz_groq_model: localStorage.getItem('mz_groq_model') || '',
-           mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
-           mz_aivene_model: localStorage.getItem('mz_aivene_model') || ''
-        };
-
         setDoc(userDocRef, {
           email: user.email,
           displayName: user.displayName || '',
@@ -1685,7 +1594,6 @@ const App: React.FC = () => {
           dailyUsage: {
             [dateStr]: initialUsage
           },
-          settings: initialSettings,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }).catch(err => {
@@ -1764,7 +1672,7 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Trial Period tracking (Unlimited Trial Days)
+  // Trial Period tracking
   const [trialDaysLeft, setTrialDaysLeft] = useState(() => {
     return 99999;
   });
@@ -2370,22 +2278,6 @@ const App: React.FC = () => {
       cleanBluesminds.length > 0 ||
       cleanAivene.length > 0
     );
-
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.gemini_api_key': cleanGemini.join(','),
-        'settings.groq_api_key': cleanGroq.join(','),
-        'settings.mistral_api_key': cleanMistral.join(','),
-        'settings.openai_api_key': cleanOpenai.join(','),
-        'settings.openrouter_api_key': cleanOpenrouter.join(','),
-        'settings.blackbox_api_key': cleanBlackbox.join(','),
-        'settings.nvidia_api_key': cleanNvidia.join(','),
-        'settings.bluesminds_api_key': cleanBluesminds.join(','),
-        'settings.aivene_api_key': cleanAivene.join(','),
-        'settings.ai_provider': selectedProvider,
-      }).catch(err => console.error('Failed to sync api keys to cloud:', err));
-    }
-
     setShowSettingsModal(false);
   };
 
@@ -2413,21 +2305,6 @@ const App: React.FC = () => {
     setSelectedProvider('gemini');
     setHasCustomKeySaved(false);
     setKeyTestResults({});
-
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.gemini_api_key': '',
-        'settings.groq_api_key': '',
-        'settings.mistral_api_key': '',
-        'settings.openai_api_key': '',
-        'settings.openrouter_api_key': '',
-        'settings.blackbox_api_key': '',
-        'settings.nvidia_api_key': '',
-        'settings.bluesminds_api_key': '',
-        'settings.aivene_api_key': '',
-        'settings.ai_provider': 'gemini',
-      }).catch(err => console.error('Failed to reset api keys on cloud:', err));
-    }
   };
 
   const handleCloseWelcome = () => {
@@ -4245,11 +4122,6 @@ const App: React.FC = () => {
                           const val = e.target.value as any;
                           setSelectedGeminiModel(val);
                           localStorage.setItem('mz_gemini_model', val);
-                          if (auth.currentUser) {
-                            updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                              'settings.mz_gemini_model': val
-                            }).catch(() => {});
-                          }
                       }}
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
@@ -4811,11 +4683,6 @@ const App: React.FC = () => {
                         const val = e.target.value;
                         setSelectedNvidiaModel(val);
                         localStorage.setItem('mz_nvidia_model', val);
-                        if (auth.currentUser) {
-                          updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                            'settings.mz_nvidia_model': val
-                          }).catch(() => {});
-                        }
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
@@ -5082,11 +4949,6 @@ const App: React.FC = () => {
                       onChange={(e) => {
                         setSelectedAiveneModel(e.target.value);
                         localStorage.setItem('mz_aivene_model', e.target.value);
-                        if (auth.currentUser) {
-                          updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                            'settings.mz_aivene_model': e.target.value
-                          }).catch(() => {});
-                        }
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all cursor-pointer"
                     >
@@ -5133,11 +4995,6 @@ const App: React.FC = () => {
                           const val = e.target.value as any;
                           setSelectedGroqModel(val);
                           localStorage.setItem('mz_groq_model', val);
-                          if (auth.currentUser) {
-                            updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                              'settings.mz_groq_model': val
-                            }).catch(() => {});
-                          }
                       }}
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >

@@ -346,23 +346,23 @@ export const ImageQualityCheck: React.FC<{
             </div>
           </div>
 
-          {/* Adobe Kurator Notice Card */}
-          <div className="bg-emerald-500/5 dark:bg-emerald-500/[0.02] border border-emerald-500/15 rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-500">
+          {/* Adobe Stock IP Refusal Notice Card */}
+          <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 rounded-2xl p-5 space-y-3 shadow-sm">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
               <AlertCircle size={14} className="shrink-0" />
               <h4 className="text-[10px] font-black tracking-wider uppercase">
-                {t.language === 'Bahasa' ? 'STANDAR KURATOR ADOBE' : 'ADOBE CURATOR STANDARDS'}
+                {t.language === 'Bahasa' ? 'PATUH REKAYASA IP ADOBE' : 'ADOBE IP REFUSAL COMPLIANCE'}
               </h4>
             </div>
             <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
               {t.language === 'Bahasa' 
-                ? 'Audit memindai cacat teknis seperti Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus, serta mendeteksi pelanggaran IP (logo, paten, landmark).'
-                : 'Audit scans for technical flaws such as Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus, and detects IP violations (logos, patents, landmarks).'
+                ? 'Audit memindai pelanggaran logo merek, merk dagang, desain terproteksi (grille Jeep, bodi iPhone, LEGO), arsitektur terproteksi (Eiffel malam, Disney), karakter fiksi, serta klub olahraga.'
+                : 'Audit scans for brand logos, trademarks, proprietary designs (Jeep grille, iPhone body shape, LEGO), protected architecture (Eiffel nighttime lights, Disney), fictional characters, and sports teams.'
               }
             </p>
             <div className="flex flex-wrap gap-1 pt-1.5 border-t border-slate-100 dark:border-white/5">
-              {['Lighting', 'Sharpness', 'Artifacts', 'IP/Brands'].map((tag) => (
-                <span key={tag} className="text-[8px] font-bold uppercase text-emerald-600 dark:text-emerald-500/80 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              {['Brands', 'Designs', 'Landmarks', 'Characters'].map((tag) => (
+                <span key={tag} className="text-[8px] font-bold uppercase text-amber-600 dark:text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded">
                   {tag}
                 </span>
               ))}
