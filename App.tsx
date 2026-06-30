@@ -1705,13 +1705,18 @@ const App: React.FC = () => {
     if (user && hasSyncedProfile && !isCheckingAuth) {
       if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
         sessionStorage.removeItem('mz_just_logged_in_promo');
-        // If the synced profile reveals they are NOT licensed (free trial account)
-        if (!isMzLicensed) {
+        
+        // Use mzLicenseKey directly instead of isMzLicensed to avoid race condition
+        // since isMzLicensed requires an extra render cycle to evaluate.
+        const k = mzLicenseKey.trim().toUpperCase();
+        
+        // If the synced profile reveals they have no license key (free trial account)
+        if (!k) {
           setShowPromoWindow(true);
         }
       }
     }
-  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth]);
+  }, [user, hasSyncedProfile, mzLicenseKey, isCheckingAuth]);
 
   // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
