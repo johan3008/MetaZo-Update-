@@ -6,7 +6,7 @@ import {
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
   Calendar, CreditCard, Info
 } from 'lucide-react';
-import { ToolType, GenerationMode } from '../../types';
+import { ToolType, GenerationMode, toolToPath } from '../../types';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-base" }) => {
   const chars = name.split('');
@@ -82,7 +82,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleNavClick = (tool: ToolType) => {
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, tool: ToolType) => {
+    e.preventDefault();
     setActiveTool(tool);
     setSidebarOpen(false); // Close mobile drawer if open
   };
@@ -145,13 +146,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
           <nav className="space-y-1">
             {/* Dashboard Button */}
-            <button 
-              onClick={() => handleNavClick(ToolType.DASHBOARD)}
-              className={`w-full text-left ${navItemClass(ToolType.DASHBOARD)} mb-1.5`}
+            <a 
+              href={toolToPath[ToolType.DASHBOARD]}
+              onClick={(e) => handleNavClick(e, ToolType.DASHBOARD)}
+              className={`block w-full text-left ${navItemClass(ToolType.DASHBOARD)} mb-1.5`}
             >
               <LayoutDashboard size={16} className={activeTool === ToolType.DASHBOARD ? "text-white dark:text-slate-900" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_dashboard}</span>}
-            </button>
+            </a>
 
             {/* Metadata Gen tab and dropdown */}
             <div className="space-y-1">
@@ -185,8 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Sub-items list */}
               {metadataGenOpen && !sidebarCollapsed && (
                 <div className="pl-3.5 pr-1 py-1 space-y-1 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 mt-1 animate-in slide-in-from-top-1 duration-200">
-                  <button 
-                    onClick={() => handleNavClick(ToolType.IMAGE)}
+                  <a href={toolToPath[ToolType.IMAGE]} onClick={(e) => handleNavClick(e, ToolType.IMAGE)}
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.IMAGE 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
@@ -194,11 +195,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <ImageIcon size={14} className={activeTool === ToolType.IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                    <span>{t.image_tool} {t.common_editor}</span>
-                  </button>
+                    <span>{t.image_tool} {t.common_editor}</span></a>
 
-                  <button 
-                    onClick={() => handleNavClick(ToolType.VIDEO)}
+                  <a href={toolToPath[ToolType.VIDEO]} onClick={(e) => handleNavClick(e, ToolType.VIDEO)}
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.VIDEO 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
@@ -206,11 +205,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <Film size={14} className={activeTool === ToolType.VIDEO ? "text-purple-400" : "text-slate-400"} />
-                    <span>{t.video_tool} {t.common_editor}</span>
-                  </button>
+                    <span>{t.video_tool} {t.common_editor}</span></a>
 
-                  <button 
-                    onClick={() => handleNavClick(ToolType.VECTOR)}
+                  <a href={toolToPath[ToolType.VECTOR]} onClick={(e) => handleNavClick(e, ToolType.VECTOR)}
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.VECTOR 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
@@ -218,8 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <FileCode size={14} className={activeTool === ToolType.VECTOR ? "text-amber-400" : "text-slate-400"} />
-                    <span>{t.vector_tool} {t.common_editor}</span>
-                  </button>
+                    <span>{t.vector_tool} {t.common_editor}</span></a>
                 </div>
               )}
             </div>
@@ -256,8 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Sub-items list for Prompt Gen */}
               {promptGenOpen && !sidebarCollapsed && (
                 <div className="pl-3.5 pr-1 py-1 space-y-1 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 mt-1 animate-in slide-in-from-top-1 duration-200">
-                  <button 
-                    onClick={() => handleNavClick(ToolType.PROMPT_GEN)}
+                  <a href={toolToPath[ToolType.PROMPT_GEN]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_GEN)}
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.PROMPT_GEN 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
@@ -265,11 +260,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <Type size={14} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
-                    <span>{t.sidebar_prompt_text}</span>
-                  </button>
+                    <span>{t.sidebar_prompt_text}</span></a>
 
-                  <button 
-                    onClick={() => handleNavClick(ToolType.PROMPT_IMAGE)}
+                  <a href={toolToPath[ToolType.PROMPT_IMAGE]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_IMAGE)}
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.PROMPT_IMAGE 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
@@ -277,11 +270,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <ImageIcon size={14} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                    <span>{t.sidebar_prompt_image}</span>
-                  </button>
+                    <span>{t.sidebar_prompt_image}</span></a>
 
-                  <button 
-                    onClick={() => handleNavClick(ToolType.PROMPT_VIDEO)}
+                  <a href={toolToPath[ToolType.PROMPT_VIDEO]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_VIDEO)}
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.PROMPT_VIDEO 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
@@ -289,14 +280,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <Film size={14} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
-                    <span>{t.sidebar_prompt_video}</span>
-                  </button>
+                    <span>{t.sidebar_prompt_video}</span></a>
                 </div>
               )}
             </div>
 
-            <button 
-              onClick={() => handleNavClick(ToolType.PROMPT_IMAGE_CHECK)}
+            <a href={toolToPath[ToolType.PROMPT_IMAGE_CHECK]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_IMAGE_CHECK)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.PROMPT_IMAGE_CHECK 
                   ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
@@ -305,10 +294,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <CheckCircle size={16} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_image_check}</span>}
-            </button>
+            </a>
 
-            <button 
-              onClick={() => handleNavClick(ToolType.CALENDAR_GEN)}
+            <a href={toolToPath[ToolType.CALENDAR_GEN]} onClick={(e) => handleNavClick(e, ToolType.CALENDAR_GEN)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.CALENDAR_GEN 
                   ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
@@ -317,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Calendar size={16} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
-            </button>
+            </a>
           </nav>
         </div>
 
@@ -516,8 +504,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       } mb-1.5`}
                     >
                       <LayoutDashboard size={14} className={activeTool === ToolType.DASHBOARD ? "text-slate-900 dark:text-white animate-pulse" : "text-slate-400"} />
-                      <span>{t.sidebar_dashboard}</span>
-                    </button>
+                      <span>{t.sidebar_dashboard}</span></button>
 
                     {/* Metadata Gen Dropdown for Mobile */}
                     <div className="space-y-1">
@@ -551,8 +538,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <ImageIcon size={12} className={activeTool === ToolType.IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                            <span>{t.image_tool} Editor</span>
-                          </button>
+                            <span>{t.image_tool} Editor</span></button>
 
                           <button 
                             onClick={() => { setActiveTool(ToolType.VIDEO); setSidebarOpen(false); }}
@@ -563,8 +549,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Film size={12} className={activeTool === ToolType.VIDEO ? "text-purple-400" : "text-slate-400"} />
-                            <span>{t.video_tool} Editor</span>
-                          </button>
+                            <span>{t.video_tool} Editor</span></button>
 
                           <button 
                             onClick={() => { setActiveTool(ToolType.VECTOR); setSidebarOpen(false); }}
@@ -575,8 +560,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <FileCode size={12} className={activeTool === ToolType.VECTOR ? "text-amber-400" : "text-slate-400"} />
-                            <span>{t.vector_tool} Editor</span>
-                          </button>
+                            <span>{t.vector_tool} Editor</span></button>
                         </div>
                       )}
                     </div>
@@ -613,8 +597,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Type size={12} className={activeTool === ToolType.PROMPT_GEN ? "text-emerald-400" : "text-slate-400"} />
-                            <span>{t.sidebar_prompt_text}</span>
-                          </button>
+                            <span>{t.sidebar_prompt_text}</span></button>
 
                           <button 
                             onClick={() => { setActiveTool(ToolType.PROMPT_IMAGE); setSidebarOpen(false); }}
@@ -625,8 +608,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <ImageIcon size={12} className={activeTool === ToolType.PROMPT_IMAGE ? "text-emerald-400" : "text-slate-400"} />
-                            <span>{t.sidebar_prompt_image}</span>
-                          </button>
+                            <span>{t.sidebar_prompt_image}</span></button>
 
                           <button 
                             onClick={() => { setActiveTool(ToolType.PROMPT_VIDEO); setSidebarOpen(false); }}
@@ -637,8 +619,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Film size={12} className={activeTool === ToolType.PROMPT_VIDEO ? "text-emerald-400" : "text-slate-400"} />
-                            <span>{t.sidebar_prompt_video}</span>
-                          </button>
+                            <span>{t.sidebar_prompt_video}</span></button>
                         </div>
                       )}
                     </div>
@@ -652,8 +633,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <CheckCircle size={14} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-400"} />
-                      <span>{t.sidebar_image_check}</span>
-                    </button>
+                      <span>{t.sidebar_image_check}</span></button>
 
                     <button 
                       onClick={() => { setActiveTool(ToolType.CALENDAR_GEN); setSidebarOpen(false); }}
@@ -664,8 +644,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <Calendar size={14} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
-                      <span>{t.sidebar_calendar_gen}</span>
-                    </button>
+                      <span>{t.sidebar_calendar_gen}</span></button>
                   </nav>
                 </div>
 
@@ -676,12 +655,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="space-y-1.5">
                     <button onClick={() => { setGenerationMode(GenerationMode.STANDARD); setSidebarOpen(false); }} className={`w-full text-left flex items-center space-x-3 px-4 py-2 rounded-2xl text-xs font-bold ${generationMode === GenerationMode.STANDARD ? 'bg-amber-500 text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400/80 hover:bg-white/5'}`}>
                       <Clock size={13} />
-                      <span>{t.generation_mode_standard} Mode</span>
-                    </button>
+                      <span>{t.generation_mode_standard} Mode</span></button>
                     <button onClick={() => { setGenerationMode(GenerationMode.BATCH); setSidebarOpen(false); }} className={`w-full text-left flex items-center space-x-3 px-4 py-2 rounded-2xl text-xs font-bold ${generationMode === GenerationMode.BATCH ? 'bg-emerald-500 text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400/80 hover:bg-white/5'}`}>
                       <Zap size={13} />
-                      <span>{t.generation_mode_batch} Mode</span>
-                    </button>
+                      <span>{t.generation_mode_batch} Mode</span></button>
                   </div>
                 </div>
               </div>
@@ -693,8 +670,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-full text-center py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-[1.5rem] flex items-center justify-center space-x-2 cursor-pointer mb-1.5"
               >
                 <Info size={14} />
-                <span>{t.sidebar_about || 'Tentang MetaZo PRO'}</span>
-              </button>
+                <span>{t.sidebar_about || 'Tentang MetaZo PRO'}</span></button>
 
               <a href={t.whatsapp_link} target="_blank" rel="noopener noreferrer" className="w-full text-center py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 dark:text-white text-xs font-black rounded-[1.5rem] flex items-center justify-center space-x-2">
                 <MessageCircle size={14} />

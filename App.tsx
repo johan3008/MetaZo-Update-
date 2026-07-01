@@ -8,7 +8,7 @@ import {
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
   Plus, Key, Lock, MessageCircle, Monitor, Palette, Gift, Tag, ExternalLink
 } from 'lucide-react';
-import { ToolType, GenerationMode, FileItem, ProgressInfo } from './types';
+import { ToolType, GenerationMode, FileItem, ProgressInfo, toolToPath } from './types';
 import { Sidebar } from './src/components/Sidebar';
 import { Topbar } from './src/components/Topbar';
 import { MetricsRow } from './src/components/MetricsRow';
@@ -986,18 +986,7 @@ const extractVideoHybrid = async (file: File): Promise<string[]> => {
     }
 };
 
-const toolToPath: Record<ToolType, string> = {
-  [ToolType.DASHBOARD]: '/Dashboard',
-  [ToolType.IMAGE]: '/GenMetadataGambar',
-  [ToolType.VIDEO]: '/GenMetadataVideo',
-  [ToolType.VECTOR]: '/GenMetadataVektor',
-  [ToolType.PROMPT_GEN]: '/SeoTextPrompt',
-  [ToolType.PROMPT_IMAGE]: '/ImageToPrompt',
-  [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
-  [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
-  [ToolType.VECTOR_EPS]: '/EpsConverter',
-  [ToolType.CALENDAR_GEN]: '/NicheCalendar'
-};
+
 
 const getToolFromPath = (path: string): ToolType | null => {
   const normalized = path.toLowerCase().replace(/^\/+/g, '').trim();

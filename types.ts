@@ -12,6 +12,19 @@ export enum ToolType {
   CALENDAR_GEN = 'calendar_gen'
 }
 
+export const toolToPath: Record<ToolType, string> = {
+  [ToolType.DASHBOARD]: '/Dashboard',
+  [ToolType.IMAGE]: '/GenMetadataGambar',
+  [ToolType.VIDEO]: '/GenMetadataVideo',
+  [ToolType.VECTOR]: '/GenMetadataVektor',
+  [ToolType.PROMPT_GEN]: '/SeoTextPrompt',
+  [ToolType.PROMPT_IMAGE]: '/ImageToPrompt',
+  [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
+  [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
+  [ToolType.VECTOR_EPS]: '/EpsConverter',
+  [ToolType.CALENDAR_GEN]: '/NicheCalendar'
+};
+
 export enum GenerationMode {
   STANDARD = 'standard',
   BATCH = 'batch'
