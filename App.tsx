@@ -1188,10 +1188,16 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'reseller'>('gemini');
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds'>(() => {
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene'>(() => {
     return (localStorage.getItem('ai_provider') || 'gemini') as any;
   });
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'reseller'>(selectedProvider);
+
+  useEffect(() => {
+    if (showSettingsModal) {
+      setActiveSettingsTab(selectedProvider);
+    }
+  }, [showSettingsModal, selectedProvider]);
 
   // Reseller & License state
   const [isResellerUnlocked, setIsResellerUnlocked] = useState(() => localStorage.getItem('mz_reseller_unlocked') === 'true');
@@ -1207,7 +1213,7 @@ const App: React.FC = () => {
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
   const [isMzLicensedState, setIsMzLicensed] = useState(false);
-  const [isCheckingLicense, setIsCheckingLicense] = useState(false);
+  const [isCheckingLicense, setIsCheckingLicense] = useState(true);
   const isMzLicensed = isMzLicensedState;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
@@ -1780,11 +1786,24 @@ const App: React.FC = () => {
   // Fetch active promo codes for the Login Promo modal
   useEffect(() => {
     if (!user) return;
-    getDocs(query(collection(db, 'promos'), limit(5)))
+    getDocs(query(collection(db, 'promos'), limit(15)))
       .then((qSnap) => {
         const list: any[] = [];
+        const now = new Date();
         qSnap.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          const usedCount = Number(data.usedCount) || 0;
+          const maxUses = Number(data.maxUses) || 99999;
+          
+          if (usedCount >= maxUses) return;
+          
+          if (data.endDate) {
+            const endStr = data.endDate;
+            const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
+            if (now > end) return;
+          }
+          
+          list.push({ id: doc.id, ...data });
         });
         setPromoCodesForModal(list);
       })
@@ -2012,7 +2031,7 @@ const App: React.FC = () => {
     return (localStorage.getItem('aivene_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
   });
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
-  const [selectedAiveneModel, setSelectedAiveneModel] = useState<string>(localStorage.getItem('mz_aivene_model') || 'gpt-4o-mini');
+  const [selectedAiveneModel, setSelectedAiveneModel] = useState<string>(localStorage.getItem('mz_aivene_model') || 'auto');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
 
@@ -2968,7 +2987,12 @@ const App: React.FC = () => {
               } else if (selectedProvider === 'nvidia') {
                   modelParam = selectedNvidiaModel;
               } else if (selectedProvider === 'aivene') {
-                  modelParam = selectedAiveneModel;
+                  if (selectedAiveneModel === 'auto') {
+                      const stableModels = ['gpt-4o-mini', 'gemini-3.5-flash', 'deepseek-v4-flash', 'qwen3.5-flash'];
+                      modelParam = stableModels[Math.floor(Math.random() * stableModels.length)];
+                  } else {
+                      modelParam = selectedAiveneModel;
+                  }
               }
               const aiOptions = {
                 provider: selectedProvider,
@@ -3118,7 +3142,12 @@ const App: React.FC = () => {
                 } else if (selectedProvider === 'nvidia') {
                     modelParam = selectedNvidiaModel;
                 } else if (selectedProvider === 'aivene') {
-                    modelParam = selectedAiveneModel;
+                    if (selectedAiveneModel === 'auto') {
+                        const stableModels = ['gpt-4o-mini', 'gemini-3.5-flash', 'deepseek-v4-flash', 'qwen3.5-flash'];
+                        modelParam = stableModels[Math.floor(Math.random() * stableModels.length)];
+                    } else {
+                        modelParam = selectedAiveneModel;
+                    }
                 }
                 const aiOptions = {
                   provider: selectedProvider,
@@ -3558,10 +3587,42 @@ const App: React.FC = () => {
   const successfulFilesCount = files.filter(f => f.title).length;
   const isAllFinished = hasFiles && !isAnythingGenerating && files.every(f => f.title || f.error);
 
+  const getDiscountedPriceAuto = (priceStr: string, discountPercent: number) => {
+    if (!priceStr || typeof priceStr !== 'string') return priceStr;
+    const cleanNumStr = priceStr.replace(/[^0-9]/g, '');
+    if (!cleanNumStr) return priceStr;
+    const originalVal = parseInt(cleanNumStr, 10);
+    if (isNaN(originalVal)) return priceStr; 
+    const discountedVal = Math.round(originalVal * (1 - discountPercent / 100));
+    if (priceStr.startsWith('Rp')) {
+      const formatted = new Intl.NumberFormat('id-ID').format(discountedVal);
+      return `Rp. ${formatted}`;
+    } else if (priceStr.includes('$')) {
+      return `$${discountedVal}`;
+    }
+    return priceStr;
+  };
+
+  const isPromoActive = new Date() < new Date('2026-07-01T00:00:00+07:00');
+  const price30DaysRaw = localStorage.getItem('mz_price_30_days') || 'Rp 50.000';
+  const priceUnlimitedRaw = localStorage.getItem('mz_price_unlimited') || 'Rp 250.000';
+  const price30DaysUSDRaw = localStorage.getItem('mz_price_30_days_usd') || '$2';
+  const priceUnlimitedUSDRaw = localStorage.getItem('mz_price_unlimited_usd') || '$14';
+
+  const autoPricingTierId = isPromoActive 
+    ? `30 Hari ${getDiscountedPriceAuto(price30DaysRaw, 30)} - Unlimited ${getDiscountedPriceAuto(priceUnlimitedRaw, 30)}` 
+    : `30 Hari ${price30DaysRaw} - Unlimited ${priceUnlimitedRaw}`;
+    
+  const autoPricingTierEn = isPromoActive 
+    ? `30 Days ${getDiscountedPriceAuto(price30DaysUSDRaw, 30)} - Unlimited ${getDiscountedPriceAuto(priceUnlimitedUSDRaw, 30)}` 
+    : `30 Days ${price30DaysUSDRaw} - Unlimited ${priceUnlimitedUSDRaw}`;
+
+  const autoPricingTier = uiLanguage === 'id' ? autoPricingTierId : autoPricingTierEn;
+
   const globalModelParam = selectedProvider === 'gemini' ? (selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel) :
                            selectedProvider === 'groq' ? selectedGroqModel :
                            selectedProvider === 'nvidia' ? selectedNvidiaModel :
-                           selectedProvider === 'aivene' ? selectedAiveneModel : undefined;
+                           selectedProvider === 'aivene' ? (selectedAiveneModel === 'auto' ? 'gpt-4o-mini' : selectedAiveneModel) : undefined;
   
   const commonAiOptions = {
     provider: selectedProvider,
@@ -3661,7 +3722,7 @@ const App: React.FC = () => {
               generationMode={generationMode}
               isLicensed={isMzLicensed}
               appName={mzAppName}
-              pricingTier={mzPriceText || t.default_pricing}
+              pricingTier={autoPricingTier}
               whatsAppLink={mzWhatsApp}
               setShowActivation={setShowActivationModal}
               imageDailyCount={dailyGenCounts[ToolType.IMAGE] || 0}
@@ -4102,9 +4163,9 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['appearance', 'gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'reseller'] as const).map(tab => (
+              {(['appearance', selectedProvider, 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${tab.toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
@@ -5052,6 +5113,7 @@ const App: React.FC = () => {
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all cursor-pointer"
                     >
+                      <option value="auto">Otomatis (Paling Stabil)</option>
                       <option value="gpt-4o-mini">gpt-4o-mini (Active - Default)</option>
                       <option value="mimo-v2.5">mimo-v2.5 (Aivene Endpoint)</option>
                       <option value="gpt-5.4-nano">gpt-5.4-nano (Aivene Endpoint)</option>
@@ -5061,6 +5123,7 @@ const App: React.FC = () => {
                       <option value="deepseek-v4-flash">deepseek-v4-flash (Aivene Endpoint)</option>
                       <option value="gemma-4-31b-it">gemma-4-31b-it (Aivene Endpoint)</option>
                       <option value="gemma-4-26b-a4b-it">gemma-4-26b-a4b-it (Aivene Endpoint)</option>
+                      <option value="qwen3.5-flash">qwen3.5-flash (Aivene Endpoint)</option>
                     </select>
                   </div>
                 </div>
@@ -5309,7 +5372,7 @@ const App: React.FC = () => {
                   setAppSubtitle={setMzAppSubtitle}
                   whatsAppLink={mzWhatsApp}
                   setWhatsAppLink={setMzWhatsApp}
-                  pricingTier={mzPriceText}
+                  pricingTier={autoPricingTier}
                   setPricingTier={setMzPriceText}
                   licenseSeed={mzLicenseSeed}
                   setLicenseSeed={setMzLicenseSeed}
@@ -5564,7 +5627,7 @@ const App: React.FC = () => {
         setAppSubtitle={setMzAppSubtitle}
         whatsAppLink={mzWhatsApp}
         setWhatsAppLink={setMzWhatsApp}
-        pricingTier={mzPriceText}
+        pricingTier={autoPricingTier}
         setPricingTier={setMzPriceText}
         licenseSeed={mzLicenseSeed}
         setLicenseSeed={setMzLicenseSeed}

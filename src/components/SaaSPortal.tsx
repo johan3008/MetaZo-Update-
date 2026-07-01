@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getDailyLimit } from '../../constants';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
@@ -124,7 +125,23 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoApplySuccess, setPromoApplySuccess] = useState('');
   const [promoApplyError, setPromoApplyError] = useState('');
-  const [activePromo, setActivePromo] = useState<PromoCode | null>(null);
+  
+  const isSystemPromoActive = new Date() < new Date('2026-07-01T00:00:00+07:00');
+  const systemPromo: PromoCode | null = isSystemPromoActive ? {
+    id: 'SYSTEM_PROMO',
+    code: 'PROMO SYSTEM',
+    type: 'discount',
+    value: 30,
+    maxUses: 999999,
+    startDate: '2025-01-01',
+    endDate: '2026-07-01',
+    usedCount: 0,
+    description: 'Diskon otomatis 30%'
+  } : null;
+
+  const [activePromoState, setActivePromoState] = useState<PromoCode | null>(null);
+  const activePromo = activePromoState || systemPromo;
+  const setActivePromo = setActivePromoState;
 
   // Reseller Landing Gateway State
   const [landingPasscode, setLandingPasscode] = useState('');
@@ -1977,7 +1994,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           <ul className="text-[9.5px] font-semibold text-slate-500 dark:text-slate-400 space-y-2 mt-4 text-left border-t border-slate-150 dark:border-slate-800/80 pt-3">
                             <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? 'Tanpa Batas Hari' : 'Unlimited Trial Days'}</span></li>
                             <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? 'Semua Fitur Terbuka' : 'All Features Unlocked'}</span></li>
-                            <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? 'Batas 30 Generasi / Hari' : '30 Generations / Day Limit'}</span></li>
+                            <li className="flex items-start space-x-1.5"><Check size={8} className="text-slate-400 mt-1 shrink-0" /><span>{t.language === 'Bahasa' ? `Batas ${getDailyLimit()} Generasi / Hari` : `${getDailyLimit()} Generations / Day Limit`}</span></li>
                           </ul>
                         </div>
                       </div>
