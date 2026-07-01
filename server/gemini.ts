@@ -3286,7 +3286,11 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   const provider = (store && store.provider) || 'gemini';
   
   const systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
-JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION). Lakukan pemindaian visual mendalam pada piksel gambar sebelum memberikan vonis.
+
+ATURAN PALING PENTING (CRITICAL RULE):
+1. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION). Lakukan pemindaian visual mendalam pada piksel gambar sebelum memberikan vonis.
+2. JIKA GAMBAR SEMPURNA DAN TIDAK ADA MASALAH, JANGAN MENGARANG KEKURANGAN. ANDA HARUS BERSIKAP OBJEKTIF DAN FAKTUAL.
+3. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 - STRICT: "Zero Tolerance" mutlak. Sedikit noise, soft focus, chromatic aberration, sensor dust, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59).
@@ -3334,11 +3338,12 @@ STATUS & SKOR (KONSISTENSI MUTLAK):
 Jangan berikan skor 70-74. Hanya <70 atau >=75.
 
 PIXEL HEATMAPS (SANGAT KETAT & HARUS BENAR-BENAR ADA DI GAMBAR):
-Berikan koordinat titik area spesifik yang bermasalah (jangan mengarang, cari lokasi aktual cacat tersebut):
+Hanya berikan koordinat titik area spesifik JIKA BENAR-BENAR ADA MASALAH. JANGAN MENGARANG (HALLUCINATE) MASALAH JIKA GAMBAR SEMPURNA.
+Jika tidak ada masalah, array heatmaps WAJIB kosong ([]).
 - x: Horizontal dari kiri (0) ke kanan (100).
 - y: Vertikal dari atas (0) ke bawah (100).
 "type": pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
-"raw_value": deskripsi jelas dari temuan (Misal: "Chromatic aberration hijau di pinggir daun", "Jari tangan menyatu (Gen-AI)", "Logo terdeteksi pada botol", "Highlight terbakar di dahi").
+"raw_value": deskripsi jelas dari temuan.
 
 ATURAN BAHASA OUTPUT:
 Jika 'Bahasa', gunakan Bahasa Indonesia profesional.
@@ -3352,11 +3357,11 @@ Respons Anda WAJIB dalam format JSON:
   "recommendation": "PASS" atau "FAIL",
   "overall_score": [0-100],
   "legal_status": "Aman dari IP atau Terindikasi IP/Trademark Violation",
-  "technical_issues": ["list masalah spesifik: over-exposed, sensor dust, blurry, dsb"],
+  "technical_issues": ["list masalah spesifik jika ada, kosongkan array jika gambar aman dari cacat"],
   "strengths": ["list keunggulan: komposisi kuat, pencahayaan dramatis, dsb"],
   "detailed_feedback": "Penjelasan spesifik, bernada Kurator Senior, mengapa lolos/ditolak.",
   "heatmaps": [
-    { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail temuan spesifik di koordinat ini" }
+    { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail temuan spesifik" }
   ]
 }
 `;
@@ -3376,7 +3381,7 @@ Respons Anda WAJIB dalam format JSON:
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    type: { type: Type.STRING, enum: ["noise", "focus", "lighting", "ip_violation", "artifact"] },
+                    type: { type: Type.STRING, enum: ["noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition"] },
                     x: { type: Type.INTEGER },
                     y: { type: Type.INTEGER },
                     intensity: { type: Type.NUMBER },
@@ -3402,7 +3407,7 @@ Respons Anda WAJIB dalam format JSON:
         contents: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }],
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.1 },
+        config: { temperature: 0.0 },
         model
       });
       responseText = res;
@@ -3419,7 +3424,7 @@ Respons Anda WAJIB dalam format JSON:
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
-          temperature: 0.1
+          temperature: 0.0
         });
         responseText = res.text || "{}";
         break;
