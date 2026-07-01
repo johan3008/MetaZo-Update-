@@ -95,7 +95,7 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'aivene']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -716,7 +716,7 @@ async function callOpenAICompatibleWithRetry(params: {
       payload.response_format = { type: "json_object" };
     }
 
-    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia') {
+    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene') {
       payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
     } else if (provider === 'bluesminds') {
       // Do not send max_tokens to avoid pre-check reservation failures on limited balance
@@ -1100,7 +1100,13 @@ export const generateStockMetadata = async (
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
+    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
+    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
+    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
+    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
 
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -1118,7 +1124,13 @@ export const generateStockMetadata = async (
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
+    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
+    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
+    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
+    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
@@ -1135,7 +1147,13 @@ export const generateStockMetadata = async (
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
+    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
+    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
+    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
+    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -1150,7 +1168,8 @@ export const generateStockMetadata = async (
     mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
   }
 
-  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : 'gemini-3.1-pro-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   
   const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
@@ -1297,7 +1316,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 Rules for Titles:
 - Use clear natural language.
-- Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
@@ -1305,7 +1323,7 @@ Rules for Titles:
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
-- Focus on subject + action + environment + concept.
+- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
@@ -1361,7 +1379,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
         } catch (providerError: any) {
              console.warn(`[JohMeta Pipeline] ${provider.toUpperCase()} failed completely:`, providerError.message);
              console.warn(`[JohMeta Pipeline] Falling back to Gemini as absolute failsafe...`);
-             genResponse = await callGeminiWithRetry('gemini-3.1-pro-preview', { 
+             genResponse = await callGeminiWithRetry(fallbackGeminiModel, { 
                   parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
                 }, {
                   systemInstruction: genSystemInstruction,
@@ -1371,7 +1389,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
                 });
         }
     } else {
-        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-pro-preview', { 
+        genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : fallbackGeminiModel, { 
             parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
           }, {
             systemInstruction: genSystemInstruction,
@@ -1434,7 +1452,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 Rules for Titles:
 - Use clear natural language.
-- Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
@@ -1442,7 +1459,7 @@ Rules for Titles:
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
-- Focus on subject + action + environment + concept.
+- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
@@ -1496,7 +1513,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-pro-preview', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : fallbackGeminiModel, { 
           parts: [{ text: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
@@ -1664,7 +1681,13 @@ export const generateBatchStockMetadata = async (
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
+    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
+    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
+    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
+    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
 
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -1682,7 +1705,13 @@ export const generateBatchStockMetadata = async (
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
+    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
+    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
+    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
+    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
@@ -1699,7 +1728,13 @@ export const generateBatchStockMetadata = async (
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.`;
+10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
+11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
+    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
+    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
+    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
+    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
   const store = apiKeyStorage.getStore();
@@ -1708,7 +1743,8 @@ export const generateBatchStockMetadata = async (
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : 'gemini-3.1-pro-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
@@ -1868,7 +1904,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 Rules for Titles:
 - Use clear natural language.
-- Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
@@ -1876,7 +1911,7 @@ Rules for Titles:
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
-- Focus on subject + action + environment + concept.
+- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
@@ -1940,7 +1975,7 @@ OUTPUT FORMAT:
       } catch (providerError: any) {
         console.warn(`[JohMeta Pipeline - Batch] ${provider.toUpperCase()} failed completely:`, providerError.message);
         console.warn(`[JohMeta Pipeline - Batch] Falling back to Gemini as absolute failsafe...`);
-        genResponse = await callGeminiWithRetry('gemini-3.1-flash-lite-preview', { 
+        genResponse = await callGeminiWithRetry(fallbackGeminiModel, { 
             parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
           }, {
             systemInstruction: genSystemInstruction,
@@ -1949,7 +1984,7 @@ OUTPUT FORMAT:
             topP: 0.8 });
       }
     } else {
-      genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-flash-lite-preview', { 
+      genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : fallbackGeminiModel, { 
           parts: [{ text: `Generate draft metadata array based on provided VISUAL_FACTS source. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: genSystemInstruction,
@@ -2010,7 +2045,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 Rules for Titles:
 - Use clear natural language.
-- Length between 60-120 characters.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
@@ -2018,7 +2052,7 @@ Rules for Titles:
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
 - Do not use articles unless necessary (a, an, the).
-- Focus on subject + action + environment + concept.
+- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
@@ -2076,7 +2110,7 @@ OUTPUT FORMAT:
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
-      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : 'gemini-3.1-pro-preview', { 
+      : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : fallbackGeminiModel, { 
           parts: [{ text: `Audit and validate the Draft Metadata array for ${items.length} assets based on VISUAL_FACTS. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
@@ -3279,15 +3313,24 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
    - Geometri mustahil: objek yang menyatu (merged objects), arsitektur tidak masuk akal, tekstur seperti plastik (plastic skin).
 
 B. INTELLECTUAL PROPERTY (IP) & TRADEMARK REFUSAL
-Tolak (FAIL) secara instan jika mendeteksi:
-1. Logo merek komersial (Apple, Nike, tulisan merek di baju/topi, grill mobil yang dikenali).
-2. Desain hak cipta (pakaian/sepatu ikonik bermerek).
-3. Bangunan/Lokasi terproteksi (Eiffel malam hari, Disney, Tokyo Skytree, dll).
-4. Karakter fiksi/kartun (Disney, Marvel, dsb).
+Tolak (FAIL) secara instan jika mendeteksi isu kekayaan intelektual berikut:
+1. Logo & Merek: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali.
+2. Desain Khas & Produk Komersial: Produk komersial dengan desain khas sebagai subjek utama (misal: mainan, barang fesyen/pakaian/sepatu ikonik, elektronik, atau furnitur rancangan desainer).
+3. Karakter & Karya Seni: Karakter fiksi/kartun, serta karya yang dilindungi hak cipta (termasuk lukisan, patung, seni jalanan/mural, ilustrasi, font, atau elemen grafis milik orang lain).
+4. Lokasi Terlarang: Penggambaran lokasi yang memerlukan tiket masuk atau situs terlarang tanpa izin.
+5. Bangunan & Monumen: Bangunan/monumen yang dilarang (Eiffel malam hari, Disney, Tokyo Skytree, dsb) atau arsitektur modern dengan desain unik/mudah dikenali sebagai fokus utama.
+
+C. KNOWN IMAGE RESTRICTIONS (Berdasarkan Adobe Stock Content Policies)
+Tolak (FAIL) atau flag sebagai risiko tinggi jika mendeteksi pembatasan khusus berikut:
+1. Uang & Identitas: Uang kertas/koin modern yang terlalu detail/dapat disalin, prangko pos, paspor, dokumen ID, atau pelat nomor kendaraan asli.
+2. Tato & Seni Tubuh: Tato yang sangat unik/khas yang menjadi fokus utama (membutuhkan property release).
+3. Landmark Spesifik: Menara Eiffel malam hari (hak cipta lighting), Louvre Pyramid, Atomium, Hollywood Sign, Sydney Opera House, Kastil Neuschwanstein.
+4. Desain Proprietary & Mainan: Kepingan LEGO, Rubik's Cube, mainan action figure bermerek, pola kain paten (seperti Burberry check, Louis Vuitton), sepatu dengan desain sangat ikonik (sol merah Louboutin, tiga garis Adidas).
+5. Fasilitas Militer/Pemerintah: Segel resmi pemerintah, lencana militer khusus, atau properti pemerintah yang dilarang untuk stok komersial.
 
 STATUS & SKOR (KONSISTENSI MUTLAK):
-- PASS: Lulus standar Adobe Stock, bebas cacat teknis, IP, dan gen-AI anomaly sesuai toleransi. Skor WAJIB 75 - 100.
-- FAIL: Gambar ditolak karena salah satu kriteria A atau B di atas. Skor WAJIB di bawah 70 (0 - 69).
+- PASS: Lulus standar Adobe Stock, bebas cacat teknis, IP, gen-AI anomaly, dan image restrictions sesuai toleransi. Skor WAJIB 75 - 100.
+- FAIL: Gambar ditolak karena salah satu kriteria A, B, atau C di atas. Skor WAJIB di bawah 70 (0 - 69).
 Jangan berikan skor 70-74. Hanya <70 atau >=75.
 
 PIXEL HEATMAPS (SANGAT KETAT & HARUS BENAR-BENAR ADA DI GAMBAR):

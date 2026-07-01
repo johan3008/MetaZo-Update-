@@ -224,7 +224,8 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
         body: JSON.stringify({
           title,
           description: description || '',
-          existingKeywords: keywords
+          existingKeywords: keywords,
+          model: aiOptions?.model
         })
       });
 
@@ -350,7 +351,8 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
                       title, 
                       description, 
                       existingKeywords: initialCleaned, 
-                      requestCount: targetCount - initialCleaned.length 
+                      requestCount: targetCount - initialCleaned.length,
+                      model: aiOptions?.model
                     })
                   });
                   if (!res.ok) throw new Error();
@@ -521,7 +523,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
               title: file.title,
               description: file.description || '',
               existingKeywords: initialCleaned,
-              requestCount: targetCount - initialCleaned.length
+              requestCount: targetCount - initialCleaned.length,
+              model: aiOptions?.model
             })
           });
           if (!res.ok) {
