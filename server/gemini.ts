@@ -1295,48 +1295,33 @@ OUTPUT FORMAT:
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
-   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive terms!
-   - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
-   - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
-   - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
-   - NEVER include specific, identifiable car brands/models or manufacturers (e.g., "Porsche 911", "Ferrari", "Tesla Model 3"). Use generic descriptors (e.g., "modern sports car", "electric sedan", "luxury racing automobile").
-   - NEVER include names of protected landmarks, private venues, parks, or architectural works that have strict intellectual property/trademark rights on their names (e.g., do NOT use "Disneyland", "Eiffel Tower", "Empire State Building", "Sydney Opera House", "Taj Mahal", "Louvre Museum", "Burj Khalifa", "Colosseum", "Stonehenge"). Instead, refer to them generically where possible (e.g., "famous amusement park", "historic European wrought iron tower", "art deco skyscraper", "iconic harbor opera house", "ancient white marble mausoleum").
-   - NEVER include names of fictional characters, intellectual franchises, films, games, or books (e.g., "Harry Potter", "Spider-Man", "Mickey Mouse", "Pokémon", "Minecraft"). Use generic visual descriptions (e.g., "wizard characters", "superhero figure", "cartoon mouse", "pocket monsters design", "pixel block game style").
+1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural language.
-- Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
-- Include important commercial keywords naturally.
-- Do not use keyword stuffing.
-- Do not use brand names, trademarks, company names, or copyrighted terms.
-- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
-- Do not use articles unless necessary (a, an, the).
-- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
-- Use sentence case.
-- Output only one title.
-- Do not include explanations, labels, quotation marks, or numbering.
+1. Focus directly on the main subject and action. Introduce the content clearly. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+3. Use easy-to-read phrases, NOT formal sentence structures.
+4. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
-2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
-3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-4. Limit to 200 characters.
+1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
+2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+3. Limit to 200 characters.
 
 Rules for Keywords:
-${keywordRulePromptText}
+1. Start with the most important descriptors. Use conceptual terms (e.g., 'concept', 'success', 'nature').
+2. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
+3. Ensure no IP, brands, or names are included.
+\${keywordRulePromptText}
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -1883,48 +1868,33 @@ OUTPUT FORMAT:
 
   const genSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE (NO INTELLECTUAL PROPERTY): 
-   - You MUST strictly comply with Adobe Stock's intellectual property refusal guidelines. There are absolutely ZERO exceptions to this rule. Any mention of a brand name, trademark, proprietary model, or protected landmark in the Title, Description, or Keywords will result in instant rejection of the asset by stock reviewers. Always default to generic, descriptive terms!
-   - NEVER use, name, or reference any company names, brand names, manufacturer names, trademarked names, or product names (e.g., Apple, Microsoft, Google, Samsung, Nike, Adidas, Sony, Nintendo, Coca-Cola, Pepsi, Starbucks, Disney).
-   - NEVER name specific proprietary models, series, or product lines in either the title or keywords (e.g., do NOT use "iPhone", "MacBook", "iPad", "Nintendo Switch", "PlayStation", "Xbox", "Jeep", "Vespa", "Lego", "Barbie", "Air Max", "Walkman", "GoPro"). Instead, use strictly generic equivalents (e.g., use "smartphone", "laptop", "tablet computer", "handheld gaming console", "video game console", "off-road sport utility vehicle", "motor scooter", "toy building blocks", "fashion doll", "athletic sneakers", "portable cassette player", "action camera").
-   - NEVER include trademarked names of common products, materials, or services that have become genericized in speech but are protected trademarks (e.g., do NOT use "Velcro" -> use "hook and loop fastener"; "Popsicle" -> use "ice pop"; "Post-it" -> use "sticky note"; "Band-Aid" -> use "adhesive bandage"; "Super Glue" -> use "cyanoacrylate adhesive"; "Frisbee" -> use "flying disc"; "Bubble Wrap" -> use "plastic bubble packaging"; "Crayola" -> use "wax crayons"; "Teflon" -> use "non-stick coating"; "Tupperware" -> use "plastic food storage container"; "PowerPoint" -> use "presentation software"; "Photoshop" -> use "digital image editing software"; "Xerox" -> use "photocopier").
-   - NEVER include specific, identifiable car brands/models or manufacturers (e.g., "Porsche 911", "Ferrari", "Tesla Model 3"). Use generic descriptors (e.g., "modern sports car", "electric sedan", "luxury racing automobile").
-   - NEVER include names of protected landmarks, private venues, parks, or architectural works that have strict intellectual property/trademark rights on their names (e.g., do NOT use "Disneyland", "Eiffel Tower", "Empire State Building", "Sydney Opera House", "Taj Mahal", "Louvre Museum", "Burj Khalifa", "Colosseum", "Stonehenge"). Instead, refer to them generically where possible (e.g., "famous amusement park", "historic European wrought iron tower", "art deco skyscraper", "iconic harbor opera house", "ancient white marble mausoleum").
-   - NEVER include names of fictional characters, intellectual franchises, films, games, or books (e.g., "Harry Potter", "Spider-Man", "Mickey Mouse", "Pokémon", "Minecraft"). Use generic visual descriptions (e.g., "wizard characters", "superhero figure", "cartoon mouse", "pocket monsters design", "pixel block game style").
+1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural language.
-- Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
-- Include important commercial keywords naturally.
-- Do not use keyword stuffing.
-- Do not use brand names, trademarks, company names, or copyrighted terms.
-- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
-- Do not use articles unless necessary (a, an, the).
-- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
-- Use sentence case.
-- Output only one title.
-- Do not include explanations, labels, quotation marks, or numbering.
+1. Focus directly on the main subject and action. Introduce the content clearly. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+3. Use easy-to-read phrases, NOT formal sentence structures.
+4. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
-2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
-3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-4. Limit to 200 characters.
+1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details.
+2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+3. Limit to 200 characters.
 
 Rules for Keywords:
-${keywordRulePromptText}
+1. Start with the most important descriptors. Use conceptual terms (e.g., 'concept', 'success', 'nature').
+2. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
+3. Ensure no IP, brands, or names are included.
+\${keywordRulePromptText}
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
