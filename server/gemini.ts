@@ -3286,6 +3286,7 @@ ATURAN PALING PENTING (CRITICAL RULE):
 2. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual.
 3. JIKA GAMBAR SEMPURNA DAN TIDAK ADA MASALAH, JANGAN MENGARANG KEKURANGAN. ANDA HARUS BERSIKAP OBJEKTIF DAN FAKTUAL.
 4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
+5. ANALISIS EKSTRA UNTUK GAMBAR DETAIL: Jika gambar memiliki tingkat detail yang tinggi, ornamen rumit, atau tekstur yang padat, Anda WAJIB menganalisisnya dengan ketelitian ganda. Perhatikan baik-baik adanya anomali struktural AI (AI structural anomalies), elemen atau garis yang melebur, pola yang rusak, atau bentuk asimetris tidak logis yang sering tersembunyi dalam pola rumit.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 - STRICT: "Zero Tolerance" mutlak. Sedikit noise, soft focus, chromatic aberration, sensor dust, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59).
