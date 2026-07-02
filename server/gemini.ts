@@ -95,7 +95,7 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'aivene']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -619,7 +619,7 @@ async function callOpenAICompatibleWithRetry(params: {
     const messages: any[] = [];
     let userSystemInstruction = '';
     if (params.systemInstruction) {
-      if (provider === 'bluesminds') {
+      if (provider === 'bluesminds' || provider === 'aivene') {
         userSystemInstruction = `[SYSTEM INSTRUCTION]\n${params.systemInstruction}\n\n[USER INPUT]\n`;
       } else {
         messages.push({ role: 'system', content: params.systemInstruction });
@@ -697,7 +697,7 @@ async function callOpenAICompatibleWithRetry(params: {
 
     // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
     // (artinya caller belum sempat resolve), pakai default provider ini.
-    if (model?.startsWith('gemini-') || model?.startsWith('gemma-')) {
+    if (provider !== 'aivene' && (model?.startsWith('gemini-') || model?.startsWith('gemma-'))) {
       model = PROVIDER_DEFAULT_MODELS[provider];
     }
 
@@ -719,7 +719,7 @@ async function callOpenAICompatibleWithRetry(params: {
     if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene') {
       payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
     } else if (provider === 'bluesminds') {
-      // Do not send max_tokens to avoid pre-check reservation failures on limited balance
+      // Do not send max_tokens to avoid pre-check reservation failures on limited balance or custom endpoints
     }
     payload.stream = false;
 
@@ -847,7 +847,7 @@ async function callOpenAICompatibleWithRetry(params: {
                                  errorMsg.includes('timeout') || 
                                  errorMsg.includes('exceeded') || 
                                  errorMsg.includes('fetch failed') ||
-                                 errorMsg.includes('500') ||
+                                 errorMsg.includes('500') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504') || errorMsg.includes('524') || errorMsg.includes('upstream_error') ||
                                  errorMsg.includes('extra data') ||
                                  errorMsg.includes('empty response content') ||
                                  errorMsg.includes('empty json object') ||
@@ -883,7 +883,8 @@ function getAIClient(): any {
 
         // ONLY redirect to Groq/Mistral/OpenAI/etc if the model name is NOT explicitly a Gemini / Gemma model.
         // This allows hybrid vision tasks (which explicitly request gemini-3.1-flash-lite-preview) to work.
-        if (NON_GEMINI_PROVIDERS.has(provider) && !params.model?.startsWith('gemini-') && !params.model?.startsWith('gemma-')) {
+        const isAiveneNative = provider === 'aivene' && (params.model?.startsWith('gemini-') || params.model?.startsWith('gemma-'));
+        if (NON_GEMINI_PROVIDERS.has(provider) && (isAiveneNative || (!params.model?.startsWith('gemini-') && !params.model?.startsWith('gemma-')))) {
           const text = await callOpenAICompatibleWithRetry({
             systemInstruction: params.config?.systemInstruction,
             contents: params.contents,
@@ -2940,8 +2941,12 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 
 export const analyzeImageToPrompt = async (
   image: string,
-  styleCategory: string = 'Cinematic'
+  styleCategory: string = 'Cinematic',
+  model?: string
 ): Promise<{ prompt: string; description: string }> => {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
@@ -2987,29 +2992,54 @@ CRITICAL RULES:
   const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
+  let responseText = "";
 
-  for (const modelName of modelsToTry) {
-    try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema
-      });
-      break;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+      let attempts = 0;
+      while(attempts < 2) {
+          try {
+              responseText = await callOpenAICompatibleWithRetry({
+                  systemInstruction,
+                  contents: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }],
+                  responseMimeType: "application/json",
+                  responseSchema,
+                  config: { temperature: 0.8 },
+                  model
+              });
+              break;
+          } catch(err: any) {
+              lastError = err;
+              attempts++;
+              console.warn(`[analyzeImageToPrompt] ${provider.toUpperCase()} failed attempt ${attempts}:`, err.message);
+              if (attempts < 2) await new Promise(r => setTimeout(r, 1000));
+          }
+      }
+  } else {
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    for (const modelName of modelsToTryList) {
+      try {
+        response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema
+        });
+        responseText = response.text || "{}";
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
+        if (err.message && err.message.includes('API_KEY')) throw err;
+      }
     }
   }
 
-  if (!response) {
+  if (!responseText) {
     console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
     throw lastError || new Error("Failed to analyze image. Please try again.");
   }
 
   try {
-    let text = response.text || "{}";
+    let text = responseText;
     // Clean potential markdown backticks
     if (text.includes("```")) {
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -3018,7 +3048,7 @@ CRITICAL RULES:
     const data = JSON.parse(text);
     return data as { prompt: string; description: string };
   } catch (error) {
-    console.warn("Gemini Parse Error:", error, response.text);
+    console.warn("Gemini Parse Error:", error, responseText);
     throw new Error("Failed to parse AI response. Please try again.");
   }
 };

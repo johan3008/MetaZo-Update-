@@ -899,11 +899,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/analyze-image-to-prompt', async (req, res) => {
         try {
-            const { image, styleCategory } = req.body;
+            const { image, styleCategory, model } = req.body;
             if (!image) {
                 return res.status(400).json({ error: 'Missing image data' });
             }
-            const data = await analyzeImageToPrompt(image, styleCategory);
+            const data = await analyzeImageToPrompt(image, styleCategory, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-image-to-prompt error:', e);

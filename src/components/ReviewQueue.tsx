@@ -258,6 +258,15 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     }
   };
 
+  const handleShuffle = () => {
+    const shuffled = [...keywords];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    onChange(shuffled);
+  };
+
   const handleClean = () => {
     // Deduplicate while preserving original order (crucial for search relevance ranking)
     const cleaned: string[] = [];
@@ -288,6 +297,9 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           )}
           <button onClick={handleClean} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
             clean
+          </button>
+          <button onClick={handleShuffle} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
+            shuffle
           </button>
           <button onClick={handleCopy} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
             {copied ? 'copied!' : 'copy'}
