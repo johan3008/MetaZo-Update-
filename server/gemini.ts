@@ -1101,11 +1101,13 @@ export const generateStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
-    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
-    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
-    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
-    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
+    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.1))}: Main Subject
+    - Keywords ${Math.max(1, Math.round(targetCount * 0.1)) + 1} to ${Math.max(2, Math.round(targetCount * 0.2))}: SEO & Variasi Subject
+    - Keywords ${Math.max(2, Math.round(targetCount * 0.2)) + 1} to ${Math.max(3, Math.round(targetCount * 0.4))}: Attributes
+    - Keywords ${Math.max(3, Math.round(targetCount * 0.4)) + 1} to ${Math.max(4, Math.round(targetCount * 0.6))}: Action / State
+    - Keywords ${Math.max(4, Math.round(targetCount * 0.6)) + 1} to ${Math.max(5, Math.round(targetCount * 0.8))}: Concept / Intent
+    - Keywords ${Math.max(5, Math.round(targetCount * 0.8)) + 1} to ${targetCount}: Environment, Style, Industry, Synonyms
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
 
   if (keywordMode === 'single') {
@@ -1125,11 +1127,13 @@ export const generateStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
-    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
-    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
-    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
-    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
+    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.1))}: Main Subject
+    - Keywords ${Math.max(1, Math.round(targetCount * 0.1)) + 1} to ${Math.max(2, Math.round(targetCount * 0.2))}: SEO & Variasi Subject
+    - Keywords ${Math.max(2, Math.round(targetCount * 0.2)) + 1} to ${Math.max(3, Math.round(targetCount * 0.4))}: Attributes
+    - Keywords ${Math.max(3, Math.round(targetCount * 0.4)) + 1} to ${Math.max(4, Math.round(targetCount * 0.6))}: Action / State
+    - Keywords ${Math.max(4, Math.round(targetCount * 0.6)) + 1} to ${Math.max(5, Math.round(targetCount * 0.8))}: Concept / Intent
+    - Keywords ${Math.max(5, Math.round(targetCount * 0.8)) + 1} to ${targetCount}: Environment, Style, Industry, Synonyms
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -1148,11 +1152,13 @@ export const generateStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
-    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
-    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
-    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
-    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
+    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.1))}: Main Subject
+    - Keywords ${Math.max(1, Math.round(targetCount * 0.1)) + 1} to ${Math.max(2, Math.round(targetCount * 0.2))}: SEO & Variasi Subject
+    - Keywords ${Math.max(2, Math.round(targetCount * 0.2)) + 1} to ${Math.max(3, Math.round(targetCount * 0.4))}: Attributes
+    - Keywords ${Math.max(3, Math.round(targetCount * 0.4)) + 1} to ${Math.max(4, Math.round(targetCount * 0.6))}: Action / State
+    - Keywords ${Math.max(4, Math.round(targetCount * 0.6)) + 1} to ${Math.max(5, Math.round(targetCount * 0.8))}: Concept / Intent
+    - Keywords ${Math.max(5, Math.round(targetCount * 0.8)) + 1} to ${targetCount}: Environment, Style, Industry, Synonyms
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
@@ -1179,9 +1185,11 @@ ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
 VISUAL ACCURACY RULES:
-1. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-2. Never hallucinate brands, trademarked logos, or copyrighted characters.
-3. If uncertain, provide the closest accurate generic description.
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
+2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
+3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
+4. Never hallucinate brands, trademarked logos, or copyrighted characters.
+5. If uncertain, provide the closest accurate generic description.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
@@ -1667,11 +1675,13 @@ export const generateBatchStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
-    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
-    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
-    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
-    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
+    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.1))}: Main Subject
+    - Keywords ${Math.max(1, Math.round(targetCount * 0.1)) + 1} to ${Math.max(2, Math.round(targetCount * 0.2))}: SEO & Variasi Subject
+    - Keywords ${Math.max(2, Math.round(targetCount * 0.2)) + 1} to ${Math.max(3, Math.round(targetCount * 0.4))}: Attributes
+    - Keywords ${Math.max(3, Math.round(targetCount * 0.4)) + 1} to ${Math.max(4, Math.round(targetCount * 0.6))}: Action / State
+    - Keywords ${Math.max(4, Math.round(targetCount * 0.6)) + 1} to ${Math.max(5, Math.round(targetCount * 0.8))}: Concept / Intent
+    - Keywords ${Math.max(5, Math.round(targetCount * 0.8)) + 1} to ${targetCount}: Environment, Style, Industry, Synonyms
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
 
   if (keywordMode === 'single') {
@@ -1691,11 +1701,13 @@ export const generateBatchStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
-    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
-    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
-    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
-    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
+    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.1))}: Main Subject
+    - Keywords ${Math.max(1, Math.round(targetCount * 0.1)) + 1} to ${Math.max(2, Math.round(targetCount * 0.2))}: SEO & Variasi Subject
+    - Keywords ${Math.max(2, Math.round(targetCount * 0.2)) + 1} to ${Math.max(3, Math.round(targetCount * 0.4))}: Attributes
+    - Keywords ${Math.max(3, Math.round(targetCount * 0.4)) + 1} to ${Math.max(4, Math.round(targetCount * 0.6))}: Action / State
+    - Keywords ${Math.max(4, Math.round(targetCount * 0.6)) + 1} to ${Math.max(5, Math.round(targetCount * 0.8))}: Concept / Intent
+    - Keywords ${Math.max(5, Math.round(targetCount * 0.8)) + 1} to ${targetCount}: Environment, Style, Industry, Synonyms
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -1714,11 +1726,13 @@ export const generateBatchStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (up to the requested target count, only include if relevant):
-    - Keywords 1-10: Main subject and search intent (highest SEO). (Subjek utama dan intent pencarian - SEO tertinggi)
-    - Keywords 11-25: Visual attributes, actions, objects, and environment. (Atribut visual, aksi, objek, dan lingkungan)
-    - Keywords 26-40: Concepts, industry, and usage. (Konsep, industri, dan penggunaan)
-    - Keywords 41-50: Visual style, emotions, colors (if allowed), and highly relevant technical terms. (Gaya visual, emosi, warna, dan istilah teknis yang benar-benar relevan)
+11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
+    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.1))}: Main Subject
+    - Keywords ${Math.max(1, Math.round(targetCount * 0.1)) + 1} to ${Math.max(2, Math.round(targetCount * 0.2))}: SEO & Variasi Subject
+    - Keywords ${Math.max(2, Math.round(targetCount * 0.2)) + 1} to ${Math.max(3, Math.round(targetCount * 0.4))}: Attributes
+    - Keywords ${Math.max(3, Math.round(targetCount * 0.4)) + 1} to ${Math.max(4, Math.round(targetCount * 0.6))}: Action / State
+    - Keywords ${Math.max(4, Math.round(targetCount * 0.6)) + 1} to ${Math.max(5, Math.round(targetCount * 0.8))}: Concept / Intent
+    - Keywords ${Math.max(5, Math.round(targetCount * 0.8)) + 1} to ${targetCount}: Environment, Style, Industry, Synonyms
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
@@ -1750,9 +1764,11 @@ ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
 VISUAL ACCURACY RULES:
-1. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-2. Never hallucinate brands, trademarked logos, or copyrighted characters.
-3. If uncertain, provide the closest accurate generic description.
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
+2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
+3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
+4. Never hallucinate brands, trademarked logos, or copyrighted characters.
+5. If uncertain, provide the closest accurate generic description.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
@@ -2929,6 +2945,10 @@ export const analyzeImageToPrompt = async (
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
+CRITICAL VISUAL ANALYSIS RULES:
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
+2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
+
 STEP 1: EXTRACT THE FOLLOWING DATA POINTS:
 - Subject (The main entity)
 - Action (What is happening)
@@ -3013,6 +3033,10 @@ export const analyzeBatchImageToPrompt = async (
   
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
+
+CRITICAL VISUAL ANALYSIS RULES:
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
+2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 
 FOR EACH IMAGE, EXTRACT AND ANALYZE:
 - Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
@@ -3258,9 +3282,10 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   const systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
 
 ATURAN PALING PENTING (CRITICAL RULE):
-1. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION). Lakukan pemindaian visual mendalam pada piksel gambar sebelum memberikan vonis.
-2. JIKA GAMBAR SEMPURNA DAN TIDAK ADA MASALAH, JANGAN MENGARANG KEKURANGAN. ANDA HARUS BERSIKAP OBJEKTIF DAN FAKTUAL.
-3. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
+1. PEMINDAIAN KESELURUHAN (FULL SCAN): Anda WAJIB memeriksa KESELURUHAN gambar dari ujung ke ujung (corner-to-corner), bukan hanya fokus pada bagian tengah atau subjek utama saja. Periksa setiap tepi, sudut, background, dan elemen kecil.
+2. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual.
+3. JIKA GAMBAR SEMPURNA DAN TIDAK ADA MASALAH, JANGAN MENGARANG KEKURANGAN. ANDA HARUS BERSIKAP OBJEKTIF DAN FAKTUAL.
+4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 - STRICT: "Zero Tolerance" mutlak. Sedikit noise, soft focus, chromatic aberration, sensor dust, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59).
@@ -3268,39 +3293,46 @@ Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 - LOOSE: Loloskan selama gambar memiliki nilai estetika dan komposisi baik. Hanya cacat teknis fatal, gen-AI anomaly yang sangat jelas, atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
 
 A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standards)
-Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi berikut:
-1. Out of Focus: Subjek utama tidak tajam (soft). Blur karena guncangan kamera (motion blur) atau noise reduction yang terlalu agresif (menghaluskan detail tekstur). Jika ada manusia/hewan, mata WAJIB fokus tajam.
-2. Artifacts / Noise: 
-   - Digital noise/grain berlebihan di area gelap (shadows).
-   - Chromatic aberration (color fringing/viola atau hijau di pinggiran objek dengan kontras tinggi).
-   - Sensor dust / bintik kotor pada area datar seperti langit.
-   - Compression artifacts / pixelation (kotak-kotak jpeg).
-   - Color banding pada langit atau gradasi halus.
-3. Lighting / Exposure: 
-   - Blown-out highlights (putih pekat kehilangan detail) atau crushed shadows (hitam pekat kehilangan detail).
-   - Flat lighting, kontras yang sangat buruk, atau lighting terlalu keras tanpa alasan artistik.
-4. Composition: Cropping yang canggung (memotong persendian manusia), horizon/cakrawala yang miring (crooked).
-5. Over-processing: Sharpening yang berlebihan memunculkan halo, saturasi warna ekstrem, filter murahan yang merusak kualitas asli gambar.
-6. Generative AI Artifacts (SANGAT PENTING): 
-   - Anatomi cacat: jari berlebih/kurang, anggota tubuh menyatu, mata tidak simetris.
-   - Teks/Huruf kacau (gibberish/alien text).
-   - Geometri mustahil: objek yang menyatu (merged objects), arsitektur tidak masuk akal, tekstur seperti plastik (plastic skin).
+Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi berikut secara ketat dan teliti:
+1. Out of Focus (Tidak Fokus):
+   - Unintentional blur / subjek utama tidak tajam (soft).
+   - Motion blur (blur karena guncangan kamera atau gerakan subjek yang tidak disengaja).
+   - Noise reduction yang terlalu agresif sehingga menghaluskan detail tekstur (menjadi seperti lilin/plastik).
+   - Jika gambar menampilkan manusia atau hewan, mata harus fokus tajam.
+2. Artifacts (Artifak):
+   - Noise / Grain: Bintik digital berlebihan, terutama di area gelap (shadows).
+   - Chromatic aberration / Color fringing: Violas atau hijau terang di sepanjang tepi objek dengan kontras tinggi.
+   - Sensor dust: Bintik-bintik debu hitam/gelap pada area datar seperti langit terang.
+   - Compression artifacts: Efek blok atau kotak-kotak piksel (biasanya akibat kompresi JPEG tinggi).
+   - Color banding: Transisi warna yang kasar atau bergaris pada gradasi warna (seperti langit biru).
+3. Lighting Problem (Masalah Pencahayaan):
+   - Overexposure: Blown-out highlights atau area terang yang benar-benar putih murni tanpa detail.
+   - Underexposure: Crushed shadows atau area gelap yang hitam pekat tanpa detail.
+   - Kontras terlalu tinggi atau lighting terlalu datar (flat lighting).
+   - Bayangan yang sangat tidak sedap dipandang (unflattering shadows).
+   - White balance buruk atau color temperature yang tidak wajar.
+4. Image Not Upright / Composition / Cropping:
+   - Crooked horizon (garis cakrawala miring).
+   - Cropping/pemotongan yang tidak disengaja dan canggung (misal: memotong sendi pergelangan tangan, kepala terpotong tanpa alasan komposisi yang jelas).
+5. Over-processing:
+   - Sharpening yang berlebihan sehingga memunculkan efek "halo" di sekitar tepi objek.
+   - Saturasi warna buatan yang sangat ekstrem.
+6. Generative AI Technical Issues (SANGAT KRITIS UNTUK AI):
+   - Anatomi cacat: Jari berlebih/kurang, anggota tubuh menyatu, wajah atau mata yang terdistorsi/tidak simetris.
+   - Teks Inkoheren: Huruf atau tulisan kacau (gibberish/alien text) yang tidak masuk akal.
+   - Geometri mustahil: Objek menyatu satu sama lain, struktur arsitektur atau perspektif tidak masuk akal.
+   - Detail berhalusinasi (hallucinated details) pada pola berulang atau latar belakang kompleks.
 
 B. INTELLECTUAL PROPERTY (IP) & TRADEMARK REFUSAL
 Tolak (FAIL) secara instan jika mendeteksi isu kekayaan intelektual berikut:
-1. Logo & Merek: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali.
-2. Desain Khas & Produk Komersial: Produk komersial dengan desain khas sebagai subjek utama (misal: mainan, barang fesyen/pakaian/sepatu ikonik, elektronik, atau furnitur rancangan desainer).
-3. Karakter & Karya Seni: Karakter fiksi/kartun, serta karya yang dilindungi hak cipta (termasuk lukisan, patung, seni jalanan/mural, ilustrasi, font, atau elemen grafis milik orang lain).
-4. Lokasi Terlarang: Penggambaran lokasi yang memerlukan tiket masuk atau situs terlarang tanpa izin.
-5. Bangunan & Monumen: Bangunan/monumen yang dilarang (Eiffel malam hari, Disney, Tokyo Skytree, dsb) atau arsitektur modern dengan desain unik/mudah dikenali sebagai fokus utama.
+1. Logo & Merek: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali (sekecil apapun).
+2. Desain Khas & Produk Komersial: Produk komersial dengan desain khas sebagai subjek utama (misal: pakaian desainer, gadget modern, sepatu ikonik, kendaraan spesifik).
+3. Karakter & Karya Seni: Karakter fiksi/kartun terkenal, serta karya yang dilindungi hak cipta (termasuk lukisan, seni jalanan, desain font spesifik).
+4. Bangunan & Monumen Dilarang: Bangunan yang dilindungi IP (seperti Eiffel Tower di malam hari, taman hiburan terkenal, arsitektur ikonik swasta).
 
-C. KNOWN IMAGE RESTRICTIONS (Berdasarkan Adobe Stock Content Policies)
-Tolak (FAIL) atau flag sebagai risiko tinggi jika mendeteksi pembatasan khusus berikut:
-1. Uang & Identitas: Uang kertas/koin modern yang terlalu detail/dapat disalin, prangko pos, paspor, dokumen ID, atau pelat nomor kendaraan asli.
-2. Tato & Seni Tubuh: Tato yang sangat unik/khas yang menjadi fokus utama (membutuhkan property release).
-3. Landmark Spesifik: Menara Eiffel malam hari (hak cipta lighting), Louvre Pyramid, Atomium, Hollywood Sign, Sydney Opera House, Kastil Neuschwanstein.
-4. Desain Proprietary & Mainan: Kepingan LEGO, Rubik's Cube, mainan action figure bermerek, pola kain paten (seperti Burberry check, Louis Vuitton), sepatu dengan desain sangat ikonik (sol merah Louboutin, tiga garis Adidas).
-5. Fasilitas Militer/Pemerintah: Segel resmi pemerintah, lencana militer khusus, atau properti pemerintah yang dilarang untuk stok komersial.
+C. KNOWN IMAGE RESTRICTIONS
+1. Uang & Identitas: Uang kertas, prangko, paspor, atau dokumen ID modern yang dapat disalin dengan detail.
+2. Tato & Seni Tubuh: Tato unik sebagai fokus utama (memerlukan rilis properti).
 
 STATUS & SKOR (KONSISTENSI MUTLAK):
 - PASS: Lulus standar Adobe Stock, bebas cacat teknis, IP, gen-AI anomaly, dan image restrictions sesuai toleransi. Skor WAJIB 75 - 100.
