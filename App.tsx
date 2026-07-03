@@ -1477,7 +1477,6 @@ const App: React.FC = () => {
       [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
       [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
       [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
-      [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
       [ToolType.VECTOR_EPS]: 0,
       [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN)
     });
@@ -1535,15 +1534,33 @@ const App: React.FC = () => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         
-        // 1. Sync license key
+        // 1. Sync license key (with local backup protection)
+        const localKey = localStorage.getItem('mz_license_key') || '';
         if (data.licenseKey !== undefined) {
           const cloudKey = data.licenseKey || '';
-          setMzLicenseKey(cloudKey);
           if (cloudKey) {
+            setMzLicenseKey(cloudKey);
             localStorage.setItem('mz_license_key', cloudKey);
+          } else if (localKey) {
+            // Write local key to cloud so the active license is synced to Firestore
+            setMzLicenseKey(localKey);
+            const userRef = doc(db, 'users', user.uid);
+            updateDoc(userRef, {
+              licenseKey: localKey,
+              updatedAt: new Date().toISOString()
+            }).catch(e => console.error("Failed to sync local key to cloud:", e));
           } else {
+            setMzLicenseKey('');
             localStorage.removeItem('mz_license_key');
           }
+        } else if (localKey) {
+          // If licenseKey field is missing in document but exists locally
+          setMzLicenseKey(localKey);
+          const userRef = doc(db, 'users', user.uid);
+          updateDoc(userRef, {
+            licenseKey: localKey,
+            updatedAt: new Date().toISOString()
+          }).catch(e => console.error("Failed to sync local key to cloud:", e));
         }
 
         // 2. Sync trialStart
@@ -1810,19 +1827,21 @@ const App: React.FC = () => {
 
   // Trigger login promo modal if user is on a free trial account
   useEffect(() => {
-    if (user && hasSyncedProfile && !isCheckingAuth && !isCheckingLicense) {
-      // Ensure state has caught up with synchronous localStorage updates before showing promos
-      if (mzLicenseKey !== (localStorage.getItem('mz_license_key') || '')) return;
-
+    if (user && hasSyncedProfile && !isCheckingAuth) {
       if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
-        sessionStorage.removeItem('mz_just_logged_in_promo');
-        // If the synced profile reveals they are NOT licensed (free trial account)
-        if (!isMzLicensed) {
-          setShowPromoWindow(true);
-        }
+        const timer = setTimeout(() => {
+          if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
+            sessionStorage.removeItem('mz_just_logged_in_promo');
+            // If the synced profile reveals they are NOT licensed (free trial account) after settling
+            if (!isMzLicensed && !isCheckingLicense) {
+              setShowPromoWindow(true);
+            }
+          }
+        }, 1200); // 1.2s delay to fully settle any network/Firestore licensing updates
+        return () => clearTimeout(timer);
       }
     }
-  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense, mzLicenseKey]);
+  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense]);
 
   // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
@@ -1903,22 +1922,6 @@ const App: React.FC = () => {
 
     setIsCheckingLicense(true);
 
-    const s = mzLicenseSeed.trim().toUpperCase();
-    const isOfflineValid = 
-      k === s ||
-      k === 'MZPRO-VIP-2026' || 
-      k === 'MZPRO-UNLIMITED-LIFE' || 
-      k === 'MZPRO-COMMERCIAL-2026' ||
-      (k.startsWith('MZPRO-') && k.endsWith('-OK')) ||
-      (k.length >= 10 && k.includes('MZ') && k.includes('2026'));
-
-    if (isOfflineValid) {
-      setIsMzLicensed(true);
-      setSubDaysLeft(null);
-      setIsCheckingLicense(false);
-      return;
-    }
-
     let devId = localStorage.getItem('mz_device_id');
     if (!devId) {
       devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
@@ -1967,26 +1970,13 @@ const App: React.FC = () => {
       })
       .catch(err => {
         console.error('License validator connection error:', err);
-        // Silent fallback to allow offline usage, check offline algo validation
-        const validateKey = (key: string, seed: string) => {
-          const k = key.trim().toUpperCase();
-          const s = seed.trim().toUpperCase();
-          if (!k) return false;
-          if (k === s) return true;
-          if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
-          if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
-          if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
-          return false;
-        };
-        const isValid = validateKey(k, localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
-        if (isValid) {
-           setIsMzLicensed(true);
-        }
+        setIsMzLicensed(false);
+        setSubDaysLeft(null);
       })
       .finally(() => {
         setIsCheckingLicense(false);
       });
-  }, [mzLicenseKey, mzLicenseSeed]);
+  }, [mzLicenseKey]);
 
   const handleTryUnlockReseller = (typedVal?: string) => {
     const val = (typedVal !== undefined ? typedVal : resellerPasscodeVal).trim();
@@ -3775,6 +3765,7 @@ const App: React.FC = () => {
               dailyGenCount={dailyGenCounts[ToolType.PROMPT_IMAGE_CHECK] || 0}
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE_CHECK, amount)}
               setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
               aiOptions={commonAiOptions}
             />
           ) : activeTool === ToolType.CALENDAR_GEN ? (
@@ -5740,15 +5731,26 @@ const App: React.FC = () => {
               </p>
             </div>
 
-            <button
-              onClick={() => {
-                // Placeholder for donation link
-                alert('Terima kasih! Silakan arahkan ke halaman donasi (misal: Saweria/Trakteer).');
-              }}
-              className="w-full py-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
-            >
-              Dukung Kami (Donate)
-            </button>
+            <div className="w-full space-y-2.5">
+              <button
+                onClick={() => {
+                  setShowLimitModal(false);
+                  setShowActivationModal(true);
+                }}
+                className="w-full py-3 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <Zap size={14} className="animate-pulse text-amber-300" />
+                <span>Berlangganan PRO (Subscribe)</span>
+              </button>
+
+              <button
+                onClick={() => window.open('https://teer.id/johan3008', '_blank')}
+                className="w-full py-2.5 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase rounded-xl transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <Heart size={13} className="text-rose-500 fill-rose-500" />
+                <span>Dukung Kami (Donate)</span>
+              </button>
+            </div>
             
             <button
               onClick={() => setShowLimitModal(false)}

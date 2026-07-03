@@ -903,6 +903,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         localStorage.setItem('mz_license_key', newKey);
         setLicenseKey(newKey);
         
+        // Refresh backend keys in SaaSPortal so it immediately reflects in the reseller audit
+        await fetchBackendKeys().catch(e => console.error("Failed to refresh keys:", e));
+        
         // Try to send email
         if (userEmail) {
           try {
@@ -1018,52 +1021,11 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           }, 2500);
         }
       } else {
-        // Fallback backward-compatible Master Keys check
-        const isValid = validateKey(inputKey, tempLicenseSeed);
-        if (isValid) {
-          localStorage.setItem('mz_license_key', targetKeyFormatted);
-          await syncUserDb(targetKeyFormatted);
-          setLicenseKey(targetKeyFormatted);
-          setActivationSuccess(true);
-          setActivationError('');
-          setTimeout(() => {
-            setActivationSuccess(false);
-            setShowActivation(false);
-          }, 2500);
-        } else {
-          setActivationError(t.activation_error_invalid);
-        }
+        setActivationError(t.activation_error_invalid);
       }
     } catch (err) {
-      console.error('Firestore activate check error, testing fallback offline keys:', err);
-      const isValid = validateKey(inputKey, tempLicenseSeed);
-      const syncUserDb = async (key: string) => {
-        if (userId) {
-          const userRef = doc(db, 'users', userId);
-          await setDoc(userRef, {
-            licenseKey: key,
-            updatedAt: new Date().toISOString()
-          }, { merge: true }).catch(err => {
-            console.error("Sync to user profile failed:", err);
-          });
-        }
-      };
-
-      if (isValid) {
-        localStorage.setItem('mz_license_key', targetKeyFormatted);
-        await syncUserDb(targetKeyFormatted);
-        setLicenseKey(targetKeyFormatted);
-        setActivationSuccess(true);
-        setActivationError('');
-        setTimeout(() => {
-          setActivationSuccess(false);
-          setShowActivation(false);
-        }, 2500);
-      } else {
-        setActivationError('Sistem sedang offline. Mohon periksa internet Anda atau pastikan kunci lisensi Anda valid secara offline.');
-        // Bypass offline crash
-        console.error('License validator offline error:', err);
-      }
+      console.error('Firestore activate check error:', err);
+      setActivationError('Koneksi internet bermasalah atau gagal menghubungi server lisensi. Mohon periksa internet Anda.');
     } finally {
       setIsActivating(false);
     }

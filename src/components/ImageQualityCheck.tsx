@@ -24,13 +24,15 @@ export const ImageQualityCheck: React.FC<{
   dailyGenCount?: number;
   incrementDailyCount?: (amount?: number) => void;
   setShowLimitModal?: (show: boolean) => void;
+  setShowActivationModal?: (show: boolean) => void;
 }> = ({ 
   t, 
   aiOptions,
   isLicensed = false,
   dailyGenCount = 0,
   incrementDailyCount,
-  setShowLimitModal
+  setShowLimitModal,
+  setShowActivationModal
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -101,22 +103,40 @@ export const ImageQualityCheck: React.FC<{
       if (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i)) {
         const url = URL.createObjectURL(file);
         const video = document.createElement('video');
-        video.src = url;
         video.muted = true;
         video.playsInline = true;
-        video.crossOrigin = 'anonymous';
+        video.preload = 'auto';
+        
+        // Append to DOM to ensure active browser processing
+        video.style.position = 'fixed';
+        video.style.top = '-9999px';
+        video.style.opacity = '0';
+        document.body.appendChild(video);
+
+        let isResolved = false;
+        const cleanup = () => {
+          if (video.parentNode) {
+            video.parentNode.removeChild(video);
+          }
+          URL.revokeObjectURL(url);
+        };
 
         const timeoutId = setTimeout(() => {
-          URL.revokeObjectURL(url);
-          reject(new Error("Video frame extraction timed out"));
-        }, 15000);
+          if (!isResolved) {
+            isResolved = true;
+            cleanup();
+            reject(new Error("Video frame extraction timed out"));
+          }
+        }, 30000);
 
-        video.onloadeddata = () => {
+        video.onloadedmetadata = () => {
           video.currentTime = Math.min(1, video.duration / 2 || 1);
         };
 
         video.onseeked = () => {
+          if (isResolved) return;
           clearTimeout(timeoutId);
+          isResolved = true;
           try {
             const canvas = document.createElement('canvas');
             const MAX_WIDTH = 1200;
@@ -142,15 +162,20 @@ export const ImageQualityCheck: React.FC<{
           } catch (e) {
             reject(e);
           } finally {
-            URL.revokeObjectURL(url);
+            cleanup();
           }
         };
 
         video.onerror = () => {
+          if (isResolved) return;
           clearTimeout(timeoutId);
-          URL.revokeObjectURL(url);
+          isResolved = true;
+          cleanup();
           reject(new Error("Failed to load video file"));
         };
+        
+        video.src = url;
+        video.load();
         return;
       }
 
@@ -510,6 +535,15 @@ export const ImageQualityCheck: React.FC<{
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold block mt-2 leading-tight">
                   {t.image_check_trial_remaining} <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.max(0, getDailyLimit() - dailyGenCount)} {t.image_check_trial_times}</strong>.
                 </span>
+              )}
+              {setShowActivationModal && (
+                <button
+                  onClick={() => setShowActivationModal(true)}
+                  className="w-full mt-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-900 font-black text-[10px] uppercase tracking-wider rounded-2xl transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Sparkles size={11} className="animate-bounce" />
+                  <span>Berlangganan PRO (Subscribe)</span>
+                </button>
               )}
             </div>
           )}
