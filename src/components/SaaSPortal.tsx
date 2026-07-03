@@ -2409,8 +2409,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   }
                                   handleCheckoutWithPakasir(amount, "Subscription 30 Days");
                                 }}
-                                disabled={isCheckoutLoading}
-                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                                disabled={true}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {isCheckoutLoading ? <RefreshCw size={15} className="animate-spin" /> : <CreditCard size={15} />}
                                 <span>{isCheckoutLoading ? 'Wait' : 'QRIS 30 Hari'}</span>
@@ -2426,8 +2426,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   }
                                   handleCheckoutWithPakasir(amount, "Subscription Unlimited");
                                 }}
-                                disabled={isCheckoutLoading}
-                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                                disabled={true}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {isCheckoutLoading ? <RefreshCw size={15} className="animate-spin" /> : <CreditCard size={15} />}
                                 <span>{isCheckoutLoading ? 'Wait' : 'QRIS Unlimited'}</span>

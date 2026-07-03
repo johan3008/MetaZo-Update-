@@ -3361,7 +3361,12 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
    - Anatomi cacat: Jari berlebih/kurang, anggota tubuh menyatu, wajah atau mata yang terdistorsi/tidak simetris.
    - Teks Inkoheren: Huruf atau tulisan kacau (gibberish/alien text) yang tidak masuk akal.
    - Geometri mustahil: Objek menyatu satu sama lain, struktur arsitektur atau perspektif tidak masuk akal.
-   - Detail berhalusinasi (hallucinated details) pada pola berulang atau latar belakang kompleks.`;
+   - Detail berhalusinasi (hallucinated details) pada pola berulang atau latar belakang kompleks.
+6. Final quality check before submission (Pemeriksaan Kualitas Akhir):
+   - The main subject must be sharp and clearly defined.
+   - Check that noise and artifacts are minimized.
+   - Confirm lighting, contrast, and color are balanced.
+   - Verify all technical requirements are met.`;
 
   if (isVideo) {
       systemInstruction += `
