@@ -28,6 +28,7 @@
     "mp4box": "^2.3.0",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.10",
+    "pakasir-client": "^1.0.0",
     "pdfjs-dist": "^5.5.207",
     "playwright-chromium": "^1.61.0",
     "react": "^19.2.4",

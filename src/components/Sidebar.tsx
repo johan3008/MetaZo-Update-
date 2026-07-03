@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info
+  Calendar, CreditCard, Info, Receipt
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '../../types';
 
@@ -392,6 +392,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <CreditCard size={14} className="text-amber-400" />
               {!sidebarCollapsed && <span>{t.sidebar_subscription_plan}</span>}
+            </button>
+            <button 
+              type="button"
+              onClick={() => setShowActivation?.(true)}
+              className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer mb-1.5"
+            >
+              <Receipt size={14} className="text-blue-400" />
+              {!sidebarCollapsed && <span>{t.language === 'id' ? 'Tagihan (Billing)' : 'Billing'}</span>}
             </button>
 
             <button 

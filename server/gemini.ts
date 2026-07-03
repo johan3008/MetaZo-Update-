@@ -3309,16 +3309,23 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
     ...p,
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
   }));
-}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string) {
+}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string, fileType?: string) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
+  const isVideo = fileType?.startsWith('video/') || fileType?.match(/^(mp4|mov)$/i);
+  const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
+
+  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
 
 ATURAN PALING PENTING (CRITICAL RULE):
 1. PEMINDAIAN KESELURUHAN (FULL SCAN): Anda WAJIB memeriksa KESELURUHAN gambar dari ujung ke ujung (corner-to-corner), bukan hanya fokus pada bagian tengah atau subjek utama saja. Periksa setiap tepi, sudut, background, dan elemen kecil.
-2. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual.
-3. JIKA GAMBAR SEMPURNA DAN TIDAK ADA MASALAH, JANGAN MENGARANG KEKURANGAN. ANDA HARUS BERSIKAP OBJEKTIF DAN FAKTUAL.
+2. SANGAT KETAT TERHADAP 4 ISU UTAMA ADOBE STOCK: Anda harus SANGAT SENSITIF dan TANPA AMPUN terhadap:
+   - EXPOSURE ISSUES (Overexposure, underexposure, highlight yang blown out, atau shadow yang terlalu gelap).
+   - SOFT FOCUS (Kurang tajam, fokus meleset, motion blur yang tidak disengaja, atau ketajaman subjek utama yang kurang optimal).
+   - EXCESSIVE FILTERING (Efek over-processed, warna terlalu tersaturasi, terlalu kontras, atau tekstur yang tampak plastik/lilin akibat pemrosesan berlebih).
+   - ARTIFACTS / NOISE (Grain digital, color banding, chromatic aberration, sensor dust, atau kompresi JPEG).
+3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual.
 4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
 5. ANALISIS EKSTRA UNTUK GAMBAR DETAIL: Jika gambar memiliki tingkat detail yang tinggi, ornamen rumit, atau tekstur yang padat, Anda WAJIB menganalisisnya dengan ketelitian ganda. Perhatikan baik-baik adanya anomali struktural AI (AI structural anomalies), elemen atau garis yang melebur, pola yang rusak, atau bentuk asimetris tidak logis yang sering tersembunyi dalam pola rumit.
 
@@ -3329,18 +3336,19 @@ Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 
 A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standards)
 Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi berikut secara ketat dan teliti:
-1. Out of Focus (Tidak Fokus):
-   - Unintentional blur / subjek utama tidak tajam (soft).
+1. Out of Focus (Tidak Fokus) & Soft Focus [ISU KRITIS]:
+   - Unintentional blur / subjek utama tidak tajam secara sempurna (soft).
    - Motion blur (blur karena guncangan kamera atau gerakan subjek yang tidak disengaja).
    - Noise reduction yang terlalu agresif sehingga menghaluskan detail tekstur (menjadi seperti lilin/plastik).
-   - Jika gambar menampilkan manusia atau hewan, mata harus fokus tajam.
-2. Artifacts (Artifak):
-   - Noise / Grain: Bintik digital berlebihan, terutama di area gelap (shadows).
+   - Jika gambar menampilkan manusia atau hewan, mata harus sangat tajam (pin-sharp).
+2. Artifacts / Noise / Excessive Filtering [ISU KRITIS]:
+   - Noise / Grain: Bintik digital berlebihan, terutama di area gelap (shadows) atau langit.
    - Chromatic aberration / Color fringing: Violas atau hijau terang di sepanjang tepi objek dengan kontras tinggi.
    - Sensor dust: Bintik-bintik debu hitam/gelap pada area datar seperti langit terang.
    - Compression artifacts: Efek blok atau kotak-kotak piksel (biasanya akibat kompresi JPEG tinggi).
-   - Color banding: Transisi warna yang kasar atau bergaris pada gradasi warna (seperti langit biru).
-3. Lighting Problem (Masalah Pencahayaan):
+   - Color banding: Transisi warna yang kasar atau bergaris pada gradasi warna.
+   - Efek filter berlebihan, terlalu HDR, atau pemrosesan berlebih.
+3. Lighting Problem / Exposure Issues [ISU KRITIS]:
    - Overexposure: Blown-out highlights atau area terang yang benar-benar putih murni tanpa detail.
    - Underexposure: Crushed shadows atau area gelap yang hitam pekat tanpa detail.
    - Kontras terlalu tinggi atau lighting terlalu datar (flat lighting).
@@ -3348,15 +3356,40 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
    - White balance buruk atau color temperature yang tidak wajar.
 4. Image Not Upright / Composition / Cropping:
    - Crooked horizon (garis cakrawala miring).
-   - Cropping/pemotongan yang tidak disengaja dan canggung (misal: memotong sendi pergelangan tangan, kepala terpotong tanpa alasan komposisi yang jelas).
-5. Over-processing:
-   - Sharpening yang berlebihan sehingga memunculkan efek "halo" di sekitar tepi objek.
-   - Saturasi warna buatan yang sangat ekstrem.
-6. Generative AI Technical Issues (SANGAT KRITIS UNTUK AI):
+   - Cropping/pemotongan yang tidak disengaja dan canggung.
+5. Generative AI Technical Issues (SANGAT KRITIS UNTUK AI):
    - Anatomi cacat: Jari berlebih/kurang, anggota tubuh menyatu, wajah atau mata yang terdistorsi/tidak simetris.
    - Teks Inkoheren: Huruf atau tulisan kacau (gibberish/alien text) yang tidak masuk akal.
    - Geometri mustahil: Objek menyatu satu sama lain, struktur arsitektur atau perspektif tidak masuk akal.
-   - Detail berhalusinasi (hallucinated details) pada pola berulang atau latar belakang kompleks.
+   - Detail berhalusinasi (hallucinated details) pada pola berulang atau latar belakang kompleks.`;
+
+  if (isVideo) {
+      systemInstruction += `
+
+ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
+Ini adalah cuplikan frame dari sebuah file Video. Anda WAJIB menganalisa dan MENCARI indikasi dari "Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues."
+Perhatikan secara khusus jika frame ini mengindikasikan:
+- Kompresi video yang sangat buruk (compression blocks).
+- Empty black or white frame (frame kosong/hitam pekat/putih pekat yang tidak disengaja di awal atau tengah).
+- Indikasi shaking, skew, jello effects, flash banding, atau format/color grading yang salah.
+- Maintain video quality: High‑quality video content should be stable, clear, and technically consistent. Consider the following: Use a tripod or stabilizer for smooth, stable footage. Avoid rolling‑shutter artifacts such as skew, jello effects, or flash banding. Apply correct formats and color grading.
+- Jika terindikasi ada masalah teknis video, tambahkan ke technical_issues secara spesifik.`;
+  }
+
+  if (isVector) {
+      systemInstruction += `
+
+ATURAN KHUSUS VEKTOR (MAINTAIN VECTOR QUALITY):
+Ini adalah pratinjau dari sebuah file Vektor (EPS/AI/SVG). Anda WAJIB menganalisa kualitas Vektor dengan prinsip: "Vector content must be clean, scalable, and easy to edit."
+Perhatikan secara khusus indikasi berikut:
+1. Gaps in Shape Paths: Cek apakah ada bentuk/shape yang terpotong atau tidak tertutup sempurna secara visual (Close all shape paths fully to prevent gaps).
+2. Embedded Raster Images: Deteksi jika ada bagian dari gambar ini yang terlihat seperti sisipan foto/bitmap/raster pecah yang tidak scalable. Vektor murni tidak boleh mengandalkan foto bitmap. (Avoid embedding raster images to maintain scalability).
+3. Auto-Tracing Artifacts: Deteksi pola berantakan, garis-garis kasar, atau terlalu banyak noise anchor points yang biasanya berasal dari proses "Auto-Trace" gambar kompleks secara malas. (Use clean, simple hand-drawn paths. Avoid auto-tracing complex graphics).
+4. Artboard/Framing: Pastikan framing dan artboard rapi.
+- Jika terindikasi masalah teknis vektor, masukkan ke technical_issues secara spesifik.`;
+  }
+
+  systemInstruction += `
 
 B. INTELLECTUAL PROPERTY (IP) & TRADEMARK REFUSAL
 Tolak (FAIL) secara instan jika mendeteksi isu kekayaan intelektual berikut:

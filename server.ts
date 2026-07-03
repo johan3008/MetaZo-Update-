@@ -8,6 +8,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { GoogleGenAI } from '@google/genai';
 
@@ -945,13 +946,13 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/check-image-quality', async (req, res) => {
         try {
-            const { image, tolerance, language, model } = req.body;
+            const { image, tolerance, language, model, fileType } = req.body;
             if (!image) {
                 console.warn('Server check-image-quality error: Missing image data');
                 return res.status(400).json({ error: 'Missing image data' });
             }
             console.log('Server check-image-quality: Analyzing image...');
-            const data = await checkImageQuality(image, tolerance, language, model);
+            const data = await checkImageQuality(image, tolerance, language, model, fileType);
             console.log('Server check-image-quality: Analysis successful');
             res.json(data);
         } catch (e: any) {
@@ -1050,6 +1051,56 @@ app.get('/api/debug-uploads', (req, res) => {
             res.json(shuffled.slice(0, 5));
         } catch (e: any) {
             res.status(500).json({ error: 'Error fetching inspirations' });
+        }
+    });
+
+    app.post('/api/pakasir/create-payment', async (req, res) => {
+        try {
+            const { projectSlug, apiKey, orderId, amount, redirectUrl } = req.body;
+            if (!projectSlug || !apiKey || !orderId || !amount) {
+                return res.status(400).json({ error: 'Missing required parameters' });
+            }
+
+            const pakasir = new PakasirClient({
+                project: projectSlug,
+                apiKey: apiKey
+            });
+
+            const payment = await pakasir.createPaymentWithQRAndURL(orderId, Number(amount), {
+                qrOptions: { size: 400 },
+                urlOptions: { redirect: redirectUrl || 'https://pakasir.com' }
+            });
+
+            res.json({
+                success: true,
+                paymentUrl: payment.paymentUrl,
+                dataUrl: payment.dataUrl,
+                paymentNumber: payment.paymentNumber
+            });
+        } catch (error: any) {
+            console.error('Pakasir error:', error);
+            res.status(500).json({ error: error.message || 'Failed to create Pakasir payment' });
+        }
+    });
+
+    app.post('/api/pakasir/check-status', async (req, res) => {
+        try {
+            const { projectSlug, apiKey, orderId, amount } = req.body;
+            if (!projectSlug || !apiKey || !orderId || !amount) {
+                return res.status(400).json({ error: 'Missing required parameters' });
+            }
+            const pakasir = new PakasirClient({
+                project: projectSlug,
+                apiKey: apiKey
+            });
+            const status = await pakasir.checkTransactionStatus(orderId, Number(amount));
+            res.json({
+                success: true,
+                status: status.transaction ? status.transaction.status : status.status
+            });
+        } catch (error: any) {
+            console.error('Pakasir status error:', error);
+            res.status(500).json({ error: error.message || 'Failed to check Pakasir status' });
         }
     });
 

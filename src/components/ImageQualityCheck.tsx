@@ -97,6 +97,181 @@ export const ImageQualityCheck: React.FC<{
 
   const resizeAndProcess = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // 1. Handle Video (MP4, MOV, etc.)
+      if (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i)) {
+        const url = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.src = url;
+        video.muted = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+
+        const timeoutId = setTimeout(() => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Video frame extraction timed out"));
+        }, 15000);
+
+        video.onloadeddata = () => {
+          video.currentTime = Math.min(1, video.duration / 2 || 1);
+        };
+
+        video.onseeked = () => {
+          clearTimeout(timeoutId);
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = video.videoWidth || 640;
+            let height = video.videoHeight || 480;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+            } else {
+              if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.85));
+            } else {
+              reject(new Error("Canvas context failed"));
+            }
+          } catch (e) {
+            reject(e);
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        };
+
+        video.onerror = () => {
+          clearTimeout(timeoutId);
+          URL.revokeObjectURL(url);
+          reject(new Error("Failed to load video file"));
+        };
+        return;
+      }
+
+      // 2. Handle EPS / AI
+      if (file.name.match(/\.(eps|ai)$/i)) {
+          (async () => {
+             try {
+                let uploadedUrl = null;
+                let getUrlData = null;
+                try {
+                    const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'application/postscript')}`);
+                    getUrlData = await getUrlRes.json().catch(() => ({}));
+                    
+                    if (getUrlRes.ok && getUrlData.uploadUrl && getUrlData.fileUrl) {
+                        const putRes = await fetch(getUrlData.uploadUrl, {
+                            method: 'PUT',
+                            body: file,
+                            headers: { 'Content-Type': file.type || 'application/postscript' }
+                        });
+                        if (!putRes.ok) throw new Error(`Failed to upload to storage: ${putRes.status}`);
+                        uploadedUrl = getUrlData.fileUrl;
+                    } else {
+                        try {
+                            const { upload } = await import('@vercel/blob/client');
+                            const blob = await upload(file.name, file, {
+                                access: 'public',
+                                handleUploadUrl: '/api/upload-vercel-blob'
+                            });
+                            uploadedUrl = blob.url;
+                        } catch (blobErr) {
+                            console.warn("Vercel Blob failed:", blobErr);
+                        }
+                    }
+                } catch (uploadErr: any) {
+                    console.warn("Failed to save EPS to R2/Storage:", uploadErr);
+                    if (uploadErr.message === 'Failed to fetch') {
+                         throw new Error(`Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan setting CORS di dashboard Cloudflare R2 bucket Anda.`);
+                    }
+                }
+
+                let response;
+                try {
+                    if (uploadedUrl) {
+                        response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fileUrl: uploadedUrl, pathKey: getUrlData?.pathKey })
+                        });
+                    } else {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        response = await fetch(`/api/convert-eps-multipart?t=${Date.now()}_${Math.random()}`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                    }
+                } catch (fetchErr: any) {
+                    if (fetchErr.message === 'Failed to fetch') {
+                        throw new Error(`Koneksi terputus (Failed to fetch). Jika menggunakan Cloudflare R2, pastikan CORS dikonfigurasi dengan benar. Jika tanpa R2, ukuran file mungkin terlalu besar untuk diproses server.`);
+                    }
+                    throw fetchErr;
+                }
+                
+                if (!response.ok) {
+                    if (response.status === 413) {
+                        const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
+                        if (isVercel) {
+                            throw new Error(`File terlalu besar — Vercel menolak body > 4.5MB. Tambahkan Cloudflare R2 ke Vercel Environment Variables.`);
+                        }
+                        throw new Error(`File is too large (>500MB Server limit).`);
+                    }
+                    if (response.status === 500) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(`Ghostscript Error: ${data.error || 'Failed to convert'}`);
+                    }
+                    throw new Error(`Server error (${response.status})`);
+                }
+                
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("image/jpeg") !== -1) {
+                    const blob = await response.blob();
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const img = new Image();
+                      img.onload = () => {
+                         const canvas = document.createElement('canvas');
+                         const MAX_WIDTH = 1200;
+                         const MAX_HEIGHT = 1200;
+                         let width = img.width;
+                         let height = img.height;
+                         if (width > height) {
+                           if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                         } else {
+                           if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                         }
+                         canvas.width = width;
+                         canvas.height = height;
+                         const ctx = canvas.getContext('2d');
+                         if (ctx) {
+                           ctx.drawImage(img, 0, 0, width, height);
+                           resolve(canvas.toDataURL('image/jpeg', 0.85));
+                         } else {
+                           resolve(reader.result as string);
+                         }
+                      };
+                      img.onerror = () => resolve(reader.result as string);
+                      img.src = reader.result as string;
+                    };
+                    reader.onerror = () => reject(new Error("Failed to read server EPS blob"));
+                    reader.readAsDataURL(blob);
+                } else {
+                   throw new Error("Invalid content type from server: " + contentType);
+                }
+             } catch (serverErr: any) {
+                 reject(new Error(`Gagal mengekstrak EPS/AI ${file.name} melalui server: ${serverErr.message}`));
+             }
+          })();
+          return;
+      }
+
+      // 3. Fallback for SVG, JPG, PNG, etc.
       const reader = new FileReader();
       reader.onloadend = () => {
         const img = new Image();
@@ -206,12 +381,21 @@ export const ImageQualityCheck: React.FC<{
         setProgress(startProgress + 5);
         
         const base64Image = await resizeAndProcess(file);
+        if (file.name.match(/\.(eps|ai)$/i)) {
+          setPreviews(prev => ({ ...prev, [file.name]: base64Image }));
+        }
         setProgress(startProgress + 15);
 
         const response = await fetch('/api/check-image-quality', {
           method: 'POST',
           headers: getHeaders(aiOptions),
-          body: JSON.stringify({ image: base64Image, tolerance, language: t.language || 'English', model: aiOptions?.model }),
+          body: JSON.stringify({ 
+            image: base64Image, 
+            tolerance, 
+            language: t.language || 'English', 
+            model: aiOptions?.model,
+            fileType: file.type || file.name.split('.').pop()
+          }),
         });
         if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);
         const data = await response.json();
@@ -369,6 +553,19 @@ export const ImageQualityCheck: React.FC<{
             </div>
           </div>
 
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex items-start gap-3"
+            >
+              <AlertCircle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 leading-relaxed">
+                {error}
+              </p>
+            </motion.div>
+          )}
+
           {/* Upload Hub */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-2 shadow-2xl shadow-slate-200/40 dark:shadow-none overflow-hidden">
             <div className="p-4 border-b border-slate-100 dark:border-white/5">
@@ -392,7 +589,7 @@ export const ImageQualityCheck: React.FC<{
                   <FileImage size={12} /> {t.qc_multiple_upload}
                 </span>
               </div>
-              <input type="file" accept="image/*" onChange={handleFileChange} multiple className="hidden" />
+              <input type="file" accept="image/*,video/mp4,video/quicktime,.eps,.ai,.svg" onChange={handleFileChange} multiple className="hidden" />
             </label>
 
             <AnimatePresence>
@@ -416,7 +613,16 @@ export const ImageQualityCheck: React.FC<{
                       >
                         <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
                           {previews[file.name] && (
-                            <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
+                            (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i)) ? (
+                               <video src={`${previews[file.name]}#t=1`} className="w-full h-full object-cover" muted playsInline />
+                            ) : (file.name.match(/\.(eps|ai)$/i) && previews[file.name].startsWith('blob:')) ? (
+                               <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex flex-col items-center justify-center">
+                                 <FileImage size={16} className="text-slate-400 mb-1" />
+                                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">EPS</span>
+                               </div>
+                            ) : (
+                               <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
+                            )
                           )}
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
@@ -485,6 +691,8 @@ export const ImageQualityCheck: React.FC<{
                 {Object.entries(reports).map(([fileName, report], rIdx) => {
                   const r = report as QualityReport;
                   const isPassed = r.recommendation === "PASS";
+                  const fileObj = files.find(f => f.name === fileName);
+                  const isVideo = fileObj && (fileObj.type.startsWith('video/') || fileObj.name.match(/\.(mp4|mov)$/i));
 
                   return (
                     <motion.div 
@@ -518,13 +726,22 @@ export const ImageQualityCheck: React.FC<{
 
                       {/* Image Stage */}
                       {previews[fileName] && (
-                        <div className="image-check-viewer relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700">
-                          <img 
-                            src={previews[fileName]} 
-                            alt={fileName} 
-                            className={`w-full h-full object-cover transition-all duration-500 ${showHeatmaps.has(fileName) ? 'brightness-[0.4] grayscale-[0.5]' : ''}`}
-                            referrerPolicy="no-referrer"
-                          />
+                          <div className="image-check-viewer relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700">
+                            {isVideo ? (
+                               <video 
+                                 src={`${previews[fileName]}#t=1`} 
+                                 className={`w-full h-full object-cover transition-all duration-500 ${showHeatmaps.has(fileName) ? 'brightness-[0.4] grayscale-[0.5]' : ''}`}
+                                 muted 
+                                 playsInline 
+                               />
+                            ) : (
+                               <img 
+                                 src={previews[fileName]} 
+                                 alt={fileName} 
+                                 className={`w-full h-full object-cover transition-all duration-500 ${showHeatmaps.has(fileName) ? 'brightness-[0.4] grayscale-[0.5]' : ''}`}
+                                 referrerPolicy="no-referrer"
+                               />
+                            )}
                           
                           {/* Heatmap Overlay */}
                           <AnimatePresence>

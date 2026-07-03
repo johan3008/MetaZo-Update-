@@ -95,6 +95,18 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [tempPriceUnlimited, setTempPriceUnlimited] = useState(() => localStorage.getItem('mz_price_unlimited') || 'Rp 250.000');
   const [tempPriceUnlimitedUSD, setTempPriceUnlimitedUSD] = useState(() => localStorage.getItem('mz_price_unlimited_usd') || '$14');
 
+  // Pakasir Configuration States
+  const [pakasirProject, setPakasirProject] = useState(() => localStorage.getItem('mz_pakasir_project') || '');
+  const [pakasirApiKey, setPakasirApiKey] = useState(() => localStorage.getItem('mz_pakasir_apikey') || '');
+  const [tempPakasirProject, setTempPakasirProject] = useState(() => localStorage.getItem('mz_pakasir_project') || '');
+  const [tempPakasirApiKey, setTempPakasirApiKey] = useState(() => localStorage.getItem('mz_pakasir_apikey') || '');
+  const [checkoutUrl, setCheckoutUrl] = useState('');
+  const [checkoutDataUrl, setCheckoutDataUrl] = useState('');
+  const [checkoutOrderId, setCheckoutOrderId] = useState('');
+  const [checkoutAmount, setCheckoutAmount] = useState(0);
+  const [checkoutPlan, setCheckoutPlan] = useState('');
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+
   // Promo Code States
   interface PromoCode {
     id: string;
@@ -506,6 +518,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             setPriceUnlimitedUSD(data.priceUnlimitedUSD);
             setTempPriceUnlimitedUSD(data.priceUnlimitedUSD);
           }
+          if (data.pakasirProject) {
+            setPakasirProject(data.pakasirProject);
+            setTempPakasirProject(data.pakasirProject);
+          }
+          if (data.pakasirApiKey) {
+            setPakasirApiKey(data.pakasirApiKey);
+            setTempPakasirApiKey(data.pakasirApiKey);
+          }
         }
       } catch (err) {
         console.warn('Silent pricing load fail:', err);
@@ -528,6 +548,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         price30DaysUSD: tempPrice30DaysUSD.trim() || '$2',
         priceUnlimited: tempPriceUnlimited.trim() || 'Rp 250.000',
         priceUnlimitedUSD: tempPriceUnlimitedUSD.trim() || '$14',
+        pakasirProject: tempPakasirProject.trim(),
+        pakasirApiKey: tempPakasirApiKey.trim(),
         updatedAt: new Date().toISOString()
       });
 
@@ -541,6 +563,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       localStorage.setItem('mz_price_30_days_usd', tempPrice30DaysUSD.trim() || '$2');
       localStorage.setItem('mz_price_unlimited', tempPriceUnlimited.trim() || 'Rp 250.000');
       localStorage.setItem('mz_price_unlimited_usd', tempPriceUnlimitedUSD.trim() || '$14');
+      localStorage.setItem('mz_pakasir_project', tempPakasirProject.trim());
+      localStorage.setItem('mz_pakasir_apikey', tempPakasirApiKey.trim());
 
       setAppName(tempAppName.trim() || 'MetaZo PRO');
       setAppSubtitle(tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant');
@@ -551,6 +575,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setPrice30DaysUSD(tempPrice30DaysUSD.trim() || '$2');
       setPriceUnlimited(tempPriceUnlimited.trim() || 'Rp 250.000');
       setPriceUnlimitedUSD(tempPriceUnlimitedUSD.trim() || '$14');
+      setPakasirProject(tempPakasirProject.trim());
+      setPakasirApiKey(tempPakasirApiKey.trim());
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -578,9 +604,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           price30DaysUSD: '$2',
           priceUnlimited: 'Rp 250.000',
           priceUnlimitedUSD: '$14',
+          pakasirProject: '',
+          pakasirApiKey: '',
           updatedAt: new Date().toISOString()
         });
-
         localStorage.removeItem('mz_reseller_app_name');
         localStorage.removeItem('mz_reseller_app_subtitle');
         localStorage.removeItem('mz_reseller_whatsapp');
@@ -591,6 +618,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         localStorage.removeItem('mz_price_30_days_usd');
         localStorage.removeItem('mz_price_unlimited');
         localStorage.removeItem('mz_price_unlimited_usd');
+        localStorage.removeItem('mz_pakasir_project');
+        localStorage.removeItem('mz_pakasir_apikey');
 
         setAppName('MetaZo PRO');
         setAppSubtitle('AI-Powered Metadata Assistant');
@@ -606,6 +635,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         setTempPrice30DaysUSD('$2');
         setTempPriceUnlimited('Rp 250.000');
         setTempPriceUnlimitedUSD('$14');
+        setPakasirProject('');
+        setPakasirApiKey('');
+        setTempPakasirProject('');
+        setTempPakasirApiKey('');
 
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 1500);
@@ -782,6 +815,128 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setPromoApplyError('Terjadi kesalahan saat menerapkan kode promo.');
     } finally {
       setIsApplyingPromo(false);
+    }
+  };
+
+  const handleCheckoutWithPakasir = async (amount: number, planDesc: string) => {
+    if (!pakasirProject || !pakasirApiKey) {
+      alert("Admin belum mengkonfigurasi Integrasi Pakasir.");
+      return;
+    }
+
+    setIsCheckoutLoading(true);
+    try {
+      const orderId = `MZPRO-${Date.now()}`;
+      
+      const response = await fetch('/api/pakasir/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectSlug: pakasirProject,
+          apiKey: pakasirApiKey,
+          orderId: orderId,
+          amount: amount,
+          redirectUrl: window.location.href
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+
+      setCheckoutUrl(data.paymentUrl);
+      setCheckoutDataUrl(data.dataUrl);
+      setCheckoutOrderId(orderId);
+      setCheckoutAmount(amount);
+      setCheckoutPlan(planDesc);
+
+    } catch (err: any) {
+      console.error("Pakasir Checkout Failed:", err);
+      alert("Gagal membuat pembayaran Pakasir: " + err.message);
+    } finally {
+      setIsCheckoutLoading(false);
+    }
+  };
+
+  const checkPaymentStatus = async () => {
+    setIsCheckoutLoading(true);
+    try {
+      const response = await fetch('/api/pakasir/check-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectSlug: pakasirProject,
+          apiKey: pakasirApiKey,
+          orderId: checkoutOrderId,
+          amount: checkoutAmount
+        })
+      });
+      const data = await response.json();
+      if (data.status === 'SUCCESS' || data.status === 'SETTLED' || data.status === 'PAID' || data.status === 'completed' || data.status === 'COMPLETED') {
+         const newKey = generateRandomKey();
+         const duration = checkoutPlan.includes('30') ? '30days' : 'unlimited';
+         
+         let devId = localStorage.getItem('mz_device_id');
+         if (!devId) {
+           devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
+           localStorage.setItem('mz_device_id', devId);
+         }
+
+         await setDoc(doc(db, 'keys', newKey), {
+          key: newKey,
+          activated: true,
+          activatedBy: userEmail || devId,
+          activatedAt: new Date().toISOString(),
+          duration: duration,
+          createdAt: new Date().toISOString()
+        });
+        
+        if (userId) {
+          const userRef = doc(db, 'users', userId);
+          await setDoc(userRef, {
+            licenseKey: newKey,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }).catch(err => {
+            console.error("Sync to user profile failed:", err);
+          });
+        }
+        
+        localStorage.setItem('mz_license_key', newKey);
+        setLicenseKey(newKey);
+        
+        // Try to send email
+        if (userEmail) {
+          try {
+             await fetch('/api/send-key', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({
+                 email: userEmail,
+                 licenseKey: newKey,
+                 appName: tempAppName || 'MetaZo PRO',
+                 caption: `Terima kasih atas pembayaran Anda! Akun Anda kini berstatus PRO dengan paket ${duration === '30days' ? '30 Hari' : 'Unlimited'}. Berikut adalah salinan License Key Anda.`
+               })
+             });
+          } catch(e) {
+             console.error("Failed to send key email:", e);
+          }
+        }
+
+        setInputKey(newKey);
+        setActivationSuccess(true);
+        setActivationError('');
+        setTimeout(() => {
+          setActivationSuccess(false);
+          setCheckoutUrl('');
+          setCheckoutDataUrl('');
+          setShowActivation(false);
+        }, 2500);
+      } else {
+        alert("Pembayaran belum selesai. Status: " + data.status);
+      }
+    } catch (err: any) {
+       alert("Gagal cek status: " + err.message);
+    } finally {
+       setIsCheckoutLoading(false);
     }
   };
 
@@ -1192,6 +1347,27 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       value={tempPayInfo}
                       onChange={(e) => setTempPayInfo(e.target.value)}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none transition-all line-clamp-3"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Pakasir Project Slug</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. metazo-pro"
+                      value={tempPakasirProject}
+                      onChange={(e) => setTempPakasirProject(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs focus:ring-1 focus:ring-emerald-500 transition-all text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-400 font-bold uppercase tracking-wider text-[9px] block">Pakasir API Key</label>
+                    <input
+                      type="password"
+                      placeholder="pakasir_live_..."
+                      value={tempPakasirApiKey}
+                      onChange={(e) => setTempPakasirApiKey(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs focus:ring-1 focus:ring-emerald-500 transition-all text-slate-800 dark:text-slate-200"
                     />
                   </div>
                 </div>
@@ -2179,22 +2355,97 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       {t.activation_no_license_title}
                     </h5>
                     
-                    <div className="p-4 bg-violet-500/[0.03] hover:bg-violet-500/[0.05] border border-violet-500/10 rounded-2xl flex flex-col items-center text-center space-y-1.5 transition-all">
-                      <Gift size={18} className="text-[#7c3aed] animate-bounce" />
-                      <span className="text-[11px] font-black text-[#7c3aed] dark:text-violet-400 uppercase tracking-widest">{t.activation_personal_activation}</span>
-                      <span className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400">{t.activation_license_price} <strong className="text-slate-800 dark:text-white">{pricingTier}</strong></span>
-                      <span className="text-[9.5px] font-semibold text-slate-400 dark:text-slate-500 max-w-sm leading-relaxed">{tempPayInfo}</span>
-                    </div>
-
-                    <a
-                      href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName)}%20premium.`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/15"
-                    >
-                      <MessageCircle size={15} className="animate-pulse" />
-                      <span>{t.activation_buy_whatsapp}</span>
-                    </a>
+                    {checkoutDataUrl ? (
+                      <div className="p-4 bg-white dark:bg-slate-900 border border-emerald-500/30 rounded-2xl flex flex-col items-center text-center space-y-3 shadow-lg">
+                        <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                          Scan QRIS Untuk Membayar
+                        </span>
+                        <img src={checkoutDataUrl} alt="QRIS" className="w-48 h-48 rounded-xl shadow-sm border border-slate-200 p-1" />
+                        <div className="flex flex-col space-y-2 w-full">
+                          <button
+                            onClick={checkPaymentStatus}
+                            disabled={isCheckoutLoading}
+                            className="w-full py-3 bg-emerald-500 text-white font-black text-[11px] rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5 shadow-md disabled:opacity-50"
+                          >
+                            {isCheckoutLoading ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                            <span>{isCheckoutLoading ? 'Mengecek...' : 'Cek Status Pembayaran'}</span>
+                          </button>
+                          <div className="flex space-x-2 w-full">
+                             <a
+                              href={checkoutUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 py-2.5 bg-[#7c3aed] text-white font-black text-[10px] rounded-xl uppercase tracking-wider text-center"
+                             >
+                               Buka Link
+                             </a>
+                             <button
+                              onClick={() => { setCheckoutUrl(''); setCheckoutDataUrl(''); }}
+                              className="flex-1 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black text-[10px] rounded-xl uppercase tracking-wider"
+                             >
+                               Batal
+                             </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-violet-500/[0.03] hover:bg-violet-500/[0.05] border border-violet-500/10 rounded-2xl flex flex-col items-center text-center space-y-1.5 transition-all">
+                          <Gift size={18} className="text-[#7c3aed] animate-bounce" />
+                          <span className="text-[11px] font-black text-[#7c3aed] dark:text-violet-400 uppercase tracking-widest">{t.activation_personal_activation}</span>
+                          <span className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400">{t.activation_license_price} <strong className="text-slate-800 dark:text-white">{activePromo?.type === 'discount' ? getDiscountedPrice(pricingTier, activePromo.value) : pricingTier}</strong></span>
+                          <span className="text-[9.5px] font-semibold text-slate-400 dark:text-slate-500 max-w-sm leading-relaxed">{tempPayInfo}</span>
+                        </div>
+                        <div className="flex flex-col gap-2 w-full">
+                          {pakasirProject && pakasirApiKey && (
+                            <div className="flex gap-2 w-full">
+                              <button
+                                onClick={() => {
+                                  const match = price30Days.replace(/\./g, '').match(/\d+/);
+                                  let amount = match ? parseInt(match[0], 10) : 50000;
+                                  if (amount < 500) amount = amount * 16000;
+                                  if (activePromo?.type === 'discount') {
+                                    amount = Math.floor(amount - (amount * (activePromo.value / 100)));
+                                  }
+                                  handleCheckoutWithPakasir(amount, "Subscription 30 Days");
+                                }}
+                                disabled={isCheckoutLoading}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                              >
+                                {isCheckoutLoading ? <RefreshCw size={15} className="animate-spin" /> : <CreditCard size={15} />}
+                                <span>{isCheckoutLoading ? 'Wait' : 'QRIS 30 Hari'}</span>
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  const match = priceUnlimited.replace(/\./g, '').match(/\d+/);
+                                  let amount = match ? parseInt(match[0], 10) : 250000;
+                                  if (amount < 500) amount = amount * 16000;
+                                  if (activePromo?.type === 'discount') {
+                                    amount = Math.floor(amount - (amount * (activePromo.value / 100)));
+                                  }
+                                  handleCheckoutWithPakasir(amount, "Subscription Unlimited");
+                                }}
+                                disabled={isCheckoutLoading}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                              >
+                                {isCheckoutLoading ? <RefreshCw size={15} className="animate-spin" /> : <CreditCard size={15} />}
+                                <span>{isCheckoutLoading ? 'Wait' : 'QRIS Unlimited'}</span>
+                              </button>
+                            </div>
+                          )}
+                          <a
+                            href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName)}%20premium.`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] rounded-xl uppercase tracking-wider transition-colors flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/15"
+                          >
+                            <MessageCircle size={15} className="animate-pulse" />
+                            <span>{t.activation_buy_whatsapp}</span>
+                          </a>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

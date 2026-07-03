@@ -2718,15 +2718,18 @@ const App: React.FC = () => {
                       // Silently fallback to multipart if Vercel Blob isn't configured
                   }
               }
-          } catch (uploadErr) {
+          } catch (uploadErr: any) {
               console.warn("Failed to save EPS to R2/Storage:", uploadErr);
+              if (uploadErr.message === 'Failed to fetch') {
+                  throw new Error(`Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan setting CORS di dashboard Cloudflare R2 bucket Anda.`);
+              }
           }
 
           // If client-side thumbnail succeeded, we just return it to AI Vision!
           if (clientSidePreview) {
               return [clientSidePreview];
-          } 
-          
+          }
+           
           // 3. Fallback: If client-side failed, use server-side Ghostscript
           let retryCount = 0;
           const maxRetries = 3; // Reduced to 3 retries because if the server OOMs repeatedly, it will never succeed
@@ -2735,6 +2738,7 @@ const App: React.FC = () => {
               
               try {
                   let response;
+                  try {
                     if (uploadedUrl) {
                         // Now ask the server to process the URL
                         response = await fetch(`/api/convert-eps?t=${Date.now()}_${Math.random()}`, {
@@ -2765,6 +2769,12 @@ const App: React.FC = () => {
                             body: formData
                         });
                     }
+                  } catch (fetchErr: any) {
+                      if (fetchErr.message === 'Failed to fetch') {
+                          throw new Error(`Koneksi terputus (Failed to fetch). Jika menggunakan Cloudflare R2, pastikan CORS dikonfigurasi dengan benar. Jika tanpa R2, ukuran file mungkin terlalu besar untuk diproses server.`);
+                      }
+                      throw fetchErr;
+                  }
                   
                   const contentType = response.headers.get("content-type");
                   
