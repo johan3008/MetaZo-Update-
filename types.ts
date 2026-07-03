@@ -8,6 +8,7 @@ export enum ToolType {
   PROMPT_IMAGE = 'prompt_image',
   PROMPT_VIDEO = 'prompt_video',
   PROMPT_IMAGE_CHECK = 'prompt_image_check',
+  PROMPT_VIDEO_CHECK = 'prompt_video_check',
   VECTOR_EPS = 'vector_eps',
   CALENDAR_GEN = 'calendar_gen'
 }
@@ -21,6 +22,7 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.PROMPT_IMAGE]: '/ImageToPrompt',
   [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
   [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
+  [ToolType.PROMPT_VIDEO_CHECK]: '/AiVideoQualityCheck',
   [ToolType.VECTOR_EPS]: '/EpsConverter',
   [ToolType.CALENDAR_GEN]: '/NicheCalendar'
 };

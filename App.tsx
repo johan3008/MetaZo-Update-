@@ -22,6 +22,7 @@ import { PromptGenView } from './src/components/PromptGenView';
 import { PromptImageView } from './src/components/PromptImageView';
 import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
+import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -999,6 +1000,8 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'imagetoprompt': return ToolType.PROMPT_IMAGE;
     case 'videokeywordanalyzer': return ToolType.PROMPT_VIDEO;
     case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
+    
+    case 'aivideoqualitycheck': return ToolType.PROMPT_VIDEO_CHECK;
     case 'epsconverter': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
     default: return null;
@@ -1454,6 +1457,8 @@ const App: React.FC = () => {
       ToolType.PROMPT_IMAGE,
       ToolType.PROMPT_VIDEO,
       ToolType.PROMPT_IMAGE_CHECK,
+      ToolType.PROMPT_VIDEO_CHECK,
+      ToolType.PROMPT_VIDEO_CHECK,
       ToolType.CALENDAR_GEN
     ];
     return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
@@ -1471,6 +1476,8 @@ const App: React.FC = () => {
       [ToolType.PROMPT_IMAGE]: getDailyCount(ToolType.PROMPT_IMAGE),
       [ToolType.PROMPT_VIDEO]: getDailyCount(ToolType.PROMPT_VIDEO),
       [ToolType.PROMPT_IMAGE_CHECK]: getDailyCount(ToolType.PROMPT_IMAGE_CHECK),
+      [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
+      [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
       [ToolType.VECTOR_EPS]: 0,
       [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN)
     });
