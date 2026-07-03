@@ -10,11 +10,24 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import ffprobeInstaller from '@ffprobe-installer/ffprobe';
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
+let ffmpeg: any;
+if (!process.env.VERCEL) {
+    try {
+        const req = typeof require !== 'undefined' ? require : null;
+        if (req) {
+            const m1 = 'fluent-ffmpeg';
+            const m2 = '@ffmpeg-installer/ffmpeg';
+            const m3 = '@ffprobe-installer/ffprobe';
+            ffmpeg = req(m1);
+            ffmpeg.setFfmpegPath(req(m2).path);
+            ffmpeg.setFfprobePath(req(m3).path);
+        }
+    } catch (e) {
+        console.warn('ffmpeg not available locally', e);
+    }
+}
+
 
 
 // TRICK: Strict Queue to prevent Server OOM.
@@ -1551,68 +1564,6 @@ app.get('/api/debug-uploads', (req, res) => {
                     console.log("[MANDOR GC] Memori dibersihkan untuk worker selanjutnya.");
                 }
             }, 100);
-        }
-    });
-
-    app.post('/api/extract-video-frames', upload.single('file'), async (req, res) => {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-        
-        const inputPath = req.file.path;
-        const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
-        
-        try {
-            fs.mkdirSync(outDir, { recursive: true });
-            
-            // First get duration
-            const duration = await new Promise<number>((resolve, reject) => {
-                ffmpeg.ffprobe(inputPath, (err, metadata) => {
-                    if (err) resolve(5); // fallback 5 seconds
-                    else resolve(metadata.format.duration || 5);
-                });
-            });
-
-            const seekTimes = [
-                duration * 0.1,
-                duration * 0.5,
-                duration * 0.9
-            ];
-            
-            const frames: string[] = [];
-            
-            for (let i = 0; i < seekTimes.length; i++) {
-                const outName = `frame_${i}.jpg`;
-                const outPath = path.join(outDir, outName);
-                
-                await new Promise<void>((resolve, reject) => {
-                    ffmpeg(inputPath)
-                        .setStartTime(seekTimes[i])
-                        .frames(1)
-                        .size('320x?') // Maintain aspect ratio
-                        .outputOptions(['-q:v', '2'])
-                        .output(outPath)
-                        .on('end', () => resolve())
-                        .on('error', (err) => reject(err))
-                        .run();
-                });
-                
-                const data = fs.readFileSync(outPath);
-                const base64 = `data:image/jpeg;base64,${data.toString('base64')}`;
-                frames.push(base64);
-            }
-            
-            res.json({ frames });
-        } catch (error: any) {
-            console.error('Error extracting video frames:', error);
-            res.status(500).json({ error: 'Failed to extract video frames', details: error.message });
-        } finally {
-            if (fs.existsSync(inputPath)) {
-                fs.rmSync(inputPath, { force: true });
-            }
-            if (fs.existsSync(outDir)) {
-                fs.rmSync(outDir, { recursive: true, force: true });
-            }
         }
     });
 
