@@ -1,4 +1,5 @@
 import express from 'express';
+import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
 import { exec, spawn } from 'child_process';
 import util from 'util';
