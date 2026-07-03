@@ -96,10 +96,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [tempPriceUnlimitedUSD, setTempPriceUnlimitedUSD] = useState(() => localStorage.getItem('mz_price_unlimited_usd') || '$14');
 
   // Pakasir Configuration States
-  const [pakasirProject, setPakasirProject] = useState(() => localStorage.getItem('mz_pakasir_project') || '');
-  const [pakasirApiKey, setPakasirApiKey] = useState(() => localStorage.getItem('mz_pakasir_apikey') || '');
-  const [tempPakasirProject, setTempPakasirProject] = useState(() => localStorage.getItem('mz_pakasir_project') || '');
-  const [tempPakasirApiKey, setTempPakasirApiKey] = useState(() => localStorage.getItem('mz_pakasir_apikey') || '');
+  const [pakasirProject, setPakasirProject] = useState(() => import.meta.env.VITE_PAKASIR_PROJECT_SLUG || localStorage.getItem('mz_pakasir_project') || '');
+  const [pakasirApiKey, setPakasirApiKey] = useState(() => import.meta.env.VITE_PAKASIR_API_KEY || localStorage.getItem('mz_pakasir_apikey') || '');
+  const [tempPakasirProject, setTempPakasirProject] = useState(() => import.meta.env.VITE_PAKASIR_PROJECT_SLUG || localStorage.getItem('mz_pakasir_project') || '');
+  const [tempPakasirApiKey, setTempPakasirApiKey] = useState(() => import.meta.env.VITE_PAKASIR_API_KEY || localStorage.getItem('mz_pakasir_apikey') || '');
   const [checkoutUrl, setCheckoutUrl] = useState('');
   const [checkoutDataUrl, setCheckoutDataUrl] = useState('');
   const [checkoutOrderId, setCheckoutOrderId] = useState('');
