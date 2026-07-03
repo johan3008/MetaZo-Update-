@@ -1804,6 +1804,9 @@ const App: React.FC = () => {
   // Trigger login promo modal if user is on a free trial account
   useEffect(() => {
     if (user && hasSyncedProfile && !isCheckingAuth && !isCheckingLicense) {
+      // Ensure state has caught up with synchronous localStorage updates before showing promos
+      if (mzLicenseKey !== (localStorage.getItem('mz_license_key') || '')) return;
+
       if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
         sessionStorage.removeItem('mz_just_logged_in_promo');
         // If the synced profile reveals they are NOT licensed (free trial account)
@@ -1812,7 +1815,7 @@ const App: React.FC = () => {
         }
       }
     }
-  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense]);
+  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense, mzLicenseKey]);
 
   // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
