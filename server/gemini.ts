@@ -95,7 +95,7 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'bluesminds', 'aivene']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -619,7 +619,7 @@ async function callOpenAICompatibleWithRetry(params: {
     const messages: any[] = [];
     let userSystemInstruction = '';
     if (params.systemInstruction) {
-      if (provider === 'bluesminds' || provider === 'aivene') {
+      if (provider === 'aivene') {
         userSystemInstruction = `[SYSTEM INSTRUCTION]\n${params.systemInstruction}\n\n[USER INPUT]\n`;
       } else {
         messages.push({ role: 'system', content: params.systemInstruction });
@@ -711,6 +711,10 @@ async function callOpenAICompatibleWithRetry(params: {
       messages,
       temperature: params.config?.temperature ?? 0.85,
     };
+    
+    if (params.config?.topP !== undefined) {
+      payload.top_p = params.config.topP;
+    }
 
     if (SUPPORTS_JSON_MODE.has(provider)) {
       payload.response_format = { type: "json_object" };
@@ -1069,16 +1073,21 @@ export const generateStockMetadata = async (
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail'
 ): Promise<StockMetadata> => {
-  let activeModel = model;
-  if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-    activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
-  }
-  const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
-  const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
-  
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
+  let activeModel = model;
+  if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    }
+  } else if (!activeModel) {
+    activeModel = PROVIDER_DEFAULT_MODELS[provider];
+  }
+
+  const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
+  const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
+  
   const imageParts = frames.map(frame => processFrameServer(frame));
 
   // Amankan hitungan target keyword sejak awal
@@ -1254,7 +1263,7 @@ OUTPUT FORMAT:
     }, {
       systemInstruction: visionSystemInstruction,
       responseMimeType: "application/json",
-      temperature: temperature ?? 0.1,
+      temperature: 0.0,
       topP: 0.8 });
     
     visualFactsJson = visionResponse.text || "{}";
@@ -1650,10 +1659,18 @@ export const generateBatchStockMetadata = async (
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail'
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
   let activeModel = model;
-  if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-    activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    }
+  } else if (!activeModel) {
+    activeModel = PROVIDER_DEFAULT_MODELS[provider];
   }
+
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
@@ -1739,8 +1756,6 @@ export const generateBatchStockMetadata = async (
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
@@ -1835,7 +1850,7 @@ OUTPUT FORMAT:
           }, {
             systemInstruction: visionSystemInstruction,
             responseMimeType: "application/json",
-            temperature: temperature ?? 0.1,
+            temperature: 0.0,
             topP: 0.8 });
           
           let facts = visionResponse.text || "{}";
@@ -2993,47 +3008,27 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
   let responseText = "";
 
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-      let attempts = 0;
-      while(attempts < 2) {
-          try {
-              responseText = await callOpenAICompatibleWithRetry({
-                  systemInstruction,
-                  contents: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }],
-                  responseMimeType: "application/json",
-                  responseSchema,
-                  config: { temperature: 0.8 },
-                  model
-              });
-              break;
-          } catch(err: any) {
-              lastError = err;
-              attempts++;
-              console.warn(`[analyzeImageToPrompt] ${provider.toUpperCase()} failed attempt ${attempts}:`, err.message);
-              if (attempts < 2) await new Promise(r => setTimeout(r, 1000));
-          }
-      }
-  } else {
-    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-    for (const modelName of modelsToTryList) {
-      try {
-        response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema
-        });
-        responseText = response.text || "{}";
-        break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
-        if (err.message && err.message.includes('API_KEY')) throw err;
-      }
+  // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
+  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  for (const modelName of modelsToTryList) {
+    try {
+      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.0
+      });
+      responseText = response.text || "{}";
+      break;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      if (err.message && err.message.includes('API_KEY')) throw err;
     }
   }
 
@@ -3107,47 +3102,27 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-      let attempts = 0;
-      while(attempts < 2) {
-          try {
-              responseText = await callOpenAICompatibleWithRetry({
-                  systemInstruction,
-                  contents: parts,
-                  responseMimeType: "application/json",
-                  responseSchema,
-                  config: { temperature: 0.8 },
-                  model
-              });
-              break;
-          } catch(err: any) {
-              lastError = err;
-              attempts++;
-              console.warn(`[analyzeBatchImageToPrompt] ${provider.toUpperCase()} failed attempt ${attempts}:`, err.message);
-              if (attempts < 2) await new Promise(r => setTimeout(r, 1000));
-          }
-      }
-  } else {
-      const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-      for (const modelName of modelsToTryList) {
-        try {
-          const res = await callGeminiWithRetry(modelName, { parts }, {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema
-          });
-          responseText = res.text || "[]";
-          break;
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
-          if (err.message && err.message.includes('API_KEY')) throw err;
-        }
-      }
+  // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
+  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  for (const modelName of modelsToTryList) {
+    try {
+      const res = await callGeminiWithRetry(modelName, { parts }, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.0
+      });
+      responseText = res.text || "[]";
+      break;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      if (err.message && err.message.includes('API_KEY')) throw err;
+    }
   }
 
   if (!responseText) {
@@ -3223,21 +3198,15 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
   };
 
   let responseText = "";
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    responseText = await callOpenAICompatibleWithRetry({
-      contents: prompt,
-      responseMimeType: "application/json",
-      responseSchema,
-      config: { temperature: 0.7 },
-      model
-    });
-  } else {
-    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
-      responseMimeType: "application/json",
-      responseSchema
-    });
-    responseText = response.text || "{}";
-  }
+  // Forcing Gemini for Video Analysis to ensure consistency and prevent variations across providers
+  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+    responseMimeType: "application/json",
+    responseSchema,
+    temperature: 0.0,
+    topK: 1,
+    topP: 0.1
+  });
+  responseText = response.text || "{}";
 
   return JSON.parse(responseText) as VideoAnalysisResult;
 };
@@ -3319,6 +3288,8 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
 
 ATURAN PALING PENTING (CRITICAL RULE):
+KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Analisis Anda akan diulang 2x sampai 5x oleh sistem. Hasil Anda WAJIB 100% konsisten pada setiap pengulangan. DILARANG KERAS menebak-nebak, berasumsi, atau mengarang masalah (hallucination). Jika cacat tidak terlihat SANGAT JELAS secara visual, jangan dicantumkan.
+Unfortunately, during our review we found that it contains one or more technical issues. Common issues that can impact the technical quality of images include exposure issues, soft focus, excessive filtering or artifacts/noise.
 1. PEMINDAIAN KESELURUHAN (FULL SCAN): Anda WAJIB memeriksa KESELURUHAN gambar dari ujung ke ujung (corner-to-corner), bukan hanya fokus pada bagian tengah atau subjek utama saja. Periksa setiap tepi, sudut, background, dan elemen kecil.
 2. SANGAT KETAT TERHADAP 4 ISU UTAMA ADOBE STOCK: Anda harus SANGAT SENSITIF dan TANPA AMPUN terhadap:
    - EXPOSURE ISSUES (Overexposure, underexposure, highlight yang blown out, atau shadow yang terlalu gelap).
@@ -3369,23 +3340,29 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
    - Verify all technical requirements are met.`;
 
   if (isVideo) {
-      systemInstruction += `
-
+    systemInstruction += `
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
-Ini adalah cuplikan frame dari sebuah file Video. Anda WAJIB menganalisa dan MENCARI indikasi dari "Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues."
-Perhatikan secara khusus jika frame ini mengindikasikan:
-- Kompresi video yang sangat buruk (compression blocks).
-- Empty black or white frame (frame kosong/hitam pekat/putih pekat yang tidak disengaja di awal atau tengah).
-- Indikasi shaking, skew, jello effects, flash banding, atau format/color grading yang salah.
-- Maintain video quality: High‑quality video content should be stable, clear, and technically consistent. Consider the following: Use a tripod or stabilizer for smooth, stable footage. Avoid rolling‑shutter artifacts such as skew, jello effects, or flash banding. Apply correct formats and color grading.
-- Jika terindikasi ada masalah teknis video, tambahkan ke technical_issues secara spesifik.`;
+Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.
+Ini adalah SATU CUPLIKAN FRAME diam dari sebuah file Video. Anda HANYA BISA menganalisis aspek visual statis dari frame ini.
+PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN, dan tidak berubah-ubah pada 2x sampai 5x pengulangan. Jangan mengarang masalah yang tidak kasat mata!
+
+MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
+1. Rolling-Shutter Artifacts: Cek apakah ada efek skew (distorsi miring) yang parah pada garis vertikal atau objek bergerak, jello effects, atau flash banding (garis/pita horizontal dengan exposure berbeda).
+2. Stability & Blur: Jika terlihat motion blur yang sangat ekstrem pada subjek utama (bukan disengaja) sehingga merusak kualitas visual, tandai sebagai isu.
+3. Kompresi & Kualitas Pixel: Cari blok kompresi (compression artifacts), noise digital berlebih, pixelation, atau color banding yang sangat buruk di latar belakang.
+4. Exposure & Pencahayaan: Cek apakah overexposed (blown out) atau underexposed (crushed blacks).
+5. Frame Kosong: Apakah frame ini secara tidak sengaja kosong (hitam/putih pekat).
+
+KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
+JIKA TIDAK ADA MASALAH VISUAL FATAL ATAU ARTIFACT (SEPERTI SKEW/FLASH BANDING) YANG SANGAT JELAS PADA FRAME INI, BERIKAN STATUS PASS.
+DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELANGGARAN IP ATAU CACAT FATAL! Berhentilah menebak-nebak (No hallucination)!`;
   }
 
   if (isVector) {
       systemInstruction += `
 
 ATURAN KHUSUS VEKTOR (MAINTAIN VECTOR QUALITY):
-Ini adalah pratinjau dari sebuah file Vektor (EPS/AI/SVG). Anda WAJIB menganalisa kualitas Vektor dengan prinsip: "Vector content must be clean, scalable, and easy to edit."
+Ini adalah pratinjau dari sebuah file Vektor (EPS/AI/SVG). Anda WAJIB menganalisa kualitas Vektor dengan prinsip: "Vector content must be clean, scalable, and easy to edit." Analisis harus BERDASARKAN FAKTA VISUAL JELAS, jangan tebak-tebakan. Konsistensi mutlak diperlukan saat diuji berkali-kali.
 Perhatikan secara khusus indikasi berikut:
 1. Gaps in Shape Paths: Cek apakah ada bentuk/shape yang terpotong atau tidak tertutup sempurna secara visual (Close all shape paths fully to prevent gaps).
 2. Embedded Raster Images: Deteksi jika ada bagian dari gambar ini yang terlihat seperti sisipan foto/bitmap/raster pecah yang tidak scalable. Vektor murni tidak boleh mengandalkan foto bitmap. (Avoid embedding raster images to maintain scalability).
@@ -3471,43 +3448,27 @@ Respons Anda WAJIB dalam format JSON:
 
   const imagePart = processFrameServer(image);
   
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
+  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  for (const modelName of modelsToTryList) {
     try {
-      const res = await callOpenAICompatibleWithRetry({
+      const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
         systemInstruction,
-        contents: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }],
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.0 },
-        model
+        temperature: 0.0,
+        topK: 1,
+        topP: 0.1
       });
-      responseText = res;
+      responseText = res.text || "{}";
+      break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[checkImageQuality] Failed with ${provider.toUpperCase()}:`, err.message || err);
+      console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
       if (err.message && err.message.includes('API_KEY')) throw err;
-    }
-  } else {
-    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-    for (const modelName of modelsToTryList) {
-      try {
-        const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-          temperature: 0.0
-        });
-        responseText = res.text || "{}";
-        break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
-        if (err.message && err.message.includes('API_KEY')) throw err;
-      }
     }
   }
 
