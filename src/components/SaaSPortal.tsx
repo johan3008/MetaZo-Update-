@@ -978,7 +978,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       if (dSnap.exists()) {
         const data = dSnap.data();
         if (data.activated) {
-          if (data.activatedBy === devId || data.activatedBy === userEmail) {
+          if (data.activatedBy === devId || (userEmail && data.activatedBy === userEmail)) {
             if (data.duration === '30days' && data.activatedAt) {
               const activatedTime = new Date(data.activatedAt).getTime();
               const nowTime = new Date().getTime();
@@ -989,6 +989,13 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 setIsActivating(false);
                 return;
               }
+            }
+            // Link device-bound key to user email if logged in
+            if (userEmail && data.activatedBy === devId) {
+              await updateDoc(keyRef, {
+                activatedBy: userEmail,
+                updatedAt: new Date().toISOString()
+              }).catch(console.error);
             }
             localStorage.setItem('mz_license_key', targetKeyFormatted);
             await syncUserDb(targetKeyFormatted);

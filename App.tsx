@@ -1933,6 +1933,51 @@ const App: React.FC = () => {
         if (dSnap.exists()) {
           const data = dSnap.data();
           if (data.activated) {
+            // Check if this key belongs to another account (1 key 1 account restriction)
+            const currentEmail = user?.email || '';
+            const keyActivatedBy = data.activatedBy || '';
+
+            const isEmail = (str: string) => str.includes('@');
+
+            let isRejected = false;
+            if (isEmail(keyActivatedBy)) {
+              // Bound to an email, must match the current logged-in user's email
+              if (!currentEmail || keyActivatedBy.toLowerCase() !== currentEmail.toLowerCase()) {
+                isRejected = true;
+              }
+            } else if (keyActivatedBy && keyActivatedBy !== devId) {
+              // Bound to another device ID and no email is associated with it yet
+              isRejected = true;
+            }
+
+            if (isRejected) {
+              setIsMzLicensed(false);
+              setSubDaysLeft(null);
+              localStorage.removeItem('mz_license_key');
+              setMzLicenseKey('');
+              // Remove it from the logged-in user's cloud document to prevent re-syncing
+              if (user) {
+                const userRef = doc(db, 'users', user.uid);
+                updateDoc(userRef, {
+                  licenseKey: '',
+                  updatedAt: new Date().toISOString()
+                }).catch(console.error);
+              }
+              setIsCheckingLicense(false);
+              alert(localStorage.getItem('mz_language') === 'Bahasa'
+                ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.' 
+                : 'This license key is already registered to another account! One license can only be used on one account.');
+              return;
+            }
+
+            // Link device-bound activation to user's email when they log in
+            if (user && user.email && keyActivatedBy === devId) {
+              updateDoc(doc(db, 'keys', k), {
+                activatedBy: user.email,
+                updatedAt: new Date().toISOString()
+              }).catch(e => console.error("Failed to link key to user email:", e));
+            }
+
             // Check if 30days subscription is expired
             if (data.duration === '30days' && data.activatedAt) {
               const activatedTime = new Date(data.activatedAt).getTime();
@@ -1976,7 +2021,7 @@ const App: React.FC = () => {
       .finally(() => {
         setIsCheckingLicense(false);
       });
-  }, [mzLicenseKey]);
+  }, [mzLicenseKey, user]);
 
   const handleTryUnlockReseller = (typedVal?: string) => {
     const val = (typedVal !== undefined ? typedVal : resellerPasscodeVal).trim();
