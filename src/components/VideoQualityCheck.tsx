@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getDailyLimit } from '../../constants';
 
@@ -65,6 +65,14 @@ export const VideoQualityCheck: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
+  const [r2Configured, setR2Configured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/r2-status')
+      .then(res => res.json())
+      .then(data => setR2Configured(!!data.configured))
+      .catch(() => setR2Configured(false));
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -252,6 +260,27 @@ export const VideoQualityCheck: React.FC<{
       )}
 
       {/* Error Message */}
+      {r2Configured === false && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-500/10 dark:bg-amber-500/[0.03] border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3"
+        >
+          <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-[10px] font-black tracking-wider uppercase text-amber-700 dark:text-amber-400">
+              {t.language === 'Bahasa' ? 'SARAN KONFIGURASI CLOUDFLARE R2' : 'CLOUDFLARE R2 RECOMMENDED'}
+            </h4>
+            <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+              {t.language === 'Bahasa' 
+                ? 'Vercel membatasi ukuran request maksimum 4.5MB. Untuk menganalisis file video beresolusi tinggi atau file besar tanpa batasan ukuran payload, silakan konfigurasikan Cloudflare R2 di Settings menu.'
+                : 'Vercel limits request payloads to 4.5MB. To analyze high-resolution videos or large files with no file size limitations, please configure Cloudflare R2 in the Settings menu.'
+              }
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <AnimatePresence>
         {error && (
           <motion.div 
