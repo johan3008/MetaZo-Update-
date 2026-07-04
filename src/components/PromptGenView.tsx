@@ -18,6 +18,7 @@ interface PromptGenViewProps {
   aiOptions?: any;
   user?: any;
   db?: any;
+  uiLanguage?: 'id' | 'en';
 }
 
 interface PromptHistoryItem {
@@ -75,7 +76,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   incrementDailyCount,
   aiOptions,
   user,
-  db
+  db,
+  uiLanguage = 'en'
 }) => {
   const [subject, setSubject] = useState('');
 
@@ -90,6 +92,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
   const [minWords, setMinWords] = useState<number>(15);
   const [maxWords, setMaxWords] = useState<number>(60);
+  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1000000));
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [promptMode, setPromptMode] = useState<'background' | 'png'>('background');
@@ -340,7 +343,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           minWords,
           maxWords,
           userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim(),
-          model: aiOptions?.model
+          model: aiOptions?.model,
+          seed
         })
       });
 
@@ -821,6 +825,40 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   {t.prompt_word_count_desc}
                 </p>
               </div>
+
+              {/* 5. Seed Variation Config */}
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 p-4 rounded-[1.5rem]">
+                <div className="flex justify-between items-center text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                  <span>{uiLanguage === 'id' ? '🎲 Variasi Seed (Entropy)' : '🎲 Variation Seed (Entropy)'}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-[1.5rem] p-4 font-mono shadow-sm">
+                    {seed}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    placeholder="E.g. 12345"
+                    className="flex-1 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSeed(Math.floor(Math.random() * 1000000))}
+                    className="p-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl transition-all shadow-sm flex items-center justify-center cursor-pointer w-10 shrink-0"
+                    title={uiLanguage === 'id' ? 'Acak Seed' : 'Randomize Seed'}
+                  >
+                    <RefreshCw size={14} className="animate-spin-slow text-white" />
+                  </button>
+                </div>
+
+                <p className="text-[9px] text-slate-400 dark:text-slate-550 font-medium leading-relaxed italic">
+                  {uiLanguage === 'id' 
+                    ? "Masukkan nilai seed manual untuk replikasi layout, atau acak seed untuk memaksimalkan variasi dan menghindari pola prompt monoton." 
+                    : "Enter a manual seed to replicate specific composition layouts, or randomize to maximize prompt variation and avoid repetitiveness."}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -979,6 +1017,29 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
             ) : result && result.prompts && result.prompts.length > 0 ? (
               <div className="space-y-4 animate-in fade-in duration-200">
+                
+                {/* Adobe Stock Similarity Protection Alert Banner */}
+                <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-[1.5rem] p-4 flex gap-3 items-start shadow-sm">
+                  <span className="text-lg">🛡️</span>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+                      {uiLanguage === 'id' ? 'Proteksi Anti-Kesamaan Adobe Stock Aktif' : 'Adobe Stock Similarity Protection Active'}
+                    </h4>
+                    <p className="text-[10.5px] text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
+                      {uiLanguage === 'id' 
+                        ? "Prompt di bawah ini telah dioptimalkan secara otomatis untuk menghasilkan perbedaan mencolok dalam komposisi, warna, ekspresi, atau skenario guna menghindari penolakan konten duplikat/repetitif dari moderator Adobe Stock." 
+                        : "The prompts below are dynamically randomized and structured with Noticeable Differences in composition, color, expression, and scenarios to safely clear Adobe Stock's strict anti-repetitive moderation."}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/20">
+                        {uiLanguage === 'id' ? 'Komposisi Variatif' : 'Noticeable Variations'}
+                      </span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/20">
+                        {uiLanguage === 'id' ? 'Bebas Klona' : 'Anti-Clone Engine'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 
                 {/* No filter matching message */}
                 {totalPrompts === 0 && (

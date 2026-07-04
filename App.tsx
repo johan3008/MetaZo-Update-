@@ -3823,6 +3823,7 @@ const App: React.FC = () => {
           ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView 
               t={t} 
+              uiLanguage={uiLanguage}
               prefilledSubject={prefilledSubject} 
               onPrefillConsumed={() => setPrefilledSubject('')} 
               isLicensed={isMzLicensed}

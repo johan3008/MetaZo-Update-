@@ -2362,6 +2362,7 @@ export const generateOptimizedPrompt = async (options: {
   minWords?: number;
   maxWords?: number;
   model?: string;
+  seed?: number;
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -2372,7 +2373,8 @@ export const generateOptimizedPrompt = async (options: {
     userNegativePrompt = '',
     minWords = 10,
     maxWords = 70,
-    model = undefined
+    model = undefined,
+    seed = Math.floor(Math.random() * 1000000)
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
@@ -2384,14 +2386,25 @@ export const generateOptimizedPrompt = async (options: {
   const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky"];
   const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream"];
 
-  const randomAngle = angles[Math.floor(Math.random() * angles.length)];
-  const randomLighting = lightings[Math.floor(Math.random() * lightings.length)];
-  const randomComp = compositions[Math.floor(Math.random() * compositions.length)];
-  const randomSeason = seasonsOrWeathers[Math.floor(Math.random() * seasonsOrWeathers.length)];
-  const randomColor = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
-  const uniqueSeed = Math.floor(Math.random() * 100000);
+  // Linear Congruential Generator (PRNG) using the seed to ensure deterministic but highly varied selections
+  let currentSeed = seed;
+  const prng = () => {
+    currentSeed = (currentSeed * 9301 + 49297) % 233280;
+    return currentSeed / 233280;
+  };
+  
+  const selectRandom = <T>(arr: T[]): T => {
+    const r = prng();
+    return arr[Math.floor(r * arr.length)];
+  };
 
-  const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${uniqueSeed}]`;
+  const randomAngle = selectRandom(angles);
+  const randomLighting = selectRandom(lightings);
+  const randomComp = selectRandom(compositions);
+  const randomSeason = selectRandom(seasonsOrWeathers);
+  const randomColor = selectRandom(colorPalettes);
+
+  const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -2434,10 +2447,8 @@ export const generateOptimizedPrompt = async (options: {
 CRITICAL PNG MODE SETTINGS:
 - The user requests PNG Asset style generation.
 - All generated prompt variations MUST strictly place the main subject "${subject}" isolated on a solid ${pngBgColor} background.
-- Vary the count and arrangement of the subjects dynamically across prompts to ensure rich variation and prevent repetitiveness:
-  * Some prompts MUST feature a single standalone object (e.g., a single prominent item).
-  * Some prompts MUST feature exactly two related or complementary objects (e.g., a pair, a main item alongside its accessory, packaging, ingredient, or a split open/closed view).
-  * Some prompts MUST feature an elegant multi-angle collection, a neat flat lay, or an organic arrangement of 3+ items.
+- Focus on a premium, high-end commercial presentation of the subject with exquisite detailing, high fidelity, and ultra-clean studio quality.
+- The arrangement and styling are fully flexible—let the AI design the composition dynamically, prioritizing a professional, high-end visual asset.
 - You must explicitly append tags such as "isolated on a plain ${pngBgColor} background", "solid flat ${pngBgColor} backdrop", or "pure solid ${pngBgColor} background, no shadows" into the prompt variations.
 ${currentDirective}
 ${stickerPrevention}
@@ -2499,6 +2510,7 @@ Rules for the Generated Prompts:
     You MUST adhere exactly to Adobe Stock's "Similar vs. Spamming" guidelines. Adobe Stock rejects content with the reason: "During our review, we found that your submission closely resembles content already available on Adobe Stock... we refuse content that is too repetitive so customers can easily find distinct and relevant content."
     - EVERY SINGLE PROMPT in the batch MUST be clearly, visibly, and dramatically differentiated from the others to prevent "Similar content" flag rejections.
     - Do NOT just make minimal variations (e.g., just changing a shirt color or moving a prop slightly). Each prompt must be a visually distinct, unique, and standalone masterpiece.
+    - Moderators look for NOTICEABLE DIFFERENCES including variations in composition, color, expression, or scenario. You must be extremely selective and output only your most varied, premium, and distinct concepts.
     - Inject extreme variation across:
       * Composition & Camera Angle: Vary across wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, and overhead drone shots.
       * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
