@@ -70,12 +70,21 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
 
   // Load history with cloud sync
   useEffect(() => {
+    // Load deleted video history item IDs to prevent resurrection
+    let deletedIds: string[] = [];
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_video_ids');
+      if (deletedStored) {
+        deletedIds = JSON.parse(deletedStored);
+      }
+    } catch (e) {}
+
     // 1. First load from local storage
     let localHistory: HistoryItem[] = [];
     try {
       const stored = localStorage.getItem('metazo_video_analysis_history');
       if (stored) {
-        localHistory = JSON.parse(stored);
+        localHistory = JSON.parse(stored).filter((item: any) => !deletedIds.includes(item.id));
         setHistory(localHistory);
       }
     } catch (e) {}
@@ -91,11 +100,13 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               const combinedMap = new Map<string, HistoryItem>();
               // Add cloud items first
               cloudData.videoHistory.forEach((item: any) => {
-                combinedMap.set(item.id, item);
+                if (!deletedIds.includes(item.id)) {
+                  combinedMap.set(item.id, item);
+                }
               });
               // Add local items
               localHistory.forEach((item: any) => {
-                if (!combinedMap.has(item.id)) {
+                if (!combinedMap.has(item.id) && !deletedIds.includes(item.id)) {
                   combinedMap.set(item.id, item);
                 }
               });
@@ -172,8 +183,22 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       }
 
       // Save to history
+      const newItemId = `vid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // If the saved item ID was previously in deletedIds, remove it
+      try {
+        const deletedStored = localStorage.getItem('metazo_deleted_video_ids');
+        if (deletedStored) {
+          let deletedIds: string[] = JSON.parse(deletedStored);
+          if (deletedIds.includes(newItemId)) {
+            deletedIds = deletedIds.filter(id => id !== newItemId);
+            localStorage.setItem('metazo_deleted_video_ids', JSON.stringify(deletedIds));
+          }
+        }
+      } catch (e) {}
+
       const newItem: HistoryItem = {
-        id: `vid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: newItemId,
         keyword: keyword.trim(),
         result: data,
         timestamp: Date.now()
@@ -199,6 +224,18 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   };
 
   const clearHistory = () => {
+    // Add all current IDs to deletedIds list to prevent resurrection
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_video_ids');
+      let deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+      history.forEach(item => {
+        if (!deletedIds.includes(item.id)) {
+          deletedIds.push(item.id);
+        }
+      });
+      localStorage.setItem('metazo_deleted_video_ids', JSON.stringify(deletedIds));
+    } catch (e) {}
+
     setHistory([]);
     localStorage.removeItem('metazo_video_analysis_history');
 
@@ -212,6 +249,16 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   };
 
   const removeHistoryItem = (id: string) => {
+    // Add to deletedIds list to prevent resurrection
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_video_ids');
+      let deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem('metazo_deleted_video_ids', JSON.stringify(deletedIds));
+      }
+    } catch (e) {}
+
     const updated = history.filter(item => item.id !== id);
     setHistory(updated);
     localStorage.setItem('metazo_video_analysis_history', JSON.stringify(updated));

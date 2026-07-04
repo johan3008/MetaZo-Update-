@@ -138,6 +138,15 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
   // Load history with backward compatibility and cloud sync
   useEffect(() => {
+    // Load deleted prompt history item IDs to prevent resurrection
+    let deletedIds: string[] = [];
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_prompt_ids');
+      if (deletedStored) {
+        deletedIds = JSON.parse(deletedStored);
+      }
+    } catch (e) {}
+
     // 1. First load from local storage
     let localHistory: PromptHistoryItem[] = [];
     try {
@@ -148,7 +157,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           localHistory = parsed.map((item: any) => ({
             ...item,
             prompts: item.prompts || (item.optimizedPrompt ? [item.optimizedPrompt] : [item.subject])
-          }));
+          })).filter((item: any) => !deletedIds.includes(item.id));
           setHistory(localHistory);
         }
       }
@@ -167,11 +176,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               const combinedMap = new Map<string, PromptHistoryItem>();
               // Add cloud items first (so they are preferred if matching ids)
               cloudData.promptGenHistory.forEach((item: any) => {
-                combinedMap.set(item.id, item);
+                if (!deletedIds.includes(item.id)) {
+                  combinedMap.set(item.id, item);
+                }
               });
               // Add local items (overwrite or fill missing)
               localHistory.forEach((item: any) => {
-                if (!combinedMap.has(item.id)) {
+                if (!combinedMap.has(item.id) && !deletedIds.includes(item.id)) {
                   combinedMap.set(item.id, item);
                 }
               });
@@ -202,6 +213,18 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   }, [user, db]);
 
   const saveToHistory = (newItem: PromptHistoryItem) => {
+    // If the saved item ID was previously in deletedIds, remove it
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_prompt_ids');
+      if (deletedStored) {
+        let deletedIds: string[] = JSON.parse(deletedStored);
+        if (deletedIds.includes(newItem.id)) {
+          deletedIds = deletedIds.filter(id => id !== newItem.id);
+          localStorage.setItem('metazo_deleted_prompt_ids', JSON.stringify(deletedIds));
+        }
+      }
+    } catch (e) {}
+
     const updated = [newItem, ...history.slice(0, 29)]; // limit to last 30 items
     setHistory(updated);
     try {
@@ -218,6 +241,18 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   };
 
   const handleClearHistory = () => {
+    // Add all current IDs to deletedIds list to prevent resurrection
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_prompt_ids');
+      let deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+      history.forEach(item => {
+        if (!deletedIds.includes(item.id)) {
+          deletedIds.push(item.id);
+        }
+      });
+      localStorage.setItem('metazo_deleted_prompt_ids', JSON.stringify(deletedIds));
+    } catch (e) {}
+
     setHistory([]);
     try {
       localStorage.removeItem('metazo_prompt_history_simple');
@@ -234,6 +269,17 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
   const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Add to deletedIds list to prevent resurrection
+    try {
+      const deletedStored = localStorage.getItem('metazo_deleted_prompt_ids');
+      let deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem('metazo_deleted_prompt_ids', JSON.stringify(deletedIds));
+      }
+    } catch (e) {}
+
     const updated = history.filter(item => item.id !== id);
     setHistory(updated);
     try {
