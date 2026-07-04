@@ -75,17 +75,58 @@ export const VideoQualityCheck: React.FC<{
     setError(null);
     setReport(null);
 
-    const formData = new FormData();
-    formData.append('video', file);
-    formData.append('tolerance', tolerance);
-    formData.append('language', aiOptions?.language || 'Bahasa');
-    formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
-
     try {
-      const response = await fetch('/api/check-video-quality', {
-        method: 'POST',
-        body: formData,
-      });
+      let response;
+      let uploadedUrl = null;
+      let getUrlData = null;
+
+      // 1. Try to upload to Cloudflare R2 first to bypass Vercel limits
+      try {
+        const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
+        if (getUrlRes.ok) {
+          getUrlData = await getUrlRes.json().catch(() => ({}));
+          if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+            console.log(`[Video Audit] Uploading to Cloudflare R2 directly: ${file.name}`);
+            const putRes = await fetch(getUrlData.uploadUrl, {
+              method: 'PUT',
+              body: file,
+              headers: { 'Content-Type': file.type || 'video/mp4' }
+            });
+            if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
+            uploadedUrl = getUrlData.fileUrl;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("[Video Audit] Failed to upload to Cloudflare R2, falling back to server multipart:", uploadErr);
+      }
+
+      // 2. Call backend endpoint to audit the video
+      if (uploadedUrl) {
+        console.log(`[Video Audit] Triggering R2-based check-video-quality: ${uploadedUrl}`);
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileUrl: uploadedUrl,
+            pathKey: getUrlData?.pathKey,
+            tolerance,
+            language: aiOptions?.language || 'Bahasa',
+            model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
+          })
+        });
+      } else {
+        console.log(`[Video Audit] Falling back to multipart form-data upload: ${file.name}`);
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('tolerance', tolerance);
+        formData.append('language', aiOptions?.language || 'Bahasa');
+        formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
+
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          body: formData,
+        });
+      }
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));

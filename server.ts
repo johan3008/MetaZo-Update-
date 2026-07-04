@@ -964,11 +964,34 @@ app.get('/api/debug-uploads', (req, res) => {
 
 
     app.post('/api/check-video-quality', upload.single('video'), async (req, res) => {
+        let videoPath = '';
+        let cleanupFn = () => {};
         try {
-            if (!req.file) {
-                return res.status(400).json({ error: 'No video uploaded' });
+            let tolerance = '';
+            let language = '';
+            let model = '';
+
+            if (req.file) {
+                videoPath = req.file.path;
+                tolerance = req.body.tolerance;
+                language = req.body.language;
+                model = req.body.model;
+                cleanupFn = () => {
+                    try { if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch (e) {}
+                };
+            } else if (req.body.fileUrl) {
+                const { fileUrl, pathKey, tolerance: bodyTolerance, language: bodyLanguage, model: bodyModel } = req.body;
+                tolerance = bodyTolerance;
+                language = bodyLanguage;
+                model = bodyModel;
+                
+                const ext = path.extname(fileUrl.split('?')[0]) || '.mp4';
+                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
+                videoPath = downloadResult.localPath;
+                cleanupFn = downloadResult.cleanup;
+            } else {
+                return res.status(400).json({ error: 'No video uploaded or fileUrl provided.' });
             }
-            const videoPath = req.file.path;
             
             if (!ffmpeg) {
                 return res.status(500).json({ error: 'ffmpeg is not initialized on the server.' });
@@ -1045,20 +1068,16 @@ app.get('/api/debug-uploads', (req, res) => {
                 extractFast();
             });
 
-            const { tolerance, language, model } = req.body;
             console.log('Server check-video-quality: Analyzing frames with Gemini...');
             const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model);
             console.log('Server check-video-quality: Analysis successful');
             
-            // Clean up uploaded video
-            fs.unlinkSync(videoPath);
+            cleanupFn();
 
             res.json(data);
-        } catch (e) {
+        } catch (e: any) {
             console.warn('Server check-video-quality error:', e);
-            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
-            }
+            cleanupFn();
             res.status(500).json({ error: e.message || 'Error checking video quality' });
         }
     });
@@ -1066,24 +1085,51 @@ app.get('/api/debug-uploads', (req, res) => {
     app.post('/api/mute-video', upload.single('video'), async (req, res) => {
         let inputPath = '';
         let originalPath = '';
+        let outputPath = '';
+        let cleanupFn = () => {};
+        
         try {
-            if (!req.file) {
-                return res.status(400).json({ error: 'Tidak ada file video yang diunggah.' });
-            }
             if (!ffmpeg) {
                 return res.status(500).json({ error: 'ffmpeg tidak terinisialisasi di server.' });
             }
 
-            originalPath = req.file.path;
-            const originalName = req.file.originalname;
-            const extension = path.extname(originalName) || '.mp4';
-            inputPath = `${originalPath}${extension}`;
+            let originalName = '';
+            let extension = '.mp4';
+            let baseName = 'video';
+            let contentType = 'video/mp4';
 
-            // Rename the uploaded file to include its original extension so ffmpeg can successfully decode/demux it
-            fs.renameSync(originalPath, inputPath);
+            if (req.file) {
+                originalPath = req.file.path;
+                originalName = req.file.originalname;
+                extension = path.extname(originalName) || '.mp4';
+                inputPath = `${originalPath}${extension}`;
+                contentType = req.file.mimetype || 'video/mp4';
 
-            const baseName = path.basename(originalName, extension);
-            const outputPath = path.join(uploadDir, `muted_${Date.now()}_${baseName}${extension}`);
+                // Rename the uploaded file to include its original extension so ffmpeg can successfully decode/demux it
+                fs.renameSync(originalPath, inputPath);
+                baseName = path.basename(originalName, extension);
+                
+                cleanupFn = () => {
+                    try {
+                        if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath);
+                        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                    } catch (e) {}
+                };
+            } else if (req.body.fileUrl) {
+                const { fileUrl, pathKey } = req.body;
+                originalName = path.basename(fileUrl.split('?')[0]);
+                extension = path.extname(originalName) || '.mp4';
+                baseName = path.basename(originalName, extension);
+                contentType = fileUrl.endsWith('.webm') ? 'video/webm' : (fileUrl.endsWith('.mov') ? 'video/quicktime' : 'video/mp4');
+
+                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, extension);
+                inputPath = downloadResult.localPath;
+                cleanupFn = downloadResult.cleanup;
+            } else {
+                return res.status(400).json({ error: 'Tidak ada file video atau fileUrl yang disediakan.' });
+            }
+
+            outputPath = path.join(uploadDir, `muted_${Date.now()}_${baseName}${extension}`);
 
             console.log(`[MUTE VIDEO] Processing video: ${inputPath} -> ${outputPath}`);
 
@@ -1112,16 +1158,28 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             }
 
-            // Clean up original uploaded/renamed file
-            try {
-                if (fs.existsSync(inputPath)) {
-                    fs.unlinkSync(inputPath);
+            // Clean up original input video
+            cleanupFn();
+
+            // Handle output: if S3/R2 is configured, we can upload the muted output to R2 and return JSON with downloadUrl!
+            // This is extremely useful on Vercel to avoid large response body issues and timeouts.
+            if (isR2Configured()) {
+                console.log('[MUTE VIDEO] S3/R2 is configured. Uploading muted video to R2...');
+                const uploadResult = await uploadFileToStorage(outputPath, `muted_${baseName}${extension}`, contentType);
+                
+                // Clean up local output file
+                try {
+                    if (fs.existsSync(outputPath)) {
+                        fs.unlinkSync(outputPath);
+                    }
+                } catch (e) {
+                    console.warn('Failed to clean up output video:', e);
                 }
-            } catch (e) {
-                console.warn('Failed to clean up input video:', e);
+
+                return res.json({ downloadUrl: uploadResult.fileUrl });
             }
 
-            // Download response
+            // Fallback: Download response if S3/R2 is not configured
             res.download(outputPath, `muted_${baseName}${extension}`, (err) => {
                 // Always clean up output file after completion
                 try {
@@ -1137,11 +1195,9 @@ app.get('/api/debug-uploads', (req, res) => {
             });
         } catch (error: any) {
             console.error('[MUTE VIDEO API ERROR]', error);
-            if (originalPath && fs.existsSync(originalPath)) {
-                try { fs.unlinkSync(originalPath); } catch (e) {}
-            }
-            if (inputPath && fs.existsSync(inputPath)) {
-                try { fs.unlinkSync(inputPath); } catch (e) {}
+            cleanupFn();
+            if (outputPath && fs.existsSync(outputPath)) {
+                try { fs.unlinkSync(outputPath); } catch (e) {}
             }
             res.status(500).json({ error: error.message || 'Gagal menghilangkan suara video.' });
         }
@@ -1405,6 +1461,71 @@ app.get('/api/debug-uploads', (req, res) => {
     // Convenience alias kept for backwards-compat with existing usages below
     const s3Client = { send: (cmd: any) => getS3Client().send(cmd) };
 
+    const downloadFileFromStorage = async (fileUrl: string, pathKey?: string, extension: string = '.mp4'): Promise<{ localPath: string; cleanup: () => void }> => {
+        const uniqueTmpDir = path.join(uploadDir, `tmp_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+        fs.mkdirSync(uniqueTmpDir, { recursive: true });
+        const localPath = path.join(uniqueTmpDir, `downloaded${extension}`);
+        
+        const fileStream = fs.createWriteStream(localPath);
+        const { finished } = await import('stream/promises');
+
+        if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
+            console.log(`[Storage] Downloading from S3 with key ${pathKey}...`);
+            const command = new GetObjectCommand({
+                Bucket: process.env.S3_BUCKET_NAME,
+                Key: pathKey
+            });
+            const response = await getS3Client().send(command);
+            const stream = response.Body as any;
+            stream.pipe(fileStream);
+            await finished(fileStream);
+        } else {
+            console.log(`[Storage] Downloading from public URL ${fileUrl}...`);
+            const response = await fetch(fileUrl);
+            if (!response.ok) throw new Error(`Failed to fetch file from URL: ${response.statusText}`);
+            const arrayBuffer = await response.arrayBuffer();
+            fs.writeFileSync(localPath, Buffer.from(arrayBuffer));
+        }
+
+        const cleanup = () => {
+            try {
+                if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+                if (fs.existsSync(uniqueTmpDir)) fs.rmSync(uniqueTmpDir, { recursive: true, force: true });
+            } catch (e) {
+                console.warn('[Storage] Cleanup error:', e);
+            }
+        };
+
+        return { localPath, cleanup };
+    };
+
+    const uploadFileToStorage = async (localPath: string, originalName: string, contentType: string): Promise<{ fileUrl: string; pathKey: string }> => {
+        if (!isR2Configured()) throw new Error('Cloudflare R2 is not configured.');
+        
+        const sanitizedName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const uniqueFilename = `video-muted/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitizedName}`;
+        const bucketName = process.env.S3_BUCKET_NAME!;
+
+        const fileBuffer = fs.readFileSync(localPath);
+        const command = new PutObjectCommand({
+            Bucket: bucketName,
+            Key: uniqueFilename,
+            Body: fileBuffer,
+            ContentType: contentType,
+        });
+
+        await getS3Client().send(command);
+
+        let publicUrl = '';
+        if (process.env.S3_PUBLIC_URL) {
+            publicUrl = `${process.env.S3_PUBLIC_URL.replace(/\/$/, '')}/${uniqueFilename}`;
+        } else {
+            publicUrl = `${process.env.S3_ENDPOINT!.replace(/\/$/, '')}/${bucketName}/${uniqueFilename}`;
+        }
+
+        return { fileUrl: publicUrl, pathKey: uniqueFilename };
+    };
+
     // Endpoint for the frontend to check if R2 is configured (no credentials exposed)
     app.get('/api/r2-status', (req, res) => {
         res.json({
@@ -1461,9 +1582,10 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             const sanitizedName = filename.toString().replace(/[^a-zA-Z0-9._-]/g, '_');
-            const uniqueFilename = `eps-uploads/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitizedName}`;
-            const bucketName = process.env.S3_BUCKET_NAME!;
             const resolvedContentType = contentType ? String(contentType) : 'application/postscript';
+            const folder = resolvedContentType.startsWith('video/') ? 'video-uploads' : 'eps-uploads';
+            const uniqueFilename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitizedName}`;
+            const bucketName = process.env.S3_BUCKET_NAME!;
 
             const command = new PutObjectCommand({
                 Bucket: bucketName,

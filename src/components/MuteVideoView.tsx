@@ -118,25 +118,249 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
     });
   };
 
-  const processSingleFileItem = async (item: BatchFileItem): Promise<BatchFileItem> => {
-    const formData = new FormData();
-    formData.append('video', item.file);
+  const muteMp4MovClientSide = async (file: File): Promise<Blob> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const view = new DataView(arrayBuffer);
+    const uint8 = new Uint8Array(arrayBuffer);
+    
+    let offset = 0;
+    const len = arrayBuffer.byteLength;
+    const pieces: { start: number; end: number; data?: Uint8Array }[] = [];
+    let foundMoov = false;
 
+    while (offset < len) {
+      if (offset + 8 > len) {
+        pieces.push({ start: offset, end: len });
+        break;
+      }
+      let size = view.getUint32(offset);
+      const type = String.fromCharCode(
+        uint8[offset + 4],
+        uint8[offset + 5],
+        uint8[offset + 6],
+        uint8[offset + 7]
+      );
+      
+      let headerSize = 8;
+      let actualSize = size;
+      if (size === 1) {
+        if (offset + 16 > len) {
+          pieces.push({ start: offset, end: len });
+          break;
+        }
+        const high = view.getUint32(offset + 8);
+        const low = view.getUint32(offset + 12);
+        actualSize = high * 0x100000000 + low;
+        headerSize = 16;
+      } else if (size === 0) {
+        actualSize = len - offset;
+      }
+      
+      if (actualSize <= 0 || offset + actualSize > len) {
+        pieces.push({ start: offset, end: len });
+        break;
+      }
+
+      if (type === 'moov') {
+        foundMoov = true;
+        const moovEnd = offset + actualSize;
+        let moovOffset = offset + headerSize;
+        const keptChildren: Uint8Array[] = [];
+        
+        while (moovOffset < moovEnd) {
+          if (moovOffset + 8 > moovEnd) {
+            break;
+          }
+          let childSize = view.getUint32(moovOffset);
+          const childType = String.fromCharCode(
+            uint8[moovOffset + 4],
+            uint8[moovOffset + 5],
+            uint8[moovOffset + 6],
+            uint8[moovOffset + 7]
+          );
+          
+          let childHeaderSize = 8;
+          let childActualSize = childSize;
+          if (childSize === 1) {
+            if (moovOffset + 16 > moovEnd) break;
+            const high = view.getUint32(moovOffset + 8);
+            const low = view.getUint32(moovOffset + 12);
+            childActualSize = high * 0x100000000 + low;
+            childHeaderSize = 16;
+          } else if (childSize === 0) {
+            childActualSize = moovEnd - moovOffset;
+          }
+          
+          if (childActualSize <= 0 || moovOffset + childActualSize > moovEnd) {
+            break;
+          }
+
+          if (childType === 'trak') {
+            const trakData = uint8.subarray(moovOffset, moovOffset + childActualSize);
+            let isAudio = false;
+            
+            for (let i = 0; i < trakData.length - 24; i++) {
+              if (
+                trakData[i] === 104 &&     // 'h'
+                trakData[i+1] === 100 &&   // 'd'
+                trakData[i+2] === 108 &&   // 'l'
+                trakData[i+3] === 114      // 'r'
+              ) {
+                for (let j = i + 4; j < i + 24; j++) {
+                  if (
+                    trakData[j] === 115 &&   // 's'
+                    trakData[j+1] === 111 && // 'o'
+                    trakData[j+2] === 117 && // 'u'
+                    trakData[j+3] === 110    // 'n'
+                  ) {
+                    isAudio = true;
+                    break;
+                  }
+                }
+                if (isAudio) break;
+              }
+            }
+            
+            if (!isAudio) {
+              keptChildren.push(trakData);
+            } else {
+              console.log(`[Client Mute] Skipped audio track of size ${childActualSize}`);
+            }
+          } else {
+            keptChildren.push(uint8.subarray(moovOffset, moovOffset + childActualSize));
+          }
+          
+          moovOffset += childActualSize;
+        }
+        
+        let totalChildrenSize = 0;
+        for (const child of keptChildren) {
+          totalChildrenSize += child.byteLength;
+        }
+        
+        const newMoovSize = totalChildrenSize + 8;
+        const newMoov = new Uint8Array(newMoovSize);
+        const newMoovView = new DataView(newMoov.buffer);
+        
+        newMoovView.setUint32(0, newMoovSize);
+        newMoov[4] = 109; // 'm'
+        newMoov[5] = 111; // 'o'
+        newMoov[6] = 111; // 'o'
+        newMoov[7] = 118; // 'v'
+        
+        let writeOffset = 8;
+        for (const child of keptChildren) {
+          newMoov.set(child, writeOffset);
+          writeOffset += child.byteLength;
+        }
+        
+        pieces.push({ start: offset, end: offset + actualSize, data: newMoov });
+      } else {
+        pieces.push({ start: offset, end: offset + actualSize });
+      }
+      
+      offset += actualSize;
+    }
+    
+    if (!foundMoov) {
+      throw new Error('Could not find moov atom in file.');
+    }
+
+    const finalBlobs: (Blob | Uint8Array)[] = [];
+    for (const piece of pieces) {
+      if (piece.data) {
+        finalBlobs.push(piece.data);
+      } else {
+        finalBlobs.push(uint8.subarray(piece.start, piece.end));
+      }
+    }
+    
+    return new Blob(finalBlobs, { type: file.type || 'video/mp4' });
+  };
+
+  const processSingleFileItem = async (item: BatchFileItem): Promise<BatchFileItem> => {
+    const extension = item.file.name.substring(item.file.name.lastIndexOf('.')).toLowerCase();
+    const baseName = item.file.name.substring(0, item.file.name.lastIndexOf('.'));
+
+    // Try purely client-side fast, lossless processing for MP4 and MOV files
+    if (extension === '.mp4' || extension === '.mov') {
+      try {
+        console.log(`[Client Mute] Initiating fast client-side audio removal for: ${item.file.name}`);
+        const mutedBlob = await muteMp4MovClientSide(item.file);
+        const url = window.URL.createObjectURL(mutedBlob);
+
+        return {
+          ...item,
+          progress: 'done',
+          downloadUrl: url,
+          mutedFileName: `muted_${baseName}${extension}`,
+          error: undefined
+        };
+      } catch (clientErr: any) {
+        console.warn(`[Client Mute] Fast client-side parsing failed for ${item.file.name}, falling back to server:`, clientErr);
+      }
+    }
+
+    // Fallback to server processing (useful for WebM, or if client-side processing failed)
     try {
-      const response = await fetch('/api/mute-video', {
-        method: 'POST',
-        body: formData,
-      });
+      let response;
+      let uploadedUrl = null;
+      let getUrlData = null;
+
+      // 1. Try to upload to Cloudflare R2 first to bypass Vercel limits
+      try {
+        const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(item.file.name)}&contentType=${encodeURIComponent(item.file.type || 'video/mp4')}`);
+        if (getUrlRes.ok) {
+          getUrlData = await getUrlRes.json().catch(() => ({}));
+          if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+            console.log(`[Mute Video] Uploading to Cloudflare R2 directly: ${item.file.name}`);
+            const putRes = await fetch(getUrlData.uploadUrl, {
+              method: 'PUT',
+              body: item.file,
+              headers: { 'Content-Type': item.file.type || 'video/mp4' }
+            });
+            if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
+            uploadedUrl = getUrlData.fileUrl;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("[Mute Video] Failed to upload to Cloudflare R2, falling back to server multipart:", uploadErr);
+      }
+
+      // 2. Call backend endpoint to mute the video
+      if (uploadedUrl) {
+        console.log(`[Mute Video] Triggering R2-based mute-video: ${uploadedUrl}`);
+        response = await fetch('/api/mute-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl: uploadedUrl, pathKey: getUrlData?.pathKey })
+        });
+      } else {
+        console.log(`[Mute Video] Falling back to multipart form-data upload: ${item.file.name}`);
+        const formData = new FormData();
+        formData.append('video', item.file);
+        response = await fetch('/api/mute-video', {
+          method: 'POST',
+          body: formData,
+        });
+      }
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Gagal menghilangkan suara video.');
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const extension = item.file.name.substring(item.file.name.lastIndexOf('.'));
-      const baseName = item.file.name.substring(0, item.file.name.lastIndexOf('.'));
+      // 3. Handle response (S3/R2 flow returns JSON containing downloadUrl, multipart form returns file stream)
+      let url = '';
+      const responseContentType = response.headers.get('content-type') || '';
+      if (responseContentType.includes('application/json')) {
+        const jsonRes = await response.json();
+        if (!jsonRes.downloadUrl) throw new Error('Muted video URL not found in server response.');
+        url = jsonRes.downloadUrl;
+      } else {
+        const blob = await response.blob();
+        url = window.URL.createObjectURL(blob);
+      }
 
       return {
         ...item,
