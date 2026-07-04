@@ -2377,15 +2377,21 @@ export const generateOptimizedPrompt = async (options: {
 
   const count = Math.min(Math.max(variation, 10), 150);
 
-  // ELEMEN KEJUTAN (Surprise Element) - Random Salt Injection
-  const daftarCuaca = ["hujan deras", "kabut tebal", "matahari terbenam", "badai petir", "salju", "sinar fajar", "gerimis tipis", "pelangi muncul", "kilat di kejauhan", "embun pagi"];
-  const daftarSuasana = ["sinematik", "dramatis", "tenang", "penuh aksi", "misterius", "epik", "nostalgia", "futuristik", "melankolis", "ceria"];
-  
-  const cuacaAcak = daftarCuaca[Math.floor(Math.random() * daftarCuaca.length)];
-  const suasanaAcak = daftarSuasana[Math.floor(Math.random() * daftarSuasana.length)];
-  const angkaAcak = Math.floor(Math.random() * 10000);
-  
-  const randomSaltInjection = `[Suntikan Variasi Acak: ${cuacaAcak}, suasana ${suasanaAcak}, ID Unik: ${angkaAcak}]`;
+  // ELEMEN KEJUTAN (Surprise Element) - Random Salt & Diversity Injection
+  const angles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot"];
+  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light"];
+  const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background"];
+  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky"];
+  const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream"];
+
+  const randomAngle = angles[Math.floor(Math.random() * angles.length)];
+  const randomLighting = lightings[Math.floor(Math.random() * lightings.length)];
+  const randomComp = compositions[Math.floor(Math.random() * compositions.length)];
+  const randomSeason = seasonsOrWeathers[Math.floor(Math.random() * seasonsOrWeathers.length)];
+  const randomColor = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
+  const uniqueSeed = Math.floor(Math.random() * 100000);
+
+  const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${uniqueSeed}]`;
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -2407,8 +2413,8 @@ export const generateOptimizedPrompt = async (options: {
     "Metal Emboss": ' - Focus on metallic surfaces, raised 3D textures, engraved details, and realistic metal reflections like silver, gold, or steel.',
     "Lowpoly": ' - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.',
     "3D CGI": ' - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.',
-    "Cinematic": ' - Focus on professional movie-set composition while maintaining high commercial value. Prioritize: Clear subject (must occupy at least 30% of visual attention), realistic action, clean composition with copy space, and authentic natural lighting. The commercial concept must be immediately understandable. AVOID: Overly cinematic scenes, industrial docks, film noir, excessive volumetric mist, or unrealistic visual effects. REDUCE use of words: "cinematic", "anamorphic", "volumetric mist", "epic", "dramatic", "moody", "film noir". INCREASE use of words: "authentic", "realistic", "professional photography", "natural lighting", "copy space", "commercial concept", "clean composition".',
-    "Photorealistic": ' - Generate photorealistic stock photography prompts. Requirements: Authentic real-world photography, realistic people and environments, natural poses and actions, authentic lighting, realistic proportions, genuine human expressions, captured by a professional photographer. Include real-world camera settings (lens type and aperture), professional photography composition, natural imperfections allowed, and commercially usable. AVOID: Cinematic effects, unrealistic locations, fantasy elements, hyper-dramatic lighting, CGI appearance, and overly artistic descriptions. Use words like: "authentic", "realistic", "professional photography", "natural lighting", "copy space", "commercial concept", "clean composition", "genuine expressions", "realistic proportions".',
+    "Cinematic": ' - Focus on high-budget movie-set cinematography. MUST feel like a genuine motion picture still with narrative depth and dramatic mood. Prioritize: Wide cinematic aspect ratios, cinematic anamorphic lenses with subtle lens flares, organic volumetric haze, beautiful backlight/rim light, high production value, and deep cinematic color grading (e.g., warm gold, cool blue, orange and teal, moody cinematic shadow). Composition must be dynamic with cinematic framing (e.g., cinematic leading lines, cinematic symmetry, depth-of-field, tracking shot perspective). AVOID: Flat studio lighting, plain white/black backdrops, simple stock photography expressions, and non-cinematic flat compositions.',
+    "Photorealistic": ' - Generate photorealistic, authentic, high-end real-world photography. MUST look like a real physical photograph captured by a professional camera (e.g., DSLR or mirrorless). Prioritize: Pin-sharp clarity, natural skin/surface textures (e.g., pores, fine fabrics, wood grain, organic imperfections), authentic human candid expressions, and realistic real-world environments. Use natural sunlight, overcast daylight, or authentic studio strobe lighting with soft realistic shadows. Include realistic professional camera settings (e.g., 50mm lens, 85mm portrait lens, f/1.8 aperture for shallow depth of field, f/8 for sharp landscape, 1/250s shutter speed). AVOID: Theatrical cinematic color grading, CGI look, fantasy elements, artificial dramatic rim-lights, volumetric mist/fog, or movie-like dramatic staging.',
     "Anime/Manga": ' - Focus on cel-shaded aesthetics, expressive character features, vibrant colors, and classic Japanese hand-drawn illustration styles.',
     "Watercolor Painting": ' - Focus on flowing pigment washes, paper grain textures, organic color bleeds, and delicate artistic strokes.',
     "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.',
@@ -2486,13 +2492,17 @@ Rules for the Generated Prompts:
 9. CRITICAL: Conform exactly to the requested JSON schema.
 10. STRICT ADOBE NO SIMILAR CONTENT RULE (CRITICAL FOR ADOBE STOCK COMPLIANCE):
     You MUST adhere exactly to Adobe Stock's "Similar vs. Spamming" guidelines. Adobe Stock rejects content with the reason: "During our review, we found that your submission closely resembles content already available on Adobe Stock... we refuse content that is too repetitive so customers can easily find distinct and relevant content."
-    To ensure acceptance, EVERY SINGLE PROMPT in the batch MUST be clearly differentiated from the others.
-    Our moderators look for noticeable differences. You must inject extreme variation across:
-    - Composition & Camera Angle (e.g., wide shot vs. extreme close-up vs. bird's-eye view).
-    - Color Palette & Lighting (e.g., golden hour vs. neon nights vs. monochromatic blue).
-    - Expression & Pose (e.g., looking away, intense action, dynamic movement, subtle micro-expressions).
-    - Scenario & Environment (e.g., changing the background entirely, indoors vs. outdoors).
-    - Do NOT just create minimal variations (e.g., just changing a shirt color or moving a prop slightly). Each prompt must be a visually distinct and standalone masterpiece.
+    - EVERY SINGLE PROMPT in the batch MUST be clearly, visibly, and dramatically differentiated from the others to prevent "Similar content" flag rejections.
+    - Do NOT just make minimal variations (e.g., just changing a shirt color or moving a prop slightly). Each prompt must be a visually distinct, unique, and standalone masterpiece.
+    - Inject extreme variation across:
+      * Composition & Camera Angle: Vary across wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, and overhead drone shots.
+      * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
+      * Subjects, Expressions & Poses: Vary characters' ages, genders, ethnicities, actions, emotional expressions (e.g., focused, joyful, contemplative, active, serene), and direct interactions with their surroundings.
+      * Scenario & Environment: Change environments completely (e.g., indoors vs. outdoors, modern minimalist spaces vs. raw nature, urban landscapes vs. intimate workspaces).
+    - ABSOLUTE STYLE SEPARATION (CINEMATIC VS PHOTOREALISTIC):
+      * If the Selected Style is "Cinematic", the output prompts MUST be strictly cinematic, looking like a movie-set still with anamorphic qualities, film color grading, volumetric lighting, and dramatic mood. Do NOT generate standard flat stock photos.
+      * If the Selected Style is "Photorealistic", the output prompts MUST be strictly realistic, looking like sharp, candid, organic real-world captures with lifelike skin/surface textures, natural sunlight or soft studio strobes, and genuine human behaviors. Do NOT inject theatrical movie color grading or artificial film flares.
+      * NEVER mix, swap, or blur the lines between Cinematic and Photorealistic style prompts! Keep them completely distinct and accurate to their true style definition.
     - Share your best, most varied work.
 11. ADOBE STOCK CONTENT STRATEGY (MUST FOLLOW STRICTLY):
 You are an Adobe Stock content strategist. Before generating prompts, avoid concepts that are already heavily saturated on Adobe Stock.
