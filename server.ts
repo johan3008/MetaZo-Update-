@@ -9,6 +9,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { createRequire } from 'module';
@@ -1203,20 +1204,207 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    async function analyzeImageWithFFmpeg(tempFilePath: string, reqRequire: any) {
+        let ffmpegPath: string;
+        let ffprobePath: string;
+        try {
+            ffmpegPath = reqRequire('@ffmpeg-installer/ffmpeg').path;
+            ffprobePath = reqRequire('@ffprobe-installer/ffprobe').path;
+        } catch (e) {
+            throw new Error('FFmpeg/FFprobe binaries not found on the server.');
+        }
+
+        const execPromise = util.promisify(exec);
+        
+        // 1. FFprobe metadata
+        let resolution = "Unknown";
+        let color_space = "sRGB (Standard)";
+        let fileSizeKb = 0;
+        try {
+            const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
+            const probeData = JSON.parse(probeOut);
+            const stream = probeData.streams?.[0] || {};
+            const width = stream.width || 0;
+            const height = stream.height || 0;
+            if (width && height) {
+                const mp = ((width * height) / 1000000).toFixed(2);
+                resolution = `${width} x ${height} (${mp} MP)`;
+            }
+            if (stream.pix_fmt) {
+                color_space = `${stream.pix_fmt} (${stream.color_space || 'sRGB'} range ${stream.color_range || 'N/A'})`;
+            }
+        } catch (probeErr) {
+            console.warn('FFprobe analysis failed:', probeErr);
+        }
+
+        try {
+            const stats = fs.statSync(tempFilePath);
+            fileSizeKb = Math.round(stats.size / 1024);
+        } catch (e) {}
+
+        // 2. FFmpeg Grayscale Decoded analysis
+        const rawOutputPath = path.join(path.dirname(tempFilePath), `raw_${path.basename(tempFilePath)}.raw`);
+        
+        let brightnessVal = 50;
+        let brightnessStatus = "Optimal";
+        let contrastVal = 50;
+        let contrastStatus = "Normal";
+        let sharpnessVal = 50;
+        let sharpnessStatus = "Normal";
+        let noiseVal = 0;
+        let noiseStatus = "Low";
+        const histogram = new Array(32).fill(0);
+        let fileValidation = "Valid (Passed FFmpeg Integrity Check)";
+
+        try {
+            // scale to 256x256 raw grayscale
+            await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
+            
+            if (fs.existsSync(rawOutputPath)) {
+                const bytes = fs.readFileSync(rawOutputPath);
+                
+                // 2.1 Brightness
+                let sum = 0;
+                for (let i = 0; i < bytes.length; i++) {
+                    sum += bytes[i];
+                }
+                const avgBrightness = sum / bytes.length;
+                brightnessVal = Math.round((avgBrightness / 255) * 100);
+                if (brightnessVal > 85) brightnessStatus = "Very Bright (Potential Overexposure)";
+                else if (brightnessVal < 20) brightnessStatus = "Very Dark (Potential Underexposure)";
+                else brightnessStatus = "Optimal";
+
+                // 2.2 Contrast
+                let sqSum = 0;
+                for (let i = 0; i < bytes.length; i++) {
+                    const diff = bytes[i] - avgBrightness;
+                    sqSum += diff * diff;
+                }
+                const stdDev = Math.sqrt(sqSum / bytes.length);
+                contrastVal = Math.min(100, Math.round((stdDev / 64) * 100));
+                if (contrastVal > 80) contrastStatus = "High Contrast";
+                else if (contrastVal < 25) contrastStatus = "Low Contrast";
+                else contrastStatus = "Normal";
+
+                // 2.3 Histogram
+                for (let i = 0; i < bytes.length; i++) {
+                    const binIdx = Math.min(31, Math.floor(bytes[i] / 8));
+                    histogram[binIdx]++;
+                }
+                const maxBin = Math.max(...histogram) || 1;
+                for (let b = 0; b < 32; b++) {
+                    histogram[b] = Math.round((histogram[b] / maxBin) * 100);
+                }
+
+                // 2.4 Sharpness
+                let diffSum = 0;
+                let count = 0;
+                for (let y = 0; y < 256; y++) {
+                    for (let x = 0; x < 255; x++) {
+                        const idx1 = y * 256 + x;
+                        const idx2 = idx1 + 1;
+                        diffSum += Math.abs(bytes[idx1] - bytes[idx2]);
+                        count++;
+                    }
+                }
+                const avgEdgeEnergy = diffSum / count;
+                sharpnessVal = Math.min(100, Math.round((avgEdgeEnergy / 15) * 100));
+                if (sharpnessVal > 60) sharpnessStatus = "Sharp";
+                else if (sharpnessVal < 20) sharpnessStatus = "Soft Focus";
+                else sharpnessStatus = "Normal";
+
+                // 2.5 Noise estimation
+                let noiseSum = 0;
+                let noiseCount = 0;
+                for (let y = 0; y < 254; y += 2) {
+                    for (let x = 0; x < 254; x += 2) {
+                        const p1 = bytes[y * 256 + x];
+                        const p2 = bytes[y * 256 + x + 1];
+                        const p3 = bytes[(y + 1) * 256 + x];
+                        const p4 = bytes[(y + 1) * 256 + x + 1];
+                        const avg = (p1 + p2 + p3 + p4) / 4;
+                        const varLocal = ((p1 - avg) ** 2 + (p2 - avg) ** 2 + (p3 - avg) ** 2 + (p4 - avg) ** 2) / 4;
+                        if (varLocal < 16) {
+                            noiseSum += Math.sqrt(varLocal);
+                            noiseCount++;
+                        }
+                    }
+                }
+                const avgNoise = noiseCount > 0 ? (noiseSum / noiseCount) : 0.5;
+                noiseVal = Math.min(100, Math.round((avgNoise / 4) * 100));
+                if (noiseVal > 40) noiseStatus = "High Noise";
+                else if (noiseVal > 15) noiseStatus = "Medium Noise";
+                else noiseStatus = "Low Noise / Clean";
+            }
+        } catch (ffmpegErr) {
+            console.warn('FFmpeg statistics filter failed:', ffmpegErr);
+            fileValidation = "Validation Warning (FFmpeg decoding limit reached)";
+        } finally {
+            if (fs.existsSync(rawOutputPath)) {
+                try { fs.unlinkSync(rawOutputPath); } catch (e) {}
+            }
+        }
+
+        return {
+            resolution,
+            color_space,
+            histogram,
+            brightness: { value: brightnessVal, status: brightnessStatus },
+            contrast: { value: contrastVal, status: contrastStatus },
+            sharpness: { value: sharpnessVal, status: sharpnessStatus },
+            noise: { value: noiseVal, status: noiseStatus },
+            file_validation: fileValidation,
+            file_size_kb: fileSizeKb
+        };
+    }
+
     app.post('/api/check-image-quality', async (req, res) => {
+        let tempFilePath = "";
         try {
             const { image, tolerance, language, model, fileType } = req.body;
             if (!image) {
                 console.warn('Server check-image-quality error: Missing image data');
                 return res.status(400).json({ error: 'Missing image data' });
             }
-            console.log('Server check-image-quality: Analyzing image...');
-            const data = await checkImageQuality(image, tolerance, language, model, fileType);
-            console.log('Server check-image-quality: Analysis successful');
-            res.json(data);
+            
+            // 1. Decode base64 and save to temp file for FFmpeg analysis
+            const tempDir = path.join(process.cwd(), 'tmp');
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+            const fileExt = fileType?.includes('png') ? 'png' : fileType?.includes('gif') ? 'gif' : 'jpg';
+            const tempFileName = `img_${crypto.randomBytes(8).toString('hex')}.${fileExt}`;
+            tempFilePath = path.join(tempDir, tempFileName);
+
+            const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+            fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
+
+            // 2. Perform FFmpeg + FFprobe analysis
+            console.log('Server check-image-quality: Running FFmpeg analysis...');
+            const reqRequire = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
+            const ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath, reqRequire);
+
+            // 3. Run AI Vision Analysis (Gemini)
+            console.log('Server check-image-quality: Running AI Vision Analysis...');
+            const aiVisionStats = await checkImageQuality(image, tolerance, language, model, fileType);
+            
+            console.log('Server check-image-quality: Integration successful');
+            
+            // Combine results while ensuring backward compatibility
+            const combinedReport = {
+                ...aiVisionStats,
+                ffmpeg: ffmpegStats,
+                ai_vision: aiVisionStats
+            };
+            
+            res.json(combinedReport);
         } catch (e: any) {
             console.warn('Server check-image-quality error:', e);
             res.status(500).json({ error: e.message || 'Error checking image quality' });
+        } finally {
+            if (tempFilePath && fs.existsSync(tempFilePath)) {
+                try { fs.unlinkSync(tempFilePath); } catch (err) {}
+            }
         }
     });
 

@@ -3452,6 +3452,18 @@ Jika tidak ada masalah, array heatmaps WAJIB kosong ([]).
 "type": pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
 "raw_value": deskripsi jelas dari temuan.
 
+Wajib lakukan evaluasi terperinci untuk 10 kriteria kualitas visual kecerdasan buatan berikut dan kembalikan status (PASS/FAIL) dan penjelasan singkat (note) serta metadata dalam bahasa Indonesia/Inggris (sesuai requested language) di field 'ai_vision_checks':
+- blur: Status ketajaman fokus dan motion blur.
+- composition: Kualitas rule of thirds, framing, simetri, dan keseimbangan visual.
+- lighting: Kualitas eksposur, bayangan artistik, kontras, dan kecerahan visual.
+- watermark: Deteksi tanda air, text copyright, atau stock mark.
+- logo: Deteksi logo merk terkenal atau brand dagang.
+- text: Deteksi tulisan mengganggu, cap tanggal, atau text overlay.
+- anatomical_errors: Deteksi kecacatan struktur anatomi manusia/hewan (jari ganda, distorsi bentuk, dll).
+- ip_risk: Resiko pelanggaran kekayaan intelektual (IP), desain produk khas, atau hak cipta arsitektur.
+- stock_acceptance: Tingkat kemungkinan diterima di agensi premium (Adobe Stock).
+- metadata: Rekomendasi Title komersial (title) dan Keywords pencarian (keywords, array of string) yang relevan untuk pemasaran komersial gambar ini.
+
 ATURAN BAHASA OUTPUT:
 Jika 'Bahasa', gunakan Bahasa Indonesia profesional.
 Jika 'English', gunakan Bahasa Inggris.
@@ -3467,8 +3479,20 @@ Respons Anda WAJIB dalam format JSON:
   "technical_issues": ["list masalah spesifik jika ada, kosongkan array jika gambar aman dari cacat"],
   "strengths": ["list keunggulan: komposisi kuat, pencahayaan dramatis, dsb"],
   "detailed_feedback": "Penjelasan spesifik, bernada Kurator Senior, mengapa lolos/ditolak.",
+  "ai_vision_checks": {
+    "blur": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "composition": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "lighting": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "watermark": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "logo": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "text": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "anatomical_errors": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "ip_risk": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "stock_acceptance": { "status": "PASS", "note": "catatan penjelasan (gunakan PASS atau FAIL)" },
+    "metadata": { "title": "Rekomendasi judul komersial", "keywords": ["keyword1", "keyword2", "dsb"] }
+  },
   "heatmaps": [
-    { "type": "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition", "x": 0..100, "y": 0..100, "intensity": 0.0..1.0, "raw_value": "Detail temuan spesifik" }
+    { "type": "noise", "x": 50, "y": 50, "intensity": 0.5, "raw_value": "Detail temuan spesifik" }
   ]
 }
 `;
@@ -3483,6 +3507,68 @@ Respons Anda WAJIB dalam format JSON:
         overall_score: { type: Type.NUMBER },
         recommendation: { type: Type.STRING, enum: ["PASS", "FAIL"] },
         detailed_feedback: { type: Type.STRING },
+        ai_vision_checks: {
+            type: Type.OBJECT,
+            properties: {
+                blur: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                composition: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                lighting: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                watermark: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                logo: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                text: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                anatomical_errors: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                ip_risk: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                stock_acceptance: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                metadata: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING },
+                        keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ["title", "keywords"]
+                }
+            },
+            required: [
+                "blur", "composition", "lighting", "watermark", "logo", "text",
+                "anatomical_errors", "ip_risk", "stock_acceptance", "metadata"
+            ]
+        },
         heatmaps: {
             type: Type.ARRAY,
             items: {
@@ -3498,7 +3584,7 @@ Respons Anda WAJIB dalam format JSON:
             }
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
   };
 
   const imagePart = processFrameServer(image);
@@ -3952,8 +4038,6 @@ Return exactly 8 items matching the schema in JSON array format.`;
   return scrapingResults;
 }
 
-
-
 export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -3995,6 +4079,21 @@ MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 4. Exposure & Pencahayaan: Cek apakah overexposed (blown out) atau underexposed (crushed blacks).
 5. Frame Kosong: Apakah frame ini secara tidak sengaja kosong (hitam/putih pekat).
 
+Wajib lakukan evaluasi terperinci untuk 13 kriteria kualitas video berikut dan kembalikan status (PASS/FAIL) dan penjelasan singkat (note) dalam bahasa Indonesia di field \`quality_checks\`:
+- blur: Deteksi apakah subjek utama buram, tidak fokus, out-of-focus, atau motion blur berlebih.
+- noise: Deteksi bintik/grain digital berlebih atau pikselasi kasar terutama di area bayangan atau warna solid.
+- overexposure: Deteksi highlight terlalu terang atau putih pekat yang kehilangan detail (blown out).
+- underexposure: Deteksi bayangan terlalu gelap atau hitam pekat yang kehilangan detail (crushed shadows).
+- banding: Deteksi garis-garis gradasi warna kasar (color banding) di langit atau background halus.
+- compression_artifacts: Deteksi kotak-kotak pikselasi makro (macroblocking) akibat kompresi video terlalu tinggi.
+- empty_frame: Deteksi jika ada frame yang kosong (layar hitam, putih polos, solid, atau terpotong tanpa konten).
+- duplicate_frame: Deteksi jika frame berulang/statis ekstrem tanpa adanya perubahan visual sama sekali di antara cuplikan frame.
+- shaking: Deteksi apakah ada guncangan kamera (unintentional camera shake/shaking) atau ketidakstabilan visual.
+- watermark: Deteksi tanda air, logo agensi lain, atau teks copyright tersemat.
+- text_detected: Deteksi teks overlay/tulisan yang tidak diinginkan (seperti tanggal/waktu perekaman, teks deskriptif, dll).
+- logo_detected: Deteksi logo merk, brand terkenal, atau trade mark komersial yang dilindungi IP.
+- low_resolution: Deteksi visual resolusi rendah, buram piksel kasar, atau hasil upscale paksa yang tidak tajam.
+
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
 JIKA TIDAK ADA MASALAH VISUAL FATAL ATAU ARTIFACT (SEPERTI SKEW/FLASH BANDING) YANG SANGAT JELAS PADA FRAME INI, BERIKAN STATUS PASS.
 DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELANGGARAN IP ATAU CACAT FATAL! Berhentilah menebak-nebak (No hallucination)!`;
@@ -4015,6 +4114,81 @@ DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELAN
         overall_score: { type: Type.NUMBER },
         recommendation: { type: Type.STRING, enum: ["PASS", "FAIL", "RETOUCH"] },
         detailed_feedback: { type: Type.STRING },
+        quality_checks: {
+            type: Type.OBJECT,
+            properties: {
+                blur: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                noise: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                overexposure: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                underexposure: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                banding: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                compression_artifacts: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                empty_frame: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                duplicate_frame: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                shaking: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                watermark: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                text_detected: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                logo_detected: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                low_resolution: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                }
+            },
+            required: [
+                "blur", "noise", "overexposure", "underexposure", "banding", 
+                "compression_artifacts", "empty_frame", "duplicate_frame", 
+                "shaking", "watermark", "text_detected", "logo_detected", "low_resolution"
+            ]
+        },
         heatmaps: {
             type: Type.ARRAY,
             items: {
@@ -4030,7 +4204,7 @@ DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELAN
             }
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
   };
 
   const imageParts = frames.map(f => processFrameServer(f));

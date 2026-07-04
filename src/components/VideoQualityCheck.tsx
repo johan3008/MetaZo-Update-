@@ -11,7 +11,38 @@ interface QualityReport {
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
+  quality_checks?: {
+    blur?: { status: "PASS" | "FAIL"; note: string };
+    noise?: { status: "PASS" | "FAIL"; note: string };
+    overexposure?: { status: "PASS" | "FAIL"; note: string };
+    underexposure?: { status: "PASS" | "FAIL"; note: string };
+    banding?: { status: "PASS" | "FAIL"; note: string };
+    compression_artifacts?: { status: "PASS" | "FAIL"; note: string };
+    empty_frame?: { status: "PASS" | "FAIL"; note: string };
+    duplicate_frame?: { status: "PASS" | "FAIL"; note: string };
+    shaking?: { status: "PASS" | "FAIL"; note: string };
+    watermark?: { status: "PASS" | "FAIL"; note: string };
+    text_detected?: { status: "PASS" | "FAIL"; note: string };
+    logo_detected?: { status: "PASS" | "FAIL"; note: string };
+    low_resolution?: { status: "PASS" | "FAIL"; note: string };
+  };
 }
+
+const CHECK_ITEMS = [
+  { key: 'blur', label: 'Blur / Ketajaman', desc: 'Memeriksa kejelasan fokus subjek utama dan motion blur.' },
+  { key: 'noise', label: 'Noise / Grain', desc: 'Mendeteksi bintik digital berlebih pada area bayangan atau warna solid.' },
+  { key: 'overexposure', label: 'Overexposure', desc: 'Mendeteksi area yang terlalu terang (blown out) hingga kehilangan detail.' },
+  { key: 'underexposure', label: 'Underexposure', desc: 'Mendeteksi area yang terlalu gelap (crushed shadows) hingga detail hilang.' },
+  { key: 'banding', label: 'Banding', desc: 'Memeriksa efek pita warna (color banding) pada gradasi latar belakang.' },
+  { key: 'compression_artifacts', label: 'Compression Artifacts', desc: 'Mendeteksi distorsi blok/kotak makro akibat kompresi video tinggi.' },
+  { key: 'empty_frame', label: 'Empty Frame', desc: 'Mendeteksi frame hitam, putih, atau kosong tanpa konten visual.' },
+  { key: 'duplicate_frame', label: 'Duplicate Frame', desc: 'Mendeteksi frame statis berulang yang tidak memiliki perubahan visual.' },
+  { key: 'shaking', label: 'Shaking', desc: 'Memeriksa adanya guncangan kamera atau ketidakstabilan visual yang ekstrem.' },
+  { key: 'watermark', label: 'Watermark', desc: 'Mendeteksi tanda air, hak cipta, logo agensi, atau stock mark.' },
+  { key: 'text_detected', label: 'Text Detected', desc: 'Mendeteksi teks overlay, tanggal perekaman, atau tulisan yang mengganggu.' },
+  { key: 'logo_detected', label: 'Logo Detected', desc: 'Mendeteksi logo merek terkenal, brand dagang, atau kekayaan intelektual.' },
+  { key: 'low_resolution', label: 'Low Resolution', desc: 'Mendeteksi visual beresolusi rendah atau hasil upscale paksa yang pecah.' },
+];
 
 export const VideoQualityCheck: React.FC<{ 
   t: any; 
@@ -290,6 +321,61 @@ export const VideoQualityCheck: React.FC<{
                 <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
                   {report.detailed_feedback}
                 </p>
+              </div>
+
+              {/* Detailed Quality Audit Checklist */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
+                  Hasil Pemeriksaan Kualitas Video (13 Checkpoints)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {CHECK_ITEMS.map((item) => {
+                    const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
+                    // Fallback to check if the key exists in technical_issues for resilience
+                    const isFailedInIssues = report.technical_issues?.some(issue => 
+                      issue.toLowerCase().includes(item.key.toLowerCase().replace('_', ' ')) ||
+                      issue.toLowerCase().includes(item.label.toLowerCase())
+                    );
+                    
+                    const isPass = checkResult 
+                      ? checkResult.status === 'PASS' 
+                      : !isFailedInIssues;
+                      
+                    const note = checkResult 
+                      ? checkResult.note 
+                      : (isFailedInIssues ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Normal, tidak mendeteksi masalah.');
+
+                    return (
+                      <div 
+                        key={item.key} 
+                        className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                          isPass 
+                            ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/20 hover:bg-emerald-50/30' 
+                            : 'bg-red-50/20 dark:bg-red-950/10 border-red-100 dark:border-red-900/20 hover:bg-red-50/30'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{item.label}</span>
+                            <span className={`flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                              isPass 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            }`}>
+                              {isPass ? 'OK' : 'FAIL'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 leading-relaxed">
+                            {item.desc}
+                          </p>
+                        </div>
+                        <div className="text-xs text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-slate-800/40 p-2 rounded-lg mt-1 italic">
+                          {note}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Technical Issues & Strengths */}
