@@ -1169,18 +1169,15 @@ const App: React.FC = () => {
     }
   }, [metadataLanguage]);
 
-  // Cek status R2 saat user membuka tool Vector (EPS/AI)
+  // Cek status R2 saat aplikasi dimuat
   useEffect(() => {
-    if (activeTool === ToolType.VECTOR) {
-      // Hanya cek sekali, atau jika status belum diketahui
-      if (r2Status === null) {
-        fetch('/api/r2-status')
-          .then(r => r.json())
-          .then(data => setR2Status(!!data.configured))
-          .catch(() => setR2Status(false));
-      }
+    if (r2Status === null) {
+      fetch('/api/r2-status')
+        .then(r => r.json())
+        .then(data => setR2Status(!!data.configured))
+        .catch(() => setR2Status(false));
     }
-  }, [activeTool]); // eslint-disable-line
+  }, []); // eslint-disable-line
 
   const [aiCreativity, setAiCreativity] = useState<number>(0.7);
   const [aiModelPerformance, setAiModelPerformance] = useState<'speed' | 'detail'>('detail');
@@ -3956,15 +3953,21 @@ const App: React.FC = () => {
                 filesWithErrorCount={filesWithErrorCount} 
               />
 
-              {/* ⚠️ R2 WARNING BANNER — muncul hanya di tool Vector jika R2 belum dikonfigurasi */}
-              {activeTool === ToolType.VECTOR && r2Status === false && (
+              {/* ⚠️ R2 WARNING BANNER — muncul jika R2 belum dikonfigurasi */}
+              {[ToolType.VECTOR, ToolType.VIDEO, ToolType.IMAGE, ToolType.MUTE_VIDEO].includes(activeTool) && r2Status === false && (
                 <div className="flex items-start gap-3 px-4 py-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2 duration-300">
                   <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
                   </svg>
                   <div className="text-xs leading-relaxed">
-                    <span className="font-black uppercase tracking-wide">Cloudflare R2 belum dikonfigurasi.</span>
-                    {" "}File EPS/AI lebih dari <span className="font-bold">4.5MB</span> akan ditolak oleh Vercel.{" "}
+                    <span className="font-black uppercase tracking-wide">
+                      {metadataLanguage === 'Bahasa' ? 'Cloudflare R2 belum dikonfigurasi.' : 'Cloudflare R2 is not configured.'}
+                    </span>
+                    {" "}
+                    {metadataLanguage === 'Bahasa' 
+                      ? 'Vercel membatasi ukuran request maksimum 4.5MB. Agar file besar (Video/EPS/Gambar) tidak gagal upload, silakan tambahkan kredensial R2 di Settings menu.' 
+                      : 'Vercel limits payload uploads to 4.5MB. To process large files (Videos/EPS/Images) without issues, please add R2 credentials in the Settings menu.'
+                    }{" "}
                     <span className="font-semibold">
                       Tambahkan <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono text-[10px]">S3_ENDPOINT</code>,{" "}
                       <code className="bg-amber-400/20 px-1 py-0.5 rounded font-mono text-[10px]">S3_ACCESS_KEY_ID</code>,{" "}
