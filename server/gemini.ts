@@ -2411,6 +2411,7 @@ export const generateOptimizedPrompt = async (options: {
     "HandDrawn Sketch": ' - Focus on pencil or ink strokes, charcoal textures, artistic hatching, and the look of a sketchbook drawing.',
     "Glassmorphism": ' - Focus on frosted glass effects, translucent layers, blurred background refraction, and sleek glossy reflections.',
     "Metal Emboss": ' - Focus on metallic surfaces, raised 3D textures, engraved details, and realistic metal reflections like silver, gold, or steel.',
+    "Line Art": ' - Focus on clean black and white lines, elegant curves, minimalist continuous line work, crisp vector outlines, and zero shading or gradients unless requested. Elegant, simple, and high-contrast ink strokes.',
     "Lowpoly": ' - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.',
     "3D CGI": ' - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.',
     "Cinematic": ' - Focus on high-budget movie-set cinematography. MUST feel like a genuine motion picture still with narrative depth and dramatic mood. Prioritize: Wide cinematic aspect ratios, cinematic anamorphic lenses with subtle lens flares, organic volumetric haze, beautiful backlight/rim light, high production value, and deep cinematic color grading (e.g., warm gold, cool blue, orange and teal, moody cinematic shadow). Composition must be dynamic with cinematic framing (e.g., cinematic leading lines, cinematic symmetry, depth-of-field, tracking shot perspective). AVOID: Flat studio lighting, plain white/black backdrops, simple stock photography expressions, and non-cinematic flat compositions.',
@@ -2433,6 +2434,10 @@ export const generateOptimizedPrompt = async (options: {
 CRITICAL PNG MODE SETTINGS:
 - The user requests PNG Asset style generation.
 - All generated prompt variations MUST strictly place the main subject "${subject}" isolated on a solid ${pngBgColor} background.
+- Vary the count and arrangement of the subjects dynamically across prompts to ensure rich variation and prevent repetitiveness:
+  * Some prompts MUST feature a single standalone object (e.g., a single prominent item).
+  * Some prompts MUST feature exactly two related or complementary objects (e.g., a pair, a main item alongside its accessory, packaging, ingredient, or a split open/closed view).
+  * Some prompts MUST feature an elegant multi-angle collection, a neat flat lay, or an organic arrangement of 3+ items.
 - You must explicitly append tags such as "isolated on a plain ${pngBgColor} background", "solid flat ${pngBgColor} backdrop", or "pure solid ${pngBgColor} background, no shadows" into the prompt variations.
 ${currentDirective}
 ${stickerPrevention}
@@ -2503,6 +2508,8 @@ Rules for the Generated Prompts:
       * If the Selected Style is "Cinematic", the output prompts MUST be strictly cinematic, looking like a movie-set still with anamorphic qualities, film color grading, volumetric lighting, and dramatic mood. Do NOT generate standard flat stock photos.
       * If the Selected Style is "Photorealistic", the output prompts MUST be strictly realistic, looking like sharp, candid, organic real-world captures with lifelike skin/surface textures, natural sunlight or soft studio strobes, and genuine human behaviors. Do NOT inject theatrical movie color grading or artificial film flares.
       * NEVER mix, swap, or blur the lines between Cinematic and Photorealistic style prompts! Keep them completely distinct and accurate to their true style definition.
+    - PNG ASSET VARIATION (OBJECT COUNT & ARRANGEMENTS):
+      * For PNG/isolated asset mode, you MUST inject extreme variety in subject count and arrangement. Stagger the variations so that some prompts describe a single standalone object, some describe exactly two related or complementary objects, and some describe an elegant flat lay, dynamic grouping, or a neat set of 3+ objects. This ensures a rich, diverse asset pack and completely prevents "similar content" rejection.
     - Share your best, most varied work.
 11. ADOBE STOCK CONTENT STRATEGY (MUST FOLLOW STRICTLY):
 You are an Adobe Stock content strategist. Before generating prompts, avoid concepts that are already heavily saturated on Adobe Stock.
@@ -2948,6 +2955,18 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "industrial steel emboss stamp, realistic metal reflections, dark iron details, heavy relief design",
       "vintage brass metal emboss emblem plates, polished bronze carvings, Victorian brass detailing",
       "sleek titanium embossed sheet plate graphic, futuristic metal engraving patterns, high-fidelity premium metal"
+    ],
+    "Line Art": [
+      "minimalist black and white line art vector graphic, clean black outlines on solid white, continuous line drawing, elegant style",
+      "contemporary fine line art asset, crisp black vector contours, minimalist aesthetic, graceful curves",
+      "modern continuous single-line drawing style, sleek black ink lines, high contrast minimalist art design",
+      "elegant line art vector illustration, pristine sharp black paths, creative line work icon, ultra-clean look",
+      "minimalist outline vector illustration, modern clean line strokes, solid styling with high clarity",
+      "beautiful abstract line art design, continuous ink pen line strokes, sophisticated flow and structure",
+      "zen continuous line sketch graphic, balanced minimal black outlines, elegant and pure aesthetic",
+      "sleek line art emblem vector, precise geometric single-line curves, highly readable silhouette design",
+      "artistic minimalist contour illustration, fine line sketch, pristine black ink outline graphic, elegant styling",
+      "trendy line art vector asset, single-stroke flow, perfect curves and sharp line endings, modern design look"
     ]
   };
 

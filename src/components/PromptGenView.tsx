@@ -62,7 +62,8 @@ const PNG_STYLE_OPTIONS = [
   { id: 'HandDrawn Sketch', label: 'HandDrawn Sketch (Sketsa Tangan)', icon: '✏️' },
   { id: 'Origami Style', label: 'Origami Style (Seni Origami)', icon: '📄' },
   { id: 'Glassmorphism', label: 'Glassmorphism (Efek Kaca)', icon: '🔮' },
-  { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' }
+  { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' },
+  { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' }
 ];
 
 export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
