@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt
+  Calendar, CreditCard, Info, Receipt, VolumeX
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '../../types';
 
@@ -306,6 +306,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Calendar size={16} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
             </a>
+
+            <a href={toolToPath[ToolType.MUTE_VIDEO]} onClick={(e) => handleNavClick(e, ToolType.MUTE_VIDEO)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.MUTE_VIDEO 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <VolumeX size={16} className={activeTool === ToolType.MUTE_VIDEO ? "text-rose-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_mute_video || "Mute Video Gen"}</span>}
+            </a>
           </nav>
         </div>
 
@@ -428,7 +439,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
         {!sidebarCollapsed && (
           <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest pl-2">
-            v1.2.1
+            v1.3.0
           </div>
         )}
         <button 
@@ -653,6 +664,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <Calendar size={14} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
                       <span>{t.sidebar_calendar_gen}</span></button>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.MUTE_VIDEO); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.MUTE_VIDEO 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-rose-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <VolumeX size={14} className={activeTool === ToolType.MUTE_VIDEO ? "text-rose-400" : "text-slate-400"} />
+                      <span>{t.sidebar_mute_video || "Mute Video Gen"}</span></button>
                   </nav>
                 </div>
 

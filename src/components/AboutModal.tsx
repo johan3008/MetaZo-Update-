@@ -51,7 +51,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, theme, 
             <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center justify-center gap-1.5">
               <span>MetaZo</span>
               <span className="text-[#7c3aed]">PRO</span>
-              <span className="px-2 py-0.5 text-[9px] font-black tracking-widest bg-emerald-500/10 text-emerald-500 rounded-full dark:bg-emerald-500/20">v1.2.1</span>
+              <span className="px-2 py-0.5 text-[9px] font-black tracking-widest bg-emerald-500/10 text-emerald-500 rounded-full dark:bg-emerald-500/20">v1.3.0</span>
             </h2>
             
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-widest">

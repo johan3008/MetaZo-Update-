@@ -10,7 +10,8 @@ export enum ToolType {
   PROMPT_IMAGE_CHECK = 'prompt_image_check',
   PROMPT_VIDEO_CHECK = 'prompt_video_check',
   VECTOR_EPS = 'vector_eps',
-  CALENDAR_GEN = 'calendar_gen'
+  CALENDAR_GEN = 'calendar_gen',
+  MUTE_VIDEO = 'mute_video'
 }
 
 export const toolToPath: Record<ToolType, string> = {
@@ -24,7 +25,8 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
   [ToolType.PROMPT_VIDEO_CHECK]: '/AiVideoQualityCheck',
   [ToolType.VECTOR_EPS]: '/EpsConverter',
-  [ToolType.CALENDAR_GEN]: '/NicheCalendar'
+  [ToolType.CALENDAR_GEN]: '/NicheCalendar',
+  [ToolType.MUTE_VIDEO]: '/MuteVideoGen'
 };
 
 export enum GenerationMode {
