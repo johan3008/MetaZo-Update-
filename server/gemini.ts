@@ -886,9 +886,8 @@ function getAIClient(): any {
         const provider = (store && store.provider) || 'gemini';
 
         // ONLY redirect to Groq/Mistral/OpenAI/etc if the model name is NOT explicitly a Gemini / Gemma model.
-        // This allows hybrid vision tasks (which explicitly request gemini-3.1-flash-lite-preview) to work.
-        const isAiveneNative = provider === 'aivene' && (params.model?.startsWith('gemini-') || params.model?.startsWith('gemma-'));
-        if (NON_GEMINI_PROVIDERS.has(provider) && (isAiveneNative || (!params.model?.startsWith('gemini-') && !params.model?.startsWith('gemma-')))) {
+        // This allows hybrid vision/curation/audit tasks (which explicitly request gemini models) to run natively on Gemini across ALL providers (including Aivene, Groq, OpenAI, etc.).
+        if (NON_GEMINI_PROVIDERS.has(provider) && (!params.model?.startsWith('gemini-') && !params.model?.startsWith('gemma-'))) {
           const text = await callOpenAICompatibleWithRetry({
             systemInstruction: params.config?.systemInstruction,
             contents: params.contents,
@@ -3276,9 +3275,11 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   const timestamp = Date.now();
   return (Array.isArray(parsed) ? parsed : []).map((p, index) => ({
     ...p,
-    id: `hw-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `hw-${timestamp}-${index}-${Math.random().toString(36).substring(2, 11)}`,
   }));
-}export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string, fileType?: string) {
+}
+
+export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string, fileType?: string) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
@@ -3288,22 +3289,25 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock". Anda dilatih khusus untuk kurasi standar Agensi Mikrostock Global Premium dengan performa ultra-akurat dan objektif. Tugas Anda adalah melakukan inspeksi visual yang SANGAT KETAT dan 100% AKURAT terhadap gambar komersial.
 
 ATURAN PALING PENTING (CRITICAL RULE):
-KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Analisis Anda akan diulang 2x sampai 5x oleh sistem. Hasil Anda WAJIB 100% konsisten pada setiap pengulangan. DILARANG KERAS menebak-nebak, berasumsi, atau mengarang masalah (hallucination). Jika cacat tidak terlihat SANGAT JELAS secara visual, jangan dicantumkan.
-Unfortunately, during our review we found that it contains one or more technical issues. Common issues that can impact the technical quality of images include exposure issues, soft focus, excessive filtering or artifacts/noise.
-1. PEMINDAIAN KESELURUHAN (FULL SCAN): Anda WAJIB memeriksa KESELURUHAN gambar dari ujung ke ujung (corner-to-corner), bukan hanya fokus pada bagian tengah atau subjek utama saja. Periksa setiap tepi, sudut, background, dan elemen kecil.
-2. SANGAT KETAT TERHADAP 4 ISU UTAMA ADOBE STOCK: Anda harus SANGAT SENSITIF dan TANPA AMPUN terhadap:
-   - EXPOSURE ISSUES (Overexposure, underexposure, highlight yang blown out, atau shadow yang terlalu gelap).
-   - SOFT FOCUS (Kurang tajam, fokus meleset, motion blur yang tidak disengaja, atau ketajaman subjek utama yang kurang optimal).
-   - EXCESSIVE FILTERING (Efek over-processed, warna terlalu tersaturasi, terlalu kontras, atau tekstur yang tampak plastik/lilin akibat pemrosesan berlebih).
-   - ARTIFACTS / NOISE (Grain digital, color banding, chromatic aberration, sensor dust, atau kompresi JPEG).
-3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual.
-4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
-5. ANALISIS EKSTRA UNTUK GAMBAR DETAIL: Jika gambar memiliki tingkat detail yang tinggi, ornamen rumit, atau tekstur yang padat, Anda WAJIB menganalisisnya dengan ketelitian ganda. Perhatikan baik-baik adanya anomali struktural AI (AI structural anomalies), elemen atau garis yang melebur, pola yang rusak, atau bentuk asimetris tidak logis yang sering tersembunyi dalam pola rumit.
+KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Hasil analisis Anda harus selalu logis, objektif, dan berbasis visual nyata. DILARANG KERAS menebak-nebak, berasumsi, atau mengarang masalah (hallucination). Jika cacat tidak terlihat SANGAT JELAS secara visual, jangan dicantumkan.
+
+CATATAN PENTING MENGENAI PESAN STANDAR ADOBE:
+Pernyataan berikut "Unfortunately, during our review we found that it contains one or more technical issues..." adalah sebuah template penolakan standar Adobe Stock. Anda HANYA boleh mengaktifkan status FAIL apabila terdapat isu teknis nyata yang fatal sesuai tingkat toleransi yang diminta. Jika tidak ada cacat fatal, abaikan pesan ini dan berikan status PASS.
+
+PANDUAN EFEK ARTISTIK & FOTOGRAFI PROFESIONAL:
+1. BOKEH & SHALLOW DEPTH-OF-FIELD (Fokus Selektif): Latar belakang buram yang disengaja agar subjek utama menonjol adalah kualitas artistik premium, BUKAN cacat fokus (soft focus)! Jangan sekali-kali menandai latar belakang bokeh sebagai masalah fokus selama subjek utama tajam secara sempurna (pin-sharp).
+2. TEXTURE & NATURAL GRAIN: Noise digital yang merusak detail berbeda dengan grain film atau tekstur alami kamera yang halus. Jangan menandai grain normal/halus sebagai cacat kecuali berupa bintik warna (chromatic noise) ekstrem yang merusak kualitas visual.
+3. ARTISTIC LIGHTING & SHADOWS: Pencahayaan dramatis, bayangan artistik (high contrast, silhouettes), atau kontras tinggi sering kali disengaja secara estetika. Jangan menandainya sebagai cacat eksposur kecuali subjek utama benar-benar gelap pekat tanpa detail (crushed shadows) atau sangat putih tanpa detail (blown-out highlights) karena kesalahan teknis pencahayaan.
+
+STRATEGI EVALUASI:
+- DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELANGGARAN IP ATAU CACAT TEKNIS FATAL! Berhentilah menebak-nebak atau mencari-cari kesalahan kecil yang tidak merusak estetika komersial gambar.
+- PEMINDAIAN KESELURUHAN (FULL SCAN): Anda WAJIB memeriksa KESELURUHAN gambar dari ujung ke ujung (corner-to-corner), bukan hanya fokus pada bagian tengah atau subjek utama saja. Periksa setiap tepi, sudut, background, dan elemen kecil.
+- ANALISIS EKSTRA UNTUK GAMBAR DETAIL: Jika gambar memiliki tingkat detail yang tinggi, ornamen rumit, atau tekstur yang padat, Anda WAJIB menganalisisnya dengan ketelitian ganda. Perhatikan baik-baik adanya anomali struktural AI (AI structural anomalies), elemen atau garis yang melebur, pola yang rusak, atau bentuk asimetris tidak logis yang sering tersembunyi dalam pola rumit.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
-- STRICT: "Zero Tolerance" mutlak. Sedikit noise, soft focus, chromatic aberration, sensor dust, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59).
-- MEDIUM: Cacat minor di background bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure pada subjek, out-of-focus pada subjek utama, atau gen-AI anomaly = FAIL (Skor maksimal 0-65).
-- LOOSE: Loloskan selama gambar memiliki nilai estetika dan komposisi baik. Hanya cacat teknis fatal, gen-AI anomaly yang sangat jelas, atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
+- STRICT: "Zero Tolerance" mutlak terhadap cacat teknis fatal atau pelanggaran IP. Sedikit soft focus pada subjek utama, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59). Namun, bokeh latar belakang dan grain halus artistik tetap harus lolos.
+- MEDIUM: Cacat minor di background bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek, out-of-focus pada subjek utama, atau gen-AI anomaly parah = FAIL (Skor maksimal 0-65).
+- LOOSE: Loloskan selama gambar memiliki nilai estetika dan komposisi baik. Hanya cacat teknis yang sangat fatal, gen-AI anomaly yang sangat jelas mengganggu, atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
 
 A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standards)
 Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi berikut secara ketat dan teliti:
@@ -3448,7 +3452,7 @@ Respons Anda WAJIB dalam format JSON:
 
   const imagePart = processFrameServer(image);
   
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -3980,7 +3984,7 @@ DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELAN
 
   const imageParts = frames.map(f => processFrameServer(f));
   
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 

@@ -1132,18 +1132,38 @@ const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('mz_ui_language', uiLanguage);
+    if (auth.currentUser) {
+      updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        'settings.uiLanguage': uiLanguage
+      }).catch(() => {});
+    }
   }, [uiLanguage]);
 
   useEffect(() => {
     localStorage.setItem('mz_keyword_mode', keywordMode);
+    if (auth.currentUser) {
+      updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        'settings.keywordMode': keywordMode
+      }).catch(() => {});
+    }
   }, [keywordMode]);
 
   useEffect(() => {
     localStorage.setItem('mz_title_length', titleLength);
+    if (auth.currentUser) {
+      updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        'settings.titleLength': titleLength
+      }).catch(() => {});
+    }
   }, [titleLength]);
 
   useEffect(() => {
     localStorage.setItem('mz_metadata_language', metadataLanguage);
+    if (auth.currentUser) {
+      updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        'settings.metadataLanguage': metadataLanguage
+      }).catch(() => {});
+    }
   }, [metadataLanguage]);
 
   // Cek status R2 saat user membuka tool Vector (EPS/AI)
@@ -1639,6 +1659,21 @@ const App: React.FC = () => {
           syncModel(data.settings.mz_nvidia_model, 'mz_nvidia_model', setSelectedNvidiaModel);
           syncModel(data.settings.mz_aivene_model, 'mz_aivene_model', setSelectedAiveneModel);
 
+          const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
+            if (cloudValue !== undefined) {
+              const localValue = localStorage.getItem(localKey) || '';
+              if (cloudValue !== localValue) {
+                localStorage.setItem(localKey, cloudValue);
+                setter(cloudValue);
+              }
+            }
+          };
+
+          syncPreference(data.settings.uiLanguage, 'mz_ui_language', setUiLanguage);
+          syncPreference(data.settings.keywordMode, 'mz_keyword_mode', setKeywordMode);
+          syncPreference(data.settings.titleLength, 'mz_title_length', setTitleLength);
+          syncPreference(data.settings.metadataLanguage, 'mz_metadata_language', setMetadataLanguage);
+
           if (settingsChanged) {
              setHasCustomKeySaved(
                 (localStorage.getItem('gemini_api_key') || '').length > 0 ||
@@ -1694,7 +1729,11 @@ const App: React.FC = () => {
            mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
            mz_groq_model: localStorage.getItem('mz_groq_model') || '',
            mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
-           mz_aivene_model: localStorage.getItem('mz_aivene_model') || ''
+           mz_aivene_model: localStorage.getItem('mz_aivene_model') || '',
+            uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
+            keywordMode: localStorage.getItem('mz_keyword_mode') || 'commercial',
+            titleLength: localStorage.getItem('mz_title_length') || 'medium',
+            metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
         };
 
         setDoc(userDocRef, {
@@ -3784,6 +3823,8 @@ const App: React.FC = () => {
               dailyGenCount={dailyGenCounts[ToolType.PROMPT_GEN] || 0}
               incrementDailyCount={() => incrementDailyCount(ToolType.PROMPT_GEN)}
               aiOptions={commonAiOptions}
+              user={user}
+              db={db}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE ? (
             <PromptImageView 
@@ -3802,6 +3843,8 @@ const App: React.FC = () => {
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_VIDEO, amount)}
               setShowLimitModal={setShowLimitModal}
               aiOptions={commonAiOptions}
+              user={user}
+              db={db}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
             <ImageCheckView 

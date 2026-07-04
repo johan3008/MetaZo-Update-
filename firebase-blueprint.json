@@ -39,6 +39,9 @@
         "licenseKey": { "type": "string", "description": "The custom active license key string" },
         "trialStart": { "type": "string", "format": "date-time", "description": "The exact start moment of user's free trial" },
         "dailyUsage": { "type": "object", "description": "Day-by-day nested mapping tracking processing numbers per type" },
+        "settings": { "type": "object", "description": "Nested configuration settings including API keys and preferences" },
+        "promptGenHistory": { "type": "array", "description": "Array of saved text prompt generator logs" },
+        "videoHistory": { "type": "array", "description": "Array of saved video keyword analysis logs" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Account cloud register moment" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Last synced moment" }
       },

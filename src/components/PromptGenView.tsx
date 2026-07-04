@@ -16,6 +16,8 @@ interface PromptGenViewProps {
   dailyGenCount?: number;
   incrementDailyCount?: () => void;
   aiOptions?: any;
+  user?: any;
+  db?: any;
 }
 
 interface PromptHistoryItem {
@@ -70,7 +72,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   isLicensed = false,
   dailyGenCount = 0,
   incrementDailyCount,
-  aiOptions
+  aiOptions,
+  user,
+  db
 }) => {
   const [subject, setSubject] = useState('');
 
@@ -132,31 +136,85 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
   const [history, setHistory] = useState<PromptHistoryItem[]>([]);
 
-  // Load history with backward compatibility
+  // Load history with backward compatibility and cloud sync
   useEffect(() => {
+    // 1. First load from local storage
+    let localHistory: PromptHistoryItem[] = [];
     try {
       const stored = localStorage.getItem('metazo_prompt_history_simple');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          const migrated = parsed.map((item: any) => ({
+          localHistory = parsed.map((item: any) => ({
             ...item,
             prompts: item.prompts || (item.optimizedPrompt ? [item.optimizedPrompt] : [item.subject])
           }));
-          setHistory(migrated);
+          setHistory(localHistory);
         }
       }
     } catch (e) {
       console.warn("Could not load prompt history:", e);
     }
-  }, []);
+
+    // 2. Fetch/sync from Firestore if user is logged in
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, getDoc, updateDoc }) => {
+        getDoc(doc(db, 'users', user.uid)).then((docSnap) => {
+          if (docSnap.exists()) {
+            const cloudData = docSnap.data();
+            if (Array.isArray(cloudData.promptGenHistory)) {
+              // Merge local and cloud history by id
+              const combinedMap = new Map<string, PromptHistoryItem>();
+              // Add cloud items first (so they are preferred if matching ids)
+              cloudData.promptGenHistory.forEach((item: any) => {
+                combinedMap.set(item.id, item);
+              });
+              // Add local items (overwrite or fill missing)
+              localHistory.forEach((item: any) => {
+                if (!combinedMap.has(item.id)) {
+                  combinedMap.set(item.id, item);
+                }
+              });
+              // Convert back to sorted list
+              const sorted = Array.from(combinedMap.values()).sort((a, b) => {
+                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+              }).slice(0, 30); // Keep up to 30 items
+              
+              setHistory(sorted);
+              localStorage.setItem('metazo_prompt_history_simple', JSON.stringify(sorted));
+              
+              if (sorted.length !== cloudData.promptGenHistory.length) {
+                updateDoc(doc(db, 'users', user.uid), {
+                  promptGenHistory: sorted
+                }).catch(err => console.error("Error syncing prompt history to cloud:", err));
+              }
+            } else {
+              if (localHistory.length > 0) {
+                updateDoc(doc(db, 'users', user.uid), {
+                  promptGenHistory: localHistory
+                }).catch(err => console.error("Error setting initial cloud history:", err));
+              }
+            }
+          }
+        }).catch(err => console.error("Failed to load prompt history from cloud:", err));
+      });
+    }
+  }, [user, db]);
 
   const saveToHistory = (newItem: PromptHistoryItem) => {
-    const updated = [newItem, ...history.slice(0, 14)]; // limit to last 15 items
+    const updated = [newItem, ...history.slice(0, 29)]; // limit to last 30 items
     setHistory(updated);
     try {
       localStorage.setItem('metazo_prompt_history_simple', JSON.stringify(updated));
     } catch(e) {}
+
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          promptGenHistory: updated
+        }).catch(err => console.error("Error saving prompt history to cloud:", err));
+      });
+    }
   };
 
   const handleClearHistory = () => {
@@ -164,6 +222,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     try {
       localStorage.removeItem('metazo_prompt_history_simple');
     } catch(e) {}
+
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          promptGenHistory: []
+        }).catch(err => console.error("Error clearing prompt history on cloud:", err));
+      });
+    }
   };
 
   const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
@@ -173,6 +239,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     try {
       localStorage.setItem('metazo_prompt_history_simple', JSON.stringify(updated));
     } catch(e) {}
+
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          promptGenHistory: updated
+        }).catch(err => console.error("Error deleting prompt history item on cloud:", err));
+      });
+    }
   };
 
   const handleGenerate = async () => {

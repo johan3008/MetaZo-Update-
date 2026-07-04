@@ -44,6 +44,8 @@ interface PromptVideoViewProps {
   dailyGenCount?: number;
   incrementDailyCount?: (amount?: number) => void;
   setShowLimitModal?: (show: boolean) => void;
+  user?: any;
+  db?: any;
 }
 
 export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ 
@@ -52,7 +54,9 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   isLicensed = false,
   dailyGenCount = 0,
   incrementDailyCount,
-  setShowLimitModal
+  setShowLimitModal,
+  user,
+  db
 }) => {
   const [keyword, setKeyword] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -64,15 +68,62 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  // Load history
+  // Load history with cloud sync
   useEffect(() => {
+    // 1. First load from local storage
+    let localHistory: HistoryItem[] = [];
     try {
       const stored = localStorage.getItem('metazo_video_analysis_history');
       if (stored) {
-        setHistory(JSON.parse(stored));
+        localHistory = JSON.parse(stored);
+        setHistory(localHistory);
       }
     } catch (e) {}
-  }, []);
+
+    // 2. Fetch/sync from Firestore if user is logged in
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, getDoc, updateDoc }) => {
+        getDoc(doc(db, 'users', user.uid)).then((docSnap) => {
+          if (docSnap.exists()) {
+            const cloudData = docSnap.data();
+            if (Array.isArray(cloudData.videoHistory)) {
+              // Merge local and cloud history by id
+              const combinedMap = new Map<string, HistoryItem>();
+              // Add cloud items first
+              cloudData.videoHistory.forEach((item: any) => {
+                combinedMap.set(item.id, item);
+              });
+              // Add local items
+              localHistory.forEach((item: any) => {
+                if (!combinedMap.has(item.id)) {
+                  combinedMap.set(item.id, item);
+                }
+              });
+              // Convert back to sorted list
+              const sorted = Array.from(combinedMap.values()).sort((a, b) => {
+                return b.timestamp - a.timestamp;
+              }).slice(0, 30); // Keep up to 30 items
+              
+              setHistory(sorted);
+              localStorage.setItem('metazo_video_analysis_history', JSON.stringify(sorted));
+              
+              if (sorted.length !== cloudData.videoHistory.length) {
+                updateDoc(doc(db, 'users', user.uid), {
+                  videoHistory: sorted
+                }).catch(err => console.error("Error syncing video history to cloud:", err));
+              }
+            } else {
+              if (localHistory.length > 0) {
+                updateDoc(doc(db, 'users', user.uid), {
+                  videoHistory: localHistory
+                }).catch(err => console.error("Error setting initial cloud video history:", err));
+              }
+            }
+          }
+        }).catch(err => console.error("Failed to load video history from cloud:", err));
+      });
+    }
+  }, [user, db]);
 
   const handleAnalyze = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -128,9 +179,17 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
         timestamp: Date.now()
       };
       
-      const updatedHistory = [newItem, ...history].slice(0, 20);
+      const updatedHistory = [newItem, ...history].slice(0, 29); // Limit to 30 items
       setHistory(updatedHistory);
       localStorage.setItem('metazo_video_analysis_history', JSON.stringify(updatedHistory));
+
+      if (user && db) {
+        import('firebase/firestore').then(({ doc, updateDoc }) => {
+          updateDoc(doc(db, 'users', user.uid), {
+            videoHistory: updatedHistory
+          }).catch(err => console.error("Error saving video history to cloud:", err));
+        });
+      }
       
     } catch (err: any) {
       setError(err.message);
@@ -142,12 +201,28 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   const clearHistory = () => {
     setHistory([]);
     localStorage.removeItem('metazo_video_analysis_history');
+
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          videoHistory: []
+        }).catch(err => console.error("Error clearing video history on cloud:", err));
+      });
+    }
   };
 
   const removeHistoryItem = (id: string) => {
     const updated = history.filter(item => item.id !== id);
     setHistory(updated);
     localStorage.setItem('metazo_video_analysis_history', JSON.stringify(updated));
+
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          videoHistory: updated
+        }).catch(err => console.error("Error deleting video history item on cloud:", err));
+      });
+    }
   };
 
   const loadFromHistory = (item: HistoryItem) => {

@@ -1043,11 +1043,28 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     // Fully return to trial mode by resetting the trial period
     localStorage.setItem('mz_trial_start', new Date().toISOString());
     
+    // Clear all daily usage in localStorage to reset quota
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('mz_daily_gen_') || key.startsWith('daily_gen_') || key.includes('_daily_gen_'))) {
+        localStorage.removeItem(key);
+      }
+    }
+    
     if (userId) {
       const userRef = doc(db, 'users', userId);
       await setDoc(userRef, {
         licenseKey: '',
         trialStart: new Date().toISOString(),
+        dailyUsage: {
+          [dateStr]: {} // Clear today's daily usage in Firestore to reset quota to 0/25
+        },
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => {
         console.error("Failed to clear license in user profile:", err);
