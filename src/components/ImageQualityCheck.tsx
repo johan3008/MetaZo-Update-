@@ -1,5 +1,5 @@
 import { getDailyLimit } from '../../constants';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getHeaders } from '../../services/geminiService';
 import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -77,6 +77,14 @@ export const ImageQualityCheck: React.FC<{
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
+  const [r2Configured, setR2Configured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/r2-status')
+      .then(res => res.json())
+      .then(data => setR2Configured(!!data.configured))
+      .catch(() => setR2Configured(false));
+  }, []);
 
   const toggleHeatmap = (fileName: string) => {
     const next = new Set(showHeatmaps);
@@ -443,17 +451,77 @@ export const ImageQualityCheck: React.FC<{
         }
         setProgress(startProgress + 15);
 
-        const response = await fetch('/api/check-image-quality', {
-          method: 'POST',
-          headers: getHeaders(aiOptions),
-          body: JSON.stringify({ 
-            image: base64Image, 
-            tolerance, 
-            language: t.language || 'English', 
-            model: aiOptions?.model,
-            fileType: file.type || file.name.split('.').pop()
-          }),
-        });
+        let uploadedUrl = null;
+        let getUrlData = null;
+
+        // Try R2 upload for standard images to prevent Vercel 4.5MB payload limits
+        if (!file.name.match(/\.(eps|ai)$/i)) {
+          try {
+            let uploadBlob: Blob | File = file;
+            try {
+              const arr = base64Image.split(',');
+              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+              const bstr = atob(arr[1]);
+              let n = bstr.length;
+              const u8arr = new Uint8Array(n);
+              while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+              }
+              uploadBlob = new Blob([u8arr], { type: mime });
+            } catch (e) {
+              console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
+              uploadBlob = file;
+            }
+
+            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
+            if (getUrlRes.ok) {
+              getUrlData = await getUrlRes.json().catch(() => ({}));
+              if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+                console.log(`[Image Audit] Uploading to Cloudflare R2: ${file.name}`);
+                const putRes = await fetch(getUrlData.uploadUrl, {
+                  method: 'PUT',
+                  body: uploadBlob,
+                  headers: { 'Content-Type': uploadBlob.type || 'image/jpeg' }
+                });
+                if (putRes.ok) {
+                  uploadedUrl = getUrlData.fileUrl;
+                } else {
+                  console.warn(`[Image Audit] PUT to R2 failed: ${putRes.status}`);
+                }
+              }
+            }
+          } catch (uploadErr) {
+            console.warn("[Image Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
+          }
+        }
+
+        let response;
+        if (uploadedUrl) {
+          response = await fetch('/api/check-image-quality', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+            body: JSON.stringify({ 
+              fileUrl: uploadedUrl,
+              pathKey: getUrlData?.pathKey,
+              tolerance, 
+              language: t.language || 'English', 
+              model: aiOptions?.model,
+              fileType: file.type || file.name.split('.').pop()
+            }),
+          });
+        } else {
+          response = await fetch('/api/check-image-quality', {
+            method: 'POST',
+            headers: getHeaders(aiOptions),
+            body: JSON.stringify({ 
+              image: base64Image, 
+              tolerance, 
+              language: t.language || 'English', 
+              model: aiOptions?.model,
+              fileType: file.type || file.name.split('.').pop()
+            }),
+          });
+        }
         if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);
         const data = await response.json();
         newReports[file.name] = data;
@@ -618,6 +686,27 @@ export const ImageQualityCheck: React.FC<{
               ))}
             </div>
           </div>
+
+          {r2Configured === false && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-amber-500/10 dark:bg-amber-500/[0.03] border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3"
+            >
+              <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="text-[10px] font-black tracking-wider uppercase text-amber-700 dark:text-amber-400">
+                  {t.language === 'Bahasa' ? 'SARAN KONFIGURASI CLOUDFLARE R2' : 'CLOUDFLARE R2 RECOMMENDED'}
+                </h4>
+                <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {t.language === 'Bahasa' 
+                    ? 'Vercel membatasi ukuran request maksimum 4.5MB. Untuk menganalisis gambar beresolusi tinggi tanpa batasan ukuran file, silakan konfigurasikan Cloudflare R2 di Settings menu.'
+                    : 'Vercel limits request payloads to 4.5MB. To analyze high-resolution images with no file size limitations, please configure Cloudflare R2 in the Settings menu.'
+                  }
+                </p>
+              </div>
+            </motion.div>
+          )}
 
           {error && (
             <motion.div 

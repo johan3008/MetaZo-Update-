@@ -1415,24 +1415,39 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/check-image-quality', async (req, res) => {
         let tempFilePath = "";
+        let cleanupFn = () => {};
         try {
-            const { image, tolerance, language, model, fileType } = req.body;
-            if (!image) {
-                console.warn('Server check-image-quality error: Missing image data');
-                return res.status(400).json({ error: 'Missing image data' });
-            }
+            const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
             
-            // 1. Decode base64 and save to temp file for FFmpeg analysis
-            const tempDir = path.join(process.cwd(), 'tmp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
-            const fileExt = fileType?.includes('png') ? 'png' : fileType?.includes('gif') ? 'gif' : 'jpg';
-            const tempFileName = `img_${crypto.randomBytes(8).toString('hex')}.${fileExt}`;
-            tempFilePath = path.join(tempDir, tempFileName);
+            let imageBase64 = "";
+            if (fileUrl) {
+                console.log(`Server check-image-quality: Downloading file from storage: ${fileUrl}`);
+                const ext = fileType?.includes('png') ? '.png' : fileType?.includes('gif') ? '.gif' : '.jpg';
+                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
+                tempFilePath = downloadResult.localPath;
+                cleanupFn = downloadResult.cleanup;
+                
+                // Read local downloaded file as base64 for Gemini check
+                const fileBuffer = fs.readFileSync(tempFilePath);
+                const mime = fileType || (ext === '.png' ? 'image/png' : 'image/jpeg');
+                imageBase64 = `data:${mime};base64,${fileBuffer.toString('base64')}`;
+            } else if (image) {
+                // 1. Decode base64 and save to temp file for FFmpeg analysis
+                const tempDir = uploadDir;
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+                const fileExt = fileType?.includes('png') ? 'png' : fileType?.includes('gif') ? 'gif' : 'jpg';
+                const tempFileName = `img_${crypto.randomBytes(8).toString('hex')}.${fileExt}`;
+                tempFilePath = path.join(tempDir, tempFileName);
 
-            const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-            fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
+                const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+                fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
+                imageBase64 = image;
+            } else {
+                console.warn('Server check-image-quality error: Missing image data or fileUrl');
+                return res.status(400).json({ error: 'Missing image data or fileUrl' });
+            }
 
             // 2. Perform FFmpeg + FFprobe analysis
             console.log('Server check-image-quality: Running FFmpeg analysis...');
@@ -1457,7 +1472,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
-            const aiVisionStats = await checkImageQuality(image, tolerance, language, model, fileType);
+            const aiVisionStats = await checkImageQuality(imageBase64, tolerance, language, model, fileType);
             
             console.log('Server check-image-quality: Integration successful');
             
@@ -1473,6 +1488,7 @@ app.get('/api/debug-uploads', (req, res) => {
             console.warn('Server check-image-quality error:', e);
             res.status(500).json({ error: e.message || 'Error checking image quality' });
         } finally {
+            cleanupFn();
             if (tempFilePath && fs.existsSync(tempFilePath)) {
                 try { fs.unlinkSync(tempFilePath); } catch (err) {}
             }
@@ -1697,11 +1713,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     // Lazy S3/R2 client — only created when credentials are actually present.
     // This prevents a crash on startup when the env vars are not yet set.
-    const isR2Configured = () =>
-        !!(process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
+    function isR2Configured() {
+        return !!(process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
+    }
 
     let _s3ClientInstance: S3Client | null = null;
-    const getS3Client = (): S3Client => {
+    function getS3Client(): S3Client {
         if (!isR2Configured()) throw new Error('Cloudflare R2 is not configured in environment variables.');
         if (!_s3ClientInstance) {
             _s3ClientInstance = new S3Client({
@@ -1715,12 +1732,12 @@ app.get('/api/debug-uploads', (req, res) => {
             });
         }
         return _s3ClientInstance;
-    };
+    }
 
     // Convenience alias kept for backwards-compat with existing usages below
     const s3Client = { send: (cmd: any) => getS3Client().send(cmd) };
 
-    const downloadFileFromStorage = async (fileUrl: string, pathKey?: string, extension: string = '.mp4'): Promise<{ localPath: string; cleanup: () => void }> => {
+    async function downloadFileFromStorage(fileUrl: string, pathKey?: string, extension: string = '.mp4'): Promise<{ localPath: string; cleanup: () => void }> {
         const uniqueTmpDir = path.join(uploadDir, `tmp_${Date.now()}_${Math.random().toString(36).substring(7)}`);
         fs.mkdirSync(uniqueTmpDir, { recursive: true });
         const localPath = path.join(uniqueTmpDir, `downloaded${extension}`);
@@ -1756,7 +1773,7 @@ app.get('/api/debug-uploads', (req, res) => {
         };
 
         return { localPath, cleanup };
-    };
+    }
 
     const uploadFileToStorage = async (localPath: string, originalName: string, contentType: string): Promise<{ fileUrl: string; pathKey: string }> => {
         if (!isR2Configured()) throw new Error('Cloudflare R2 is not configured.');
