@@ -126,17 +126,31 @@ export const VideoQualityCheck: React.FC<{
           getUrlData = await getUrlRes.json().catch(() => ({}));
           if (getUrlData.uploadUrl && getUrlData.fileUrl) {
             console.log(`[Video Audit] Uploading to Cloudflare R2 directly: ${file.name}`);
-            const putRes = await fetch(getUrlData.uploadUrl, {
-              method: 'PUT',
-              body: file,
-              headers: { 'Content-Type': file.type || 'video/mp4' }
-            });
-            if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
-            uploadedUrl = getUrlData.fileUrl;
+            try {
+              const putRes = await fetch(getUrlData.uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type || 'video/mp4' }
+              });
+              if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
+              uploadedUrl = getUrlData.fileUrl;
+            } catch (putErr: any) {
+              if (putErr.message === 'Failed to fetch') {
+                throw new Error(
+                  t.language === 'Bahasa'
+                    ? 'Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan konfigurasi CORS di dashboard Cloudflare R2 bucket Anda.'
+                    : 'Failed to upload to Cloudflare R2 (CORS Error). Please make sure you have added CORS configuration to your Cloudflare R2 bucket settings.'
+                );
+              }
+              throw putErr;
+            }
           }
         }
-      } catch (uploadErr) {
-        console.warn("[Video Audit] Failed to upload to Cloudflare R2, falling back to server multipart:", uploadErr);
+      } catch (uploadErr: any) {
+        console.warn("[Video Audit] Failed to upload to Cloudflare R2:", uploadErr);
+        if (uploadErr.message.includes('CORS') || uploadErr.message.includes('Cloudflare R2')) {
+          throw uploadErr;
+        }
       }
 
       // 2. Call backend endpoint to audit the video
