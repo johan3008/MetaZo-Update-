@@ -2968,11 +2968,13 @@ export const analyzeImageToPrompt = async (
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
-CRITICAL VISUAL ANALYSIS RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
-2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
+CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
+2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
+3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
+4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
 
-STEP 1: EXTRACT THE FOLLOWING DATA POINTS:
+STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
 - Subject (The main entity)
 - Action (What is happening)
 - Environment (Setting, location, context)
@@ -2994,7 +2996,7 @@ Adapt the prompt structure according to the chosen style:
 
 CRITICAL RULES:
 1. OUTPUT PROMPT MUST BE IN ENGLISH.
-2. The description should be a concise summary of the visual analysis.
+2. The description should be a concise summary of the visual analysis and how this variation differs or complements the original asset.
 3. Return a JSON object with "prompt" and "description".`;
 
   const responseSchema = {
@@ -3062,9 +3064,11 @@ export const analyzeBatchImageToPrompt = async (
   const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
 
-CRITICAL VISUAL ANALYSIS RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
-2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
+CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
+2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
+3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
+4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
 
 FOR EACH IMAGE, EXTRACT AND ANALYZE:
 - Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.

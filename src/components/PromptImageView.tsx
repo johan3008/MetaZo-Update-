@@ -159,8 +159,8 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     setGlobalError(null);
   };
 
-  const analyzeBatch = async (itemsToAnalyze?: ImageItem[]) => {
-    const unanalyzed = itemsToAnalyze || images.filter(img => !img.result && !img.loading);
+  const analyzeBatch = async (itemsToAnalyze?: ImageItem[], forceAll = false) => {
+    const unanalyzed = itemsToAnalyze || (forceAll ? images : images.filter(img => !img.result && !img.loading));
     if (unanalyzed.length === 0) return;
 
     if (!isLicensed && dailyGenCount + unanalyzed.length > getDailyLimit()) {
@@ -393,33 +393,44 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
               </div>
             )}
 
-            <button
-              onClick={analyzeBatch}
-              disabled={loadingBatch || images.filter(img => !img.result).length === 0}
-              className={`w-full py-3.5 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center space-x-3 transition-all duration-300 relative overflow-hidden ${
-                loadingBatch || images.filter(img => !img.result).length === 0
-                  ? 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-white/5' 
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 active:scale-[0.98]'
-              }`}
-            >
-              {loadingBatch && (
-                <div 
-                  className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300"
-                  style={{ width: `${batchProgress}%` }}
-                />
-              )}
-              {loadingBatch ? (
-                <>
-                  <RefreshCw className="animate-spin" size={14} />
-                  <span>{t.image_studio_btn_analyzing.replace('{count}', images.filter(img => img.loading).length.toString()).replace('{progress}', Math.round(batchProgress).toString())}</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={14} className="animate-pulse" />
-                  <span>{t.image_studio_btn_analyze.replace('{count}', images.filter(img => !img.result).length.toString())}</span>
-                </>
-              )}
-            </button>
+            {(() => {
+              const hasUnanalyzed = images.some(img => !img.result);
+              const canAnalyze = images.length > 0;
+              return (
+                <button
+                  onClick={() => analyzeBatch(undefined, !hasUnanalyzed)}
+                  disabled={loadingBatch || !canAnalyze}
+                  className={`w-full py-3.5 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center space-x-3 transition-all duration-300 relative overflow-hidden ${
+                    loadingBatch || !canAnalyze
+                      ? 'bg-slate-100 dark:bg-white/5 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-white/5' 
+                      : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 active:scale-[0.98]'
+                  }`}
+                >
+                  {loadingBatch && (
+                    <div 
+                      className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300"
+                      style={{ width: `${batchProgress}%` }}
+                    />
+                  )}
+                  {loadingBatch ? (
+                    <>
+                      <RefreshCw className="animate-spin" size={14} />
+                      <span>{t.image_studio_btn_analyzing.replace('{count}', images.filter(img => img.loading).length.toString()).replace('{progress}', Math.round(batchProgress).toString())}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} className="animate-pulse" />
+                      <span>
+                        {hasUnanalyzed 
+                          ? t.image_studio_btn_analyze.replace('{count}', images.filter(img => !img.result).length.toString())
+                          : `Analisis Ulang dengan Estetika: ${styleCategory}`
+                        }
+                      </span>
+                    </>
+                  )}
+                </button>
+              );
+            })()}
           </div>
         </div>
 
@@ -531,17 +542,27 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                 )}
                               </div>
                               {item.result && (
-                                <button
-                                  onClick={() => copyToClipboard(item.result!.prompt, item.id)}
-                                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
-                                    copiedId === item.id 
-                                      ? 'bg-emerald-500 text-white' 
-                                      : 'bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-md shadow-black/5'
-                                  }`}
-                                >
-                                  {copiedId === item.id ? <Check size={12} /> : <Copy size={12} />}
-                                  <span>{copiedId === item.id ? 'Copied' : 'Salin'}</span>
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => analyzeBatch([item])}
+                                    className="flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-md shadow-black/5"
+                                    title="Regenerasi dengan Target Estetika terpilih"
+                                  >
+                                    <RefreshCw size={12} className={item.loading ? "animate-spin" : ""} />
+                                    <span>Regen</span>
+                                  </button>
+                                  <button
+                                    onClick={() => copyToClipboard(item.result!.prompt, item.id)}
+                                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
+                                      copiedId === item.id 
+                                        ? 'bg-emerald-500 text-white' 
+                                        : 'bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-md shadow-black/5'
+                                    }`}
+                                  >
+                                    {copiedId === item.id ? <Check size={12} /> : <Copy size={12} />}
+                                    <span>{copiedId === item.id ? 'Copied' : 'Salin'}</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
 
