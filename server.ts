@@ -1138,7 +1138,7 @@ app.get('/api/debug-uploads', (req, res) => {
         
         try {
             if (!ffmpeg) {
-                return res.status(500).json({ error: 'ffmpeg tidak terinisialisasi di server.' });
+                console.warn('[MUTE VIDEO WARNING] FFmpeg is not available (running on Vercel). Falling back to direct stream copy.');
             }
 
             let originalName = '';
