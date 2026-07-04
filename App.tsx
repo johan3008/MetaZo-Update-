@@ -26,6 +26,7 @@ import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
 import { SaaSPortal } from './src/components/SaaSPortal';
+import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
@@ -1205,7 +1206,7 @@ const App: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene'>(() => {
     return (localStorage.getItem('ai_provider') || 'gemini') as any;
   });
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'reseller'>(selectedProvider);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'reseller' | 'faq_billing'>(selectedProvider);
 
   useEffect(() => {
     if (showSettingsModal) {
@@ -4265,9 +4266,9 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['appearance', selectedProvider, 'reseller'] as const).map(tab => (
+              {(['appearance', selectedProvider, 'faq_billing', 'reseller'] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? '💳 FAQ Tagihan & Langganan' : '💳 Billing & Subscription FAQ') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
@@ -5491,6 +5492,17 @@ const App: React.FC = () => {
                   subDaysLeft={subDaysLeft}
                   t={t}
                 />
+              )}
+
+              {activeSettingsTab === 'faq_billing' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    {uiLanguage === 'id' 
+                      ? "Pelajari transisi dari masa uji coba gratis (Free Trial) ke status berbayar penuh (PRO) dengan lancar." 
+                      : "Understand how your Free Trial account transitions seamlessly to a paid PRO subscription."}
+                  </p>
+                  <FAQAccordion language={uiLanguage} />
+                </div>
               )}
 
               {/* Status Penggunaan info footer */}
