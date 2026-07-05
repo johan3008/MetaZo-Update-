@@ -458,22 +458,26 @@ export const ImageQualityCheck: React.FC<{
         if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
             let uploadBlob: Blob | File = file;
-            try {
-              const arr = base64Image.split(',');
-              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-              const bstr = atob(arr[1]);
-              let n = bstr.length;
-              const u8arr = new Uint8Array(n);
-              while (n--) {
-                u8arr[n] = bstr.charCodeAt(n);
+            const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
+            
+            if (!isVideo) {
+              try {
+                const arr = base64Image.split(',');
+                const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                  u8arr[n] = bstr.charCodeAt(n);
+                }
+                uploadBlob = new Blob([u8arr], { type: mime });
+              } catch (e) {
+                console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
+                uploadBlob = file;
               }
-              uploadBlob = new Blob([u8arr], { type: mime });
-            } catch (e) {
-              console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
-              uploadBlob = file;
             }
 
-            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
+            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || (isVideo ? 'video/mp4' : 'image/jpeg'))}`);
             if (getUrlRes.ok) {
               getUrlData = await getUrlRes.json().catch(() => ({}));
               if (getUrlData.uploadUrl && getUrlData.fileUrl) {
@@ -496,8 +500,10 @@ export const ImageQualityCheck: React.FC<{
         }
 
         let response;
+        const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
+        
         if (uploadedUrl) {
-          response = await fetch('/api/check-image-quality', {
+          response = await fetch(isVideo ? '/api/check-video-quality' : '/api/check-image-quality', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
             body: JSON.stringify({ 
@@ -510,17 +516,37 @@ export const ImageQualityCheck: React.FC<{
             }),
           });
         } else {
-          response = await fetch('/api/check-image-quality', {
-            method: 'POST',
-            headers: getHeaders(aiOptions),
-            body: JSON.stringify({ 
-              image: base64Image, 
-              tolerance, 
-              language: t.language || 'English', 
-              model: aiOptions?.model,
-              fileType: file.type || file.name.split('.').pop()
-            }),
-          });
+          if (isVideo) {
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('tolerance', tolerance);
+            formData.append('language', t.language || 'English');
+            formData.append('model', aiOptions?.model || '');
+            
+            const headers = getHeaders(aiOptions);
+            // Delete Content-Type so browser sets multipart boundary
+            if (headers && headers['Content-Type']) {
+              delete headers['Content-Type'];
+            }
+            
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers,
+              body: formData,
+            });
+          } else {
+            response = await fetch('/api/check-image-quality', {
+              method: 'POST',
+              headers: getHeaders(aiOptions),
+              body: JSON.stringify({ 
+                image: base64Image, 
+                tolerance, 
+                language: t.language || 'English', 
+                model: aiOptions?.model,
+                fileType: file.type || file.name.split('.').pop()
+              }),
+            });
+          }
         }
         if (!response.ok) throw new Error(`Failed to analyze ${file.name}`);
         const data = await response.json();
