@@ -271,6 +271,20 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     }
   };
 
+  const exportHistoryToJSON = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `metazo_prompt_history_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+    } catch (e) {
+      console.error("Export failed", e);
+    }
+  };
+
   const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -1197,13 +1211,22 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 Riwayat Gubahan ({history.length})
               </span>
               {history.length > 0 && (
-                <button
-                  onClick={handleClearHistory}
-                  className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-500/10 px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Trash2 size={10} />
-                  Hapus
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={exportHistoryToJSON}
+                    className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest hover:bg-indigo-50 dark:hover:bg-indigo-500/10 px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Download size={10} />
+                    Backup
+                  </button>
+                  <button
+                    onClick={handleClearHistory}
+                    className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-500/10 px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Trash2 size={10} />
+                    Hapus
+                  </button>
+                </div>
               )}
             </div>
 

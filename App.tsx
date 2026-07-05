@@ -15,6 +15,7 @@ import { MetricsRow } from './src/components/MetricsRow';
 import { UploadPanel } from './src/components/UploadPanel';
 import { AiConfigPanel } from './src/components/AiConfigPanel';
 import { ExportPanel } from './src/components/ExportPanel';
+import { BackupManagerPanel } from './src/components/BackupManagerPanel';
 import { FeatureGuideButton } from './src/components/FeatureGuideModal';
 import { ReviewQueue } from './src/components/ReviewQueue';
 import { DashboardView } from './src/components/DashboardView';
@@ -2546,6 +2547,13 @@ const App: React.FC = () => {
   };
   
   const [autoDownloadCSV, setAutoDownloadCSVState] = useState(false);
+  const [autoBackup, setAutoBackupState] = useState(false);
+  const autoBackupRef = useRef(false);
+
+  const setAutoBackup = (val: boolean) => {
+      setAutoBackupState(val);
+      autoBackupRef.current = val;
+  };
   const [mobileTab, setMobileTab] = useState<'upload' | 'ai' | 'review'>('upload');
   const [returnToStartCountdown, setReturnToStartCountdown] = useState<number | null>(null);
 
@@ -3427,6 +3435,9 @@ const App: React.FC = () => {
           stopTabKeepAlive();
           stopGenerationRef.current = false;
       } finally {
+          if (processedInThisRun > 0 && autoBackupRef.current) {
+              setTimeout(() => handleCloudAutoBackup(filesRef.current), 1000);
+          }
           isProcessingLoopRef.current = false;
       }
     };
@@ -3454,6 +3465,117 @@ const App: React.FC = () => {
       stopTabKeepAlive();
       // Clean up any files that were stuck in "generating" state
       updateFiles(prev => prev.map(f => f.isGenerating ? { ...f, isGenerating: false, error: "Cancelled by user" } : f));
+  };
+
+  const handleBackupJSON = () => {
+    const validFiles = files.filter(f => f.title);
+    if (!validFiles.length) return;
+    
+    const backupData = validFiles.map(f => ({
+      id: f.id,
+      fileName: f.customFileName || f.file.name,
+      title: f.title,
+      description: f.description,
+      keywords: f.keywords,
+      adobeCategoryId: f.adobeCategoryId,
+      shutterstockCategory1: f.shutterstockCategory1,
+      shutterstockCategory2: f.shutterstockCategory2,
+      categoryReason: f.categoryReason,
+      timestamp: new Date().toISOString()
+    }));
+    
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `metazo_metadata_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+    } catch (e) {
+      console.error("Backup JSON failed", e);
+    }
+  };
+
+  const handleImportJSON = (backupData: any[]) => {
+    updateFiles(prev => {
+      const newFiles = [...prev];
+      
+      backupData.forEach(backupItem => {
+        const existingIdx = newFiles.findIndex(f => (f.customFileName || f.file.name) === backupItem.fileName);
+        if (existingIdx >= 0) {
+          // Merge with existing
+          newFiles[existingIdx] = {
+            ...newFiles[existingIdx],
+            title: backupItem.title || newFiles[existingIdx].title,
+            description: backupItem.description || newFiles[existingIdx].description,
+            keywords: backupItem.keywords || newFiles[existingIdx].keywords,
+            adobeCategoryId: backupItem.adobeCategoryId || newFiles[existingIdx].adobeCategoryId,
+            shutterstockCategory1: backupItem.shutterstockCategory1 || newFiles[existingIdx].shutterstockCategory1,
+            shutterstockCategory2: backupItem.shutterstockCategory2 || newFiles[existingIdx].shutterstockCategory2,
+            categoryReason: backupItem.categoryReason || newFiles[existingIdx].categoryReason,
+            isGenerating: false,
+            error: null
+          };
+        } else {
+          // Create dummy file for imported metadata without corresponding actual file
+          const ext = backupItem.fileName?.split('.').pop()?.toLowerCase();
+          const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '');
+          const dummyFile = new File([], backupItem.fileName || 'imported_file', { type: isVideo ? 'video/mp4' : 'image/jpeg' });
+          
+          newFiles.push({
+            id: backupItem.id || Math.random().toString(36).substring(2, 9),
+            file: dummyFile,
+            customFileName: backupItem.fileName,
+            thumbnail: null,
+            analysisFrames: [],
+            title: backupItem.title || '',
+            description: backupItem.description || '',
+            keywords: backupItem.keywords || [],
+            adobeCategoryId: backupItem.adobeCategoryId || '',
+            shutterstockCategory1: backupItem.shutterstockCategory1 || '',
+            shutterstockCategory2: backupItem.shutterstockCategory2 || '',
+            categoryReason: backupItem.categoryReason || '',
+            isGenerating: false,
+            error: null
+          });
+        }
+      });
+      return newFiles;
+    });
+    alert(`Successfully imported metadata. ${backupData.length} items loaded.`);
+  };
+
+  const handleCloudAutoBackup = (filesToBackup: FileItem[]) => {
+    if (!user || !db) return;
+    const validFiles = filesToBackup.filter(f => f.title);
+    if (!validFiles.length) return;
+    
+    const backupData = validFiles.map(f => ({
+      id: f.id,
+      fileName: f.customFileName || f.file.name,
+      title: f.title,
+      description: f.description,
+      keywords: f.keywords,
+      timestamp: new Date().toISOString()
+    }));
+
+    import('firebase/firestore').then(({ doc, updateDoc, getDoc }) => {
+      const userRef = doc(db, 'users', user.uid);
+      getDoc(userRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const currentHistory = data.metadataGenHistory || [];
+          const updatedHistory = [{
+            batchId: `batch-${Date.now()}`,
+            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            tool: activeTool,
+            items: backupData
+          }, ...currentHistory].slice(0, 30);
+          updateDoc(userRef, { metadataGenHistory: updatedHistory }).catch(err => console.warn('db_op', err));
+        }
+      });
+    });
   };
 
   const handleExport = () => {
@@ -3865,6 +3987,20 @@ const App: React.FC = () => {
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
               aiOptions={commonAiOptions}
+              user={user}
+              db={db}
+            />
+          ) : activeTool === ToolType.PROMPT_VIDEO_CHECK ? (
+            <VideoQualityCheck 
+              t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.PROMPT_VIDEO_CHECK] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_VIDEO_CHECK, amount)}
+              setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
+              aiOptions={commonAiOptions}
+              user={user}
+              db={db}
             />
           ) : activeTool === ToolType.CALENDAR_GEN ? (
             <CalendarGenView 
@@ -4082,27 +4218,40 @@ const App: React.FC = () => {
               />
 
               {/* Section Row 3: Bulk Export Integration Panels */}
-              {hasFiles && (
-                <ExportPanel 
-                  exportAdobe={exportAdobe} 
-                  setExportAdobe={setExportAdobe} 
-                  exportShutterstock={exportShutterstock} 
-                  setExportShutterstock={setExportShutterstock} 
-                  exportVecteezy={exportVecteezy} 
-                  setExportVecteezy={setExportVecteezy} 
-                  exportCanva={exportCanva} 
-                  setExportCanva={setExportCanva} 
-                  exportFreepik={exportFreepik} 
-                  setExportFreepik={setExportFreepik} 
-                  shutterstockDescMode={shutterstockDescMode} 
-                  setShutterstockDescMode={setShutterstockDescMode} 
-                  autoDownloadCSV={autoDownloadCSV} 
-                  setAutoDownloadCSV={setAutoDownloadCSV} 
-                  canDownload={canDownload} 
-                  handleExport={handleExport} 
-                  t={t} 
+              <div className={mobileTab === 'review' ? 'block animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:block'}>
+                {hasFiles && (
+                  <ExportPanel 
+                    exportAdobe={exportAdobe} 
+                    setExportAdobe={setExportAdobe} 
+                    exportShutterstock={exportShutterstock} 
+                    setExportShutterstock={setExportShutterstock} 
+                    exportVecteezy={exportVecteezy} 
+                    setExportVecteezy={setExportVecteezy} 
+                    exportCanva={exportCanva} 
+                    setExportCanva={setExportCanva} 
+                    exportFreepik={exportFreepik} 
+                    setExportFreepik={setExportFreepik} 
+                    shutterstockDescMode={shutterstockDescMode} 
+                    setShutterstockDescMode={setShutterstockDescMode} 
+                    autoDownloadCSV={autoDownloadCSV} 
+                    setAutoDownloadCSV={setAutoDownloadCSVState} 
+                    canDownload={canDownload} 
+                    handleExport={handleExport} 
+                    handleBackupJSON={handleBackupJSON}
+                    t={t} 
+                  />
+                )}
+                
+                <BackupManagerPanel
+                  user={user}
+                  db={db}
+                  handleBackupJSON={handleBackupJSON}
+                  handleImportJSON={handleImportJSON}
+                  autoBackup={autoBackup}
+                  setAutoBackup={setAutoBackup}
+                  activeTool={activeTool}
                 />
-              )}
+              </div>
             </>
           )}
           </motion.div>

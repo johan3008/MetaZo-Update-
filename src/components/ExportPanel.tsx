@@ -18,6 +18,7 @@ interface ExportPanelProps {
   setAutoDownloadCSV: (v: boolean) => void;
   canDownload: boolean;
   handleExport: () => void;
+  handleBackupJSON?: () => void;
   t: any;
 }
 
@@ -38,6 +39,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   setAutoDownloadCSV,
   canDownload,
   handleExport,
+  handleBackupJSON,
   t
 }) => {
   return (
@@ -206,7 +208,19 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         </div>
 
         {/* BUTTON ACTION FLOOR */}
-        <div className="pt-4 border-t border-[#e3e6f0]/60 dark:border-white/5 flex justify-end">
+        <div className="pt-4 border-t border-[#e3e6f0]/60 dark:border-white/5 flex flex-col sm:flex-row justify-end gap-3">
+          {handleBackupJSON && (
+            <button
+              onClick={handleBackupJSON}
+              disabled={!canDownload}
+              className={`w-full sm:w-auto px-6 py-3 text-sm font-black rounded-[1.5rem] shadow transition-all flex items-center justify-center space-x-2 active:scale-[0.98] ${
+                canDownload ? 'bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-slate-700' : 'bg-slate-50 dark:bg-slate-900 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <Download size={15} />
+              <span>BACKUP AS JSON</span>
+            </button>
+          )}
           <button
             onClick={handleExport}
             disabled={!canDownload}

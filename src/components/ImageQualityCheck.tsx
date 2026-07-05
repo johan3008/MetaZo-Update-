@@ -1,7 +1,7 @@
 import { getDailyLimit } from '../../constants';
 import React, { useState, useEffect } from 'react';
 import { getHeaders } from '../../services/geminiService';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
@@ -47,6 +47,13 @@ interface QualityReport {
   };
 }
 
+interface HistoryItem {
+  id: string;
+  timestamp: string;
+  fileName: string;
+  report: QualityReport;
+}
+
 import { FeatureGuideButton } from './FeatureGuideModal';
 
 export const ImageQualityCheck: React.FC<{ 
@@ -57,6 +64,8 @@ export const ImageQualityCheck: React.FC<{
   incrementDailyCount?: (amount?: number) => void;
   setShowLimitModal?: (show: boolean) => void;
   setShowActivationModal?: (show: boolean) => void;
+  user?: any;
+  db?: any;
 }> = ({ 
   t, 
   aiOptions,
@@ -64,7 +73,9 @@ export const ImageQualityCheck: React.FC<{
   dailyGenCount = 0,
   incrementDailyCount,
   setShowLimitModal,
-  setShowActivationModal
+  setShowActivationModal,
+  user,
+  db
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -78,6 +89,88 @@ export const ImageQualityCheck: React.FC<{
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  useEffect(() => {
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, getDoc }) => {
+        getDoc(doc(db, 'users', user.uid)).then(docSnap => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.imageQualityHistory && Array.isArray(data.imageQualityHistory)) {
+              setHistory(data.imageQualityHistory);
+            }
+          }
+        }).catch(err => console.warn("Failed to load image quality history:", err));
+      });
+    }
+  }, [user, db]);
+
+  const saveToHistory = (newReport: QualityReport, fileName: string) => {
+    const newItem: HistoryItem = {
+      id: `iq-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      fileName,
+      report: newReport
+    };
+    const updated = [newItem, ...history.slice(0, 29)];
+    setHistory(updated);
+    
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          imageQualityHistory: updated
+        }).catch(err => console.warn('db_op', err));
+      });
+    }
+  };
+
+  const exportHistoryToJSON = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `metazo_image_quality_history_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+    } catch (e) {
+      console.error("Export failed", e);
+    }
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          imageQualityHistory: []
+        }).catch(err => console.warn('db_op', err));
+      });
+    }
+  };
+
+  const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = history.filter(item => item.id !== id);
+    setHistory(updated);
+    if (user && db) {
+      import('firebase/firestore').then(({ doc, updateDoc }) => {
+        updateDoc(doc(db, 'users', user.uid), {
+          imageQualityHistory: updated
+        }).catch(err => console.warn('db_op', err));
+      });
+    }
+  };
+
+  const loadFromHistory = (item: HistoryItem) => {
+    setReports({ [item.id]: item.report });
+    setFiles([]); 
+    setExpandedReports(new Set([item.id]));
+    setTimeout(() => {
+      document.getElementById('image-quality-reports')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
 
   useEffect(() => {
     fetch('/api/r2-status')
@@ -552,6 +645,7 @@ export const ImageQualityCheck: React.FC<{
         const data = await response.json();
         newReports[file.name] = data;
         setReports({ ...newReports });
+        saveToHistory(data, file.name);
         
         if (incrementDailyCount) {
           incrementDailyCount(1);
@@ -1320,6 +1414,74 @@ export const ImageQualityCheck: React.FC<{
             )}
           </AnimatePresence>
         </div>
+
+        {/* History Section */}
+        {history.length > 0 && (
+          <section className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-lg mt-8">
+            <div className="px-8 py-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <History size={16} className="text-slate-400" />
+                <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Analysis History</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={exportHistoryToJSON}
+                  className="p-2 text-slate-400 hover:text-indigo-500 transition-colors"
+                  title="Backup History"
+                >
+                  <Download size={16} />
+                </button>
+                <button 
+                  onClick={handleClearHistory}
+                  className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                  title="Clear History"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="divide-y divide-slate-200 dark:divide-white/5">
+              {history.map((item) => (
+                <div 
+                  key={item.id}
+                  className="group flex items-center justify-between p-4 sm:px-8 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  onClick={() => loadFromHistory(item)}
+                >
+                  <div className="flex items-center space-x-4 min-w-0">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      item.report.recommendation === 'PASS' ? 'bg-emerald-500' : 'bg-red-500'
+                    }`} />
+                    <div className="truncate">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                        {item.fileName || 'Untitled Image'}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {item.timestamp}
+                        </p>
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                          Score: {item.report.overall_score}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    <button 
+                      onClick={(e) => handleDeleteHistoryItem(item.id, e)}
+                      className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete item"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
       </div>
     </div>
   );

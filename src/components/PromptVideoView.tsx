@@ -223,6 +223,20 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
     }
   };
 
+  const exportVideoHistoryToJSON = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `metazo_video_history_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+    } catch (e) {
+      console.error("Export failed", e);
+    }
+  };
+
   const clearHistory = () => {
     // Add all current IDs to deletedIds list to prevent resurrection
     try {
@@ -737,12 +751,22 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               <History size={16} className="text-slate-400" />
               <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Analysis History</h2>
             </div>
-            <button 
-              onClick={clearHistory}
-              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-            >
-              <Trash2 size={16} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={exportVideoHistoryToJSON}
+                className="p-2 text-slate-400 hover:text-indigo-500 transition-colors"
+                title="Backup History"
+              >
+                <Download size={16} />
+              </button>
+              <button 
+                onClick={clearHistory}
+                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                title="Clear History"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </div>
           
           <div className="divide-y divide-slate-200 dark:divide-white/5">

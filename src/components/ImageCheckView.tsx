@@ -9,7 +9,9 @@ export const ImageCheckView: React.FC<{
   incrementDailyCount?: (amount?: number) => void;
   setShowLimitModal?: (show: boolean) => void;
   setShowActivationModal?: (show: boolean) => void;
-}> = ({ t, aiOptions, isLicensed, dailyGenCount, incrementDailyCount, setShowLimitModal, setShowActivationModal }) => {
+  user?: any;
+  db?: any;
+}> = ({ t, aiOptions, isLicensed, dailyGenCount, incrementDailyCount, setShowLimitModal, setShowActivationModal, user, db }) => {
   return (
     <div className="w-full">
       <ImageQualityCheck 
@@ -20,6 +22,8 @@ export const ImageCheckView: React.FC<{
         incrementDailyCount={incrementDailyCount}
         setShowLimitModal={setShowLimitModal}
         setShowActivationModal={setShowActivationModal}
+        user={user}
+        db={db}
       />
     </div>
   );
