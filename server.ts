@@ -1874,7 +1874,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
             const sanitizedName = filename.toString().replace(/[^a-zA-Z0-9._-]/g, '_');
             const resolvedContentType = contentType ? String(contentType) : 'application/postscript';
-            const folder = resolvedContentType.startsWith('video/') ? 'video-uploads' : 'eps-uploads';
+            const folder = resolvedContentType.startsWith('video/') ? 'metazostorage/Video' : 'eps-uploads';
             const uniqueFilename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitizedName}`;
             const bucketName = process.env.S3_BUCKET_NAME!;
 
