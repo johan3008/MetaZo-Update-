@@ -4091,24 +4091,43 @@ MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 4. Exposure & Pencahayaan: Cek apakah overexposed (blown out) atau underexposed (crushed blacks).
 5. Frame Kosong: Apakah frame ini secara tidak sengaja kosong (hitam/putih pekat).
 
-Wajib lakukan evaluasi terperinci untuk 13 kriteria kualitas video berikut dan kembalikan status (PASS/FAIL) dan penjelasan singkat (note) dalam bahasa Indonesia di field \`quality_checks\`:
-- blur: Deteksi apakah subjek utama buram, tidak fokus, out-of-focus, atau motion blur berlebih.
-- noise: Deteksi bintik/grain digital berlebih atau pikselasi kasar terutama di area bayangan atau warna solid.
-- overexposure: Deteksi highlight terlalu terang atau putih pekat yang kehilangan detail (blown out).
-- underexposure: Deteksi bayangan terlalu gelap atau hitam pekat yang kehilangan detail (crushed shadows).
-- banding: Deteksi garis-garis gradasi warna kasar (color banding) di langit atau background halus.
-- compression_artifacts: Deteksi kotak-kotak pikselasi makro (macroblocking) akibat kompresi video terlalu tinggi.
-- empty_frame: Deteksi jika ada frame yang kosong (layar hitam, putih polos, solid, atau terpotong tanpa konten).
-- duplicate_frame: Deteksi jika frame berulang/statis ekstrem tanpa adanya perubahan visual sama sekali di antara cuplikan frame.
-- shaking: Deteksi apakah ada guncangan kamera (unintentional camera shake/shaking) atau ketidakstabilan visual.
-- watermark: Deteksi tanda air, logo agensi lain, atau teks copyright tersemat.
-- text_detected: Deteksi teks overlay/tulisan yang tidak diinginkan (seperti tanggal/waktu perekaman, teks deskriptif, dll).
-- logo_detected: Deteksi logo merk, brand terkenal, atau trade mark komersial yang dilindungi IP.
-- low_resolution: Deteksi visual resolusi rendah, buram piksel kasar, atau hasil upscale paksa yang tidak tajam.
+Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan kembalikan status (PASS/FAIL) dan penjelasan singkat (note) dalam bahasa Indonesia di field \`quality_checks\`:
+- blur: Deteksi apakah subjek utama buram.
+- noise: Deteksi bintik/grain digital berlebih.
+- compression_artifacts: Deteksi kotak-kotak pikselasi makro.
+- blocking: Deteksi distorsi blok atau kotak akibat kompresi/encoding buruk.
+- banding: Deteksi pita-pita warna (color banding).
+- overexposure: Deteksi highlight terlalu terang atau putih pekat (blown out).
+- underexposure: Deteksi bayangan terlalu gelap atau hitam pekat (crushed shadows).
+- white_balance: Deteksi ketidakseimbangan warna.
+- motion_blur: Deteksi kekaburan karena gerakan (motion blur).
+- camera_shake: Deteksi guncangan kamera (camera shake).
+- out_of_focus: Deteksi fokus yang tidak tajam (out of focus).
+- flickering: Deteksi kilatan atau kedipan cahaya (flickering).
+- duplicate_frame: Deteksi jika frame berulang/statis.
+- empty_frame: Deteksi frame kosong.
+- black_frame: Deteksi frame yang sepenuhnya hitam.
+- frozen_frame: Deteksi frame yang membeku atau macet.
+- watermark: Deteksi tanda air (watermark).
+- logo: Deteksi logo merk atau IP.
+- text: Deteksi overlay teks.
+- ai_artifact: Deteksi artefak AI generatif atau cacat turunan.
+- deformed_object: Deteksi objek dengan bentuk tidak wajar.
+- bad_anatomy: Deteksi anatomi cacat pada makhluk hidup.
+- cropped_subject: Deteksi subjek terpotong secara buruk.
+- cut_off_object: Deteksi objek utama yang terpotong bingkai.
+- wrong_perspective: Deteksi perspektif aneh.
+- low_aesthetic_quality: Deteksi kualitas estetika rendah.
 
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
 JIKA TIDAK ADA MASALAH VISUAL FATAL ATAU ARTIFACT (SEPERTI SKEW/FLASH BANDING) YANG SANGAT JELAS PADA FRAME INI, BERIKAN STATUS PASS.
-DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELANGGARAN IP ATAU CACAT FATAL! Berhentilah menebak-nebak (No hallucination)!`;
+DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELANGGARAN IP ATAU CACAT FATAL! Berhentilah menebak-nebak (No hallucination)!
+
+BERIKAN SKOR BERIKUT:
+- technical_score (0-100): Berdasarkan cacat teknis murni seperti noise, blur, banding, compression, exposure.
+- visual_score (0-100): Berdasarkan estetika visual, komposisi, perspektif, anatomi, watermark.
+- overall_score (0-100): Rata-rata dari technical_score dan visual_score.
+- adobe_stock_readiness: Berikan "Ready" jika overall_score >= 90, "Needs Improvement" jika 75-89, dan "Reject Risk" jika < 75.`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -4124,81 +4143,48 @@ DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELAN
             items: { type: Type.STRING }
         },
         overall_score: { type: Type.NUMBER },
+        technical_score: { type: Type.NUMBER },
+        visual_score: { type: Type.NUMBER },
         recommendation: { type: Type.STRING, enum: ["PASS", "FAIL", "RETOUCH"] },
+        adobe_stock_readiness: { type: Type.STRING, enum: ["Ready", "Needs Improvement", "Reject Risk"] },
         detailed_feedback: { type: Type.STRING },
         quality_checks: {
             type: Type.OBJECT,
             properties: {
-                blur: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                noise: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                overexposure: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                underexposure: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                banding: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                compression_artifacts: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                empty_frame: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                duplicate_frame: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                shaking: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                watermark: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                text_detected: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                logo_detected: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                low_resolution: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                }
+                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                overexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                underexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                camera_shake: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                out_of_focus: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                flickering: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                duplicate_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                empty_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                black_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                frozen_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
             },
             required: [
-                "blur", "noise", "overexposure", "underexposure", "banding", 
-                "compression_artifacts", "empty_frame", "duplicate_frame", 
-                "shaking", "watermark", "text_detected", "logo_detected", "low_resolution"
+                "blur", "noise", "compression_artifacts", "blocking", "banding", 
+                "overexposure", "underexposure", "white_balance", "motion_blur",
+                "camera_shake", "out_of_focus", "flickering", "duplicate_frame",
+                "empty_frame", "black_frame", "frozen_frame", "watermark",
+                "logo", "text", "ai_artifact", "deformed_object", "bad_anatomy",
+                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality"
             ]
         },
         heatmaps: {

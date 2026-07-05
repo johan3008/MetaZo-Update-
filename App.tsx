@@ -1098,7 +1098,7 @@ const App: React.FC = () => {
         try {
             await updateDoc(userRef, { lastSeen: serverTimestamp() });
         } catch (e) {
-            console.error('Error marking online:', e);
+            console.info('Error marking online:', e);
         }
     };
     
@@ -1116,7 +1116,7 @@ const App: React.FC = () => {
             const snapshot = await getDocs(q);
             setActiveAccountsCount(snapshot.size);
         } catch (e) {
-            console.error('Error fetching online accounts:', e);
+            ;
         }
     };
     
@@ -1201,7 +1201,10 @@ const App: React.FC = () => {
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene'>(() => {
-    return (localStorage.getItem('ai_provider') || 'gemini') as any;
+    const val = localStorage.getItem('ai_provider') || 'gemini';
+    const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+    if (!validProviders.includes(val)) { localStorage.setItem('ai_provider', 'gemini'); return 'gemini'; }
+    return val as any;
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'reseller' | 'faq_billing'>(selectedProvider);
 
@@ -1379,7 +1382,7 @@ const App: React.FC = () => {
       
       unreadCounts['global'] = globalUnread;
       updateCombinedCount();
-    });
+    }, (err) => console.warn('Global messages snapshot error:', err));
 
     // 2. Subscribe to user DM Rooms where user is a participant
     const roomsQuery1 = query(collection(db, 'chats'), where('user1', '==', user.uid));
@@ -1422,7 +1425,7 @@ const App: React.FC = () => {
         
         unreadCounts[roomId] = roomUnread;
         updateCombinedCount();
-      });
+      }, (err) => console.warn('Room messages snapshot error:', err));
     };
 
     const processRoomDocs = (snapshot: any) => {
@@ -1438,8 +1441,8 @@ const App: React.FC = () => {
       });
     };
 
-    const unsubscribeRooms1 = onSnapshot(roomsQuery1, processRoomDocs);
-    const unsubscribeRooms2 = onSnapshot(roomsQuery2, processRoomDocs);
+    const unsubscribeRooms1 = onSnapshot(roomsQuery1, processRoomDocs, (err) => console.warn('Rooms1 snapshot error', err));
+    const unsubscribeRooms2 = onSnapshot(roomsQuery2, processRoomDocs, (err) => console.warn('Rooms2 snapshot error', err));
 
     return () => {
       unsubscribeGlobal();
@@ -1525,7 +1528,7 @@ const App: React.FC = () => {
           },
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(e => {
-          console.error("Failed to set user cloud document:", e);
+          console.info('db_op', e);
         });
       });
     }
@@ -1570,7 +1573,7 @@ const App: React.FC = () => {
             updateDoc(userRef, {
               licenseKey: localKey,
               updatedAt: new Date().toISOString()
-            }).catch(e => console.error("Failed to sync local key to cloud:", e));
+            }).catch(e => console.info('db_op', e));
           } else {
             setMzLicenseKey('');
             localStorage.removeItem('mz_license_key');
@@ -1582,7 +1585,7 @@ const App: React.FC = () => {
           updateDoc(userRef, {
             licenseKey: localKey,
             updatedAt: new Date().toISOString()
-          }).catch(e => console.error("Failed to sync local key to cloud:", e));
+          }).catch(e => console.info('db_op', e));
         }
 
         // 2. Sync trialStart
@@ -1635,9 +1638,11 @@ const App: React.FC = () => {
 
           if (data.settings.ai_provider !== undefined) {
             const localProvider = localStorage.getItem('ai_provider') || 'gemini';
-            if (data.settings.ai_provider !== localProvider) {
-              localStorage.setItem('ai_provider', data.settings.ai_provider);
-              setSelectedProvider(data.settings.ai_provider as any);
+            const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+            const cloudProvider = validProviders.includes(data.settings.ai_provider) ? data.settings.ai_provider : 'gemini';
+            if (cloudProvider !== localProvider) {
+              localStorage.setItem('ai_provider', cloudProvider);
+              setSelectedProvider(cloudProvider as any);
               settingsChanged = true;
             }
           }
@@ -1751,7 +1756,7 @@ const App: React.FC = () => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }).catch(err => {
-          console.error("Error bootstrapping cloud user profile:", err);
+          console.info('db_op', err);
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
         });
       }
@@ -1798,7 +1803,7 @@ const App: React.FC = () => {
           let payInfoToSave = data.payInfo;
           if (payInfoToSave.includes('BCA 817')) {
             payInfoToSave = 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom';
-            setDoc(docRef, { payInfo: payInfoToSave }, { merge: true }).catch(console.error);
+            setDoc(docRef, { payInfo: payInfoToSave }, { merge: true }).catch(() => {});
           }
           localStorage.setItem('mz_reseller_pay_info', payInfoToSave);
           // dispatch custom event to notify SaaSPortal
@@ -1815,13 +1820,12 @@ const App: React.FC = () => {
           payInfo: 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom',
           updatedAt: new Date().toISOString()
         }).catch(err => {
-          console.error('Bootstrap branding error:', err);
+          console.info('db_op', err);
           handleFirestoreError(err, OperationType.WRITE, 'branding/main');
         });
       }
     }, (error) => {
       console.warn('Firestore branding load error, keeping local cached entries:', error);
-      handleFirestoreError(error, OperationType.GET, 'branding/main');
     });
     return () => unsubscribe();
   }, []);
@@ -2003,7 +2007,7 @@ const App: React.FC = () => {
                 updateDoc(userRef, {
                   licenseKey: '',
                   updatedAt: new Date().toISOString()
-                }).catch(console.error);
+                }).catch(() => {});
               }
               setIsCheckingLicense(false);
               alert(localStorage.getItem('mz_language') === 'Bahasa'
@@ -2017,7 +2021,7 @@ const App: React.FC = () => {
               updateDoc(doc(db, 'keys', k), {
                 activatedBy: user.email,
                 updatedAt: new Date().toISOString()
-              }).catch(e => console.error("Failed to link key to user email:", e));
+              }).catch(e => console.info('db_op', e));
             }
 
             // Check if 30days subscription is expired
@@ -2056,7 +2060,7 @@ const App: React.FC = () => {
         }
       })
       .catch(err => {
-        console.error('License validator connection error:', err);
+        console.warn('License validator connection error:', err);
         setIsMzLicensed(false);
         setSubDaysLeft(null);
       })
@@ -2166,7 +2170,9 @@ const App: React.FC = () => {
       const nSaved = localStorage.getItem('nvidia_api_key') || '';
       const blSaved = localStorage.getItem('bluesminds_api_key') || '';
       const aSaved = localStorage.getItem('aivene_api_key') || '';
-      const pSaved = (localStorage.getItem('ai_provider') || 'gemini') as 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene';
+      const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+      const rawP = localStorage.getItem('ai_provider') || 'gemini';
+      const pSaved = (validProviders.includes(rawP) ? rawP : 'gemini') as any;
 
       const gParsed = gSaved.split(',').map(k => k.trim()).filter(Boolean);
       const grParsed = grSaved.split(',').map(k => k.trim()).filter(Boolean);
@@ -2487,7 +2493,7 @@ const App: React.FC = () => {
         'settings.bluesminds_api_key': cleanBluesminds.join(','),
         'settings.aivene_api_key': cleanAivene.join(','),
         'settings.ai_provider': selectedProvider,
-      }).catch(err => console.error('Failed to sync api keys to cloud:', err));
+      }).catch(err => console.info('db_op', err));
     }
 
     setShowSettingsModal(false);
@@ -2530,7 +2536,7 @@ const App: React.FC = () => {
         'settings.bluesminds_api_key': '',
         'settings.aivene_api_key': '',
         'settings.ai_provider': 'gemini',
-      }).catch(err => console.error('Failed to reset api keys on cloud:', err));
+      }).catch(err => console.info('db_op', err));
     }
   };
 

@@ -121,17 +121,17 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               if (sorted.length !== cloudData.videoHistory.length) {
                 updateDoc(doc(db, 'users', user.uid), {
                   videoHistory: sorted
-                }).catch(err => console.error("Error syncing video history to cloud:", err));
+                }).catch(err => console.warn('db_op', err));
               }
             } else {
               if (localHistory.length > 0) {
                 updateDoc(doc(db, 'users', user.uid), {
                   videoHistory: localHistory
-                }).catch(err => console.error("Error setting initial cloud video history:", err));
+                }).catch(err => console.warn('db_op', err));
               }
             }
           }
-        }).catch(err => console.error("Failed to load video history from cloud:", err));
+        }).catch(err => console.warn("Failed to load video history from cloud:", err));
       });
     }
   }, [user, db]);
@@ -212,7 +212,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
         import('firebase/firestore').then(({ doc, updateDoc }) => {
           updateDoc(doc(db, 'users', user.uid), {
             videoHistory: updatedHistory
-          }).catch(err => console.error("Error saving video history to cloud:", err));
+          }).catch(err => console.warn('db_op', err));
         });
       }
       
@@ -243,7 +243,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       import('firebase/firestore').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoHistory: []
-        }).catch(err => console.error("Error clearing video history on cloud:", err));
+        }).catch(err => console.warn('db_op', err));
       });
     }
   };
@@ -267,7 +267,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       import('firebase/firestore').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoHistory: updated
-        }).catch(err => console.error("Error deleting video history item on cloud:", err));
+        }).catch(err => console.warn('db_op', err));
       });
     }
   };

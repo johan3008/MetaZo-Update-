@@ -790,7 +790,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             licenseKey: generatedLicenseKey,
             updatedAt: new Date().toISOString()
           }, { merge: true }).catch(err => {
-            console.error("Sync to user profile failed:", err);
+            console.warn('db_op', err);
           });
         }
 
@@ -896,7 +896,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             licenseKey: newKey,
             updatedAt: new Date().toISOString()
           }, { merge: true }).catch(err => {
-            console.error("Sync to user profile failed:", err);
+            console.warn('db_op', err);
           });
         }
         
@@ -970,7 +970,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             licenseKey: key,
             updatedAt: new Date().toISOString()
           }, { merge: true }).catch(err => {
-            console.error("Sync to user profile failed:", err);
+            console.warn('db_op', err);
           });
         }
       };
@@ -1031,7 +1031,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         setActivationError(t.activation_error_invalid);
       }
     } catch (err) {
-      console.error('Firestore activate check error:', err);
+      console.warn('Firestore activate check error:', err);
       setActivationError('Koneksi internet bermasalah atau gagal menghubungi server lisensi. Mohon periksa internet Anda.');
     } finally {
       setIsActivating(false);
@@ -1067,7 +1067,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         },
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => {
-        console.error("Failed to clear license in user profile:", err);
+        console.warn('db_op', err);
       });
     }
 

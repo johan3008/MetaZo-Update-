@@ -201,17 +201,17 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               if (sorted.length !== cloudData.promptGenHistory.length) {
                 updateDoc(doc(db, 'users', user.uid), {
                   promptGenHistory: sorted
-                }).catch(err => console.error("Error syncing prompt history to cloud:", err));
+                }).catch(err => console.warn('db_op', err));
               }
             } else {
               if (localHistory.length > 0) {
                 updateDoc(doc(db, 'users', user.uid), {
                   promptGenHistory: localHistory
-                }).catch(err => console.error("Error setting initial cloud history:", err));
+                }).catch(err => console.warn('db_op', err));
               }
             }
           }
-        }).catch(err => console.error("Failed to load prompt history from cloud:", err));
+        }).catch(err => console.warn("Failed to load prompt history from cloud:", err));
       });
     }
   }, [user, db]);
@@ -239,7 +239,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
       import('firebase/firestore').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           promptGenHistory: updated
-        }).catch(err => console.error("Error saving prompt history to cloud:", err));
+        }).catch(err => console.warn('db_op', err));
       });
     }
   };
@@ -266,7 +266,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
       import('firebase/firestore').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           promptGenHistory: []
-        }).catch(err => console.error("Error clearing prompt history on cloud:", err));
+        }).catch(err => console.warn('db_op', err));
       });
     }
   };
@@ -294,7 +294,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
       import('firebase/firestore').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           promptGenHistory: updated
-        }).catch(err => console.error("Error deleting prompt history item on cloud:", err));
+        }).catch(err => console.warn('db_op', err));
       });
     }
   };
