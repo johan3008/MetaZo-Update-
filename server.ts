@@ -995,10 +995,17 @@ app.get('/api/debug-uploads', (req, res) => {
                 language = bodyLanguage;
                 model = bodyModel;
                 
-                const ext = path.extname(fileUrl.split('?')[0]) || '.mp4';
-                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
-                videoPath = downloadResult.localPath;
-                cleanupFn = downloadResult.cleanup;
+                if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
+                    console.log(`[Video Audit] Generating pre-signed URL for direct streaming: ${pathKey}`);
+                    const command = new GetObjectCommand({
+                        Bucket: process.env.S3_BUCKET_NAME,
+                        Key: pathKey
+                    });
+                    videoPath = await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+                } else {
+                    videoPath = fileUrl;
+                }
+                cleanupFn = () => {};
             } else {
                 return res.status(400).json({ error: 'No video uploaded or fileUrl provided.' });
             }
@@ -1039,10 +1046,10 @@ app.get('/api/debug-uploads', (req, res) => {
                                     throw new Error("Could not determine video duration");
                                 }
 
-                                // 2. Calculate timestamps (10%, 50%, 90%)
-                                const t1 = duration * 0.1;
+                                // 2. Calculate timestamps (Awal, Tengah, Akhir)
+                                const t1 = 0;
                                 const t2 = duration * 0.5;
-                                const t3 = duration * 0.9;
+                                const t3 = Math.max(0, duration - 0.5);
 
                                 // 3. Extract frames with fast seek (-ss BEFORE -i)
                                 const f1Path = path.join(outDir, 'frame-1.jpg');
@@ -1170,9 +1177,17 @@ app.get('/api/debug-uploads', (req, res) => {
                 baseName = path.basename(originalName, extension);
                 contentType = fileUrl.endsWith('.webm') ? 'video/webm' : (fileUrl.endsWith('.mov') ? 'video/quicktime' : 'video/mp4');
 
-                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, extension);
-                inputPath = downloadResult.localPath;
-                cleanupFn = downloadResult.cleanup;
+                if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
+                    console.log(`[Mute Video] Generating pre-signed URL for direct streaming: ${pathKey}`);
+                    const command = new GetObjectCommand({
+                        Bucket: process.env.S3_BUCKET_NAME,
+                        Key: pathKey
+                    });
+                    inputPath = await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+                } else {
+                    inputPath = fileUrl;
+                }
+                cleanupFn = () => {};
             } else {
                 return res.status(400).json({ error: 'Tidak ada file video atau fileUrl yang disediakan.' });
             }
