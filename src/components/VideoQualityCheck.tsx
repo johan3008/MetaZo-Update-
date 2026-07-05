@@ -216,65 +216,101 @@ export const VideoQualityCheck: React.FC<{
             : 'Automated 26 checkpoints video quality audit (blur, noise, overexposure, watermark, AI artifacts, and other legal/technical issues) for global microstock agency approval standards.'}
         </p>
 
-        {/* Workflow Stepper Diagram */}
-        <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-white/5 shadow-inner max-w-4xl mx-auto mt-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-2">
-            {/* Step 1: Upload */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs shrink-0">1</div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Video Upload</p>
-                <p className="text-[8px] text-slate-400 font-bold uppercase">Asset Source</p>
+        {/* Workflow Info Box */}
+        <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 text-left max-w-xl mx-auto mt-6 shadow-sm">
+          <h4 className="font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2 justify-center text-lg">
+            <Zap size={18} className="text-indigo-500" /> 
+            Workflow Analisis Kualitas Video
+          </h4>
+          
+          <div className="flex flex-col items-center space-y-2">
+            {/* Step 1 */}
+            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-center shadow-sm">
+              <span className="font-bold text-slate-800 dark:text-white text-sm">Video Upload</span>
+            </div>
+            
+            <div className="text-slate-300 dark:text-slate-600">│</div>
+            <div className="text-slate-300 dark:text-slate-600">▼</div>
+            
+            {/* Step 2 */}
+            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
+              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 flex items-center justify-center font-bold text-xs border border-violet-200 dark:border-violet-800">1</div>
+              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">FFprobe</h5>
+              <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-4 list-disc marker:text-violet-400 text-left">
+                <li>Resolution</li>
+                <li>FPS</li>
+                <li>Codec</li>
+                <li>Bitrate</li>
+                <li>Pixel format</li>
+                <li>Duration</li>
+                <li>Audio</li>
+              </ul>
+            </div>
+            
+            <div className="text-slate-300 dark:text-slate-600">│</div>
+            <div className="text-slate-300 dark:text-slate-600">▼</div>
+            
+            {/* Step 3 */}
+            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
+              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-200 dark:border-emerald-800">2</div>
+              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">FFmpeg</h5>
+              <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-4 list-disc marker:text-emerald-400 text-left">
+                <li>Extract frame setiap 1 detik</li>
+                <li>Ambil frame awal, tengah, akhir</li>
+                <li>Detect black frame</li>
+                <li>Detect duplicate frame</li>
+                <li>Detect freeze frame</li>
+                <li>Detect scene change</li>
+              </ul>
+            </div>
+            
+            <div className="text-slate-300 dark:text-slate-600">│</div>
+            <div className="text-slate-300 dark:text-slate-600">▼</div>
+
+            {/* Step 4 */}
+            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
+              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-200 dark:border-amber-800">3</div>
+              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">AI Vision</h5>
+              <div className="grid grid-cols-2 gap-x-2 text-xs text-slate-500 dark:text-slate-400 pl-4 text-left">
+                <ul className="space-y-1 list-disc marker:text-amber-400">
+                  <li>Blur</li>
+                  <li>Focus</li>
+                  <li>Noise</li>
+                  <li>Compression artifact</li>
+                  <li>Banding</li>
+                  <li>Blocking</li>
+                  <li>Flicker</li>
+                  <li>Exposure</li>
+                </ul>
+                <ul className="space-y-1 list-disc marker:text-amber-400">
+                  <li>White balance</li>
+                  <li>Watermark</li>
+                  <li>Text</li>
+                  <li>AI artifact</li>
+                  <li>Bad anatomy</li>
+                  <li>Camera shake</li>
+                  <li>IP</li>
+                </ul>
               </div>
             </div>
-              
-            {/* Arrow */}
-            <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
 
-            {/* Step 2: FFprobe */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-violet-500/10 text-violet-500 flex items-center justify-center font-bold text-xs shrink-0">2</div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">FFprobe</p>
-                <p className="text-[8px] text-slate-400 font-bold uppercase">Metadata, Res, FPS</p>
-              </div>
+            <div className="text-slate-300 dark:text-slate-600">│</div>
+            <div className="text-slate-300 dark:text-slate-600">▼</div>
+
+            {/* Step 5 */}
+            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-center shadow-sm relative">
+              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center font-bold text-xs border border-blue-200 dark:border-blue-800">4</div>
+              <span className="font-bold text-slate-800 dark:text-white text-sm">Quality Engine</span>
             </div>
 
-            {/* Arrow */}
-            <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+            <div className="text-slate-300 dark:text-slate-600">│</div>
+            <div className="text-slate-300 dark:text-slate-600">▼</div>
 
-            {/* Step 3: FFmpeg */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs shrink-0">3</div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">FFmpeg</p>
-                <p className="text-[8px] text-slate-400 font-bold uppercase">Extract 3 Frames (0, 50, 100%)</p>
-              </div>
+            {/* Step 6 */}
+            <div className="bg-indigo-600 dark:bg-indigo-500 w-full sm:w-80 p-3 rounded-xl border border-indigo-700 dark:border-indigo-400 text-center shadow-md">
+              <span className="font-black text-white text-sm tracking-wide">Adobe Stock Risk Score</span>
             </div>
 
-            {/* Arrow */}
-            <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
-
-            {/* Step 4: AI Vision */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold text-xs shrink-0">4</div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">AI Vision</p>
-                <p className="text-[8px] text-slate-400 font-bold uppercase">Analyze Each Frame</p>
-              </div>
-            </div>
-
-            {/* Arrow */}
-            <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
-
-            {/* Step 5: Report */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-xs shrink-0">5</div>
-              <div>
-                <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Merge Results</p>
-                <p className="text-[8px] text-slate-400 font-bold uppercase">Final Quality Report</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
