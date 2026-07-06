@@ -2042,8 +2042,16 @@ const App: React.FC = () => {
             let isRejected = false;
             if (isEmail(keyActivatedBy)) {
               // Bound to an email, must match the current logged-in user's email
-              if (!currentEmail || keyActivatedBy.toLowerCase() !== currentEmail.toLowerCase()) {
-                isRejected = true;
+              if (user) {
+                if (!currentEmail || keyActivatedBy.toLowerCase() !== currentEmail.toLowerCase()) {
+                  isRejected = true;
+                }
+              } else {
+                // User is not logged in yet (or auth state is still resolving). 
+                // Do NOT reject or delete the key, just don't set it to licensed yet.
+                setIsMzLicensed(false);
+                setIsCheckingLicense(false);
+                return;
               }
             } else if (keyActivatedBy && keyActivatedBy !== devId) {
               // Bound to another device ID and no email is associated with it yet
