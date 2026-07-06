@@ -1,7 +1,7 @@
 import { getDailyLimit } from '../../constants';
 import React, { useState, useEffect } from 'react';
 import { getHeaders } from '../../services/geminiService';
-import { Upload, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
@@ -784,26 +784,40 @@ export const ImageQualityCheck: React.FC<{
             </div>
           </div>
 
-          {/* Adobe Kurator Notice Card */}
-          <div className="bg-emerald-500/5 dark:bg-emerald-500/[0.02] border border-emerald-500/15 rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-500">
-              <AlertCircle size={14} className="shrink-0" />
-              <h4 className="text-[10px] font-black tracking-wider uppercase">
-                {t.language === 'Bahasa' ? 'STANDAR KURATOR ADOBE' : 'ADOBE CURATOR STANDARDS'}
-              </h4>
+          {/* PRO Adobe Kurator Notice Card */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/15 dark:via-emerald-500/5 dark:to-transparent border border-emerald-500/30 dark:border-emerald-500/20 rounded-[1.5rem] p-6 shadow-lg shadow-emerald-500/5">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <ShieldCheck size={80} className="text-emerald-500 rotate-12" />
             </div>
-            <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-              {t.language === 'Bahasa' 
-                ? 'Audit memindai cacat teknis seperti Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus, serta mendeteksi pelanggaran IP (logo, paten, landmark).'
-                : 'Audit scans for technical flaws such as Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus, and detects IP violations (logos, patents, landmarks).'
-              }
-            </p>
-            <div className="flex flex-wrap gap-1 pt-1.5 border-t border-slate-100 dark:border-white/5">
-              {['Lighting', 'Sharpness', 'Artifacts', 'IP/Brands'].map((tag) => (
-                <span key={tag} className="text-[8px] font-bold uppercase text-emerald-600 dark:text-emerald-500/80 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                  {tag}
-                </span>
-              ))}
+            
+            <div className="relative z-10 flex flex-col gap-4">
+              <div className="flex items-center gap-3 text-emerald-700 dark:text-emerald-400">
+                <div className="p-2.5 bg-emerald-500/20 rounded-[1rem] shadow-sm">
+                  <ShieldCheck size={20} className="shrink-0" />
+                </div>
+                <div>
+                  <h4 className="text-[12px] font-black tracking-widest uppercase">
+                    {t.language === 'Bahasa' ? 'STANDAR KURATOR ADOBE PRO' : 'PRO ADOBE CURATOR STANDARDS'}
+                  </h4>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">Powered by Gemini AI Vision</p>
+                </div>
+              </div>
+              
+              <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-relaxed max-w-[90%]">
+                {t.language === 'Bahasa' 
+                  ? 'Mesin audit tingkat lanjut yang secara otomatis memindai cacat teknis (Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus) dan mendeteksi secara presisi pelanggaran IP/Merek Dagang sebelum penolakan.'
+                  : 'Advanced audit engine that automatically scans for technical flaws (Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus) and precisely detects IP/Trademark violations before rejection.'
+                }
+              </p>
+              
+              <div className="flex flex-wrap gap-2 pt-3 border-t border-emerald-500/20">
+                {['Lighting Analysis', 'Sharpness Focus', 'Artifact Detection', 'IP/Brands Safety'].map((tag) => (
+                  <span key={tag} className="flex items-center gap-1.5 text-[9px] font-black uppercase text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 dark:bg-emerald-500/20 px-2.5 py-1.5 rounded-full border border-emerald-500/20">
+                    <CheckCircle size={10} />
+                    {tag}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1249,7 +1263,7 @@ export const ImageQualityCheck: React.FC<{
                                             <div className="bg-white/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 space-y-2">
                                               <p className="text-[8px] font-black uppercase text-slate-400">Luminance Histogram</p>
                                               <div className="h-16 w-full flex items-end gap-[2px] bg-slate-950 p-2 rounded-lg border border-white/5">
-                                                {ffmpegData.histogram.map((h, i) => (
+                                                {(ffmpegData.histogram || []).map((h, i) => (
                                                   <div 
                                                     key={`hist-bar-${i}`}
                                                     className="flex-1 bg-gradient-to-t from-emerald-500 via-emerald-400 to-teal-300 rounded-t-[1px]"
@@ -1301,16 +1315,16 @@ export const ImageQualityCheck: React.FC<{
 
                                       {(() => {
                                         const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {
-                                          blur: { status: r.technical_issues.some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur')) ? "FAIL" : "PASS", note: "Fokus subjek utama tajam secara sempurna." },
+                                          blur: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur')) ? "FAIL" : "PASS", note: "Fokus subjek utama tajam secara sempurna." },
                                           composition: { status: "PASS", note: "Komposisi seimbang dengan rule of thirds." },
-                                          lighting: { status: r.technical_issues.some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure')) ? "FAIL" : "PASS", note: "Pencahayaan terdistribusi merata dengan detail tinggi." },
+                                          lighting: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure')) ? "FAIL" : "PASS", note: "Pencahayaan terdistribusi merata dengan detail tinggi." },
                                           watermark: { status: "PASS", note: "Tidak mendeteksi watermark komersial." },
-                                          logo: { status: r.legal_status.includes('VIOLATION') ? "FAIL" : "PASS", note: "Bebas dari logo atau hak cipta merek dagang." },
+                                          logo: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Bebas dari logo atau hak cipta merek dagang." },
                                           text: { status: "PASS", note: "Tidak ada teks overlay mengganggu." },
                                           anatomical_errors: { status: "PASS", note: "Struktur anatomi subjek terlihat alami." },
-                                          ip_risk: { status: r.legal_status.includes('VIOLATION') ? "FAIL" : "PASS", note: "Aman dari potensi resiko paten atau desain khas." },
-                                          stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback },
-                                          metadata: { title: "Stock photography showing details", keywords: r.strengths }
+                                          ip_risk: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Aman dari potensi resiko paten atau desain khas." },
+                                          stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
+                                          metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
                                         };
 
                                         const checks = [
@@ -1414,9 +1428,10 @@ export const ImageQualityCheck: React.FC<{
             )}
           </AnimatePresence>
         </div>
+      </div>
 
-        {/* History Section */}
-        {history.length > 0 && (
+      {/* History Section */}
+      {history.length > 0 && (
           <section className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-lg mt-8">
             <div className="px-8 py-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1481,8 +1496,6 @@ export const ImageQualityCheck: React.FC<{
             </div>
           </section>
         )}
-
-      </div>
     </div>
   );
 };

@@ -251,6 +251,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     } catch (err) {
       console.error('Failed to fetch keys from Firestore:', err);
       handleFirestoreError(err, OperationType.LIST, 'keys');
+      const cached = localStorage.getItem('mz_backend_keys_cache');
+      if (cached) {
+        try {
+          setBackendKeys(JSON.parse(cached));
+        } catch(e) { console.error("Cache parsing error", e); }
+      }
     } finally {
       setIsKeysLoading(false);
     }
@@ -281,6 +287,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     } catch (e: any) {
       console.error("Error loading promo codes:", e);
       setPromoErrorMsg('Gagal mengambil daftar promo.');
+      const cached = localStorage.getItem('mz_promos_cache');
+      if (cached) {
+        try {
+          setPromos(JSON.parse(cached));
+        } catch(err) { console.error("Cache parsing error", err); }
+      }
     } finally {
       setIsPromosLoading(false);
     }

@@ -552,7 +552,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                     <span>Regen</span>
                                   </button>
                                   <button
-                                    onClick={() => copyToClipboard(item.result!.prompt, item.id)}
+                                    onClick={() => copyToClipboard(item.result?.prompt || '', item.id)}
                                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                                       copiedId === item.id 
                                         ? 'bg-emerald-500 text-white' 
@@ -596,7 +596,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                       </code>
                                     </div>
                                     <button
-                                      onClick={() => copyToClipboard(item.result!.prompt, item.id)}
+                                      onClick={() => copyToClipboard(item.result?.prompt || '', item.id)}
                                       className="absolute top-2 right-2 p-2.5 bg-white dark:bg-slate-800 rounded-xl hover:bg-emerald-500 hover:text-white text-slate-400 hover:border-emerald-500 shadow-sm opacity-0 group-hover/copy:opacity-100 transition-all border border-slate-100 dark:border-white/5"
                                     >
                                       {copiedId === item.id ? <Check size={14} className="text-white" /> : <Copy size={14} />}

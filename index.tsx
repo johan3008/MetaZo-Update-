@@ -48,11 +48,13 @@ try {
   }
 }
 
+console.log('App is mounting...');
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+console.log('Root element found, rendering...');
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
@@ -60,3 +62,4 @@ root.render(
     <Analytics />
   </React.StrictMode>
 );
+console.log('App rendered.');

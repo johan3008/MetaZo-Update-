@@ -1554,6 +1554,15 @@ const App: React.FC = () => {
     }
 
     const dateStr = getTodayDateString();
+    
+    // Check if quota exceeded today
+    const lastQuotaError = localStorage.getItem('last_firestore_quota_error');
+    if (lastQuotaError && lastQuotaError === new Date().toDateString()) {
+      console.warn("Skipping Firestore user read due to previous quota error");
+      setHasSyncedProfile(true);
+      return;
+    }
+    
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
       setHasSyncedProfile(true);

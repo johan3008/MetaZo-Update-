@@ -488,7 +488,7 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
     completedFiles.forEach((f, idx) => {
       setTimeout(() => {
         const link = document.createElement('a');
-        link.href = f.downloadUrl!;
+        link.href = f.downloadUrl;
         link.download = f.mutedFileName || 'muted_video.mp4';
         document.body.appendChild(link);
         link.click();
