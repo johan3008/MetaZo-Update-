@@ -604,7 +604,7 @@ app.get('/api/debug-uploads', (req, res) => {
             await ensureD1Table();
 
             const queryResult = await queryD1(
-                `SELECT batch_id, timestamp, tool, items FROM metadata_backups WHERE uid = ? ORDER BY created_at DESC LIMIT 30`,
+                `SELECT batch_id, timestamp, tool, items, created_at FROM metadata_backups WHERE uid = ? ORDER BY created_at DESC LIMIT 30`,
                 [String(uid)]
             );
 
@@ -620,7 +620,8 @@ app.get('/api/debug-uploads', (req, res) => {
                     batchId: row.batch_id,
                     timestamp: row.timestamp,
                     tool: row.tool,
-                    items
+                    items,
+                    createdAt: row.created_at
                 };
             });
 

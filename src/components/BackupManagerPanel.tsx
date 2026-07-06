@@ -57,11 +57,6 @@ export const BackupManagerPanel: React.FC<{
 
   useEffect(() => {
     if (user) {
-      if (isLicensed) {
-        setIsD1Configured(true);
-        setD1ErrorType(null);
-        return;
-      }
       fetch(`/api/d1-backup/history?uid=${user.uid}`)
         .then(res => res.json())
         .then(resData => {
@@ -87,41 +82,12 @@ export const BackupManagerPanel: React.FC<{
           setD1ErrorType('CREDENTIALS_MISSING');
         });
     }
-  }, [user, isLicensed]);
+  }, [user]);
 
   useEffect(() => {
     if (showRestoreModal && user) {
       setLoading(true);
       const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-
-      if (isLicensed) {
-        console.log('[Firebase Firestore] Loading backup history from Firestore...');
-        const backupsCol = collection(db, 'users', user.uid, 'backups');
-        const qBackups = query(backupsCol, orderBy('createdAt', 'desc'), limit(30));
-        getDocs(qBackups)
-          .then(querySnapshot => {
-            const history: any[] = [];
-            querySnapshot.forEach(docSnap => {
-              const data = docSnap.data();
-              const createdTime = data.createdAt ? new Date(data.createdAt).getTime() : Date.now();
-              if (createdTime >= sevenDaysAgo) {
-                history.push({
-                  id: docSnap.id,
-                  ...data
-                });
-              }
-            });
-            setCloudHistory(history);
-            setIsD1Configured(true);
-            setD1ErrorType(null);
-            setLoading(false);
-          })
-          .catch(err => {
-            console.error('[Firebase Firestore] Failed to load backup history:', err);
-            setLoading(false);
-          });
-        return;
-      }
 
       fetch(`/api/d1-backup/history?uid=${user.uid}`)
         .then(res => res.json())
@@ -157,7 +123,7 @@ export const BackupManagerPanel: React.FC<{
           setLoading(false);
         });
     }
-  }, [showRestoreModal, user, isLicensed, db]);
+  }, [showRestoreModal, user]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -237,19 +203,19 @@ export const BackupManagerPanel: React.FC<{
         </div>
       </div>
 
-      {isLicensed ? (
+      {isD1Configured ? (
         <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 rounded-[1.5rem] flex items-start gap-3">
           <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">Penyimpanan Cloud Aktif (Firebase Firestore)</h4>
+            <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">Penyimpanan Cloud Aktif (Cloudflare D1)</h4>
             <p className="text-[10px] text-emerald-700/90 dark:text-emerald-400/85 leading-relaxed mt-1">
-              Sebagai akun <strong>PRO / Langganan</strong>, seluruh data Anda secara otomatis tersinkronisasi dan disimpan dengan aman di cloud Firebase Firestore tanpa memerlukan konfigurasi tambahan.
+              Seluruh data Anda secara otomatis tersinkronisasi dan disimpan dengan aman di cloud database Cloudflare D1 Anda secara real-time.
             </p>
           </div>
         </div>
       ) : (
         <>
-          {isD1Configured === false && d1ErrorType === 'CREDENTIALS_MISSING' && (
+          {d1ErrorType === 'CREDENTIALS_MISSING' && (
             <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 rounded-[1.5rem] flex items-start gap-3">
               <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -261,7 +227,7 @@ export const BackupManagerPanel: React.FC<{
             </div>
           )}
 
-          {isD1Configured === false && d1ErrorType === 'CREDENTIALS_INVALID' && (
+          {d1ErrorType === 'CREDENTIALS_INVALID' && (
             <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
               <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -273,7 +239,7 @@ export const BackupManagerPanel: React.FC<{
             </div>
           )}
 
-          {isD1Configured === false && d1ErrorType === 'DATABASE_INVALID' && (
+          {d1ErrorType === 'DATABASE_INVALID' && (
             <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
               <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
               <div className="flex-1">

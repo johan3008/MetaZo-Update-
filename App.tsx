@@ -3652,10 +3652,29 @@ const App: React.FC = () => {
     updateFiles(prev => {
       const newFiles = [...prev];
       
-      backupData.forEach(backupItem => {
-        const existingIdx = newFiles.findIndex(f => (f.customFileName || f.file?.name || 'unnamed_file') === backupItem.fileName);
+      const uniqueBackupItems: any[] = [];
+      const seenNames = new Set<string>();
+      const seenIds = new Set<string>();
+
+      backupData.forEach(item => {
+        const name = item.fileName || 'unnamed_file';
+        const id = item.id;
+        if (!seenNames.has(name) && (!id || !seenIds.has(id))) {
+          seenNames.add(name);
+          if (id) seenIds.add(id);
+          uniqueBackupItems.push(item);
+        }
+      });
+      
+      uniqueBackupItems.forEach(backupItem => {
+        const itemFileName = backupItem.fileName || 'unnamed_file';
+        const existingIdx = newFiles.findIndex(f => 
+          (f.customFileName || f.file?.name || 'unnamed_file') === itemFileName ||
+          f.id === backupItem.id
+        );
+
         if (existingIdx >= 0) {
-          // Merge with existing
+          // Merge with existing to avoid duplicating
           newFiles[existingIdx] = {
             ...newFiles[existingIdx],
             title: backupItem.title || newFiles[existingIdx].title,
@@ -3670,14 +3689,14 @@ const App: React.FC = () => {
           };
         } else {
           // Create dummy file for imported metadata without corresponding actual file
-          const ext = backupItem.fileName?.split('.').pop()?.toLowerCase();
+          const ext = itemFileName.split('.').pop()?.toLowerCase();
           const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '');
-          const dummyFile = new File([], backupItem.fileName || 'imported_file', { type: isVideo ? 'video/mp4' : 'image/jpeg' });
+          const dummyFile = new File([], itemFileName, { type: isVideo ? 'video/mp4' : 'image/jpeg' });
           
           newFiles.push({
             id: backupItem.id || Math.random().toString(36).substring(2, 9),
             file: dummyFile,
-            customFileName: backupItem.fileName,
+            customFileName: itemFileName,
             thumbnail: null,
             analysisFrames: [],
             title: backupItem.title || '',
@@ -3745,26 +3764,8 @@ const App: React.FC = () => {
       console.warn('[Local Storage] Auto-backup failed to save locally:', localErr);
     }
 
-    if (isMzLicensed) {
-      console.log('[Firebase Firestore] User is PRO/Subscribed. Saving backup to Firebase...');
-      const backupsCol = collection(db, 'users', user.uid, 'backups');
-      addDoc(backupsCol, {
-        batchId: `fb-batch-${Date.now()}`,
-        timestamp: new Date().toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
-        tool: activeTool,
-        items: backupData,
-        createdAt: new Date().toISOString()
-      })
-      .then(docRef => {
-        console.log('[Firebase Firestore] Backup saved successfully with path:', docRef.path);
-      })
-      .catch(err => {
-        console.warn('[Firebase Firestore] Failed to save backup to Firebase:', err);
-      });
-      return;
-    }
-
-    // Try Cloudflare D1
+    // Fully Cloud Storage using Cloudflare D1
+    console.log('[Cloudflare D1] Saving backup to Cloudflare D1...');
     fetch('/api/d1-backup/save', {
       method: 'POST',
       headers: {
