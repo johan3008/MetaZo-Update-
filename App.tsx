@@ -2055,7 +2055,15 @@ const App: React.FC = () => {
               }
             } else if (keyActivatedBy && keyActivatedBy !== devId) {
               // Bound to another device ID and no email is associated with it yet
-              isRejected = true;
+              if (user && user.email) {
+                // Link device-bound activation to user's email since they are logged in
+                updateDoc(doc(db, 'keys', k), {
+                  activatedBy: user.email,
+                  updatedAt: new Date().toISOString()
+                }).catch(e => console.info('db_op', e));
+              } else {
+                isRejected = true;
+              }
             }
 
             if (isRejected) {

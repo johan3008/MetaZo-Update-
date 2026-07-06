@@ -1398,7 +1398,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       if (dSnap.exists()) {
         const data = dSnap.data();
         if (data.activated) {
-          if (data.activatedBy === devId || (userEmail && data.activatedBy === userEmail)) {
+          const isEmail = (str: string) => str && str.includes('@');
+          const keyActivatedBy = data.activatedBy || '';
+
+          if (
+            keyActivatedBy === devId || 
+            (userEmail && keyActivatedBy.toLowerCase() === userEmail.toLowerCase()) ||
+            (userEmail && !isEmail(keyActivatedBy))
+          ) {
             if (data.duration === '30days' && data.activatedAt) {
               const activatedTime = new Date(data.activatedAt).getTime();
               const nowTime = new Date().getTime();
@@ -1411,7 +1418,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               }
             }
             // Link device-bound key to user email if logged in
-            if (userEmail && data.activatedBy === devId) {
+            if (userEmail && (data.activatedBy === devId || !isEmail(data.activatedBy))) {
               await updateDoc(keyRef, {
                 activatedBy: userEmail,
                 updatedAt: new Date().toISOString()
@@ -1464,7 +1471,22 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       }
       
       if (foundInCache) {
-        if (foundInCache.activated && foundInCache.activatedBy !== devId && (!userEmail || foundInCache.activatedBy !== userEmail)) {
+        const isEmail = (str: string) => str && str.includes('@');
+        const keyActivatedBy = foundInCache.activatedBy || '';
+        
+        let offlineRejected = false;
+        if (foundInCache.activated) {
+          if (keyActivatedBy === devId || (userEmail && keyActivatedBy.toLowerCase() === userEmail.toLowerCase())) {
+            // Match
+          } else if (userEmail && !isEmail(keyActivatedBy)) {
+            // Allowed to bind device-bound key to email offline/cached
+            foundInCache.activatedBy = userEmail;
+          } else {
+            offlineRejected = true;
+          }
+        }
+
+        if (offlineRejected) {
           setActivationError(t.activation_error_used);
           setIsActivating(false);
           return;
