@@ -28,7 +28,23 @@ export const BackupManagerPanel: React.FC<{
         const localBackupsKey = `metazo_local_backups_${user.uid}`;
         const existingStr = localStorage.getItem(localBackupsKey);
         if (existingStr) {
-          setLocalHistory(JSON.parse(existingStr));
+          const list = JSON.parse(existingStr);
+          if (Array.isArray(list)) {
+            const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            // Filter list to keep only those within the last 7 days
+            const filteredList = list.filter((batch: any) => {
+              const createdTime = batch.createdAt ? new Date(batch.createdAt).getTime() : Date.now();
+              return createdTime >= sevenDaysAgo;
+            });
+            
+            // If some items were filtered out, write back to localStorage to reset/clean up
+            if (filteredList.length !== list.length) {
+              localStorage.setItem(localBackupsKey, JSON.stringify(filteredList));
+            }
+            setLocalHistory(filteredList);
+          } else {
+            setLocalHistory([]);
+          }
         } else {
           setLocalHistory([]);
         }
@@ -76,6 +92,8 @@ export const BackupManagerPanel: React.FC<{
   useEffect(() => {
     if (showRestoreModal && user) {
       setLoading(true);
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
       if (isLicensed) {
         console.log('[Firebase Firestore] Loading backup history from Firestore...');
         const backupsCol = collection(db, 'users', user.uid, 'backups');
@@ -84,10 +102,14 @@ export const BackupManagerPanel: React.FC<{
           .then(querySnapshot => {
             const history: any[] = [];
             querySnapshot.forEach(docSnap => {
-              history.push({
-                id: docSnap.id,
-                ...docSnap.data()
-              });
+              const data = docSnap.data();
+              const createdTime = data.createdAt ? new Date(data.createdAt).getTime() : Date.now();
+              if (createdTime >= sevenDaysAgo) {
+                history.push({
+                  id: docSnap.id,
+                  ...data
+                });
+              }
             });
             setCloudHistory(history);
             setIsD1Configured(true);
@@ -105,7 +127,11 @@ export const BackupManagerPanel: React.FC<{
         .then(res => res.json())
         .then(resData => {
           if (resData.success && Array.isArray(resData.data)) {
-            setCloudHistory(resData.data);
+            const filteredCloud = resData.data.filter((batch: any) => {
+              const createdTime = batch.createdAt ? new Date(batch.createdAt).getTime() : Date.now();
+              return createdTime >= sevenDaysAgo;
+            });
+            setCloudHistory(filteredCloud);
             setIsD1Configured(true);
             setD1ErrorType(null);
           } else {

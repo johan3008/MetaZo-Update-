@@ -637,7 +637,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       await updateDoc(doc(db, 'keys', keyToReset), {
         activated: false,
         activatedBy: '',
-        activatedAt: ''
+        activatedAt: '',
+        firstActivatedBy: ''
       });
       await fetchBackendKeys();
       alert(`Key ${keyToReset} berhasil direset.`);
@@ -652,7 +653,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           currentList = JSON.parse(cached);
         } catch(e) {}
       }
-      const updatedList = currentList.map(k => k.key === keyToReset ? { ...k, activated: false, activatedBy: '', activatedAt: '' } : k);
+      const updatedList = currentList.map(k => k.key === keyToReset ? { ...k, activated: false, activatedBy: '', activatedAt: '', firstActivatedBy: '' } : k);
       setBackendKeys(updatedList);
       localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
       alert(`Key ${keyToReset} berhasil direset secara lokal (Sandbox Mode).`);
@@ -1378,6 +1379,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
 
     const targetKeyFormatted = inputKey.trim().toUpperCase();
+    localStorage.removeItem('mz_cancelled_subscription');
     const keyRef = doc(db, 'keys', targetKeyFormatted);
 
     const syncUserDb = async (key: string) => {
@@ -1385,6 +1387,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         const userRef = doc(db, 'users', userId);
         await setDoc(userRef, {
           licenseKey: key,
+          cancelledSubscription: false,
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => {
           console.warn('db_op', err);
@@ -1397,15 +1400,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
       if (dSnap.exists()) {
         const data = dSnap.data();
-        if (data.activated) {
-          const isEmail = (str: string) => str && str.includes('@');
-          const keyActivatedBy = data.activatedBy || '';
+        const isEmail = (str: string) => str && str.includes('@');
+        const keyActivatedBy = data.activatedBy || '';
+        const firstActivatedBy = data.firstActivatedBy || '';
+        const ownerEmail = firstActivatedBy || keyActivatedBy;
 
-          if (
-            keyActivatedBy === devId || 
-            (userEmail && keyActivatedBy.toLowerCase() === userEmail.toLowerCase()) ||
-            (userEmail && !isEmail(keyActivatedBy))
-          ) {
+        if (ownerEmail) {
+          const isOwner = (
+            ownerEmail === devId || 
+            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase()) ||
+            (userEmail && !isEmail(ownerEmail))
+          );
+
+          if (isOwner) {
             if (data.duration === '30days' && data.activatedAt) {
               const activatedTime = new Date(data.activatedAt).getTime();
               const nowTime = new Date().getTime();
@@ -1417,13 +1424,16 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 return;
               }
             }
-            // Link device-bound key to user email if logged in
-            if (userEmail && (data.activatedBy === devId || !isEmail(data.activatedBy))) {
-              await updateDoc(keyRef, {
-                activatedBy: userEmail,
-                updatedAt: new Date().toISOString()
-              }).catch(console.error);
-            }
+
+            // Allowed! Owner is reactivating or using it
+            await updateDoc(keyRef, {
+              activated: true,
+              cancelled: false,
+              activatedBy: userEmail || devId,
+              firstActivatedBy: userEmail || devId,
+              updatedAt: new Date().toISOString()
+            }).catch(console.error);
+
             localStorage.setItem('mz_license_key', targetKeyFormatted);
             await syncUserDb(targetKeyFormatted);
             setLicenseKey(targetKeyFormatted);
@@ -1434,14 +1444,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               setShowActivation(false);
             }, 2500);
           } else {
-            setActivationError(t.activation_error_used);
+            setActivationError(localStorage.getItem('mz_language') === 'Bahasa'
+              ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.'
+              : 'This license key is already registered to another account! One license can only be used on one account.');
           }
         } else {
-          // Unactivated single-use key -> activate it!
+          // Unactivated single-use key -> activate and bind permanently to this account!
           await updateDoc(keyRef, {
             activated: true,
+            cancelled: false,
             activatedBy: userEmail || devId,
-            activatedAt: new Date().toISOString()
+            firstActivatedBy: userEmail || devId,
+            activatedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           });
 
           localStorage.setItem('mz_license_key', targetKeyFormatted);
@@ -1473,39 +1488,48 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       if (foundInCache) {
         const isEmail = (str: string) => str && str.includes('@');
         const keyActivatedBy = foundInCache.activatedBy || '';
+        const firstActivatedBy = foundInCache.firstActivatedBy || '';
+        const ownerEmail = firstActivatedBy || keyActivatedBy;
         
         let offlineRejected = false;
-        if (foundInCache.activated) {
-          if (keyActivatedBy === devId || (userEmail && keyActivatedBy.toLowerCase() === userEmail.toLowerCase())) {
-            // Match
-          } else if (userEmail && !isEmail(keyActivatedBy)) {
-            // Allowed to bind device-bound key to email offline/cached
-            foundInCache.activatedBy = userEmail;
-          } else {
+        if (ownerEmail) {
+          const isOwner = (
+            ownerEmail === devId || 
+            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase()) ||
+            (userEmail && !isEmail(ownerEmail))
+          );
+          if (!isOwner) {
             offlineRejected = true;
           }
         }
 
         if (offlineRejected) {
-          setActivationError(t.activation_error_used);
+          setActivationError(localStorage.getItem('mz_language') === 'Bahasa'
+            ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.'
+            : 'This license key is already registered to another account! One license can only be used on one account.');
           setIsActivating(false);
           return;
         }
         
-        if (!foundInCache.activated) {
-          foundInCache.activated = true;
-          foundInCache.activatedBy = userEmail || devId;
+        // Allowed
+        foundInCache.activated = true;
+        foundInCache.cancelled = false;
+        foundInCache.activatedBy = userEmail || devId;
+        if (!foundInCache.firstActivatedBy) {
+          foundInCache.firstActivatedBy = userEmail || devId;
+        }
+        if (!foundInCache.activatedAt) {
           foundInCache.activatedAt = new Date().toISOString();
-          
-          let cachedKeys2 = localStorage.getItem('mz_backend_keys_cache');
-          if (cachedKeys2) {
-            try {
-              let list2: LicenseKeyBackend[] = JSON.parse(cachedKeys2);
-              const updated = list2.map(k => k.key === targetKeyFormatted ? foundInCache : k);
-              localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updated));
-              setBackendKeys(updated);
-            } catch(e) {}
-          }
+        }
+        
+        let cachedKeys2 = localStorage.getItem('mz_backend_keys_cache');
+        if (cachedKeys2) {
+          try {
+            let list2: LicenseKeyBackend[] = JSON.parse(cachedKeys2);
+            const updated = list2.map(k => k.key === targetKeyFormatted ? foundInCache : k);
+            localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updated));
+            setBackendKeys(updated);
+          } catch(e) {}
         }
         
         localStorage.setItem('mz_license_key', targetKeyFormatted);
@@ -1550,6 +1574,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
 
     localStorage.removeItem('mz_license_key');
+    localStorage.setItem('mz_cancelled_subscription', 'true');
     // Fully return to trial mode by resetting the trial period
     localStorage.setItem('mz_trial_start', new Date().toISOString());
     
@@ -1571,6 +1596,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       const userRef = doc(db, 'users', userId);
       await setDoc(userRef, {
         licenseKey: '',
+        cancelledSubscription: true,
         trialStart: new Date().toISOString(),
         dailyUsage: {
           [dateStr]: {} // Clear today's daily usage in Firestore to reset quota to 0/25

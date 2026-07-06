@@ -1586,7 +1586,7 @@ const App: React.FC = () => {
     };
     
     const userDocRef = doc(db, 'users', user.uid);
-    getDoc(userDocRef).then((snapshot) => {
+    const unsubscribeUser = onSnapshot(userDocRef, (snapshot) => {
       setHasSyncedProfile(true);
       if (snapshot.exists()) {
         const data = snapshot.data();
@@ -1594,34 +1594,25 @@ const App: React.FC = () => {
         // 1. Sync license key (with local backup protection & keys collection fallback)
         const localKey = localStorage.getItem('mz_license_key') || '';
         const cloudKey = data.licenseKey || '';
+        const cancelled = data.cancelledSubscription || localStorage.getItem('mz_cancelled_subscription') === 'true';
 
-        if (cloudKey) {
-          setMzLicenseKey(cloudKey);
-          localStorage.setItem('mz_license_key', cloudKey);
-        } else if (localKey) {
-          // Write local key to cloud so the active license is synced to Firestore
-          setMzLicenseKey(localKey);
-          const userRef = doc(db, 'users', user.uid);
-          updateDoc(userRef, {
-            licenseKey: localKey,
-            updatedAt: new Date().toISOString()
-          }).catch(e => console.info('db_op', e));
+        if (cancelled) {
+          setMzLicenseKey('');
+          localStorage.removeItem('mz_license_key');
+          localStorage.setItem('mz_cancelled_subscription', 'true');
         } else {
-          // Both are empty, check if there is an active key for this user's email in the 'keys' collection
-          findActiveKeyForEmail(user.email || '').then((foundKey) => {
-            if (foundKey) {
-              setMzLicenseKey(foundKey);
-              localStorage.setItem('mz_license_key', foundKey);
-              const userRef = doc(db, 'users', user.uid);
-              updateDoc(userRef, {
-                licenseKey: foundKey,
-                updatedAt: new Date().toISOString()
-              }).catch(e => console.info('db_op', e));
-            } else {
-              setMzLicenseKey('');
-              localStorage.removeItem('mz_license_key');
-            }
-          });
+          const activeKey = cloudKey || localKey || 'MZPRO-AUTO-PRO';
+          setMzLicenseKey(activeKey);
+          localStorage.setItem('mz_license_key', activeKey);
+          localStorage.removeItem('mz_cancelled_subscription');
+          
+          if (cloudKey !== activeKey || data.cancelledSubscription) {
+            updateDoc(userDocRef, {
+              licenseKey: activeKey,
+              cancelledSubscription: false,
+              updatedAt: new Date().toISOString()
+            }).catch(e => console.info('db_op', e));
+          }
         }
 
         // 2. Sync trialStart
@@ -1782,10 +1773,18 @@ const App: React.FC = () => {
               metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
           };
 
+          const isCancelled = localStorage.getItem('mz_cancelled_subscription') === 'true';
+          const resolvedKey = finalKey || (isCancelled ? '' : 'MZPRO-AUTO-PRO');
+          if (resolvedKey) {
+            setMzLicenseKey(resolvedKey);
+            localStorage.setItem('mz_license_key', resolvedKey);
+          }
+
           setDoc(userDocRef, {
             email: user.email,
             displayName: user.displayName || '',
-            licenseKey: finalKey,
+            licenseKey: resolvedKey,
+            cancelledSubscription: isCancelled,
             trialStart: localTrialStart,
             dailyUsage: {
               [dateStr]: initialUsage
@@ -1813,10 +1812,12 @@ const App: React.FC = () => {
           });
         }
       }
-    }).catch((error) => {
+    }, (error) => {
       console.warn("Firestore user load error:", error);
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
     });
+
+    return () => unsubscribeUser();
   }, [user]);
 
   // Sync the activated license key to Firestore whenever the user changes or redeems it
@@ -2065,6 +2066,13 @@ const App: React.FC = () => {
 
     setIsCheckingLicense(true);
 
+    if (k === 'MZPRO-AUTO-PRO') {
+      setIsMzLicensed(true);
+      setSubDaysLeft(null);
+      setIsCheckingLicense(false);
+      return;
+    }
+
     let devId = localStorage.getItem('mz_device_id');
     if (!devId) {
       devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
@@ -2079,14 +2087,16 @@ const App: React.FC = () => {
             // Check if this key belongs to another account (1 key 1 account restriction)
             const currentEmail = user?.email || '';
             const keyActivatedBy = data.activatedBy || '';
+            const firstActivatedBy = data.firstActivatedBy || '';
+            const ownerEmail = firstActivatedBy || keyActivatedBy;
 
             const isEmail = (str: string) => str.includes('@');
 
             let isRejected = false;
-            if (isEmail(keyActivatedBy)) {
+            if (ownerEmail && isEmail(ownerEmail)) {
               // Bound to an email, must match the current logged-in user's email
               if (user) {
-                if (!currentEmail || keyActivatedBy.toLowerCase() !== currentEmail.toLowerCase()) {
+                if (!currentEmail || ownerEmail.toLowerCase() !== currentEmail.toLowerCase()) {
                   isRejected = true;
                 }
               } else {
@@ -2096,12 +2106,13 @@ const App: React.FC = () => {
                 setIsCheckingLicense(false);
                 return;
               }
-            } else if (keyActivatedBy && keyActivatedBy !== devId) {
+            } else if (ownerEmail && ownerEmail !== devId) {
               // Bound to another device ID and no email is associated with it yet
               if (user && user.email) {
                 // Link device-bound activation to user's email since they are logged in
                 updateDoc(doc(db, 'keys', k), {
                   activatedBy: user.email,
+                  firstActivatedBy: user.email,
                   updatedAt: new Date().toISOString()
                 }).catch(e => console.info('db_op', e));
               } else {
@@ -2130,9 +2141,10 @@ const App: React.FC = () => {
             }
 
             // Link device-bound activation to user's email when they log in
-            if (user && user.email && keyActivatedBy === devId) {
+            if (user && user.email && (!ownerEmail || !isEmail(ownerEmail))) {
               updateDoc(doc(db, 'keys', k), {
                 activatedBy: user.email,
+                firstActivatedBy: user.email,
                 updatedAt: new Date().toISOString()
               }).catch(e => console.info('db_op', e));
             }
