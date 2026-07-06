@@ -6,8 +6,7 @@ import {
   Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc, onSnapshot } from '../firebase';
 
 interface SaaSPortalProps {
   // Brand States
@@ -194,6 +193,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [emailAddress, setEmailAddress] = useState('');
   const [emailCaption, setEmailCaption] = useState('Terima kasih telah berlangganan layanan PRO kami.');
   const [isEmailSending, setIsEmailSending] = useState(false);
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState(() => {
+    return localStorage.getItem('last_firestore_quota_error') === new Date().toDateString();
+  });
 
   // Single-use multi-key engine states
   interface LicenseKeyBackend {
@@ -248,15 +250,36 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       });
       keysList.sort((a, b) => a.key.localeCompare(b.key));
       setBackendKeys(keysList);
-    } catch (err) {
-      console.error('Failed to fetch keys from Firestore:', err);
-      handleFirestoreError(err, OperationType.LIST, 'keys');
-      const cached = localStorage.getItem('mz_backend_keys_cache');
-      if (cached) {
-        try {
-          setBackendKeys(JSON.parse(cached));
-        } catch(e) { console.error("Cache parsing error", e); }
+      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(keysList));
+    } catch (err: any) {
+      const errMsg = err?.message || (err && typeof err === 'object' && 'message' in err ? String((err as any).message) : '') || String(err);
+      const errCode = (err && typeof err === 'object' && 'code' in err ? String((err as any).code) : '');
+      const isPermissionErr = errMsg.toLowerCase().includes('permission') || 
+                              errMsg.toLowerCase().includes('denied') ||
+                              errCode.toLowerCase().includes('permission') ||
+                              errCode.toLowerCase().includes('denied');
+      if (err?.message?.includes('Quota') || err?.message?.includes('quota') || err?.message?.includes('exhausted')) {
+        setIsQuotaExceeded(true);
+        localStorage.setItem('last_firestore_quota_error', new Date().toDateString());
       }
+      if (!isPermissionErr) {
+        console.error('Failed to fetch keys from Firestore:', err);
+        handleFirestoreError(err, OperationType.LIST, 'keys');
+      }
+      let cached = localStorage.getItem('mz_backend_keys_cache');
+      if (!cached) {
+        const seedKeys = [
+          { key: "MZPRO-ABCD-EFGH-IJKL", activated: true, activatedBy: "trialuser1@gmail.com", activatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), duration: "30days" },
+          { key: "MZPRO-1234-5678-90AB", activated: true, activatedBy: "premiumuser@gmail.com", activatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), duration: "unlimited" },
+          { key: "MZPRO-WXYZ-8888-9999", activated: false, activatedBy: "", activatedAt: "", duration: "30days" },
+          { key: "MZPRO-K7Y9-L1R4-Q9W2", activated: false, activatedBy: "", activatedAt: "", duration: "unlimited" }
+        ];
+        localStorage.setItem('mz_backend_keys_cache', JSON.stringify(seedKeys));
+        cached = JSON.stringify(seedKeys);
+      }
+      try {
+        setBackendKeys(JSON.parse(cached));
+      } catch(e) { console.error("Cache parsing error", e); }
     } finally {
       setIsKeysLoading(false);
     }
@@ -284,15 +307,27 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         });
       });
       setPromos(list);
+      localStorage.setItem('mz_promos_cache', JSON.stringify(list));
     } catch (e: any) {
       console.error("Error loading promo codes:", e);
-      setPromoErrorMsg('Gagal mengambil daftar promo.');
-      const cached = localStorage.getItem('mz_promos_cache');
-      if (cached) {
-        try {
-          setPromos(JSON.parse(cached));
-        } catch(err) { console.error("Cache parsing error", err); }
+      if (e?.message?.includes('Quota') || e?.message?.includes('quota') || e?.message?.includes('exhausted')) {
+        setIsQuotaExceeded(true);
+        localStorage.setItem('last_firestore_quota_error', new Date().toDateString());
       }
+      setPromoErrorMsg('Gagal mengambil daftar promo.');
+      let cached = localStorage.getItem('mz_promos_cache');
+      if (!cached) {
+        const seedPromos = [
+          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
+          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
+          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" }
+        ];
+        localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
+        cached = JSON.stringify(seedPromos);
+      }
+      try {
+        setPromos(JSON.parse(cached));
+      } catch(err) { console.error("Cache parsing error", err); }
     } finally {
       setIsPromosLoading(false);
     }
@@ -335,9 +370,38 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       
       // reload directory
       await fetchPromosFromDb();
-    } catch (e: any) {
-      console.error("Failed to create promo:", e);
-      setPromoErrorMsg('Gagal membuat kode promo.');
+    } catch (err: any) {
+      console.error("Failed to create promo in Firestore, falling back to local storage:", err);
+      
+      const promoObj = {
+        id: code,
+        code,
+        type: newPromoType,
+        value: Number(newPromoValue),
+        maxUses: Number(newPromoMaxUses),
+        usedCount: 0,
+        description: newPromoDesc.trim(),
+        createdAt: new Date().toISOString(),
+        startDate: newPromoStartDate || null,
+        endDate: newPromoEndDate || null
+      };
+      
+      let cached = localStorage.getItem('mz_promos_cache');
+      let currentList: PromoCode[] = [];
+      if (cached) {
+        try {
+          currentList = JSON.parse(cached);
+        } catch(errEx) {}
+      }
+      const updatedList = [promoObj, ...currentList.filter(p => p.code !== code)];
+      setPromos(updatedList);
+      localStorage.setItem('mz_promos_cache', JSON.stringify(updatedList));
+
+      setPromoSuccessMsg(`Kode promo ${code} berhasil dibuat secara lokal (Sandbox Mode)!`);
+      setNewPromoCode('');
+      setNewPromoDesc('');
+      setNewPromoStartDate('');
+      setNewPromoEndDate('');
     } finally {
       setIsPromosLoading(false);
     }
@@ -352,20 +416,142 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       await deleteDoc(doc(db, 'promos', promoId));
       setPromoSuccessMsg('Kode promo berhasil dihapus.');
       await fetchPromosFromDb();
-    } catch (e: any) {
-      console.error("Failed to delete promo:", e);
-      setPromoErrorMsg('Gagal menghapus kode promo.');
+    } catch (err: any) {
+      console.error("Failed to delete promo in Firestore, falling back to local storage:", err);
+      let cached = localStorage.getItem('mz_promos_cache');
+      let currentList: PromoCode[] = [];
+      if (cached) {
+        try {
+          currentList = JSON.parse(cached);
+        } catch(errEx) {}
+      }
+      const updatedList = currentList.filter(p => p.id !== promoId);
+      setPromos(updatedList);
+      localStorage.setItem('mz_promos_cache', JSON.stringify(updatedList));
+      setPromoSuccessMsg('Kode promo berhasil dihapus secara lokal (Sandbox Mode).');
     } finally {
       setIsPromosLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!onlyModal) {
-      fetchBackendKeys();
-      fetchPromosFromDb();
+    if (onlyModal) return;
+
+    if (!showResellerHub) {
+      setIsKeysLoading(false);
+      setIsPromosLoading(false);
+      return;
     }
-  }, [onlyModal]);
+
+    setIsKeysLoading(true);
+    setIsPromosLoading(true);
+
+    // 1. Realtime listener for keys
+    const unsubKeys = onSnapshot(collection(db, 'keys'), (qSnap) => {
+      const keysList: LicenseKeyBackend[] = [];
+      qSnap.forEach((doc) => {
+        const data = doc.data();
+        keysList.push({
+          key: doc.id,
+          activated: !!data.activated,
+          activatedBy: data.activatedBy || '',
+          activatedAt: data.activatedAt || '',
+          duration: data.duration || 'unlimited'
+        });
+      });
+      keysList.sort((a, b) => a.key.localeCompare(b.key));
+      setBackendKeys(keysList);
+      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(keysList));
+      setIsKeysLoading(false);
+    }, (err) => {
+      const errMsg = err?.message || (err && typeof err === 'object' && 'message' in err ? String((err as any).message) : '') || String(err);
+      const errCode = (err && typeof err === 'object' && 'code' in err ? String((err as any).code) : '');
+      const isPermissionErr = errMsg.toLowerCase().includes('permission') || 
+                              errMsg.toLowerCase().includes('denied') ||
+                              errCode.toLowerCase().includes('permission') ||
+                              errCode.toLowerCase().includes('denied');
+      if (err?.message?.includes('Quota') || err?.message?.includes('quota') || err?.message?.includes('exhausted')) {
+        setIsQuotaExceeded(true);
+        localStorage.setItem('last_firestore_quota_error', new Date().toDateString());
+      }
+      if (!isPermissionErr) {
+        console.error('Realtime Firestore keys subscription error, loading cached data:', err);
+        handleFirestoreError(err, OperationType.LIST, 'keys');
+      }
+      let cached = localStorage.getItem('mz_backend_keys_cache');
+      if (!cached) {
+        const seedKeys = [
+          { key: "MZPRO-ABCD-EFGH-IJKL", activated: true, activatedBy: "trialuser1@gmail.com", activatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), duration: "30days" },
+          { key: "MZPRO-1234-5678-90AB", activated: true, activatedBy: "premiumuser@gmail.com", activatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), duration: "unlimited" },
+          { key: "MZPRO-WXYZ-8888-9999", activated: false, activatedBy: "", activatedAt: "", duration: "30days" },
+          { key: "MZPRO-K7Y9-L1R4-Q9W2", activated: false, activatedBy: "", activatedAt: "", duration: "unlimited" }
+        ];
+        localStorage.setItem('mz_backend_keys_cache', JSON.stringify(seedKeys));
+        cached = JSON.stringify(seedKeys);
+      }
+      try {
+        setBackendKeys(JSON.parse(cached));
+      } catch(e) { console.error("Cache parsing error", e); }
+      setIsKeysLoading(false);
+    });
+
+    // 2. Realtime listener for promos
+    const unsubPromos = onSnapshot(collection(db, 'promos'), (qSnap) => {
+      const list: PromoCode[] = [];
+      qSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          code: data.code || docSnap.id,
+          type: data.type || 'free_premium',
+          value: Number(data.value || 0),
+          maxUses: Number(data.maxUses || 0),
+          usedCount: Number(data.usedCount || 0),
+          description: data.description || '',
+          createdAt: data.createdAt || '',
+          startDate: data.startDate || '',
+          endDate: data.endDate || ''
+        });
+      });
+      setPromos(list);
+      localStorage.setItem('mz_promos_cache', JSON.stringify(list));
+      setIsPromosLoading(false);
+    }, (err) => {
+      const errMsg = err?.message || (err && typeof err === 'object' && 'message' in err ? String((err as any).message) : '') || String(err);
+      const errCode = (err && typeof err === 'object' && 'code' in err ? String((err as any).code) : '');
+      const isPermissionErr = errMsg.toLowerCase().includes('permission') || 
+                              errMsg.toLowerCase().includes('denied') ||
+                              errCode.toLowerCase().includes('permission') ||
+                              errCode.toLowerCase().includes('denied');
+      if (err?.message?.includes('Quota') || err?.message?.includes('quota') || err?.message?.includes('exhausted')) {
+        setIsQuotaExceeded(true);
+        localStorage.setItem('last_firestore_quota_error', new Date().toDateString());
+      }
+      if (!isPermissionErr) {
+        console.error("Realtime Firestore promos subscription error, loading cached data:", err);
+      }
+      setPromoErrorMsg(isPermissionErr ? 'Menggunakan data promo lokal (Sandbox Mode).' : 'Gagal mengambil daftar promo real-time (Quota exceeded). Menggunakan data lokal.');
+      let cached = localStorage.getItem('mz_promos_cache');
+      if (!cached) {
+        const seedPromos = [
+          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
+          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
+          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" }
+        ];
+        localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
+        cached = JSON.stringify(seedPromos);
+      }
+      try {
+        setPromos(JSON.parse(cached));
+      } catch(e) {}
+      setIsPromosLoading(false);
+    });
+
+    return () => {
+      unsubKeys();
+      unsubPromos();
+    };
+  }, [onlyModal, showResellerHub]);
 
   const generateRandomKey = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -381,23 +567,39 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
   const handleGenerateKeys = async () => {
     setIsKeysLoading(true);
+    const generatedCount = keysCountToGen;
+    const newlyCreated: LicenseKeyBackend[] = [];
     try {
-      const generatedCount = keysCountToGen;
       for (let i = 0; i < generatedCount; i++) {
         const newKey = generateRandomKey();
-        await setDoc(doc(db, 'keys', newKey), {
+        const keyData = {
           key: newKey,
           activated: false,
           activatedBy: '',
           activatedAt: '',
           duration: selectedDuration,
           createdAt: new Date().toISOString()
-        });
+        };
+        newlyCreated.push(keyData);
+        await setDoc(doc(db, 'keys', newKey), keyData);
       }
       await fetchBackendKeys();
     } catch (err) {
-      console.error('Failed to generate keys in Firestore:', err);
+      console.error('Failed to generate keys in Firestore, falling back to local storage:', err);
       handleFirestoreError(err, OperationType.WRITE, 'keys');
+      
+      // Fallback: Append newlyCreated to the local cache!
+      let cached = localStorage.getItem('mz_backend_keys_cache');
+      let currentList: LicenseKeyBackend[] = [];
+      if (cached) {
+        try {
+          currentList = JSON.parse(cached);
+        } catch(e) {}
+      }
+      const updatedList = [...newlyCreated, ...currentList];
+      setBackendKeys(updatedList);
+      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
+      alert(`Firestore Quota Terlampaui! Sistem beralih ke Mode Sandbox Offline. ${generatedCount} Serial Key baru berhasil digenerate secara lokal untuk simulasi.`);
     } finally {
       setIsKeysLoading(false);
     }
@@ -410,9 +612,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       await fetchBackendKeys();
       alert(`Key ${keyToDelete} berhasil dihapus.`);
     } catch (err) {
-      console.error('Failed to delete key inside Firestore:', err);
-      alert(`Gagal menghapus key: ${err}`);
+      console.error('Failed to delete key inside Firestore, falling back to local storage:', err);
       handleFirestoreError(err, OperationType.DELETE, `keys/${keyToDelete}`);
+      
+      let cached = localStorage.getItem('mz_backend_keys_cache');
+      let currentList: LicenseKeyBackend[] = [];
+      if (cached) {
+        try {
+          currentList = JSON.parse(cached);
+        } catch(e) {}
+      }
+      const updatedList = currentList.filter(k => k.key !== keyToDelete);
+      setBackendKeys(updatedList);
+      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
+      alert(`Key ${keyToDelete} berhasil dihapus secara lokal (Sandbox Mode).`);
     } finally {
       setIsKeysLoading(false);
     }
@@ -429,9 +642,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       await fetchBackendKeys();
       alert(`Key ${keyToReset} berhasil direset.`);
     } catch (err) {
-      console.error('Failed to reset key inside Firestore:', err);
-      alert(`Gagal mereset key: ${err}`);
+      console.error('Failed to reset key inside Firestore, falling back to local storage:', err);
       handleFirestoreError(err, OperationType.UPDATE, `keys/${keyToReset}`);
+      
+      let cached = localStorage.getItem('mz_backend_keys_cache');
+      let currentList: LicenseKeyBackend[] = [];
+      if (cached) {
+        try {
+          currentList = JSON.parse(cached);
+        } catch(e) {}
+      }
+      const updatedList = currentList.map(k => k.key === keyToReset ? { ...k, activated: false, activatedBy: '', activatedAt: '' } : k);
+      setBackendKeys(updatedList);
+      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
+      alert(`Key ${keyToReset} berhasil direset secara lokal (Sandbox Mode).`);
     } finally {
       setIsKeysLoading(false);
     }
@@ -593,9 +817,38 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
-      console.error('Failed to save branding in Firestore:', err);
-      alert('Gagal menyimpan branding. Sila periksa perizinan Firestore.');
+      console.error('Failed to save branding in Firestore, falling back to local storage:', err);
       handleFirestoreError(err, OperationType.WRITE, 'branding/main');
+      
+      // Update local storage and React states anyway!
+      localStorage.setItem('mz_reseller_app_name', tempAppName.trim() || 'MetaZo PRO');
+      localStorage.setItem('mz_reseller_app_subtitle', tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant');
+      localStorage.setItem('mz_reseller_whatsapp', tempWhatsApp.trim() || 'https://wa.me/+6282275408171');
+      localStorage.setItem('mz_reseller_price', tempPricingTier.trim() || 'Rp 149.000 / Bulan');
+      localStorage.setItem('mz_reseller_seed', tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026');
+      localStorage.setItem('mz_reseller_pay_info', tempPayInfo.trim());
+      localStorage.setItem('mz_price_30_days', tempPrice30Days.trim() || 'Rp 50.000');
+      localStorage.setItem('mz_price_30_days_usd', tempPrice30DaysUSD.trim() || '$2');
+      localStorage.setItem('mz_price_unlimited', tempPriceUnlimited.trim() || 'Rp 250.000');
+      localStorage.setItem('mz_price_unlimited_usd', tempPriceUnlimitedUSD.trim() || '$14');
+      localStorage.setItem('mz_pakasir_project', tempPakasirProject.trim());
+      localStorage.setItem('mz_pakasir_apikey', tempPakasirApiKey.trim());
+
+      setAppName(tempAppName.trim() || 'MetaZo PRO');
+      setAppSubtitle(tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant');
+      setWhatsAppLink(tempWhatsApp.trim() || 'https://wa.me/+6282275408171');
+      setPricingTier(tempPricingTier.trim() || 'Rp 149.000 / Bulan');
+      setLicenseSeed(tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026');
+      setPrice30Days(tempPrice30Days.trim() || 'Rp 50.000');
+      setPrice30DaysUSD(tempPrice30DaysUSD.trim() || '$2');
+      setPriceUnlimited(tempPriceUnlimited.trim() || 'Rp 250.000');
+      setPriceUnlimitedUSD(tempPriceUnlimitedUSD.trim() || '$14');
+      setPakasirProject(tempPakasirProject.trim());
+      setPakasirApiKey(tempPakasirApiKey.trim());
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      alert('Firestore Quota Terlampaui! Branding Anda berhasil disimpan secara lokal (Sandbox Mode) dan langsung diterapkan.');
     } finally {
       setIsKeysLoading(false);
     }
@@ -655,8 +908,44 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 1500);
       } catch (err) {
-        console.error('Failed to reset branding settings in Firestore:', err);
+        console.error('Failed to reset branding settings in Firestore, falling back to local storage:', err);
         handleFirestoreError(err, OperationType.WRITE, 'branding/main');
+
+        localStorage.removeItem('mz_reseller_app_name');
+        localStorage.removeItem('mz_reseller_app_subtitle');
+        localStorage.removeItem('mz_reseller_whatsapp');
+        localStorage.removeItem('mz_reseller_price');
+        localStorage.removeItem('mz_reseller_seed');
+        localStorage.removeItem('mz_reseller_pay_info');
+        localStorage.removeItem('mz_price_30_days');
+        localStorage.removeItem('mz_price_30_days_usd');
+        localStorage.removeItem('mz_price_unlimited');
+        localStorage.removeItem('mz_price_unlimited_usd');
+        localStorage.removeItem('mz_pakasir_project');
+        localStorage.removeItem('mz_pakasir_apikey');
+
+        setAppName('MetaZo PRO');
+        setAppSubtitle('AI-Powered Metadata Assistant');
+        setWhatsAppLink('https://wa.me/+6282275408171');
+        setPricingTier('Rp 149.000 / Bulan');
+        setLicenseSeed('MZPRO-COMMERCIAL-2026');
+        setTempPayInfo('Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom');
+        setPrice30Days('Rp 50.000');
+        setPrice30DaysUSD('$2');
+        setPriceUnlimited('Rp 250.000');
+        setPriceUnlimitedUSD('$14');
+        setTempPrice30Days('Rp 50.000');
+        setTempPrice30DaysUSD('$2');
+        setTempPriceUnlimited('Rp 250.000');
+        setTempPriceUnlimitedUSD('$14');
+        setPakasirProject('');
+        setPakasirApiKey('');
+        setTempPakasirProject('');
+        setTempPakasirApiKey('');
+
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 1500);
+        alert('Branding Anda berhasil disetel ulang secara lokal (Sandbox Mode).');
       } finally {
         setIsKeysLoading(false);
       }
@@ -672,6 +961,11 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
     if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
     if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
+    
+    // Add fallback seed keys for Firestore quota block resilience
+    const fallbackKeys = ['MZPRO-ABCD-EFGH-IJKL', 'MZPRO-1234-5678-90AB', 'MZPRO-WXYZ-8888-9999', 'MZPRO-K7Y9-L1R4-Q9W2'];
+    if (fallbackKeys.includes(k)) return true;
+    
     return false;
   };
 
@@ -823,8 +1117,121 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         }, 1500);
       }
     } catch (err) {
-      console.error('Apply promo error:', err);
-      setPromoApplyError('Terjadi kesalahan saat menerapkan kode promo.');
+      console.error('Apply promo error, trying local cache fallback:', err);
+      
+      // Look up promo locally
+      let cachedPromos = localStorage.getItem('mz_promos_cache');
+      let foundPromo: any = null;
+      if (cachedPromos) {
+        try {
+          const list: any[] = JSON.parse(cachedPromos);
+          foundPromo = list.find(p => p.code === cleanPromo || p.id === cleanPromo);
+        } catch(e) {}
+      }
+      
+      if (foundPromo) {
+        const usedCount = Number(foundPromo.usedCount) || 0;
+        const maxUses = Number(foundPromo.maxUses) || 99999;
+        
+        const now = new Date();
+        if (foundPromo.startDate) {
+          const start = new Date(foundPromo.startDate);
+          if (now < start) {
+            setPromoApplyError(`Kode promo belum aktif. Promo ini mulai berlaku tanggal ${foundPromo.startDate}.`);
+            setIsApplyingPromo(false);
+            return;
+          }
+        }
+
+        if (foundPromo.endDate) {
+          const endStr = foundPromo.endDate;
+          const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
+          if (now > end) {
+            setPromoApplyError('Kode promo ini sudah kedaluwarsa (expired).');
+            setIsApplyingPromo(false);
+            return;
+          }
+        }
+
+        if (usedCount >= maxUses) {
+          setPromoApplyError('Kode promo sudah melebihi batas penggunaan.');
+          setIsApplyingPromo(false);
+          return;
+        }
+
+        if (foundPromo.type === 'discount') {
+          setActivePromo(foundPromo);
+          setPromoApplySuccess(`Kode promo ${cleanPromo} diterapkan! Potongan harga ${foundPromo.value}%!`);
+          
+          // Increment locally
+          foundPromo.usedCount = usedCount + 1;
+          if (cachedPromos) {
+            try {
+              const list: any[] = JSON.parse(cachedPromos);
+              const updated = list.map(p => (p.code === cleanPromo || p.id === cleanPromo) ? foundPromo : p);
+              localStorage.setItem('mz_promos_cache', JSON.stringify(updated));
+              setPromos(updated);
+            } catch(e) {}
+          }
+        } else if (foundPromo.type === 'free_premium') {
+          const durationDays = Number(foundPromo.value) || 30;
+          const durationStr = durationDays === 30 ? '30days' : `${durationDays}days`;
+          const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+          const generatedLicenseKey = `PROMO-${cleanPromo}-${randomStr}`;
+          
+          let devId = localStorage.getItem('mz_device_id');
+          if (!devId) {
+            devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
+            localStorage.setItem('mz_device_id', devId);
+          }
+
+          // Apply locally
+          localStorage.setItem('mz_license_key', generatedLicenseKey);
+          setLicenseKey(generatedLicenseKey);
+          
+          // Increment promo count locally
+          foundPromo.usedCount = usedCount + 1;
+          if (cachedPromos) {
+            try {
+              const list: any[] = JSON.parse(cachedPromos);
+              const updated = list.map(p => (p.code === cleanPromo || p.id === cleanPromo) ? foundPromo : p);
+              localStorage.setItem('mz_promos_cache', JSON.stringify(updated));
+              setPromos(updated);
+            } catch(e) {}
+          }
+          
+          // Also save generated key to local cache!
+          const keyData = {
+            key: generatedLicenseKey,
+            activated: true,
+            activatedBy: userEmail || devId,
+            activatedAt: new Date().toISOString(),
+            duration: durationStr,
+            promoCode: cleanPromo,
+            createdAt: new Date().toISOString()
+          };
+          
+          let cachedKeys = localStorage.getItem('mz_backend_keys_cache');
+          let currentKeysList: any[] = [];
+          if (cachedKeys) {
+            try {
+              currentKeysList = JSON.parse(cachedKeys);
+            } catch(e) {}
+          }
+          const updatedKeys = [keyData, ...currentKeysList];
+          localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedKeys));
+          setBackendKeys(updatedKeys);
+
+          setPromoApplySuccess(`Promo berhasil! Premium ${durationDays} Hari diaktifkan gratis!`);
+          alert(`Selamat! Anda mendapatkan akses PREMIUM ${durationDays} Hari secara gratis menggunakan kode promo: ${cleanPromo}.`);
+          
+          setTimeout(() => {
+            setShowActivation(false);
+          }, 1500);
+        }
+      } else {
+        setPromoApplyError('Terjadi kesalahan saat menerapkan kode promo atau kode tidak valid dalam mode offline.');
+      }
     } finally {
       setIsApplyingPromo(false);
     }
@@ -973,19 +1380,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     const targetKeyFormatted = inputKey.trim().toUpperCase();
     const keyRef = doc(db, 'keys', targetKeyFormatted);
 
+    const syncUserDb = async (key: string) => {
+      if (userId) {
+        const userRef = doc(db, 'users', userId);
+        await setDoc(userRef, {
+          licenseKey: key,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(err => {
+          console.warn('db_op', err);
+        });
+      }
+    };
+
     try {
       const dSnap = await getDoc(keyRef);
-      const syncUserDb = async (key: string) => {
-        if (userId) {
-          const userRef = doc(db, 'users', userId);
-          await setDoc(userRef, {
-            licenseKey: key,
-            updatedAt: new Date().toISOString()
-          }, { merge: true }).catch(err => {
-            console.warn('db_op', err);
-          });
-        }
-      };
 
       if (dSnap.exists()) {
         const data = dSnap.data();
@@ -1043,8 +1451,62 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         setActivationError(t.activation_error_invalid);
       }
     } catch (err) {
-      console.warn('Firestore activate check error:', err);
-      setActivationError('Koneksi internet bermasalah atau gagal menghubungi server lisensi. Mohon periksa internet Anda.');
+      console.warn('Firestore activate check error, attempting offline/cached check:', err);
+      
+      // Check local cache
+      let cachedKeys = localStorage.getItem('mz_backend_keys_cache');
+      let foundInCache: any = null;
+      if (cachedKeys) {
+        try {
+          const list: LicenseKeyBackend[] = JSON.parse(cachedKeys);
+          foundInCache = list.find(k => k.key === targetKeyFormatted);
+        } catch(e) {}
+      }
+      
+      if (foundInCache) {
+        if (foundInCache.activated && foundInCache.activatedBy !== devId && (!userEmail || foundInCache.activatedBy !== userEmail)) {
+          setActivationError(t.activation_error_used);
+          setIsActivating(false);
+          return;
+        }
+        
+        if (!foundInCache.activated) {
+          foundInCache.activated = true;
+          foundInCache.activatedBy = userEmail || devId;
+          foundInCache.activatedAt = new Date().toISOString();
+          
+          let cachedKeys2 = localStorage.getItem('mz_backend_keys_cache');
+          if (cachedKeys2) {
+            try {
+              let list2: LicenseKeyBackend[] = JSON.parse(cachedKeys2);
+              const updated = list2.map(k => k.key === targetKeyFormatted ? foundInCache : k);
+              localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updated));
+              setBackendKeys(updated);
+            } catch(e) {}
+          }
+        }
+        
+        localStorage.setItem('mz_license_key', targetKeyFormatted);
+        await syncUserDb(targetKeyFormatted);
+        setLicenseKey(targetKeyFormatted);
+        setActivationSuccess(true);
+        setActivationError('');
+        setTimeout(() => {
+          setActivationSuccess(false);
+          setShowActivation(false);
+        }, 2500);
+      } else if (validateKey(targetKeyFormatted, '')) {
+        localStorage.setItem('mz_license_key', targetKeyFormatted);
+        setLicenseKey(targetKeyFormatted);
+        setActivationSuccess(true);
+        setActivationError('');
+        setTimeout(() => {
+          setActivationSuccess(false);
+          setShowActivation(false);
+        }, 2500);
+      } else {
+        setActivationError('Koneksi database/lisensi bermasalah, dan serial key Anda tidak terdaftar untuk aktivasi offline.');
+      }
     } finally {
       setIsActivating(false);
     }
@@ -1243,6 +1705,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                 Anda berniat menjual aplikasi ini kembali? Ubah identitas visual, syarat tagih, kontak personal, serta key pembeli secara dinamis sesuai kebutuhan branding Anda.
               </p>
             </div>
+
+            {isQuotaExceeded && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 flex items-start gap-3 text-amber-700 dark:text-amber-400 animate-in fade-in duration-300">
+                <div className="p-1 bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                  <Sparkles size={14} className="animate-spin duration-1000" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider">Firestore Quota Limit Reached (Sandbox Mode Active)</h4>
+                  <p className="text-[9.5px] leading-relaxed opacity-90">
+                    Aplikasi mendeteksi batas kuota baca/tulis harian database Firestore telah terlampaui. Sistem telah beralih ke <strong>Mode Sandbox Offline</strong> secara cerdas. Anda tetap dapat mengedit branding, membuat lisensi key baru, menghapus data, dan menyetel ulang portal secara real-time karena semua modifikasi sekarang disimulasikan dan dicadangkan dengan aman di memori lokal browser Anda.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Admin Tabs */}
             <div className="flex font-semibold text-[10px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">

@@ -19,7 +19,7 @@ export const BackupManagerPanel: React.FC<{
   useEffect(() => {
     if (showRestoreModal && user && db) {
       setLoading(true);
-      import('firebase/firestore').then(({ doc, getDoc }) => {
+      import('../firebase').then(({ doc, getDoc }) => {
         getDoc(doc(db, 'users', user.uid)).then(docSnap => {
           if (docSnap.exists()) {
             const data = docSnap.data();

@@ -87,7 +87,7 @@ export const VideoQualityCheck: React.FC<{
 
   useEffect(() => {
     if (user && db) {
-      import('firebase/firestore').then(({ doc, getDoc }) => {
+      import('../firebase').then(({ doc, getDoc }) => {
         getDoc(doc(db, 'users', user.uid)).then(docSnap => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -111,7 +111,7 @@ export const VideoQualityCheck: React.FC<{
     setHistory(updated);
     
     if (user && db) {
-      import('firebase/firestore').then(({ doc, updateDoc }) => {
+      import('../firebase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoQualityHistory: updated
         }).catch(err => console.warn('db_op', err));
@@ -136,7 +136,7 @@ export const VideoQualityCheck: React.FC<{
   const handleClearHistory = () => {
     setHistory([]);
     if (user && db) {
-      import('firebase/firestore').then(({ doc, updateDoc }) => {
+       import('../firebase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoQualityHistory: []
         }).catch(err => console.warn('db_op', err));
@@ -149,7 +149,7 @@ export const VideoQualityCheck: React.FC<{
     const updated = history.filter(item => item.id !== id);
     setHistory(updated);
     if (user && db) {
-      import('firebase/firestore').then(({ doc, updateDoc }) => {
+      import('../firebase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoQualityHistory: updated
         }).catch(err => console.warn('db_op', err));

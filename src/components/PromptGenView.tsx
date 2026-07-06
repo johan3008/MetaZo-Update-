@@ -171,7 +171,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
     // 2. Fetch/sync from Firestore if user is logged in
     if (user && db) {
-      import('firebase/firestore').then(({ doc, getDoc, updateDoc }) => {
+      import('../firebase').then(({ doc, getDoc, updateDoc }) => {
         getDoc(doc(db, 'users', user.uid)).then((docSnap) => {
           if (docSnap.exists()) {
             const cloudData = docSnap.data();
@@ -236,7 +236,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     } catch(e) {}
 
     if (user && db) {
-      import('firebase/firestore').then(({ doc, updateDoc }) => {
+      import('../firebase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           promptGenHistory: updated
         }).catch(err => console.warn('db_op', err));
@@ -263,7 +263,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     } catch(e) {}
 
     if (user && db) {
-      import('firebase/firestore').then(({ doc, updateDoc }) => {
+      import('../firebase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           promptGenHistory: []
         }).catch(err => console.warn('db_op', err));
@@ -305,7 +305,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     } catch(e) {}
 
     if (user && db) {
-      import('firebase/firestore').then(({ doc, updateDoc }) => {
+      import('../firebase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           promptGenHistory: updated
         }).catch(err => console.warn('db_op', err));
