@@ -1562,6 +1562,28 @@ const App: React.FC = () => {
       setHasSyncedProfile(true);
       return;
     }
+
+    const findActiveKeyForEmail = async (email: string): Promise<string> => {
+      if (!email) return '';
+      const keysRef = collection(db, 'keys');
+      try {
+        const q1 = query(keysRef, where('activatedBy', '==', email), where('activated', '==', true));
+        const qSnap1 = await getDocs(q1);
+        if (!qSnap1.empty) {
+          return qSnap1.docs[0].id;
+        }
+        if (email.toLowerCase() !== email) {
+          const q2 = query(keysRef, where('activatedBy', '==', email.toLowerCase()), where('activated', '==', true));
+          const qSnap2 = await getDocs(q2);
+          if (!qSnap2.empty) {
+            return qSnap2.docs[0].id;
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying keys collection:', err);
+      }
+      return '';
+    };
     
     const userDocRef = doc(db, 'users', user.uid);
     getDoc(userDocRef).then((snapshot) => {
@@ -1569,33 +1591,37 @@ const App: React.FC = () => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         
-        // 1. Sync license key (with local backup protection)
+        // 1. Sync license key (with local backup protection & keys collection fallback)
         const localKey = localStorage.getItem('mz_license_key') || '';
-        if (data.licenseKey !== undefined) {
-          const cloudKey = data.licenseKey || '';
-          if (cloudKey) {
-            setMzLicenseKey(cloudKey);
-            localStorage.setItem('mz_license_key', cloudKey);
-          } else if (localKey) {
-            // Write local key to cloud so the active license is synced to Firestore
-            setMzLicenseKey(localKey);
-            const userRef = doc(db, 'users', user.uid);
-            updateDoc(userRef, {
-              licenseKey: localKey,
-              updatedAt: new Date().toISOString()
-            }).catch(e => console.info('db_op', e));
-          } else {
-            setMzLicenseKey('');
-            localStorage.removeItem('mz_license_key');
-          }
+        const cloudKey = data.licenseKey || '';
+
+        if (cloudKey) {
+          setMzLicenseKey(cloudKey);
+          localStorage.setItem('mz_license_key', cloudKey);
         } else if (localKey) {
-          // If licenseKey field is missing in document but exists locally
+          // Write local key to cloud so the active license is synced to Firestore
           setMzLicenseKey(localKey);
           const userRef = doc(db, 'users', user.uid);
           updateDoc(userRef, {
             licenseKey: localKey,
             updatedAt: new Date().toISOString()
           }).catch(e => console.info('db_op', e));
+        } else {
+          // Both are empty, check if there is an active key for this user's email in the 'keys' collection
+          findActiveKeyForEmail(user.email || '').then((foundKey) => {
+            if (foundKey) {
+              setMzLicenseKey(foundKey);
+              localStorage.setItem('mz_license_key', foundKey);
+              const userRef = doc(db, 'users', user.uid);
+              updateDoc(userRef, {
+                licenseKey: foundKey,
+                updatedAt: new Date().toISOString()
+              }).catch(e => console.info('db_op', e));
+            } else {
+              setMzLicenseKey('');
+              localStorage.removeItem('mz_license_key');
+            }
+          });
         }
 
         // 2. Sync trialStart
@@ -1708,67 +1734,84 @@ const App: React.FC = () => {
       } else {
         // Init cloud user profile if missing
         const localKey = localStorage.getItem('mz_license_key') || '';
-        const localTrialStart = localStorage.getItem('mz_trial_start') || new Date().toISOString();
-        localStorage.setItem('mz_trial_start', localTrialStart);
-        setTrialDaysLeft(99999);
+        
+        const proceedWithInit = (finalKey: string) => {
+          const localTrialStart = localStorage.getItem('mz_trial_start') || new Date().toISOString();
+          localStorage.setItem('mz_trial_start', localTrialStart);
+          setTrialDaysLeft(99999);
 
-        // Prepopulate standard daily counts to cloud if any
-        const initialUsage: any = {};
-        const tools = [
-          ToolType.IMAGE, 
-          ToolType.VIDEO, 
-          ToolType.VECTOR, 
-          ToolType.PROMPT_GEN,
-          ToolType.PROMPT_IMAGE,
-          ToolType.PROMPT_VIDEO,
-          ToolType.PROMPT_IMAGE_CHECK,
-          ToolType.CALENDAR_GEN,
-          ToolType.MUTE_VIDEO
-        ];
-        tools.forEach((t) => {
-          const val = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`);
-          if (val) {
-            initialUsage[t] = parseInt(val) || 0;
-          }
-        });
+          // Prepopulate standard daily counts to cloud if any
+          const initialUsage: any = {};
+          const tools = [
+            ToolType.IMAGE, 
+            ToolType.VIDEO, 
+            ToolType.VECTOR, 
+            ToolType.PROMPT_GEN,
+            ToolType.PROMPT_IMAGE,
+            ToolType.PROMPT_VIDEO,
+            ToolType.PROMPT_IMAGE_CHECK,
+            ToolType.CALENDAR_GEN,
+            ToolType.MUTE_VIDEO
+          ];
+          tools.forEach((t) => {
+            const val = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`);
+            if (val) {
+              initialUsage[t] = parseInt(val) || 0;
+            }
+          });
 
-        // Prepopulate settings to cloud
-        const initialSettings = {
-           gemini_api_key: localStorage.getItem('gemini_api_key') || '',
-           groq_api_key: localStorage.getItem('groq_api_key') || '',
-           mistral_api_key: localStorage.getItem('mistral_api_key') || '',
-           openai_api_key: localStorage.getItem('openai_api_key') || '',
-           openrouter_api_key: localStorage.getItem('openrouter_api_key') || '',
-           blackbox_api_key: localStorage.getItem('blackbox_api_key') || '',
-           nvidia_api_key: localStorage.getItem('nvidia_api_key') || '',
-           bluesminds_api_key: localStorage.getItem('bluesminds_api_key') || '',
-           aivene_api_key: localStorage.getItem('aivene_api_key') || '',
-           ai_provider: localStorage.getItem('ai_provider') || 'gemini',
-           mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
-           mz_groq_model: localStorage.getItem('mz_groq_model') || '',
-           mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
-           mz_aivene_model: localStorage.getItem('mz_aivene_model') || '',
-            uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
-            keywordMode: localStorage.getItem('mz_keyword_mode') || 'commercial',
-            titleLength: localStorage.getItem('mz_title_length') || 'medium',
-            metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
+          // Prepopulate settings to cloud
+          const initialSettings = {
+             gemini_api_key: localStorage.getItem('gemini_api_key') || '',
+             groq_api_key: localStorage.getItem('groq_api_key') || '',
+             mistral_api_key: localStorage.getItem('mistral_api_key') || '',
+             openai_api_key: localStorage.getItem('openai_api_key') || '',
+             openrouter_api_key: localStorage.getItem('openrouter_api_key') || '',
+             blackbox_api_key: localStorage.getItem('blackbox_api_key') || '',
+             nvidia_api_key: localStorage.getItem('nvidia_api_key') || '',
+             bluesminds_api_key: localStorage.getItem('bluesminds_api_key') || '',
+             aivene_api_key: localStorage.getItem('aivene_api_key') || '',
+             ai_provider: localStorage.getItem('ai_provider') || 'gemini',
+             mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
+             mz_groq_model: localStorage.getItem('mz_groq_model') || '',
+             mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
+             mz_aivene_model: localStorage.getItem('mz_aivene_model') || '',
+              uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
+              keywordMode: localStorage.getItem('mz_keyword_mode') || 'commercial',
+              titleLength: localStorage.getItem('mz_title_length') || 'medium',
+              metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
+          };
+
+          setDoc(userDocRef, {
+            email: user.email,
+            displayName: user.displayName || '',
+            licenseKey: finalKey,
+            trialStart: localTrialStart,
+            dailyUsage: {
+              [dateStr]: initialUsage
+            },
+            settings: initialSettings,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }).catch(err => {
+            console.info('db_op', err);
+            handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+          });
         };
 
-        setDoc(userDocRef, {
-          email: user.email,
-          displayName: user.displayName || '',
-          licenseKey: localKey,
-          trialStart: localTrialStart,
-          dailyUsage: {
-            [dateStr]: initialUsage
-          },
-          settings: initialSettings,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }).catch(err => {
-          console.info('db_op', err);
-          handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
-        });
+        if (localKey) {
+          proceedWithInit(localKey);
+        } else {
+          findActiveKeyForEmail(user.email || '').then((foundKey) => {
+            if (foundKey) {
+              setMzLicenseKey(foundKey);
+              localStorage.setItem('mz_license_key', foundKey);
+              proceedWithInit(foundKey);
+            } else {
+              proceedWithInit('');
+            }
+          });
+        }
       }
     }).catch((error) => {
       console.warn("Firestore user load error:", error);

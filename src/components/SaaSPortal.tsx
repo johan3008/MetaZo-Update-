@@ -1535,6 +1535,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   };
 
   const handleRemoveLicenseKey = async () => {
+    const keyToRemove = localStorage.getItem('mz_license_key');
+    if (keyToRemove) {
+      try {
+        await updateDoc(doc(db, 'keys', keyToRemove.trim().toUpperCase()), {
+          activated: false,
+          activatedBy: '',
+          activatedAt: '',
+          updatedAt: new Date().toISOString()
+        });
+      } catch (e) {
+        console.warn("Could not deactivate key in keys collection:", e);
+      }
+    }
+
     localStorage.removeItem('mz_license_key');
     // Fully return to trial mode by resetting the trial period
     localStorage.setItem('mz_trial_start', new Date().toISOString());
