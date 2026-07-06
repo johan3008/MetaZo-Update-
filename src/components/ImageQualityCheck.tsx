@@ -93,7 +93,7 @@ export const ImageQualityCheck: React.FC<{
 
   useEffect(() => {
     if (user && db) {
-      import('../firebase').then(({ doc, getDoc }) => {
+      import('../supabase').then(({ doc, getDoc }) => {
         getDoc(doc(db, 'users', user.uid)).then(docSnap => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -117,7 +117,7 @@ export const ImageQualityCheck: React.FC<{
     setHistory(updated);
     
     if (user && db) {
-      import('../firebase').then(({ doc, updateDoc }) => {
+      import('../supabase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           imageQualityHistory: updated
         }).catch(err => console.warn('db_op', err));
@@ -142,7 +142,7 @@ export const ImageQualityCheck: React.FC<{
   const handleClearHistory = () => {
     setHistory([]);
     if (user && db) {
-      import('../firebase').then(({ doc, updateDoc }) => {
+      import('../supabase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           imageQualityHistory: []
         }).catch(err => console.warn('db_op', err));
@@ -155,7 +155,7 @@ export const ImageQualityCheck: React.FC<{
     const updated = history.filter(item => item.id !== id);
     setHistory(updated);
     if (user && db) {
-      import('../firebase').then(({ doc, updateDoc }) => {
+      import('../supabase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           imageQualityHistory: updated
         }).catch(err => console.warn('db_op', err));

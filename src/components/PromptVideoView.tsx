@@ -91,7 +91,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
 
     // 2. Fetch/sync from Firestore if user is logged in
     if (user && db) {
-      import('../firebase').then(({ doc, getDoc, updateDoc }) => {
+      import('../supabase').then(({ doc, getDoc, updateDoc }) => {
         getDoc(doc(db, 'users', user.uid)).then((docSnap) => {
           if (docSnap.exists()) {
             const cloudData = docSnap.data();
@@ -209,7 +209,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       localStorage.setItem('metazo_video_analysis_history', JSON.stringify(updatedHistory));
 
       if (user && db) {
-        import('../firebase').then(({ doc, updateDoc }) => {
+        import('../supabase').then(({ doc, updateDoc }) => {
           updateDoc(doc(db, 'users', user.uid), {
             videoHistory: updatedHistory
           }).catch(err => console.warn('db_op', err));
@@ -254,7 +254,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
     localStorage.removeItem('metazo_video_analysis_history');
 
     if (user && db) {
-      import('../firebase').then(({ doc, updateDoc }) => {
+      import('../supabase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoHistory: []
         }).catch(err => console.warn('db_op', err));
@@ -278,7 +278,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
     localStorage.setItem('metazo_video_analysis_history', JSON.stringify(updated));
 
     if (user && db) {
-      import('../firebase').then(({ doc, updateDoc }) => {
+      import('../supabase').then(({ doc, updateDoc }) => {
         updateDoc(doc(db, 'users', user.uid), {
           videoHistory: updated
         }).catch(err => console.warn('db_op', err));

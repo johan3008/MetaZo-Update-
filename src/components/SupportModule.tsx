@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MessageSquare, Send } from 'lucide-react';
-import { db, collection, addDoc } from '../firebase';
+import { db, collection, addDoc } from '../supabase';
 
 export const SupportModule: React.FC = () => {
     const [message, setMessage] = useState('');

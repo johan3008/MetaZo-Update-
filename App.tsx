@@ -34,9 +34,10 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit, addDoc } from './src/firebase';
-import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
-import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { 
+  doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit, addDoc,
+  db, auth, handleFirestoreError, OperationType, onAuthStateChanged, User, signOut 
+} from './src/supabase';
 import { LoginScreen } from './src/components/LoginScreen';
 import { Meteors } from './src/components/Meteors';
 import { AboutModal } from './src/components/AboutModal';

@@ -274,6 +274,119 @@ async function startServer() {
     }
 }
 
+app.get(['/auth/callback', '/auth/callback/'], (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Authentication Callback</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding: 50px; background: #0f172a; color: #f8fafc;">
+  <h2>Authenticating...</h2>
+  <p>Please wait while we complete your sign-in.</p>
+  <script>
+    function handleAuth() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
+
+      if (error) {
+        sendErrorToOpener(error, errorDescription || 'Authentication failed');
+        return;
+      }
+
+      if (code) {
+        sendCodeToOpener(code);
+        return;
+      }
+
+      const hash = window.location.hash;
+      if (!hash) {
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+        if (accessToken) {
+          sendToOpener({ access_token: accessToken, refresh_token: refreshToken });
+          return;
+        }
+        document.body.innerHTML = '<h2>Authentication Failed</h2><p>No authentication parameters found in the response URL.</p>';
+        return;
+      }
+
+      const params = {};
+      hash.substring(1).split('&').forEach(pair => {
+        const [key, val] = pair.split('=');
+        if (key && val) {
+          params[key] = decodeURIComponent(val);
+        }
+      });
+
+      if (params.access_token) {
+        sendToOpener(params);
+      } else {
+        document.body.innerHTML = '<h2>Authentication Failed</h2><p>Authentication failed or token is missing.</p>';
+      }
+    }
+
+    function sendCodeToOpener(code) {
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'SUPABASE_OAUTH_CODE',
+          code: code
+        }, '*');
+        
+        document.body.innerHTML = '<h2>Success!</h2><p>Completing your sign-in... This window will close automatically.</p>';
+        setTimeout(() => {
+          window.close();
+        }, 1500);
+      } else {
+        window.location.href = '/';
+      }
+    }
+
+    function sendErrorToOpener(error, desc) {
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'SUPABASE_OAUTH_ERROR',
+          error: error,
+          description: desc
+        }, '*');
+        
+        document.body.innerHTML = '<h2>Authentication Error</h2><p>' + desc + '</p>';
+        setTimeout(() => {
+          window.close();
+        }, 3000);
+      } else {
+        window.location.href = '/';
+      }
+    }
+
+    function sendToOpener(params) {
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'SUPABASE_OAUTH_SUCCESS',
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+          expires_in: params.expires_in,
+          provider_token: params.provider_token
+        }, '*');
+        
+        document.body.innerHTML = '<h2>Success!</h2><p>Signing in... This window will close automatically.</p>';
+        setTimeout(() => {
+          window.close();
+        }, 1000);
+      } else {
+        window.location.href = '/';
+      }
+    }
+
+    handleAuth();
+  </script>
+</body>
+</html>
+    `);
+});
+
 app.get('/api/debug-uploads', (req, res) => {
         try {
             const files = fs.readdirSync(uploadDir);

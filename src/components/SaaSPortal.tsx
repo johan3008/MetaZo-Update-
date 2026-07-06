@@ -6,7 +6,7 @@ import {
   Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, handleFirestoreError, OperationType, doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc, onSnapshot } from '../firebase';
+import { db, handleFirestoreError, OperationType, doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc, onSnapshot } from '../supabase';
 
 interface SaaSPortalProps {
   // Brand States

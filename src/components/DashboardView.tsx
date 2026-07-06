@@ -7,7 +7,7 @@ import {
   AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
-import { db, collection, getDocs, limit, query } from '../firebase';
+import { db, collection, getDocs, limit, query } from '../supabase';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Database, Download, Upload, Cloud, HardDrive, History, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, getDocs, orderBy, limit } from '../firebase';
+import { collection, query, getDocs, orderBy, limit } from '../supabase';
 
 export const BackupManagerPanel: React.FC<{
   user: any;
