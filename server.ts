@@ -441,8 +441,13 @@ app.get('/api/debug-uploads', (req, res) => {
         const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 
             (process.env.S3_ENDPOINT ? process.env.S3_ENDPOINT.match(/https:\/\/([a-zA-Z0-9]+)\.r2\.cloudflarestorage\.com/)?.[1] : '');
         const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-        const databaseId = "60a4d870-56c9-4dc6-9079-789d9e536cea";
+        const databaseId = process.env.CLOUDFLARE_D1_DATABASE_ID || process.env.D1_DATABASE_ID || "60a4d870-56c9-4dc6-9079-789d9e536cea";
         return { accountId, apiToken, databaseId };
+    }
+
+    function isD1Configured() {
+        const { accountId, apiToken } = getD1Config();
+        return !!(accountId && apiToken);
     }
 
     async function queryD1(sql: string, params: any[] = []) {
@@ -479,6 +484,10 @@ app.get('/api/debug-uploads', (req, res) => {
 
     async function ensureD1Table() {
         if (isD1TableInitialized) return;
+        if (!isD1Configured()) {
+            console.warn('[Cloudflare D1] Skipping table verification: Cloudflare credentials are not configured.');
+            return;
+        }
         try {
             await queryD1(`
                 CREATE TABLE IF NOT EXISTS metadata_backups (
@@ -494,7 +503,7 @@ app.get('/api/debug-uploads', (req, res) => {
             isD1TableInitialized = true;
             console.log('[Cloudflare D1] metadata_backups table verified/created.');
         } catch (e: any) {
-            console.error('[Cloudflare D1] Failed to verify/create metadata_backups table:', e.message);
+            console.warn('[Cloudflare D1] Failed to verify/create metadata_backups table:', e.message || e);
             throw e;
         }
     }
@@ -505,6 +514,14 @@ app.get('/api/debug-uploads', (req, res) => {
             const { uid, tool, items } = req.body;
             if (!uid || !items || !Array.isArray(items)) {
                 return res.status(400).json({ error: 'Missing uid or items array' });
+            }
+
+            if (!isD1Configured()) {
+                return res.status(200).json({ 
+                    success: false, 
+                    code: 'CREDENTIALS_MISSING', 
+                    error: 'Cloudflare API Token belum dikonfigurasi. Sila masukkan CLOUDFLARE_API_TOKEN di menu Settings di kanan atas.' 
+                });
             }
 
             await ensureD1Table();
@@ -544,8 +561,26 @@ app.get('/api/debug-uploads', (req, res) => {
 
             res.json({ success: true, batchId, timestamp });
         } catch (err: any) {
-            console.error('[Cloudflare D1] Backup Save Error:', err.message);
-            res.status(500).json({ error: err.message || 'Failed to save backup to Cloudflare D1' });
+            const isAuthError = err.message?.includes('401') || err.message?.includes('Authentication error') || err.message?.includes('API Token');
+            const isDbError = err.message?.includes('404') || err.message?.includes('7003') || err.message?.includes('Could not route') || err.message?.includes('object identifier is invalid') || err.message?.includes('database');
+            
+            console.warn('[Cloudflare D1] Backup Save handled gracefully:', err.message || err);
+            
+            if (isAuthError) {
+                return res.status(200).json({ 
+                    success: false, 
+                    code: 'CREDENTIALS_INVALID', 
+                    error: 'Cloudflare API Token tidak valid atau salah. Sila semak CLOUDFLARE_API_TOKEN di menu Settings di kanan atas.' 
+                });
+            }
+            if (isDbError) {
+                return res.status(200).json({ 
+                    success: false, 
+                    code: 'DATABASE_INVALID', 
+                    error: 'Cloudflare D1 Database ID tidak valid atau salah. Sila semak CLOUDFLARE_D1_DATABASE_ID di menu Settings di kanan atas.' 
+                });
+            }
+            res.status(200).json({ success: false, error: err.message || 'Failed to save backup to Cloudflare D1' });
         }
     });
 
@@ -555,6 +590,15 @@ app.get('/api/debug-uploads', (req, res) => {
             const { uid } = req.query;
             if (!uid) {
                 return res.status(400).json({ error: 'Missing uid' });
+            }
+
+            if (!isD1Configured()) {
+                return res.status(200).json({ 
+                    success: false, 
+                    code: 'CREDENTIALS_MISSING', 
+                    error: 'Cloudflare API Token belum dikonfigurasi. Sila masukkan CLOUDFLARE_API_TOKEN di menu Settings di kanan atas.',
+                    data: []
+                });
             }
 
             await ensureD1Table();
@@ -582,8 +626,28 @@ app.get('/api/debug-uploads', (req, res) => {
 
             res.json({ success: true, data: history });
         } catch (err: any) {
-            console.error('[Cloudflare D1] Backup History Error:', err.message);
-            res.status(500).json({ error: err.message || 'Failed to retrieve backup history from Cloudflare D1' });
+            const isAuthError = err.message?.includes('401') || err.message?.includes('Authentication error') || err.message?.includes('API Token');
+            const isDbError = err.message?.includes('404') || err.message?.includes('7003') || err.message?.includes('Could not route') || err.message?.includes('object identifier is invalid') || err.message?.includes('database');
+            
+            console.warn('[Cloudflare D1] Backup History handled gracefully:', err.message || err);
+            
+            if (isAuthError) {
+                return res.status(200).json({ 
+                    success: false, 
+                    code: 'CREDENTIALS_INVALID', 
+                    error: 'Cloudflare API Token tidak valid atau salah. Sila semak CLOUDFLARE_API_TOKEN di menu Settings di kanan atas.',
+                    data: []
+                });
+            }
+            if (isDbError) {
+                return res.status(200).json({ 
+                    success: false, 
+                    code: 'DATABASE_INVALID', 
+                    error: 'Cloudflare D1 Database ID tidak valid atau salah. Sila semak CLOUDFLARE_D1_DATABASE_ID di menu Settings di kanan atas.',
+                    data: []
+                });
+            }
+            res.status(200).json({ success: false, error: err.message || 'Failed to retrieve backup history', data: [] });
         }
     });
 

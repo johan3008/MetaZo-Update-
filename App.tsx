@@ -2600,12 +2600,21 @@ const App: React.FC = () => {
   };
   
   const [autoDownloadCSV, setAutoDownloadCSVState] = useState(false);
-  const [autoBackup, setAutoBackupState] = useState(false);
-  const autoBackupRef = useRef(false);
+  const [autoBackup, setAutoBackupState] = useState(() => {
+    try {
+      return localStorage.getItem('mz_auto_backup') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const autoBackupRef = useRef(autoBackup);
 
   const setAutoBackup = (val: boolean) => {
       setAutoBackupState(val);
       autoBackupRef.current = val;
+      try {
+        localStorage.setItem('mz_auto_backup', val ? 'true' : 'false');
+      } catch (e) {}
   };
   const [mobileTab, setMobileTab] = useState<'upload' | 'ai' | 'review'>('upload');
   const [returnToStartCountdown, setReturnToStartCountdown] = useState<number | null>(null);
@@ -3526,7 +3535,7 @@ const App: React.FC = () => {
     
     const backupData = validFiles.map(f => ({
       id: f.id,
-      fileName: f.customFileName || f.file.name,
+      fileName: f.customFileName || f.file?.name || 'unnamed_file',
       title: f.title,
       description: f.description,
       keywords: f.keywords,
@@ -3555,7 +3564,7 @@ const App: React.FC = () => {
       const newFiles = [...prev];
       
       backupData.forEach(backupItem => {
-        const existingIdx = newFiles.findIndex(f => (f.customFileName || f.file.name) === backupItem.fileName);
+        const existingIdx = newFiles.findIndex(f => (f.customFileName || f.file?.name || 'unnamed_file') === backupItem.fileName);
         if (existingIdx >= 0) {
           // Merge with existing
           newFiles[existingIdx] = {
@@ -3606,7 +3615,7 @@ const App: React.FC = () => {
     
     const backupData = validFiles.map(f => ({
       id: f.id,
-      fileName: f.customFileName || f.file.name,
+      fileName: f.customFileName || f.file?.name || 'unnamed_file',
       title: f.title,
       description: f.description,
       keywords: f.keywords,
@@ -3617,6 +3626,37 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString()
     }));
 
+    // Save to Local Storage first (robust instant fallback)
+    try {
+      const localBackupsKey = `metazo_local_backups_${user.uid}`;
+      const existingStr = localStorage.getItem(localBackupsKey);
+      let existingBackups = existingStr ? JSON.parse(existingStr) : [];
+      if (!Array.isArray(existingBackups)) {
+        existingBackups = [];
+      }
+      
+      const newLocalBackup = {
+        batchId: `local-batch-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        tool: activeTool,
+        items: backupData,
+        createdAt: new Date().toISOString()
+      };
+
+      existingBackups.unshift(newLocalBackup);
+
+      // Keep only last 30 backups to avoid localStorage overflow
+      if (existingBackups.length > 30) {
+        existingBackups = existingBackups.slice(0, 30);
+      }
+
+      localStorage.setItem(localBackupsKey, JSON.stringify(existingBackups));
+      console.log('[Local Storage] Auto-backup saved successfully.');
+    } catch (localErr) {
+      console.warn('[Local Storage] Auto-backup failed to save locally:', localErr);
+    }
+
+    // Try Cloudflare D1
     fetch('/api/d1-backup/save', {
       method: 'POST',
       headers: {
@@ -3640,6 +3680,24 @@ const App: React.FC = () => {
       console.warn('[Cloudflare D1] Auto-backup request error:', err);
     });
   };
+
+  // Debounced auto backup when files change
+  useEffect(() => {
+    if (!autoBackup) return;
+    if (!user) return;
+    if (files.length === 0) return;
+    
+    // Check if there is any actually generated/edited file
+    const hasMetadata = files.some(f => f.title);
+    if (!hasMetadata) return;
+
+    const timer = setTimeout(() => {
+      console.log('[Cloudflare D1] Triggering debounced auto-backup for files changes...');
+      handleCloudAutoBackup(files);
+    }, 5000); // 5s debounce to avoid spamming the database on typing/successive generations
+
+    return () => clearTimeout(timer);
+  }, [files, autoBackup, user?.uid]);
 
   const handleExport = () => {
     const validFiles = files.filter(f => f.title);

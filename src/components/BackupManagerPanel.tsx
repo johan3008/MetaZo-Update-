@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Database, Download, Upload, Cloud, HardDrive, History, CheckCircle2, Clock } from 'lucide-react';
+import { Database, Download, Upload, Cloud, HardDrive, History, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const BackupManagerPanel: React.FC<{
@@ -14,8 +14,57 @@ export const BackupManagerPanel: React.FC<{
 }> = ({ user, db, handleBackupJSON, handleImportJSON, autoBackup, setAutoBackup, activeTool, handleCloudBackup }) => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [cloudHistory, setCloudHistory] = useState<any[]>([]);
+  const [localHistory, setLocalHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isD1Configured, setIsD1Configured] = useState<boolean | null>(null);
+  const [d1ErrorType, setD1ErrorType] = useState<'CREDENTIALS_MISSING' | 'CREDENTIALS_INVALID' | 'DATABASE_INVALID' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user && showRestoreModal) {
+      try {
+        const localBackupsKey = `metazo_local_backups_${user.uid}`;
+        const existingStr = localStorage.getItem(localBackupsKey);
+        if (existingStr) {
+          setLocalHistory(JSON.parse(existingStr));
+        } else {
+          setLocalHistory([]);
+        }
+      } catch (e) {
+        console.warn('Failed to load local backup history:', e);
+        setLocalHistory([]);
+      }
+    }
+  }, [showRestoreModal, user]);
+
+  useEffect(() => {
+    if (user) {
+      fetch(`/api/d1-backup/history?uid=${user.uid}`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.code === 'CREDENTIALS_MISSING') {
+            setIsD1Configured(false);
+            setD1ErrorType('CREDENTIALS_MISSING');
+          } else if (resData.code === 'CREDENTIALS_INVALID') {
+            setIsD1Configured(false);
+            setD1ErrorType('CREDENTIALS_INVALID');
+          } else if (resData.code === 'DATABASE_INVALID') {
+            setIsD1Configured(false);
+            setD1ErrorType('DATABASE_INVALID');
+          } else if (resData.success === false) {
+            setIsD1Configured(false);
+            setD1ErrorType('CREDENTIALS_INVALID');
+          } else {
+            setIsD1Configured(true);
+            setD1ErrorType(null);
+          }
+        })
+        .catch(() => {
+          setIsD1Configured(false);
+          setD1ErrorType('CREDENTIALS_MISSING');
+        });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (showRestoreModal && user) {
@@ -25,7 +74,22 @@ export const BackupManagerPanel: React.FC<{
         .then(resData => {
           if (resData.success && Array.isArray(resData.data)) {
             setCloudHistory(resData.data);
+            setIsD1Configured(true);
+            setD1ErrorType(null);
           } else {
+            if (resData.code === 'CREDENTIALS_MISSING') {
+              setIsD1Configured(false);
+              setD1ErrorType('CREDENTIALS_MISSING');
+            } else if (resData.code === 'CREDENTIALS_INVALID') {
+              setIsD1Configured(false);
+              setD1ErrorType('CREDENTIALS_INVALID');
+            } else if (resData.code === 'DATABASE_INVALID') {
+              setIsD1Configured(false);
+              setD1ErrorType('DATABASE_INVALID');
+            } else {
+              setIsD1Configured(false);
+              setD1ErrorType('CREDENTIALS_INVALID');
+            }
             console.warn('[Cloudflare D1] Failed to retrieve cloud history:', resData.error);
           }
           setLoading(false);
@@ -115,6 +179,42 @@ export const BackupManagerPanel: React.FC<{
         </div>
       </div>
 
+      {isD1Configured === false && d1ErrorType === 'CREDENTIALS_MISSING' && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 rounded-[1.5rem] flex items-start gap-3">
+          <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">Cloudflare D1 Belum Dikonfigurasi</h4>
+            <p className="text-[10px] text-amber-700/90 dark:text-amber-400/85 leading-relaxed mt-1">
+              Penyimpanan Cloud (Auto Backup, Restore, dan Import) membutuhkan konfigurasi kredensial database Cloudflare D1. Harap tambahkan <code className="bg-amber-100/80 dark:bg-amber-950 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900 dark:text-amber-300">CLOUDFLARE_API_TOKEN</code> di menu Settings di kanan atas layar.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isD1Configured === false && d1ErrorType === 'CREDENTIALS_INVALID' && (
+        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
+          <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Kredensial Cloudflare Tidak Valid</h4>
+            <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
+              Gagal menghubungi database Cloudflare D1. Harap pastikan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_API_TOKEN</code> dan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_ACCOUNT_ID</code> di menu Settings sudah benar.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isD1Configured === false && d1ErrorType === 'DATABASE_INVALID' && (
+        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
+          <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Cloudflare D1 Database ID Tidak Valid / Tidak Ditemui</h4>
+            <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
+              Gagal menemukan database D1 di dalam akun Cloudflare Anda. Harap tambahkan environment variable <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_D1_DATABASE_ID</code> di menu Settings dengan ID database D1 yang aktif di dalam Cloudflare Console Anda.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <button
           onClick={handleBackupNow}
@@ -173,32 +273,73 @@ export const BackupManagerPanel: React.FC<{
                 Restore from Cloud
               </h2>
               
-              <div className="overflow-y-auto flex-1 pr-2 space-y-3">
+              <div className="overflow-y-auto flex-1 pr-2 space-y-4">
                 {loading ? (
                   <div className="text-center py-8 text-slate-400">Loading history...</div>
-                ) : cloudHistory.length === 0 ? (
+                ) : localHistory.filter(b => b.tool === activeTool || !b.tool).length === 0 && cloudHistory.filter(b => b.tool === activeTool || !b.tool).length === 0 ? (
                   <div className="text-center py-8 text-slate-400 text-sm">No backup history found.</div>
                 ) : (
-                  cloudHistory.filter(b => b.tool === activeTool || !b.tool).map((batch: any, idx: number) => (
-                    <div 
-                      key={idx}
-                      className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 transition-colors flex items-center justify-between cursor-pointer"
-                      onClick={() => restoreFromCloud(batch)}
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Clock size={14} className="text-slate-400" />
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
-                        </p>
+                  <>
+                    {localHistory.filter(b => b.tool === activeTool || !b.tool).length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                          <HardDrive size={12} />
+                          Penyimpanan Lokal (Browser)
+                        </h3>
+                        {localHistory.filter(b => b.tool === activeTool || !b.tool).map((batch: any, idx: number) => (
+                          <div 
+                            key={`local-${idx}`}
+                            className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-violet-400 transition-colors flex items-center justify-between cursor-pointer"
+                            onClick={() => restoreFromCloud(batch)}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Clock size={14} className="text-slate-400" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
+                                <span className="px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[8px] font-bold rounded">LOKAL</span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
+                              </p>
+                            </div>
+                            <div className="px-3 py-1.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                              Restore
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                        Restore
+                    )}
+
+                    {cloudHistory.filter(b => b.tool === activeTool || !b.tool).length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                          <Cloud size={12} />
+                          Penyimpanan Awan (Cloudflare D1)
+                        </h3>
+                        {cloudHistory.filter(b => b.tool === activeTool || !b.tool).map((batch: any, idx: number) => (
+                          <div 
+                            key={`cloud-${idx}`}
+                            className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 transition-colors flex items-center justify-between cursor-pointer"
+                            onClick={() => restoreFromCloud(batch)}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Clock size={14} className="text-slate-400" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
+                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-bold rounded">AWAN</span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
+                              </p>
+                            </div>
+                            <div className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                              Restore
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))
+                    )}
+                  </>
                 )}
               </div>
               

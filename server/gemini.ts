@@ -920,26 +920,120 @@ function getAIClient(): any {
           }
         }
 
+        const runGeminiDirectFetch = async (keyToUse: string, params: any) => {
+          const model = params.model || 'gemini-2.5-flash';
+          const cleanModel = model.startsWith('models/') ? model : `models/${model}`;
+          const url = `https://generativelanguage.googleapis.com/v1beta/${cleanModel}:generateContent?key=${keyToUse}`;
+
+          const contents = params.contents || [];
+          let apiContents = [];
+          if (Array.isArray(contents)) {
+            if (contents.length > 0 && contents[0].parts) {
+              apiContents = contents;
+            } else {
+              apiContents = [{ parts: contents }];
+            }
+          } else if (contents.parts) {
+            apiContents = [contents];
+          } else {
+            apiContents = [{ parts: [contents] }];
+          }
+
+          const apiPayload: any = {
+            contents: apiContents
+          };
+
+          if (params.config) {
+            apiPayload.generationConfig = {};
+            if (params.config.responseMimeType) {
+              apiPayload.generationConfig.responseMimeType = params.config.responseMimeType;
+            }
+            if (params.config.responseSchema) {
+              apiPayload.generationConfig.responseSchema = params.config.responseSchema;
+            }
+            if (typeof params.config.temperature === 'number') {
+              apiPayload.generationConfig.temperature = params.config.temperature;
+            }
+            if (typeof params.config.topP === 'number') {
+              apiPayload.generationConfig.topP = params.config.topP;
+            }
+            if (params.config.systemInstruction) {
+              if (typeof params.config.systemInstruction === 'string') {
+                apiPayload.systemInstruction = {
+                  parts: [{ text: params.config.systemInstruction }]
+                };
+              } else if (params.config.systemInstruction.parts) {
+                apiPayload.systemInstruction = params.config.systemInstruction;
+              } else {
+                apiPayload.systemInstruction = {
+                  parts: [params.config.systemInstruction]
+                };
+              }
+            }
+          }
+
+          console.log(`[Gemini Direct Fetch] Calling REST API fallback for model: ${cleanModel}...`);
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(apiPayload)
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Gemini Direct Fetch Failed (${response.status}): ${errText}`);
+          }
+
+          const resJson: any = await response.json();
+          const text = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          
+          return {
+            text,
+            candidates: resJson.candidates,
+            usageMetadata: resJson.usageMetadata
+          };
+        };
+
         const runGemini = async (keyToUse: string | undefined) => {
           if (!keyToUse) {
             throw new Error('GEMINI_API_KEY / API_KEY environment variable is required. Silakan masukkan API Key Gemini Anda terlebih dahulu melalui tombol Pengaturan (ikon Gear) di bagian samping aplikasi.');
           }
-          const client = new GoogleGenAI({
-            apiKey: keyToUse,
-            httpOptions: {
-              headers: {
-                'User-Agent': 'aistudio-build',
+          try {
+            const client = new GoogleGenAI({
+              apiKey: keyToUse,
+              httpOptions: {
+                headers: {
+                  'User-Agent': 'aistudio-build',
+                }
               }
+            });
+            const result = await client.models.generateContent(params);
+            if (params.config?.responseMimeType === 'application/json' && result.text) {
+              return {
+                ...result,
+                text: result.text.replace(/^```json\s*/, '').replace(/```$/, '').trim()
+              };
             }
-          });
-          const result = await client.models.generateContent(params);
-          if (params.config?.responseMimeType === 'application/json' && result.text) {
-            return {
-              ...result,
-              text: result.text.replace(/^```json\s*/, '').replace(/```$/, '').trim()
-            };
+            return result;
+          } catch (sdkError: any) {
+            console.warn(`[getAIClient] SDK generateContent failed: ${sdkError.message || sdkError}. Attempting REST API fallback...`);
+            try {
+              const directResult = await runGeminiDirectFetch(keyToUse, params);
+              if (params.config?.responseMimeType === 'application/json' && directResult.text) {
+                return {
+                  ...directResult,
+                  text: directResult.text.replace(/^```json\s*/, '').replace(/```$/, '').trim()
+                };
+              }
+              return directResult;
+            } catch (fallbackError: any) {
+              console.error(`[getAIClient] Both SDK and REST fallback failed. REST Error: ${fallbackError.message || fallbackError}`);
+              throw sdkError; // Throw original SDK error to keep rotation/retry logic intact
+            }
           }
-          return result;
         };
 
         if (keysList.length > 1) {
