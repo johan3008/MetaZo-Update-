@@ -1776,6 +1776,23 @@ const App: React.FC = () => {
     });
   }, [user]);
 
+  // Sync the activated license key to Firestore whenever the user changes or redeems it
+  useEffect(() => {
+    if (!user || !hasSyncedProfile) return;
+    
+    const userRef = doc(db, 'users', user.uid);
+    updateDoc(userRef, {
+      licenseKey: mzLicenseKey,
+      updatedAt: new Date().toISOString()
+    }).catch(err => {
+      // Fallback merge
+      setDoc(userRef, {
+        licenseKey: mzLicenseKey,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(e => console.info('db_op', e));
+    });
+  }, [mzLicenseKey, user, hasSyncedProfile]);
+
   // Keep daily counts refreshed when cloudDailyCounts changes
   useEffect(() => {
     refreshDailyCounts();
