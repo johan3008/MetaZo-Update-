@@ -238,136 +238,22 @@ export async function signInWithTokens(accessToken: string, refreshToken: string
 
 export async function signInWithPopup(authInstance: any, provider: any): Promise<{ user: User }> {
   if (supabase) {
-    let oauthResponse;
     try {
-      oauthResponse = await supabase.auth.signInWithOAuth({
+      // Use standard redirect instead of popup to avoid popup blockers and cross-origin issues on Vercel
+      await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/auth/callback',
-          skipBrowserRedirect: true,
+          redirectTo: window.location.origin,
         }
       });
+      
+      // Because we use standard redirect, the page will navigate away.
+      // We return a never-resolving promise so the UI stays in loading state until navigation happens.
+      return new Promise(() => {});
     } catch (e: any) {
       console.warn('[Supabase OAuth] Google authentication failed to initialize. Falling back to Sandbox simulation.', e);
       return runSandboxGoogleSignIn();
     }
-
-    const { data, error } = oauthResponse;
-    if (error) {
-      const errMsg = error.message || '';
-      if (
-        errMsg.includes('provider is not enabled') ||
-        errMsg.includes('Unsupported provider') ||
-        errMsg.includes('not enabled')
-      ) {
-        console.warn('[Supabase OAuth] Google provider is not enabled on your Supabase dashboard. Falling back to Sandbox Mode.');
-        return runSandboxGoogleSignIn();
-      }
-      throw error;
-    }
-
-    if (data?.url) {
-      const popup = window.open(data.url, 'google_oauth_popup', 'width=600,height=700');
-      if (!popup) {
-        const err: any = new Error('Popup blocked');
-        err.code = 'auth/popup-blocked';
-        throw err;
-      }
-      
-      return new Promise<{ user: User }>((resolve, reject) => {
-        let finished = false;
-        
-        const handleMessage = async (event: MessageEvent) => {
-          if (finished) return;
-          if (event.origin !== window.location.origin) return;
-          
-          if (event.data?.type === 'SUPABASE_OAUTH_SUCCESS') {
-            finished = true;
-            cleanup();
-            
-            try {
-              const { access_token, refresh_token } = event.data;
-              const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-                access_token,
-                refresh_token
-              });
-              
-              if (sessionError) throw sessionError;
-              
-              const user = sessionData?.user;
-              if (user) {
-                resolve({
-                  user: {
-                    uid: user.id,
-                    email: user.email || null,
-                    emailVerified: !!user.email_confirmed_at
-                  }
-                });
-              } else {
-                reject(new Error('No user returned after setting session.'));
-              }
-            } catch (err) {
-              reject(err);
-            }
-          } else if (event.data?.type === 'SUPABASE_OAUTH_CODE') {
-            finished = true;
-            cleanup();
-            
-            try {
-              const { code } = event.data;
-              const { data: sessionData, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
-              
-              if (sessionError) throw sessionError;
-              
-              const user = sessionData?.user;
-              if (user) {
-                resolve({
-                  user: {
-                    uid: user.id,
-                    email: user.email || null,
-                    emailVerified: !!user.email_confirmed_at
-                  }
-                });
-              } else {
-                reject(new Error('No user returned after exchanging code.'));
-              }
-            } catch (err) {
-              reject(err);
-            }
-          } else if (event.data?.type === 'SUPABASE_OAUTH_ERROR') {
-            finished = true;
-            cleanup();
-            const desc = event.data.description || '';
-            if (desc.includes('provider is not enabled') || desc.includes('Unsupported provider')) {
-              console.warn('[Supabase OAuth Popup] Google provider not enabled. Falling back to Sandbox Mode.');
-              resolve(runSandboxGoogleSignIn());
-            } else {
-              reject(new Error(desc || 'Google sign-in error occurred in the popup.'));
-            }
-          }
-        };
-
-        const timer = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(timer);
-            if (!finished) {
-              finished = true;
-              cleanup();
-              console.warn('[Supabase OAuth] Popup was closed. Falling back to Sandbox Mode to ensure a seamless sign-in experience.');
-              resolve(runSandboxGoogleSignIn());
-            }
-          }
-        }, 1000);
-
-        function cleanup() {
-          clearInterval(timer);
-          window.removeEventListener('message', handleMessage);
-        }
-
-        window.addEventListener('message', handleMessage);
-      });
-    }
-    throw new Error('Failed to generate OAuth sign-in URL');
   } else {
     return runSandboxGoogleSignIn();
   }
