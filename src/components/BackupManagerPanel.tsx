@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Database, Download, Upload, Cloud, HardDrive, History, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { collection, query, getDocs, orderBy, limit } from '../firebase';
 
 export const BackupManagerPanel: React.FC<{
   user: any;
   db: any;
+  isLicensed?: boolean;
   handleBackupJSON: () => void;
   handleImportJSON: (data: any[]) => void;
   autoBackup: boolean;
   setAutoBackup: (v: boolean) => void;
   activeTool: string;
   handleCloudBackup?: () => void;
-}> = ({ user, db, handleBackupJSON, handleImportJSON, autoBackup, setAutoBackup, activeTool, handleCloudBackup }) => {
+}> = ({ user, db, isLicensed = false, handleBackupJSON, handleImportJSON, autoBackup, setAutoBackup, activeTool, handleCloudBackup }) => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [cloudHistory, setCloudHistory] = useState<any[]>([]);
   const [localHistory, setLocalHistory] = useState<any[]>([]);
@@ -39,6 +41,11 @@ export const BackupManagerPanel: React.FC<{
 
   useEffect(() => {
     if (user) {
+      if (isLicensed) {
+        setIsD1Configured(true);
+        setD1ErrorType(null);
+        return;
+      }
       fetch(`/api/d1-backup/history?uid=${user.uid}`)
         .then(res => res.json())
         .then(resData => {
@@ -64,11 +71,36 @@ export const BackupManagerPanel: React.FC<{
           setD1ErrorType('CREDENTIALS_MISSING');
         });
     }
-  }, [user]);
+  }, [user, isLicensed]);
 
   useEffect(() => {
     if (showRestoreModal && user) {
       setLoading(true);
+      if (isLicensed) {
+        console.log('[Firebase Firestore] Loading backup history from Firestore...');
+        const backupsCol = collection(db, 'users', user.uid, 'backups');
+        const qBackups = query(backupsCol, orderBy('createdAt', 'desc'), limit(30));
+        getDocs(qBackups)
+          .then(querySnapshot => {
+            const history: any[] = [];
+            querySnapshot.forEach(docSnap => {
+              history.push({
+                id: docSnap.id,
+                ...docSnap.data()
+              });
+            });
+            setCloudHistory(history);
+            setIsD1Configured(true);
+            setD1ErrorType(null);
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error('[Firebase Firestore] Failed to load backup history:', err);
+            setLoading(false);
+          });
+        return;
+      }
+
       fetch(`/api/d1-backup/history?uid=${user.uid}`)
         .then(res => res.json())
         .then(resData => {
@@ -99,7 +131,7 @@ export const BackupManagerPanel: React.FC<{
           setLoading(false);
         });
     }
-  }, [showRestoreModal, user]);
+  }, [showRestoreModal, user, isLicensed, db]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -179,40 +211,54 @@ export const BackupManagerPanel: React.FC<{
         </div>
       </div>
 
-      {isD1Configured === false && d1ErrorType === 'CREDENTIALS_MISSING' && (
-        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 rounded-[1.5rem] flex items-start gap-3">
-          <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+      {isLicensed ? (
+        <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 rounded-[1.5rem] flex items-start gap-3">
+          <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">Cloudflare D1 Belum Dikonfigurasi</h4>
-            <p className="text-[10px] text-amber-700/90 dark:text-amber-400/85 leading-relaxed mt-1">
-              Penyimpanan Cloud (Auto Backup, Restore, dan Import) membutuhkan konfigurasi kredensial database Cloudflare D1. Harap tambahkan <code className="bg-amber-100/80 dark:bg-amber-950 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900 dark:text-amber-300">CLOUDFLARE_API_TOKEN</code> di menu Settings di kanan atas layar.
+            <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">Penyimpanan Cloud Aktif (Firebase Firestore)</h4>
+            <p className="text-[10px] text-emerald-700/90 dark:text-emerald-400/85 leading-relaxed mt-1">
+              Sebagai akun <strong>PRO / Langganan</strong>, seluruh data Anda secara otomatis tersinkronisasi dan disimpan dengan aman di cloud Firebase Firestore tanpa memerlukan konfigurasi tambahan.
             </p>
           </div>
         </div>
-      )}
+      ) : (
+        <>
+          {isD1Configured === false && d1ErrorType === 'CREDENTIALS_MISSING' && (
+            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 rounded-[1.5rem] flex items-start gap-3">
+              <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">Cloudflare D1 Belum Dikonfigurasi</h4>
+                <p className="text-[10px] text-amber-700/90 dark:text-amber-400/85 leading-relaxed mt-1">
+                  Penyimpanan Cloud (Auto Backup, Restore, dan Import) membutuhkan konfigurasi kredensial database Cloudflare D1. Harap tambahkan <code className="bg-amber-100/80 dark:bg-amber-950 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900 dark:text-amber-300">CLOUDFLARE_API_TOKEN</code> di menu Settings di kanan atas layar.
+                </p>
+              </div>
+            </div>
+          )}
 
-      {isD1Configured === false && d1ErrorType === 'CREDENTIALS_INVALID' && (
-        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
-          <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Kredensial Cloudflare Tidak Valid</h4>
-            <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
-              Gagal menghubungi database Cloudflare D1. Harap pastikan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_API_TOKEN</code> dan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_ACCOUNT_ID</code> di menu Settings sudah benar.
-            </p>
-          </div>
-        </div>
-      )}
+          {isD1Configured === false && d1ErrorType === 'CREDENTIALS_INVALID' && (
+            <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
+              <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Kredensial Cloudflare Tidak Valid</h4>
+                <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
+                  Gagal menghubungi database Cloudflare D1. Harap pastikan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_API_TOKEN</code> dan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_ACCOUNT_ID</code> di menu Settings sudah benar.
+                </p>
+              </div>
+            </div>
+          )}
 
-      {isD1Configured === false && d1ErrorType === 'DATABASE_INVALID' && (
-        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
-          <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Cloudflare D1 Database ID Tidak Valid / Tidak Ditemui</h4>
-            <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
-              Gagal menemukan database D1 di dalam akun Cloudflare Anda. Harap tambahkan environment variable <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_D1_DATABASE_ID</code> di menu Settings dengan ID database D1 yang aktif di dalam Cloudflare Console Anda.
-            </p>
-          </div>
-        </div>
+          {isD1Configured === false && d1ErrorType === 'DATABASE_INVALID' && (
+            <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
+              <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Cloudflare D1 Database ID Tidak Valid / Tidak Ditemui</h4>
+                <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
+                  Gagal menemukan database D1 di dalam akun Cloudflare Anda. Harap tambahkan environment variable <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_D1_DATABASE_ID</code> di menu Settings dengan ID database D1 yang aktif di dalam Cloudflare Console Anda.
+                </p>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

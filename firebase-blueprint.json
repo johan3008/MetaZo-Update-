@@ -101,6 +101,19 @@
         "userEmail": { "type": "string", "description": "Email address of the sender" }
       },
       "required": ["message", "timestamp", "userEmail"]
+    },
+    "BackupBatch": {
+      "title": "BackupBatch",
+      "description": "A metadata backup batch for pro or subscribed users",
+      "type": "object",
+      "properties": {
+        "batchId": { "type": "string", "description": "Unique batch ID" },
+        "timestamp": { "type": "string", "description": "User-friendly timestamp of the backup" },
+        "tool": { "type": "string", "description": "The active tool name" },
+        "items": { "type": "array", "description": "Metadata items backed up" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "ISO timestamp of creation" }
+      },
+      "required": ["batchId", "timestamp", "tool", "items", "createdAt"]
     }
   },
   "firestore": {
@@ -115,6 +128,10 @@
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Individual account state, synced to cloud."
+    },
+    "/users/{userId}/backups/{backupId}": {
+      "schema": "BackupBatch",
+      "description": "Metadata backups for pro or subscription users stored securely in Firebase Firestore."
     },
     "/global_messages/{messageId}": {
       "schema": "ChatMessage",

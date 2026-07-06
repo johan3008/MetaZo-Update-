@@ -34,7 +34,7 @@ import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit } from './src/firebase';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit, addDoc } from './src/firebase';
 import { db, auth, handleFirestoreError, OperationType } from './src/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { LoginScreen } from './src/components/LoginScreen';
@@ -1994,6 +1994,7 @@ const App: React.FC = () => {
   }, [activeTool, user, isCheckingAuth]);
 
   useEffect(() => {
+    if (isCheckingAuth) return;
     const k = mzLicenseKey.trim().toUpperCase();
     if (!k) {
       setIsMzLicensed(false);
@@ -2121,7 +2122,7 @@ const App: React.FC = () => {
       .finally(() => {
         setIsCheckingLicense(false);
       });
-  }, [mzLicenseKey, user]);
+  }, [mzLicenseKey, user, isCheckingAuth]);
 
   const handleTryUnlockReseller = (typedVal?: string) => {
     const val = (typedVal !== undefined ? typedVal : resellerPasscodeVal).trim();
@@ -3656,6 +3657,25 @@ const App: React.FC = () => {
       console.warn('[Local Storage] Auto-backup failed to save locally:', localErr);
     }
 
+    if (isMzLicensed) {
+      console.log('[Firebase Firestore] User is PRO/Subscribed. Saving backup to Firebase...');
+      const backupsCol = collection(db, 'users', user.uid, 'backups');
+      addDoc(backupsCol, {
+        batchId: `fb-batch-${Date.now()}`,
+        timestamp: new Date().toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }),
+        tool: activeTool,
+        items: backupData,
+        createdAt: new Date().toISOString()
+      })
+      .then(docRef => {
+        console.log('[Firebase Firestore] Backup saved successfully with path:', docRef.path);
+      })
+      .catch(err => {
+        console.warn('[Firebase Firestore] Failed to save backup to Firebase:', err);
+      });
+      return;
+    }
+
     // Try Cloudflare D1
     fetch('/api/d1-backup/save', {
       method: 'POST',
@@ -4366,6 +4386,7 @@ const App: React.FC = () => {
                 <BackupManagerPanel
                   user={user}
                   db={db}
+                  isLicensed={isMzLicensed}
                   handleBackupJSON={handleBackupJSON}
                   handleImportJSON={handleImportJSON}
                   autoBackup={autoBackup}
