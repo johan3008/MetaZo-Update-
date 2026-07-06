@@ -10,31 +10,32 @@ export const BackupManagerPanel: React.FC<{
   autoBackup: boolean;
   setAutoBackup: (v: boolean) => void;
   activeTool: string;
-}> = ({ user, db, handleBackupJSON, handleImportJSON, autoBackup, setAutoBackup, activeTool }) => {
+  handleCloudBackup?: () => void;
+}> = ({ user, db, handleBackupJSON, handleImportJSON, autoBackup, setAutoBackup, activeTool, handleCloudBackup }) => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [cloudHistory, setCloudHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (showRestoreModal && user && db) {
+    if (showRestoreModal && user) {
       setLoading(true);
-      import('../firebase').then(({ doc, getDoc }) => {
-        getDoc(doc(db, 'users', user.uid)).then(docSnap => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.metadataGenHistory) {
-              setCloudHistory(data.metadataGenHistory);
-            }
+      fetch(`/api/d1-backup/history?uid=${user.uid}`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success && Array.isArray(resData.data)) {
+            setCloudHistory(resData.data);
+          } else {
+            console.warn('[Cloudflare D1] Failed to retrieve cloud history:', resData.error);
           }
           setLoading(false);
-        }).catch(err => {
-          console.error(err);
+        })
+        .catch(err => {
+          console.error('[Cloudflare D1] Error loading backup history:', err);
           setLoading(false);
         });
-      });
     }
-  }, [showRestoreModal, user, db]);
+  }, [showRestoreModal, user]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,12 +63,15 @@ export const BackupManagerPanel: React.FC<{
   };
 
   const handleBackupNow = () => {
-    if (!user || !db) return;
+    if (!user) return;
     // We can just trigger JSON download for manual backup, or we can trigger cloud backup if they want.
     // The user requested: Backup Now -> Membuat backup manual.
     // Export CSV / JSON -> Mengekspor metadata.
     // Since handleBackupJSON does both local JSON and cloud save (in App.tsx), we just call it.
     handleBackupJSON();
+    if (handleCloudBackup) {
+      handleCloudBackup();
+    }
   };
 
   const restoreFromCloud = (batch: any) => {

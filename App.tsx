@@ -1882,6 +1882,12 @@ const App: React.FC = () => {
       if (!isPermissionErr) {
         console.warn("Failed to subscribe to promos for modal, loading cached:", err);
       }
+      
+      if (isPermissionErr) {
+        setPromoCodesForModal([]);
+        return;
+      }
+
       let cached = localStorage.getItem('mz_promos_cache');
       if (!cached) {
         const seedPromos = [
@@ -1908,7 +1914,8 @@ const App: React.FC = () => {
           if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
             sessionStorage.removeItem('mz_just_logged_in_promo');
             // If the synced profile reveals they are NOT licensed (free trial account) after settling
-            if (!isMzLicensed && !isCheckingLicense) {
+            // AND there are actual active promo codes loaded from the reseller portal
+            if (!isMzLicensed && !isCheckingLicense && promoCodesForModal.length > 0) {
               setShowPromoWindow(true);
             }
           }
@@ -1916,7 +1923,7 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
       }
     }
-  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense]);
+  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense, promoCodesForModal]);
 
   // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
@@ -3593,7 +3600,7 @@ const App: React.FC = () => {
   };
 
   const handleCloudAutoBackup = (filesToBackup: FileItem[]) => {
-    if (!user || !db) return;
+    if (!user) return;
     const validFiles = filesToBackup.filter(f => f.title);
     if (!validFiles.length) return;
     
@@ -3603,24 +3610,34 @@ const App: React.FC = () => {
       title: f.title,
       description: f.description,
       keywords: f.keywords,
+      adobeCategoryId: f.adobeCategoryId,
+      shutterstockCategory1: f.shutterstockCategory1,
+      shutterstockCategory2: f.shutterstockCategory2,
+      categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
 
-    import('./src/firebase').then(({ doc, updateDoc, getDoc }) => {
-      const userRef = doc(db, 'users', user.uid);
-      getDoc(userRef).then(docSnap => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const currentHistory = data.metadataGenHistory || [];
-          const updatedHistory = [{
-            batchId: `batch-${Date.now()}`,
-            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-            tool: activeTool,
-            items: backupData
-          }, ...currentHistory].slice(0, 30);
-          updateDoc(userRef, { metadataGenHistory: updatedHistory }).catch(err => console.warn('db_op', err));
-        }
-      });
+    fetch('/api/d1-backup/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        uid: user.uid,
+        tool: activeTool,
+        items: backupData
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        console.log('[Cloudflare D1] Auto-backup saved successfully:', data.batchId);
+      } else {
+        console.warn('[Cloudflare D1] Auto-backup failed:', data.error);
+      }
+    })
+    .catch(err => {
+      console.warn('[Cloudflare D1] Auto-backup request error:', err);
     });
   };
 
@@ -4296,6 +4313,7 @@ const App: React.FC = () => {
                   autoBackup={autoBackup}
                   setAutoBackup={setAutoBackup}
                   activeTool={activeTool}
+                  handleCloudBackup={() => handleCloudAutoBackup(files)}
                 />
               </div>
             </>

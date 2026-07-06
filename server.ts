@@ -434,6 +434,159 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    // =========== CLOUDFLARE D1 BACKUP, RESTORE, IMPORT INTEGRATION ===========
+    let isD1TableInitialized = false;
+
+    function getD1Config() {
+        const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || 
+            (process.env.S3_ENDPOINT ? process.env.S3_ENDPOINT.match(/https:\/\/([a-zA-Z0-9]+)\.r2\.cloudflarestorage\.com/)?.[1] : '');
+        const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+        const databaseId = "60a4d870-56c9-4dc6-9079-789d9e536cea";
+        return { accountId, apiToken, databaseId };
+    }
+
+    async function queryD1(sql: string, params: any[] = []) {
+        const { accountId, apiToken, databaseId } = getD1Config();
+        if (!accountId) {
+            throw new Error('Cloudflare Account ID is missing. Please set CLOUDFLARE_ACCOUNT_ID in environment variables or configure S3_ENDPOINT.');
+        }
+        if (!apiToken) {
+            throw new Error('Cloudflare API Token is missing. Please set CLOUDFLARE_API_TOKEN in environment variables.');
+        }
+
+        const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ sql, params })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Cloudflare D1 HTTP API Error ${response.status}: ${errText}`);
+        }
+
+        const json: any = await response.json();
+        if (!json.success) {
+            throw new Error(`Cloudflare D1 Query Failed: ${JSON.stringify(json.errors)}`);
+        }
+
+        return json.result;
+    }
+
+    async function ensureD1Table() {
+        if (isD1TableInitialized) return;
+        try {
+            await queryD1(`
+                CREATE TABLE IF NOT EXISTS metadata_backups (
+                    id TEXT PRIMARY KEY,
+                    uid TEXT NOT NULL,
+                    batch_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    tool TEXT NOT NULL,
+                    items TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
+            `);
+            isD1TableInitialized = true;
+            console.log('[Cloudflare D1] metadata_backups table verified/created.');
+        } catch (e: any) {
+            console.error('[Cloudflare D1] Failed to verify/create metadata_backups table:', e.message);
+            throw e;
+        }
+    }
+
+    // Save a backup to Cloudflare D1
+    app.post('/api/d1-backup/save', async (req, res) => {
+        try {
+            const { uid, tool, items } = req.body;
+            if (!uid || !items || !Array.isArray(items)) {
+                return res.status(400).json({ error: 'Missing uid or items array' });
+            }
+
+            await ensureD1Table();
+
+            const id = `backup-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            const batchId = `batch-${Date.now()}`;
+            const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            const itemsStr = JSON.stringify(items);
+
+            // Insert new backup
+            await queryD1(
+                `INSERT INTO metadata_backups (id, uid, batch_id, timestamp, tool, items) VALUES (?, ?, ?, ?, ?, ?)`,
+                [id, uid, batchId, timestamp, tool || 'Unknown Tool', itemsStr]
+            );
+
+            // Get count of backups for this user to prune if greater than 30 (just like original Firestore design)
+            try {
+                const countResult = await queryD1(
+                    `SELECT COUNT(*) as count FROM metadata_backups WHERE uid = ?`,
+                    [uid]
+                );
+                const count = countResult?.[0]?.results?.[0]?.count || 0;
+                if (count > 30) {
+                    // Fetch backup IDs ordered by created_at ascending
+                    const allBackups = await queryD1(
+                        `SELECT id FROM metadata_backups WHERE uid = ? ORDER BY created_at ASC`,
+                        [uid]
+                    );
+                    const backupsToDelete = allBackups?.[0]?.results?.slice(0, count - 30) || [];
+                    for (const oldBackup of backupsToDelete) {
+                        await queryD1(`DELETE FROM metadata_backups WHERE id = ?`, [oldBackup.id]);
+                    }
+                }
+            } catch (pruneErr: any) {
+                console.warn('[Cloudflare D1] Failed to prune old backups:', pruneErr.message);
+            }
+
+            res.json({ success: true, batchId, timestamp });
+        } catch (err: any) {
+            console.error('[Cloudflare D1] Backup Save Error:', err.message);
+            res.status(500).json({ error: err.message || 'Failed to save backup to Cloudflare D1' });
+        }
+    });
+
+    // Fetch backup history from Cloudflare D1
+    app.get('/api/d1-backup/history', async (req, res) => {
+        try {
+            const { uid } = req.query;
+            if (!uid) {
+                return res.status(400).json({ error: 'Missing uid' });
+            }
+
+            await ensureD1Table();
+
+            const queryResult = await queryD1(
+                `SELECT batch_id, timestamp, tool, items FROM metadata_backups WHERE uid = ? ORDER BY created_at DESC LIMIT 30`,
+                [String(uid)]
+            );
+
+            const rows = queryResult?.[0]?.results || [];
+            const history = rows.map((row: any) => {
+                let items: any[] = [];
+                try {
+                    items = JSON.parse(row.items);
+                } catch (e) {
+                    console.warn('[Cloudflare D1] Failed to parse items JSON:', e);
+                }
+                return {
+                    batchId: row.batch_id,
+                    timestamp: row.timestamp,
+                    tool: row.tool,
+                    items
+                };
+            });
+
+            res.json({ success: true, data: history });
+        } catch (err: any) {
+            console.error('[Cloudflare D1] Backup History Error:', err.message);
+            res.status(500).json({ error: err.message || 'Failed to retrieve backup history from Cloudflare D1' });
+        }
+    });
+
     app.post('/api/test-gemini-key', async (req, res) => {
         try {
             const { apiKey } = req.body;
