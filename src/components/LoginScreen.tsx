@@ -57,10 +57,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [password, setPassword] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
-  const [showGoogleChoice, setShowGoogleChoice] = useState(false);
+  
   
   // Manual Token / Redirect URL override states
-  const [showManualTokenInput, setShowManualTokenInput] = useState(false);
+  
   const [manualTokenUrl, setManualTokenUrl] = useState('');
   const [manualTokenError, setManualTokenError] = useState('');
 
@@ -134,7 +134,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setErrorHeader(err.message || "Simulated sign-in failed.");
     } finally {
       setIsLoading(false);
-      setShowGoogleChoice(false);
+      
     }
   };
 
@@ -175,7 +175,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       const result = await signInWithTokens(accessToken, refreshToken);
       if (result.user) {
         onLoginSuccess(result.user);
-        setShowGoogleChoice(false);
+        
       }
     } catch (err: any) {
       console.error("Manual Session Auth Error:", err);
@@ -188,8 +188,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setErrorHeader('');
-    setShowGoogleChoice(true);
-    setShowManualTokenInput(true);
+    
+    
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
@@ -198,7 +198,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       const result = await signInWithPopup(auth, provider);
       if (result.user) {
         onLoginSuccess(result.user);
-        setShowGoogleChoice(false);
+        
       }
     } catch (err: any) {
       console.error("Google Sign-In Error:", err);
@@ -554,7 +554,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 {/* Main Action Google Sign-In Button */}
                 <button
                   type="button"
-                  onClick={() => setShowGoogleChoice(true)}
+                  onClick={handleGoogleLogin}
                   disabled={isLoading}
                   className="w-full py-3.5 bg-slate-900 hover:bg-slate-850 active:scale-[0.98] dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg hover:shadow-xl transition-all cursor-pointer flex items-center justify-center space-x-3.5 disabled:opacity-75 disabled:cursor-not-allowed group/btn"
                 >
@@ -603,230 +603,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
       </footer>
 
-      {/* GOOGLE SIGN IN METHOD SELECTION MODAL */}
-      <AnimatePresence>
-        {showGoogleChoice && (
-          <div 
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
-            onClick={() => setShowGoogleChoice(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: 'spring', duration: 0.4 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0f172a] rounded-[2.5rem] p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200/80 dark:border-white/10 relative overflow-hidden flex flex-col text-[#5a5c69] dark:text-slate-100"
-            >
-              {/* Accent glowing gradient behind logo */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-12 bg-gradient-to-r from-violet-500/20 to-indigo-500/20 dark:from-violet-500/10 dark:to-indigo-500/10 blur-xl rounded-full" />
-
-              {/* Close button */}
-              <button 
-                onClick={() => setShowGoogleChoice(false)} 
-                className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-full transition-colors focus:outline-none"
-              >
-                <X size={16} />
-              </button>
-
-              {/* Header */}
-              <div className="flex flex-col items-center text-center pb-5 border-b border-slate-200/60 dark:border-slate-800/60 shrink-0">
-                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-md mb-3 border border-slate-200 dark:border-white/5">
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                  </svg>
-                </div>
-                
-                <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                  {language === 'id' ? 'Metode Masuk Google' : 'Google Sign-In Method'}
-                </h3>
-                
-                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-widest">
-                  {language === 'id' ? 'Pilih salah satu metode masuk' : 'Choose your preferred sign-in method'}
-                </p>
-              </div>
-
-              {/* Options */}
-              <div className="py-6 space-y-4">
-                {/* 1. Sandbox Simulated Sign In (Highly Recommended) */}
-                <button
-                  type="button"
-                  onClick={handleInstantGoogleLogin}
-                  className="w-full text-left p-4 bg-violet-500/5 hover:bg-violet-500/10 dark:bg-violet-500/10 dark:hover:bg-violet-500/15 border-2 border-[#7c3aed]/40 hover:border-[#7c3aed] rounded-3xl transition-all cursor-pointer group flex items-start space-x-3.5"
-                >
-                  <div className="w-8 h-8 bg-[#7c3aed]/10 text-[#7c3aed] rounded-xl flex items-center justify-center shrink-0">
-                    <Sparkles size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-950 dark:text-white uppercase tracking-tight">
-                        {language === 'id' ? '1. Masuk Cepat (Rekomendasi)' : '1. Fast Sign-In (Recommended)'}
-                      </span>
-                      <span className="px-1.5 py-0.5 text-[8px] font-black tracking-widest bg-[#34a853]/15 text-[#34a853] dark:text-[#34a853] rounded-full uppercase">
-                        {language === 'id' ? 'Langsung' : 'Instant'}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed mt-1">
-                      {language === 'id' 
-                        ? 'Langsung masuk menggunakan Akun Google Simulasi secara aman tanpa pendaftaran / setup tambahan.' 
-                        : 'Instantly sign in with a secure, pre-configured sandbox Google profile. No dashboard setup required.'}
-                    </p>
-                  </div>
-                </button>
-
-                {/* 2. Real Google Sign In (Requires Supabase Setup) */}
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  className="w-full text-left p-4 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/60 dark:hover:bg-slate-900 border-2 border-slate-200/60 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10 rounded-3xl transition-all cursor-pointer group flex items-start space-x-3.5"
-                >
-                  <div className="w-8 h-8 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl flex items-center justify-center shrink-0">
-                    <Globe size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
-                        {language === 'id' ? '2. Akun Google Asli' : '2. Real Google Account'}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed mt-1">
-                      {language === 'id' 
-                        ? 'Masuk menggunakan email Google asli Anda. Memerlukan integrasi Google Provider aktif di dashboard Supabase Anda.' 
-                        : 'Authenticates with your real personal Google account. Requires Google OAuth enabled in your Supabase dashboard.'}
-                    </p>
-                  </div>
-                </button>
-
-                {/* Manual Token / localhost:3000 workaround helper */}
-                <div className="pt-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowManualTokenInput(!showManualTokenInput)}
-                    className="text-[10px] font-black text-[#7c3aed] dark:text-[#a78bfa] hover:text-[#6d28d9] hover:underline cursor-pointer uppercase tracking-wider bg-violet-500/10 px-3.5 py-1.5 rounded-full inline-flex items-center space-x-1"
-                  >
-                    <span>{showManualTokenInput 
-                      ? (language === 'id' ? '▲ Tutup Solusi Solutif' : '▲ Close Help Workaround')
-                      : (language === 'id' ? '👉 Jendela Google macet / "localhost menolak terhubung"?' : '👉 Google window stuck / "localhost refused to connect"?')}</span>
-                  </button>
-                </div>
-
-                <AnimatePresence>
-                  {showManualTokenInput && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden space-y-3.5 bg-gradient-to-br from-amber-500/10 to-violet-500/10 dark:from-amber-500/15 dark:to-violet-500/15 p-5 rounded-[2rem] border-2 border-amber-500/30 text-left"
-                    >
-                      <div className="space-y-2">
-                        <span className="text-amber-600 dark:text-amber-400 block text-[10px] uppercase tracking-wider font-black flex items-center space-x-1.5">
-                          <AlertCircle size={12} className="shrink-0" />
-                          <span>
-                            {language === 'id' ? 'KONEKSI ANDA BAGUS! INI BUKAN MASALAH JARINGAN:' : 'YOUR INTERNET IS FINE! THIS IS NOT A NETWORK ISSUE:'}
-                          </span>
-                        </span>
-                        
-                        <p className="text-[10px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed normal-case">
-                          {language === 'id' 
-                            ? 'Aplikasi ini berjalan di cloud server sandbox (AI Studio). Saat login dengan Google Asli, sistem akan mengarahkan (redirect) ke "localhost:3000" di browser Anda. Karena localhost:3000 tidak berjalan di HP/PC Anda, browser Anda akan salah mendeteksi sebagai "koneksi ditolak".'
-                            : 'This app is running in a secure cloud sandbox. When using the Real Google sign-in, it redirects back to "localhost:3000" which is not running locally on your PC/phone, triggering a connection refused page.'}
-                        </p>
-
-                        <div className="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
-
-                        <span className="text-[#7c3aed] dark:text-[#a78bfa] block text-[9px] uppercase tracking-wider font-black">
-                          {language === 'id' ? '✅ PILIHAN SOLUSI TERBAIK:' : '✅ CHOOSE A SOLUTION BELOW:'}
-                        </span>
-
-                        <div className="space-y-2 text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                          {/* Method A */}
-                          <div className="bg-white/60 dark:bg-slate-900/40 p-2.5 rounded-xl border border-violet-500/20">
-                            <p className="text-[#7c3aed] dark:text-[#a78bfa] text-[9px] uppercase tracking-wider font-black mb-0.5">
-                              {language === 'id' ? 'CARA A: MASUK INSTAN (SANGAT DIREKOMENDASIKAN)' : 'METHOD A: FAST INSTANT SIGN-IN (HIGHLY RECOMMENDED)'}
-                            </p>
-                            <p className="font-semibold text-slate-600 dark:text-slate-300 text-[9px]">
-                              {language === 'id'
-                                ? 'Gunakan opsi "1. Masuk Cepat" di atas. Ini adalah akun Google simulasi resmi yang masuk dalam 1 detik tanpa konfigurasi apa pun.'
-                                : 'Simply choose "Option 1: Fast Sign-In" above. It uses a built-in sandbox Google account to bypass authentication limits.'}
-                            </p>
-                          </div>
-
-                          {/* Method B */}
-                          <div className="bg-white/60 dark:bg-slate-900/40 p-2.5 rounded-xl border border-amber-500/20">
-                            <p className="text-amber-600 dark:text-amber-400 text-[9px] uppercase tracking-wider font-black mb-1">
-                              {language === 'id' ? 'CARA B: BYPASS DENGAN COPY-PASTE ALAMAT URL' : 'METHOD B: BYPASS VIA COPY-PASTING THE STUCK URL'}
-                            </p>
-                            <ol className="list-decimal pl-4 space-y-1 text-slate-600 dark:text-slate-300 text-[9px] font-medium leading-normal normal-case">
-                              <li>
-                                {language === 'id' 
-                                  ? 'Buka/klik opsi "2. Akun Google Asli" di atas.' 
-                                  : 'Click the "2. Real Google Account" button above.'}
-                              </li>
-                              <li>
-                                {language === 'id' 
-                                  ? 'Ketika jendela baru browser Google terbuka dan macet dengan pesan "localhost menolak terhubung" (atau ERR_CONNECTION_REFUSED), SALIN (COPY) seluruh isi alamat/URL dari kolom atas browser baru tersebut.' 
-                                  : 'When the new window gets stuck on "localhost refused to connect", COPY the entire URL from the address bar of that stuck window.'}
-                              </li>
-                              <li>
-                                {language === 'id' 
-                                  ? 'TEMPEL (PASTE) URL yang Anda salin ke kotak di bawah ini dan tekan "Selesaikan Masuk".' 
-                                  : 'PASTE that copied URL into the input field below and click "Complete Sign-In".'}
-                              </li>
-                            </ol>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <input
-                          type="text"
-                          value={manualTokenUrl}
-                          onChange={(e) => setManualTokenUrl(e.target.value)}
-                          placeholder={language === 'id' ? "Tempel (Paste) URL localhost yang Anda salin di sini..." : "Paste the copied localhost URL here..."}
-                          className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border-2 border-[#7c3aed]/30 dark:border-slate-700 rounded-2xl text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-[#7c3aed] text-slate-900 dark:text-white placeholder:text-slate-400 shadow-inner"
-                          required
-                        />
-                        {manualTokenError && (
-                          <div className="text-[9px] font-bold text-red-500 dark:text-red-400 flex items-start space-x-1 bg-red-500/10 p-2 rounded-xl border border-red-500/20">
-                            <AlertCircle size={11} className="shrink-0 mt-0.5" />
-                            <span>{manualTokenError}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleManualTokenSubmit}
-                        disabled={isLoading}
-                        className="w-full py-3 bg-[#7c3aed] hover:bg-[#6d28d9] active:scale-[0.98] text-white font-black text-[10px] uppercase tracking-wider rounded-2xl shadow-lg transition-all disabled:opacity-75 flex items-center justify-center space-x-2 cursor-pointer"
-                      >
-                        {isLoading ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <>
-                            <Sparkles size={11} />
-                            <span>{language === 'id' ? 'Selesaikan Masuk & Mulai' : 'Complete Sign-In & Launch'}</span>
-                          </>
-                        )}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Notice footer */}
-              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-medium leading-relaxed text-center px-4">
-                {language === 'id'
-                  ? 'Gunakan opsi 1 jika Anda melihat error "provider is not enabled" di dashboard Supabase.'
-                  : 'Please choose Option 1 if you encounter the "provider is not enabled" error in Supabase.'}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      
     </div>
   );
 };

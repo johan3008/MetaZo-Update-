@@ -375,17 +375,14 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
         .select('*')
         .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
         .single();
-        
-      if (error && error.code !== 'PGRST116') { // PGRST116 is record not found
-        throw error;
+      if (!error || error.code === 'PGRST116') {
+        return new DocumentSnapshot(docRef.id, data || null);
       }
-      return new DocumentSnapshot(docRef.id, data || null);
+      console.warn('[Supabase] getDoc error, falling back:', error);
     } catch (e) {
-      console.warn(`[Supabase] Error reading doc from ${docRef.table}:${docRef.id}, falling back to Local Storage:`, e);
+      console.warn('[Supabase] getDoc exception, falling back:', e);
     }
   }
-
-  // Local emulation fallback
   const list = getEmulatedTable(docRef.table);
   const found = list.find(row => (row.key === docRef.id || row.id === docRef.id));
   return new DocumentSnapshot(docRef.id, found || null);
@@ -398,20 +395,15 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
   } else {
     processedData.id = docRef.id;
   }
-
   if (supabase) {
     try {
-      const { error } = await supabase
-        .from(docRef.table)
-        .upsert(processedData);
+      const { error } = await supabase.from(docRef.table).upsert(processedData);
       if (!error) return;
-      console.warn(`[Supabase] setDoc failed, falling back to Local Storage:`, error);
+      console.warn('[Supabase] setDoc error, falling back:', error);
     } catch (e) {
-      console.warn(`[Supabase] setDoc failed with error, falling back to Local Storage:`, e);
+      console.warn('[Supabase] setDoc exception, falling back:', e);
     }
   }
-
-  // Local emulation fallback
   const list = getEmulatedTable(docRef.table);
   const index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
   if (index >= 0) {
@@ -453,13 +445,11 @@ export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
         .delete()
         .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
       if (!error) return;
-      console.warn(`[Supabase] deleteDoc failed, falling back to Local Storage:`, error);
+      console.warn('[Supabase] deleteDoc error, falling back:', error);
     } catch (e) {
-      console.warn(`[Supabase] deleteDoc failed with error, falling back to Local Storage:`, e);
+      console.warn('[Supabase] deleteDoc exception, falling back:', e);
     }
   }
-
-  // Local emulation fallback
   const list = getEmulatedTable(docRef.table);
   const filtered = list.filter(row => (row.key !== docRef.id && row.id !== docRef.id));
   saveEmulatedTable(docRef.table, filtered);
@@ -471,20 +461,15 @@ export async function addDoc(collectionRef: SupabaseCollectionRef, data: any): P
   if (collectionRef.parentId) {
     processedData.uid = collectionRef.parentId;
   }
-
   if (supabase) {
     try {
-      const { error } = await supabase
-        .from(collectionRef.table)
-        .insert(processedData);
+      const { error } = await supabase.from(collectionRef.table).insert(processedData);
       if (!error) return new SupabaseDocRef(collectionRef.table, generatedId);
-      console.warn(`[Supabase] addDoc failed, falling back to Local Storage:`, error);
+      console.warn('[Supabase] addDoc error, falling back:', error);
     } catch (e) {
-      console.warn(`[Supabase] addDoc failed with error, falling back to Local Storage:`, e);
+      console.warn('[Supabase] addDoc exception, falling back:', e);
     }
   }
-
-  // Local emulation fallback
   const list = getEmulatedTable(collectionRef.table);
   list.push(processedData);
   saveEmulatedTable(collectionRef.table, list);
@@ -495,31 +480,20 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
   const table = refOrQuery.table;
   const parentId = refOrQuery.parentId;
   const constraints = refOrQuery instanceof SupabaseQuery ? refOrQuery.constraints : [];
-
   if (supabase) {
     try {
       let q: any = supabase.from(table).select('*');
-      if (parentId) {
-        q = q.eq('uid', parentId);
-      }
-      
+      if (parentId) q = q.eq('uid', parentId);
       for (const c of constraints) {
         if (!c) continue;
         if (c.type === 'where') {
           const { field, operator, value } = c;
-          if (operator === '==') {
-            q = q.eq(field, value);
-          } else if (operator === '!=') {
-            q = q.neq(field, value);
-          } else if (operator === '>') {
-            q = q.gt(field, value);
-          } else if (operator === '>=') {
-            q = q.gte(field, value);
-          } else if (operator === '<') {
-            q = q.lt(field, value);
-          } else if (operator === '<=') {
-            q = q.lte(field, value);
-          }
+          if (operator === '==') q = q.eq(field, value);
+          else if (operator === '!=') q = q.neq(field, value);
+          else if (operator === '>') q = q.gt(field, value);
+          else if (operator === '>=') q = q.gte(field, value);
+          else if (operator === '<') q = q.lt(field, value);
+          else if (operator === '<=') q = q.lte(field, value);
         } else if (c.type === 'orderBy') {
           const { field, direction } = c;
           q = q.order(field, { ascending: direction === 'asc' });
@@ -527,24 +501,19 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
           q = q.limit(c.value);
         }
       }
-
       const { data, error } = await q;
-      if (!error && data) {
-        const docs = data.map(row => new DocumentSnapshot(row.key || row.id || '', row));
+      if (!error) {
+        const docs = (data || []).map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
         return new QuerySnapshot(docs);
       }
-      console.warn(`[Supabase] getDocs failed, falling back to Local Storage:`, error);
+      console.warn('[Supabase] getDocs error, falling back:', error);
     } catch (e) {
-      console.warn(`[Supabase] getDocs failed with error, falling back to Local Storage:`, e);
+      console.warn('[Supabase] getDocs exception, falling back:', e);
     }
   }
-
-  // Local emulation fallback
+  
   let list = getEmulatedTable(table);
-  if (parentId) {
-    list = list.filter(row => row.uid === parentId);
-  }
-
+  if (parentId) list = list.filter(row => row.uid === parentId);
   for (const c of constraints) {
     if (!c) continue;
     if (c.type === 'where') {
@@ -561,8 +530,6 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
       });
     }
   }
-
-  // Handle orderBy
   const orderByConstraint = constraints.find(c => c && c.type === 'orderBy');
   if (orderByConstraint) {
     const { field, direction } = orderByConstraint;
@@ -576,13 +543,8 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
       return 0;
     });
   }
-
-  // Handle limit
   const limitConstraint = constraints.find(c => c && c.type === 'limit');
-  if (limitConstraint) {
-    list = list.slice(0, limitConstraint.value);
-  }
-
+  if (limitConstraint) list = list.slice(0, limitConstraint.value);
   const docs = list.map(row => new DocumentSnapshot(row.key || row.id || '', row));
   return new QuerySnapshot(docs);
 }

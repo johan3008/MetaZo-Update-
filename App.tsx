@@ -1089,6 +1089,7 @@ const App: React.FC = () => {
   const [titleLength, setTitleLength] = useState<'short' | 'medium' | 'long'>(() => (localStorage.getItem('mz_title_length') as 'short' | 'medium' | 'long') || 'medium');
   const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
   // 1. Mark current user as online
   useEffect(() => {
@@ -1098,7 +1099,11 @@ const App: React.FC = () => {
     
     const markOnline = async () => {
         try {
-            await updateDoc(userRef, { lastSeen: serverTimestamp() });
+            await setDoc(userRef, { 
+              lastSeen: serverTimestamp(),
+              email: auth.currentUser?.email || '',
+              displayName: auth.currentUser?.displayName || ''
+            }, { merge: true });
         } catch (e) {
             console.info('Error marking online:', e);
         }
@@ -1116,9 +1121,36 @@ const App: React.FC = () => {
             const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
             const q = query(collection(db, 'users'), where('lastSeen', '>', fiveMinutesAgo));
             const snapshot = await getDocs(q);
-            setActiveAccountsCount(snapshot.size);
+            
+            const usersList: string[] = [];
+            snapshot.forEach(doc => {
+               const data = doc.data();
+               const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
+               if (nameToShow !== 'Unknown') usersList.push(nameToShow);
+            });
+            
+            if (usersList.length === 0 && auth.currentUser) {
+               const nameToShow = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
+               if (nameToShow !== 'Unknown') usersList.push(nameToShow);
+            }
+            
+            setActiveUsers(usersList);
+            setActiveAccountsCount(usersList.length);
         } catch (e) {
-            ;
+            console.error("Active accounts error:", e);
+            if (auth.currentUser) {
+                const nameToShow = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
+                if (nameToShow !== 'Unknown') {
+                    setActiveUsers([nameToShow]);
+                    setActiveAccountsCount(1);
+                } else {
+                    setActiveUsers([]);
+                    setActiveAccountsCount(0);
+                }
+            } else {
+                setActiveUsers([]);
+                setActiveAccountsCount(0);
+            }
         }
     };
     
@@ -4108,6 +4140,7 @@ const App: React.FC = () => {
           setUiLanguage={setUiLanguage}
           user={user}
           activeAccountsCount={activeAccountsCount}
+          activeUsers={activeUsers}
           onSignOut={async () => {
             try {
               await signOut(auth);

@@ -19,6 +19,7 @@ interface TopbarProps {
   user?: any;
   onSignOut?: () => void;
   activeAccountsCount?: number;
+  activeUsers?: string[];
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -37,7 +38,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   setUiLanguage,
   user,
   onSignOut,
-  activeAccountsCount = 0
+  activeAccountsCount = 0,
+  activeUsers = []
 }) => {
   const [time, setTime] = React.useState(new Date());
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -112,14 +114,31 @@ export const Topbar: React.FC<TopbarProps> = ({
       {/* RIGHT: SYSTEM HEALTH PILL, THEME SWAP, PROFILE */}
       <div className="flex items-center space-x-3">
         {/* Core status badge */}
-        <div className="hidden lg:flex items-center px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 transition-colors">
+        <div className="relative group flex items-center px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-help">
           <span className="relative flex h-2 w-2 mr-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-            {activeAccountsCount} Active Accounts
+            {activeUsers.length > 0 ? activeUsers.length : activeAccountsCount} Active {activeUsers.length === 1 ? 'Account' : 'Accounts'}
           </span>
+          
+          {/* Active Users Dropdown Tooltip */}
+          {activeUsers.length > 0 && (
+            <div className="absolute top-full right-0 mt-2 w-max min-w-[150px] max-w-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all p-3 z-50">
+              <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-700 pb-1.5">
+                {uiLanguage === 'id' ? 'Pengguna Online' : 'Online Users'}
+              </p>
+              <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                {activeUsers.map((email, idx) => (
+                  <div key={idx} className="flex items-center space-x-2 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span className="truncate">{email}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Dynamic License Badge */}

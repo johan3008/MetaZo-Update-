@@ -247,27 +247,11 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setBackendKeys(keysList);
       localStorage.setItem('mz_backend_keys_cache', JSON.stringify(keysList));
     } catch (err: any) {
-      const errMsg = err?.message || (err && typeof err === 'object' && 'message' in err ? String((err as any).message) : '') || String(err);
-      const errCode = (err && typeof err === 'object' && 'code' in err ? String((err as any).code) : '');
-      const isPermissionErr = errMsg.toLowerCase().includes('permission') || 
-                              errMsg.toLowerCase().includes('denied') ||
-                              errCode.toLowerCase().includes('permission') ||
-                              errCode.toLowerCase().includes('denied');
-      if (err?.message?.includes('Quota') || err?.message?.includes('quota') || err?.message?.includes('exhausted')) {
-        setIsQuotaExceeded(true);
-        localStorage.setItem('last_firestore_quota_error', new Date().toDateString());
-      }
-      if (!isPermissionErr) {
-        console.error('Failed to fetch keys from Firestore:', err);
-        handleFirestoreError(err, OperationType.LIST, 'keys');
-      }
+      console.warn('Failed to fetch keys from database, falling back:', err);
       let cached = localStorage.getItem('mz_backend_keys_cache');
-      if (!cached) {
-        cached = JSON.stringify([]);
+      if (cached) {
+        try { setBackendKeys(JSON.parse(cached)); } catch(e) {}
       }
-      try {
-        setBackendKeys(JSON.parse(cached));
-      } catch(e) { console.error("Cache parsing error", e); }
     } finally {
       setIsKeysLoading(false);
     }
@@ -561,22 +545,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await setDoc(doc(db, 'keys', newKey), keyData);
       }
       await fetchBackendKeys();
-    } catch (err) {
-      console.error('Failed to generate keys in Firestore, falling back to local storage:', err);
-      handleFirestoreError(err, OperationType.WRITE, 'keys');
-      
-      // Fallback: Append newlyCreated to the local cache!
-      let cached = localStorage.getItem('mz_backend_keys_cache');
-      let currentList: LicenseKeyBackend[] = [];
-      if (cached) {
-        try {
-          currentList = JSON.parse(cached);
-        } catch(e) {}
-      }
-      const updatedList = [...newlyCreated, ...currentList];
-      setBackendKeys(updatedList);
-      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
-      alert(`Firestore Quota Terlampaui! Sistem beralih ke Mode Sandbox Offline. ${generatedCount} Serial Key baru berhasil digenerate secara lokal untuk simulasi.`);
+    } catch (err: any) {
+      console.warn('Failed to generate keys in database, falling back:', err);
     } finally {
       setIsKeysLoading(false);
     }
@@ -1469,60 +1439,41 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       } else {
         setActivationError(t.activation_error_invalid);
       }
-    } catch (err) {
-      console.warn('Firestore activate check error, attempting offline/cached check:', err);
-      
-      // Check local cache
+    } catch (err: any) {
+      console.warn('Database activate check error, falling back:', err);
+      // Fallback check against cached keys
       let cachedKeys = localStorage.getItem('mz_backend_keys_cache');
       let foundInCache: any = null;
       if (cachedKeys) {
         try {
-          const list: LicenseKeyBackend[] = JSON.parse(cachedKeys);
+          const list: any[] = JSON.parse(cachedKeys);
           foundInCache = list.find(k => k.key === targetKeyFormatted);
         } catch(e) {}
       }
-      
       if (foundInCache) {
-        const isEmail = (str: string) => str && str.includes('@');
-        const keyActivatedBy = foundInCache.activatedBy || '';
-        const firstActivatedBy = foundInCache.firstActivatedBy || '';
-        const ownerId = firstActivatedBy || keyActivatedBy;
-        
+        const ownerId = foundInCache.firstActivatedBy || foundInCache.activatedBy || '';
         let offlineRejected = false;
         if (ownerId) {
-          const isOwner = (
-            ownerId === devId || 
-            (userId && ownerId === userId) ||
-            (userEmail && ownerId.toLowerCase() === userEmail.toLowerCase())
-          );
-          if (!isOwner) {
-            offlineRejected = true;
-          }
+          const isOwner = (ownerId === devId || (userId && ownerId === userId) || (userEmail && ownerId.toLowerCase() === userEmail.toLowerCase()));
+          if (!isOwner) offlineRejected = true;
         }
-
         if (offlineRejected) {
           setActivationError(localStorage.getItem('mz_language') === 'Bahasa'
-            ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.'
-            : 'This license key is already registered to another account! One license can only be used on one account.');
+            ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! (Offline Mode)'
+            : 'This license key is already registered to another account! (Offline Mode)');
           setIsActivating(false);
           return;
         }
-        
-        // Allowed
         foundInCache.activated = true;
         foundInCache.cancelled = false;
         foundInCache.activatedBy = userEmail || devId;
-        if (!foundInCache.firstActivatedBy) {
-          foundInCache.firstActivatedBy = userEmail || devId;
-        }
-        if (!foundInCache.activatedAt) {
-          foundInCache.activatedAt = new Date().toISOString();
-        }
+        if (!foundInCache.firstActivatedBy) foundInCache.firstActivatedBy = userEmail || devId;
+        if (!foundInCache.activatedAt) foundInCache.activatedAt = new Date().toISOString();
         
         let cachedKeys2 = localStorage.getItem('mz_backend_keys_cache');
         if (cachedKeys2) {
           try {
-            let list2: LicenseKeyBackend[] = JSON.parse(cachedKeys2);
+            let list2: any[] = JSON.parse(cachedKeys2);
             const updated = list2.map(k => k.key === targetKeyFormatted ? foundInCache : k);
             localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updated));
             setBackendKeys(updated);
