@@ -345,7 +345,7 @@ export const ImageQualityCheck: React.FC<{
                 } catch (uploadErr: any) {
                     console.warn("Failed to save EPS to R2/Storage:", uploadErr);
                     if (uploadErr.message === 'Failed to fetch') {
-                         throw new Error(`Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan setting CORS di dashboard Cloudflare R2 bucket Anda.`);
+                         throw new Error(`Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan setting CORS di dashboard Cloudflare R2 bucket Anda (Settings > CORS).`);
                     }
                 }
 

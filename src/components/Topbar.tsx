@@ -180,9 +180,11 @@ export const Topbar: React.FC<TopbarProps> = ({
                   className="w-7 h-7 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" 
                 />
               ) : (
-                <div className="w-7 h-7 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-[10px] font-black uppercase shadow-sm">
-                  {user.email ? user.email.substring(0, 2) : 'MZ'}
-                </div>
+                <img 
+                  src="https://ssl.gstatic.com/accounts/ui/avatar_2x.png" 
+                  alt="Default Profile" 
+                  className="w-7 h-7 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" 
+                />
               )}
             </button>
 

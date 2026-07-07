@@ -334,8 +334,8 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
               if (putErr.message === 'Failed to fetch') {
                 throw new Error(
                   t.language === 'Bahasa'
-                    ? 'Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan konfigurasi CORS di dashboard Cloudflare R2 bucket Anda.'
-                    : 'Failed to upload to Cloudflare R2 (CORS Error). Please make sure you have added CORS configuration to your Cloudflare R2 bucket settings.'
+                    ? 'Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan konfigurasi CORS di dashboard Cloudflare R2 bucket Anda (Settings > CORS).'
+                    : 'Failed to upload to Cloudflare R2 (CORS Error). Please make sure you have added CORS configuration to your Cloudflare R2 bucket settings (Settings > CORS).'
                 );
               }
               throw putErr;

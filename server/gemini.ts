@@ -1046,6 +1046,15 @@ function getAIClient(): any {
               const statusCode = err.status || err.code;
               const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
               
+              if (statusCode === 429) {
+                const retryMatch = errorMsg.match(/retry in ([\d\.]+)s/i) || errorMsg.match(/retrydelay['":\s]+([\d\.]+)s/i);
+                if (retryMatch && retryMatch[1]) {
+                  const delay = parseFloat(retryMatch[1]) * 1000 + 1000;
+                  console.log(`[Key Rotation - GEMINI] Rate limited, waiting ${delay}ms before next attempt/key rotation`);
+                  await new Promise(r => setTimeout(r, delay));
+                }
+              }
+
               if (statusCode === 429 || statusCode === 403 || errorMsg.includes("quota") || errorMsg.includes("exceeded") || errorMsg.includes("resource_exhausted") || errorMsg.includes("limit") || errorMsg.includes("api key")) {
                 if (store && store.gemini && store.gemini.activeIndex < keysList.length - 1) {
                   store.gemini.activeIndex++;

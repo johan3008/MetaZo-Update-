@@ -323,63 +323,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 2. PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
-      {isLicensed ? (
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xl shadow-emerald-500/10">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-white/20 text-white rounded-2xl shrink-0 mt-0.5">
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h4 className="text-sm font-black text-white uppercase tracking-wider">
-                {t.license_active_title}
-              </h4>
-              <p className="text-xs font-medium text-emerald-50 leading-relaxed mt-1">
-                {t.license_active_desc} {appName}.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center shrink-0">
-            <span className="px-4 py-2 bg-white text-emerald-700 font-extrabold text-[11px] rounded-full uppercase tracking-widest shadow-lg">
-              {t.license_pro_badge}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/30 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 shadow-md shadow-black/5 shadow-amber-500/5 select-none">
-          {!isLicensed && (
-            <div className="flex items-start space-x-4">
-              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0 mt-1">
-                <Key size={22} />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center space-x-2">
-                  <span>{t.trial_badge}</span>
-                </h4>
-                <p className="text-[12px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl mt-1.5">
-                  {t.trial_desc_part1} <strong className="text-slate-900 dark:text-slate-100 font-semibold">{appName}</strong> {t.trial_desc_part2} <strong className="text-amber-600 dark:text-amber-400 font-bold">{pricingTier}</strong>.
-                </p>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-            <button
-              onClick={() => setShowActivation?.(true)}
-              className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all shadow-md shadow-amber-500/20 cursor-pointer"
-            >
-              {t.trial_cta_license}
-            </button>
-            <a
-              href={`${whatsAppLink}?text=Halo%20Admin%2C%20saya%20tertarik%20membeli%20lisensi%20aktif%20SaaS%20${encodeURIComponent(appName || '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-[11px] uppercase tracking-wider rounded-full transition-all flex items-center justify-center cursor-pointer"
-            >
-              {t.trial_cta_admin}
-            </a>
-          </div>
-        </div>
-      )}
+      {/* Removed PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
 
       {/* PROMO / VOUCHER HIGHLIGHT BANNER */}
       {!isLicensed && (isLoadingPromos || promoCodes.length > 0) && (
