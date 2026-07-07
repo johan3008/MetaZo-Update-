@@ -328,6 +328,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       await setDoc(doc(db, 'promos', code), promoObj);
       setPromoSuccessMsg(`Kode promo ${code} berhasil dibuat!`);
       
+      // Update local state immediately
+      setPromos(prev => [{
+        id: code,
+        ...promoObj
+      } as PromoCode, ...prev]);
+
       // Reset form
       setNewPromoCode('');
       setNewPromoDesc('');
@@ -2812,7 +2818,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   <button
                     type="button"
                     onClick={handleApplyLicenseKey}
-                    disabled={isActivating || !inputKey.trim()}
+                    disabled={!inputKey.trim()}
                     className="w-full mt-3 py-3.5 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2 shadow-lg shadow-violet-500/10 cursor-pointer"
                   >
                     {isActivating ? (

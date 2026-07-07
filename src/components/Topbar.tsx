@@ -114,12 +114,12 @@ export const Topbar: React.FC<TopbarProps> = ({
       {/* RIGHT: SYSTEM HEALTH PILL, THEME SWAP, PROFILE */}
       <div className="flex items-center space-x-3">
         {/* Core status badge */}
-        <div className="relative group flex items-center px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-help">
-          <span className="relative flex h-2 w-2 mr-2">
+        <div className="relative group flex items-center px-2 py-1 sm:px-3 sm:py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-help">
+          <span className="relative flex h-2 w-2 mr-1.5 sm:mr-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+          <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
             {activeUsers.length > 0 ? activeUsers.length : activeAccountsCount} Active {activeUsers.length === 1 ? 'Account' : 'Accounts'}
           </span>
           
@@ -146,7 +146,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button 
             type="button"
             onClick={() => setShowActivation?.(true)}
-            className="text-[10px] font-black uppercase bg-emerald-500/10 dark:bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-full text-emerald-600 dark:text-emerald-400 cursor-pointer transition-all hover:scale-105 active:scale-95"
+            className="text-[9px] sm:text-[10px] font-black uppercase bg-emerald-500/10 dark:bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-emerald-600 dark:text-emerald-400 cursor-pointer transition-all hover:scale-105 active:scale-95"
             title={t.sidebar_manage_license}
           >
             {t.topbar_pro_active}
@@ -155,7 +155,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             type="button"
             onClick={() => setShowActivation?.(true)}
-            className="text-[10px] font-black uppercase bg-amber-500/10 dark:bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2.5 py-1 rounded-full text-amber-600 dark:text-amber-400 cursor-pointer transition-all hover:scale-105 active:scale-95 animate-pulse"
+            className="text-[9px] sm:text-[10px] font-black uppercase bg-amber-500/10 dark:bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-amber-600 dark:text-amber-400 cursor-pointer transition-all hover:scale-105 active:scale-95 animate-pulse"
             title={t.sidebar_activation_tooltip}
           >
             {t.topbar_trial_eval}
