@@ -137,7 +137,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [promoApplySuccess, setPromoApplySuccess] = useState('');
   const [promoApplyError, setPromoApplyError] = useState('');
   
-  const isSystemPromoActive = new Date() < new Date('2026-07-01T00:00:00+07:00');
+  const isSystemPromoActive = new Date() < new Date('2027-07-01T00:00:00+07:00');
   const systemPromo: PromoCode | null = isSystemPromoActive ? {
     id: 'SYSTEM_PROMO',
     code: 'PROMO SYSTEM',
@@ -145,7 +145,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     value: 30,
     maxUses: 999999,
     startDate: '2025-01-01',
-    endDate: '2026-07-01',
+    endDate: '2027-07-01',
     usedCount: 0,
     description: 'Diskon otomatis 30%'
   } : null;
@@ -2524,7 +2524,6 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                         {backendKeys
-                          .filter(k => k.activated)
                           .filter(k => 
                             k.key.toLowerCase().includes(auditSearchQuery.toLowerCase()) || 
                             (k.activatedBy || '').toLowerCase().includes(auditSearchQuery.toLowerCase())
@@ -2532,23 +2531,23 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           .map((k, idx) => (
                             <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
                               <td className="px-4 py-3 font-mono font-bold text-[10px]">{k.key}</td>
-                              <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">{k.activatedBy}</td>
+                              <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">{k.activatedBy || 'N/A'}</td>
                               <td className="px-4 py-3 font-semibold text-[10px] text-slate-600 dark:text-slate-300">
-                                {k.duration === 'unlimited' ? 'Unlimited PRO' : (k.duration === '30days' ? '30 Days PRO' : `${k.duration} PRO`)}
+                                {k.activated ? (k.duration === 'unlimited' ? 'Unlimited PRO' : (k.duration === '30days' ? '30 Days PRO' : `${k.duration} PRO`)) : 'Free Trial'}
                               </td>
                               <td className="px-4 py-3 text-slate-500 text-[10px]">
-                                {k.duration === 'unlimited' ? 'Lifetime' : (k.duration === '30days' ? '30 Hari' : `${k.duration}`)}
+                                {k.activated ? (k.duration === 'unlimited' ? 'Lifetime' : (k.duration === '30days' ? '30 Hari' : `${k.duration}`)) : '-'}
                               </td>
                               <td className="px-4 py-3 text-slate-500 text-[10px]">{k.activatedAt ? new Date(k.activatedAt).toLocaleString() : '-'}</td>
                               <td className="px-4 py-3">
-                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest">
-                                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
-                                  <span>Active</span>
+                                <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest ${k.activated ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400'}`}>
+                                  <span className={`w-1 h-1 rounded-full ${k.activated ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`}></span>
+                                  <span>{k.activated ? 'Active' : 'Free Trial'}</span>
                                 </span>
                               </td>
                             </tr>
                         ))}
-                        {backendKeys.filter(k => k.activated).filter(k => k.key.toLowerCase().includes(auditSearchQuery.toLowerCase()) || (k.activatedBy || '').toLowerCase().includes(auditSearchQuery.toLowerCase())).length === 0 && (
+                        {backendKeys.filter(k => k.key.toLowerCase().includes(auditSearchQuery.toLowerCase()) || (k.activatedBy || '').toLowerCase().includes(auditSearchQuery.toLowerCase())).length === 0 && (
                           <tr>
                             <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                               Tidak ada data aktivasi yang sesuai pencarian.
