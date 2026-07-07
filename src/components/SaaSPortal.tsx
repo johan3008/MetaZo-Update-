@@ -1036,7 +1036,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await setDoc(generatedKeyRef, {
           key: generatedLicenseKey,
           activated: true,
-          activatedBy: userId || devId,
+          activatedBy: userEmail || devId,
           activatedAt: new Date().toISOString(),
           duration: durationStr,
           promoCode: cleanPromo,
@@ -1158,7 +1158,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           const keyData = {
             key: generatedLicenseKey,
             activated: true,
-            activatedBy: userId || devId,
+            activatedBy: userEmail || devId,
             activatedAt: new Date().toISOString(),
             duration: durationStr,
             promoCode: cleanPromo,
@@ -1257,7 +1257,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
          await setDoc(doc(db, 'keys', newKey), {
           key: newKey,
           activated: true,
-          activatedBy: userId || devId,
+          activatedBy: userEmail || devId,
           activatedAt: new Date().toISOString(),
           duration: duration,
           createdAt: new Date().toISOString()
@@ -1410,8 +1410,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             await updateDoc(keyRef, {
               activated: true,
               cancelled: false,
-              activatedBy: userId || devId,
-              firstActivatedBy: userId || devId,
+              activatedBy: userEmail || devId,
+              firstActivatedBy: userEmail || devId,
               updatedAt: new Date().toISOString()
             }).catch(console.error);
 
@@ -1434,8 +1434,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           await updateDoc(keyRef, {
             activated: true,
             cancelled: false,
-            activatedBy: userId || devId,
-            firstActivatedBy: userId || devId,
+            activatedBy: userEmail || devId,
+            firstActivatedBy: userEmail || devId,
             activatedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
@@ -1495,9 +1495,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         // Allowed
         foundInCache.activated = true;
         foundInCache.cancelled = false;
-        foundInCache.activatedBy = userId || devId;
+        foundInCache.activatedBy = userEmail || devId;
         if (!foundInCache.firstActivatedBy) {
-          foundInCache.firstActivatedBy = userId || devId;
+          foundInCache.firstActivatedBy = userEmail || devId;
         }
         if (!foundInCache.activatedAt) {
           foundInCache.activatedAt = new Date().toISOString();

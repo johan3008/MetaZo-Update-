@@ -2090,42 +2090,40 @@ const App: React.FC = () => {
             const currentEmail = user?.email || '';
             const keyActivatedBy = data.activatedBy || '';
             const firstActivatedBy = data.firstActivatedBy || '';
-            const ownerEmail = firstActivatedBy || keyActivatedBy;
-
+            const ownerId = firstActivatedBy || keyActivatedBy;
             const isEmail = (str: string) => str.includes('@');
-
             let isRejected = false;
 
-            if (ownerEmail && isEmail(ownerEmail)) {
-              // Bound to an email, must match the current logged-in user's email
-              if (user) {
-                if (!currentEmail || ownerEmail.toLowerCase() !== currentEmail.toLowerCase()) {
-                  isRejected = true;
-                }
-              } else {
-                // User is not logged in yet (or auth state is still resolving). 
-                // Do NOT reject or delete the key, just don't set it to licensed yet.
-                setIsMzLicensed(false);
-                setIsCheckingLicense(false);
-                return;
-              }
-            } else if (ownerEmail && !isEmail(ownerEmail)) {
-              // Bound to a device ID
-              if (ownerEmail === devId) {
-                // Same device ID, upgrade to email binding if logged in
-                if (user && user.email) {
+            if (user) {
+              if (ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
+                // Valid! If it's a UID, upgrade it to email
+                if (ownerId === user.uid && currentEmail) {
                   updateDoc(doc(db, 'keys', k), {
-                    activatedBy: user.email,
-                    firstActivatedBy: user.email,
+                    activatedBy: currentEmail,
+                    firstActivatedBy: currentEmail,
+                    updatedAt: new Date().toISOString()
+                  }).catch(e => console.info('db_op', e));
+                }
+              } else if (ownerId === devId) {
+                if (currentEmail) {
+                  updateDoc(doc(db, 'keys', k), {
+                    activatedBy: currentEmail,
+                    firstActivatedBy: currentEmail,
                     updatedAt: new Date().toISOString()
                   }).catch(e => console.info('db_op', e));
                 }
               } else {
-                // Bound to a DIFFERENT device ID!
+                isRejected = true;
+              }
+            } else {
+              if (ownerId && isEmail(ownerId)) {
+                setIsMzLicensed(false);
+                setIsCheckingLicense(false);
+                return;
+              } else if (ownerId && ownerId !== devId) {
                 isRejected = true;
               }
             }
-
             const clearLicenseKey = (msg?: string) => {
               setIsMzLicensed(false);
               setSubDaysLeft(null);
@@ -2150,7 +2148,7 @@ const App: React.FC = () => {
             }
 
             // Link device-bound activation to user's email when they log in
-            if (user && user.email && (!ownerEmail || !isEmail(ownerEmail))) {
+            if (user && user.email && (!ownerId || !isEmail(ownerId))) {
               updateDoc(doc(db, 'keys', k), {
                 activatedBy: user.email,
                 firstActivatedBy: user.email,
@@ -4635,7 +4633,7 @@ const App: React.FC = () => {
             >
               {(['appearance', selectedProvider, 'faq_billing', ...(isAdminAccount ? ['reseller'] : [])] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? '💳 FAQ Tagihan & Langganan' : '💳 Billing & Subscription FAQ') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? '�� Tampilan & Tema' : '�� Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? '�� FAQ Tagihan & Langganan' : '�� Billing & Subscription FAQ') : tab === 'reseller' ? '�� Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
