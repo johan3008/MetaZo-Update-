@@ -1603,16 +1603,35 @@ const App: React.FC = () => {
           localStorage.setItem('mz_cancelled_subscription', 'true');
         } else {
           const activeKey = cloudKey || localKey || '';
-          setMzLicenseKey(activeKey);
-          localStorage.setItem('mz_license_key', activeKey);
-          localStorage.removeItem('mz_cancelled_subscription');
           
-          if (cloudKey !== activeKey || data.cancelledSubscription) {
-            updateDoc(userDocRef, {
-              licenseKey: activeKey,
-              cancelledSubscription: false,
-              updatedAt: new Date().toISOString()
-            }).catch(e => console.info('db_op', e));
+          if (activeKey) {
+            setMzLicenseKey(activeKey);
+            localStorage.setItem('mz_license_key', activeKey);
+            localStorage.removeItem('mz_cancelled_subscription');
+            
+            if (cloudKey !== activeKey || data.cancelledSubscription) {
+              updateDoc(userDocRef, {
+                licenseKey: activeKey,
+                cancelledSubscription: false,
+                updatedAt: new Date().toISOString()
+              }).catch(e => console.info('db_op', e));
+            }
+          } else {
+            // Attempt to restore from keys collection if both cloud and local are empty
+            findActiveKeyForEmail(user.email || '').then((foundKey) => {
+              if (foundKey) {
+                setMzLicenseKey(foundKey);
+                localStorage.setItem('mz_license_key', foundKey);
+                localStorage.removeItem('mz_cancelled_subscription');
+                updateDoc(userDocRef, {
+                  licenseKey: foundKey,
+                  cancelledSubscription: false,
+                  updatedAt: new Date().toISOString()
+                }).catch(e => console.info('db_op', e));
+              } else {
+                setMzLicenseKey('');
+              }
+            });
           }
         }
 
@@ -1820,23 +1839,6 @@ const App: React.FC = () => {
 
     return () => unsubscribeUser();
   }, [user]);
-
-  // Sync the activated license key to Firestore whenever the user changes or redeems it
-  useEffect(() => {
-    if (!user || !hasSyncedProfile) return;
-    
-    const userRef = doc(db, 'users', user.uid);
-    updateDoc(userRef, {
-      licenseKey: mzLicenseKey,
-      updatedAt: new Date().toISOString()
-    }).catch(err => {
-      // Fallback merge
-      setDoc(userRef, {
-        licenseKey: mzLicenseKey,
-        updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(e => console.info('db_op', e));
-    });
-  }, [mzLicenseKey, user, hasSyncedProfile]);
 
   // Keep daily counts refreshed when cloudDailyCounts changes
   useEffect(() => {
@@ -2114,12 +2116,11 @@ const App: React.FC = () => {
               }
             }
 
-            if (isRejected) {
+            const clearLicenseKey = (msg?: string) => {
               setIsMzLicensed(false);
               setSubDaysLeft(null);
               localStorage.removeItem('mz_license_key');
               setMzLicenseKey('');
-              // Remove it from the logged-in user's cloud document to prevent re-syncing
               if (user) {
                 const userRef = doc(db, 'users', user.uid);
                 updateDoc(userRef, {
@@ -2128,7 +2129,11 @@ const App: React.FC = () => {
                 }).catch(() => {});
               }
               setIsCheckingLicense(false);
-              alert(localStorage.getItem('mz_language') === 'Bahasa'
+              if (msg) alert(msg);
+            };
+
+            if (isRejected) {
+              clearLicenseKey(localStorage.getItem('mz_language') === 'Bahasa'
                 ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.' 
                 : 'This license key is already registered to another account! One license can only be used on one account.');
               return;
@@ -2152,12 +2157,7 @@ const App: React.FC = () => {
               const remainingDays = 30 - elapsedDays;
 
               if (remainingDays <= 0) {
-                setIsMzLicensed(false);
-                setSubDaysLeft(null);
-                localStorage.removeItem('mz_license_key');
-                setMzLicenseKey('');
-                setIsCheckingLicense(false);
-                alert('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
+                clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
                 return;
               }
               setSubDaysLeft(Math.max(0, remainingDays));
@@ -2166,34 +2166,19 @@ const App: React.FC = () => {
             }
             setIsMzLicensed(true);
           } else {
-            setIsMzLicensed(false);
-            setSubDaysLeft(null);
-            localStorage.removeItem('mz_license_key');
-            setMzLicenseKey('');
+            clearLicenseKey();
           }
         } else {
-          setIsMzLicensed(false);
-          setSubDaysLeft(null);
-          localStorage.removeItem('mz_license_key');
-          setMzLicenseKey('');
+          clearLicenseKey();
         }
       })
       .catch(err => {
         console.warn('License validator connection error, attempting offline check:', err);
-        const validateKeyOffline = (keyStr: string) => {
-          return false;
-        };
-
-        if (validateKeyOffline(k)) {
-          console.info('Offline key validation passed for:', k);
-          setIsMzLicensed(true);
-          setSubDaysLeft(null);
-        } else {
-          setIsMzLicensed(false);
-          setSubDaysLeft(null);
-          localStorage.removeItem('mz_license_key');
-          setMzLicenseKey('');
-        }
+        
+        setIsMzLicensed(false);
+        setSubDaysLeft(null);
+        localStorage.removeItem('mz_license_key');
+        setMzLicenseKey('');
       })
       .finally(() => {
         setIsCheckingLicense(false);
