@@ -333,15 +333,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         id: code,
         ...promoObj
       } as PromoCode, ...prev]);
+      
+      console.log("Promo created and local state updated, skipping refetch");
 
       // Reset form
       setNewPromoCode('');
       setNewPromoDesc('');
       setNewPromoStartDate('');
       setNewPromoEndDate('');
-      
-      // reload directory
-      await fetchPromosFromDb();
     } catch (err: any) {
       console.error("Failed to create promo in Firestore, falling back to local storage:", err);
       
