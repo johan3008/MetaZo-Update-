@@ -136,22 +136,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoApplySuccess, setPromoApplySuccess] = useState('');
   const [promoApplyError, setPromoApplyError] = useState('');
-  
-  const isSystemPromoActive = new Date() < new Date('2027-07-01T00:00:00+07:00');
-  const systemPromo: PromoCode | null = isSystemPromoActive ? {
-    id: 'SYSTEM_PROMO',
-    code: 'PROMO SYSTEM',
-    type: 'discount',
-    value: 30,
-    maxUses: 999999,
-    startDate: '2025-01-01',
-    endDate: '2027-07-01',
-    usedCount: 0,
-    description: 'Diskon otomatis 30%'
-  } : null;
 
   const [activePromoState, setActivePromoState] = useState<PromoCode | null>(null);
-  const activePromo = activePromoState || systemPromo;
+  const activePromo = activePromoState;
   const setActivePromo = setActivePromoState;
 
   // Reseller Landing Gateway State
@@ -268,14 +255,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       }
       let cached = localStorage.getItem('mz_backend_keys_cache');
       if (!cached) {
-        const seedKeys = [
-          { key: "MZPRO-ABCD-EFGH-IJKL", activated: true, activatedBy: "trialuser1@gmail.com", activatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), duration: "30days" },
-          { key: "MZPRO-1234-5678-90AB", activated: true, activatedBy: "premiumuser@gmail.com", activatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), duration: "unlimited" },
-          { key: "MZPRO-WXYZ-8888-9999", activated: false, activatedBy: "", activatedAt: "", duration: "30days" },
-          { key: "MZPRO-K7Y9-L1R4-Q9W2", activated: false, activatedBy: "", activatedAt: "", duration: "unlimited" }
-        ];
-        localStorage.setItem('mz_backend_keys_cache', JSON.stringify(seedKeys));
-        cached = JSON.stringify(seedKeys);
+        cached = JSON.stringify([]);
       }
       try {
         setBackendKeys(JSON.parse(cached));
@@ -317,13 +297,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setPromoErrorMsg('Gagal mengambil daftar promo.');
       let cached = localStorage.getItem('mz_promos_cache');
       if (!cached) {
-        const seedPromos = [
-          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" }
-        ];
-        localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
-        cached = JSON.stringify(seedPromos);
+        cached = JSON.stringify([]);
       }
       try {
         setPromos(JSON.parse(cached));
@@ -480,14 +454,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       }
       let cached = localStorage.getItem('mz_backend_keys_cache');
       if (!cached) {
-        const seedKeys = [
-          { key: "MZPRO-ABCD-EFGH-IJKL", activated: true, activatedBy: "trialuser1@gmail.com", activatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), duration: "30days" },
-          { key: "MZPRO-1234-5678-90AB", activated: true, activatedBy: "premiumuser@gmail.com", activatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), duration: "unlimited" },
-          { key: "MZPRO-WXYZ-8888-9999", activated: false, activatedBy: "", activatedAt: "", duration: "30days" },
-          { key: "MZPRO-K7Y9-L1R4-Q9W2", activated: false, activatedBy: "", activatedAt: "", duration: "unlimited" }
-        ];
-        localStorage.setItem('mz_backend_keys_cache', JSON.stringify(seedKeys));
-        cached = JSON.stringify(seedKeys);
+        cached = JSON.stringify([]);
       }
       try {
         setBackendKeys(JSON.parse(cached));
@@ -533,13 +500,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setPromoErrorMsg(isPermissionErr ? 'Menggunakan data promo lokal (Sandbox Mode).' : 'Gagal mengambil daftar promo real-time (Quota exceeded). Menggunakan data lokal.');
       let cached = localStorage.getItem('mz_promos_cache');
       if (!cached) {
-        const seedPromos = [
-          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" }
-        ];
-        localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
-        cached = JSON.stringify(seedPromos);
+        cached = JSON.stringify([]);
       }
       try {
         setPromos(JSON.parse(cached));
@@ -959,14 +920,6 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     const s = seed.trim().toUpperCase();
     if (!k) return false;
     if (k === s) return true;
-    if (k === 'MZPRO-VIP-2026' || k === 'MZPRO-UNLIMITED-LIFE' || k === 'MZPRO-COMMERCIAL-2026') return true;
-    if (k.startsWith('MZPRO-') && k.endsWith('-OK')) return true;
-    if (k.length >= 10 && k.includes('MZ') && k.includes('2026')) return true;
-    
-    // Add fallback seed keys for Firestore quota block resilience
-    const fallbackKeys = ['MZPRO-ABCD-EFGH-IJKL', 'MZPRO-1234-5678-90AB', 'MZPRO-WXYZ-8888-9999', 'MZPRO-K7Y9-L1R4-Q9W2'];
-    if (fallbackKeys.includes(k)) return true;
-    
     return false;
   };
 
@@ -1534,15 +1487,6 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         
         localStorage.setItem('mz_license_key', targetKeyFormatted);
         await syncUserDb(targetKeyFormatted);
-        setLicenseKey(targetKeyFormatted);
-        setActivationSuccess(true);
-        setActivationError('');
-        setTimeout(() => {
-          setActivationSuccess(false);
-          setShowActivation(false);
-        }, 2500);
-      } else if (validateKey(targetKeyFormatted, '')) {
-        localStorage.setItem('mz_license_key', targetKeyFormatted);
         setLicenseKey(targetKeyFormatted);
         setActivationSuccess(true);
         setActivationError('');
@@ -2848,13 +2792,13 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                           setInputKey(e.target.value.toUpperCase());
                           setActivationError('');
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 outline-none font-mono font-bold text-xs focus:ring-1 focus:ring-[#7c3aed] focus:border-[#7c3aed] transition-all whitespace-nowrap overflow-x-auto text-slate-900 dark:text-slate-103 text-center tracking-wider placeholder:text-slate-40o"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 outline-none font-mono font-bold text-xs focus:ring-1 focus:ring-[#7c3aed] focus:border-[#7c3aed] transition-all whitespace-nowrap overflow-x-auto text-slate-900 dark:text-slate-100 text-center tracking-wider placeholder:text-slate-400"
                       />
                       <Key size={14} className="text-slate-400 absolute left-3 w-4 h-4 top-[14px] rotate-45" />
                     </div>
                     
                     {activationError && (
-                      <p className="text-[10px] font-extrabold text-red-550 border-l-2 border-red-500 pl-2 mt-1.5 uppercase transition-all">
+                      <p className="text-[10px] font-extrabold text-red-500 border-l-2 border-red-500 pl-2 mt-1.5 uppercase transition-all">
                         ⚠️ {activationError}
                       </p>
                     )}
@@ -2873,8 +2817,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   <button
                     type="button"
                     onClick={handleApplyLicenseKey}
-                    disabled={isActivating}
-                    className="w-full py-3.5 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2 shadow-lg shadow-violet-550/10 cursor-pointer"
+                    disabled={isActivating || !inputKey.trim()}
+                    className="w-full mt-3 py-3.5 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2 shadow-lg shadow-violet-500/10 cursor-pointer"
                   >
                     {isActivating ? (
                       <RefreshCw size={14} className="animate-spin" />
@@ -2883,6 +2827,20 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     )}
                     <span>{isActivating ? t.activation_btn_process : t.activation_btn_activate}</span>
                   </button>
+
+                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-[#1e293b] space-y-3">
+                    <h5 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
+                      {t.language === 'Bahasa' ? 'Perlu Bantuan Aktivasi?' : 'Need Activation Help?'}
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => window.open(whatsAppLink, '_blank')}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center space-x-2 shadow-lg"
+                    >
+                      <MessageCircle size={14} />
+                      <span>{t.language === 'Bahasa' ? 'Hubungi Support' : 'Contact Support'}</span>
+                    </button>
+                  </div>
 
                   {/* Need support details */}
                   <div className="pt-4 border-t border-slate-100 dark:border-[#1e293b] space-y-3">

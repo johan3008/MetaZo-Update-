@@ -1602,7 +1602,7 @@ const App: React.FC = () => {
           localStorage.removeItem('mz_license_key');
           localStorage.setItem('mz_cancelled_subscription', 'true');
         } else {
-          const activeKey = cloudKey || localKey || 'MZPRO-AUTO-PRO';
+          const activeKey = cloudKey || localKey || '';
           setMzLicenseKey(activeKey);
           localStorage.setItem('mz_license_key', activeKey);
           localStorage.removeItem('mz_cancelled_subscription');
@@ -1775,7 +1775,7 @@ const App: React.FC = () => {
           };
 
           const isCancelled = localStorage.getItem('mz_cancelled_subscription') === 'true';
-          const resolvedKey = finalKey || (isCancelled ? '' : 'MZPRO-AUTO-PRO');
+          const resolvedKey = finalKey || '';
           if (resolvedKey) {
             setMzLicenseKey(resolvedKey);
             localStorage.setItem('mz_license_key', resolvedKey);
@@ -2067,13 +2067,6 @@ const App: React.FC = () => {
 
     setIsCheckingLicense(true);
 
-    if (k === 'MZPRO-AUTO-PRO') {
-      setIsMzLicensed(true);
-      setSubDaysLeft(null);
-      setIsCheckingLicense(false);
-      return;
-    }
-
     let devId = localStorage.getItem('mz_device_id');
     if (!devId) {
       devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
@@ -2188,12 +2181,6 @@ const App: React.FC = () => {
       .catch(err => {
         console.warn('License validator connection error, attempting offline check:', err);
         const validateKeyOffline = (keyStr: string) => {
-          const uk = keyStr.trim().toUpperCase();
-          if (uk === 'MZPRO-VIP-2026' || uk === 'MZPRO-UNLIMITED-LIFE' || uk === 'MZPRO-COMMERCIAL-2026') return true;
-          if (uk.startsWith('MZPRO-') && uk.endsWith('-OK')) return true;
-          if (uk.length >= 10 && uk.includes('MZ') && uk.includes('2026')) return true;
-          const fallbackKeys = ['MZPRO-ABCD-EFGH-IJKL', 'MZPRO-1234-5678-90AB', 'MZPRO-WXYZ-8888-9999', 'MZPRO-K7Y9-L1R4-Q9W2'];
-          if (fallbackKeys.includes(uk)) return true;
           return false;
         };
 
@@ -4157,6 +4144,7 @@ const App: React.FC = () => {
             >
               {activeTool === ToolType.DASHBOARD ? (
                 <DashboardView 
+              userName={user?.displayName || user?.email?.split('@')[0] || ''}
               files={files}
               setActiveTool={handleSetActiveTool}
               setShowInfoModal={setShowInfoModal}
