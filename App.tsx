@@ -1126,7 +1126,7 @@ const App: React.FC = () => {
             snapshot.forEach(doc => {
                const data = doc.data();
                const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
-               if (nameToShow !== 'Unknown') usersList.push(nameToShow);
+               if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') usersList.push(nameToShow);
             });
             
             if (usersList.length === 0 && auth.currentUser) {
@@ -1140,7 +1140,7 @@ const App: React.FC = () => {
             console.error("Active accounts error:", e);
             if (auth.currentUser) {
                 const nameToShow = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
-                if (nameToShow !== 'Unknown') {
+                if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') {
                     setActiveUsers([nameToShow]);
                     setActiveAccountsCount(1);
                 } else {
