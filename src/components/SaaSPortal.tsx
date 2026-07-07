@@ -226,11 +226,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       const qSnap = await getDocs(collection(db, 'keys'));
       const keysList: LicenseKeyBackend[] = [];
       qSnap.forEach((doc) => {
+        let activatedBy = doc.data().activatedBy || '';
+        const firstActivatedBy = doc.data().firstActivatedBy || '';
+        let ownerId = firstActivatedBy || activatedBy;
+        if (userId && userEmail && ownerId === userId) {
+           activatedBy = userEmail;
+           // Automatically heal the database for this user
+           updateDoc(doc.ref, { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
+        }
         const data = doc.data();
         keysList.push({
           key: doc.id,
           activated: !!data.activated,
-          activatedBy: data.activatedBy || '',
+          activatedBy: activatedBy || '',
           activatedAt: data.activatedAt || '',
           duration: data.duration || 'unlimited'
         });
@@ -424,11 +432,19 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     const unsubKeys = onSnapshot(collection(db, 'keys'), (qSnap) => {
       const keysList: LicenseKeyBackend[] = [];
       qSnap.forEach((doc) => {
+        let activatedBy = doc.data().activatedBy || '';
+        const firstActivatedBy = doc.data().firstActivatedBy || '';
+        let ownerId = firstActivatedBy || activatedBy;
+        if (userId && userEmail && ownerId === userId) {
+           activatedBy = userEmail;
+           // Automatically heal the database for this user
+           updateDoc(doc.ref, { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
+        }
         const data = doc.data();
         keysList.push({
           key: doc.id,
           activated: !!data.activated,
-          activatedBy: data.activatedBy || '',
+          activatedBy: activatedBy || '',
           activatedAt: data.activatedAt || '',
           duration: data.duration || 'unlimited'
         });
