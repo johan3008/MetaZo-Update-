@@ -2090,7 +2090,9 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isCheckingAuth) return;
     const k = mzLicenseKey.trim().toUpperCase();
+    console.log("App.tsx license useEffect running. k:", k);
     if (!k) {
+      console.log("App.tsx license useEffect: no key");
       setIsMzLicensed(false);
       setSubDaysLeft(null);
       setIsCheckingLicense(false);

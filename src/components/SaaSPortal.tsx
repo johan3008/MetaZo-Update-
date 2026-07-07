@@ -1420,6 +1420,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             setActivationError(localStorage.getItem('mz_language') === 'Bahasa'
               ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.'
               : 'This license key is already registered to another account! One license can only be used on one account.');
+            setIsActivating(false);
           }
         } else {
           // Unactivated single-use key -> activate and bind permanently to this account!
@@ -1441,12 +1442,15 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             setActivationSuccess(false);
             setShowActivation(false);
           }, 2500);
+          setIsActivating(false);
         }
       } else {
         setActivationError(t.activation_error_invalid);
+        setIsActivating(false);
       }
     } catch (err: any) {
       console.warn('Database activate check error, falling back:', err);
+      setIsActivating(false);
       // Fallback check against cached keys
       let cachedKeys = localStorage.getItem('mz_backend_keys_cache');
       let foundInCache: any = null;
