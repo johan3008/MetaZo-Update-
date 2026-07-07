@@ -178,12 +178,14 @@ export const Topbar: React.FC<TopbarProps> = ({
                   src={user.photoURL} 
                   alt={user.displayName || 'Profile'} 
                   className="w-7 h-7 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" 
+                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <img 
                   src="https://ssl.gstatic.com/accounts/ui/avatar_2x.png" 
                   alt="Default Profile" 
                   className="w-7 h-7 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" 
+                  referrerPolicy="no-referrer"
                 />
               )}
             </button>
