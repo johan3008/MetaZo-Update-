@@ -425,29 +425,36 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
 }
 
 export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void> {
-  if (supabase) {
-    try {
-      const { error } = await supabase
-        .from(docRef.table)
-        .update(data)
-        .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
-      if (!error) return;
-      console.warn(`[Supabase] updateDoc failed, falling back to Local Storage:`, error);
-    } catch (e) {
-      console.warn(`[Supabase] updateDoc failed with error, falling back to Local Storage:`, e);
-    }
-  }
-
-  // Local emulation fallback
+  // Always update local emulation as a cache
   const list = getEmulatedTable(docRef.table);
   const index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
   if (index >= 0) {
     list[index] = { ...list[index], ...data };
     saveEmulatedTable(docRef.table, list);
   }
+
+  if (supabase) {
+    try {
+      const { data: resData, error } = await supabase
+        .from(docRef.table)
+        .update(data)
+        .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+        .select();
+      
+      if (!error && resData && resData.length > 0) return;
+      console.warn(`[Supabase] updateDoc failed or no rows updated, falling back to Local Storage:`, error);
+    } catch (e) {
+      console.warn(`[Supabase] updateDoc failed with error, falling back to Local Storage:`, e);
+    }
+  }
 }
 
 export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
+  // Always update local emulation as a cache
+  const list = getEmulatedTable(docRef.table);
+  const filtered = list.filter(row => (row.key !== docRef.id && row.id !== docRef.id));
+  saveEmulatedTable(docRef.table, filtered);
+
   if (supabase) {
     try {
       const { error } = await supabase
@@ -460,9 +467,6 @@ export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
       console.warn('[Supabase] deleteDoc exception, falling back:', e);
     }
   }
-  const list = getEmulatedTable(docRef.table);
-  const filtered = list.filter(row => (row.key !== docRef.id && row.id !== docRef.id));
-  saveEmulatedTable(docRef.table, filtered);
 }
 
 export async function addDoc(collectionRef: SupabaseCollectionRef, data: any): Promise<SupabaseDocRef> {
