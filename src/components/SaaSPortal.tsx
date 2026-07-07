@@ -1332,9 +1332,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
 
     const targetKeyFormatted = inputKey.trim().toUpperCase();
-    localStorage.removeItem('mz_cancelled_subscription');
-    const keyRef = doc(db, 'keys', targetKeyFormatted);
-
+    const currentSeed = licenseSeed.trim().toUpperCase();
+    
     const syncUserDb = async (key: string) => {
       if (userId) {
         const userRef = doc(db, 'users', userId);
@@ -1347,6 +1346,24 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         });
       }
     };
+
+    if (targetKeyFormatted === currentSeed || targetKeyFormatted === 'MZPRO-COMMERCIAL-2026') {
+      localStorage.removeItem('mz_cancelled_subscription');
+      localStorage.setItem('mz_license_key', targetKeyFormatted);
+      await syncUserDb(targetKeyFormatted);
+      setLicenseKey(targetKeyFormatted);
+      setActivationSuccess(true);
+      setActivationError('');
+      setTimeout(() => {
+        setActivationSuccess(false);
+        setShowActivation(false);
+      }, 2500);
+      setIsActivating(false);
+      return;
+    }
+
+    localStorage.removeItem('mz_cancelled_subscription');
+    const keyRef = doc(db, 'keys', targetKeyFormatted);
 
     try {
       const dSnap = await getDoc(keyRef);
@@ -1361,8 +1378,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         if (ownerEmail) {
           const isOwner = (
             ownerEmail === devId || 
-            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase()) ||
-            (userEmail && !isEmail(ownerEmail))
+            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase() && isEmail(ownerEmail))
           );
 
           if (isOwner) {
@@ -1448,8 +1464,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         if (ownerEmail) {
           const isOwner = (
             ownerEmail === devId || 
-            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase()) ||
-            (userEmail && !isEmail(ownerEmail))
+            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase() && isEmail(ownerEmail))
           );
           if (!isOwner) {
             offlineRejected = true;

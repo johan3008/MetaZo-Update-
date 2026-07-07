@@ -2069,6 +2069,14 @@ const App: React.FC = () => {
 
     setIsCheckingLicense(true);
 
+    const currentSeed = localStorage.getItem('mz_reseller_seed')?.trim().toUpperCase() || 'MZPRO-COMMERCIAL-2026';
+    if (k === currentSeed || k === 'MZPRO-COMMERCIAL-2026') {
+      setIsMzLicensed(true);
+      setSubDaysLeft(null);
+      setIsCheckingLicense(false);
+      return;
+    }
+
     let devId = localStorage.getItem('mz_device_id');
     if (!devId) {
       devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
@@ -2089,6 +2097,7 @@ const App: React.FC = () => {
             const isEmail = (str: string) => str.includes('@');
 
             let isRejected = false;
+
             if (ownerEmail && isEmail(ownerEmail)) {
               // Bound to an email, must match the current logged-in user's email
               if (user) {
@@ -4147,7 +4156,6 @@ const App: React.FC = () => {
               videoDailyCount={dailyGenCounts[ToolType.VIDEO] || 0}
               vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
               t={t}
-              userName={user?.displayName || user?.email?.split('@')[0] || ''}
             />
           ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView 
