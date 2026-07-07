@@ -1217,12 +1217,6 @@ const App: React.FC = () => {
   }, [showSettingsModal, selectedProvider]);
 
   // Reseller & License state
-  const [isResellerUnlocked, setIsResellerUnlocked] = useState(() => localStorage.getItem('mz_reseller_unlocked') === 'true');
-  const [resellerClicks, setResellerClicks] = useState(0);
-  const [showResellerUnlockInput, setShowResellerUnlockInput] = useState(false);
-  const [resellerPasscodeVal, setResellerPasscodeVal] = useState('');
-  const [resellerPasscodeError, setResellerPasscodeError] = useState('');
-
   const [mzAppName, setMzAppName] = useState(() => localStorage.getItem('mz_reseller_app_name') || 'MetaZo PRO');
   const [mzAppSubtitle, setMzAppSubtitle] = useState(() => localStorage.getItem('mz_reseller_app_subtitle') || 'AI-Powered Metadata Assistant');
   const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr');
@@ -1244,6 +1238,10 @@ const App: React.FC = () => {
 
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  const isAdminAccount = !!user && ((import.meta.env.VITE_ADMIN_UID && user.uid === import.meta.env.VITE_ADMIN_UID) || (user.email && ['johanchrismant4@gmail.com'].includes(user.email)));
+  const isResellerUnlocked = isAdminAccount;
+  const setIsResellerUnlocked = () => {};
 
   // --- Real-time Chat Notifications, Chime Synthesizer & Toasting Stack ---
   const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -2111,16 +2109,19 @@ const App: React.FC = () => {
                 setIsCheckingLicense(false);
                 return;
               }
-            } else if (ownerEmail && ownerEmail !== devId) {
-              // Bound to another device ID and no email is associated with it yet
-              if (user && user.email) {
-                // Link device-bound activation to user's email since they are logged in
-                updateDoc(doc(db, 'keys', k), {
-                  activatedBy: user.email,
-                  firstActivatedBy: user.email,
-                  updatedAt: new Date().toISOString()
-                }).catch(e => console.info('db_op', e));
+            } else if (ownerEmail && !isEmail(ownerEmail)) {
+              // Bound to a device ID
+              if (ownerEmail === devId) {
+                // Same device ID, upgrade to email binding if logged in
+                if (user && user.email) {
+                  updateDoc(doc(db, 'keys', k), {
+                    activatedBy: user.email,
+                    firstActivatedBy: user.email,
+                    updatedAt: new Date().toISOString()
+                  }).catch(e => console.info('db_op', e));
+                }
               } else {
+                // Bound to a DIFFERENT device ID!
                 isRejected = true;
               }
             }
@@ -2194,19 +2195,7 @@ const App: React.FC = () => {
       });
   }, [mzLicenseKey, user, isCheckingAuth]);
 
-  const handleTryUnlockReseller = (typedVal?: string) => {
-    const val = (typedVal !== undefined ? typedVal : resellerPasscodeVal).trim();
-    if (val === 'METAZO-OWNER-2026' || val === 'METAZO-RESELLER-2026') {
-      setIsResellerUnlocked(true);
-      localStorage.setItem('mz_reseller_unlocked', 'true');
-      setActiveSettingsTab('reseller');
-      setShowResellerUnlockInput(false);
-      setResellerPasscodeVal('');
-      setResellerPasscodeError('');
-    } else {
-      setResellerPasscodeError('Passcode salah atau kedaluwarsa!');
-    }
-  };
+  // Passcode logic removed for UID-based Admin Access
 
   const [geminiKeysList, setGeminiKeysList] = useState<string[]>(() => {
     return (localStorage.getItem('gemini_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
@@ -4091,7 +4080,12 @@ const App: React.FC = () => {
         filesLength={files.length} 
         isLicensed={isMzLicensed}
         setShowActivation={setShowActivationModal}
-        onUnlockReseller={() => setShowResellerUnlockInput(true)}
+        onUnlockReseller={() => {
+          if (isAdminAccount) {
+            setShowSettingsModal(true);
+            setActiveSettingsTab('reseller');
+          }
+        }}
         appName={mzAppName}
         unreadChatCount={unreadChatCount}
         onShowAbout={() => setShowAboutModal(true)}
@@ -4639,7 +4633,7 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['appearance', selectedProvider, 'faq_billing', 'reseller'] as const).map(tab => (
+              {(['appearance', selectedProvider, 'faq_billing', ...(isAdminAccount ? ['reseller'] : [])] as const).map(tab => (
                 <option key={tab} value={tab}>
                   {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? '💳 FAQ Tagihan & Langganan' : '💳 Billing & Subscription FAQ') : tab === 'reseller' ? '💻 Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
@@ -6131,67 +6125,7 @@ const App: React.FC = () => {
         t={t}
       />
 
-      {/* Hidden Custom Secure Reseller Passcode Dialog Overlay */}
-      {showResellerUnlockInput && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={() => {
-          setShowResellerUnlockInput(false);
-          setResellerPasscodeVal('');
-          setResellerPasscodeError('');
-        }}>
-          <div className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <button 
-              type="button"
-              onClick={() => {
-                setShowResellerUnlockInput(false);
-                setResellerPasscodeVal('');
-                setResellerPasscodeError('');
-              }} 
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full cursor-pointer"
-            >
-              <X size={14} />
-            </button>
-            <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5">
-              <Lock size={15} className="text-[#7c3aed]" />
-              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Owner / Reseller Access</h2>
-            </div>
-            
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-4 leading-relaxed">
-              Silakan masukkan passcode otorisasi Anda untuk membuka fitur administrasi reseller:
-            </p>
-
-            <div className="space-y-3">
-              <input
-                type="password"
-                placeholder="Masukkan Passcode Reseller"
-                value={resellerPasscodeVal}
-                onChange={(e) => {
-                  setResellerPasscodeVal(e.target.value);
-                  setResellerPasscodeError('');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleTryUnlockReseller();
-                  }
-                }}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3.5 py-2.5 outline-none font-bold text-xs focus:border-[#7c3aed] dark:text-white transition-all text-slate-900"
-                autoFocus
-              />
-              
-              {resellerPasscodeError && (
-                <p className="text-[10px] text-red-500 font-extrabold uppercase tracking-wide">⚠️ {resellerPasscodeError}</p>
-              )}
-
-              <button
-                type="button"
-                onClick={() => handleTryUnlockReseller()}
-                className="w-full py-2.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-black text-xs uppercase rounded-[1.5rem] transition-all shadow-md flex items-center justify-center space-x-1.5 cursor-pointer"
-              >
-                <span>Aktifkan Akses</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Hidden Custom Secure Reseller Passcode Dialog Overlay Removed */}
 
       {/* Limit Harian Modal */}
       {showLimitModal && (

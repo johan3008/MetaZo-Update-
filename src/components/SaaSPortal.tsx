@@ -207,7 +207,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
   // === ADMIN ACCOUNT CONFIG ===
   const ADMIN_EMAILS = ['johanchrismant4@gmail.com'];
-  const isAdminAccount = userEmail ? ADMIN_EMAILS.includes(userEmail) : false;
+  const isAdminAccount = (userEmail ? ADMIN_EMAILS.includes(userEmail) : false) || (userId && import.meta.env.VITE_ADMIN_UID && userId === import.meta.env.VITE_ADMIN_UID);
   const showResellerHub = isResellerUnlocked || isAdminAccount;
   const [portalTab, setPortalTab] = useState<'branding' | 'keys' | 'promo' | 'audit'>('branding');
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
@@ -1036,7 +1036,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await setDoc(generatedKeyRef, {
           key: generatedLicenseKey,
           activated: true,
-          activatedBy: userEmail || devId,
+          activatedBy: userId || devId,
           activatedAt: new Date().toISOString(),
           duration: durationStr,
           promoCode: cleanPromo,
@@ -1158,7 +1158,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           const keyData = {
             key: generatedLicenseKey,
             activated: true,
-            activatedBy: userEmail || devId,
+            activatedBy: userId || devId,
             activatedAt: new Date().toISOString(),
             duration: durationStr,
             promoCode: cleanPromo,
@@ -1257,7 +1257,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
          await setDoc(doc(db, 'keys', newKey), {
           key: newKey,
           activated: true,
-          activatedBy: userEmail || devId,
+          activatedBy: userId || devId,
           activatedAt: new Date().toISOString(),
           duration: duration,
           createdAt: new Date().toISOString()
@@ -1334,6 +1334,17 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     const targetKeyFormatted = inputKey.trim().toUpperCase();
     const currentSeed = licenseSeed.trim().toUpperCase();
     
+    // Prevent activating a second key if already licensed
+    if (isLicensed && licenseKey && targetKeyFormatted !== currentSeed && targetKeyFormatted !== 'MZPRO-COMMERCIAL-2026') {
+      if (targetKeyFormatted !== licenseKey.toUpperCase()) {
+        setActivationError(localStorage.getItem('mz_language') === 'Bahasa'
+          ? 'Akun Anda sudah memiliki lisensi aktif. Satu akun hanya dapat memiliki 1 lisensi aktif.'
+          : 'Your account already has an active license. One account can only have 1 active license.');
+        setIsActivating(false);
+        return;
+      }
+    }
+
     const syncUserDb = async (key: string) => {
       if (userId) {
         const userRef = doc(db, 'users', userId);
@@ -1373,12 +1384,13 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         const isEmail = (str: string) => str && str.includes('@');
         const keyActivatedBy = data.activatedBy || '';
         const firstActivatedBy = data.firstActivatedBy || '';
-        const ownerEmail = firstActivatedBy || keyActivatedBy;
+        const ownerId = firstActivatedBy || keyActivatedBy;
 
-        if (ownerEmail) {
+        if (ownerId) {
           const isOwner = (
-            ownerEmail === devId || 
-            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase() && isEmail(ownerEmail))
+            ownerId === devId || 
+            (userId && ownerId === userId) ||
+            (userEmail && ownerId.toLowerCase() === userEmail.toLowerCase())
           );
 
           if (isOwner) {
@@ -1398,8 +1410,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             await updateDoc(keyRef, {
               activated: true,
               cancelled: false,
-              activatedBy: userEmail || devId,
-              firstActivatedBy: userEmail || devId,
+              activatedBy: userId || devId,
+              firstActivatedBy: userId || devId,
               updatedAt: new Date().toISOString()
             }).catch(console.error);
 
@@ -1422,8 +1434,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           await updateDoc(keyRef, {
             activated: true,
             cancelled: false,
-            activatedBy: userEmail || devId,
-            firstActivatedBy: userEmail || devId,
+            activatedBy: userId || devId,
+            firstActivatedBy: userId || devId,
             activatedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
@@ -1458,13 +1470,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         const isEmail = (str: string) => str && str.includes('@');
         const keyActivatedBy = foundInCache.activatedBy || '';
         const firstActivatedBy = foundInCache.firstActivatedBy || '';
-        const ownerEmail = firstActivatedBy || keyActivatedBy;
+        const ownerId = firstActivatedBy || keyActivatedBy;
         
         let offlineRejected = false;
-        if (ownerEmail) {
+        if (ownerId) {
           const isOwner = (
-            ownerEmail === devId || 
-            (userEmail && ownerEmail.toLowerCase() === userEmail.toLowerCase() && isEmail(ownerEmail))
+            ownerId === devId || 
+            (userId && ownerId === userId) ||
+            (userEmail && ownerId.toLowerCase() === userEmail.toLowerCase())
           );
           if (!isOwner) {
             offlineRejected = true;
@@ -1482,9 +1495,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         // Allowed
         foundInCache.activated = true;
         foundInCache.cancelled = false;
-        foundInCache.activatedBy = userEmail || devId;
+        foundInCache.activatedBy = userId || devId;
         if (!foundInCache.firstActivatedBy) {
-          foundInCache.firstActivatedBy = userEmail || devId;
+          foundInCache.firstActivatedBy = userId || devId;
         }
         if (!foundInCache.activatedAt) {
           foundInCache.activatedAt = new Date().toISOString();
