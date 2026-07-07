@@ -341,8 +341,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       setNewPromoDesc('');
       setNewPromoStartDate('');
       setNewPromoEndDate('');
+      
+      // reload directory
+      await fetchPromosFromDb();
     } catch (err: any) {
       console.error("Failed to create promo in Firestore, falling back to local storage:", err);
+      setPromoErrorMsg("Gagal menyimpan ke database, mencoba penyimpanan lokal.");
       
       const promoObj = {
         id: code,

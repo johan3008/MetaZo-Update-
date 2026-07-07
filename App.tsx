@@ -2088,6 +2088,7 @@ const App: React.FC = () => {
   }, [activeTool, user, isCheckingAuth]);
 
   useEffect(() => {
+    console.log("App.tsx license useEffect. isCheckingAuth:", isCheckingAuth);
     if (isCheckingAuth) return;
     const k = mzLicenseKey.trim().toUpperCase();
     console.log("App.tsx license useEffect running. k:", k);
@@ -2115,10 +2116,28 @@ const App: React.FC = () => {
       localStorage.setItem('mz_device_id', devId);
     }
 
+    const clearLicenseKey = (msg?: string) => {
+      setIsMzLicensed(false);
+      setSubDaysLeft(null);
+      localStorage.removeItem('mz_license_key');
+      setMzLicenseKey('');
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        updateDoc(userRef, {
+          licenseKey: '',
+          updatedAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+      setIsCheckingLicense(false);
+      if (msg) alert(msg);
+    };
+
     getDoc(doc(db, 'keys', k))
       .then(dSnap => {
+        console.log("License check: key", k, "exists:", dSnap.exists());
         if (dSnap.exists()) {
           const data = dSnap.data();
+          console.log("License check: data:", data);
           if (data.activated) {
             // Check if this key belongs to another account (1 key 1 account restriction)
             const currentEmail = user?.email || '';
@@ -2158,21 +2177,6 @@ const App: React.FC = () => {
                 isRejected = true;
               }
             }
-            const clearLicenseKey = (msg?: string) => {
-              setIsMzLicensed(false);
-              setSubDaysLeft(null);
-              localStorage.removeItem('mz_license_key');
-              setMzLicenseKey('');
-              if (user) {
-                const userRef = doc(db, 'users', user.uid);
-                updateDoc(userRef, {
-                  licenseKey: '',
-                  updatedAt: new Date().toISOString()
-                }).catch(() => {});
-              }
-              setIsCheckingLicense(false);
-              if (msg) alert(msg);
-            };
 
             if (isRejected) {
               clearLicenseKey(localStorage.getItem('mz_language') === 'Bahasa'

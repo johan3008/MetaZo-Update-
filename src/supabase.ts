@@ -376,7 +376,17 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
         .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
         .single();
       if (!error || error.code === 'PGRST116') {
-        return new DocumentSnapshot(docRef.id, data || null);
+        let resultData = data || null;
+        
+        // Merge with emulated data so local fallback updates (like activation) are respected
+        const list = getEmulatedTable(docRef.table);
+        const found = list.find(row => (row.key === docRef.id || row.id === docRef.id));
+        
+        if (found) {
+          resultData = { ...(resultData || {}), ...found };
+        }
+        
+        return new DocumentSnapshot(docRef.id, resultData);
       }
       console.warn('[Supabase] getDoc error, falling back:', error);
     } catch (e) {
@@ -503,7 +513,20 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
       }
       const { data, error } = await q;
       if (!error) {
-        const docs = (data || []).map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
+        // Merge with emulated data to prevent data loss if fallback occurred
+        const emulated = getEmulatedTable(table);
+        const combined = [...(data || [])];
+        const existingIds = new Map(combined.map((r, i) => [r.key || r.id, i]));
+        for (const row of emulated) {
+          const id = row.key || row.id;
+          if (!existingIds.has(id)) {
+            combined.push(row);
+          } else {
+            const index = existingIds.get(id)!;
+            combined[index] = { ...combined[index], ...row };
+          }
+        }
+        const docs = combined.map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
         return new QuerySnapshot(docs);
       }
       console.warn('[Supabase] getDocs error, falling back:', error);
