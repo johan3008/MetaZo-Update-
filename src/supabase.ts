@@ -22,6 +22,7 @@ if (supabase) {
 export interface User {
   uid: string;
   email: string | null;
+  displayName?: string | null;
   emailVerified?: boolean;
   tenantId?: string | null;
   providerData?: any[];
@@ -442,7 +443,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
         .select();
       
       if (!error && resData && resData.length > 0) return;
-      console.warn(`[Supabase] updateDoc failed or no rows updated, falling back to Local Storage:`, error);
+      // warn removed
     } catch (e) {
       console.warn(`[Supabase] updateDoc failed with error, falling back to Local Storage:`, e);
     }

@@ -609,79 +609,20 @@ export const ImageQualityCheck: React.FC<{
             }),
           });
         } else {
+          
           if (isVideo) {
-            // Client-side extraction for Video to avoid Vercel Serverless FFmpeg errors
-            const frames = await new Promise<string[]>((resolve, reject) => {
-              const video = document.createElement('video');
-              video.preload = 'metadata';
-              const url = URL.createObjectURL(file);
-              video.src = url;
-              video.muted = true;
-              video.playsInline = true;
-
-              video.onloadedmetadata = () => {
-                const duration = video.duration;
-                if (isNaN(duration) || duration === 0) {
-                  URL.revokeObjectURL(url);
-                  return reject(new Error("Video duration is invalid or zero"));
-                }
-                const numFrames = 12;
-                const extractedFrames: string[] = [];
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                let currentFrame = 0;
-                const segmentDuration = duration / numFrames;
-                
-                const captureFrame = () => {
-                  if (currentFrame >= numFrames) {
-                    URL.revokeObjectURL(url);
-                    resolve(extractedFrames);
-                    return;
-                  }
-                  const targetTime = (currentFrame * segmentDuration) + (Math.random() * (segmentDuration - 0.1));
-                  video.currentTime = Math.max(0, targetTime);
-                };
-
-                video.onseeked = () => {
-                  if (!ctx) return;
-                  const videoRatio = video.videoWidth / video.videoHeight;
-                  let drawWidth = 640;
-                  let drawHeight = 640 / videoRatio;
-                  if (drawHeight > 360) {
-                      drawHeight = 360;
-                      drawWidth = 360 * videoRatio;
-                  }
-                  canvas.width = drawWidth;
-                  canvas.height = drawHeight;
-                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                  const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                  extractedFrames.push(dataUrl.split(',')[1]); 
-                  currentFrame++;
-                  captureFrame();
-                };
-                
-                video.onerror = () => {
-                  URL.revokeObjectURL(url);
-                  reject(new Error("Failed to decode video."));
-                };
-                captureFrame();
-              };
-              video.onerror = () => {
-                URL.revokeObjectURL(url);
-                reject(new Error("Failed to load video in browser."));
-              };
-            });
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('tolerance', tolerance);
+            formData.append('language', t.language || 'English');
+            formData.append('model', aiOptions?.model || 'gemini-3.1-pro-preview');
 
             response = await fetch('/api/check-video-quality', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-              body: JSON.stringify({
-                frames: frames,
-                tolerance,
-                language: t.language || 'English',
-                model: aiOptions?.model || 'gemini-3.1-pro-preview'
-              })
+              headers: { 
+                'X-API-Key': aiOptions?.apiKey || ''
+              },
+              body: formData
             });
           } else {
             response = await fetch('/api/check-image-quality', {

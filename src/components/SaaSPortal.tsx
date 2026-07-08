@@ -232,7 +232,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         if (userId && userEmail && ownerId === userId) {
            activatedBy = userEmail;
            // Automatically heal the database for this user
-           updateDoc(doc.ref, { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
+           updateDoc(doc(db, 'keys', doc.id), { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
         }
         const data = doc.data();
         keysList.push({
@@ -431,7 +431,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         if (userId && userEmail && ownerId === userId) {
            activatedBy = userEmail;
            // Automatically heal the database for this user
-           updateDoc(doc.ref, { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
+           updateDoc(doc(db, 'keys', doc.id), { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
         }
         const data = doc.data();
         keysList.push({

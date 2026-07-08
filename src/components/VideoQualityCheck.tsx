@@ -280,19 +280,21 @@ export const VideoQualityCheck: React.FC<{
 
       console.log(`[Video Audit] Extracted ${frames.length} frames client-side, sending to API...`);
 
+      
+      const formData = new FormData();
+      formData.append('video', file);
+      formData.append('tolerance', tolerance);
+      formData.append('language', aiOptions?.language || 'Bahasa');
+      formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
+
       const response = await fetch('/api/check-video-quality', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey || ''
+          'X-API-Key': aiOptions?.apiKey || ''
         },
-        body: JSON.stringify({
-          frames: frames,
-          tolerance,
-          language: aiOptions?.language || 'Bahasa',
-          model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
-        })
+        body: formData
       });
+
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));

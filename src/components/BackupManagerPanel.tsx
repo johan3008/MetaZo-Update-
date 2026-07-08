@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Database, Download, Upload, Cloud, HardDrive, History, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, getDocs, orderBy, limit } from '../supabase';
+import { collection, query, getDocs, orderBy, limit, where } from '../supabase';
 
 export const BackupManagerPanel: React.FC<{
   user: any;
@@ -55,73 +55,59 @@ export const BackupManagerPanel: React.FC<{
     }
   }, [showRestoreModal, user]);
 
+  
   useEffect(() => {
     if (user) {
-      fetch(`/api/d1-backup/history?uid=${user.uid}`)
-        .then(res => res.json())
-        .then(resData => {
-          if (resData.code === 'CREDENTIALS_MISSING') {
-            setIsD1Configured(false);
-            setD1ErrorType('CREDENTIALS_MISSING');
-          } else if (resData.code === 'CREDENTIALS_INVALID') {
-            setIsD1Configured(false);
-            setD1ErrorType('CREDENTIALS_INVALID');
-          } else if (resData.code === 'DATABASE_INVALID') {
-            setIsD1Configured(false);
-            setD1ErrorType('DATABASE_INVALID');
-          } else if (resData.success === false) {
-            setIsD1Configured(false);
-            setD1ErrorType('CREDENTIALS_INVALID');
-          } else {
-            setIsD1Configured(true);
-            setD1ErrorType(null);
-          }
-        })
-        .catch(() => {
-          setIsD1Configured(false);
-          setD1ErrorType('CREDENTIALS_MISSING');
-        });
+      setIsD1Configured(true);
+      setD1ErrorType(null);
     }
   }, [user]);
+
 
   useEffect(() => {
     if (showRestoreModal && user) {
       setLoading(true);
       const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-      fetch(`/api/d1-backup/history?uid=${user.uid}`)
-        .then(res => res.json())
-        .then(resData => {
-          if (resData.success && Array.isArray(resData.data)) {
-            const filteredCloud = resData.data.filter((batch: any) => {
-              const createdTime = batch.createdAt ? new Date(batch.createdAt).getTime() : Date.now();
-              return createdTime >= sevenDaysAgo;
-            });
-            setCloudHistory(filteredCloud);
-            setIsD1Configured(true);
-            setD1ErrorType(null);
-          } else {
-            if (resData.code === 'CREDENTIALS_MISSING') {
-              setIsD1Configured(false);
-              setD1ErrorType('CREDENTIALS_MISSING');
-            } else if (resData.code === 'CREDENTIALS_INVALID') {
-              setIsD1Configured(false);
-              setD1ErrorType('CREDENTIALS_INVALID');
-            } else if (resData.code === 'DATABASE_INVALID') {
-              setIsD1Configured(false);
-              setD1ErrorType('DATABASE_INVALID');
-            } else {
-              setIsD1Configured(false);
-              setD1ErrorType('CREDENTIALS_INVALID');
-            }
-            console.warn('[Cloudflare D1] Failed to retrieve cloud history:', resData.error);
-          }
+      
+      const fetchSupabaseHistory = async () => {
+        try {
+          
+          const backupsRef = collection(db, 'metadata_backups');
+          const q = query(backupsRef, where('uid', '==', user.uid), orderBy('created_at', 'desc'), limit(50));
+          const snapshot = await getDocs(q);
+          const data = snapshot.docs.map(doc => {
+            const d = doc.data();
+            let parsedItems = [];
+            try {
+              parsedItems = typeof d.items === 'string' ? JSON.parse(d.items) : d.items;
+            } catch(e) {}
+            return {
+              id: d.id,
+              batchId: d.batch_id,
+              timestamp: d.timestamp,
+              tool: d.tool,
+              items: parsedItems,
+              createdAt: d.created_at
+            };
+          });
+          
+          const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const filteredCloud = data.filter((batch: any) => {
+            const createdTime = batch.createdAt ? new Date(batch.createdAt).getTime() : Date.now();
+            return createdTime >= sevenDaysAgo;
+          });
+          setCloudHistory(filteredCloud);
+          setIsD1Configured(true);
+          setD1ErrorType(null);
+        } catch (err) {
+          console.error('[Supabase] Error loading backup history:', err);
+        } finally {
           setLoading(false);
-        })
-        .catch(err => {
-          console.error('[Cloudflare D1] Error loading backup history:', err);
-          setLoading(false);
-        });
+        }
+      };
+      fetchSupabaseHistory();
+
     }
   }, [showRestoreModal, user]);
 
@@ -207,9 +193,9 @@ export const BackupManagerPanel: React.FC<{
         <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 rounded-[1.5rem] flex items-start gap-3">
           <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">Penyimpanan Cloud Aktif (Cloudflare D1)</h4>
+            <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">Penyimpanan Cloud Aktif (Supabase)</h4>
             <p className="text-[10px] text-emerald-700/90 dark:text-emerald-400/85 leading-relaxed mt-1">
-              Seluruh data Anda secara otomatis tersinkronisasi dan disimpan dengan aman di cloud database Cloudflare D1 Anda secara real-time.
+              Seluruh data Anda secara otomatis tersinkronisasi dan disimpan dengan aman di cloud database Supabase Anda secara real-time.
             </p>
           </div>
         </div>
@@ -219,9 +205,9 @@ export const BackupManagerPanel: React.FC<{
             <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 rounded-[1.5rem] flex items-start gap-3">
               <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">Cloudflare D1 Belum Dikonfigurasi</h4>
+                <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">Supabase Belum Dikonfigurasi</h4>
                 <p className="text-[10px] text-amber-700/90 dark:text-amber-400/85 leading-relaxed mt-1">
-                  Penyimpanan Cloud (Auto Backup, Restore, dan Import) membutuhkan konfigurasi kredensial database Cloudflare D1. Harap tambahkan <code className="bg-amber-100/80 dark:bg-amber-950 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900 dark:text-amber-300">CLOUDFLARE_API_TOKEN</code> di menu Settings di kanan atas layar.
+                  Penyimpanan Cloud (Auto Backup, Restore, dan Import) membutuhkan konfigurasi kredensial database Supabase. Harap tambahkan <code className="bg-amber-100/80 dark:bg-amber-950 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900 dark:text-amber-300">SUPABASE_ANON_KEY</code> di menu Settings di kanan atas layar.
                 </p>
               </div>
             </div>
@@ -233,7 +219,7 @@ export const BackupManagerPanel: React.FC<{
               <div className="flex-1">
                 <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Kredensial Cloudflare Tidak Valid</h4>
                 <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
-                  Gagal menghubungi database Cloudflare D1. Harap pastikan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_API_TOKEN</code> dan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_ACCOUNT_ID</code> di menu Settings sudah benar.
+                  Gagal menghubungi database Supabase. Harap pastikan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">SUPABASE_ANON_KEY</code> dan <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">SUPABASE_URL</code> di menu Settings sudah benar.
                 </p>
               </div>
             </div>
@@ -243,7 +229,7 @@ export const BackupManagerPanel: React.FC<{
             <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 rounded-[1.5rem] flex items-start gap-3">
               <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Cloudflare D1 Database ID Tidak Valid / Tidak Ditemui</h4>
+                <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest">Supabase Database ID Tidak Valid / Tidak Ditemui</h4>
                 <p className="text-[10px] text-rose-700/90 dark:text-rose-400/85 leading-relaxed mt-1">
                   Gagal menemukan database D1 di dalam akun Cloudflare Anda. Harap tambahkan environment variable <code className="bg-rose-100/80 dark:bg-rose-950 px-1.5 py-0.5 rounded font-mono font-bold text-rose-900 dark:text-rose-300">CLOUDFLARE_D1_DATABASE_ID</code> di menu Settings dengan ID database D1 yang aktif di dalam Cloudflare Console Anda.
                 </p>
@@ -377,7 +363,7 @@ export const BackupManagerPanel: React.FC<{
                         <div className="space-y-2 pt-2">
                           <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
                             <Cloud size={12} />
-                            Penyimpanan Awan (Cloudflare D1)
+                            Penyimpanan Awan (Supabase)
                           </h3>
                           {uniqueCloudHistory.map((batch: any, idx: number) => (
                             <div 

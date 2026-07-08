@@ -1641,11 +1641,11 @@ const App: React.FC = () => {
             localStorage.removeItem('mz_cancelled_subscription');
             
             if (cloudKey !== activeKey || data.cancelledSubscription) {
-              updateDoc(userDocRef, {
+              setDoc(userDocRef, {
                 licenseKey: activeKey,
                 cancelledSubscription: false,
                 updatedAt: new Date().toISOString()
-              }).catch(e => console.info('db_op', e));
+              }, { merge: true }).catch(e => console.info('db_op', e));
             }
           } else {
             // Attempt to restore from keys collection if both cloud and local are empty
@@ -1654,11 +1654,11 @@ const App: React.FC = () => {
                 setMzLicenseKey(foundKey);
                 localStorage.setItem('mz_license_key', foundKey);
                 localStorage.removeItem('mz_cancelled_subscription');
-                updateDoc(userDocRef, {
+                setDoc(userDocRef, {
                   licenseKey: foundKey,
                   cancelledSubscription: false,
                   updatedAt: new Date().toISOString()
-                }).catch(e => console.info('db_op', e));
+              }, { merge: true }).catch(e => console.info('db_op', e));
               } else {
                 setMzLicenseKey('');
               }
@@ -1843,7 +1843,7 @@ const App: React.FC = () => {
             settings: initialSettings,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          }).catch(err => {
+              }, { merge: true }).catch(err => {
             console.info('db_op', err);
             handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
           });
@@ -1922,7 +1922,7 @@ const App: React.FC = () => {
           licenseSeed: 'MZPRO-COMMERCIAL-2026',
           payInfo: 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom',
           updatedAt: new Date().toISOString()
-        }).catch(err => {
+              }, { merge: true }).catch(err => {
           console.info('db_op', err);
           handleFirestoreError(err, OperationType.WRITE, 'branding/main');
         });
@@ -3774,30 +3774,27 @@ const App: React.FC = () => {
       console.warn('[Local Storage] Auto-backup failed to save locally:', localErr);
     }
 
-    // Fully Cloud Storage using Cloudflare D1
-    console.log('[Cloudflare D1] Saving backup to Cloudflare D1...');
-    fetch('/api/d1-backup/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        uid: user.uid,
-        tool: activeTool,
-        items: backupData
+    
+    // Fully Cloud Storage using Supabase
+    console.log('[Supabase] Saving backup to Supabase...');
+    const batchId = `batch-${Date.now()}`;
+    const newBackup = {
+      uid: user.uid,
+      batch_id: batchId,
+      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      tool: activeTool,
+      items: JSON.stringify(backupData),
+      created_at: new Date().toISOString()
+    };
+    
+    addDoc(collection(db, 'metadata_backups'), newBackup)
+      .then((docRef) => {
+        console.log('[Supabase] Auto-backup saved successfully:', batchId);
       })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        console.log('[Cloudflare D1] Auto-backup saved successfully:', data.batchId);
-      } else {
-        console.warn('[Cloudflare D1] Auto-backup failed:', data.error);
-      }
-    })
-    .catch(err => {
-      console.warn('[Cloudflare D1] Auto-backup request error:', err);
-    });
+      .catch(err => {
+        console.warn('[Supabase] Auto-backup failed:', err);
+      });
+
   };
 
   // Debounced auto backup when files change
