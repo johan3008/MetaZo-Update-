@@ -1377,33 +1377,28 @@ app.get('/api/debug-uploads', (req, res) => {
                                     throw new Error("Could not determine video duration");
                                 }
 
-                                // 2. Calculate timestamps (Awal, Tengah, Akhir)
-                                const t1 = 0;
-                                const t2 = duration * 0.5;
-                                const t3 = Math.max(0, duration - 0.5);
+                                // 2. Calculate timestamps (extract 12 frames evenly spaced)
+                                const numFrames = 12;
+                                const timestamps = [];
+                                for (let i = 0; i < numFrames; i++) {
+                                    timestamps.push(Math.max(0, Math.min(duration - 0.1, duration * (i / (numFrames - 1)))));
+                                }
 
                                 // 3. Extract frames with fast seek (-ss BEFORE -i)
-                                const f1Path = path.join(outDir, 'frame-1.jpg');
-                                const f2Path = path.join(outDir, 'frame-2.jpg');
-                                const f3Path = path.join(outDir, 'frame-3.jpg');
+                                const framePaths = [];
+                                for (let i = 0; i < numFrames; i++) {
+                                    const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
+                                    await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
+                                    framePaths.push(fPath);
+                                }
 
-                                await execPromise(`"${ffmpegPath}" -ss ${t1} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${f1Path}" -y`);
-                                await execPromise(`"${ffmpegPath}" -ss ${t2} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${f2Path}" -y`);
-                                await execPromise(`"${ffmpegPath}" -ss ${t3} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${f3Path}" -y`);
-
-                                const f1 = fs.readFileSync(f1Path, 'base64');
-                                const f2 = fs.readFileSync(f2Path, 'base64');
-                                const f3 = fs.readFileSync(f3Path, 'base64');
+                                const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
                                 fs.rmSync(outDir, { recursive: true, force: true });
 
                                 if (!isDone) {
                                     isDone = true;
                                     clearTimeout(timeout);
-                                    resolve([
-                                      `data:image/jpeg;base64,${f1}`,
-                                      `data:image/jpeg;base64,${f2}`,
-                                      `data:image/jpeg;base64,${f3}`
-                                    ]);
+                                    resolve(frameData.map(f => `data:image/jpeg;base64,${f}`));
                                 }
                             } catch (e) {
                                 if (!isDone) {

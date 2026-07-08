@@ -4169,7 +4169,7 @@ KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Analisi
    - SOFT FOCUS (Kurang tajam, fokus meleset, motion blur yang tidak disengaja, atau ketajaman subjek utama yang kurang optimal).
    - EXCESSIVE FILTERING (Efek over-processed, warna terlalu tersaturasi, terlalu kontras, atau tekstur yang tampak plastik/lilin akibat pemrosesan berlebih).
    - ARTIFACTS / NOISE (Grain digital, color banding, chromatic aberration, sensor dust, atau kompresi JPEG).
-3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual. JIKA RAGU-RAGU, BERIKAN STATUS PASS.
+3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual. BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS. JIKA ADA KERAGUAN TENTANG KUALITAS ATAU KEJELASAN VISUAL, BERIKAN EVALUASI SESUAI DENGAN TOLERANSI YANG DITETAPKAN. JANGAN MENGANGGAP SEMUANYA PASS. JANGAN HALLUCINATE, TAPI JANGAN TOLERANSI CACAT YANG TERLIHAT.
 4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
@@ -4224,8 +4224,8 @@ Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan k
 - low_aesthetic_quality: Deteksi kualitas estetika rendah.
 
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
-JIKA TIDAK ADA MASALAH VISUAL FATAL ATAU ARTIFACT (SEPERTI SKEW/FLASH BANDING) YANG SANGAT JELAS PADA FRAME INI, BERIKAN STATUS PASS.
-DEFAULT-KAN KE STATUS PASS KECUALI ANDA BISA MEMBUKTIKAN SECARA MUTLAK ADA PELANGGARAN IP ATAU CACAT FATAL! Berhentilah menebak-nebak (No hallucination)!
+BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS. JIKA VIDEO TERLIHAT DIREKAM MENGGUNAKAN KAMERA BERKUALITAS RENDAH (BLUR, PENCAHAYAAN BURUK, NOISE, KOMPRESI BURUK, RESOLUSI RENDAH, ATAU ESTETIKA AMATIR), ANDA WAJIB MEMBERIKAN STATUS FAIL DAN SKOR DI BAWAH 60. JANGAN MENEBAK-NEBAK CACAT YANG TIDAK ADA, TETAPI JANGAN PULA MEMBERIKAN PASS PADA VIDEO BERKUALITAS RENDAH ATAU AMATIR. HUKUM DENGAN TEGAS VIDEO YANG TIDAK MEMENUHI STANDAR STOCK PREMIUM.
+JIKA VIDEO GAGAL (FAIL), Anda WAJIB memberikan "detailed_feedback" persis seperti kalimat berikut ini tanpa tambahan apapun: "Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues".
 
 BERIKAN SKOR BERIKUT:
 - technical_score (0-100): Berdasarkan cacat teknis murni seperti noise, blur, banding, compression, exposure.
@@ -4318,7 +4318,7 @@ BERIKAN SKOR BERIKUT:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: "Act as an objective Adobe Stock QA curator. Evaluate these 3 video frames (Start, Middle, End). Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} video frames extracted evenly throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, output: 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues'.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
