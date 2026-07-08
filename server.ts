@@ -1377,11 +1377,15 @@ app.get('/api/debug-uploads', (req, res) => {
                                     throw new Error("Could not determine video duration");
                                 }
 
-                                // 2. Calculate timestamps (extract 12 frames evenly spaced)
+                                // 2. Calculate timestamps (extract 12 random frames spread across the entire video)
                                 const numFrames = 12;
                                 const timestamps = [];
+                                const segmentDuration = Math.max(0.1, duration / numFrames);
                                 for (let i = 0; i < numFrames; i++) {
-                                    timestamps.push(Math.max(0, Math.min(duration - 0.1, duration * (i / (numFrames - 1)))));
+                                    // Generate a random timestamp within this segment
+                                    const segmentStart = i * segmentDuration;
+                                    const randomOffset = Math.random() * (segmentDuration - 0.1);
+                                    timestamps.push(Math.max(0, segmentStart + randomOffset));
                                 }
 
                                 // 3. Extract frames with fast seek (-ss BEFORE -i)
@@ -1426,51 +1430,8 @@ app.get('/api/debug-uploads', (req, res) => {
                 cleanupFn();
                 res.json(data);
             } else {
-                // Return beautiful, highly descriptive Simulated fallback audit so Vercel never crashes!
-                const videoName = req.file ? req.file.originalname : 'Video';
-                const fallbackReport = {
-                    visual_scan_analysis: `Analisis simulasi visual (FFmpeg tidak aktif/berjalan di Vercel). Mengaudit file "${videoName}" berdasarkan integrasi container teknis dan kepatuhan standar komersial Adobe Stock.`,
-                    legal_status: "SAFE",
-                    technical_issues: [],
-                    strengths: ["Resolusi aspek kontainer standar", "Format video container terverifikasi", "Metadata stream aman"],
-                    overall_score: 94,
-                    technical_score: 98,
-                    visual_score: 91,
-                    adobe_stock_readiness: "Ready",
-                    recommendation: "PASS",
-                    detailed_feedback: `Server mendeteksi backend Anda saat ini berjalan di lingkungan Vercel Serverless tanpa binary FFmpeg eksternal. Kami telah memeriksa struktur file video, dan lulus verifikasi kontainer dasar. Untuk melakukan ekstraksi frame visual mikro-analisis secara penuh menggunakan AI Vision, silakan jalankan aplikasi ini di lingkungan container penuh (seperti Docker, Cloud Run, atau Railway).`,
-                    quality_checks: {
-                        blur: { status: "PASS", note: "Format penargetan fokus terdeteksi aman." },
-                        noise: { status: "PASS", note: "Toleransi grain/noise sensor diredam dengan baik." },
-                        compression_artifacts: { status: "PASS", note: "Toleransi kompresi tinggi disetujui." },
-                        blocking: { status: "PASS", note: "Tidak ada distorsi blok terdeteksi." },
-                        banding: { status: "PASS", note: "Kepadatan gradasi bit-rate video optimal." },
-                        overexposure: { status: "PASS", note: "Skema pencahayaan seimbang pada kontainer video." },
-                        underexposure: { status: "PASS", note: "Tidak terdeteksi area bayangan rusak mendalam." },
-                        white_balance: { status: "PASS", note: "Keseimbangan warna aman." },
-                        motion_blur: { status: "PASS", note: "Pergerakan subjek tajam." },
-                        camera_shake: { status: "PASS", note: "Pergerakan kamera terindikasi stabil." },
-                        out_of_focus: { status: "PASS", note: "Fokus objek utama tajam." },
-                        flickering: { status: "PASS", note: "Cahaya stabil, tidak ada kedipan." },
-                        duplicate_frame: { status: "PASS", note: "Pola durasi stream stabil." },
-                        empty_frame: { status: "PASS", note: "Tidak terdeteksi frame kosong hitam/putih secara struktural." },
-                        black_frame: { status: "PASS", note: "Tidak ada frame hitam penuh." },
-                        frozen_frame: { status: "PASS", note: "Video tidak memiliki frame yang membeku." },
-                        watermark: { status: "PASS", note: "Bebas dari watermark komersial eksternal." },
-                        logo: { status: "PASS", note: "Tidak ada logo merek komersial yang dilindungi IP." },
-                        text: { status: "PASS", note: "Tidak ada overlay teks ilegal di layar." },
-                        ai_artifact: { status: "PASS", note: "Tidak ada cacat AI terdeteksi." },
-                        deformed_object: { status: "PASS", note: "Objek terlihat normal." },
-                        bad_anatomy: { status: "PASS", note: "Anatomi subjek proporsional." },
-                        cropped_subject: { status: "PASS", note: "Subjek tidak terpotong dengan salah." },
-                        cut_off_object: { status: "PASS", note: "Objek dalam batas frame." },
-                        wrong_perspective: { status: "PASS", note: "Perspektif normal." },
-                        low_aesthetic_quality: { status: "PASS", note: "Kualitas estetika memadai." }
-                    },
-                    heatmaps: []
-                };
                 cleanupFn();
-                res.json(fallbackReport);
+                return res.status(500).json({ error: 'Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi).' });
             }
         } catch (e: any) {
             console.warn('Server check-video-quality error:', e);

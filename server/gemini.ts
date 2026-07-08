@@ -4184,9 +4184,10 @@ A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standar
 5. Gen-AI Anomalies (Anomali AI Generatif)
 
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
-Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.
-Ini adalah 3 CUPLIKAN FRAME diam (Awal, Tengah, Akhir) dari sebuah file Video. Anda HANYA BISA menganalisis aspek visual statis dari ketiga frame ini.
-PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN, dan tidak berubah-ubah pada 2x sampai 5x pengulangan. Jangan mengarang masalah yang tidak kasat mata!
+Ini adalah 12 CUPLIKAN FRAME diam yang diambil dari berbagai bagian (awal, tengah, hingga akhir) dari sebuah file Video. Anda menganalisis aspek visual statis dari ke-12 frame ini.
+PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN.
+PENTING: JIKA VIDEO DITOLAK (FAIL), ANDA WAJIB MENGISI \`detailed_feedback\` DENGAN KALIMAT BERIKUT SECARA PERSIS TANPA TAMBAHAN APAPUN:
+'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.'
 
 MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 1. Rolling-Shutter Artifacts: Cek apakah ada efek skew (distorsi miring) yang parah pada garis vertikal atau objek bergerak, jello effects, atau flash banding (garis/pita horizontal dengan exposure berbeda).
@@ -4318,7 +4319,7 @@ BERIKAN SKOR BERIKUT:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} video frames extracted evenly throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, output: 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues'.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, output exactly: 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues' in detailed_feedback.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
