@@ -1122,12 +1122,13 @@ const App: React.FC = () => {
             const q = query(collection(db, 'users'), where('lastSeen', '>', fiveMinutesAgo));
             const snapshot = await getDocs(q);
             
-            const usersList: string[] = [];
+            const uniqueUsers = new Set<string>();
             snapshot.forEach(doc => {
                const data = doc.data();
                const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
-               if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') usersList.push(nameToShow);
+               if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') uniqueUsers.add(nameToShow);
             });
+            const usersList = Array.from(uniqueUsers);
             
             if (usersList.length === 0 && auth.currentUser) {
                const nameToShow = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
