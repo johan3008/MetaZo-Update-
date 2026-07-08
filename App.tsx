@@ -2152,19 +2152,11 @@ const App: React.FC = () => {
               if (ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
                 // Valid! If it's a UID, upgrade it to email
                 if (ownerId === user.uid && currentEmail) {
-                  updateDoc(doc(db, 'keys', k), {
-                    activatedBy: currentEmail,
-                    firstActivatedBy: currentEmail,
-                    updatedAt: new Date().toISOString()
-                  }).catch(e => console.info('db_op', e));
+                  updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
                 }
               } else if (ownerId === devId) {
                 if (currentEmail) {
-                  updateDoc(doc(db, 'keys', k), {
-                    activatedBy: currentEmail,
-                    firstActivatedBy: currentEmail,
-                    updatedAt: new Date().toISOString()
-                  }).catch(e => console.info('db_op', e));
+                  updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
                 }
               } else {
                 isRejected = true;
@@ -2188,11 +2180,7 @@ const App: React.FC = () => {
 
             // Link device-bound activation to user's email when they log in
             if (user && user.email && (!ownerId || !isEmail(ownerId))) {
-              updateDoc(doc(db, 'keys', k), {
-                activatedBy: user.email,
-                firstActivatedBy: user.email,
-                updatedAt: new Date().toISOString()
-              }).catch(e => console.info('db_op', e));
+              updateDoc(doc(db, 'keys', k), { activatedBy: user.email, firstActivatedBy: user.email }).catch(e => console.info('db_op', e));
             }
 
             // Check if 30days subscription is expired

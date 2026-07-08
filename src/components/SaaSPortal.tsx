@@ -1034,7 +1034,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           activatedBy: userEmail || devId,
           activatedAt: new Date().toISOString(),
           duration: durationStr,
-          promoCode: cleanPromo,
+          
           createdAt: new Date().toISOString()
         });
 
@@ -1156,7 +1156,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             activatedBy: userEmail || devId,
             activatedAt: new Date().toISOString(),
             duration: durationStr,
-            promoCode: cleanPromo,
+            
             createdAt: new Date().toISOString()
           };
           
@@ -1404,10 +1404,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             // Allowed! Owner is reactivating or using it
             await updateDoc(keyRef, {
               activated: true,
-              cancelled: false,
+              
               activatedBy: userEmail || devId,
-              firstActivatedBy: userEmail || devId,
-              updatedAt: new Date().toISOString()
+              firstActivatedBy: userEmail || devId
             }).catch(console.error);
 
             localStorage.setItem('mz_license_key', targetKeyFormatted);
@@ -1429,11 +1428,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           // Unactivated single-use key -> activate and bind permanently to this account!
           await updateDoc(keyRef, {
             activated: true,
-            cancelled: false,
+            
             activatedBy: userEmail || devId,
             firstActivatedBy: userEmail || devId,
-            activatedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            activatedAt: new Date().toISOString()
           });
 
           localStorage.setItem('mz_license_key', targetKeyFormatted);
@@ -1517,8 +1515,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await updateDoc(doc(db, 'keys', keyToRemove.trim().toUpperCase()), {
           activated: false,
           activatedBy: '',
-          activatedAt: '',
-          updatedAt: new Date().toISOString()
+          activatedAt: ''
         });
       } catch (e) {
         console.warn("Could not deactivate key in keys collection:", e);
