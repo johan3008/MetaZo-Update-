@@ -4161,14 +4161,15 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
 
 ATURAN PALING PENTING (CRITICAL RULE):
 KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Analisis Anda akan diulang 2x sampai 5x oleh sistem. Hasil Anda WAJIB 100% konsisten pada setiap pengulangan. DILARANG KERAS menebak-nebak, berasumsi, atau mengarang masalah (hallucination). Jika cacat tidak terlihat SANGAT JELAS secara visual, jangan dicantumkan.
-Unfortunately, during our review we found that it contains one or more technical issues. Common issues that can impact the technical quality of images include exposure issues, soft focus, excessive filtering or artifacts/noise.
+**JIKA ANDA MENDETEKSI KESALAHAN (FAIL), ANDA WAJIB MEMBERIKAN BUKTI VISUAL YANG SPESIFIK DAN JELAS PADA "detailed_feedback".**
+
 1. PEMINDAIAN KESELURUHAN (FULL SCAN): Anda WAJIB memeriksa KESELURUHAN gambar dari ujung ke ujung (corner-to-corner), bukan hanya fokus pada bagian tengah atau subjek utama saja. Periksa setiap tepi, sudut, background, dan elemen kecil.
 2. SANGAT KETAT TERHADAP 4 ISU UTAMA ADOBE STOCK: Anda harus SANGAT SENSITIF dan TANPA AMPUN terhadap:
    - EXPOSURE ISSUES (Overexposure, underexposure, highlight yang blown out, atau shadow yang terlalu gelap).
    - SOFT FOCUS (Kurang tajam, fokus meleset, motion blur yang tidak disengaja, atau ketajaman subjek utama yang kurang optimal).
    - EXCESSIVE FILTERING (Efek over-processed, warna terlalu tersaturasi, terlalu kontras, atau tekstur yang tampak plastik/lilin akibat pemrosesan berlebih).
    - ARTIFACTS / NOISE (Grain digital, color banding, chromatic aberration, sensor dust, atau kompresi JPEG).
-3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual.
+3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual. JIKA RAGU-RAGU, BERIKAN STATUS PASS.
 4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
