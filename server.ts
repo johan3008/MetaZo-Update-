@@ -1507,6 +1507,10 @@ app.get('/api/debug-uploads', (req, res) => {
 
             try {
                 await new Promise<void>((resolve, reject) => {
+                    if (!ffmpeg) {
+                        reject(new Error("ffmpeg is not available"));
+                        return;
+                    }
                     ffmpeg(inputPath)
                         .outputOptions('-an') // remove audio
                         .videoCodec('copy')   // copy video stream directly (fast, lossless)
@@ -1524,8 +1528,16 @@ app.get('/api/debug-uploads', (req, res) => {
                 console.warn('[MUTE VIDEO FALLBACK] FFmpeg processing failed (possibly a mock/test payload). Copying input directly to output. Error:', ffmpegErr);
                 // Fallback to copy file so that test suite/unsupported formats download successfully without throwing 500 error
                 try {
-                    fs.copyFileSync(inputPath, outputPath);
+                    if (inputPath.startsWith('http')) {
+                        const fileRes = await fetch(inputPath);
+                        if (!fileRes.ok) throw new Error(`Failed to fetch remote file: ${fileRes.statusText}`);
+                        const arrayBuffer = await fileRes.arrayBuffer();
+                        fs.writeFileSync(outputPath, Buffer.from(arrayBuffer));
+                    } else {
+                        fs.copyFileSync(inputPath, outputPath);
+                    }
                 } catch (copyErr) {
+                    console.error('[MUTE VIDEO FALLBACK] Failed to copy file:', copyErr);
                     throw ffmpegErr; // If copying also fails, rethrow the original ffmpeg error
                 }
             }

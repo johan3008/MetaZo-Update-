@@ -211,90 +211,72 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      // 1. Extract frames client-side to bypass Vercel limits and FFmpeg requirement
-      const frames = await new Promise<string[]>((resolve, reject) => {
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        const url = URL.createObjectURL(file);
-        video.src = url;
-        video.muted = true;
-        video.playsInline = true;
+      let uploadedUrl = null;
+      let getUrlData = null;
 
-        video.onloadedmetadata = () => {
-          const duration = video.duration;
-          if (isNaN(duration) || duration === 0) {
-            URL.revokeObjectURL(url);
-            return reject(new Error("Video duration is invalid or zero"));
+      // 1. Try to upload to Cloudflare R2 first to bypass Vercel limits
+      try {
+        const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
+        if (getUrlRes.ok) {
+          getUrlData = await getUrlRes.json().catch(() => ({}));
+          if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+            console.log(`[Video Audit] Uploading to Cloudflare R2 directly: ${file.name}`);
+            try {
+              const putRes = await fetch(getUrlData.uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type || 'video/mp4' }
+              });
+              if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
+              uploadedUrl = getUrlData.fileUrl;
+            } catch (putErr: any) {
+              if (putErr.message === 'Failed to fetch') {
+                throw new Error('Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan konfigurasi CORS di dashboard Cloudflare R2 bucket Anda (Settings > CORS).');
+              }
+              throw putErr;
+            }
           }
-          const numFrames = 12;
-          const extractedFrames: string[] = [];
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          let currentFrame = 0;
-          const segmentDuration = duration / numFrames;
-          
-          const captureFrame = () => {
-            if (currentFrame >= numFrames) {
-              URL.revokeObjectURL(url);
-              resolve(extractedFrames);
-              return;
-            }
-            
-            const targetTime = (currentFrame * segmentDuration) + (Math.random() * (segmentDuration - 0.1));
-            video.currentTime = Math.max(0, targetTime);
-          };
+        }
+      } catch (uploadErr: any) {
+        console.warn("[Video Audit] Failed to upload to Cloudflare R2:", uploadErr);
+        if (uploadErr.message.includes('CORS') || uploadErr.message.includes('Cloudflare R2')) {
+          throw uploadErr;
+        }
+      }
 
-          video.onseeked = () => {
-            if (!ctx) return;
-            const videoRatio = video.videoWidth / video.videoHeight;
-            let drawWidth = 1280;
-            let drawHeight = 1280 / videoRatio;
-            if (drawHeight > 720) {
-                drawHeight = 720;
-                drawWidth = 720 * videoRatio;
-            }
-            canvas.width = drawWidth;
-            canvas.height = drawHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Get base64 string
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            extractedFrames.push(dataUrl.split(',')[1]); // Only keep base64 data to save size
-            
-            currentFrame++;
-            captureFrame();
-          };
-          
-          video.onerror = () => {
-            URL.revokeObjectURL(url);
-            reject(new Error("Browser failed to decode video for frame extraction. Please ensure it's a standard MP4/MOV format."));
-          };
-          
-          captureFrame();
-        };
-        
-        video.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error("Failed to load video in browser."));
-        };
-      });
+      let response;
+      if (uploadedUrl) {
+        console.log(`[Video Audit] Triggering R2-based audit: ${uploadedUrl}`);
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey || ''
+          },
+          body: JSON.stringify({
+            fileUrl: uploadedUrl,
+            pathKey: getUrlData?.pathKey,
+            tolerance,
+            language: aiOptions?.language || 'Bahasa',
+            model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
+          })
+        });
+      } else {
+        console.log(`[Video Audit] Falling back to multipart form-data upload: ${file.name}`);
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('tolerance', tolerance);
+        formData.append('language', aiOptions?.language || 'Bahasa');
+        formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
 
-      console.log(`[Video Audit] Extracted ${frames.length} frames client-side, sending to API...`);
-
-      // 2. Call backend endpoint to audit the frames directly
-      const response = await fetch('/api/check-video-quality', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey || ''
-        },
-        body: JSON.stringify({
-          frames: frames,
-          tolerance,
-          language: aiOptions?.language || 'Bahasa',
-          model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
-        })
-      });
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: {
+            'X-API-Key': apiKey || ''
+          },
+          body: formData
+        });
+      }
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));

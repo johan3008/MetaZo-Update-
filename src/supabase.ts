@@ -388,7 +388,7 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
         
         return new DocumentSnapshot(docRef.id, resultData);
       }
-      console.warn('[Supabase] getDoc error, falling back:', error);
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] getDoc error, falling back:', error); }
     } catch (e) {
       console.warn('[Supabase] getDoc exception, falling back:', e);
     }
@@ -409,7 +409,7 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
     try {
       const { error } = await supabase.from(docRef.table).upsert(processedData);
       if (!error) return;
-      console.warn('[Supabase] setDoc error, falling back:', error);
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] setDoc error, falling back:', error); }
     } catch (e) {
       console.warn('[Supabase] setDoc exception, falling back:', e);
     }
@@ -462,7 +462,7 @@ export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
         .delete()
         .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
       if (!error) return;
-      console.warn('[Supabase] deleteDoc error, falling back:', error);
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] deleteDoc error, falling back:', error); }
     } catch (e) {
       console.warn('[Supabase] deleteDoc exception, falling back:', e);
     }
@@ -479,7 +479,7 @@ export async function addDoc(collectionRef: SupabaseCollectionRef, data: any): P
     try {
       const { error } = await supabase.from(collectionRef.table).insert(processedData);
       if (!error) return new SupabaseDocRef(collectionRef.table, generatedId);
-      console.warn('[Supabase] addDoc error, falling back:', error);
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] addDoc error, falling back:', error); }
     } catch (e) {
       console.warn('[Supabase] addDoc exception, falling back:', e);
     }
@@ -533,7 +533,7 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
         const docs = combined.map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
         return new QuerySnapshot(docs);
       }
-      console.warn('[Supabase] getDocs error, falling back:', error);
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] getDocs error, falling back:', error); }
     } catch (e) {
       console.warn('[Supabase] getDocs exception, falling back:', e);
     }

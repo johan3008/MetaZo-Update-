@@ -314,71 +314,97 @@ export const BackupManagerPanel: React.FC<{
               <div className="overflow-y-auto flex-1 pr-2 space-y-4">
                 {loading ? (
                   <div className="text-center py-8 text-slate-400">Loading history...</div>
-                ) : localHistory.filter(b => b.tool === activeTool || !b.tool).length === 0 && cloudHistory.filter(b => b.tool === activeTool || !b.tool).length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 text-sm">No backup history found.</div>
-                ) : (
-                  <>
-                    {localHistory.filter(b => b.tool === activeTool || !b.tool).length > 0 && (
-                      <div className="space-y-2">
-                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
-                          <HardDrive size={12} />
-                          Penyimpanan Lokal (Browser)
-                        </h3>
-                        {localHistory.filter(b => b.tool === activeTool || !b.tool).map((batch: any, idx: number) => (
-                          <div 
-                            key={`local-${idx}`}
-                            className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-violet-400 transition-colors flex items-center justify-between cursor-pointer"
-                            onClick={() => restoreFromCloud(batch)}
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <Clock size={14} className="text-slate-400" />
-                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
-                                <span className="px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[8px] font-bold rounded">LOKAL</span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
-                              </p>
-                            </div>
-                            <div className="px-3 py-1.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                              Restore
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                ) : (() => {
+                  const sanitizeForComparison = (items: any[]) => items.map(i => {
+                    const { timestamp, ...rest } = i;
+                    return rest;
+                  });
+                  
+                  const getUniqueBackups = (history: any[]) => {
+                    const unique: any[] = [];
+                    const seen = new Set<string>();
+                    
+                    history.filter(b => b.tool === activeTool || !b.tool).forEach(batch => {
+                      const hash = JSON.stringify(sanitizeForComparison(batch.items || []));
+                      if (!seen.has(hash)) {
+                        seen.add(hash);
+                        unique.push(batch);
+                      }
+                    });
+                    return unique;
+                  };
+                  
+                  const uniqueLocalHistory = getUniqueBackups(localHistory);
+                  const uniqueCloudHistory = getUniqueBackups(cloudHistory);
 
-                    {cloudHistory.filter(b => b.tool === activeTool || !b.tool).length > 0 && (
-                      <div className="space-y-2 pt-2">
-                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
-                          <Cloud size={12} />
-                          Penyimpanan Awan (Cloudflare D1)
-                        </h3>
-                        {cloudHistory.filter(b => b.tool === activeTool || !b.tool).map((batch: any, idx: number) => (
-                          <div 
-                            key={`cloud-${idx}`}
-                            className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 transition-colors flex items-center justify-between cursor-pointer"
-                            onClick={() => restoreFromCloud(batch)}
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <Clock size={14} className="text-slate-400" />
-                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
-                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-bold rounded">AWAN</span>
+                  if (uniqueLocalHistory.length === 0 && uniqueCloudHistory.length === 0) {
+                    return <div className="text-center py-8 text-slate-400 text-sm">No backup history found.</div>;
+                  }
+
+                  return (
+                    <>
+                      {uniqueLocalHistory.length > 0 && (
+                        <div className="space-y-2">
+                          <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                            <HardDrive size={12} />
+                            Penyimpanan Lokal (Browser)
+                          </h3>
+                          {uniqueLocalHistory.map((batch: any, idx: number) => (
+                            <div 
+                              key={`local-${idx}`}
+                              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-violet-400 transition-colors flex items-center justify-between cursor-pointer"
+                              onClick={() => restoreFromCloud(batch)}
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Clock size={14} className="text-slate-400" />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
+                                  <span className="px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[8px] font-bold rounded">LOKAL</span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-1">
+                                  {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
+                                </p>
                               </div>
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
-                              </p>
+                              <div className="px-3 py-1.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                                Restore
+                              </div>
                             </div>
-                            <div className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                              Restore
+                          ))}
+                        </div>
+                      )}
+
+                      {uniqueCloudHistory.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                            <Cloud size={12} />
+                            Penyimpanan Awan (Cloudflare D1)
+                          </h3>
+                          {uniqueCloudHistory.map((batch: any, idx: number) => (
+                            <div 
+                              key={`cloud-${idx}`}
+                              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 transition-colors flex items-center justify-between cursor-pointer"
+                              onClick={() => restoreFromCloud(batch)}
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Clock size={14} className="text-slate-400" />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{batch.timestamp}</span>
+                                  <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-bold rounded">AWAN</span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-1">
+                                  {batch.items?.length || 0} items • {batch.tool || 'Unknown Tool'}
+                                </p>
+                              </div>
+                              <div className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                                Restore
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               
               <button 

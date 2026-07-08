@@ -3742,7 +3742,12 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString()
     }));
 
-    // Save to Local Storage first (robust instant fallback)
+    // Prevent duplicates if data (ignoring item timestamp) is identical
+    const sanitizeForComparison = (items: any[]) => items.map(i => {
+      const { timestamp, ...rest } = i;
+      return rest;
+    });
+
     try {
       const localBackupsKey = `metazo_local_backups_${user.uid}`;
       const existingStr = localStorage.getItem(localBackupsKey);
@@ -3751,6 +3756,15 @@ const App: React.FC = () => {
         existingBackups = [];
       }
       
+      const isDuplicate = existingBackups.length > 0 && 
+        existingBackups[0].tool === activeTool &&
+        JSON.stringify(sanitizeForComparison(existingBackups[0].items)) === JSON.stringify(sanitizeForComparison(backupData));
+
+      if (isDuplicate) {
+        console.log('[Auto-backup] Skipped (duplicate data).');
+        return;
+      }
+
       const newLocalBackup = {
         batchId: `local-batch-${Date.now()}`,
         timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
