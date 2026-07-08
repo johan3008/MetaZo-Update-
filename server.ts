@@ -1311,8 +1311,17 @@ app.get('/api/debug-uploads', (req, res) => {
             let tolerance = '';
             let language = '';
             let model = '';
+            let frames: any[] = [];
+            let extractionSuccess = false;
 
-            if (req.file) {
+            if (req.body.frames) {
+                frames = Array.isArray(req.body.frames) ? req.body.frames : JSON.parse(req.body.frames);
+                extractionSuccess = true;
+                tolerance = req.body.tolerance;
+                language = req.body.language;
+                model = req.body.model;
+                cleanupFn = () => {};
+            } else if (req.file) {
                 videoPath = req.file.path;
                 tolerance = req.body.tolerance;
                 language = req.body.language;
@@ -1338,13 +1347,10 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
                 cleanupFn = () => {};
             } else {
-                return res.status(400).json({ error: 'No video uploaded or fileUrl provided.' });
+                return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
-            
-            let frames: any[] = [];
-            let extractionSuccess = false;
 
-            if (ffmpeg) {
+            if (!extractionSuccess && ffmpeg) {
                 try {
                     console.log('Server check-video-quality: Extracting frames...');
                     const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
@@ -1419,8 +1425,8 @@ app.get('/api/debug-uploads', (req, res) => {
                 } catch (extractionErr: any) {
                     console.warn('[Video Audit Fallback] Extraction failed. Using fallback simulation audit:', extractionErr);
                 }
-            } else {
-                console.warn('[Video Audit Fallback] FFmpeg not initialized. Using fallback simulation audit.');
+            } else if (!extractionSuccess) {
+                console.warn('[Video Audit Fallback] FFmpeg not initialized and no frames provided. Using fallback simulation audit.');
             }
 
             if (extractionSuccess && frames && frames.length > 0) {
