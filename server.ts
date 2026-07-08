@@ -1384,16 +1384,13 @@ app.get('/api/debug-uploads', (req, res) => {
                                     throw new Error("Could not determine video duration");
                                 }
 
-                                // 2. Calculate timestamps (extract 12 random frames spread across the entire video)
-                                const numFrames = 12;
-                                const timestamps = [];
-                                const segmentDuration = Math.max(0.1, duration / numFrames);
-                                for (let i = 0; i < numFrames; i++) {
-                                    // Generate a random timestamp within this segment
-                                    const segmentStart = i * segmentDuration;
-                                    const randomOffset = Math.random() * (segmentDuration - 0.1);
-                                    timestamps.push(Math.max(0, segmentStart + randomOffset));
-                                }
+                                // 2. Calculate timestamps (extract frames from Awal, Tengah, and Akhir)
+                                const numFrames = 3;
+                                const timestamps = [
+                                    duration * 0.1, // Awal
+                                    duration * 0.5, // Tengah
+                                    duration * 0.9  // Akhir
+                                ];
 
                                 // 3. Extract frames with fast seek (-ss BEFORE -i)
                                 const framePaths = [];

@@ -4184,7 +4184,7 @@ A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standar
 5. Gen-AI Anomalies (Anomali AI Generatif)
 
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
-Ini adalah 12 CUPLIKAN FRAME diam yang diambil dari berbagai bagian (awal, tengah, hingga akhir) dari sebuah file Video. Anda menganalisis aspek visual statis dari ke-12 frame ini.
+Ini adalah 3 CUPLIKAN FRAME diam yang diambil secara berurutan dari bagian Awal, Tengah, dan Akhir dari sebuah file Video. Anda menganalisis aspek visual statis dari ke-3 frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN.
 PENTING: JIKA VIDEO DITOLAK (FAIL), ANDA WAJIB MENGISI \`detailed_feedback\` DENGAN KALIMAT BERIKUT SECARA PERSIS TANPA TAMBAHAN APAPUN:
 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.'
