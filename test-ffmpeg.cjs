@@ -1,3 +1,3 @@
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-console.log(ffmpegInstaller.path);
+const req = require;
+const f = req('fluent-ffmpeg');
+console.log(typeof f, Object.keys(f));

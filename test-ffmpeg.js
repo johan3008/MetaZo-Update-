@@ -1,9 +1,4 @@
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import ffprobeInstaller from '@ffprobe-installer/ffprobe';
-
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-ffmpeg.setFfprobePath(ffprobeInstaller.path);
-
-console.log('Testing ffmpeg parsing options...');
-// just create dummy logic
+import { createRequire } from 'module';
+const req = createRequire(import.meta.url);
+const f = req('fluent-ffmpeg');
+console.log(typeof f, Object.keys(f));

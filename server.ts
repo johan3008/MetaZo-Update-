@@ -15,13 +15,14 @@ import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPro
 import { createRequire } from 'module';
 
 let ffmpeg: any;
-if (!process.env.VERCEL) {
+if (true) { // always try to load ffmpeg
     try {
         const req = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
         const m1 = 'fluent-ffmpeg';
         const m2 = '@ffmpeg-installer/ffmpeg';
         const m3 = '@ffprobe-installer/ffprobe';
-        ffmpeg = req(m1);
+        const ffmpegLib = req(m1);
+        ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
         ffmpeg.setFfmpegPath(req(m2).path);
         ffmpeg.setFfprobePath(req(m3).path);
     } catch (e) {
