@@ -385,15 +385,20 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
         
         if (found) {
           resultData = { ...(resultData || {}), ...found };
+          // Deep merge 'settings' to prevent wiping out other fields during optimistic updates
+          if (data && data.settings && found.settings) {
+            resultData.settings = { ...data.settings, ...found.settings };
+          }
         }
         
         return new DocumentSnapshot(docRef.id, resultData);
       }
-      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] getDoc error, falling back:', error); }
+      throw error;
     } catch (e) {
-      console.warn('[Supabase] getDoc exception, falling back:', e);
+      console.warn(`[Supabase] getDoc failed with error, falling back to Local Storage:`, e);
     }
   }
+
   const list = getEmulatedTable(docRef.table);
   const found = list.find(row => (row.key === docRef.id || row.id === docRef.id));
   return new DocumentSnapshot(docRef.id, found || null);
@@ -427,22 +432,15 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
 
 export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void> {
   let topLevelUpdates: any = { ...data };
-  
   const hasDottedKeys = Object.keys(data).some(k => k.includes('.'));
+  
+  // 1. Immediately update local cache for optimistic UI (shallow/partial)
+  let list = getEmulatedTable(docRef.table);
+  let index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
+  let currentLocalData = index >= 0 ? list[index] : {};
+  
   if (hasDottedKeys) {
-    let currentDocData: any = {};
-    if (supabase) {
-      const { data: snapData } = await supabase
-        .from(docRef.table)
-        .select('*')
-        .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-        .single();
-      if (snapData) currentDocData = snapData;
-    }
-    
-    topLevelUpdates = {};
-    const resultData = { ...currentDocData };
-    
+    const resultData = { ...currentLocalData };
     for (const [key, value] of Object.entries(data)) {
       if (key.includes('.')) {
         const parts = key.split('.');
@@ -461,22 +459,71 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
       }
     }
   }
-
-  // Always update local emulation as a cache
-  const list = getEmulatedTable(docRef.table);
-  const index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
+  
   if (index >= 0) {
     list[index] = { ...list[index], ...topLevelUpdates };
-    saveEmulatedTable(docRef.table, list);
+  } else {
+    list.push({ id: docRef.id, ...topLevelUpdates });
   }
+  saveEmulatedTable(docRef.table, list);
 
+  // 2. Then do the actual DB update
   if (supabase) {
     try {
+      let finalUpdates = topLevelUpdates;
+      let fullDbData = null;
+      // Re-evaluate with latest DB state to avoid overwriting other fields
+      if (hasDottedKeys) {
+        const { data: snapData } = await supabase
+          .from(docRef.table)
+          .select('*')
+          .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+          .single();
+          
+        if (snapData) {
+           fullDbData = { ...snapData };
+           let dbResultData = { ...snapData };
+           let dbTopLevelUpdates: any = {};
+           for (const [key, value] of Object.entries(data)) {
+              if (key.includes('.')) {
+                const parts = key.split('.');
+                let current = dbResultData;
+                let topKey = parts[0];
+                for (let i = 0; i < parts.length - 1; i++) {
+                  if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
+                  else current[parts[i]] = { ...current[parts[i]] };
+                  current = current[parts[i]];
+                }
+                current[parts[parts.length - 1]] = value;
+                dbTopLevelUpdates[topKey] = dbResultData[topKey];
+              } else {
+                dbResultData[key] = value;
+                dbTopLevelUpdates[key] = value;
+              }
+            }
+            finalUpdates = dbTopLevelUpdates;
+            fullDbData = { ...fullDbData, ...finalUpdates };
+        }
+      }
+
       const { data: resData, error } = await supabase
         .from(docRef.table)
-        .update(topLevelUpdates)
+        .update(finalUpdates)
         .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
         .select();
+      
+      // Update local emulation again with full data from DB to heal any partial updates
+      if (fullDbData || (resData && resData.length > 0)) {
+        const correctData = fullDbData || resData[0];
+        let newList = getEmulatedTable(docRef.table);
+        let newIdx = newList.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
+        if (newIdx >= 0) {
+          newList[newIdx] = { ...newList[newIdx], ...correctData };
+        } else {
+          newList.push(correctData);
+        }
+        saveEmulatedTable(docRef.table, newList);
+      }
       
       if (!error && resData && resData.length > 0) return;
     } catch (e) {

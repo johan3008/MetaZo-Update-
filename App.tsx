@@ -1726,6 +1726,7 @@ const App: React.FC = () => {
           }
 
           const syncModel = (cloudValue: string | undefined, localKey: string, setter: any) => {
+            console.log(`[syncModel] ${localKey} cloud: ${cloudValue}, local: ${localStorage.getItem(localKey)}`);
             if (cloudValue !== undefined) {
               const localValue = localStorage.getItem(localKey) || '';
               if (cloudValue !== localValue) {
@@ -4639,10 +4640,17 @@ const App: React.FC = () => {
               <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-2">{t.settings_main_provider_label}</label>
               <select
                 value={selectedProvider}
-                onChange={(e) => {
+                                onChange={(e) => {
                   const val = e.target.value as any;
+                  console.log(`[Provider Transition] Changing selectedProvider from ${selectedProvider} to ${val}`);
                   setSelectedProvider(val);
                   setActiveSettingsTab(val);
+                  localStorage.setItem('ai_provider', val);
+                  if (auth.currentUser) {
+                    updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                      'settings.ai_provider': val
+                    }).catch(() => {});
+                  }
                 }}
                 className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
               >
