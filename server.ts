@@ -1,6 +1,18 @@
 import "@ffmpeg-installer/ffmpeg";
 import "@ffprobe-installer/ffprobe";
 import "fluent-ffmpeg";
+
+// Vercel NFT hack to include binaries
+import "@ffmpeg-installer/linux-x64/package.json";
+import "@ffprobe-installer/linux-x64/package.json";
+
+
+// Vercel NFT hack to include binaries
+try {
+    
+    require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); require.resolve('@ffprobe-installer/linux-x64/ffprobe');
+} catch (e) {}
+
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
