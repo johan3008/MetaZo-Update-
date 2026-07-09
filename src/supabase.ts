@@ -23,6 +23,7 @@ export interface User {
   uid: string;
   email: string | null;
   displayName?: string | null;
+  photoURL?: string | null;
   emailVerified?: boolean;
   tenantId?: string | null;
   providerData?: any[];
@@ -92,7 +93,9 @@ export const auth = {
             return {
               uid: user.id,
               email: user.email,
-              emailVerified: !!user.email_confirmed_at
+              emailVerified: !!user.email_confirmed_at,
+              displayName: user.user_metadata?.full_name || user.user_metadata?.name || null,
+              photoURL: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
             };
           }
         } catch (e) {}
@@ -119,8 +122,11 @@ export function onAuthStateChanged(authInstance: any, callback: (user: User | nu
       const mappedUser: User | null = user ? {
         uid: user.id,
         email: user.email || null,
-        emailVerified: !!user.email_confirmed_at
+        emailVerified: !!user.email_confirmed_at,
+        displayName: user.user_metadata?.full_name || user.user_metadata?.name || null,
+        photoURL: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
       } : null;
+      
 
       // Sync listeners
       authListeners.forEach(cb => cb(mappedUser));
@@ -145,7 +151,9 @@ export async function signInWithEmailAndPassword(authInstance: any, email: strin
       user: {
         uid: data.user.id,
         email: data.user.email || null,
-        emailVerified: !!data.user.email_confirmed_at
+        emailVerified: !!data.user.email_confirmed_at,
+        displayName: data.user.user_metadata?.full_name || data.user.user_metadata?.name || null,
+        photoURL: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null
       }
     };
   } else {
@@ -172,7 +180,9 @@ export async function createUserWithEmailAndPassword(authInstance: any, email: s
       user: {
         uid: data.user.id,
         email: data.user.email || null,
-        emailVerified: !!data.user.email_confirmed_at
+        emailVerified: !!data.user.email_confirmed_at,
+        displayName: data.user.user_metadata?.full_name || data.user.user_metadata?.name || null,
+        photoURL: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null
       }
     };
   } else {
@@ -229,7 +239,9 @@ export async function signInWithTokens(accessToken: string, refreshToken: string
       user: {
         uid: data.user.id,
         email: data.user.email || null,
-        emailVerified: !!data.user.email_confirmed_at
+        emailVerified: !!data.user.email_confirmed_at,
+        displayName: data.user.user_metadata?.full_name || data.user.user_metadata?.name || null,
+        photoURL: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null
       }
     };
   } else {
