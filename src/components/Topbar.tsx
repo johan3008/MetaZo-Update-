@@ -120,7 +120,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-            {activeUsers.length > 0 ? activeUsers.length : activeAccountsCount} {uiLanguage === 'id' ? 'Akun Aktif' : ((activeUsers.length > 0 ? activeUsers.length : activeAccountsCount) === 1 ? 'Active Account' : 'Active Accounts')}
+            {activeUsers.length > 0 ? activeUsers.length : activeAccountsCount} Active {activeUsers.length === 1 ? 'Account' : 'Accounts'}
           </span>
           
           {/* Active Users Dropdown Tooltip */}
