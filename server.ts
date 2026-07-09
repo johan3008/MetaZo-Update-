@@ -1,18 +1,3 @@
-import "@ffmpeg-installer/ffmpeg";
-import "@ffprobe-installer/ffprobe";
-import "fluent-ffmpeg";
-
-// Vercel NFT hack to include binaries
-import "@ffmpeg-installer/linux-x64/package.json";
-import "@ffprobe-installer/linux-x64/package.json";
-
-
-// Vercel NFT hack to include binaries
-try {
-    
-    require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); require.resolve('@ffprobe-installer/linux-x64/ffprobe');
-} catch (e) {}
-
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
@@ -33,10 +18,13 @@ let ffmpeg: any;
 if (true) { // always try to load ffmpeg
     try {
         const req = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
-        const ffmpegLib = req('fluent-ffmpeg');
+        const m1 = 'fluent-ffmpeg';
+        const m2 = '@ffmpeg-installer/ffmpeg';
+        const m3 = '@ffprobe-installer/ffprobe';
+        const ffmpegLib = req(m1);
         ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
-        ffmpeg.setFfmpegPath(req('@ffmpeg-installer/ffmpeg').path);
-        ffmpeg.setFfprobePath(req('@ffprobe-installer/ffprobe').path);
+        ffmpeg.setFfmpegPath(req(m2).path);
+        ffmpeg.setFfprobePath(req(m3).path);
     } catch (e) {
         console.warn('ffmpeg not available locally', e);
     }
@@ -1363,7 +1351,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
 
-            if (!extractionSuccess && ffmpeg) {
+            if (!extractionSuccess) {
                 try {
                     console.log('Server check-video-quality: Extracting frames...');
                     const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
@@ -1381,9 +1369,12 @@ app.get('/api/debug-uploads', (req, res) => {
                         // Fast Native Extraction using ffmpeg path directly
                         const extractFast = async () => {
                             try {
+                                const m2 = '@ffmpeg-installer/ffmpeg';
+                                const m3 = '@ffprobe-installer/ffprobe';
                                 const reqReq = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
-                                const ffmpegPath = reqReq('@ffmpeg-installer/ffmpeg').path;
-                                const ffprobePath = reqReq('@ffprobe-installer/ffprobe').path;
+                                
+                                const ffmpegPath = reqReq(m2).path;
+                                const ffprobePath = reqReq(m3).path;
                                 const execPromise = util.promisify(exec);
 
                                 // 1. Get duration
@@ -1396,16 +1387,16 @@ app.get('/api/debug-uploads', (req, res) => {
                                 // 2. Calculate timestamps (extract frames from Awal, Tengah, and Akhir)
                                 const numFrames = 3;
                                 const timestamps = [
-                                    duration * 0.1, // Awal
-                                    duration * 0.5, // Tengah
-                                    duration * 0.9  // Akhir
+                                    0, // Awal (0 detik)
+                                    Number((duration / 2).toFixed(3)), // Tengah
+                                    Number((Math.max(0, duration - 0.5)).toFixed(3))  // Akhir (0.5 dtk sebelum usai)
                                 ];
 
-                                // 3. Extract frames with fast seek (-ss BEFORE -i)
+                                // 3. Extract frames with robust command
                                 const framePaths = [];
                                 for (let i = 0; i < numFrames; i++) {
                                     const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
-                                    await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
+                                    await execPromise(`"${ffmpegPath}" -y -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}"`);
                                     framePaths.push(fPath);
                                 }
 
