@@ -1178,7 +1178,10 @@ const App: React.FC = () => {
         }
         
         currentUsersList = usersList;
-        setActiveUsers(usersList);
+        setActiveUsers(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(usersList)) return prev;
+            return usersList;
+        });
         setActiveAccountsCount(usersList.length);
     };
 
@@ -1731,13 +1734,16 @@ const App: React.FC = () => {
         // 3. Sync daily gen counts for today
         if (data.dailyUsage && data.dailyUsage[dateStr]) {
           const usageToday = data.dailyUsage[dateStr];
-          setCloudDailyCounts(usageToday);
+          setCloudDailyCounts((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(usageToday)) return prev;
+            return usageToday;
+          });
           // Sync to localStorage for offline access/backup
           Object.keys(usageToday).forEach((typeKey) => {
             localStorage.setItem(`mz_daily_gen_${typeKey}_${dateStr}`, String(usageToday[typeKey]));
           });
         } else {
-          setCloudDailyCounts({});
+          setCloudDailyCounts((prev) => Object.keys(prev).length === 0 ? prev : {});
         }
 
         // 4. Sync Settings

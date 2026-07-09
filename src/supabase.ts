@@ -738,7 +738,7 @@ export function onSnapshot(
   // Supabase Realtime fallback - we poll every 4 seconds or trigger on mutations
   const intervalId = setInterval(() => {
     listenerObj.callback();
-  }, 4000);
+  }, 15000);
 
   return () => {
     dbListeners.delete(listenerObj);
