@@ -173,7 +173,7 @@ export const ImageQualityCheck: React.FC<{
   };
 
   useEffect(() => {
-    fetch('/api/r2-status')
+    fetch(`/api/r2-status?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => setR2Configured(!!data.configured))
       .catch(() => setR2Configured(false));

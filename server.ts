@@ -2145,6 +2145,9 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
     // Endpoint for the frontend to check if R2 is configured (no credentials exposed)
     app.get('/api/r2-status', (req, res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.json({
             configured: isR2Configured(),
             bucketName: isR2Configured() ? process.env.S3_BUCKET_NAME : null,

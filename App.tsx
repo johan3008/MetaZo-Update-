@@ -1249,7 +1249,7 @@ const App: React.FC = () => {
   // Cek status R2 saat aplikasi dimuat
   useEffect(() => {
     if (r2Status === null) {
-      fetch('/api/r2-status')
+      fetch(`/api/r2-status?t=${Date.now()}`)
         .then(r => r.json())
         .then(data => setR2Status(!!data.configured))
         .catch(() => setR2Status(false));

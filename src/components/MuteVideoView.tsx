@@ -40,7 +40,7 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetch('/api/r2-status')
+    fetch(`/api/r2-status?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => setR2Configured(!!data.configured))
       .catch(() => setR2Configured(false));
