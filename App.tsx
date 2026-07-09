@@ -2223,8 +2223,8 @@ const App: React.FC = () => {
                   updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
                 }
               } else {
-                // We do NOT aggressively reject/delete key on reload to prevent accidental wipeouts
-                isRejected = false;
+                // Reject key if it belongs to another user
+                isRejected = true;
               }
             } else {
               if (ownerId && isEmail(ownerId)) {
@@ -2232,8 +2232,8 @@ const App: React.FC = () => {
                 setIsCheckingLicense(false);
                 return;
               } else if (ownerId && ownerId !== devId) {
-                // We do NOT aggressively reject/delete key on reload to prevent accidental wipeouts
-                isRejected = false;
+                // Reject key if it belongs to another device
+                isRejected = true;
               }
             }
 
@@ -2265,18 +2265,16 @@ const App: React.FC = () => {
             }
             setIsMzLicensed(true);
           } else {
-            // Keep licensed even if DB hasn't fully updated yet, to ensure a smooth transition
-            setIsMzLicensed(true);
+            clearLicenseKey();
           }
         } else {
-          // Keep licensed even if key collection check returns false (sandbox, connection lag, or master key seed)
-          setIsMzLicensed(true);
+          clearLicenseKey();
         }
       })
       .catch(err => {
         console.warn('License validator connection error, retaining local state:', err);
-        // Retain local state
-        setIsMzLicensed(true);
+        // Retain local state only if a local key is present and was previously active
+        setIsMzLicensed((prev) => prev && !!localStorage.getItem('mz_license_key'));
       })
       .finally(() => {
         setIsCheckingLicense(false);
