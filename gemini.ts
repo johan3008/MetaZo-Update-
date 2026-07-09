@@ -4186,8 +4186,7 @@ A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standar
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
 Ini adalah 3 CUPLIKAN FRAME diam yang diambil secara berurutan dari bagian Awal, Tengah, dan Akhir dari sebuah file Video. Anda menganalisis aspek visual statis dari ke-3 frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN.
-PENTING: JIKA VIDEO DITOLAK (FAIL), ANDA WAJIB MENGISI \`detailed_feedback\` DENGAN KALIMAT BERIKUT SECARA PERSIS TANPA TAMBAHAN APAPUN:
-'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.'
+PENTING: JIKA VIDEO DITOLAK (FAIL), Anda WAJIB MENGISI \`detailed_feedback\` DENGAN ANALISIS SPESIFIK MENGAPA VIDEO DITOLAK (misalnya: "Video ditolak karena terdapat noise digital yang berlebih pada latar belakang di frame ke-2"). JANGAN GUNAKAN KALIMAT TEMPLATE GENERIC. Berikan alasan yang nyata dan faktual sesuai apa yang Anda temukan.
 
 MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 1. Rolling-Shutter Artifacts: Cek apakah ada efek skew (distorsi miring) yang parah pada garis vertikal atau objek bergerak, jello effects, atau flash banding (garis/pita horizontal dengan exposure berbeda).
@@ -4226,7 +4225,7 @@ Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan k
 
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
 BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS UNTUK VIDEO AMATIR (BLUR, PENCAHAYAAN BURUK, NOISE, KOMPRESI BURUK, RESOLUSI RENDAH), DAN WAJIB MEMBERIKAN FAIL. TETAPI SEBALIKNYA, JIKA VIDEO INI BERKUALITAS TINGGI, BERSIH, DAN PROFESIONAL SECARA VISUAL STATIS, ANDA WAJIB MEMBERIKAN STATUS PASS DENGAN SKOR TINGGI. JANGAN MENEBAK-NEBAK MASALAH (SEPERTI MASALAH AUDIO, FLICKERING, ATAU CAMERA SHAKE) JIKA BUKTI VISUAL DARI 3 FRAME INI TIDAK MENDUKUNG.
-JIKA VIDEO GAGAL (FAIL), Anda WAJIB memberikan "detailed_feedback" persis seperti kalimat berikut ini tanpa tambahan apapun: "Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues".
+JIKA VIDEO GAGAL (FAIL), Anda WAJIB menjelaskan secara detail dan spesifik dalam "detailed_feedback" mengenai cacat apa yang Anda temukan dan di mana lokasinya pada frame. JANGAN PERNAH MENGGUNAKAN KALIMAT TEMPLATE DEFAULT.
 
 BERIKAN SKOR BERIKUT:
 - technical_score (0-100): Berdasarkan cacat teknis murni seperti noise, blur, banding, compression, exposure.
