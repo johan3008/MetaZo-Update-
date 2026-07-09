@@ -464,6 +464,59 @@ export const ImageQualityCheck: React.FC<{
     });
   };
 
+  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(videoFile);
+      video.muted = true;
+      video.playsInline = true;
+      
+      const frames: string[] = [];
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      video.onloadedmetadata = () => {
+        const scale = Math.min(1, 1280 / video.videoWidth);
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        
+        const duration = video.duration;
+        if (!duration || !isFinite(duration) || duration <= 0) {
+            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
+            return;
+        }
+
+        const targetTimes = [
+            0.1,
+            duration / 2,
+            Math.max(0, duration - 0.5)
+        ];
+        
+        let currentTimeIndex = 0;
+        
+        video.onseeked = () => {
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            frames.push(dataUrl);
+          }
+          
+          currentTimeIndex++;
+          if (currentTimeIndex < targetTimes.length) {
+            video.currentTime = targetTimes[currentTimeIndex];
+          } else {
+            URL.revokeObjectURL(video.src);
+            resolve(frames);
+          }
+        };
+        
+        video.currentTime = targetTimes[currentTimeIndex];
+      };
+      
+      video.onerror = () => reject(new Error("Gagal memutar/memuat video untuk diekstrak."));
+    });
+  };
+
   const handleFilesSelected = async (selectedFiles: FileList | File[]) => {
     // Revoke old object URLs
     Object.keys(previews).forEach(key => URL.revokeObjectURL(previews[key]));
@@ -548,29 +601,32 @@ export const ImageQualityCheck: React.FC<{
         let getUrlData = null;
 
         // Try R2 upload for standard images to prevent Vercel 4.5MB payload limits
-        if (!file.name.match(/\.(eps|ai)$/i)) {
+        const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
+        let extractedVideoFrames: string[] | null = null;
+        
+        if (isVideo) {
+           console.log(`[Video Audit in Image] Mengekstrak frame video melalui Browser Frontend...`);
+           extractedVideoFrames = await extractFramesFromVideo(file);
+        } else if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
             let uploadBlob: Blob | File = file;
-            const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
             
-            if (!isVideo) {
-              try {
-                const arr = base64Image.split(',');
-                const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-                const bstr = atob(arr[1]);
-                let n = bstr.length;
-                const u8arr = new Uint8Array(n);
-                while (n--) {
-                  u8arr[n] = bstr.charCodeAt(n);
-                }
-                uploadBlob = new Blob([u8arr], { type: mime });
-              } catch (e) {
-                console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
-                uploadBlob = file;
+            try {
+              const arr = base64Image.split(',');
+              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+              const bstr = atob(arr[1]);
+              let n = bstr.length;
+              const u8arr = new Uint8Array(n);
+              while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
               }
+              uploadBlob = new Blob([u8arr], { type: mime });
+            } catch (e) {
+              console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
+              uploadBlob = file;
             }
 
-            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || (isVideo ? 'video/mp4' : 'image/jpeg'))}`);
+            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
             if (getUrlRes.ok) {
               getUrlData = await getUrlRes.json().catch(() => ({}));
               if (getUrlData.uploadUrl && getUrlData.fileUrl) {
@@ -593,10 +649,20 @@ export const ImageQualityCheck: React.FC<{
         }
 
         let response;
-        const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
         
-        if (uploadedUrl) {
-          response = await fetch(isVideo ? '/api/check-video-quality' : '/api/check-image-quality', {
+        if (isVideo && extractedVideoFrames) {
+          response = await fetch('/api/check-video-quality', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+            body: JSON.stringify({
+              frames: extractedVideoFrames,
+              tolerance,
+              language: t.language || 'English',
+              model: aiOptions?.model || 'gemini-3.1-pro-preview'
+            })
+          });
+        } else if (uploadedUrl) {
+          response = await fetch('/api/check-image-quality', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
             body: JSON.stringify({ 
@@ -609,34 +675,17 @@ export const ImageQualityCheck: React.FC<{
             }),
           });
         } else {
-          
-          if (isVideo) {
-            const formData = new FormData();
-            formData.append('video', file);
-            formData.append('tolerance', tolerance);
-            formData.append('language', t.language || 'English');
-            formData.append('model', aiOptions?.model || 'gemini-3.1-pro-preview');
-
-            response = await fetch('/api/check-video-quality', {
-              method: 'POST',
-              headers: { 
-                'X-API-Key': aiOptions?.apiKey || ''
-              },
-              body: formData
-            });
-          } else {
-            response = await fetch('/api/check-image-quality', {
-              method: 'POST',
-              headers: getHeaders(aiOptions),
-              body: JSON.stringify({ 
-                image: base64Image, 
-                tolerance, 
-                language: t.language || 'English', 
-                model: aiOptions?.model,
-                fileType: file.type || file.name.split('.').pop()
-              }),
-            });
-          }
+          response = await fetch('/api/check-image-quality', {
+            method: 'POST',
+            headers: getHeaders(aiOptions),
+            body: JSON.stringify({ 
+              image: base64Image, 
+              tolerance, 
+              language: t.language || 'English', 
+              model: aiOptions?.model,
+              fileType: file.type || file.name.split('.').pop()
+            }),
+          });
         }
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
