@@ -4225,7 +4225,9 @@ Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan k
 
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
 BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS UNTUK VIDEO AMATIR (BLUR, PENCAHAYAAN BURUK, NOISE, KOMPRESI BURUK, RESOLUSI RENDAH), DAN WAJIB MEMBERIKAN FAIL. TETAPI SEBALIKNYA, JIKA VIDEO INI BERKUALITAS TINGGI, BERSIH, DAN PROFESIONAL SECARA VISUAL STATIS, ANDA WAJIB MEMBERIKAN STATUS PASS DENGAN SKOR TINGGI. JANGAN MENEBAK-NEBAK MASALAH (SEPERTI MASALAH AUDIO, FLICKERING, ATAU CAMERA SHAKE) JIKA BUKTI VISUAL DARI 3 FRAME INI TIDAK MENDUKUNG.
-JIKA VIDEO GAGAL (FAIL), Anda WAJIB menjelaskan secara detail dan spesifik dalam "detailed_feedback" mengenai cacat apa yang Anda temukan dan di mana lokasinya pada frame. JANGAN PERNAH MENGGUNAKAN KALIMAT TEMPLATE DEFAULT.
+PENGISIAN DETAILED FEEDBACK:
+- JIKA VIDEO GAGAL (FAIL): Anda WAJIB menjelaskan secara detail dan spesifik dalam "detailed_feedback" berdasarkan poin-poin yang gagal di "quality_checks" (contoh: "Video ditolak karena terdeteksi noise berlebih dan overexposure pada frame ke-3"). JANGAN PERNAH MENGGUNAKAN KALIMAT TEMPLATE DEFAULT.
+- JIKA VIDEO AMAN (PASS): Anda WAJIB menjelaskan dalam "detailed_feedback" bahwa video aman, bersih dari cacat teknis/AI, dan layak (contoh: "Video aman dan lulus kualifikasi. Kualitas visual sangat baik dan bebas noise.").
 
 BERIKAN SKOR BERIKUT:
 - technical_score (0-100): Berdasarkan cacat teknis murni seperti noise, blur, banding, compression, exposure.
@@ -4318,7 +4320,7 @@ BERIKAN SKOR BERIKUT:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, output exactly: 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues' in detailed_feedback.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. Ensure the detailed_feedback provides specific and actual reasons based on visual evidence.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
