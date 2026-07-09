@@ -1651,8 +1651,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     setInputKey('');
     setActivationError('');
     setShowCancelConfirm(false);
-    alert("Lisensi telah dihapus. Aplikasi akan dimuat ulang.");
-    window.location.reload(); // Force reload to ensure App state updates
+    alert("Lisensi telah dihapus.");
   };
 
   const handleCopyText = (text: string, label: string) => {

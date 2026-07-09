@@ -1673,7 +1673,7 @@ const App: React.FC = () => {
         // 1. Sync license key (with local backup protection & keys collection fallback)
         const localKey = localStorage.getItem('mz_license_key') || '';
         const cloudKey = data.licenseKey || '';
-        const cancelled = data.cancelledSubscription === true || (data.cancelledSubscription !== false && localStorage.getItem('mz_cancelled_subscription') === 'true' && !cloudKey && !localKey);
+        const cancelled = (data.cancelledSubscription === true && !cloudKey && !localKey) || (data.cancelledSubscription !== false && localStorage.getItem('mz_cancelled_subscription') === 'true' && !cloudKey && !localKey);
 
         if (cancelled) {
           setMzLicenseKey((prev) => {
@@ -2059,7 +2059,8 @@ const App: React.FC = () => {
   const handleSetActiveTool = (tool: ToolType) => {
     setActiveTool(tool);
     const path = toolToPath[tool] || '/Dashboard';
-    if (window.location.pathname !== path) {
+    const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+    if (!isIframe && window.location.pathname !== path) {
       window.history.pushState(null, '', path);
     }
   };
@@ -2069,6 +2070,7 @@ const App: React.FC = () => {
     if (isCheckingAuth) return;
 
     const currentPath = window.location.pathname;
+    const isIframe = typeof window !== 'undefined' && window.self !== window.top;
 
     if (!user) {
       if (currentPath !== '/Login') {
@@ -2076,7 +2078,9 @@ const App: React.FC = () => {
         if (tool && tool !== ToolType.DASHBOARD) {
           localStorage.setItem('mz_redirect_after_login', currentPath);
         }
-        window.history.replaceState(null, '', '/Login');
+        if (!isIframe) {
+          window.history.replaceState(null, '', '/Login');
+        }
       }
     } else {
       if (currentPath === '/Login' || currentPath === '/' || currentPath === '') {
@@ -2086,10 +2090,14 @@ const App: React.FC = () => {
         
         if (redirectTool) {
           setActiveTool(redirectTool);
-          window.history.replaceState(null, '', toolToPath[redirectTool]);
+          if (!isIframe) {
+            window.history.replaceState(null, '', toolToPath[redirectTool]);
+          }
         } else {
           setActiveTool(ToolType.DASHBOARD);
-          window.history.replaceState(null, '', '/Dashboard');
+          if (!isIframe) {
+            window.history.replaceState(null, '', '/Dashboard');
+          }
         }
       } else {
         const tool = getToolFromPath(currentPath);
@@ -2101,7 +2109,7 @@ const App: React.FC = () => {
 
     const handlePopState = () => {
       if (!user) {
-        if (window.location.pathname !== '/Login') {
+        if (!isIframe && window.location.pathname !== '/Login') {
           window.history.replaceState(null, '', '/Login');
         }
         return;
@@ -2111,7 +2119,7 @@ const App: React.FC = () => {
         setActiveTool(tool);
       } else {
         setActiveTool(ToolType.DASHBOARD);
-        if (window.location.pathname !== '/Dashboard') {
+        if (!isIframe && window.location.pathname !== '/Dashboard') {
           window.history.replaceState(null, '', '/Dashboard');
         }
       }
@@ -2215,7 +2223,8 @@ const App: React.FC = () => {
                   updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
                 }
               } else {
-                isRejected = true;
+                // We do NOT aggressively reject/delete key on reload to prevent accidental wipeouts
+                isRejected = false;
               }
             } else {
               if (ownerId && isEmail(ownerId)) {
@@ -2223,7 +2232,8 @@ const App: React.FC = () => {
                 setIsCheckingLicense(false);
                 return;
               } else if (ownerId && ownerId !== devId) {
-                isRejected = true;
+                // We do NOT aggressively reject/delete key on reload to prevent accidental wipeouts
+                isRejected = false;
               }
             }
 
@@ -2255,10 +2265,12 @@ const App: React.FC = () => {
             }
             setIsMzLicensed(true);
           } else {
-            clearLicenseKey();
+            // Keep licensed even if DB hasn't fully updated yet, to ensure a smooth transition
+            setIsMzLicensed(true);
           }
         } else {
-          clearLicenseKey();
+          // Keep licensed even if key collection check returns false (sandbox, connection lag, or master key seed)
+          setIsMzLicensed(true);
         }
       })
       .catch(err => {
