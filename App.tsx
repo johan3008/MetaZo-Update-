@@ -1311,11 +1311,27 @@ const App: React.FC = () => {
   // Promo Window States
   const [showPromoWindow, setShowPromoWindow] = useState(false);
   const [hasSyncedProfile, setHasSyncedProfile] = useState(false);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const [lastUid, setLastUid] = useState<string | null>(null);
+
   const [promoCodesForModal, setPromoCodesForModal] = useState<any[]>([]);
   const [copiedCodeInModal, setCopiedCodeInModal] = useState<string | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    if (user?.uid !== lastUid) {
+      setHasInitiallyLoaded(false);
+      setLastUid(user?.uid || null);
+    }
+  }, [user?.uid, lastUid]);
+
+  useEffect(() => {
+    if (!isCheckingAuth && hasSyncedProfile && !isCheckingLicense) {
+      setHasInitiallyLoaded(true);
+    }
+  }, [isCheckingAuth, hasSyncedProfile, isCheckingLicense]);
 
   const isAdminAccount = !!user && ((import.meta.env.VITE_ADMIN_UID && user.uid === import.meta.env.VITE_ADMIN_UID) || (user.email && ['johanchrismant4@gmail.com'].includes(user.email)));
   const isResellerUnlocked = isAdminAccount;
@@ -4064,7 +4080,7 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[uiLanguage];
 
-  if (isCheckingAuth || (user && (!hasSyncedProfile || isCheckingLicense))) {
+  if (!hasInitiallyLoaded && (isCheckingAuth || (user && (!hasSyncedProfile || isCheckingLicense)))) {
     return (
       <div className={`min-h-screen flex items-center justify-center bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
         <div className="flex flex-col items-center space-y-4 animate-pulse">
