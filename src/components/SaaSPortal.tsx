@@ -731,8 +731,6 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     setIsKeysLoading(true);
     try {
       await setDoc(doc(db, 'branding', 'main'), {
-        appName: tempAppName.trim() || 'MetaZo PRO',
-        appSubtitle: tempAppSubtitle.trim() || 'AI-Powered Metadata Assistant',
         whatsAppLink: tempWhatsApp.trim() || 'https://wa.me/+6282275408171',
         pricingTier: tempPricingTier.trim() || 'Rp 149.000 / Bulan',
         licenseSeed: tempLicenseSeed.trim() || 'MZPRO-COMMERCIAL-2026',
@@ -1043,6 +1041,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           const userRef = doc(db, 'users', userId);
           await setDoc(userRef, {
             licenseKey: generatedLicenseKey,
+            cancelledSubscription: false,
             updatedAt: new Date().toISOString()
           }, { merge: true }).catch(err => {
             console.warn('db_op', err);
@@ -1050,6 +1049,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         }
 
         // Apply immediately inside the client
+        localStorage.removeItem('mz_cancelled_subscription');
         localStorage.setItem('mz_license_key', generatedLicenseKey);
         setLicenseKey(generatedLicenseKey);
         
@@ -1135,6 +1135,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           }
 
           // Apply locally
+          localStorage.removeItem('mz_cancelled_subscription');
           localStorage.setItem('mz_license_key', generatedLicenseKey);
           setLicenseKey(generatedLicenseKey);
           
@@ -1266,12 +1267,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
               const userRef = doc(db, 'users', userId);
               await setDoc(userRef, {
                 licenseKey: newKey,
+            cancelledSubscription: false,
                 updatedAt: new Date().toISOString()
               }, { merge: true }).catch(err => {
                 console.warn('db_op', err);
               });
             }
             
+            localStorage.removeItem('mz_cancelled_subscription');
             localStorage.setItem('mz_license_key', newKey);
             setLicenseKey(newKey);
             
@@ -1347,12 +1350,14 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           const userRef = doc(db, 'users', userId);
           await setDoc(userRef, {
             licenseKey: newKey,
+            cancelledSubscription: false,
             updatedAt: new Date().toISOString()
           }, { merge: true }).catch(err => {
             console.warn('db_op', err);
           });
         }
         
+        localStorage.removeItem('mz_cancelled_subscription');
         localStorage.setItem('mz_license_key', newKey);
         setLicenseKey(newKey);
         
@@ -1426,6 +1431,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
 
     const syncUserDb = async (key: string) => {
+      localStorage.removeItem('mz_cancelled_subscription');
       if (userId) {
         const userRef = doc(db, 'users', userId);
         await setDoc(userRef, {

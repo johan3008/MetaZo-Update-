@@ -30,5 +30,5 @@ try {
     console.log('Ghostscript downloaded and extracted successfully to', gsPath);
 } catch (error) {
     console.error('Failed to download Ghostscript:', error);
-    process.exit(1);
+    
 }

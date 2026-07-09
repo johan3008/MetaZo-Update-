@@ -1673,11 +1673,11 @@ const App: React.FC = () => {
         // 1. Sync license key (with local backup protection & keys collection fallback)
         const localKey = localStorage.getItem('mz_license_key') || '';
         const cloudKey = data.licenseKey || '';
-        const cancelled = data.cancelledSubscription || localStorage.getItem('mz_cancelled_subscription') === 'true';
+        const cancelled = data.cancelledSubscription === true || (data.cancelledSubscription !== false && localStorage.getItem('mz_cancelled_subscription') === 'true' && !cloudKey && !localKey);
 
         if (cancelled) {
           setMzLicenseKey((prev) => {
-                  if (prev !== '') setIsCheckingLicense(true);
+                  
                   return '';
                 });
           localStorage.removeItem('mz_license_key');
@@ -1687,7 +1687,7 @@ const App: React.FC = () => {
           
           if (activeKey) {
             setMzLicenseKey((prev) => {
-              if (prev !== activeKey) setIsCheckingLicense(true);
+              
               return activeKey;
             });
             localStorage.setItem('mz_license_key', activeKey);
@@ -1705,7 +1705,7 @@ const App: React.FC = () => {
             findActiveKeyForEmail(user.email || '').then((foundKey) => {
               if (foundKey) {
                 setMzLicenseKey((prev) => {
-                  if (prev !== foundKey) setIsCheckingLicense(true);
+                  
                   return foundKey;
                 });
                 localStorage.setItem('mz_license_key', foundKey);
@@ -1717,7 +1717,7 @@ const App: React.FC = () => {
               }, { merge: true }).catch(e => console.info('db_op', e));
               } else {
                 setMzLicenseKey((prev) => {
-                  if (prev !== '') setIsCheckingLicense(true);
+                  
                   return '';
                 });
               }
@@ -1867,11 +1867,14 @@ const App: React.FC = () => {
               metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
           };
 
-          const isCancelled = localStorage.getItem('mz_cancelled_subscription') === 'true';
           const resolvedKey = finalKey || '';
           if (resolvedKey) {
+            localStorage.removeItem('mz_cancelled_subscription');
+          }
+          const isCancelled = resolvedKey ? false : (localStorage.getItem('mz_cancelled_subscription') === 'true');
+          if (resolvedKey) {
             setMzLicenseKey((prev) => {
-            if (prev !== resolvedKey) setIsCheckingLicense(true);
+            
             return resolvedKey;
           });
             localStorage.setItem('mz_license_key', resolvedKey);
@@ -1901,7 +1904,7 @@ const App: React.FC = () => {
           findActiveKeyForEmail(user.email || '').then((foundKey) => {
             if (foundKey) {
               setMzLicenseKey((prev) => {
-                  if (prev !== foundKey) setIsCheckingLicense(true);
+                  
                   return foundKey;
                 });
               localStorage.setItem('mz_license_key', foundKey);
@@ -2121,12 +2124,12 @@ const App: React.FC = () => {
   }, [activeTool, user, isCheckingAuth]);
 
   useEffect(() => {
-    console.log("App.tsx license useEffect. isCheckingAuth:", isCheckingAuth);
+    
     if (isCheckingAuth) return;
     const k = mzLicenseKey.trim().toUpperCase();
-    console.log("App.tsx license useEffect running. k:", k);
+    
     if (!k) {
-      console.log("App.tsx license useEffect: no key");
+      
       setIsMzLicensed(false);
       setSubDaysLeft(null);
       setIsCheckingLicense(false);
@@ -2154,7 +2157,7 @@ const App: React.FC = () => {
       setSubDaysLeft(null);
       localStorage.removeItem('mz_license_key');
       setMzLicenseKey((prev) => {
-                  if (prev !== '') setIsCheckingLicense(true);
+                  
                   return '';
                 });
       
@@ -2200,9 +2203,11 @@ const App: React.FC = () => {
             let isRejected = false;
 
             if (user) {
-              if (ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
+              if (!ownerId || ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
                 // Valid! If it's a UID, upgrade it to email
                 if (ownerId === user.uid && currentEmail) {
+                  updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
+                } else if (!ownerId && currentEmail) {
                   updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
                 }
               } else if (ownerId === devId) {
@@ -4202,7 +4207,7 @@ const App: React.FC = () => {
               localStorage.removeItem('mz_license_key');
               localStorage.removeItem('mz_trial_start');
               setMzLicenseKey((prev) => {
-                  if (prev !== '') setIsCheckingLicense(true);
+                  
                   return '';
                 });
               await signOut(auth);
