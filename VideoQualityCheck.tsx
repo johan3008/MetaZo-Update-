@@ -198,6 +198,64 @@ export const VideoQualityCheck: React.FC<{
     }
   };
 
+  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(videoFile);
+      video.muted = true;
+      video.playsInline = true;
+      
+      const frames: string[] = [];
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      video.onloadedmetadata = () => {
+        // Resize to 1280px width max to save payload bandwidth
+        const scale = Math.min(1, 1280 / video.videoWidth);
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        
+        const duration = video.duration;
+        if (!duration || !isFinite(duration) || duration <= 0) {
+            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
+            return;
+        }
+
+        const targetTimes = [
+            0.1, // Awal
+            duration / 2, // Tengah
+            Math.max(0, duration - 0.5) // Akhir
+        ];
+        
+        let currentTimeIndex = 0;
+        
+        video.onseeked = () => {
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Get JPEG base64
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            frames.push(dataUrl);
+          }
+          
+          currentTimeIndex++;
+          if (currentTimeIndex < targetTimes.length) {
+            video.currentTime = targetTimes[currentTimeIndex];
+          } else {
+            URL.revokeObjectURL(video.src);
+            resolve(frames);
+          }
+        };
+        
+        // Start extraction
+        video.currentTime = targetTimes[currentTimeIndex];
+      };
+      
+      video.onerror = () => {
+        reject(new Error("Gagal memutar/memuat video untuk diekstrak. Format mungkin tidak didukung browser."));
+      };
+    });
+  };
+
   const analyzeVideo = async () => {
     if (!file) return;
 
@@ -211,73 +269,27 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      console.log(`[Video Audit] Delegating extraction to server FFmpeg...`);
-
-      let uploadedUrl = null;
-      let getUrlData = null;
+      console.log(`[Video Audit] Mengekstrak frame video melalui Browser Frontend...`);
       
-      if (r2Configured !== false) {
-        try {
-          const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
-          if (getUrlRes.ok) {
-            getUrlData = await getUrlRes.json().catch(() => ({}));
-            if (getUrlData.uploadUrl && getUrlData.fileUrl) {
-              console.log(`[Video Audit] Uploading to Cloudflare R2 directly: ${file.name}`);
-              try {
-                const putRes = await fetch(getUrlData.uploadUrl, {
-                  method: 'PUT',
-                  body: file,
-                  headers: { 'Content-Type': file.type || 'video/mp4' }
-                });
-                if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
-                uploadedUrl = getUrlData.fileUrl;
-              } catch (putErr: any) {
-                if (putErr.message === 'Failed to fetch') {
-                  throw new Error(
-                    t.language === 'Bahasa'
-                      ? 'Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan konfigurasi CORS di dashboard Cloudflare R2.'
-                      : 'Failed to upload to Cloudflare R2 (CORS Error). Please configure CORS in your Cloudflare R2 dashboard.'
-                  );
-                }
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("R2 bypass failed, falling back to form data", e);
-        }
-      }
+      // Lakukan ekstraksi frame secara lokal di Browser!
+      // Vercel tidak lagi perlu menggunakan FFmpeg di Backend
+      const framesBase64 = await extractFramesFromVideo(file);
+      
+      console.log(`[Video Audit] Berhasil mengekstrak ${framesBase64.length} frame. Mengirim ke API...`);
 
-      let response;
-      if (uploadedUrl) {
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 
-              'X-API-Key': aiOptions?.apiKey || '',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              fileUrl: uploadedUrl,
-              pathKey: getUrlData?.pathKey || '',
-              tolerance: tolerance,
-              language: aiOptions?.language || 'Bahasa',
-              model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
-            })
-          });
-      } else {
-          const formData = new FormData();
-          formData.append('video', file);
-          formData.append('tolerance', tolerance);
-          formData.append('language', aiOptions?.language || 'Bahasa');
-          formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
-
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 
-              'X-API-Key': aiOptions?.apiKey || ''
-            },
-            body: formData
-          });
-      }
+      const response = await fetch('/api/check-video-quality', {
+        method: 'POST',
+        headers: { 
+          'X-API-Key': aiOptions?.apiKey || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          frames: framesBase64,
+          tolerance: tolerance,
+          language: aiOptions?.language || 'Bahasa',
+          model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
+        })
+      });
 
 
       if (!response.ok) {
