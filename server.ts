@@ -1351,7 +1351,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
 
-            if (!extractionSuccess && ffmpeg) {
+            if (!extractionSuccess) {
                 try {
                     console.log('Server check-video-quality: Extracting frames...');
                     const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
