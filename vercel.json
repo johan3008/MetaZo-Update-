@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/**/*.js": {
-      "includeFiles": "bin/**",
+      "includeFiles": "{bin/**,node_modules/@ffmpeg-installer/linux-x64/ffmpeg,node_modules/@ffprobe-installer/linux-x64/ffprobe}",
       "maxDuration": 300
     }
   },

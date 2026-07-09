@@ -1101,7 +1101,6 @@ const App: React.FC = () => {
         try {
             await setDoc(userRef, { 
               lastSeen: new Date().getTime(),
-              isOnline: true,
               email: auth.currentUser?.email || '',
               displayName: auth.currentUser?.displayName || ''
             }, { merge: true });
@@ -1114,7 +1113,7 @@ const App: React.FC = () => {
     const interval = setInterval(markOnline, 60000); // 1 minute
     
     const handleBeforeUnload = () => {
-        setDoc(userRef, { isOnline: false, lastSeen: 0 }, { merge: true }).catch(() => {});
+        setDoc(userRef, { lastSeen: 0 }, { merge: true }).catch(() => {});
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     
@@ -1138,7 +1137,7 @@ const App: React.FC = () => {
         
         snapshot.forEach(doc => {
             const data = doc.data();
-            let isUserOnline = data.isOnline === true;
+            let isUserOnline = false;
             
             if (data.lastSeen !== undefined && data.lastSeen !== null) {
                 let lastSeenTime = 0;
@@ -4193,7 +4192,7 @@ const App: React.FC = () => {
             try {
               if (auth.currentUser) {
                 const userRef = doc(db, 'users', auth.currentUser.uid);
-                await updateDoc(userRef, { lastSeen: 0, isOnline: false }).catch(()=>console.info("onSignOut update error"));
+                await updateDoc(userRef, { lastSeen: 0 }).catch(()=>console.info("onSignOut update error"));
               }
               await signOut(auth);
             } catch (err) {
