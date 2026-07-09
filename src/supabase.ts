@@ -440,6 +440,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
   let currentLocalData = index >= 0 ? list[index] : {};
   
   if (hasDottedKeys) {
+    topLevelUpdates = {};
     const resultData = { ...currentLocalData };
     for (const [key, value] of Object.entries(data)) {
       if (key.includes('.')) {
@@ -506,11 +507,13 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
         }
       }
 
+      console.log('[Supabase] About to update:', docRef.table, docRef.id, finalUpdates);
       const { data: resData, error } = await supabase
         .from(docRef.table)
         .update(finalUpdates)
         .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
         .select();
+      console.log('[Supabase] Update result:', resData, error);
       
       // Update local emulation again with full data from DB to heal any partial updates
       if (fullDbData || (resData && resData.length > 0)) {
