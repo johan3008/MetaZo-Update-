@@ -3458,7 +3458,7 @@ ATURAN PALING PENTING (CRITICAL RULE):
 KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Hasil analisis Anda harus selalu logis, objektif, dan berbasis visual nyata. DILARANG KERAS menebak-nebak, berasumsi, atau mengarang masalah (hallucination). Jika cacat tidak terlihat SANGAT JELAS secara visual, jangan dicantumkan.
 
 CATATAN PENTING MENGENAI PESAN STANDAR ADOBE:
-Pernyataan berikut "Unfortunately, during our review we found that it contains one or more technical issues..." adalah sebuah template penolakan standar Adobe Stock. Anda HANYA boleh mengaktifkan status FAIL apabila terdapat isu teknis nyata yang fatal sesuai tingkat toleransi yang diminta. Jika tidak ada cacat fatal, abaikan pesan ini dan berikan status PASS.
+Anda HANYA boleh mengaktifkan status FAIL apabila terdapat isu teknis nyata yang fatal sesuai tingkat toleransi yang diminta. Jika tidak ada cacat fatal, abaikan pesan ini dan berikan status PASS.
 
 PANDUAN EFEK ARTISTIK & FOTOGRAFI PROFESIONAL:
 1. BOKEH & SHALLOW DEPTH-OF-FIELD (Fokus Selektif): Latar belakang buram yang disengaja agar subjek utama menonjol adalah kualitas artistik premium, BUKAN cacat fokus (soft focus)! Jangan sekali-kali menandai latar belakang bokeh sebagai masalah fokus selama subjek utama tajam secara sempurna (pin-sharp).
@@ -3512,7 +3512,7 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
   if (isVideo) {
     systemInstruction += `
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
-Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.
+Berikan analisis mendalam tentang isu visual yang ditemukan pada frame sebagai detailed_feedback.
 Ini adalah SATU CUPLIKAN FRAME diam dari sebuah file Video. Anda HANYA BISA menganalisis aspek visual statis dari frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN, dan tidak berubah-ubah pada 2x sampai 5x pengulangan. Jangan mengarang masalah yang tidak kasat mata!
 
@@ -4186,8 +4186,8 @@ A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standar
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
 Ini adalah 3 CUPLIKAN FRAME diam yang diambil secara berurutan dari bagian Awal, Tengah, dan Akhir dari sebuah file Video. Anda menganalisis aspek visual statis dari ke-3 frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN.
-PENTING: JIKA VIDEO DITOLAK (FAIL), ANDA WAJIB MENGISI \`detailed_feedback\` DENGAN KALIMAT BERIKUT SECARA PERSIS TANPA TAMBAHAN APAPUN:
-'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.'
+PENTING: JIKA VIDEO DITOLAK (FAIL), ANDA WAJIB MENGISI \`detailed_feedback\` DENGAN ANALISIS MENDALAM TENTANG MENGAPA VIDEO TERSEBUT DITOLAK BERSERTA BUKTI VISUAL YANG DITEMUKAN PADA FRAME.
+
 
 MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 1. Rolling-Shutter Artifacts: Cek apakah ada efek skew (distorsi miring) yang parah pada garis vertikal atau objek bergerak, jello effects, atau flash banding (garis/pita horizontal dengan exposure berbeda).
@@ -4226,7 +4226,7 @@ Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan k
 
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
 BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS. JIKA VIDEO TERLIHAT DIREKAM MENGGUNAKAN KAMERA BERKUALITAS RENDAH (BLUR, PENCAHAYAAN BURUK, NOISE, KOMPRESI BURUK, RESOLUSI RENDAH, ATAU ESTETIKA AMATIR), ANDA WAJIB MEMBERIKAN STATUS FAIL DAN SKOR DI BAWAH 60. JANGAN MENEBAK-NEBAK CACAT YANG TIDAK ADA, TETAPI JANGAN PULA MEMBERIKAN PASS PADA VIDEO BERKUALITAS RENDAH ATAU AMATIR. HUKUM DENGAN TEGAS VIDEO YANG TIDAK MEMENUHI STANDAR STOCK PREMIUM.
-JIKA VIDEO GAGAL (FAIL), Anda WAJIB memberikan "detailed_feedback" persis seperti kalimat berikut ini tanpa tambahan apapun: "Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues".
+JIKA VIDEO GAGAL (FAIL), Anda WAJIB memberikan "detailed_feedback" dengan penjelasan analisis mendalam mengapa video tersebut gagal berdasarkan frame yang diperiksa.
 
 BERIKAN SKOR BERIKUT:
 - technical_score (0-100): Berdasarkan cacat teknis murni seperti noise, blur, banding, compression, exposure.
@@ -4319,7 +4319,7 @@ BERIKAN SKOR BERIKUT:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, output exactly: 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues' in detailed_feedback.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
