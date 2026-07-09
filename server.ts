@@ -10,7 +10,7 @@ import "@ffprobe-installer/linux-x64/package.json";
 // Vercel NFT hack to include binaries
 try {
     
-    require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); require.resolve('@ffprobe-installer/linux-x64/ffprobe');
+    _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe');
 } catch (e) {}
 
 import express from 'express';
@@ -28,14 +28,15 @@ import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { createRequire } from 'module';
+const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 
 let ffmpeg: any;
 if (true) { // always try to load ffmpeg
     try {
-        const ffmpegLib = require('fluent-ffmpeg');
+        const ffmpegLib = _require('fluent-ffmpeg');
 ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
-ffmpeg.setFfmpegPath(require('@ffmpeg-installer/ffmpeg').path);
-ffmpeg.setFfprobePath(require('@ffprobe-installer/ffprobe').path);
+ffmpeg.setFfmpegPath(_require('@ffmpeg-installer/ffmpeg').path);
+ffmpeg.setFfprobePath(_require('@ffprobe-installer/ffprobe').path);
     } catch (e) {
         console.warn('ffmpeg not available locally', e);
     }
@@ -1380,8 +1381,8 @@ app.get('/api/debug-uploads', (req, res) => {
                         // Fast Native Extraction using ffmpeg path directly
                         const extractFast = async () => {
                             try {
-                                const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-const ffprobePath = require('@ffprobe-installer/ffprobe').path;
+                                const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
+const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                                 const execPromise = util.promisify(exec);
 
                                 // 1. Get duration
@@ -1596,8 +1597,8 @@ const ffprobePath = require('@ffprobe-installer/ffprobe').path;
         let ffmpegPath: string;
         let ffprobePath: string;
         try {
-            ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-ffprobePath = require('@ffprobe-installer/ffprobe').path;
+            ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
+ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             
             // Set executable permissions in case they lost them during packaging
             if (fs.existsSync(ffmpegPath)) {

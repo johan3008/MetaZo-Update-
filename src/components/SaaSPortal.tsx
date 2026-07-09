@@ -1225,6 +1225,91 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     }
   };
 
+  
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (checkoutDataUrl && checkoutOrderId && checkoutAmount) {
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/pakasir/check-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectSlug: pakasirProject,
+              apiKey: pakasirApiKey,
+              orderId: checkoutOrderId,
+              amount: checkoutAmount
+            })
+          });
+          const data = await response.json();
+          if (data.status === 'SUCCESS' || data.status === 'SETTLED' || data.status === 'PAID' || data.status === 'completed' || data.status === 'COMPLETED') {
+             clearInterval(interval);
+             const newKey = generateRandomKey();
+             const duration = checkoutPlan.includes('30') ? '30days' : 'unlimited';
+             
+             let devId = localStorage.getItem('mz_device_id');
+             if (!devId) {
+               devId = 'dev-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
+               localStorage.setItem('mz_device_id', devId);
+             }
+
+             await setDoc(doc(db, 'keys', newKey), {
+              key: newKey,
+              activated: true,
+              activatedBy: userEmail || devId,
+              activatedAt: new Date().toISOString(),
+              duration: duration,
+              createdAt: new Date().toISOString()
+            });
+            
+            if (userId) {
+              const userRef = doc(db, 'users', userId);
+              await setDoc(userRef, {
+                licenseKey: newKey,
+                updatedAt: new Date().toISOString()
+              }, { merge: true }).catch(err => {
+                console.warn('db_op', err);
+              });
+            }
+            
+            localStorage.setItem('mz_license_key', newKey);
+            setLicenseKey(newKey);
+            
+            await fetchBackendKeys().catch(e => console.error("Failed to refresh keys:", e));
+            
+            if (userEmail) {
+              try {
+                 await fetch('/api/send-key', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({
+                     email: userEmail,
+                     licenseKey: newKey,
+                     appName: tempAppName || 'MetaZo PRO',
+                     caption: `Terima kasih atas pembayaran Anda! Akun Anda kini berstatus PRO dengan paket ${duration === '30days' ? '30 Hari' : 'Unlimited'}. Berikut adalah salinan License Key Anda.`
+                   })
+                 });
+              } catch(e) {
+                 console.error("Failed to send key email:", e);
+              }
+            }
+
+            setInputKey(newKey);
+            setActivationSuccess(true);
+            setActivationError('');
+            setTimeout(() => {
+              setActivationSuccess(false);
+              setCheckoutUrl('');
+              setCheckoutDataUrl('');
+              setShowActivation(false);
+            }, 2500);
+          }
+        } catch (e) {}
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [checkoutDataUrl, checkoutOrderId, checkoutAmount, checkoutPlan, pakasirProject, pakasirApiKey, userId, userEmail]);
+
   const checkPaymentStatus = async () => {
     setIsCheckoutLoading(true);
     try {

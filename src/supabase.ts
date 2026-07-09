@@ -452,7 +452,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
   let currentLocalData = index >= 0 ? list[index] : {};
   
   const applyValue = (obj, key, val) => {
-    if (val && typeof val === 'object' && val.__deleteField) {
+    if (val && typeof val === 'object' && (val as any).__deleteField) {
       delete obj[key];
     } else {
       obj[key] = val;
@@ -476,7 +476,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
         topLevelUpdates[topKey] = resultData[topKey];
       } else {
         applyValue(resultData, key, value);
-        if (value && typeof value === 'object' && value.__deleteField) {
+        if (value && typeof value === 'object' && (value as any).__deleteField) {
           // If top level field is deleted, we just omit it from topLevelUpdates if we don't want it,
           // but we actually want the remote DB to delete it too.
           topLevelUpdates[key] = null; 
@@ -487,7 +487,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
     }
   } else {
     for (const [key, value] of Object.entries(data)) {
-      if (value && typeof value === 'object' && value.__deleteField) {
+      if (value && typeof value === 'object' && (value as any).__deleteField) {
          delete topLevelUpdates[key];
          if (index >= 0) delete list[index][key];
          topLevelUpdates[key] = null; // for supabase nullifies it
