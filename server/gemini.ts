@@ -4196,7 +4196,15 @@ MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 4. Exposure & Pencahayaan: Cek apakah overexposed (blown out) atau underexposed (crushed blacks).
 5. Frame Kosong: Apakah frame ini secara tidak sengaja kosong (hitam/putih pekat).
 
-Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan kembalikan status (PASS/FAIL) dan penjelasan singkat (note) dalam bahasa Indonesia di field \`quality_checks\`:
+
+ATURAN BAHASA OUTPUT:
+Jika 'Bahasa', gunakan Bahasa Indonesia profesional.
+Jika 'English', gunakan Bahasa Inggris.
+Current requested language: ${language === 'Bahasa' ? 'Indonesian' : 'English'}
+Seluruh respon text JSON wajib menggunakan bahasa tersebut.
+
+
+Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan kembalikan status (PASS/FAIL) dan penjelasan singkat (note) dalam bahasa yang diminta di field \`quality_checks\`:
 - blur: Deteksi apakah subjek utama buram.
 - noise: Deteksi bintik/grain digital berlebih.
 - compression_artifacts: Deteksi kotak-kotak pikselasi makro.
@@ -4319,7 +4327,7 @@ BERIKAN SKOR BERIKUT:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,

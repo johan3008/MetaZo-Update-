@@ -36,7 +36,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { 
   doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit, addDoc,
-  db, auth, handleFirestoreError, OperationType, onAuthStateChanged, User, signOut 
+  db, auth, handleFirestoreError, OperationType, onAuthStateChanged, User, signOut, deleteField 
 } from './src/supabase';
 import { LoginScreen } from './src/components/LoginScreen';
 import { Meteors } from './src/components/Meteors';
@@ -1100,7 +1100,8 @@ const App: React.FC = () => {
     const markOnline = async () => {
         try {
             await setDoc(userRef, { 
-              lastSeen: serverTimestamp(),
+              lastSeen: new Date().getTime(),
+              isOnline: true,
               email: auth.currentUser?.email || '',
               displayName: auth.currentUser?.displayName || ''
             }, { merge: true });
@@ -1111,54 +1112,96 @@ const App: React.FC = () => {
     
     markOnline();
     const interval = setInterval(markOnline, 60000); // 1 minute
-    return () => clearInterval(interval);
+    
+    const handleBeforeUnload = () => {
+        setDoc(userRef, { isOnline: false, lastSeen: 0 }, { merge: true }).catch(() => {});
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+        clearInterval(interval);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [auth.currentUser]);
 
-  // 2. Fetch truly active (online) users
+  // 2. Fetch truly active (online) users REALTIME
   useEffect(() => {
-    const fetchActiveAccounts = async () => {
-        try {
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-            const q = query(collection(db, 'users'), where('lastSeen', '>', fiveMinutesAgo));
-            const snapshot = await getDocs(q);
+    const usersRef = collection(db, 'users');
+    
+    // We use a periodic timer to force re-evaluation of the 5-minute timeout locally,
+    // so we don't rely only on database updates to remove inactive users.
+    let currentUsersList = [];
+    
+    const evaluateSnapshot = (snapshot) => {
+        const uniqueUsers = new Set<string>();
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            let isUserOnline = data.isOnline === true;
             
-            const uniqueUsers = new Set<string>();
-            snapshot.forEach(doc => {
-               const data = doc.data();
-               const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
-               if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') uniqueUsers.add(nameToShow);
-            });
-            const usersList = Array.from(uniqueUsers);
-            
-            if (usersList.length === 0 && auth.currentUser) {
-               const nameToShow = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
-               if (nameToShow !== 'Unknown') usersList.push(nameToShow);
+            if (data.lastSeen !== undefined && data.lastSeen !== null) {
+                let lastSeenTime = 0;
+                if (typeof data.lastSeen === 'number') {
+                    lastSeenTime = data.lastSeen;
+                } else if (data.lastSeen.toMillis) {
+                    lastSeenTime = data.lastSeen.toMillis();
+                } else if (typeof data.lastSeen === 'string') {
+                    lastSeenTime = new Date(data.lastSeen).getTime();
+                } else if (data.lastSeen.seconds) {
+                    lastSeenTime = data.lastSeen.seconds * 1000;
+                }
+                
+                if (lastSeenTime === 0) {
+                    isUserOnline = false;
+                } else if (lastSeenTime > fiveMinutesAgo) {
+                    isUserOnline = true;
+                } else if (lastSeenTime <= fiveMinutesAgo) {
+                    isUserOnline = false;
+                }
             }
             
-            setActiveUsers(usersList);
-            setActiveAccountsCount(usersList.length);
-        } catch (e) {
-            console.error("Active accounts error:", e);
-            if (auth.currentUser) {
-                const nameToShow = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
+            if (isUserOnline) {
+                const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
                 if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') {
-                    setActiveUsers([nameToShow]);
-                    setActiveAccountsCount(1);
-                } else {
-                    setActiveUsers([]);
-                    setActiveAccountsCount(0);
+                    uniqueUsers.add(nameToShow);
                 }
-            } else {
-                setActiveUsers([]);
-                setActiveAccountsCount(0);
+            }
+        });
+        
+        const usersList = Array.from(uniqueUsers);
+        
+        if (auth.currentUser) {
+            const myName = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
+            if (myName !== 'Unknown' && myName !== 'sandbox.google.user' && !usersList.includes(myName)) {
+                usersList.push(myName);
             }
         }
+        
+        currentUsersList = usersList;
+        setActiveUsers(usersList);
+        setActiveAccountsCount(usersList.length);
     };
+
+    let lastSnapshot = null;
+    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+        lastSnapshot = snapshot;
+        evaluateSnapshot(snapshot);
+    }, (error) => {
+        console.error("Active accounts realtime error:", error);
+    });
     
-    fetchActiveAccounts();
-    const interval = setInterval(fetchActiveAccounts, 30000); // 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+    const forceUpdateInterval = setInterval(() => {
+        if (lastSnapshot) {
+            evaluateSnapshot(lastSnapshot);
+        }
+    }, 30000);
+
+    return () => {
+        unsubscribe();
+        clearInterval(forceUpdateInterval);
+    };
+  }, [auth.currentUser]);
 
   const [uiLanguage, setUiLanguage] = useState<AppLanguage>(() => {
     try {
@@ -1256,7 +1299,7 @@ const App: React.FC = () => {
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
-  const [isMzLicensedState, setIsMzLicensed] = useState(false);
+  const [isMzLicensedState, setIsMzLicensed] = useState(() => { const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase(); return !!k; });
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
   const isMzLicensed = isMzLicensedState;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
@@ -1494,15 +1537,17 @@ const App: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
-  const [cloudDailyCounts, setCloudDailyCounts] = useState<{ [key in ToolType]?: number }>({});
+  const [cloudDailyCounts, setCloudDailyCounts] = useState<{ [key: string]: number }>({});
 
   const getDailyCount = useCallback((type: ToolType): number => {
     const dateStr = getTodayDateString();
-    const cloudVal = cloudDailyCounts[type];
-    const val = localStorage.getItem(`mz_daily_gen_${type}_${dateStr}`);
+    const suffix = isMzLicensed ? '_PRO' : '_TRIAL';
+    const key = `${type}${suffix}`;
+    const cloudVal = cloudDailyCounts[key];
+    const val = localStorage.getItem(`mz_daily_gen_${key}_${dateStr}`);
     const localVal = val ? parseInt(val) || 0 : 0;
     return typeof cloudVal === 'number' ? Math.max(cloudVal, localVal) : localVal;
-  }, [cloudDailyCounts]);
+  }, [cloudDailyCounts, isMzLicensed]);
 
   const getTotalDailyCount = useCallback((): number => {
     const tools = [
@@ -1521,7 +1566,7 @@ const App: React.FC = () => {
     return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
   }, [getDailyCount]);
 
-  const [dailyGenCounts, setDailyGenCounts] = useState<{ [key in ToolType]?: number }>({});
+  const [dailyGenCounts, setDailyGenCounts] = useState<{ [key: string]: number }>({});
 
   const refreshDailyCounts = useCallback(() => {
     setDailyGenCounts({
@@ -1544,30 +1589,30 @@ const App: React.FC = () => {
     const dateStr = getTodayDateString();
     const current = getDailyCount(type);
     const newVal = current + amount;
-    localStorage.setItem(`mz_daily_gen_${type}_${dateStr}`, String(newVal));
+    const suffix = isMzLicensed ? '_PRO' : '_TRIAL';
+    const key = `${type}${suffix}`;
+    localStorage.setItem(`mz_daily_gen_${key}_${dateStr}`, String(newVal));
     
     if (user) {
       const userRef = doc(db, 'users', user.uid);
       updateDoc(userRef, {
-        [`dailyUsage.${dateStr}.${type}`]: newVal,
+        [`dailyUsage.${dateStr}.${key}`]: newVal,
         updatedAt: new Date().toISOString()
       }).catch(err => {
         // Fallback setDoc
         setDoc(userRef, {
           dailyUsage: {
             [dateStr]: {
-              [type]: newVal
+              [key]: newVal
             }
           },
           updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(e => {
-          console.info('db_op', e);
-        });
+        }, { merge: true }).catch(() => {});
       });
     }
-
+    
     refreshDailyCounts();
-  }, [getDailyCount, refreshDailyCounts, user]);
+  }, [getDailyCount, refreshDailyCounts, user, isMzLicensed]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -2103,15 +2148,31 @@ const App: React.FC = () => {
       setSubDaysLeft(null);
       localStorage.removeItem('mz_license_key');
       setMzLicenseKey('');
+      
+      // Reset FREE TRIAL to 0
+      const dateStr = getTodayDateString();
+      Object.values(ToolType).forEach(type => {
+        localStorage.removeItem(`mz_daily_gen_${type}_TRIAL_${dateStr}`);
+      });
+
       if (user) {
         const userRef = doc(db, 'users', user.uid);
-        updateDoc(userRef, {
+        
+        // Remove free trial counts from db
+        const updates: any = {
           licenseKey: '',
           updatedAt: new Date().toISOString()
-        }).catch(() => {});
+        };
+        Object.values(ToolType).forEach(type => {
+          updates[`dailyUsage.${dateStr}.${type}_TRIAL`] = deleteField();
+        });
+        
+        updateDoc(userRef, updates).catch(() => {});
       }
       setIsCheckingLicense(false);
       if (msg) alert(msg);
+      
+      refreshDailyCounts();
     };
 
     getDoc(doc(db, 'keys', k))
@@ -4130,6 +4191,10 @@ const App: React.FC = () => {
           activeUsers={activeUsers}
           onSignOut={async () => {
             try {
+              if (auth.currentUser) {
+                const userRef = doc(db, 'users', auth.currentUser.uid);
+                await updateDoc(userRef, { lastSeen: 0, isOnline: false }).catch(()=>console.info("onSignOut update error"));
+              }
               await signOut(auth);
             } catch (err) {
               console.error("Sign out error", err);

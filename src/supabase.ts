@@ -451,24 +451,46 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
   let index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
   let currentLocalData = index >= 0 ? list[index] : {};
   
+  const applyValue = (obj, key, val) => {
+    if (val && typeof val === 'object' && val.__deleteField) {
+      delete obj[key];
+    } else {
+      obj[key] = val;
+    }
+  };
+
   if (hasDottedKeys) {
     topLevelUpdates = {};
     const resultData = { ...currentLocalData };
     for (const [key, value] of Object.entries(data)) {
       if (key.includes('.')) {
         const parts = key.split('.');
-        let current = resultData;
         let topKey = parts[0];
+        let current = resultData;
         for (let i = 0; i < parts.length - 1; i++) {
           if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
           else current[parts[i]] = { ...current[parts[i]] };
           current = current[parts[i]];
         }
-        current[parts[parts.length - 1]] = value;
+        applyValue(current, parts[parts.length - 1], value);
         topLevelUpdates[topKey] = resultData[topKey];
       } else {
-        resultData[key] = value;
-        topLevelUpdates[key] = value;
+        applyValue(resultData, key, value);
+        if (value && typeof value === 'object' && value.__deleteField) {
+          // If top level field is deleted, we just omit it from topLevelUpdates if we don't want it,
+          // but we actually want the remote DB to delete it too.
+          topLevelUpdates[key] = null; 
+        } else {
+          topLevelUpdates[key] = value;
+        }
+      }
+    }
+  } else {
+    for (const [key, value] of Object.entries(data)) {
+      if (value && typeof value === 'object' && value.__deleteField) {
+         delete topLevelUpdates[key];
+         if (index >= 0) delete list[index][key];
+         topLevelUpdates[key] = null; // for supabase nullifies it
       }
     }
   }
@@ -738,4 +760,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errMsg = error instanceof Error ? error.message : String(error);
   console.warn(`[Supabase/Sandbox] Database error [${operationType}] on [${path}]:`, errMsg);
   return new Error(errMsg);
+}
+
+export function deleteField() {
+  return { __deleteField: true };
 }
