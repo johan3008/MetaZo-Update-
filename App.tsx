@@ -1725,26 +1725,6 @@ const App: React.FC = () => {
             }
           }
 
-          const syncModel = (cloudValue: string | undefined, localKey: string, setter: any) => {
-            console.log(`[syncModel] ${localKey} cloud: ${cloudValue}, local: ${localStorage.getItem(localKey)}`);
-            if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                if (cloudValue === '') {
-                  localStorage.removeItem(localKey);
-                } else {
-                  localStorage.setItem(localKey, cloudValue);
-                  setter(cloudValue);
-                }
-              }
-            }
-          };
-
-          syncModel(data.settings.mz_gemini_model, 'mz_gemini_model', setSelectedGeminiModel);
-          syncModel(data.settings.mz_groq_model, 'mz_groq_model', setSelectedGroqModel);
-          syncModel(data.settings.mz_nvidia_model, 'mz_nvidia_model', setSelectedNvidiaModel);
-          syncModel(data.settings.mz_aivene_model, 'mz_aivene_model', setSelectedAiveneModel);
-
           const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
             if (cloudValue !== undefined) {
               const localValue = localStorage.getItem(localKey) || '';
