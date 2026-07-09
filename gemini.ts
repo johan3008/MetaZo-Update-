@@ -3512,7 +3512,6 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
   if (isVideo) {
     systemInstruction += `
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
-Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.
 Ini adalah SATU CUPLIKAN FRAME diam dari sebuah file Video. Anda HANYA BISA menganalisis aspek visual statis dari frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN, dan tidak berubah-ubah pada 2x sampai 5x pengulangan. Jangan mengarang masalah yang tidak kasat mata!
 
