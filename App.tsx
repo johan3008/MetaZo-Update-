@@ -1256,8 +1256,13 @@ const App: React.FC = () => {
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
-  const [isMzLicensedState, setIsMzLicensed] = useState(false);
+  const [isMzLicensedState, setIsMzLicensed] = useState(() => localStorage.getItem('mz_is_licensed') === 'true');
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
+
+  // Sync to localStorage every time license state changes to prevent flicker on reload
+  useEffect(() => {
+    localStorage.setItem('mz_is_licensed', String(isMzLicensedState));
+  }, [isMzLicensedState]);
   const isMzLicensed = isMzLicensedState;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
@@ -1541,6 +1546,10 @@ const App: React.FC = () => {
   }, [getDailyCount]);
 
   const incrementDailyCount = useCallback((type: ToolType, amount: number = 1) => {
+    // Jika user adalah PRO (isLicensed), jangan tambahkan hitungan generate harian
+    // Ini memastikan saat lisensi mereka habis, kuota free trial mereka kembali murni 0
+    if (isMzLicensed) return;
+
     const dateStr = getTodayDateString();
     const current = getDailyCount(type);
     const newVal = current + amount;
@@ -1567,7 +1576,7 @@ const App: React.FC = () => {
     }
 
     refreshDailyCounts();
-  }, [getDailyCount, refreshDailyCounts, user]);
+  }, [getDailyCount, refreshDailyCounts, user, isMzLicensed]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
