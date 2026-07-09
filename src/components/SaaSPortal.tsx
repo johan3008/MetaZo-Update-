@@ -225,18 +225,18 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     try {
       const qSnap = await getDocs(collection(db, 'keys'));
       const keysList: LicenseKeyBackend[] = [];
-      qSnap.forEach((doc) => {
-        let activatedBy = doc.data().activatedBy || '';
-        const firstActivatedBy = doc.data().firstActivatedBy || '';
+      qSnap.forEach((d) => {
+        let activatedBy = d.data().activatedBy || '';
+        const firstActivatedBy = d.data().firstActivatedBy || '';
         let ownerId = firstActivatedBy || activatedBy;
         if (userId && userEmail && ownerId === userId) {
            activatedBy = userEmail;
            // Automatically heal the database for this user
-           updateDoc(doc(db, 'keys', doc.id), { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
+           updateDoc(doc(db, 'keys', d.id), { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
         }
-        const data = doc.data();
+        const data = d.data();
         keysList.push({
-          key: doc.id,
+          key: d.id,
           activated: !!data.activated,
           activatedBy: activatedBy || '',
           activatedAt: data.activatedAt || '',
@@ -424,18 +424,18 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     // 1. Realtime listener for keys
     const unsubKeys = onSnapshot(collection(db, 'keys'), (qSnap) => {
       const keysList: LicenseKeyBackend[] = [];
-      qSnap.forEach((doc) => {
-        let activatedBy = doc.data().activatedBy || '';
-        const firstActivatedBy = doc.data().firstActivatedBy || '';
+      qSnap.forEach((d) => {
+        let activatedBy = d.data().activatedBy || '';
+        const firstActivatedBy = d.data().firstActivatedBy || '';
         let ownerId = firstActivatedBy || activatedBy;
         if (userId && userEmail && ownerId === userId) {
            activatedBy = userEmail;
            // Automatically heal the database for this user
-           updateDoc(doc(db, 'keys', doc.id), { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
+           updateDoc(doc(db, 'keys', d.id), { activatedBy: userEmail, firstActivatedBy: userEmail }).catch(()=>{});
         }
-        const data = doc.data();
+        const data = d.data();
         keysList.push({
-          key: doc.id,
+          key: d.id,
           activated: !!data.activated,
           activatedBy: activatedBy || '',
           activatedAt: data.activatedAt || '',
