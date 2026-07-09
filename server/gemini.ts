@@ -3512,7 +3512,6 @@ Anda WAJIB memeriksa gambar terhadap alasan penolakan (Content Refusal) resmi be
   if (isVideo) {
     systemInstruction += `
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
-Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.
 Ini adalah SATU CUPLIKAN FRAME diam dari sebuah file Video. Anda HANYA BISA menganalisis aspek visual statis dari frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN, dan tidak berubah-ubah pada 2x sampai 5x pengulangan. Jangan mengarang masalah yang tidak kasat mata!
 
@@ -4169,8 +4168,8 @@ KONSISTENSI MUTLAK & BERBASIS FAKTA (ABSOLUTE CONSISTENCY & FACT-BASED): Analisi
    - SOFT FOCUS (Kurang tajam, fokus meleset, motion blur yang tidak disengaja, atau ketajaman subjek utama yang kurang optimal).
    - EXCESSIVE FILTERING (Efek over-processed, warna terlalu tersaturasi, terlalu kontras, atau tekstur yang tampak plastik/lilin akibat pemrosesan berlebih).
    - ARTIFACTS / NOISE (Grain digital, color banding, chromatic aberration, sensor dust, atau kompresi JPEG).
-3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam dan teliti. Dilarang keras menebak, mengarang, atau berasumsi jika Anda tidak melihat cacat secara fisik/nyata. Analisis harus 100% berbasis fakta visual. BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS. JIKA ADA KERAGUAN TENTANG KUALITAS ATAU KEJELASAN VISUAL, BERIKAN EVALUASI SESUAI DENGAN TOLERANSI YANG DITETAPKAN. JANGAN MENGANGGAP SEMUANYA PASS. JANGAN HALLUCINATE, TAPI JANGAN TOLERANSI CACAT YANG TERLIHAT.
-4. Jika tidak ada cacat, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
+3. JANGAN PERNAH MENEBAK-NEBAK (NO HALLUCINATION): Lakukan pemindaian visual mendalam. Analisis Anda HANYA didasarkan pada BUKTI VISUAL STATIS dari 3 frame ini. Dilarang keras menebak masalah pergerakan (seperti flickering, camera shake, atau audio) jika tidak ada distorsi visual nyata (seperti blur ekstrem) yang terekam pada frame. JIKA GAMBAR TERLIHAT BERSIH DAN PROFESIONAL, ANDA WAJIB MEMBERIKAN STATUS PASS. Jangan mengarang alasan penolakan atau mencari masalah mikroskopis yang tidak berdampak pada estetika.
+4. Jika tidak ada cacat yang JELAS TEREKAM di mata Anda, KOSONGKAN array \`technical_issues\` dan \`heatmaps\`. Jangan mencari-cari kesalahan yang tidak ada.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. Panduan ketegasan:
 - STRICT: "Zero Tolerance" mutlak. Sedikit noise, soft focus, chromatic aberration, sensor dust, gen-AI artifacts sekecil apapun, atau pelanggaran IP = FAIL secara instan (Skor maksimal 0-59).
@@ -4186,8 +4185,7 @@ A. KRITERIA EVALUASI TEKNIS (Berdasarkan Adobe Stock Quality & Technical Standar
 ATURAN KHUSUS VIDEO (VIDEO TECHNICAL ISSUES):
 Ini adalah 3 CUPLIKAN FRAME diam yang diambil secara berurutan dari bagian Awal, Tengah, dan Akhir dari sebuah file Video. Anda menganalisis aspek visual statis dari ke-3 frame ini.
 PERINTAH EKSEKUSI MUTLAK: Lakukan INSPEKSI MENDALAM dengan simulasi ZOOM 200% pada frame ini. Periksa piksel, tepian objek, dan area gelap secara mikroskopis. Hasil analisis HARUS BENAR-BENAR VALID, BERDASARKAN FAKTA, KONSISTEN.
-PENTING: JIKA VIDEO DITOLAK (FAIL), ANDA WAJIB MENGISI \`detailed_feedback\` DENGAN KALIMAT BERIKUT SECARA PERSIS TANPA TAMBAHAN APAPUN:
-'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues.'
+PENTING: JIKA VIDEO DITOLAK (FAIL), Anda WAJIB MENGISI \`detailed_feedback\` DENGAN ANALISIS SPESIFIK MENGAPA VIDEO DITOLAK (misalnya: "Video ditolak karena terdapat noise digital yang berlebih pada latar belakang di frame ke-2"). JANGAN GUNAKAN KALIMAT TEMPLATE GENERIC. Berikan alasan yang nyata dan faktual sesuai apa yang Anda temukan.
 
 MAINTAIN VIDEO QUALITY (TANGKAP ISU TEKNIS BERIKUT JIKA TERLIHAT JELAS):
 1. Rolling-Shutter Artifacts: Cek apakah ada efek skew (distorsi miring) yang parah pada garis vertikal atau objek bergerak, jello effects, atau flash banding (garis/pita horizontal dengan exposure berbeda).
@@ -4225,8 +4223,10 @@ Wajib lakukan evaluasi terperinci untuk 26 kriteria kualitas video berikut dan k
 - low_aesthetic_quality: Deteksi kualitas estetika rendah.
 
 KONSISTENSI MUTLAK (SANGAT PENTING): Anda HARUS memberikan penilaian dan alasan yang SAMA PERSIS setiap kali frame ini diperiksa ulang.
-BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS. JIKA VIDEO TERLIHAT DIREKAM MENGGUNAKAN KAMERA BERKUALITAS RENDAH (BLUR, PENCAHAYAAN BURUK, NOISE, KOMPRESI BURUK, RESOLUSI RENDAH, ATAU ESTETIKA AMATIR), ANDA WAJIB MEMBERIKAN STATUS FAIL DAN SKOR DI BAWAH 60. JANGAN MENEBAK-NEBAK CACAT YANG TIDAK ADA, TETAPI JANGAN PULA MEMBERIKAN PASS PADA VIDEO BERKUALITAS RENDAH ATAU AMATIR. HUKUM DENGAN TEGAS VIDEO YANG TIDAK MEMENUHI STANDAR STOCK PREMIUM.
-JIKA VIDEO GAGAL (FAIL), Anda WAJIB memberikan "detailed_feedback" persis seperti kalimat berikut ini tanpa tambahan apapun: "Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues".
+BERSIKAPLAH OBJEKTIF DAN SANGAT KRITIS UNTUK VIDEO AMATIR (BLUR, PENCAHAYAAN BURUK, NOISE, KOMPRESI BURUK, RESOLUSI RENDAH), DAN WAJIB MEMBERIKAN FAIL. TETAPI SEBALIKNYA, JIKA VIDEO INI BERKUALITAS TINGGI, BERSIH, DAN PROFESIONAL SECARA VISUAL STATIS, ANDA WAJIB MEMBERIKAN STATUS PASS DENGAN SKOR TINGGI. JANGAN MENEBAK-NEBAK MASALAH (SEPERTI MASALAH AUDIO, FLICKERING, ATAU CAMERA SHAKE) JIKA BUKTI VISUAL DARI 3 FRAME INI TIDAK MENDUKUNG.
+PENGISIAN DETAILED FEEDBACK:
+- JIKA VIDEO GAGAL (FAIL): Anda WAJIB menjelaskan secara detail dan spesifik dalam "detailed_feedback" berdasarkan poin-poin yang gagal di "quality_checks" (contoh: "Video ditolak karena terdeteksi noise berlebih dan overexposure pada frame ke-3"). JANGAN PERNAH MENGGUNAKAN KALIMAT TEMPLATE DEFAULT.
+- JIKA VIDEO AMAN (PASS): Anda WAJIB menjelaskan dalam "detailed_feedback" bahwa video aman, bersih dari cacat teknis/AI, dan layak (contoh: "Video aman dan lulus kualifikasi. Kualitas visual sangat baik dan bebas noise.").
 
 BERIKAN SKOR BERIKUT:
 - technical_score (0-100): Berdasarkan cacat teknis murni seperti noise, blur, banding, compression, exposure.
@@ -4319,7 +4319,7 @@ BERIKAN SKOR BERIKUT:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, output exactly: 'Unfortunately, during our review we found that it contains one or more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues' in detailed_feedback.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. Ensure the detailed_feedback provides specific and actual reasons based on visual evidence.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,

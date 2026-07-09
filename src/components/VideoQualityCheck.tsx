@@ -198,6 +198,64 @@ export const VideoQualityCheck: React.FC<{
     }
   };
 
+  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(videoFile);
+      video.muted = true;
+      video.playsInline = true;
+      
+      const frames: string[] = [];
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      video.onloadedmetadata = () => {
+        // Resize to 1280px width max to save payload bandwidth
+        const scale = Math.min(1, 1280 / video.videoWidth);
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        
+        const duration = video.duration;
+        if (!duration || !isFinite(duration) || duration <= 0) {
+            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
+            return;
+        }
+
+        const targetTimes = [
+            0.1, // Awal
+            duration / 2, // Tengah
+            Math.max(0, duration - 0.5) // Akhir
+        ];
+        
+        let currentTimeIndex = 0;
+        
+        video.onseeked = () => {
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Get JPEG base64
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            frames.push(dataUrl);
+          }
+          
+          currentTimeIndex++;
+          if (currentTimeIndex < targetTimes.length) {
+            video.currentTime = targetTimes[currentTimeIndex];
+          } else {
+            URL.revokeObjectURL(video.src);
+            resolve(frames);
+          }
+        };
+        
+        // Start extraction
+        video.currentTime = targetTimes[currentTimeIndex];
+      };
+      
+      video.onerror = () => {
+        reject(new Error("Gagal memutar/memuat video untuk diekstrak. Format mungkin tidak didukung browser."));
+      };
+    });
+  };
+
   const analyzeVideo = async () => {
     if (!file) return;
 
@@ -211,88 +269,26 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      const frames = await new Promise<string[]>((resolve, reject) => {
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        const url = URL.createObjectURL(file);
-        video.src = url;
-        video.muted = true;
-        video.playsInline = true;
-
-        video.onloadedmetadata = () => {
-          const duration = video.duration;
-          if (isNaN(duration) || duration === 0) {
-            URL.revokeObjectURL(url);
-            return reject(new Error("Video duration is invalid or zero"));
-          }
-          const numFrames = 12;
-          const extractedFrames: string[] = [];
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          let currentFrame = 0;
-          const segmentDuration = duration / numFrames;
-          
-          const captureFrame = () => {
-            if (currentFrame >= numFrames) {
-              URL.revokeObjectURL(url);
-              resolve(extractedFrames);
-              return;
-            }
-            
-            const targetTime = (currentFrame * segmentDuration) + (Math.random() * (segmentDuration - 0.1));
-            video.currentTime = Math.max(0, targetTime);
-          };
-
-          video.onseeked = () => {
-            if (!ctx) return;
-            const videoRatio = video.videoWidth / video.videoHeight;
-            let drawWidth = 640;
-            let drawHeight = 640 / videoRatio;
-            if (drawHeight > 360) {
-                drawHeight = 360;
-                drawWidth = 360 * videoRatio;
-            }
-            canvas.width = drawWidth;
-            canvas.height = drawHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Get base64 string
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-            extractedFrames.push(dataUrl.split(',')[1]); // Only keep base64 data to save size
-            
-            currentFrame++;
-            captureFrame();
-          };
-          
-          video.onerror = () => {
-            URL.revokeObjectURL(url);
-            reject(new Error("Browser failed to decode video for frame extraction. Please ensure it's a standard MP4/MOV format."));
-          };
-          
-          captureFrame();
-        };
-        
-        video.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error("Failed to load video in browser."));
-        };
-      });
-
-      console.log(`[Video Audit] Extracted ${frames.length} frames client-side, sending to API...`);
-
+      console.log(`[Video Audit] Mengekstrak frame video melalui Browser Frontend...`);
       
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('tolerance', tolerance);
-      formData.append('language', aiOptions?.language || 'Bahasa');
-      formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
+      // Lakukan ekstraksi frame secara lokal di Browser!
+      // Vercel tidak lagi perlu menggunakan FFmpeg di Backend
+      const framesBase64 = await extractFramesFromVideo(file);
+      
+      console.log(`[Video Audit] Berhasil mengekstrak ${framesBase64.length} frame. Mengirim ke API...`);
 
       const response = await fetch('/api/check-video-quality', {
         method: 'POST',
         headers: { 
-          'X-API-Key': aiOptions?.apiKey || ''
+          'X-API-Key': aiOptions?.apiKey || '',
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify({
+          frames: framesBase64,
+          tolerance: tolerance,
+          language: aiOptions?.language || 'Bahasa',
+          model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
+        })
       });
 
 
