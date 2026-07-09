@@ -1387,16 +1387,16 @@ app.get('/api/debug-uploads', (req, res) => {
                                 // 2. Calculate timestamps (extract frames from Awal, Tengah, and Akhir)
                                 const numFrames = 3;
                                 const timestamps = [
-                                    duration * 0.1, // Awal
-                                    duration * 0.5, // Tengah
-                                    duration * 0.9  // Akhir
+                                    0, // Awal (0 detik)
+                                    Number((duration / 2).toFixed(3)), // Tengah
+                                    Number((Math.max(0, duration - 0.5)).toFixed(3))  // Akhir (0.5 dtk sebelum usai)
                                 ];
 
-                                // 3. Extract frames with fast seek (-ss BEFORE -i)
+                                // 3. Extract frames with robust command
                                 const framePaths = [];
                                 for (let i = 0; i < numFrames; i++) {
                                     const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
-                                    await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
+                                    await execPromise(`"${ffmpegPath}" -y -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}"`);
                                     framePaths.push(fPath);
                                 }
 
