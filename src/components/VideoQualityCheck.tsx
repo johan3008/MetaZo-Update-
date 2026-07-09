@@ -211,73 +211,89 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      console.log(`[Video Audit] Delegating extraction to server FFmpeg...`);
+      const frames = await new Promise<string[]>((resolve, reject) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.muted = true;
+        video.playsInline = true;
 
-      let uploadedUrl = null;
-      let getUrlData = null;
-      
-      if (r2Configured !== false) {
-        try {
-          const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
-          if (getUrlRes.ok) {
-            getUrlData = await getUrlRes.json().catch(() => ({}));
-            if (getUrlData.uploadUrl && getUrlData.fileUrl) {
-              console.log(`[Video Audit] Uploading to Cloudflare R2 directly: ${file.name}`);
-              try {
-                const putRes = await fetch(getUrlData.uploadUrl, {
-                  method: 'PUT',
-                  body: file,
-                  headers: { 'Content-Type': file.type || 'video/mp4' }
-                });
-                if (!putRes.ok) throw new Error(`Failed to upload to S3/R2 storage: ${putRes.status}`);
-                uploadedUrl = getUrlData.fileUrl;
-              } catch (putErr: any) {
-                if (putErr.message === 'Failed to fetch') {
-                  throw new Error(
-                    t.language === 'Bahasa'
-                      ? 'Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan konfigurasi CORS di dashboard Cloudflare R2.'
-                      : 'Failed to upload to Cloudflare R2 (CORS Error). Please configure CORS in your Cloudflare R2 dashboard.'
-                  );
-                }
-              }
-            }
+        video.onloadedmetadata = () => {
+          const duration = video.duration;
+          if (isNaN(duration) || duration === 0) {
+            URL.revokeObjectURL(url);
+            return reject(new Error("Video duration is invalid or zero"));
           }
-        } catch (e) {
-          console.warn("R2 bypass failed, falling back to form data", e);
-        }
-      }
+          const numFrames = 12;
+          const extractedFrames: string[] = [];
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          let currentFrame = 0;
+          const segmentDuration = duration / numFrames;
+          
+          const captureFrame = () => {
+            if (currentFrame >= numFrames) {
+              URL.revokeObjectURL(url);
+              resolve(extractedFrames);
+              return;
+            }
+            
+            const targetTime = (currentFrame * segmentDuration) + (Math.random() * (segmentDuration - 0.1));
+            video.currentTime = Math.max(0, targetTime);
+          };
 
-      let response;
-      if (uploadedUrl) {
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 
-              'X-API-Key': aiOptions?.apiKey || '',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              fileUrl: uploadedUrl,
-              pathKey: getUrlData?.pathKey || '',
-              tolerance: tolerance,
-              language: aiOptions?.language || 'Bahasa',
-              model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
-            })
-          });
-      } else {
-          const formData = new FormData();
-          formData.append('video', file);
-          formData.append('tolerance', tolerance);
-          formData.append('language', aiOptions?.language || 'Bahasa');
-          formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
+          video.onseeked = () => {
+            if (!ctx) return;
+            const videoRatio = video.videoWidth / video.videoHeight;
+            let drawWidth = 640;
+            let drawHeight = 640 / videoRatio;
+            if (drawHeight > 360) {
+                drawHeight = 360;
+                drawWidth = 360 * videoRatio;
+            }
+            canvas.width = drawWidth;
+            canvas.height = drawHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Get base64 string
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+            extractedFrames.push(dataUrl.split(',')[1]); // Only keep base64 data to save size
+            
+            currentFrame++;
+            captureFrame();
+          };
+          
+          video.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("Browser failed to decode video for frame extraction. Please ensure it's a standard MP4/MOV format."));
+          };
+          
+          captureFrame();
+        };
+        
+        video.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Failed to load video in browser."));
+        };
+      });
 
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 
-              'X-API-Key': aiOptions?.apiKey || ''
-            },
-            body: formData
-          });
-      }
+      console.log(`[Video Audit] Extracted ${frames.length} frames client-side, sending to API...`);
+
+      
+      const formData = new FormData();
+      formData.append('video', file);
+      formData.append('tolerance', tolerance);
+      formData.append('language', aiOptions?.language || 'Bahasa');
+      formData.append('model', aiOptions?.visionModel || 'gemini-3.1-pro-preview');
+
+      const response = await fetch('/api/check-video-quality', {
+        method: 'POST',
+        headers: { 
+          'X-API-Key': aiOptions?.apiKey || ''
+        },
+        body: formData
+      });
 
 
       if (!response.ok) {
