@@ -8,10 +8,7 @@ import "@ffprobe-installer/linux-x64/package.json";
 
 
 // Vercel NFT hack to include binaries
-try {
-    
-    _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe');
-} catch (e) {}
+
 
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
@@ -29,6 +26,10 @@ import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
+try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
+// Vercel NFT hack to include binaries
+
+
 
 let ffmpeg: any;
 if (true) { // always try to load ffmpeg

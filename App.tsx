@@ -2026,24 +2026,7 @@ const App: React.FC = () => {
     return () => unsubPromos();
   }, [user]);
 
-  // Trigger login promo modal if user is on a free trial account
-  useEffect(() => {
-    if (user && hasSyncedProfile && !isCheckingAuth) {
-      if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
-        const timer = setTimeout(() => {
-          if (sessionStorage.getItem('mz_just_logged_in_promo') === 'true') {
-            sessionStorage.removeItem('mz_just_logged_in_promo');
-            // If the synced profile reveals they are NOT licensed (free trial account) after settling
-            // AND there are actual active promo codes loaded from the reseller portal
-            if (!isMzLicensed && !isCheckingLicense && promoCodesForModal.length > 0) {
-              setShowPromoWindow(true);
-            }
-          }
-        }, 1200); // 1.2s delay to fully settle any network/Firestore licensing updates
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [user, hasSyncedProfile, isMzLicensed, isCheckingAuth, isCheckingLicense, promoCodesForModal]);
+  // Login promo modal removed per user request
 
   // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
@@ -2213,9 +2196,7 @@ const App: React.FC = () => {
             }
 
             if (isRejected) {
-              clearLicenseKey(localStorage.getItem('mz_language') === 'Bahasa'
-                ? 'Kunci lisensi ini sudah terdaftar oleh akun lain! Satu lisensi hanya bisa digunakan untuk satu akun.' 
-                : 'This license key is already registered to another account! One license can only be used on one account.');
+              clearLicenseKey();
               return;
             }
 
@@ -2249,12 +2230,9 @@ const App: React.FC = () => {
         }
       })
       .catch(err => {
-        console.warn('License validator connection error, attempting offline check:', err);
-        
-        setIsMzLicensed(false);
-        setSubDaysLeft(null);
-        localStorage.removeItem('mz_license_key');
-        setMzLicenseKey('');
+        console.warn('License validator connection error, retaining local state:', err);
+        // Retain local state
+        setIsMzLicensed(true);
       })
       .finally(() => {
         setIsCheckingLicense(false);
@@ -4059,7 +4037,7 @@ const App: React.FC = () => {
     return (
       <LoginScreen 
         onLoginSuccess={(loggedInUser) => {
-          sessionStorage.setItem('mz_just_logged_in_promo', 'true');
+          // no promo trigger
           setUser(loggedInUser);
         }} 
         theme={theme} 
@@ -4194,6 +4172,8 @@ const App: React.FC = () => {
                 const userRef = doc(db, 'users', auth.currentUser.uid);
                 await updateDoc(userRef, { lastSeen: 0 }).catch(()=>console.info("onSignOut update error"));
               }
+              localStorage.removeItem('mz_license_key');
+              localStorage.removeItem('mz_trial_start');
               await signOut(auth);
             } catch (err) {
               console.error("Sign out error", err);
