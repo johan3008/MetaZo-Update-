@@ -42,6 +42,7 @@ interface SidebarProps {
   t: any;
   filesLength: number;
   isLicensed?: boolean;
+  isCheckingLicense?: boolean;
   setShowActivation?: (show: boolean) => void;
   onUnlockReseller?: () => void;
   appName?: string;
@@ -61,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   t,
   filesLength,
   isLicensed = false,
+  isCheckingLicense = false,
   setShowActivation,
   onUnlockReseller,
   appName,
@@ -374,6 +376,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 {!sidebarCollapsed && <span className="text-[9px] opacity-75 underline font-bold uppercase hover:text-slate-900 dark:text-white shrink-0">{t.sidebar_manage}</span>}
               </button>
+            ) : isCheckingLicense ? (
+              <div 
+                className="w-full flex items-center justify-center py-2 bg-slate-500/10 border border-slate-500/20 rounded-2xl text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 animate-pulse"
+              >
+                {!sidebarCollapsed && <span>{t.language === 'Bahasa' ? 'Memverifikasi...' : 'Verifying...'}</span>}
+              </div>
             ) : (
               <button 
                 type="button"

@@ -1706,6 +1706,7 @@ const App: React.FC = () => {
               
               return activeKey;
             });
+            setIsCheckingLicense(true);
             localStorage.setItem('mz_license_key', activeKey);
             localStorage.removeItem('mz_cancelled_subscription');
             
@@ -1724,6 +1725,7 @@ const App: React.FC = () => {
                   
                   return foundKey;
                 });
+                setIsCheckingLicense(true);
                 localStorage.setItem('mz_license_key', foundKey);
                 localStorage.removeItem('mz_cancelled_subscription');
                 setDoc(userDocRef, {
@@ -1893,6 +1895,7 @@ const App: React.FC = () => {
             
             return resolvedKey;
           });
+            setIsCheckingLicense(true);
             localStorage.setItem('mz_license_key', resolvedKey);
           }
 
@@ -1923,6 +1926,7 @@ const App: React.FC = () => {
                   
                   return foundKey;
                 });
+              setIsCheckingLicense(true);
               localStorage.setItem('mz_license_key', foundKey);
               proceedWithInit(foundKey);
             } else {
@@ -4192,6 +4196,7 @@ const App: React.FC = () => {
         t={t} 
         filesLength={files.length} 
         isLicensed={isMzLicensed}
+        isCheckingLicense={isCheckingLicense}
         setShowActivation={setShowActivationModal}
         onUnlockReseller={() => {
           if (isAdminAccount) {
@@ -4219,6 +4224,7 @@ const App: React.FC = () => {
           t={t} 
           setShowActivation={setShowActivationModal}
           isLicensed={!!isMzLicensed}
+          isCheckingLicense={isCheckingLicense}
           uiLanguage={uiLanguage}
           setUiLanguage={setUiLanguage}
           user={user}

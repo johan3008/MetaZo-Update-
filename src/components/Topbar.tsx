@@ -14,6 +14,7 @@ interface TopbarProps {
   t: any;
   setShowActivation?: (show: boolean) => void;
   isLicensed?: boolean;
+  isCheckingLicense?: boolean;
   uiLanguage: AppLanguage;
   setUiLanguage: (lang: AppLanguage) => void;
   user?: any;
@@ -34,6 +35,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   t,
   setShowActivation,
   isLicensed,
+  isCheckingLicense = false,
   uiLanguage,
   setUiLanguage,
   user,
@@ -151,6 +153,12 @@ export const Topbar: React.FC<TopbarProps> = ({
           >
             {t.topbar_pro_active}
           </button>
+        ) : isCheckingLicense ? (
+          <div 
+            className="text-[9px] sm:text-[10px] font-black uppercase bg-slate-500/10 dark:bg-slate-500/10 border border-slate-500/20 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-slate-500 dark:text-slate-400 select-none animate-pulse"
+          >
+            {uiLanguage === 'id' ? 'MEMVALIDASI...' : 'VALIDATING...'}
+          </div>
         ) : (
           <button
             type="button"
@@ -233,6 +241,10 @@ export const Topbar: React.FC<TopbarProps> = ({
                     {isLicensed ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8.5px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         {t.topbar_pro_active}
+                      </span>
+                    ) : isCheckingLicense ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8.5px] font-extrabold bg-slate-500/10 text-slate-500 dark:text-slate-450 border border-slate-500/20">
+                        {uiLanguage === 'id' ? 'Memvalidasi...' : 'Validating...'}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8.5px] font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
