@@ -3641,11 +3641,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
-5. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI):
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, tangan/kaki meliuk atau menyatu secara tidak logis, mata asimetris/juling, gigi berlebih, bentuk telinga abnormal.
-   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh, perspektif arsitektur patah atau melintir tidak masuk akal, bayangan tidak konsisten dengan sumber cahaya, pola berulang yang tiba-tiba terputus atau rusak.
-   - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details).
+5. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI TETAPI JANGAN TERLALU PARANOID):
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang secara SANGAT EXTREME (misal 7 jari), tangan/kaki meliuk atau menyatu secara sama sekali tidak masuk akal (alien-like), wajah yang benar-benar hancur. *Catatan: Jika asimetri atau detail jari sedikit kabur namun secara estetika keseluruhan (mood/lighting) masih sangat dramatis dan bisa dijual (commercially viable), JANGAN langsung menolak (FAIL). Berikan PASS.*
+   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text. *Catatan: Jika teks tersebut sangat kecil, blur di background, atau menyerupai tulisan tangan abstrak yang wajar, berikan PASS.*
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam.
+   - Polusi Visual AI & Tekstur Kulit: JANGAN menolak (FAIL) gambar hanya karena "tekstur kulit kurang pori-pori alami" (overly processed/waxy skin) JIKA gambar tersebut bergaya sinematik, dramatis, atau bernuansa fantasi. Loloskan jika estetika komersialnya secara umum bagus. Jangan menghukum gambar AI hanya karena terlihat "seperti AI" asalkan enak dilihat.
 
 6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
