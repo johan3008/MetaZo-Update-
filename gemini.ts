@@ -3703,6 +3703,13 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 - FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
+---
+PENTING - HINDARI FALSE POSITIVES (JANGAN MENEBAK-NEBAK):
+Anda DILARANG KERAS menebak-nebak (guessing) atau berhalusinasi menemukan cacat yang sebenarnya tidak ada. Kurator Adobe Stock sering kali meloloskan gambar AI yang memiliki noise wajar, sedikit asimetri artistik, atau objek yang memang secara alami bentuknya abstrak/tidak beraturan (seperti cipratan air, bentuk awan, atau makanan abstrak).
+1. Jika Anda ragu apakah suatu bagian adalah "cacat AI" atau "memang bentuk aslinya begitu secara artistik", berikan "Benefit of the Doubt" dan loloskan (PASS).
+2. Jangan over-analyze atau over-penalize gambar yang secara estetika keseluruhan terlihat sangat bagus dan layak jual (commercially viable).
+3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai gambar yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
+
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
@@ -4380,6 +4387,13 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 - PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
 - FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
+
+---
+PENTING - HINDARI FALSE POSITIVES (JANGAN MENEBAK-NEBAK):
+Anda DILARANG KERAS menebak-nebak (guessing) atau berhalusinasi menemukan cacat yang sebenarnya tidak ada. Kurator Adobe Stock sering kali meloloskan video AI atau rekaman yang memiliki noise wajar, sedikit guncangan artistik, atau objek yang memang secara alami bentuknya abstrak/tidak beraturan.
+1. Jika Anda ragu apakah suatu bagian adalah "cacat AI/kamera" atau "memang bentuk aslinya begitu secara artistik", berikan "Benefit of the Doubt" dan loloskan (PASS).
+2. Jangan over-analyze atau over-penalize video yang secara estetika keseluruhan terlihat sangat bagus dan layak jual (commercially viable).
+3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, jello effect parah, distorsi kamera parah, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai video yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
