@@ -384,6 +384,45 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
   return cleanedTitle;
 }
 
+function ensureDescription(description: string, title: string, keywords: string[]): string {
+  if (!description || typeof description !== 'string') {
+    description = "";
+  }
+  
+  const isPlaceholderDesc = (desc: string) => {
+    const d = desc.toLowerCase().trim();
+    return d === "" || 
+           d.includes("write a detailed description here") || 
+           d.includes("<generate a") || 
+           d.includes("a highly descriptive") || 
+           d.includes("a detailed visual description") || 
+           d.includes("a detailed description") ||
+           d.includes("provide a thorough visual breakdown") ||
+           d.includes("detailed description of the image") ||
+           d.includes("description of the image") ||
+           d.includes("an image containing") ||
+           d.includes("this image displays") ||
+           d.includes("this is a description");
+  };
+
+  if (isPlaceholderDesc(description)) {
+    if (title && title.trim().length > 5) {
+      const cleanTitle = title.replace(/write a descriptive/gi, '').replace(/<generate/gi, '').replace(/highly descriptive/gi, '').trim();
+      if (cleanTitle.length > 5) {
+        return `A professional stock photo showcasing ${cleanTitle.toLowerCase()}. Ideal for commercial, editorial, and creative design use.`;
+      }
+    }
+    
+    if (keywords && keywords.length >= 3) {
+      return `Professional visual content featuring ${keywords.slice(0, 5).join(', ')}. Perfect for advertising, marketing, and editorial purposes.`;
+    }
+    
+    return "High-quality professional stock asset designed for commercial, editorial, or creative media projects.";
+  }
+  
+  return description.trim();
+}
+
 const getTitleLengthRule = (titleLength?: string) => {
   if (titleLength === 'short') {
     return "Title MUST be highly SEO optimized but kept VERY SHORT and concise (around 3 to 7 words maximum). Just state the core subject briefly.";
@@ -800,7 +839,7 @@ async function callOpenAICompatibleWithRetry(params: {
     }
 
     let tryCount = 0;
-    while (tryCount < 6) {
+    while (tryCount < 3) {
       try {
         console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
 
@@ -819,7 +858,7 @@ async function callOpenAICompatibleWithRetry(params: {
           console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
         }
 
-        const fetchTimeout = provider === 'nvidia' ? 300000 : 180000;
+        const fetchTimeout = provider === 'nvidia' ? 25000 : 15000;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers,
@@ -915,9 +954,9 @@ async function callOpenAICompatibleWithRetry(params: {
           continue;
         }
 
-        if (tryCount < 6 && isRetryableError) {
+        if (tryCount < 3 && isRetryableError) {
           const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/6) after ${backoff / 1000}s...`);
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/3) after ${backoff / 1000}s...`);
           await new Promise(resolve => setTimeout(resolve, backoff));
           continue;
         }
@@ -1712,6 +1751,19 @@ OUTPUT FORMAT:
   try {
     let data = (finalMetadataRaw && typeof finalMetadataRaw === 'object' && !Array.isArray(finalMetadataRaw)) ? { ...finalMetadataRaw } : {};
     
+    // Normalize keys
+    if (data.desc && !data.description) data.description = data.desc;
+    if (data.caption && !data.description) data.description = data.caption;
+    if (data.short_description && !data.description) data.description = data.short_description;
+    if (data.image_description && !data.description) data.description = data.image_description;
+    
+    if (data.name && !data.title) data.title = data.name;
+    if (data.headline && !data.title) data.title = data.headline;
+    if (data.subject && !data.title) data.title = data.subject;
+
+    // Ensure description is valid
+    data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
+    
     // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (!data.keywords || !Array.isArray(data.keywords)) {
       data.keywords = [];
@@ -2359,6 +2411,19 @@ OUTPUT FORMAT:
     return dataArray.map((rawMetadata, index) => {
         // Ensure metadata is a valid object
         let metadata: any = (rawMetadata && typeof rawMetadata === 'object' && !Array.isArray(rawMetadata)) ? { ...rawMetadata } : {};
+
+        // Normalize keys
+        if (metadata.desc && !metadata.description) metadata.description = metadata.desc;
+        if (metadata.caption && !metadata.description) metadata.description = metadata.caption;
+        if (metadata.short_description && !metadata.description) metadata.description = metadata.short_description;
+        if (metadata.image_description && !metadata.description) metadata.description = metadata.image_description;
+        
+        if (metadata.name && !metadata.title) metadata.title = metadata.name;
+        if (metadata.headline && !metadata.title) metadata.title = metadata.headline;
+        if (metadata.subject && !metadata.title) metadata.title = metadata.subject;
+
+        // Ensure description is valid
+        metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
 
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
