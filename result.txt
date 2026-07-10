@@ -1,0 +1,17 @@
+1244:     app.post('/api/generate-prompt', async (req, res) => {
+1246:             const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed } = req.body;
+1250:             const promptData = await generateOptimizedPrompt({
+1254:                 promptMode,
+1262:             res.json(promptData);
+1264:             console.warn('Server generate-prompt error:', e);
+1268:                 res.status(500).json({ error: e.message || 'Error generating optimized prompt' });
+1273:     app.post('/api/analyze-image-to-prompt', async (req, res) => {
+1282:             console.warn('Server analyze-image-to-prompt error:', e);
+1287:     app.post('/api/analyze-batch-image-to-prompt', async (req, res) => {
+1296:             console.warn('Server analyze-batch-image-to-prompt error:', e);
+1758:     app.post('/api/check-image-quality', async (req, res) => {
+1839:     app.post('/api/generate-hollywood-prompts', async (req, res) => {
+1845:             const prompts = await generateHollywoodPrompts(keyword, model);
+1846:             res.json(prompts);
+1848:             console.warn('Server generate-hollywood-prompts error:', e);
+1852:                 res.status(500).json({ error: e.message || 'Error generating Hollywood prompts' });
