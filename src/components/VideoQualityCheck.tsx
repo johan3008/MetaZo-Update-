@@ -286,7 +286,7 @@ export const VideoQualityCheck: React.FC<{
         body: JSON.stringify({
           frames: framesBase64,
           tolerance: tolerance,
-          language: aiOptions?.language || 'Bahasa',
+          language: t.language || 'English',
           model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
         })
       });

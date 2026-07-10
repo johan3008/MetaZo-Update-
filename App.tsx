@@ -1085,7 +1085,13 @@ const App: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [keywordCount, setKeywordCount] = useState<number | string>('');
-  const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => (localStorage.getItem('mz_keyword_mode') as 'mixed' | 'single' | 'multi') || 'mixed');
+  const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => {
+    const saved = localStorage.getItem('mz_keyword_mode');
+    if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
+      return saved;
+    }
+    return 'mixed';
+  });
   const [titleLength, setTitleLength] = useState<'short' | 'medium' | 'long'>(() => (localStorage.getItem('mz_title_length') as 'short' | 'medium' | 'long') || 'medium');
   const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
@@ -1807,10 +1813,16 @@ const App: React.FC = () => {
 
           const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
             if (cloudValue !== undefined) {
+              let sanitizedValue = cloudValue;
+              if (localKey === 'mz_keyword_mode') {
+                if (cloudValue !== 'mixed' && cloudValue !== 'single' && cloudValue !== 'multi') {
+                  sanitizedValue = 'mixed';
+                }
+              }
               const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                localStorage.setItem(localKey, cloudValue);
-                setter(cloudValue);
+              if (sanitizedValue !== localValue) {
+                localStorage.setItem(localKey, sanitizedValue);
+                setter(sanitizedValue);
               }
             }
           };
@@ -1880,7 +1892,13 @@ const App: React.FC = () => {
              mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
              mz_aivene_model: localStorage.getItem('mz_aivene_model') || '',
               uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
-              keywordMode: localStorage.getItem('mz_keyword_mode') || 'commercial',
+              keywordMode: (() => {
+                 const saved = localStorage.getItem('mz_keyword_mode');
+                 if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
+                   return saved;
+                 }
+                 return 'mixed';
+               })(),
               titleLength: localStorage.getItem('mz_title_length') || 'medium',
               metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
           };
