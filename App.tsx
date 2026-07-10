@@ -2421,14 +2421,22 @@ const App: React.FC = () => {
     );
   });
 
+  const fetchProviderStatus = async () => {
+    try {
+      const response = await fetch('/api/provider-status');
+      const data = await response.json();
+      setServerKeysStatus(data);
+    } catch (err) {
+      console.warn('Gagal memuat status provider bawaan server:', err);
+    }
+  };
+
   useEffect(() => {
     if (showSettingsModal) {
-      // Fetch server key configuration status
-      fetch('/api/provider-status')
-        .then(r => r.json())
-        .then(data => setServerKeysStatus(data))
-        .catch(err => console.warn('Gagal memuat status provider bawaan server:', err));
-
+      if (Object.keys(serverKeysStatus).length === 0) {
+        fetchProviderStatus();
+      }
+      
       const gSaved = localStorage.getItem('gemini_api_key') || '';
       const grSaved = localStorage.getItem('groq_api_key') || '';
       const mSaved = localStorage.getItem('mistral_api_key') || '';
@@ -4773,6 +4781,13 @@ const App: React.FC = () => {
               </span>
               <div className="flex-1 flex items-center justify-between">
                 <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.settings_modal_title}</h2>
+                <button 
+                  onClick={fetchProviderStatus}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"
+                  title="Refresh Provider Status"
+                >
+                  <RefreshCcw size={12} />
+                </button>
               </div>
             </div>
             
