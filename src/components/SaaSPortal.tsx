@@ -180,6 +180,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [emailAddress, setEmailAddress] = useState('');
   const [emailCaption, setEmailCaption] = useState('Terima kasih telah berlangganan layanan PRO kami.');
   const [isEmailSending, setIsEmailSending] = useState(false);
+
+  // WhatsApp sending and Auto Pro states
+  const [activeWhatsAppKey, setActiveWhatsAppKey] = useState<string | null>(null);
+  const [whatsAppPhone, setWhatsAppPhone] = useState('');
+  const [autoProEmail, setAutoProEmail] = useState('');
+  const [isAutoProLoading, setIsAutoProLoading] = useState(false);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(() => {
     return localStorage.getItem('last_firestore_quota_error') === new Date().toDateString();
   });
@@ -677,6 +683,83 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       alert(`Gagal mengirim email: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsEmailSending(false);
+    }
+  };
+
+  const handleSendToWhatsApp = (key: string, duration: string) => {
+    if (!whatsAppPhone) {
+      alert('Mohon masukkan nomor WhatsApp penerima.');
+      return;
+    }
+    // Clean phone number (keep only digits)
+    let cleanPhone = whatsAppPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '62' + cleanPhone.substring(1);
+    }
+    const durationText = duration === '30days' ? '30 Hari PRO' : 'Unlimited PRO (Lifetime)';
+    const message = `Halo, berikut adalah Serial Key/License Key Anda untuk aplikasi *${appName}*:\n\n*Serial Key:* ${key}\n*Durasi:* ${durationText}\n\nSilakan masukkan Serial Key ini di menu Aktivasi untuk mengaktifkan status Premium/PRO Anda.\n\nTerima kasih atas pesanan Anda!`;
+    const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+    setActiveWhatsAppKey(null);
+    setWhatsAppPhone('');
+  };
+
+  const handleSetAutoPro = async () => {
+    const cleanEmail = autoProEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      alert('Mohon masukkan email yang valid.');
+      return;
+    }
+
+    setIsAutoProLoading(true);
+    try {
+      // 1. Generate an autopro key based on the email to keep it tidy and unique
+      const rawEmailPart = cleanEmail.replace(/[^A-Z0-9]/ig, '').toUpperCase().slice(0, 12);
+      const autoproKey = `MZPRO-AUTO-${rawEmailPart}`;
+
+      const keyData = {
+        key: autoproKey,
+        activated: true,
+        activatedBy: cleanEmail,
+        firstActivatedBy: cleanEmail,
+        activatedAt: new Date().toISOString(),
+        duration: 'unlimited',
+        createdAt: new Date().toISOString()
+      };
+
+      // Set key document in keys collection
+      await setDoc(doc(db, 'keys', autoproKey), keyData);
+
+      // 2. Search for existing user profile
+      const qSnap = await getDocs(collection(db, 'users'));
+      let foundUserDocId = null;
+
+      qSnap.forEach((userDoc) => {
+        const uData = userDoc.data();
+        if (uData && uData.email && uData.email.toLowerCase().trim() === cleanEmail) {
+          foundUserDocId = userDoc.id;
+        }
+      });
+
+      if (foundUserDocId) {
+        // Update user profile to activate this auto-pro key
+        await updateDoc(doc(db, 'users', foundUserDocId), {
+          licenseKey: autoproKey,
+          cancelledSubscription: false,
+          updatedAt: new Date().toISOString()
+        });
+        alert(`Sukses! Akun ${cleanEmail} telah berhasil di-upgrade menjadi PRO secara otomatis.\nSerial Key: ${autoproKey}`);
+      } else {
+        alert(`Key Auto-Pro berhasil disiapkan untuk ${cleanEmail}.\nKarena user belum pernah login, ketika nanti user login pertama kali dengan email tersebut, sistem akan mendeteksi key ini secara otomatis dan menjadikannya PRO!\nSerial Key: ${autoproKey}`);
+      }
+
+      setAutoProEmail('');
+      await fetchBackendKeys();
+    } catch (err: any) {
+      console.error('Failed to set Auto Pro:', err);
+      alert(`Gagal mengaktifkan Auto Pro: ${err?.message || String(err)}`);
+    } finally {
+      setIsAutoProLoading(false);
     }
   };
 
@@ -2119,6 +2202,35 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                   </button>
                 </div>
 
+                {/* INSTANT AUTO PRO ACTIVATOR */}
+                <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 rounded-[1.5rem] space-y-3">
+                  <div className="flex items-center space-x-1.5 text-emerald-800 dark:text-emerald-400">
+                    <ShieldCheck size={14} className="text-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">⚡ INSTANT AUTO PRO ACTIVATOR (EMAIL-BASED)</span>
+                  </div>
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
+                    Ubah status akun email menjadi PRO secara instan dan otomatis tanpa perlu memasukkan key manual. Cukup ketik email pengguna di bawah ini untuk mengaktifkan Auto-Pro!
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      placeholder="Ketik email akun pengguna (contoh: user@gmail.com)..."
+                      value={autoProEmail}
+                      onChange={(e) => setAutoProEmail(e.target.value)}
+                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-emerald-500 text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSetAutoPro}
+                      disabled={isAutoProLoading}
+                      className="py-1.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold rounded-[2.5rem] text-[10px] uppercase tracking-wider transition-all flex items-center justify-center space-x-1 shrink-0 shadow-md shadow-emerald-500/10 cursor-pointer"
+                    >
+                      {isAutoProLoading ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                      <span>{isAutoProLoading ? 'Memproses...' : 'Aktifkan Pro'}</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Active Keys Database List */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
@@ -2214,6 +2326,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                       setActiveEmailKey(null);
                                     } else {
                                       setActiveEmailKey(kObj.key);
+                                      setActiveWhatsAppKey(null);
                                       setEmailAddress('');
                                     }
                                   }}
@@ -2221,6 +2334,22 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   title="Kirim ke Email"
                                 >
                                   <Mail size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeWhatsAppKey === kObj.key) {
+                                      setActiveWhatsAppKey(null);
+                                    } else {
+                                      setActiveWhatsAppKey(kObj.key);
+                                      setActiveEmailKey(null);
+                                      setWhatsAppPhone('');
+                                    }
+                                  }}
+                                  className={`p-1 rounded transition-colors ${activeWhatsAppKey === kObj.key ? 'bg-emerald-500 text-white' : 'text-emerald-500 hover:bg-emerald-500/10'}`}
+                                  title="Kirim ke WhatsApp"
+                                >
+                                  <MessageCircle size={12} className="text-emerald-500 group-hover:text-white" />
                                 </button>
                               </>
                             )}
@@ -2281,6 +2410,39 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                 >
                                   {isEmailSending ? <RefreshCw size={10} className="animate-spin" /> : <Send size={10} />}
                                   {isEmailSending ? 'Menyiapkan...' : 'Kirim Sekarang'}
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Inline WhatsApp Form */}
+                        <AnimatePresence>
+                          {activeWhatsAppKey === kObj.key && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="px-2 pb-2 overflow-hidden"
+                            >
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 flex gap-2 shadow-inner">
+                                <input 
+                                  type="text"
+                                  placeholder="Input nomor WA (contoh: 08123456789)..."
+                                  value={whatsAppPhone}
+                                  onChange={(e) => setWhatsAppPhone(e.target.value)}
+                                  className="flex-1 bg-transparent text-[10px] outline-none font-bold placeholder:text-slate-400 text-slate-800 dark:text-slate-100"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="flex justify-end mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendToWhatsApp(kObj.key, kObj.duration || '30days')}
+                                  className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[9px] font-black uppercase rounded-2xl flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all"
+                                >
+                                  <Send size={10} />
+                                  <span>Kirim ke WhatsApp</span>
                                 </button>
                               </div>
                             </motion.div>
