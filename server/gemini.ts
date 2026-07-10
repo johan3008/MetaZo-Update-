@@ -3260,10 +3260,10 @@ export const analyzeImageToPrompt = async (
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
 CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
+1. FULL SCAN: You MUST examine the ENTIRE image to extract its core subject, commercial concept, and design/photographic niche.
+2. ABSOLUTELY NO DIRECT REPLICATION: Do not just literally describe the original image. Extract its core commercial niche (e.g., "minimalist organic skincare flatlay", "cozy coffee shop interior").
+3. RADICAL NICHE VARIATION: Generate a highly professional, optimized text-to-image prompt that creates a COMPLETELY NEW SCENARIO within the exact same niche. Change the subjects' poses, the specific objects, the time of day, or the camera angle radically. It must be a highly varied, unique concept that sells to the same target market, NOT a clone of the input image. Ensure every regeneration yields a distinctly different creative interpretation.
+4. TECHNICAL BASELINE: Technical facts (lens, lighting, style) must match the niche, but the visual setup must be completely unique.
 
 STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
 - Subject (The main entity)
@@ -3309,11 +3309,12 @@ CRITICAL RULES:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+      const randomSalt = Math.random().toString(36).substring(7);
+      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}. Inject radical creative variation based on the niche. [Seed: ${randomSalt}]` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.0
+        temperature: 0.85
       });
       responseText = response.text || "{}";
       break;
@@ -3356,10 +3357,10 @@ export const analyzeBatchImageToPrompt = async (
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
 
 CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
+1. FULL SCAN: You MUST examine the ENTIRE image to extract its core subject, commercial concept, and design/photographic niche.
+2. ABSOLUTELY NO DIRECT REPLICATION: Do not just literally describe the original image. Extract its core commercial niche (e.g., "minimalist organic skincare flatlay", "cozy coffee shop interior").
+3. RADICAL NICHE VARIATION: Generate a highly professional, optimized text-to-image prompt that creates a COMPLETELY NEW SCENARIO within the exact same niche. Change the subjects' poses, the specific objects, the time of day, or the camera angle radically. It must be a highly varied, unique concept that sells to the same target market, NOT a clone of the input image. Ensure every regeneration yields a distinctly different creative interpretation.
+4. TECHNICAL BASELINE: Technical facts (lens, lighting, style) must match the niche, but the visual setup must be completely unique.
 
 FOR EACH IMAGE, EXTRACT AND ANALYZE:
 - Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
@@ -3404,11 +3405,12 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
+      const randomSalt = Math.random().toString(36).substring(7);
       const res = await callGeminiWithRetry(modelName, { parts }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.0
+        temperature: 0.85
       });
       responseText = res.text || "[]";
       break;
@@ -3509,6 +3511,7 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
+  const randomSalt = Math.random().toString(36).substring(7);
   const prompt = `Act as a world-class Hollywood Director. Create 50 high-end, cinematic text-to-video prompts for: "${keyword}".
   
   BEST PROMPT STRUCTURE (MANDATORY):
@@ -3519,10 +3522,12 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   - Camera: Technical precision (Anamorphic, 85mm, T-stop settings implied).
   
   RULES:
+  - RADICAL VARIATION: Ensure every shot is completely distinct from the others in scenario, camera angle, and action.
   - NO GENERIC SHOTS. Every shot must look like a masterpiece.
   - Focus on "The Unseen": Capture angles that stock footage usually lacks.
   - English only.
   
+  [Seed: ${randomSalt}]
   Return exactly 50 prompts in JSON array format.`;
 
   const responseSchema = {
@@ -3548,13 +3553,14 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
       contents: prompt,
       responseMimeType: "application/json",
       responseSchema,
-      config: { temperature: 0.8 },
+      config: { temperature: 0.85 },
       model
     });
   } else {
     const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
       responseMimeType: "application/json",
-      responseSchema
+      responseSchema,
+      temperature: 0.85
     });
     responseText = response.text || "[]";
   }
@@ -3642,11 +3648,12 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
-5. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI TETAPI JANGAN TERLALU PARANOID):
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang secara SANGAT EXTREME (misal 7 jari), tangan/kaki meliuk atau menyatu secara sama sekali tidak masuk akal (alien-like), wajah yang benar-benar hancur. *Catatan: Jika asimetri atau detail jari sedikit kabur namun secara estetika keseluruhan (mood/lighting) masih sangat dramatis dan bisa dijual (commercially viable), JANGAN langsung menolak (FAIL). Berikan PASS.*
-   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text. *Catatan: Jika teks tersebut sangat kecil, blur di background, atau menyerupai tulisan tangan abstrak yang wajar, berikan PASS.*
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam.
-   - Polusi Visual AI & Tekstur Kulit: JANGAN menolak (FAIL) gambar hanya karena "tekstur kulit kurang pori-pori alami" (overly processed/waxy skin) JIKA gambar tersebut bergaya sinematik, dramatis, atau bernuansa fantasi. Loloskan jika estetika komersialnya secara umum bagus. Jangan menghukum gambar AI hanya karena terlihat "seperti AI" asalkan enak dilihat.
+5. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
+   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau gitar, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling. Anatomi yang secara biologis tidak mungkin = FAIL INSTAN.
+   - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam, atau objek melayang tanpa gravitasi.
+   - Polusi Visual AI: Loloskan HANYA jika masalah tekstur kulit (waxy skin) sangat halus pada gambar bergaya sinematik/fantasi. Namun CACAT BENTUK = FAIL.
 
 6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
@@ -3705,12 +3712,11 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - HINDARI FALSE POSITIVES (JANGAN MENEBAK-NEBAK):
-Anda DILARANG KERAS menebak-nebak (guessing) atau berhalusinasi menemukan cacat yang sebenarnya tidak ada. Kurator Adobe Stock sering kali meloloskan gambar AI yang memiliki noise wajar, sedikit asimetri artistik, atau objek yang memang secara alami bentuknya abstrak/tidak beraturan (seperti cipratan air, bentuk awan, atau makanan abstrak).
-1. Jika Anda ragu apakah suatu bagian adalah "cacat AI" atau "memang bentuk aslinya begitu secara artistik", berikan "Benefit of the Doubt" dan loloskan (PASS).
-2. Jangan over-analyze atau over-penalize gambar yang secara estetika keseluruhan terlihat sangat bagus dan layak jual (commercially viable).
-3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai gambar yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
-
+PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
+Kurator Adobe Stock dan pembeli premium sangat membenci gambar AI yang terlihat bagus sekilas namun cacat saat di-zoom. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
+1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama (seperti: tombol keyboard, senar/mekanisme instrumen atau busur, bentuk mata/jari, roda kendaraan, tulisan/layar). JANGAN NGAWUR dan jangan abaikan detail.
+2. JIKA ANDA MENEMUKAN KECACATAN SEKECIL APA PUN pada mekanika, teks (gibberish/alien), anatomi (meleleh/menyatu), atau elemen IP, Anda WAJIB MENGGAGALKANNYA (FAIL).
+3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat arsitektur/mekanis/teks pada subjek utama. Kegagalan rendering = FAIL. Ceritakan proses deteksi cacat Anda di visual_scan_analysis dengan jujur dan tajam.
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
@@ -4343,11 +4349,13 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Flickering: Kedipan cahaya tidak stabil pada frame karena ketidaksamaan frekuensi lampu listrik dengan shutter speed kamera.
    - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
 
-6. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI TETAPI JANGAN TERLALU PARANOID):
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang secara SANGAT EXTREME (misal 7 jari), tangan/kaki meliuk atau menyatu secara sama sekali tidak masuk akal (alien-like), wajah yang benar-benar hancur. *Catatan: Jika asimetri atau detail jari sedikit kabur namun secara estetika keseluruhan (mood/lighting) masih sangat dramatis dan bisa dijual (commercially viable), JANGAN langsung menolak (FAIL). Berikan PASS.*
-   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text. *Catatan: Jika teks tersebut sangat kecil, blur di background, atau menyerupai tulisan tangan abstrak yang wajar, berikan PASS.*
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam.
-   - Polusi Visual AI & Tekstur Kulit: JANGAN menolak (FAIL) gambar hanya karena "tekstur kulit kurang pori-pori alami" (overly processed/waxy skin) JIKA gambar/video tersebut bergaya sinematik, dramatis, atau bernuansa fantasi. Loloskan jika estetika komersialnya secara umum bagus. Jangan menghukum konten AI hanya karena terlihat "seperti AI" asalkan enak dilihat.
+6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
+   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau instrumen musik, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis ke poros. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
+   - Temporal Inconsistency & Morphing (SANGAT FATAL UNTUK VIDEO): Benda atau makhluk hidup yang berubah bentuk (morphing) secara tidak wajar di tengah video, objek yang tiba-tiba muncul/hilang, atau tekstur yang bergeser tidak sesuai dengan pergerakan objek (texture swimming).
+   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling yang berkedip secara aneh di tengah frame. Anatomi yang salah secara biologis = FAIL INSTAN.
+   - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, atau perspektif arsitektur patah tajam antar frame.
+   - Polusi Visual AI: Loloskan masalah tekstur (waxy skin) HANYA jika sangat halus pada gaya sinematik. Namun CACAT STRUKTUR ATAU MORPHING BENTUK = FAIL.
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
@@ -4390,12 +4398,11 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - HINDARI FALSE POSITIVES (JANGAN MENEBAK-NEBAK):
-Anda DILARANG KERAS menebak-nebak (guessing) atau berhalusinasi menemukan cacat yang sebenarnya tidak ada. Kurator Adobe Stock sering kali meloloskan video AI atau rekaman yang memiliki noise wajar, sedikit guncangan artistik, atau objek yang memang secara alami bentuknya abstrak/tidak beraturan.
-1. Jika Anda ragu apakah suatu bagian adalah "cacat AI/kamera" atau "memang bentuk aslinya begitu secara artistik", berikan "Benefit of the Doubt" dan loloskan (PASS).
-2. Jangan over-analyze atau over-penalize video yang secara estetika keseluruhan terlihat sangat bagus dan layak jual (commercially viable).
-3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, jello effect parah, distorsi kamera parah, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai video yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
-
+PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
+Kurator Adobe Stock dan pembeli premium sangat membenci video AI yang terlihat bagus sekilas namun cacat atau tidak logis secara struktural/mekanis. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
+1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama di setiap frame (tombol keyboard, senar/busur, bentuk jari, teks di layar, roda, dll). JANGAN NGAWUR dan jangan abaikan detail!
+2. DETEKSI KECACATAN AKTIF: Jika bentuk benda "meleleh" (morphing), teks berupa gibberish, anggota tubuh menyatu (hallucination), atau ada kegagalan mekanis, Anda WAJIB MENGGAGALKANNYA (FAIL). 
+3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat anatomi, teks kacau, distorsi kamera aneh, atau objek meleleh di subjek utama. Kegagalan rendering AI = FAIL MUTLAK. Jangan ragu memberikan FAIL. Ceritakan temuan spesifik Anda secara rinci di visual_scan_analysis!
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
 
