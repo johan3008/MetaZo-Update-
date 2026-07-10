@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, Key, Image as ImageIcon, Film, FileText, Layers, 
-  ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle, Mail, Lock, X
+  ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle, Mail, Lock, X,
+  Calendar, VolumeX
 } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens } from '../supabase';
 import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
@@ -243,6 +244,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       feature_2_desc: "Menghasilkan Judul, Deskripsi, dan 25-45 kata kunci tertarget yang dikalibrasi untuk SEO pasar stock global.",
       feature_3_title: "Ekspor File CSV Instan",
       feature_3_desc: "Unduh hasil penganalisisan batch dengan standard struktur industri untuk Adobe Stock, Shutterstock, dll.",
+      feature_4_title: "Calendar Gen (Kalender Konten)",
+      feature_4_desc: "Temukan tren lokal, liburan global, dan ide acara seasonal komersial bulanan secara cerdas.",
+      feature_5_title: "Prompt Gen (Optimasi Prompt AI)",
+      feature_5_desc: "Formulasikan visual reference dan ide mentah Anda menjadi instruksi teks deskriptif tingkat lanjut.",
+      feature_6_title: "Video Mute (Audio Removal)",
+      feature_6_desc: "Hilangkan audio dari cuplikan klip video secara otomatis demi mematuhi kebijakan agensi microstock.",
+      feature_7_title: "Quality Check (Audit Standar Teknis)",
+      feature_7_desc: "Mesin audit visual super ketat untuk mendeteksi noise, lisensi logo bocor, blur, dan cacat visual lainnya.",
     },
     en: {
       tag: "Advanced AI Metadata Engine",
@@ -261,6 +270,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       feature_2_desc: "Output optimized Titles, Descriptions and up to 49 niche-relevant keywords instantly to maximize sales.",
       feature_3_title: "Instant Batch CSV Exports",
       feature_3_desc: "Download generated attributes matching specifications of Adobe Stock, Shutterstock, Canva, and more.",
+      feature_4_title: "Calendar Gen (Content Calendar)",
+      feature_4_desc: "Discover seasonal events, commercial holiday trends, and content ideas for microstock strategy.",
+      feature_5_title: "Prompt Gen (AI Prompt Optimization)",
+      feature_5_desc: "Formulate visual references and raw concepts into rich, descriptive text prompt instructions.",
+      feature_6_title: "Video Mute (Audio Removal)",
+      feature_6_desc: "Instantly strip/remove audio tracks from video clips to perfectly meet microstock submission rules.",
+      feature_7_title: "Quality Check (Technical Standards Audit)",
+      feature_7_desc: "Advanced visual scanner to identify technical flaws, blur, IP violations, and sensor dust before rejection.",
     }
   };
 
@@ -361,22 +378,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className="space-y-4 pt-1 border-t border-slate-200/60 dark:border-slate-800/60"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/60"
             >
               {[
                 { title: tc.feature_1_title, desc: tc.feature_1_desc, icon: <Layers className="text-violet-500 shrink-0 mt-0.5" size={15} /> },
                 { title: tc.feature_2_title, desc: tc.feature_2_desc, icon: <Sparkles className="text-amber-500 shrink-0 mt-0.5" size={15} /> },
-                { title: tc.feature_3_title, desc: tc.feature_3_desc, icon: <ShieldCheck className="text-emerald-500 shrink-0 mt-0.5" size={15} /> },
+                { title: tc.feature_3_title, desc: tc.feature_3_desc, icon: <FileText className="text-emerald-500 shrink-0 mt-0.5" size={15} /> },
+                { title: tc.feature_4_title, desc: tc.feature_4_desc, icon: <Calendar className="text-indigo-500 shrink-0 mt-0.5" size={15} /> },
+                { title: tc.feature_5_title, desc: tc.feature_5_desc, icon: <Sparkles className="text-pink-500 shrink-0 mt-0.5" size={15} /> },
+                { title: tc.feature_6_title, desc: tc.feature_6_desc, icon: <VolumeX className="text-rose-500 shrink-0 mt-0.5" size={15} /> },
+                { title: tc.feature_7_title, desc: tc.feature_7_desc, icon: <ShieldCheck className="text-teal-500 shrink-0 mt-0.5" size={15} /> },
               ].map((f, i) => (
-                <div key={i} className="flex space-x-3.5 group">
-                  <div className="w-7 h-7 bg-white dark:bg-slate-900 border border-slate-250 dark:border-white/5 rounded-2xl flex items-center justify-center shadow-sm">
+                <div key={i} className="flex space-x-3 group">
+                  <div className="w-7 h-7 bg-white dark:bg-slate-900 border border-slate-250 dark:border-white/5 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
                     {f.icon}
                   </div>
                   <div>
-                    <h3 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight group-hover:text-[#7c3aed] transition-colors">
+                    <h3 className="text-[11px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight group-hover:text-[#7c3aed] transition-colors">
                       {f.title}
                     </h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400/80 leading-normal font-medium max-w-sm mt-0.5">
+                    <p className="text-[9.5px] text-slate-500 dark:text-slate-400/80 leading-snug font-medium max-w-sm mt-0.5">
                       {f.desc}
                     </p>
                   </div>
