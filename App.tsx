@@ -1357,6 +1357,7 @@ const App: React.FC = () => {
 
   const sessionStartTime = useRef<number>(Date.now());
   const notifiedMessageIds = useRef<Set<string>>(new Set());
+  const lastProviderChangeTime = useRef<number>(0);
 
   // Load last read timestamps from local storage
   const [lastReadGlobal, setLastReadGlobal] = useState<number>(() => {
@@ -1820,7 +1821,7 @@ const App: React.FC = () => {
             const localProvider = localStorage.getItem('ai_provider') || 'gemini';
             const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
             const cloudProvider = validProviders.includes(data.settings.ai_provider) ? data.settings.ai_provider : 'gemini';
-            if (cloudProvider !== localProvider) {
+            if (cloudProvider !== localProvider && Date.now() - lastProviderChangeTime.current > 5000) {
               localStorage.setItem('ai_provider', cloudProvider);
               setSelectedProvider(cloudProvider as any);
               settingsChanged = true;
@@ -4799,6 +4800,7 @@ const App: React.FC = () => {
                                 onChange={(e) => {
                   const val = e.target.value as any;
                   console.log(`[Provider Transition] Changing selectedProvider from ${selectedProvider} to ${val}`);
+                  lastProviderChangeTime.current = Date.now();
                   setSelectedProvider(val);
                   setActiveSettingsTab(val);
                   localStorage.setItem('ai_provider', val);
