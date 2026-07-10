@@ -1792,15 +1792,10 @@ const App: React.FC = () => {
           
           const syncKey = (cloudValue: string | undefined, localKey: string, setterList: any) => {
             if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                if (cloudValue === '') {
-                  localStorage.removeItem(localKey);
-                  setterList([]);
-                } else {
-                  localStorage.setItem(localKey, cloudValue);
-                  setterList(cloudValue.split(',').map((k:string)=>k.trim()).filter(Boolean));
-                }
+              const localValue = localStorage.getItem(localKey);
+              if (localValue === null && cloudValue !== '') {
+                localStorage.setItem(localKey, cloudValue);
+                setterList(cloudValue.split(',').map((k:string)=>k.trim()).filter(Boolean));
                 settingsChanged = true;
               }
             }
