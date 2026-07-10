@@ -4,9 +4,38 @@ import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../ty
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
+
+const CACHE_FILE_PATH = path.join(process.cwd(), "qa_reports_cache.json");
+let qaCacheMap: Map<string, any> = new Map();
+
+function loadQACache() {
+  try {
+    if (fs.existsSync(CACHE_FILE_PATH)) {
+      const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
+      const obj = JSON.parse(content);
+      qaCacheMap = new Map(Object.entries(obj));
+      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached reports successfully.`);
+    }
+  } catch (err) {
+    console.warn("[QA Cache] Error loading cache file, starting fresh:", err);
+  }
+}
+
+function saveQACache() {
+  try {
+    const obj = Object.fromEntries(qaCacheMap.entries());
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[QA Cache] Error saving cache file:", err);
+  }
+}
+
+// Initialize cache load
+loadQACache();
 
 // Load environment variables dynamically from local .env file
 try {
@@ -3491,6 +3520,15 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
+  // Deterministic quality check cache lookup
+  const cacheKeyInput = `${image}_${tolerance}_${targetLanguageName}_${model || "default"}`;
+  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
+
+  if (qaCacheMap.has(cacheKey)) {
+    console.log(`[QA Cache] Hit for image quality check (key: ${cacheKey})`);
+    return qaCacheMap.get(cacheKey);
+  }
+
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
 Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap gambar/vektor komersial yang diunggah.
@@ -3732,7 +3770,10 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const text = responseText;
     console.log('QA raw response:', text);
-    return JSON.parse(text);
+    const parsedResult = JSON.parse(text);
+    qaCacheMap.set(cacheKey, parsedResult);
+    saveQACache();
+    return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
     throw e;
@@ -4159,6 +4200,16 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
+  // Quality check deterministic cache lookup
+  const framesDataCombined = Array.isArray(frames) ? frames.join('') : String(frames);
+  const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
+  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
+
+  if (qaCacheMap.has(cacheKey)) {
+    console.log(`[QA Cache] Hit for video quality check (key: ${cacheKey})`);
+    return qaCacheMap.get(cacheKey);
+  }
+
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
 Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 3 frame diam yang diekstrak dari bagian Awal, Tengah, dan Akhir video.
@@ -4374,7 +4425,10 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const text = responseText;
     console.log('QA raw video response:', text);
-    return JSON.parse(text);
+    const parsedResult = JSON.parse(text);
+    qaCacheMap.set(cacheKey, parsedResult);
+    saveQACache();
+    return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
     throw e;
