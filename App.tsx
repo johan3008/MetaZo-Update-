@@ -1792,10 +1792,15 @@ const App: React.FC = () => {
           
           const syncKey = (cloudValue: string | undefined, localKey: string, setterList: any) => {
             if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey);
-              if (localValue === null && cloudValue !== '') {
-                localStorage.setItem(localKey, cloudValue);
-                setterList(cloudValue.split(',').map((k:string)=>k.trim()).filter(Boolean));
+              const localValue = localStorage.getItem(localKey) || '';
+              if (cloudValue !== localValue) {
+                if (cloudValue === '') {
+                  localStorage.removeItem(localKey);
+                  setterList([]);
+                } else {
+                  localStorage.setItem(localKey, cloudValue);
+                  setterList(cloudValue.split(',').map((k:string)=>k.trim()).filter(Boolean));
+                }
                 settingsChanged = true;
               }
             }
@@ -1811,6 +1816,16 @@ const App: React.FC = () => {
           syncKey(data.settings.bluesminds_api_key, 'bluesminds_api_key', setBluesmindsKeysList);
           syncKey(data.settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
 
+          if (data.settings.ai_provider !== undefined) {
+            const localProvider = localStorage.getItem('ai_provider') || 'gemini';
+            const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+            const cloudProvider = validProviders.includes(data.settings.ai_provider) ? data.settings.ai_provider : 'gemini';
+            if (cloudProvider !== localProvider) {
+              localStorage.setItem('ai_provider', cloudProvider);
+              setSelectedProvider(cloudProvider as any);
+              settingsChanged = true;
+            }
+          }
 
           const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
             if (cloudValue !== undefined) {
@@ -2406,22 +2421,14 @@ const App: React.FC = () => {
     );
   });
 
-  const fetchProviderStatus = async () => {
-    try {
-      const response = await fetch('/api/provider-status');
-      const data = await response.json();
-      setServerKeysStatus(data);
-    } catch (err) {
-      console.warn('Gagal memuat status provider bawaan server:', err);
-    }
-  };
-
   useEffect(() => {
     if (showSettingsModal) {
-      if (Object.keys(serverKeysStatus).length === 0) {
-        fetchProviderStatus();
-      }
-      
+      // Fetch server key configuration status
+      fetch('/api/provider-status')
+        .then(r => r.json())
+        .then(data => setServerKeysStatus(data))
+        .catch(err => console.warn('Gagal memuat status provider bawaan server:', err));
+
       const gSaved = localStorage.getItem('gemini_api_key') || '';
       const grSaved = localStorage.getItem('groq_api_key') || '';
       const mSaved = localStorage.getItem('mistral_api_key') || '';
@@ -2664,16 +2671,52 @@ const App: React.FC = () => {
     });
   };
 
-  const handleSaveKey = () => {
-    const cleanGemini = geminiKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanGroq = groqKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanMistral = mistralKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanOpenai = openaiKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanOpenrouter = openrouterKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanBlackbox = blackboxKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanNvidia = nvidiaKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanBluesminds = bluesmindsKeysList.map(k => k.trim()).filter(Boolean);
-    const cleanAivene = aiveneKeysList.map(k => k.trim()).filter(Boolean);
+    const handleSaveKey = () => {
+    let finalGemini = [...geminiKeysList];
+    if (newGeminiKey.trim() && !finalGemini.includes(newGeminiKey.trim())) finalGemini.push(newGeminiKey.trim());
+    const cleanGemini = finalGemini.map(k => k.trim()).filter(Boolean);
+
+    let finalGroq = [...groqKeysList];
+    if (newGroqKey.trim() && !finalGroq.includes(newGroqKey.trim())) finalGroq.push(newGroqKey.trim());
+    const cleanGroq = finalGroq.map(k => k.trim()).filter(Boolean);
+
+    let finalMistral = [...mistralKeysList];
+    if (newMistralKey.trim() && !finalMistral.includes(newMistralKey.trim())) finalMistral.push(newMistralKey.trim());
+    const cleanMistral = finalMistral.map(k => k.trim()).filter(Boolean);
+
+    let finalOpenai = [...openaiKeysList];
+    if (newOpenaiKey.trim() && !finalOpenai.includes(newOpenaiKey.trim())) finalOpenai.push(newOpenaiKey.trim());
+    const cleanOpenai = finalOpenai.map(k => k.trim()).filter(Boolean);
+
+    let finalOpenrouter = [...openrouterKeysList];
+    if (newOpenrouterKey.trim() && !finalOpenrouter.includes(newOpenrouterKey.trim())) finalOpenrouter.push(newOpenrouterKey.trim());
+    const cleanOpenrouter = finalOpenrouter.map(k => k.trim()).filter(Boolean);
+
+    let finalBlackbox = [...blackboxKeysList];
+    if (newBlackboxKey.trim() && !finalBlackbox.includes(newBlackboxKey.trim())) finalBlackbox.push(newBlackboxKey.trim());
+    const cleanBlackbox = finalBlackbox.map(k => k.trim()).filter(Boolean);
+
+    let finalNvidia = [...nvidiaKeysList];
+    if (newNvidiaKey.trim() && !finalNvidia.includes(newNvidiaKey.trim())) finalNvidia.push(newNvidiaKey.trim());
+    const cleanNvidia = finalNvidia.map(k => k.trim()).filter(Boolean);
+
+    let finalBluesminds = [...bluesmindsKeysList];
+    if (newBluesmindsKey.trim() && !finalBluesminds.includes(newBluesmindsKey.trim())) finalBluesminds.push(newBluesmindsKey.trim());
+    const cleanBluesminds = finalBluesminds.map(k => k.trim()).filter(Boolean);
+
+    let finalAivene = [...aiveneKeysList];
+    if (newAiveneKey.trim() && !finalAivene.includes(newAiveneKey.trim())) finalAivene.push(newAiveneKey.trim());
+    const cleanAivene = finalAivene.map(k => k.trim()).filter(Boolean);
+
+    if (newGeminiKey.trim()) { setGeminiKeysList(finalGemini); setNewGeminiKey(''); }
+    if (newGroqKey.trim()) { setGroqKeysList(finalGroq); setNewGroqKey(''); }
+    if (newMistralKey.trim()) { setMistralKeysList(finalMistral); setNewMistralKey(''); }
+    if (newOpenaiKey.trim()) { setOpenaiKeysList(finalOpenai); setNewOpenaiKey(''); }
+    if (newOpenrouterKey.trim()) { setOpenrouterKeysList(finalOpenrouter); setNewOpenrouterKey(''); }
+    if (newBlackboxKey.trim()) { setBlackboxKeysList(finalBlackbox); setNewBlackboxKey(''); }
+    if (newNvidiaKey.trim()) { setNvidiaKeysList(finalNvidia); setNewNvidiaKey(''); }
+    if (newBluesmindsKey.trim()) { setBluesmindsKeysList(finalBluesminds); setNewBluesmindsKey(''); }
+    if (newAiveneKey.trim()) { setAiveneKeysList(finalAivene); setNewAiveneKey(''); }
 
     if (cleanGemini.length > 0) {
       localStorage.setItem('gemini_api_key', cleanGemini.join(','));
@@ -4766,13 +4809,6 @@ const App: React.FC = () => {
               </span>
               <div className="flex-1 flex items-center justify-between">
                 <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.settings_modal_title}</h2>
-                <button 
-                  onClick={fetchProviderStatus}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"
-                  title="Refresh Provider Status"
-                >
-                  <RefreshCcw size={12} />
-                </button>
               </div>
             </div>
             
@@ -4783,6 +4819,7 @@ const App: React.FC = () => {
                 value={selectedProvider}
                                 onChange={(e) => {
                   const val = e.target.value as any;
+                  console.log(`[Provider Transition] Changing selectedProvider from ${selectedProvider} to ${val}`);
                   setSelectedProvider(val);
                   setActiveSettingsTab(val);
                   localStorage.setItem('ai_provider', val);
@@ -6077,11 +6114,7 @@ const App: React.FC = () => {
                 </button>
               )}
               <button 
-                type="button"
-                onClick={() => {
-                  handleSaveKey();
-                  setShowSettingsModal(false);
-                }}
+                onClick={handleSaveKey} 
                 className="flex-1 py-1.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-bold rounded-[1.5rem] text-xs uppercase shadow transition-colors"
               >
                 Simpan & Pasang
