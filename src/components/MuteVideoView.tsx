@@ -48,6 +48,8 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
 
   const activePreviewFile = files.find(f => f.id === activePreviewId);
 
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+
   const [activeOriginalUrl, setActiveOriginalUrl] = useState<string>('');
 
   useEffect(() => {
@@ -915,12 +917,26 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
                 </span>
               </div>
 
-              <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative shadow-inner">
+              <div 
+                className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative shadow-inner cursor-pointer"
+                onMouseEnter={() => {
+                  if (previewVideoRef.current) {
+                    previewVideoRef.current.play().catch(err => console.log('Autoplay on hover blocked:', err));
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (previewVideoRef.current) {
+                    previewVideoRef.current.pause();
+                  }
+                }}
+              >
                 <video 
+                  ref={previewVideoRef}
                   key={`${activePreviewFile.id}_${activePreviewFile.progress === 'done' ? 'muted' : 'orig'}`}
                   src={activePreviewFile.progress === 'done' && activePreviewFile.downloadUrl ? activePreviewFile.downloadUrl : activeOriginalUrl} 
                   controls 
                   muted
+                  autoPlay
                   playsInline
                   className="w-full h-full object-contain"
                 />
