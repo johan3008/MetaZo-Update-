@@ -48,6 +48,20 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
 
   const activePreviewFile = files.find(f => f.id === activePreviewId);
 
+  const [activeOriginalUrl, setActiveOriginalUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!activePreviewFile) {
+      setActiveOriginalUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(activePreviewFile.file);
+    setActiveOriginalUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [activePreviewFile?.id]);
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -903,9 +917,11 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
 
               <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative shadow-inner">
                 <video 
-                  key={activePreviewFile.id}
-                  src={URL.createObjectURL(activePreviewFile.file)} 
+                  key={`${activePreviewFile.id}_${activePreviewFile.progress === 'done' ? 'muted' : 'orig'}`}
+                  src={activePreviewFile.progress === 'done' && activePreviewFile.downloadUrl ? activePreviewFile.downloadUrl : activeOriginalUrl} 
                   controls 
+                  muted
+                  playsInline
                   className="w-full h-full object-contain"
                 />
               </div>
