@@ -913,24 +913,22 @@ async function callOpenAICompatibleWithRetry(params: {
 
         const errorMsg = String(err.message || "").toLowerCase();
 
-        // Handle specific NVIDIA NIM 404 (Model not found for this account/key)
-        if (provider === 'nvidia' && errorMsg.includes('404')) {
-          console.warn(`[NVIDIA 404] Model ${model} might not be supported by this key or account. Trying next key if available.`);
-          // Trigger key rotation by pretending it's a quota error
-          if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
-             providerState.activeIndex++;
-             break;
-          }
+        // Handle API key rotation on limit or auth errors
+        const shouldRotate = errorMsg.includes('429') || errorMsg.includes('quota') || 
+                             errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || 
+                             errorMsg.includes('403') || errorMsg.includes('401') ||
+                             (provider === 'nvidia' && errorMsg.includes('404'));
+        
+        if (shouldRotate) {
+           console.warn(`[${provider.toUpperCase()}] Error requires rotation: ${errorMsg}. Trying next key.`);
+           if (providerState && providerState.keys && keysList.length > 1) {
+              providerState.activeIndex = (providerState.activeIndex + 1) % keysList.length;
+              break;
+           }
         }
 
-        if (errorMsg.includes('429') || errorMsg.includes('403') || errorMsg.includes('401') || errorMsg.includes('quota') || errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || errorMsg.includes('limit') || errorMsg.includes('timeout') || errorMsg.includes('fetch failed')) {
-          if (providerState && providerState.keys && providerState.activeIndex < keysList.length - 1) {
-            const prevIdx = providerState.activeIndex;
-            providerState.activeIndex++;
-            console.warn(`[Key Rotation - ${provider.toUpperCase()}] Rotating from Key index ${prevIdx} to ${providerState.activeIndex}`);
-            break;
-          }
-        }
+        // Handle API key rotation on limit or auth errors (already handled above)
+        // Removing redundant logic that was previously here.
 
         // Automatic model fallback and exponential backoff
         tryCount++;
@@ -1146,12 +1144,12 @@ function getAIClient(): any {
               }
 
               if (statusCode === 429 || statusCode === 403 || errorMsg.includes("quota") || errorMsg.includes("exceeded") || errorMsg.includes("resource_exhausted") || errorMsg.includes("limit") || errorMsg.includes("api key")) {
-                if (store && store.gemini && store.gemini.activeIndex < keysList.length - 1) {
-                  store.gemini.activeIndex++;
+              if (store && store.gemini && keysList.length > 1) {
+                  store.gemini.activeIndex = (store.gemini.activeIndex + 1) % keysList.length;
                   console.warn(`[Key Rotation - GEMINI] Rotating key in generateContent to index ${store.gemini.activeIndex}`);
                   continue;
-                } else if (store && !store.gemini && store.activeIndex < keysList.length - 1) {
-                  store.activeIndex++;
+                } else if (store && !store.gemini && keysList.length > 1) {
+                  store.activeIndex = (store.activeIndex + 1) % keysList.length;
                   console.warn(`[Key Rotation] Rotating key in generateContent to index ${store.activeIndex}`);
                   continue;
                 }
@@ -3763,6 +3761,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                     required: ["status", "note"]
                 },
                 ip_risk: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                proportion_defects: {
                     type: Type.OBJECT,
                     properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
                     required: ["status", "note"]
