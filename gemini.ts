@@ -4352,10 +4352,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
 
 6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
    - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau instrumen musik, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis ke poros. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling. Anatomi yang salah secara biologis = FAIL INSTAN.
+   - Temporal Inconsistency & Morphing (SANGAT FATAL UNTUK VIDEO): Benda atau makhluk hidup yang berubah bentuk (morphing) secara tidak wajar di tengah video, objek yang tiba-tiba muncul/hilang, atau tekstur yang bergeser tidak sesuai dengan pergerakan objek (texture swimming).
+   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling yang berkedip secara aneh di tengah frame. Anatomi yang salah secara biologis = FAIL INSTAN.
    - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
    - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, atau perspektif arsitektur patah tajam antar frame.
-   - Polusi Visual AI: Loloskan masalah tekstur (waxy skin) HANYA jika sangat halus pada gaya sinematik. Namun CACAT STRUKTUR BENTUK = FAIL.
+   - Polusi Visual AI: Loloskan masalah tekstur (waxy skin) HANYA jika sangat halus pada gaya sinematik. Namun CACAT STRUKTUR ATAU MORPHING BENTUK = FAIL.
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
