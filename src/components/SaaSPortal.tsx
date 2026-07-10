@@ -796,9 +796,34 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           cancelledSubscription: false,
           updatedAt: new Date().toISOString()
         });
-        alert(`Sukses! Akun ${cleanEmail} telah berhasil di-upgrade menjadi PRO (${durationLabel}) secara otomatis.\nSerial Key: ${autoproKey}`);
+      }
+
+      // 3. Send email notification automatically
+      let emailSentMessage = '';
+      try {
+        const emailRes = await fetch('/api/send-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            licenseKey: autoproKey,
+            appName: appName,
+            caption: `Selamat! Akun Anda telah diaktifkan secara otomatis sebagai status PRO (${durationLabel}) oleh administrator kami.`
+          })
+        });
+        if (emailRes.ok) {
+          emailSentMessage = '\n📧 Email pemberitahuan berhasil dikirim ke pengguna.';
+        } else {
+          emailSentMessage = '\n⚠️ Catatan: Email pemberitahuan gagal dikirim (Cek konfigurasi EMAIL_USER/PASS di Settings).';
+        }
+      } catch (e) {
+        emailSentMessage = '\n⚠️ Catatan: Email pemberitahuan gagal dikirim.';
+      }
+
+      if (foundUserDocId) {
+        alert(`Sukses! Akun ${cleanEmail} telah berhasil di-upgrade menjadi PRO (${durationLabel}) secara otomatis.\nSerial Key: ${autoproKey}${emailSentMessage}`);
       } else {
-        alert(`Key Auto-Pro (${durationLabel}) berhasil disiapkan untuk ${cleanEmail}.\nKarena user belum pernah login, ketika nanti user login pertama kali dengan email tersebut, sistem akan mendeteksi key ini secara otomatis dan menjadikannya PRO!\nSerial Key: ${autoproKey}`);
+        alert(`Key Auto-Pro (${durationLabel}) berhasil disiapkan untuk ${cleanEmail}.\nKarena user belum pernah login, ketika nanti user login pertama kali dengan email tersebut, sistem akan mendeteksi key ini secara otomatis dan menjadikannya PRO!\nSerial Key: ${autoproKey}${emailSentMessage}`);
       }
 
       setAutoProEmail('');

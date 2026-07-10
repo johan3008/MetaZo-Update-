@@ -1688,7 +1688,6 @@ const App: React.FC = () => {
     
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribeUser = onSnapshot(userDocRef, (snapshot) => {
-      setHasSyncedProfile(true);
       if (snapshot.exists()) {
         const data = snapshot.data();
         
@@ -1704,6 +1703,7 @@ const App: React.FC = () => {
                 });
           localStorage.removeItem('mz_license_key');
           localStorage.setItem('mz_cancelled_subscription', 'true');
+          setHasSyncedProfile(true);
         } else {
           const activeKey = cloudKey || localKey || '';
           
@@ -1721,7 +1721,16 @@ const App: React.FC = () => {
                 licenseKey: activeKey,
                 cancelledSubscription: false,
                 updatedAt: new Date().toISOString()
-              }, { merge: true }).catch(e => console.info('db_op', e));
+              }, { merge: true })
+              .then(() => {
+                setHasSyncedProfile(true);
+              })
+              .catch(e => {
+                console.info('db_op', e);
+                setHasSyncedProfile(true);
+              });
+            } else {
+              setHasSyncedProfile(true);
             }
           } else {
             // Attempt to restore from keys collection if both cloud and local are empty
@@ -1738,12 +1747,20 @@ const App: React.FC = () => {
                   licenseKey: foundKey,
                   cancelledSubscription: false,
                   updatedAt: new Date().toISOString()
-              }, { merge: true }).catch(e => console.info('db_op', e));
+                }, { merge: true })
+                .then(() => {
+                  setHasSyncedProfile(true);
+                })
+                .catch(e => {
+                  console.info('db_op', e);
+                  setHasSyncedProfile(true);
+                });
               } else {
                 setMzLicenseKey((prev) => {
                   
                   return '';
                 });
+                setHasSyncedProfile(true);
               }
             });
           }
@@ -1929,10 +1946,15 @@ const App: React.FC = () => {
             settings: initialSettings,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-              }, { merge: true }).catch(err => {
-            console.info('db_op', err);
-            handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
-          });
+              }, { merge: true })
+              .then(() => {
+                setHasSyncedProfile(true);
+              })
+              .catch(err => {
+                console.info('db_op', err);
+                handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+                setHasSyncedProfile(true);
+              });
         };
 
         if (localKey) {
