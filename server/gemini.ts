@@ -3587,10 +3587,10 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
   const cacheKeyInput = `${image}_${tolerance}_${targetLanguageName}_${model || "default"}`;
   const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
 
-  if (qaCacheMap.has(cacheKey)) {
-    console.log(`[QA Cache] Hit for image quality check (key: ${cacheKey})`);
-    return qaCacheMap.get(cacheKey);
-  }
+  // if (qaCacheMap.has(cacheKey)) {
+  //   console.log(`[QA Cache] Hit for image quality check (key: ${cacheKey})`);
+  //   return qaCacheMap.get(cacheKey);
+  // }
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
@@ -3641,11 +3641,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
-5. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI):
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, tangan/kaki meliuk atau menyatu secara tidak logis, mata asimetris/juling, gigi berlebih, bentuk telinga abnormal.
-   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh, perspektif arsitektur patah atau melintir tidak masuk akal, bayangan tidak konsisten dengan sumber cahaya, pola berulang yang tiba-tiba terputus atau rusak.
-   - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details).
+5. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI TETAPI JANGAN TERLALU PARANOID):
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang secara SANGAT EXTREME (misal 7 jari), tangan/kaki meliuk atau menyatu secara sama sekali tidak masuk akal (alien-like), wajah yang benar-benar hancur. *Catatan: Jika asimetri atau detail jari sedikit kabur namun secara estetika keseluruhan (mood/lighting) masih sangat dramatis dan bisa dijual (commercially viable), JANGAN langsung menolak (FAIL). Berikan PASS.*
+   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text. *Catatan: Jika teks tersebut sangat kecil, blur di background, atau menyerupai tulisan tangan abstrak yang wajar, berikan PASS.*
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam.
+   - Polusi Visual AI & Tekstur Kulit: JANGAN menolak (FAIL) gambar hanya karena "tekstur kulit kurang pori-pori alami" (overly processed/waxy skin) JIKA gambar tersebut bergaya sinematik, dramatis, atau bernuansa fantasi. Loloskan jika estetika komersialnya secara umum bagus. Jangan menghukum gambar AI hanya karena terlihat "seperti AI" asalkan enak dilihat.
 
 6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
@@ -3702,6 +3702,13 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 - PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
 - FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
+
+---
+PENTING - HINDARI FALSE POSITIVES (JANGAN MENEBAK-NEBAK):
+Anda DILARANG KERAS menebak-nebak (guessing) atau berhalusinasi menemukan cacat yang sebenarnya tidak ada. Kurator Adobe Stock sering kali meloloskan gambar AI yang memiliki noise wajar, sedikit asimetri artistik, atau objek yang memang secara alami bentuknya abstrak/tidak beraturan (seperti cipratan air, bentuk awan, atau makanan abstrak).
+1. Jika Anda ragu apakah suatu bagian adalah "cacat AI" atau "memang bentuk aslinya begitu secara artistik", berikan "Benefit of the Doubt" dan loloskan (PASS).
+2. Jangan over-analyze atau over-penalize gambar yang secara estetika keseluruhan terlihat sangat bagus dan layak jual (commercially viable).
+3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai gambar yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
 
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
@@ -4335,11 +4342,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Flickering: Kedipan cahaya tidak stabil pada frame karena ketidaksamaan frekuensi lampu listrik dengan shutter speed kamera.
    - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
 
-6. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI):
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, tangan/kaki meliuk atau menyatu secara tidak logis, mata asimetris/juling, gigi berlebih, bentuk telinga abnormal.
-   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh, perspektif arsitektur patah atau melintir tidak masuk akal, bayangan tidak konsisten dengan sumber cahaya, pola berulang yang tiba-tiba terputus atau rusak.
-   - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details).
+6. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI TETAPI JANGAN TERLALU PARANOID):
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang secara SANGAT EXTREME (misal 7 jari), tangan/kaki meliuk atau menyatu secara sama sekali tidak masuk akal (alien-like), wajah yang benar-benar hancur. *Catatan: Jika asimetri atau detail jari sedikit kabur namun secara estetika keseluruhan (mood/lighting) masih sangat dramatis dan bisa dijual (commercially viable), JANGAN langsung menolak (FAIL). Berikan PASS.*
+   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text. *Catatan: Jika teks tersebut sangat kecil, blur di background, atau menyerupai tulisan tangan abstrak yang wajar, berikan PASS.*
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam.
+   - Polusi Visual AI & Tekstur Kulit: JANGAN menolak (FAIL) gambar hanya karena "tekstur kulit kurang pori-pori alami" (overly processed/waxy skin) JIKA gambar/video tersebut bergaya sinematik, dramatis, atau bernuansa fantasi. Loloskan jika estetika komersialnya secara umum bagus. Jangan menghukum konten AI hanya karena terlihat "seperti AI" asalkan enak dilihat.
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
@@ -4380,6 +4387,13 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 - PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
 - FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
+
+---
+PENTING - HINDARI FALSE POSITIVES (JANGAN MENEBAK-NEBAK):
+Anda DILARANG KERAS menebak-nebak (guessing) atau berhalusinasi menemukan cacat yang sebenarnya tidak ada. Kurator Adobe Stock sering kali meloloskan video AI atau rekaman yang memiliki noise wajar, sedikit guncangan artistik, atau objek yang memang secara alami bentuknya abstrak/tidak beraturan.
+1. Jika Anda ragu apakah suatu bagian adalah "cacat AI/kamera" atau "memang bentuk aslinya begitu secara artistik", berikan "Benefit of the Doubt" dan loloskan (PASS).
+2. Jangan over-analyze atau over-penalize video yang secara estetika keseluruhan terlihat sangat bagus dan layak jual (commercially viable).
+3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, jello effect parah, distorsi kamera parah, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai video yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
