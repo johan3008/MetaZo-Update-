@@ -1723,14 +1723,14 @@ const App: React.FC = () => {
                 updatedAt: new Date().toISOString()
               }, { merge: true })
               .then(() => {
-                setHasSyncedProfile(true);
+                // Defer: validator will set setHasSyncedProfile(true) when validation completes
               })
               .catch(e => {
                 console.info('db_op', e);
-                setHasSyncedProfile(true);
+                // In case of error, we can set true to avoid being stuck, but typically validator will run anyway.
               });
             } else {
-              setHasSyncedProfile(true);
+              // Defer: validator will set setHasSyncedProfile(true) when validation completes
             }
           } else {
             // Attempt to restore from keys collection if both cloud and local are empty
@@ -1749,11 +1749,10 @@ const App: React.FC = () => {
                   updatedAt: new Date().toISOString()
                 }, { merge: true })
                 .then(() => {
-                  setHasSyncedProfile(true);
+                  // Defer: validator will set setHasSyncedProfile(true)
                 })
                 .catch(e => {
                   console.info('db_op', e);
-                  setHasSyncedProfile(true);
                 });
               } else {
                 setMzLicenseKey((prev) => {
@@ -1948,12 +1947,16 @@ const App: React.FC = () => {
             updatedAt: new Date().toISOString()
               }, { merge: true })
               .then(() => {
-                setHasSyncedProfile(true);
+                if (!resolvedKey) {
+                  setHasSyncedProfile(true);
+                }
               })
               .catch(err => {
                 console.info('db_op', err);
                 handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
-                setHasSyncedProfile(true);
+                if (!resolvedKey) {
+                  setHasSyncedProfile(true);
+                }
               });
         };
 
@@ -2201,6 +2204,7 @@ const App: React.FC = () => {
       setIsMzLicensed(false);
       setSubDaysLeft(null);
       setIsCheckingLicense(false);
+      setHasSyncedProfile(true);
       return;
     }
 
@@ -2211,6 +2215,7 @@ const App: React.FC = () => {
       setIsMzLicensed(true);
       setSubDaysLeft(null);
       setIsCheckingLicense(false);
+      setHasSyncedProfile(true);
       return;
     }
 
@@ -2250,6 +2255,7 @@ const App: React.FC = () => {
         updateDoc(userRef, updates).catch(() => {});
       }
       setIsCheckingLicense(false);
+      setHasSyncedProfile(true);
       if (msg) alert(msg);
       
       refreshDailyCounts();
@@ -2290,6 +2296,7 @@ const App: React.FC = () => {
               if (ownerId && isEmail(ownerId)) {
                 setIsMzLicensed(false);
                 setIsCheckingLicense(false);
+                setHasSyncedProfile(true);
                 return;
               } else if (ownerId && ownerId !== devId) {
                 // Reject key if it belongs to another device
@@ -2338,6 +2345,7 @@ const App: React.FC = () => {
       })
       .finally(() => {
         setIsCheckingLicense(false);
+        setHasSyncedProfile(true);
       });
   }, [mzLicenseKey, user, isCheckingAuth]);
 
@@ -4276,13 +4284,14 @@ const App: React.FC = () => {
                 const userRef = doc(db, 'users', auth.currentUser.uid);
                 await updateDoc(userRef, { lastSeen: 0 }).catch(()=>console.info("onSignOut update error"));
               }
+              await signOut(auth);
               localStorage.removeItem('mz_license_key');
               localStorage.removeItem('mz_trial_start');
-              setMzLicenseKey((prev) => {
-                  
-                  return '';
-                });
-              await signOut(auth);
+              setMzLicenseKey('');
+              setIsMzLicensed(false);
+              setHasSyncedProfile(false);
+              setIsCheckingLicense(true);
+              setHasInitiallyLoaded(false);
             } catch (err) {
               console.error("Sign out error", err);
             }
