@@ -185,6 +185,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [activeWhatsAppKey, setActiveWhatsAppKey] = useState<string | null>(null);
   const [whatsAppPhone, setWhatsAppPhone] = useState('');
   const [autoProEmail, setAutoProEmail] = useState('');
+  const [autoProDuration, setAutoProDuration] = useState<'unlimited' | '30days'>('unlimited');
   const [isAutoProLoading, setIsAutoProLoading] = useState(false);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(() => {
     return localStorage.getItem('last_firestore_quota_error') === new Date().toDateString();
@@ -570,7 +571,29 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const handleDeleteKey = async (keyToDelete: string) => {
     setIsKeysLoading(true);
     try {
+      const keyObj = backendKeys.find(k => k.key === keyToDelete);
+      const email = keyObj?.activatedBy || keyObj?.firstActivatedBy;
+
       await deleteDoc(doc(db, 'keys', keyToDelete));
+
+      // Revoke user profile in real-time
+      if (email) {
+        try {
+          const qSnap = await getDocs(collection(db, 'users'));
+          qSnap.forEach((userDoc) => {
+            const uData = userDoc.data();
+            if (uData && uData.email && uData.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+              updateDoc(doc(db, 'users', userDoc.id), {
+                licenseKey: '',
+                updatedAt: new Date().toISOString()
+              }).catch(err => console.error("Error revoking user licence:", err));
+            }
+          });
+        } catch (e) {
+          console.warn('Could not revoke user doc during key deletion:', e);
+        }
+      }
+
       await fetchBackendKeys();
       alert(`Key ${keyToDelete} berhasil dihapus.`);
     } catch (err) {
@@ -596,12 +619,34 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const handleResetKey = async (keyToReset: string) => {
     setIsKeysLoading(true);
     try {
+      const keyObj = backendKeys.find(k => k.key === keyToReset);
+      const email = keyObj?.activatedBy || keyObj?.firstActivatedBy;
+
       await updateDoc(doc(db, 'keys', keyToReset), {
         activated: false,
         activatedBy: '',
         activatedAt: '',
         firstActivatedBy: ''
       });
+
+      // Revoke user profile in real-time
+      if (email) {
+        try {
+          const qSnap = await getDocs(collection(db, 'users'));
+          qSnap.forEach((userDoc) => {
+            const uData = userDoc.data();
+            if (uData && uData.email && uData.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+              updateDoc(doc(db, 'users', userDoc.id), {
+                licenseKey: '',
+                updatedAt: new Date().toISOString()
+              }).catch(err => console.error("Error revoking user licence:", err));
+            }
+          });
+        } catch (e) {
+          console.warn('Could not revoke user doc during key reset:', e);
+        }
+      }
+
       await fetchBackendKeys();
       alert(`Key ${keyToReset} berhasil direset.`);
     } catch (err) {
@@ -715,7 +760,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     try {
       // 1. Generate an autopro key based on the email to keep it tidy and unique
       const rawEmailPart = cleanEmail.replace(/[^A-Z0-9]/ig, '').toUpperCase().slice(0, 12);
-      const autoproKey = `MZPRO-AUTO-${rawEmailPart}`;
+      const suffix = autoProDuration === '30days' ? '30D' : 'LTD';
+      const autoproKey = `MZPRO-AUTO-${rawEmailPart}-${suffix}`;
 
       const keyData = {
         key: autoproKey,
@@ -723,7 +769,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         activatedBy: cleanEmail,
         firstActivatedBy: cleanEmail,
         activatedAt: new Date().toISOString(),
-        duration: 'unlimited',
+        duration: autoProDuration,
         createdAt: new Date().toISOString()
       };
 
@@ -741,6 +787,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         }
       });
 
+      const durationLabel = autoProDuration === '30days' ? '30 Hari' : 'Unlimited / Lifetime';
+
       if (foundUserDocId) {
         // Update user profile to activate this auto-pro key
         await updateDoc(doc(db, 'users', foundUserDocId), {
@@ -748,9 +796,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
           cancelledSubscription: false,
           updatedAt: new Date().toISOString()
         });
-        alert(`Sukses! Akun ${cleanEmail} telah berhasil di-upgrade menjadi PRO secara otomatis.\nSerial Key: ${autoproKey}`);
+        alert(`Sukses! Akun ${cleanEmail} telah berhasil di-upgrade menjadi PRO (${durationLabel}) secara otomatis.\nSerial Key: ${autoproKey}`);
       } else {
-        alert(`Key Auto-Pro berhasil disiapkan untuk ${cleanEmail}.\nKarena user belum pernah login, ketika nanti user login pertama kali dengan email tersebut, sistem akan mendeteksi key ini secara otomatis dan menjadikannya PRO!\nSerial Key: ${autoproKey}`);
+        alert(`Key Auto-Pro (${durationLabel}) berhasil disiapkan untuk ${cleanEmail}.\nKarena user belum pernah login, ketika nanti user login pertama kali dengan email tersebut, sistem akan mendeteksi key ini secara otomatis dan menjadikannya PRO!\nSerial Key: ${autoproKey}`);
       }
 
       setAutoProEmail('');
@@ -2209,9 +2257,9 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                     <span className="text-[10px] font-black uppercase tracking-wider">⚡ INSTANT AUTO PRO ACTIVATOR (EMAIL-BASED)</span>
                   </div>
                   <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                    Ubah status akun email menjadi PRO secara instan dan otomatis tanpa perlu memasukkan key manual. Cukup ketik email pengguna di bawah ini untuk mengaktifkan Auto-Pro!
+                    Ubah status akun email menjadi PRO secara instan dan otomatis tanpa perlu memasukkan key manual. Cukup ketik email pengguna dan pilih durasi di bawah ini untuk mengaktifkan Auto-Pro!
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="email"
                       placeholder="Ketik email akun pengguna (contoh: user@gmail.com)..."
@@ -2219,6 +2267,16 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                       onChange={(e) => setAutoProEmail(e.target.value)}
                       className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-emerald-500 text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
                     />
+                    <div className="w-full sm:w-28 shrink-0">
+                      <select
+                        value={autoProDuration}
+                        onChange={(e) => setAutoProDuration(e.target.value as '30days' | 'unlimited')}
+                        className="w-full h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-2 py-1.5 font-bold text-xs outline-none text-slate-800 dark:text-slate-100 cursor-pointer"
+                      >
+                        <option value="unlimited">Unlimited</option>
+                        <option value="30days">30 Hari</option>
+                      </select>
+                    </div>
                     <button
                       type="button"
                       onClick={handleSetAutoPro}
