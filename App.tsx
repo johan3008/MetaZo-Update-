@@ -2671,52 +2671,16 @@ const App: React.FC = () => {
     });
   };
 
-    const handleSaveKey = () => {
-    let finalGemini = [...geminiKeysList];
-    if (newGeminiKey.trim() && !finalGemini.includes(newGeminiKey.trim())) finalGemini.push(newGeminiKey.trim());
-    const cleanGemini = finalGemini.map(k => k.trim()).filter(Boolean);
-
-    let finalGroq = [...groqKeysList];
-    if (newGroqKey.trim() && !finalGroq.includes(newGroqKey.trim())) finalGroq.push(newGroqKey.trim());
-    const cleanGroq = finalGroq.map(k => k.trim()).filter(Boolean);
-
-    let finalMistral = [...mistralKeysList];
-    if (newMistralKey.trim() && !finalMistral.includes(newMistralKey.trim())) finalMistral.push(newMistralKey.trim());
-    const cleanMistral = finalMistral.map(k => k.trim()).filter(Boolean);
-
-    let finalOpenai = [...openaiKeysList];
-    if (newOpenaiKey.trim() && !finalOpenai.includes(newOpenaiKey.trim())) finalOpenai.push(newOpenaiKey.trim());
-    const cleanOpenai = finalOpenai.map(k => k.trim()).filter(Boolean);
-
-    let finalOpenrouter = [...openrouterKeysList];
-    if (newOpenrouterKey.trim() && !finalOpenrouter.includes(newOpenrouterKey.trim())) finalOpenrouter.push(newOpenrouterKey.trim());
-    const cleanOpenrouter = finalOpenrouter.map(k => k.trim()).filter(Boolean);
-
-    let finalBlackbox = [...blackboxKeysList];
-    if (newBlackboxKey.trim() && !finalBlackbox.includes(newBlackboxKey.trim())) finalBlackbox.push(newBlackboxKey.trim());
-    const cleanBlackbox = finalBlackbox.map(k => k.trim()).filter(Boolean);
-
-    let finalNvidia = [...nvidiaKeysList];
-    if (newNvidiaKey.trim() && !finalNvidia.includes(newNvidiaKey.trim())) finalNvidia.push(newNvidiaKey.trim());
-    const cleanNvidia = finalNvidia.map(k => k.trim()).filter(Boolean);
-
-    let finalBluesminds = [...bluesmindsKeysList];
-    if (newBluesmindsKey.trim() && !finalBluesminds.includes(newBluesmindsKey.trim())) finalBluesminds.push(newBluesmindsKey.trim());
-    const cleanBluesminds = finalBluesminds.map(k => k.trim()).filter(Boolean);
-
-    let finalAivene = [...aiveneKeysList];
-    if (newAiveneKey.trim() && !finalAivene.includes(newAiveneKey.trim())) finalAivene.push(newAiveneKey.trim());
-    const cleanAivene = finalAivene.map(k => k.trim()).filter(Boolean);
-
-    if (newGeminiKey.trim()) { setGeminiKeysList(finalGemini); setNewGeminiKey(''); }
-    if (newGroqKey.trim()) { setGroqKeysList(finalGroq); setNewGroqKey(''); }
-    if (newMistralKey.trim()) { setMistralKeysList(finalMistral); setNewMistralKey(''); }
-    if (newOpenaiKey.trim()) { setOpenaiKeysList(finalOpenai); setNewOpenaiKey(''); }
-    if (newOpenrouterKey.trim()) { setOpenrouterKeysList(finalOpenrouter); setNewOpenrouterKey(''); }
-    if (newBlackboxKey.trim()) { setBlackboxKeysList(finalBlackbox); setNewBlackboxKey(''); }
-    if (newNvidiaKey.trim()) { setNvidiaKeysList(finalNvidia); setNewNvidiaKey(''); }
-    if (newBluesmindsKey.trim()) { setBluesmindsKeysList(finalBluesminds); setNewBluesmindsKey(''); }
-    if (newAiveneKey.trim()) { setAiveneKeysList(finalAivene); setNewAiveneKey(''); }
+  const handleSaveKey = () => {
+    const cleanGemini = geminiKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanGroq = groqKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanMistral = mistralKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanOpenai = openaiKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanOpenrouter = openrouterKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanBlackbox = blackboxKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanNvidia = nvidiaKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanBluesminds = bluesmindsKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanAivene = aiveneKeysList.map(k => k.trim()).filter(Boolean);
 
     if (cleanGemini.length > 0) {
       localStorage.setItem('gemini_api_key', cleanGemini.join(','));
@@ -6114,7 +6078,11 @@ const App: React.FC = () => {
                 </button>
               )}
               <button 
-                onClick={handleSaveKey} 
+                type="button"
+                onClick={() => {
+                  handleSaveKey();
+                  setShowSettingsModal(false);
+                }}
                 className="flex-1 py-1.5 bg-[#7c3aed] hover:bg-violet-600 text-white font-bold rounded-[1.5rem] text-xs uppercase shadow transition-colors"
               >
                 Simpan & Pasang
