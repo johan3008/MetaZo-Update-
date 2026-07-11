@@ -1667,22 +1667,32 @@ const App: React.FC = () => {
     const findActiveKeyForEmail = async (email: string): Promise<string> => {
       if (!email) return '';
       const keysRef = collection(db, 'keys');
-      try {
-        const q1 = query(keysRef, where('activatedBy', '==', email), where('activated', '==', true));
-        const qSnap1 = await getDocs(q1);
-        if (!qSnap1.empty) {
-          return qSnap1.docs[0].id;
+      const emailLower = email.toLowerCase();
+      const emailCap = emailLower.charAt(0).toUpperCase() + emailLower.slice(1);
+      
+      const checkEmail = async (targetEmail: string) => {
+        try {
+          const qSnap = await getDocs(query(keysRef, where('activatedBy', '==', targetEmail), where('activated', '==', true)));
+          if (!qSnap.empty) return qSnap.docs[0].id;
+        } catch (err) {
+          console.warn('Error querying keys collection:', err);
         }
-        if (email.toLowerCase() !== email) {
-          const q2 = query(keysRef, where('activatedBy', '==', email.toLowerCase()), where('activated', '==', true));
-          const qSnap2 = await getDocs(q2);
-          if (!qSnap2.empty) {
-            return qSnap2.docs[0].id;
-          }
-        }
-      } catch (err) {
-        console.warn('Error querying keys collection:', err);
+        return '';
+      };
+
+      let found = await checkEmail(email);
+      if (found) return found;
+      
+      if (emailLower !== email) {
+        found = await checkEmail(emailLower);
+        if (found) return found;
       }
+      
+      if (emailCap !== email && emailCap !== emailLower) {
+        found = await checkEmail(emailCap);
+        if (found) return found;
+      }
+      
       return '';
     };
     
