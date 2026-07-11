@@ -381,318 +381,134 @@ function saveEmulatedTable(table: string, list: any[]) {
 
 // --- DATABASE FUNCTIONS ---
 export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> {
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from(docRef.table)
-        .select('*')
-        .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-        .single();
-      if (!error || error.code === 'PGRST116') {
-        let resultData = data || null;
-        
-        // Merge with emulated data so local fallback updates (like activation) are respected
-        const list = getEmulatedTable(docRef.table);
-        const found = list.find(row => (row.key === docRef.id || row.id === docRef.id));
-        
-        if (found) {
-          resultData = { ...(resultData || {}), ...found };
-          // Deep merge 'settings' to prevent wiping out other fields during optimistic updates
-          if (data && data.settings && found.settings) {
-            resultData.settings = { ...data.settings, ...found.settings };
-          }
-        }
-        
-        return new DocumentSnapshot(docRef.id, resultData);
-      }
-      throw error;
-    } catch (e) {
-      console.warn(`[Supabase] getDoc failed with error, falling back to Local Storage:`, e);
-    }
+  if (!supabase) throw new Error("Supabase is not initialized. Check your environment variables.");
+  const { data, error } = await supabase
+    .from(docRef.table)
+    .select('*')
+    .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+    .single();
+  if (error && error.code !== 'PGRST116') {
+    console.error('[Supabase] getDoc error:', error);
+    throw error;
   }
-
-  const list = getEmulatedTable(docRef.table);
-  const found = list.find(row => (row.key === docRef.id || row.id === docRef.id));
-  return new DocumentSnapshot(docRef.id, found || null);
+  return new DocumentSnapshot(docRef.id, data || null);
 }
 
 export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merge?: boolean }): Promise<void> {
+  if (!supabase) throw new Error("Supabase is not initialized.");
   const processedData = { ...(data || {}) };
   if (docRef.table === 'keys') {
     processedData.key = docRef.id;
   } else {
     processedData.id = docRef.id;
   }
-  if (supabase) {
-    try {
-      const { error } = await supabase.from(docRef.table).upsert(processedData);
-      if (!error) return;
-      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] setDoc error, falling back:', error); }
-    } catch (e) {
-      console.warn('[Supabase] setDoc exception, falling back:', e);
-    }
-  }
-  const list = getEmulatedTable(docRef.table);
-  const index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
-  if (index >= 0) {
-    list[index] = options?.merge ? { ...list[index], ...processedData } : processedData;
-  } else {
-    list.push(processedData);
-  }
-  saveEmulatedTable(docRef.table, list);
+  
+  const { error } = await supabase.from(docRef.table).upsert(processedData);
+  if (error) throw error;
 }
 
 export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void> {
-  let topLevelUpdates: any = { ...data };
+  if (!supabase) throw new Error("Supabase is not initialized.");
+  let topLevelUpdates: any = {};
+  
+  // Flatten dotted keys
   const hasDottedKeys = Object.keys(data).some(k => k.includes('.'));
-  
-  // 1. Immediately update local cache for optimistic UI (shallow/partial)
-  let list = getEmulatedTable(docRef.table);
-  let index = list.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
-  let currentLocalData = index >= 0 ? list[index] : {};
-  
-  const applyValue = (obj, key, val) => {
-    if (val && typeof val === 'object' && (val as any).__deleteField) {
-      delete obj[key];
-    } else {
-      obj[key] = val;
-    }
-  };
-
   if (hasDottedKeys) {
-    topLevelUpdates = {};
-    const resultData = { ...currentLocalData };
-    for (const [key, value] of Object.entries(data)) {
-      if (key.includes('.')) {
-        const parts = key.split('.');
-        let topKey = parts[0];
-        let current = resultData;
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
-          else current[parts[i]] = { ...current[parts[i]] };
-          current = current[parts[i]];
-        }
-        applyValue(current, parts[parts.length - 1], value);
-        topLevelUpdates[topKey] = resultData[topKey];
-      } else {
-        applyValue(resultData, key, value);
-        if (value && typeof value === 'object' && (value as any).__deleteField) {
-          // If top level field is deleted, we just omit it from topLevelUpdates if we don't want it,
-          // but we actually want the remote DB to delete it too.
-          topLevelUpdates[key] = null; 
+    const { data: currentData } = await supabase
+      .from(docRef.table)
+      .select('*')
+      .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+      .single();
+      
+    if (currentData) {
+      let mergedData = { ...currentData };
+      for (const [key, value] of Object.entries(data)) {
+        if (key.includes('.')) {
+          const parts = key.split('.');
+          let topKey = parts[0];
+          let current = mergedData;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
+            current = current[parts[i]];
+          }
+          current[parts[parts.length - 1]] = value;
+          topLevelUpdates[topKey] = mergedData[topKey];
         } else {
           topLevelUpdates[key] = value;
         }
       }
+    } else {
+      topLevelUpdates = { ...data };
     }
   } else {
-    for (const [key, value] of Object.entries(data)) {
-      if (value && typeof value === 'object' && (value as any).__deleteField) {
-         delete topLevelUpdates[key];
-         if (index >= 0) delete list[index][key];
-         topLevelUpdates[key] = null; // for supabase nullifies it
-      }
+    topLevelUpdates = { ...data };
+  }
+
+  // Remove deleteField
+  for (const [key, value] of Object.entries(topLevelUpdates)) {
+    if (value && typeof value === 'object' && (value as any).__deleteField) {
+      topLevelUpdates[key] = null;
     }
   }
-  
-  if (index >= 0) {
-    list[index] = { ...list[index], ...topLevelUpdates };
-  } else {
-    list.push({ id: docRef.id, ...topLevelUpdates });
-  }
-  saveEmulatedTable(docRef.table, list);
 
-  // 2. Then do the actual DB update
-  if (supabase) {
-    try {
-      let finalUpdates = topLevelUpdates;
-      let fullDbData = null;
-      // Re-evaluate with latest DB state to avoid overwriting other fields
-      if (hasDottedKeys) {
-        const { data: snapData } = await supabase
-          .from(docRef.table)
-          .select('*')
-          .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-          .single();
-          
-        if (snapData) {
-           fullDbData = { ...snapData };
-           let dbResultData = { ...snapData };
-           let dbTopLevelUpdates: any = {};
-           for (const [key, value] of Object.entries(data)) {
-              if (key.includes('.')) {
-                const parts = key.split('.');
-                let current = dbResultData;
-                let topKey = parts[0];
-                for (let i = 0; i < parts.length - 1; i++) {
-                  if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
-                  else current[parts[i]] = { ...current[parts[i]] };
-                  current = current[parts[i]];
-                }
-                current[parts[parts.length - 1]] = value;
-                dbTopLevelUpdates[topKey] = dbResultData[topKey];
-              } else {
-                dbResultData[key] = value;
-                dbTopLevelUpdates[key] = value;
-              }
-            }
-            finalUpdates = dbTopLevelUpdates;
-            fullDbData = { ...fullDbData, ...finalUpdates };
-        }
-      }
-
-      console.log('[Supabase] About to update:', docRef.table, docRef.id, finalUpdates);
-      const { data: resData, error } = await supabase
-        .from(docRef.table)
-        .update(finalUpdates)
-        .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-        .select();
-      console.log('[Supabase] Update result:', resData, error);
-      
-      // Update local emulation again with full data from DB to heal any partial updates
-      if (fullDbData || (resData && resData.length > 0)) {
-        const correctData = fullDbData || resData[0];
-        let newList = getEmulatedTable(docRef.table);
-        let newIdx = newList.findIndex(row => (row.key === docRef.id || row.id === docRef.id));
-        if (newIdx >= 0) {
-          newList[newIdx] = { ...newList[newIdx], ...correctData };
-        } else {
-          newList.push(correctData);
-        }
-        saveEmulatedTable(docRef.table, newList);
-      }
-      
-      if (!error && resData && resData.length > 0) return;
-    } catch (e) {
-      console.warn(`[Supabase] updateDoc failed with error:`, e);
-    }
-  }
+  const { error } = await supabase
+    .from(docRef.table)
+    .update(topLevelUpdates)
+    .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
+    
+  if (error) throw error;
 }
 
 export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
-  // Always update local emulation as a cache
-  const list = getEmulatedTable(docRef.table);
-  const filtered = list.filter(row => (row.key !== docRef.id && row.id !== docRef.id));
-  saveEmulatedTable(docRef.table, filtered);
-
-  if (supabase) {
-    try {
-      const { error } = await supabase
-        .from(docRef.table)
-        .delete()
-        .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
-      if (!error) return;
-      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] deleteDoc error, falling back:', error); }
-    } catch (e) {
-      console.warn('[Supabase] deleteDoc exception, falling back:', e);
-    }
-  }
+  if (!supabase) throw new Error("Supabase is not initialized.");
+  const { error } = await supabase
+    .from(docRef.table)
+    .delete()
+    .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
+  if (error) throw error;
 }
 
 export async function addDoc(collectionRef: SupabaseCollectionRef, data: any): Promise<SupabaseDocRef> {
+  if (!supabase) throw new Error("Supabase is not initialized.");
   const generatedId = 'gen-' + Math.random().toString(36).substring(2, 9);
   const processedData = { ...data, id: generatedId };
   if (collectionRef.parentId) {
     processedData.uid = collectionRef.parentId;
   }
-  if (supabase) {
-    try {
-      const { error } = await supabase.from(collectionRef.table).insert(processedData);
-      if (!error) return new SupabaseDocRef(collectionRef.table, generatedId);
-      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] addDoc error, falling back:', error); }
-    } catch (e) {
-      console.warn('[Supabase] addDoc exception, falling back:', e);
-    }
-  }
-  const list = getEmulatedTable(collectionRef.table);
-  list.push(processedData);
-  saveEmulatedTable(collectionRef.table, list);
+  const { error } = await supabase.from(collectionRef.table).insert(processedData);
+  if (error) throw error;
   return new SupabaseDocRef(collectionRef.table, generatedId);
 }
 
 export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
+  if (!supabase) throw new Error("Supabase is not initialized.");
   const table = refOrQuery.table;
   const parentId = refOrQuery.parentId;
   const constraints = refOrQuery instanceof SupabaseQuery ? refOrQuery.constraints : [];
-  if (supabase) {
-    try {
-      let q: any = supabase.from(table).select('*');
-      if (parentId) q = q.eq('uid', parentId);
-      for (const c of constraints) {
-        if (!c) continue;
-        if (c.type === 'where') {
-          const { field, operator, value } = c;
-          if (operator === '==') q = q.eq(field, value);
-          else if (operator === '!=') q = q.neq(field, value);
-          else if (operator === '>') q = q.gt(field, value);
-          else if (operator === '>=') q = q.gte(field, value);
-          else if (operator === '<') q = q.lt(field, value);
-          else if (operator === '<=') q = q.lte(field, value);
-        } else if (c.type === 'orderBy') {
-          const { field, direction } = c;
-          q = q.order(field, { ascending: direction === 'asc' });
-        } else if (c.type === 'limit') {
-          q = q.limit(c.value);
-        }
-      }
-      const { data, error } = await q;
-      if (!error) {
-        // Merge with emulated data to prevent data loss if fallback occurred
-        const emulated = getEmulatedTable(table);
-        const combined = [...(data || [])];
-        const existingIds = new Map(combined.map((r, i) => [r.key || r.id, i]));
-        for (const row of emulated) {
-          const id = row.key || row.id;
-          if (!existingIds.has(id)) {
-            combined.push(row);
-          } else {
-            const index = existingIds.get(id)!;
-            combined[index] = { ...combined[index], ...row };
-          }
-        }
-        const docs = combined.map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
-        return new QuerySnapshot(docs);
-      }
-      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === 'PGRST116')) {} else { console.warn('[Supabase] getDocs error, falling back:', error); }
-    } catch (e) {
-      console.warn('[Supabase] getDocs exception, falling back:', e);
-    }
-  }
   
-  let list = getEmulatedTable(table);
-  if (parentId) list = list.filter(row => row.uid === parentId);
+  let q: any = supabase.from(table).select('*');
+  if (parentId) q = q.eq('uid', parentId);
   for (const c of constraints) {
     if (!c) continue;
     if (c.type === 'where') {
       const { field, operator, value } = c;
-      list = list.filter(row => {
-        const v = row[field];
-        if (operator === '==') return v === value;
-        if (operator === '!=') return v !== value;
-        if (operator === '>') return v > value;
-        if (operator === '>=') return v >= value;
-        if (operator === '<') return v < value;
-        if (operator === '<=') return v <= value;
-        return true;
-      });
+      if (operator === '==') q = q.eq(field, value);
+      else if (operator === '!=') q = q.neq(field, value);
+      else if (operator === '>') q = q.gt(field, value);
+      else if (operator === '>=') q = q.gte(field, value);
+      else if (operator === '<') q = q.lt(field, value);
+      else if (operator === '<=') q = q.lte(field, value);
+    } else if (c.type === 'orderBy') {
+      const { field, direction } = c;
+      q = q.order(field, { ascending: direction === 'asc' });
+    } else if (c.type === 'limit') {
+      q = q.limit(c.value);
     }
   }
-  const orderByConstraint = constraints.find(c => c && c.type === 'orderBy');
-  if (orderByConstraint) {
-    const { field, direction } = orderByConstraint;
-    list.sort((a, b) => {
-      const valA = a[field];
-      const valB = b[field];
-      if (valA === undefined) return 1;
-      if (valB === undefined) return -1;
-      if (valA < valB) return direction === 'asc' ? -1 : 1;
-      if (valA > valB) return direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }
-  const limitConstraint = constraints.find(c => c && c.type === 'limit');
-  if (limitConstraint) list = list.slice(0, limitConstraint.value);
-  const docs = list.map(row => new DocumentSnapshot(row.key || row.id || '', row));
+  const { data, error } = await q;
+  if (error) throw error;
+  
+  const docs = (data || []).map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
   return new QuerySnapshot(docs);
 }
 
