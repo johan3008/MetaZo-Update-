@@ -3712,11 +3712,11 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
-Kurator Adobe Stock dan pembeli premium sangat membenci gambar AI yang terlihat bagus sekilas namun cacat saat di-zoom. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
-1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama (seperti: tombol keyboard, senar/mekanisme instrumen atau busur, bentuk mata/jari, roda kendaraan, tulisan/layar). JANGAN NGAWUR dan jangan abaikan detail.
-2. JIKA ANDA MENEMUKAN KECACATAN SEKECIL APA PUN pada mekanika, teks (gibberish/alien), anatomi (meleleh/menyatu), atau elemen IP, Anda WAJIB MENGGAGALKANNYA (FAIL).
-3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat arsitektur/mekanis/teks pada subjek utama. Kegagalan rendering = FAIL. Ceritakan proses deteksi cacat Anda di visual_scan_analysis dengan jujur dan tajam.
+PENTING - PRIORITASKAN KETELITIAN VISUAL SECARA OBJEKTIF DAN LOGIS:
+Kurator Adobe Stock dan pembeli premium menghargai gambar yang berkualitas. Anda WAJIB bertindak sebagai auditor visual yang realistis, objektif, dan seperti manusia sungguhan.
+1. EVALUASI REALISTIS: Lakukan evaluasi secara wajar. JANGAN MENGARANG atau MENEBAK-NEBAK (hallucinate) cacat yang sebenarnya tidak ada. Jika gambar terlihat nyata dan bagus, berikan PASS.
+2. JANGAN HALU (NO HALLUCINATIONS): Jangan mengatakan objek menghilang, menyatu, atau memiliki teks kacau HANYA karena Anda mencurigai ini adalah AI. Buktikan hanya dari apa yang benar-benar terlihat di piksel gambar. Jika tidak ada bukti cacat di gambar, jangan buat-buat alasan penolakan!
+3. TOLERANSI WAJAR UNTUK KUALITAS: Jika sebuah karya terlihat sangat estetik dan tidak memiliki kejanggalan visual yang merusak komposisi secara nyata, karya tersebut layak lulus (PASS).
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
@@ -4398,11 +4398,11 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
-Kurator Adobe Stock dan pembeli premium sangat membenci video AI yang terlihat bagus sekilas namun cacat atau tidak logis secara struktural/mekanis. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
-1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama di setiap frame (tombol keyboard, senar/busur, bentuk jari, teks di layar, roda, dll). JANGAN NGAWUR dan jangan abaikan detail!
-2. DETEKSI KECACATAN AKTIF: Jika bentuk benda "meleleh" (morphing), teks berupa gibberish, anggota tubuh menyatu (hallucination), atau ada kegagalan mekanis, Anda WAJIB MENGGAGALKANNYA (FAIL). 
-3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat anatomi, teks kacau, distorsi kamera aneh, atau objek meleleh di subjek utama. Kegagalan rendering AI = FAIL MUTLAK. Jangan ragu memberikan FAIL. Ceritakan temuan spesifik Anda secara rinci di visual_scan_analysis!
+PENTING - PRIORITASKAN KETELITIAN VISUAL SECARA OBJEKTIF DAN LOGIS:
+Kurator Adobe Stock dan pembeli premium menghargai video yang berkualitas. Anda WAJIB bertindak sebagai auditor visual yang realistis, objektif, dan seperti manusia sungguhan.
+1. EVALUASI REALISTIS: Lakukan evaluasi secara wajar pada frame yang diberikan. JANGAN MENGARANG atau MENEBAK-NEBAK (hallucinate) cacat yang sebenarnya tidak ada.
+2. JANGAN HALU TENTANG KONSISTENSI (NO HALLUCINATIONS): Jangan mengatakan "objek menghilang" atau "kegagalan logika struktural" secara sembarangan. Buktikan HANYA jika cacatnya 100% nyata dan terlihat secara visual (misalnya ada bagian tubuh yang benar-benar hilang/terpotong). Jika tidak ada bukti cacat visual yang nyata di frame tersebut, jangan buat-buat alasan penolakan!
+3. TOLERANSI WAJAR: Jika video terlihat estetik dan tidak ada kejanggalan visual yang merusak komposisi secara fatal, video tersebut layak lulus (PASS).
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
 
