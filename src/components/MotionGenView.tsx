@@ -195,32 +195,32 @@ export const MotionComposition = () => {
                     <div className="flex flex-col gap-2">
                         <button 
                             onClick={() => setRenderMode('worker-gpu')}
-                            className={\`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors \${renderMode === 'worker-gpu' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}\`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'worker-gpu' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
                         >
                             <Server className="w-4 h-4" /> 
                             <div className="text-left flex-1">
                                 <div>Worker GPU (FFmpeg)</div>
-                                <div className={\`text-[10px] font-normal \${renderMode === 'worker-gpu' ? 'text-indigo-200' : 'text-gray-500'}\`}>Background Render. Kualitas Tertinggi.</div>
+                                <div className={`text-[10px] font-normal ${renderMode === 'worker-gpu' ? 'text-indigo-200' : 'text-gray-500'}`}>Background Render. Kualitas Tertinggi.</div>
                             </div>
                         </button>
                         <button 
                             onClick={() => setRenderMode('gpu-ui')}
-                            className={\`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors \${renderMode === 'gpu-ui' ? 'bg-fuchsia-600 border-fuchsia-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}\`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'gpu-ui' ? 'bg-fuchsia-600 border-fuchsia-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
                         >
                             <Cpu className="w-4 h-4" />
                             <div className="text-left flex-1">
                                 <div>GPU UI (Main Thread)</div>
-                                <div className={\`text-[10px] font-normal \${renderMode === 'gpu-ui' ? 'text-fuchsia-200' : 'text-gray-500'}\`}>Cepat untuk UI presisi (DOM to Image).</div>
+                                <div className={`text-[10px] font-normal ${renderMode === 'gpu-ui' ? 'text-fuchsia-200' : 'text-gray-500'}`}>Cepat untuk UI presisi (DOM to Image).</div>
                             </div>
                         </button>
                         <button 
                             onClick={() => setRenderMode('media-recorder')}
-                            className={\`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors \${renderMode === 'media-recorder' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}\`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'media-recorder' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
                         >
                             <Video className="w-4 h-4" />
                             <div className="text-left flex-1">
                                 <div>Media Recorder</div>
-                                <div className={\`text-[10px] font-normal \${renderMode === 'media-recorder' ? 'text-emerald-200' : 'text-gray-500'}\`}>Real-time screen capture. Paling instan.</div>
+                                <div className={`text-[10px] font-normal ${renderMode === 'media-recorder' ? 'text-emerald-200' : 'text-gray-500'}`}>Real-time screen capture. Paling instan.</div>
                             </div>
                         </button>
                     </div>
