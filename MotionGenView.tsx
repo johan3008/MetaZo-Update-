@@ -183,7 +183,7 @@ export const MotionComposition = () => {
                                 className="w-full bg-[#222] border border-[#444] rounded p-2 text-white text-sm"
                                 value={durationSeconds}
                                 onChange={(e) => setDurationSeconds(Number(e.target.value))}
-                            >
+                            
                                 {Array.from({ length: 12 }, (_, i) => (i + 1) * 5).map(sec => (
                                     <option key={sec} value={sec}>{sec} Detik</option>
                                 ))}
@@ -201,7 +201,7 @@ export const MotionComposition = () => {
                         <button 
                             onClick={() => setRenderMode('worker-gpu')}
                             className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'worker-gpu' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
-                        >
+                        
                             <Server className="w-4 h-4" /> 
                             <div className="text-left flex-1">
                                 <div>Worker GPU (FFmpeg)</div>
