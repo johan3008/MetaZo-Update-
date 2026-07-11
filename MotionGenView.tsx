@@ -23,7 +23,7 @@ export const MotionComposition = () => {
   
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-      <div style={{ opacity, transform: \`scale(\${scale})\`, padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
+      <div style={{ opacity, transform: `scale(${scale})`, padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
         SUBSCRIBE
       </div>
     </div>
@@ -255,7 +255,7 @@ export const MotionComposition = () => {
                 
                 <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
                     {/* Mengatur rasio kontainer */}
-                    <div style={{ aspectRatio: `\${width}/\${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
+                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
                         <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} />
                     </div>
                 </div>
@@ -277,7 +277,7 @@ export const MotionComposition = () => {
                             <div className="h-3 w-full bg-[#222] rounded-full overflow-hidden">
                                 <div 
                                     className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 ease-out"
-                                    style={{ width: `\${renderProgress.progressPercentage}%` }}
+                                    style={{ width: `${renderProgress.progressPercentage}%` }}
                                 ></div>
                             </div>
                             
