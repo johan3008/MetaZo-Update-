@@ -2,11 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Player } from '@remotion/player';
 import { Code, Settings, Download, Copy, Type, Monitor, Cpu, Server, Video, Loader2, CheckCircle2, SlidersHorizontal } from 'lucide-react';
 import { LiveRemotionRunner } from './remotion/LiveRemotionRunner';
-import { useAuth } from '../context/AuthContext';
 import { RenderMode, RenderProgress, startMotionRender } from '../utils/motionRenderHelper';
 
 export function MotionGenView() {
-    const { currentUser } = useAuth();
     const [renderMode, setRenderMode] = useState<RenderMode>('media-recorder');
     const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
     const [isRendering, setIsRendering] = useState(false);
@@ -257,7 +255,7 @@ export const MotionComposition = () => {
                 
                 <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
                     {/* Mengatur rasio kontainer */}
-                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
+                    <div style={{ aspectRatio: \`${width}/${height}\`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
                         <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} />
                     </div>
                 </div>
@@ -279,7 +277,7 @@ export const MotionComposition = () => {
                             <div className="h-3 w-full bg-[#222] rounded-full overflow-hidden">
                                 <div 
                                     className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 ease-out"
-                                    style={{ width: `${renderProgress.progressPercentage}%` }}
+                                    style={{ width: \`${renderProgress.progressPercentage}%\` }}
                                 ></div>
                             </div>
                             
