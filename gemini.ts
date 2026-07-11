@@ -1523,7 +1523,7 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES (DOMINATE SEARCH ALGORITHMS):
 - DOMINATE SEARCH ALGORITHMS: You must aggressively optimize the title and keywords to dominate search algorithms. Use the highest-converting, most frequently searched commercial terms by actual buyers.
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
 - SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!`;
+- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
@@ -3712,12 +3712,11 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA:
-Kurator Adobe Stock dan pembeli premium sangat membenci gambar AI yang terlihat bagus sekilas namun cacat saat di-zoom.
-1. ZOOM IN MENTAL: Periksa objek utama (tombol keyboard, senar gitar/busur panah, tulisan di layar/buku, anatomi jari). Jika bentuknya "meleleh" (melted), gibberish, tidak teratur, atau secara mekanis/struktural gagal total, Anda WAJIB MENGGAGALKANNYA (FAIL).
-2. Teks gibberish (huruf acak yang tidak terbaca) pada objek fokus = FAIL.
-3. Anda boleh memberikan "Benefit of the Doubt" untuk noise artistik, blur (bokeh) yang logis, atau objek abstrak (seperti awan/cipratan air), TETAPI cacat bentuk arsitektur/mekanis/teks pada subjek utama TIDAK BISA DITOLERANSI.
-
+PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
+Kurator Adobe Stock dan pembeli premium sangat membenci gambar AI yang terlihat bagus sekilas namun cacat saat di-zoom. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
+1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama (seperti: tombol keyboard, senar/mekanisme instrumen atau busur, bentuk mata/jari, roda kendaraan, tulisan/layar). JANGAN NGAWUR dan jangan abaikan detail.
+2. JIKA ANDA MENEMUKAN KECACATAN SEKECIL APA PUN pada mekanika, teks (gibberish/alien), anatomi (meleleh/menyatu), atau elemen IP, Anda WAJIB MENGGAGALKANNYA (FAIL).
+3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat arsitektur/mekanis/teks pada subjek utama. Kegagalan rendering = FAIL. Ceritakan proses deteksi cacat Anda di visual_scan_analysis dengan jujur dan tajam.
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
@@ -4399,13 +4398,11 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA:
-Kurator Adobe Stock dan pembeli premium sangat membenci video AI yang terlihat bagus sekilas namun cacat atau tidak logis secara struktural/mekanis.
-1. ZOOM IN MENTAL: Periksa objek utama (tombol keyboard, senar gitar/busur panah, tulisan di layar/buku, anatomi jari). Jika bentuknya "meleleh" (melted), gibberish, tidak teratur, atau secara mekanis gagal total, Anda WAJIB MENGGAGALKANNYA (FAIL).
-2. Teks gibberish (huruf acak yang tidak terbaca) pada objek fokus utama = FAIL.
-3. Anda boleh memberikan "Benefit of the Doubt" untuk guncangan kamera dramatis atau motion blur yang relevan, TETAPI cacat bentuk arsitektur/mekanis/teks pada subjek utama TIDAK BISA DITOLERANSI.
-3. Hanya berikan status FAIL jika cacat anatomi, teks kacau, jello effect parah, distorsi kamera parah, atau pelanggaran IP benar-benar 100% NYATA, MENCOLOK, dan TIDAK BISA DIPERDEBATKAN (indisputable). Jangan sampai video yang seharusnya diterima (Approve) di Adobe Stock malah Anda tolak di sini karena analisis yang terlalu mengada-ada.
-
+PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
+Kurator Adobe Stock dan pembeli premium sangat membenci video AI yang terlihat bagus sekilas namun cacat atau tidak logis secara struktural/mekanis. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
+1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama di setiap frame (tombol keyboard, senar/busur, bentuk jari, teks di layar, roda, dll). JANGAN NGAWUR dan jangan abaikan detail!
+2. DETEKSI KECACATAN AKTIF: Jika bentuk benda "meleleh" (morphing), teks berupa gibberish, anggota tubuh menyatu (hallucination), atau ada kegagalan mekanis, Anda WAJIB MENGGAGALKANNYA (FAIL). 
+3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat anatomi, teks kacau, distorsi kamera aneh, atau objek meleleh di subjek utama. Kegagalan rendering AI = FAIL MUTLAK. Jangan ragu memberikan FAIL. Ceritakan temuan spesifik Anda secara rinci di visual_scan_analysis!
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
 

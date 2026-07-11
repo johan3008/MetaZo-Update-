@@ -1697,69 +1697,41 @@ const App: React.FC = () => {
         const cancelled = (data.cancelledSubscription === true && !cloudKey && !localKey) || (data.cancelledSubscription !== false && localStorage.getItem('mz_cancelled_subscription') === 'true' && !cloudKey && !localKey);
 
         if (cancelled) {
-          setMzLicenseKey((prev) => {
-                  
-                  return '';
-                });
+          setMzLicenseKey(() => '');
           localStorage.removeItem('mz_license_key');
           localStorage.setItem('mz_cancelled_subscription', 'true');
           setHasSyncedProfile(true);
         } else {
-          const activeKey = cloudKey || localKey || '';
-          
-          if (activeKey) {
-            setMzLicenseKey((prev) => {
+          const processKey = (activeKey: string) => {
+            if (activeKey) {
+              setMzLicenseKey(() => activeKey);
+              setIsCheckingLicense(true);
+              localStorage.setItem('mz_license_key', activeKey);
+              localStorage.removeItem('mz_cancelled_subscription');
               
-              return activeKey;
-            });
-            setIsCheckingLicense(true);
-            localStorage.setItem('mz_license_key', activeKey);
-            localStorage.removeItem('mz_cancelled_subscription');
-            
-            if (cloudKey !== activeKey || data.cancelledSubscription) {
-              setDoc(userDocRef, {
-                licenseKey: activeKey,
-                cancelledSubscription: false,
-                updatedAt: new Date().toISOString()
-              }, { merge: true })
-              .then(() => {
-                // Defer: validator will set setHasSyncedProfile(true) when validation completes
-              })
-              .catch(e => {
-                console.info('db_op', e);
-                // In case of error, we can set true to avoid being stuck, but typically validator will run anyway.
-              });
-            } else {
-              // Defer: validator will set setHasSyncedProfile(true) when validation completes
-            }
-          } else {
-            // Attempt to restore from keys collection if both cloud and local are empty
-            findActiveKeyForEmail(user.email || '').then((foundKey) => {
-              if (foundKey) {
-                setMzLicenseKey((prev) => {
-                  
-                  return foundKey;
-                });
-                setIsCheckingLicense(true);
-                localStorage.setItem('mz_license_key', foundKey);
-                localStorage.removeItem('mz_cancelled_subscription');
+              if (cloudKey !== activeKey || data.cancelledSubscription) {
                 setDoc(userDocRef, {
-                  licenseKey: foundKey,
+                  licenseKey: activeKey,
                   cancelledSubscription: false,
                   updatedAt: new Date().toISOString()
-                }, { merge: true })
-                .then(() => {
-                  // Defer: validator will set setHasSyncedProfile(true)
-                })
-                .catch(e => {
-                  console.info('db_op', e);
-                });
+                }, { merge: true }).catch(e => console.info('db_op', e));
+              }
+            } else {
+              setMzLicenseKey(() => '');
+              setHasSyncedProfile(true);
+            }
+          };
+
+          if (cloudKey) {
+            processKey(cloudKey);
+          } else {
+            // cloudKey is empty. A reseller might have just assigned a key to this email!
+            // Priority: Cloud Email Key > Local Cached Key
+            findActiveKeyForEmail(user.email || '').then((foundKey) => {
+              if (foundKey) {
+                processKey(foundKey);
               } else {
-                setMzLicenseKey((prev) => {
-                  
-                  return '';
-                });
-                setHasSyncedProfile(true);
+                processKey(localKey);
               }
             });
           }
