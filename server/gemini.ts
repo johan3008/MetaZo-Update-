@@ -1523,7 +1523,7 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES (DOMINATE SEARCH ALGORITHMS):
 - DOMINATE SEARCH ALGORITHMS: You must aggressively optimize the title and keywords to dominate search algorithms. Use the highest-converting, most frequently searched commercial terms by actual buyers.
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
 - SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!`;
+- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
