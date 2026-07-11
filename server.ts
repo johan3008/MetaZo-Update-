@@ -25,7 +25,8 @@ import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { createRequire } from 'module';
-const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
+const getMetaUrl = () => { try { return new Function('return import.meta.url')(); } catch (e) { return 'file://'; } };
+const _require = typeof require !== 'undefined' ? require : createRequire(getMetaUrl());
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
 // Vercel NFT hack to include binaries
 
@@ -84,9 +85,7 @@ const gsQueue = new AsyncQueue();
 // ESM to CJS compatibility for paths
 const __filename_safe = typeof __filename !== 'undefined' 
     ? __filename 
-    : (typeof import.meta !== 'undefined' && import.meta.url 
-        ? fileURLToPath(import.meta.url) 
-        : '');
+    : (getMetaUrl() !== 'file://' ? fileURLToPath(getMetaUrl()) : '');
 
 const __dirname_safe = typeof __dirname !== 'undefined' 
     ? __dirname 
