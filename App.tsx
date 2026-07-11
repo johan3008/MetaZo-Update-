@@ -26,6 +26,7 @@ import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
+import { MotionGenView } from './src/components/MotionGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -1308,8 +1309,8 @@ const App: React.FC = () => {
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
   const [isMzLicensedState, setIsMzLicensed] = useState(() => { const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase(); return !!k; });
+  const isMzLicensed = isMzLicensedState || !!mzLicenseKey;
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
-  const isMzLicensed = isMzLicensedState;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -4423,6 +4424,8 @@ const App: React.FC = () => {
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
             />
+          ) : activeTool === ToolType.MOTION_GEN ? (
+            <MotionGenView />
           ) : (
             <>
               {/* Welcome Intro Row */}
