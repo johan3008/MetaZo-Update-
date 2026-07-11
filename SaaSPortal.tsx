@@ -561,8 +561,10 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await setDoc(doc(db, 'keys', newKey), keyData);
       }
       await fetchBackendKeys();
+      alert(`Berhasil membuat ${generatedCount} kunci lisensi baru ke Supabase!`);
     } catch (err: any) {
-      console.warn('Failed to generate keys in database, falling back:', err);
+      console.warn('Failed to generate keys in database:', err);
+      alert('GAGAL menyimpan ke Supabase: ' + err.message + '\n\nPastikan VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY sudah disetting dengan benar!');
     } finally {
       setIsKeysLoading(false);
     }
