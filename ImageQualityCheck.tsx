@@ -41,6 +41,7 @@ interface QualityReport {
       text?: { status: "PASS" | "FAIL"; note: string };
       anatomical_errors?: { status: "PASS" | "FAIL"; note: string };
       ip_risk?: { status: "PASS" | "FAIL"; note: string };
+      proportion_defects?: { status: "PASS" | "FAIL"; note: string };
       stock_acceptance?: { status: "PASS" | "FAIL"; note: string };
       metadata?: { title: string; keywords: string[] };
     };
