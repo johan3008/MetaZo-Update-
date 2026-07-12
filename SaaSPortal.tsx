@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getDailyLimit } from '../../constants';
+import { getDailyLimit } from './constants';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
   Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, handleFirestoreError, OperationType, doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc, onSnapshot } from '../supabase';
+import { db, handleFirestoreError, OperationType, doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc, onSnapshot } from './supabase';
 
 interface SaaSPortalProps {
   // Brand States
