@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Player } from '@remotion/player';
 import * as Babel from '@babel/standalone';
+import * as Remotion from 'remotion';
 
 interface LiveRemotionRunnerProps {
     code: string;
@@ -22,8 +23,8 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height 
             }).code;
             
             const requireMock = (moduleName: string) => {
-                if (moduleName === 'react') return require('react');
-                if (moduleName === 'remotion') return require('remotion');
+                if (moduleName === 'react') return React;
+                if (moduleName === 'remotion') return Remotion;
                 throw new Error(`Module ${moduleName} is not supported in Live Editor`);
             };
 
