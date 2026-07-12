@@ -23,7 +23,7 @@ export const MotionComposition = () => {
   
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-      <div style={{ opacity, transform: `scale(${scale})`, padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
+      <div style={{ opacity, transform: 'scale(' + scale + ')', padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
         SUBSCRIBE
       </div>
     </div>
