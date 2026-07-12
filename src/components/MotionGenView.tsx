@@ -2,11 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Player } from '@remotion/player';
 import { Code, Settings, Download, Copy, Type, Monitor, Cpu, Server, Video, Loader2, CheckCircle2, SlidersHorizontal } from 'lucide-react';
 import { LiveRemotionRunner } from './remotion/LiveRemotionRunner';
-import { useAuth } from '../context/AuthContext';
 import { RenderMode, RenderProgress, startMotionRender } from '../utils/motionRenderHelper';
 
 export function MotionGenView() {
-    const { currentUser } = useAuth();
     const [renderMode, setRenderMode] = useState<RenderMode>('media-recorder');
     const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
     const [isRendering, setIsRendering] = useState(false);
@@ -25,7 +23,7 @@ export const MotionComposition = () => {
   
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-      <div style={{ opacity, transform: \`scale(\${scale})\`, padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
+      <div style={{ opacity, transform: `scale(${scale})`, padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
         SUBSCRIBE
       </div>
     </div>
@@ -77,11 +75,18 @@ export const MotionComposition = () => {
         );
         
         if (resultUrl && renderProgress?.status !== 'error') {
+            // Trigger automatic download
+            const a = document.createElement('a');
+            a.href = resultUrl;
+            a.download = `MotionGen_${resolution}_${fps}fps_${Date.now()}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
             setTimeout(() => {
-                alert("Simulasi Render Berhasil! File akan tersimpan sebagai: " + resultUrl);
                 setIsRendering(false);
                 setRenderProgress(null);
-            }, 1500);
+            }, 1000);
         } else {
             setIsRendering(false);
             setRenderProgress(null);
@@ -250,7 +255,7 @@ export const MotionComposition = () => {
                 
                 <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
                     {/* Mengatur rasio kontainer */}
-                    <div style={{ aspectRatio: \`\${width}/\${height}\`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
+                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
                         <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} />
                     </div>
                 </div>
@@ -272,7 +277,7 @@ export const MotionComposition = () => {
                             <div className="h-3 w-full bg-[#222] rounded-full overflow-hidden">
                                 <div 
                                     className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 ease-out"
-                                    style={{ width: \`\${renderProgress.progressPercentage}%\` }}
+                                    style={{ width: `${renderProgress.progressPercentage}%` }}
                                 ></div>
                             </div>
                             
