@@ -9,33 +9,7 @@ import crypto from "node:crypto";
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
-const CACHE_FILE_PATH = path.join(process.cwd(), "qa_reports_cache.json");
-let qaCacheMap: Map<string, any> = new Map();
 
-function loadQACache() {
-  try {
-    if (fs.existsSync(CACHE_FILE_PATH)) {
-      const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
-      const obj = JSON.parse(content);
-      qaCacheMap = new Map(Object.entries(obj));
-      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached reports successfully.`);
-    }
-  } catch (err) {
-    console.warn("[QA Cache] Error loading cache file, starting fresh:", err);
-  }
-}
-
-function saveQACache() {
-  try {
-    const obj = Object.fromEntries(qaCacheMap.entries());
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("[QA Cache] Error saving cache file:", err);
-  }
-}
-
-// Initialize cache load
-loadQACache();
 
 // Load environment variables dynamically from local .env file
 try {
@@ -3590,14 +3564,7 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  // Deterministic quality check cache lookup
-  const cacheKeyInput = `${image}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
 
-  // if (qaCacheMap.has(cacheKey)) {
-  //   console.log(`[QA Cache] Hit for image quality check (key: ${cacheKey})`);
-  //   return qaCacheMap.get(cacheKey);
-  // }
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
@@ -4268,12 +4235,6 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
-
-  // Quality check deterministic cache lookup
-  const framesDataCombined = Array.isArray(frames) ? frames.join('') : String(frames);
-  const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
-
 
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
