@@ -1276,9 +1276,10 @@ export const ImageQualityCheck: React.FC<{
                                   </div>
 
                                   {/* Dual Columns: FFmpeg vs AI Vision */}
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                  <div className={`grid grid-cols-1 ${isVideo ? 'lg:grid-cols-2' : ''} gap-4`}>
                                     
                                     {/* Column 1: FFmpeg Quality Checks */}
+                                    {isVideo && (
                                     <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-5 rounded-2xl space-y-4">
                                       <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/5 pb-2">
                                         <h4 className="text-xs font-black uppercase tracking-wider text-violet-600 dark:text-violet-400">
@@ -1365,6 +1366,7 @@ export const ImageQualityCheck: React.FC<{
                                         );
                                       })()}
                                     </div>
+                                    )}
 
                                     {/* Column 2: AI Vision Curator Checks */}
                                     <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-5 rounded-2xl space-y-4">

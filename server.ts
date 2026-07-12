@@ -1794,26 +1794,6 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 return res.status(400).json({ error: 'Missing image data or fileUrl' });
             }
 
-            // 2. Perform FFmpeg + FFprobe analysis
-            console.log('Server check-image-quality: Running FFmpeg analysis...');
-            let ffmpegStats;
-            try {
-                ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
-            } catch (ffErr: any) {
-                console.warn('[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:', ffErr);
-                ffmpegStats = {
-                    resolution: "Estimated from file structure",
-                    color_space: "sRGB (Standard)",
-                    histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
-                    brightness: { value: 50, status: "Optimal (Estimated by AI)" },
-                    contrast: { value: 50, status: "Normal (Estimated by AI)" },
-                    sharpness: { value: 50, status: "Normal (Estimated by AI)" },
-                    noise: { value: 5, status: "Low Noise / Clean" },
-                    file_validation: "Valid (Passed Structure Integrity Check)",
-                    file_size_kb: fs.existsSync(tempFilePath) ? Math.round(fs.statSync(tempFilePath).size / 1024) : 1024
-                };
-            }
-
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
             const aiVisionStats = await checkImageQuality(imageBase64, tolerance, language, model, fileType);
@@ -1823,7 +1803,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             // Combine results while ensuring backward compatibility
             const combinedReport = {
                 ...aiVisionStats,
-                ffmpeg: ffmpegStats,
+                ffmpeg: null,
                 ai_vision: aiVisionStats
             };
             
