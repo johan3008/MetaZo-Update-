@@ -4,9 +4,9 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX
+  Calendar, CreditCard, Info, Receipt, VolumeX, Monitor
 } from 'lucide-react';
-import { ToolType, GenerationMode, toolToPath } from '../../types';
+import { ToolType, GenerationMode, toolToPath } from '@/types';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-base" }) => {
   const chars = name.split('');
