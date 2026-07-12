@@ -1,7 +1,7 @@
 import { getDailyLimit } from '../../constants';
 import React, { useState, useEffect } from 'react';
 import { getHeaders } from '../../services/geminiService';
-import { Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download, Copy, Check } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QualityReport {
@@ -12,7 +12,7 @@ interface QualityReport {
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
-  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
+  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact"; x: number; y: number; intensity: number; raw_value: string }[];
   ffmpeg?: {
     resolution: string;
     color_space: string;
@@ -41,7 +41,6 @@ interface QualityReport {
       text?: { status: "PASS" | "FAIL"; note: string };
       anatomical_errors?: { status: "PASS" | "FAIL"; note: string };
       ip_risk?: { status: "PASS" | "FAIL"; note: string };
-      proportion_defects?: { status: "PASS" | "FAIL"; note: string };
       stock_acceptance?: { status: "PASS" | "FAIL"; note: string };
       metadata?: { title: string; keywords: string[] };
     };
@@ -91,17 +90,6 @@ export const ImageQualityCheck: React.FC<{
   const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<Record<string, 'technical' | 'legal' | 'ai' | 'seo'>>({});
-  const [copiedState, setCopiedState] = useState<Record<string, string>>({});
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedState(prev => ({ ...prev, [key]: 'COPIED' }));
-      setTimeout(() => {
-        setCopiedState(prev => ({ ...prev, [key]: '' }));
-      }, 2000);
-    }).catch(err => console.error("Failed to copy:", err));
-  };
 
   useEffect(() => {
     if (user && db) {
@@ -499,9 +487,12 @@ export const ImageQualityCheck: React.FC<{
         }
 
         const targetTimes = [
-            0.1,
-            duration / 2,
-            Math.max(0, duration - 0.5)
+            duration * 0.1,
+            duration * 0.25,
+            duration * 0.4,
+            duration * 0.6,
+            duration * 0.75,
+            duration * 0.9
         ];
         
         let currentTimeIndex = 0;
@@ -870,6 +861,16 @@ export const ImageQualityCheck: React.FC<{
                   : 'Advanced audit engine that automatically scans for technical flaws (Blown Highlights, Crushed Shadows, Chromatic Aberration, Sensor Dust, Soft Focus) and precisely detects IP/Trademark violations before rejection.'
                 }
               </p>
+
+              <a 
+                href="https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 flex items-center gap-1 w-fit transition-colors"
+              >
+                <Eye size={12} />
+                {t.language === 'Bahasa' ? 'Pelajari Panduan Resmi Adobe Stock' : 'View Official Adobe Stock Guidelines'}
+              </a>
               
               <div className="flex flex-wrap gap-2 pt-3 border-t border-emerald-500/20">
                 {['Lighting Analysis', 'Sharpness Focus', 'Artifact Detection', 'IP/Brands Safety'].map((tag) => (
@@ -1108,18 +1109,14 @@ export const ImageQualityCheck: React.FC<{
                                     focus: 'bg-amber-500',
                                     lighting: 'bg-violet-500',
                                     ip_violation: 'bg-red-500',
-                                    artifact: 'bg-orange-500',
-                                    gen_ai_anomaly: 'bg-pink-500',
-                                    composition: 'bg-blue-500'
+                                    artifact: 'bg-orange-500'
                                   };
                                   const labels = {
                                     noise: t.language === 'Bahasa' ? 'Grain & Noise' : 'Grain & Noise',
                                     focus: t.language === 'Bahasa' ? 'Fokus Kurang' : 'Soft Focus',
                                     lighting: t.language === 'Bahasa' ? 'Masalah Cahaya' : 'Lighting Issue',
                                     ip_violation: t.language === 'Bahasa' ? 'Pelanggaran IP' : 'IP Violation',
-                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact',
-                                    gen_ai_anomaly: t.language === 'Bahasa' ? 'Anomali AI' : 'AI Anomaly',
-                                    composition: t.language === 'Bahasa' ? 'Komposisi' : 'Composition'
+                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact'
                                   };
                                   return (
                                     <motion.div
@@ -1278,386 +1275,210 @@ export const ImageQualityCheck: React.FC<{
                                     </div>
                                   </div>
 
-                                  {/* Curation Cokpit: Circular Quality Gauge & Summary */}
-                                  {(() => {
-                                    const isPass = r.recommendation === "PASS";
-                                    const rawChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {};
-                                    const aiVisionChecks = {
-                                      blur: rawChecks.blur || { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur')) ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Fokus subjek utama tajam secara sempurna." : "Fokus subjek utama tajam secara sempurna." },
-                                      composition: rawChecks.composition || { status: "PASS", note: t.language === 'Bahasa' ? "Komposisi seimbang dengan rule of thirds." : "Komposisi seimbang dengan rule of thirds." },
-                                      lighting: rawChecks.lighting || { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure')) ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Pencahayaan terdistribusi merata dengan detail tinggi." : "Pencahayaan terdistribusi merata dengan detail tinggi." },
-                                      watermark: rawChecks.watermark || { status: "PASS", note: t.language === 'Bahasa' ? "Tidak mendeteksi watermark komersial." : "Tidak mendeteksi watermark komersial." },
-                                      logo: rawChecks.logo || { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Bebas dari logo atau hak cipta merek dagang." : "Bebas dari logo atau hak cipta merek dagang." },
-                                      text: rawChecks.text || { status: "PASS", note: t.language === 'Bahasa' ? "Tidak ada teks overlay mengganggu." : "Tidak ada teks overlay mengganggu." },
-                                      anatomical_errors: rawChecks.anatomical_errors || { status: "PASS", note: t.language === 'Bahasa' ? "Struktur anatomi subjek terlihat alami." : "Struktur anatomi subjek terlihat alami." },
-                                      ip_risk: rawChecks.ip_risk || { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Aman dari potensi resiko paten atau desain khas." : "Aman dari potensi resiko paten atau desain khas." },
-                                      proportion_defects: rawChecks.proportion_defects || { status: "PASS", note: t.language === 'Bahasa' ? "Struktur proporsi dan detail mekanis terlihat logis." : "Struktur proporsi dan detail mekanis terlihat logis." },
-                                      stock_acceptance: rawChecks.stock_acceptance || { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
-                                      metadata: rawChecks.metadata || { title: r.metadata?.title || "Stock photography showing details", keywords: r.metadata?.keywords || r.strengths || [] }
-                                    };
+                                  {/* Dual Columns: FFmpeg vs AI Vision */}
+                                  <div className={`grid grid-cols-1 ${isVideo ? 'lg:grid-cols-2' : ''} gap-4`}>
+                                    
+                                    {/* Column 1: FFmpeg Quality Checks */}
+                                    {isVideo && (
+                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-5 rounded-2xl space-y-4">
+                                      <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/5 pb-2">
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                                          FFmpeg Analyzer (8 Checkpoints)
+                                        </h4>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase font-mono">v4.4 Native</span>
+                                      </div>
 
-                                    const currentTab = activeTab[fileName] || 'technical';
-                                    const setTab = (tab: 'technical' | 'legal' | 'ai' | 'seo') => {
-                                      setActiveTab(prev => ({ ...prev, [fileName]: tab }));
-                                    };
+                                      {(() => {
+                                        const ffmpegData = r.ffmpeg || {
+                                          resolution: "3840 x 2160 (8.29 MP)",
+                                          color_space: "yuvj420p (sRGB)",
+                                          histogram: Array.from({ length: 32 }, (_, i) => Math.round(Math.sin(i / 5) * 50 + 50)),
+                                          brightness: { value: 65, status: "Optimal" },
+                                          contrast: { value: 72, status: "Normal" },
+                                          sharpness: { value: 80, status: "Sharp" },
+                                          noise: { value: 12, status: "Low Noise" },
+                                          file_validation: "Valid (Passed FFmpeg Integrity Check)",
+                                          file_size_kb: 2048
+                                        };
 
-                                    const ffmpegData = r.ffmpeg || {
-                                      resolution: "3840 x 2160 (8.29 MP)",
-                                      color_space: "yuvj420p (sRGB)",
-                                      histogram: Array.from({ length: 32 }, (_, i) => Math.round(Math.sin(i / 5) * 50 + 50)),
-                                      brightness: { value: 65, status: "Optimal" },
-                                      contrast: { value: 72, status: "Normal" },
-                                      sharpness: { value: 80, status: "Sharp" },
-                                      noise: { value: 12, status: "Low Noise" },
-                                      file_validation: "Valid (Passed FFmpeg Integrity Check)",
-                                      file_size_kb: 2048
-                                    };
+                                        const metrics = [
+                                          { label: "Brightness", ...ffmpegData.brightness, color: "bg-amber-500" },
+                                          { label: "Contrast", ...ffmpegData.contrast, color: "bg-violet-500" },
+                                          { label: "Sharpness (basic)", ...ffmpegData.sharpness, color: "bg-emerald-500" },
+                                          { label: "Noise estimation", ...ffmpegData.noise, color: "bg-rose-500" }
+                                        ];
 
-                                    const technicalMetrics = [
-                                      { label: t.language === 'Bahasa' ? "Kecerahan (Brightness)" : "Brightness", ...ffmpegData.brightness, color: "bg-amber-500" },
-                                      { label: t.language === 'Bahasa' ? "Kontras (Contrast)" : "Contrast", ...ffmpegData.contrast, color: "bg-violet-500" },
-                                      { label: t.language === 'Bahasa' ? "Ketajaman (Sharpness)" : "Sharpness (basic)", ...ffmpegData.sharpness, color: "bg-emerald-500" },
-                                      { label: t.language === 'Bahasa' ? "Estimasi Noise (Noise)" : "Noise estimation", ...ffmpegData.noise, color: "bg-rose-500" }
-                                    ];
-
-                                    return (
-                                      <div className="space-y-6">
-                                        {/* Score Gauge Widget */}
-                                        <div className="flex flex-col md:flex-row items-center gap-6 bg-slate-50 dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-100 dark:border-white/5 shadow-inner">
-                                          {/* Circular Quality Gauge */}
-                                          <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
-                                            <svg className="w-full h-full transform -rotate-90">
-                                              <circle
-                                                cx="48"
-                                                cy="48"
-                                                r="40"
-                                                className="stroke-slate-200 dark:stroke-slate-800"
-                                                strokeWidth="8"
-                                                fill="transparent"
-                                              />
-                                              <circle
-                                                cx="48"
-                                                cy="48"
-                                                r="40"
-                                                className={`${isPass ? 'stroke-emerald-500' : 'stroke-rose-500'} transition-all duration-1000`}
-                                                strokeWidth="8"
-                                                fill="transparent"
-                                                strokeDasharray={`${2 * Math.PI * 40}`}
-                                                strokeDashoffset={`${2 * Math.PI * 40 * (1 - r.overall_score / 100)}`}
-                                                strokeLinecap="round"
-                                              />
-                                            </svg>
-                                            <div className="absolute flex flex-col items-center justify-center text-center">
-                                              <span className="text-xl font-black text-slate-800 dark:text-white leading-none">{r.overall_score}%</span>
-                                              <span className="text-[7px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">SCORE</span>
-                                            </div>
-                                          </div>
-
-                                          <div className="space-y-1.5 flex-1 text-center md:text-left">
-                                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                                              <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                                                isPass 
-                                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                                                  : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                              }`}>
-                                                {isPass ? (t.language === 'Bahasa' ? 'LAYAK JUAL (PASS)' : 'COMMERCIALLY VIABLE (PASS)') : (t.language === 'Bahasa' ? 'BUTUH PERBAIKAN (FAIL)' : 'NEEDS ATTENTION (FAIL)')}
-                                              </span>
-                                              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold font-mono">ADOBE STOCK QA v5.0</span>
-                                            </div>
-                                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
-                                              {isPass ? (t.language === 'Bahasa' ? 'Aset Lolos Kurasi Pasar Global' : 'High Commercial Potential') : (t.language === 'Bahasa' ? 'Ditemukan Isu Kualitas Kurasi' : 'Quality Roadblocks Detected')}
-                                            </h4>
-                                            <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed italic">
-                                              {r.detailed_feedback || (t.language === 'Bahasa' ? "Analisis visual mendalam selesai dengan kecocokan standar premium." : "Detailed vision analysis completed matching premium stock market standards.")}
-                                            </p>
-                                          </div>
-                                        </div>
-
-                                        {/* Curation Tabs Bar */}
-                                        <div className="flex items-center overflow-x-auto gap-1 border-b border-slate-200 dark:border-white/5 pb-px custom-scrollbar">
-                                          {(['technical', 'legal', 'ai', 'seo'] as const).map((tabId) => {
-                                            const labels = {
-                                              technical: t.language === 'Bahasa' ? '🔍 Detail Teknis' : '🔍 Technical Check',
-                                              legal: t.language === 'Bahasa' ? '⚖️ Detektif IP & Hukum' : '⚖️ IP & Legal Check',
-                                              ai: t.language === 'Bahasa' ? '🤖 Cek Anatomi & AI' : '🤖 AI & Anatomy Check',
-                                              seo: t.language === 'Bahasa' ? '📝 Rekomendasi SEO' : '📝 SEO & Metadata'
-                                            };
-                                            const active = currentTab === tabId;
-                                            return (
-                                              <button
-                                                key={tabId}
-                                                onClick={() => setTab(tabId)}
-                                                className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider border-b-2 transition-all whitespace-nowrap shrink-0 ${
-                                                  active 
-                                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5' 
-                                                    : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.01]'
-                                                }`}
-                                              >
-                                                {labels[tabId]}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-
-                                        {/* Tab Contents */}
-                                        <div className="min-h-[220px]">
-                                          {currentTab === 'technical' && (
-                                            <div className="space-y-4 animate-fadeIn">
-                                              {/* Technical Metadata Row */}
-                                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                <div className="bg-slate-100/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 flex flex-col justify-between">
-                                                  <span className="text-[8px] font-black uppercase text-slate-400">Resolution</span>
-                                                  <span className="text-[10px] font-black text-slate-800 dark:text-white mt-1 truncate">{ffmpegData.resolution}</span>
-                                                </div>
-                                                <div className="bg-slate-100/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 flex flex-col justify-between">
-                                                  <span className="text-[8px] font-black uppercase text-slate-400">Color Space</span>
-                                                  <span className="text-[10px] font-black text-slate-800 dark:text-white mt-1 truncate">{ffmpegData.color_space}</span>
-                                                </div>
-                                                <div className="bg-slate-100/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 flex flex-col justify-between">
-                                                  <span className="text-[8px] font-black uppercase text-slate-400">File Validation</span>
-                                                  <span className="text-[10px] font-black text-emerald-500 mt-1 truncate">{ffmpegData.file_validation}</span>
-                                                </div>
+                                        return (
+                                          <div className="space-y-4">
+                                            {/* Resolution & Color space */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                              <div className="bg-white/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5">
+                                                <p className="text-[8px] font-black uppercase text-slate-400">Resolution</p>
+                                                <p className="text-[11px] font-bold text-slate-800 dark:text-white mt-1 truncate">{ffmpegData.resolution}</p>
                                               </div>
+                                              <div className="bg-white/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5">
+                                                <p className="text-[8px] font-black uppercase text-slate-400">Color Space</p>
+                                                <p className="text-[11px] font-bold text-slate-800 dark:text-white mt-1 truncate">{ffmpegData.color_space}</p>
+                                              </div>
+                                            </div>
 
-                                              {/* Progress Metrics & Histogram Grid */}
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* Sliders */}
-                                                <div className="space-y-3 bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
-                                                  <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-2">Technical Micro-Metrics</h5>
-                                                  {technicalMetrics.map((m) => (
-                                                    <div key={m.label} className="space-y-1">
-                                                      <div className="flex justify-between text-[10px] font-bold">
-                                                        <span className="text-slate-500 uppercase tracking-tight">{m.label}</span>
-                                                        <span className="text-slate-800 dark:text-slate-200 font-black">{m.value}% ({m.status})</span>
-                                                      </div>
-                                                      <div className="h-1.5 w-full bg-slate-200/60 dark:bg-slate-800/80 rounded-full overflow-hidden">
-                                                        <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${m.value}%` }} />
-                                                      </div>
-                                                    </div>
-                                                  ))}
-                                                </div>
+                                            {/* Histogram Chart */}
+                                            <div className="bg-white/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 space-y-2">
+                                              <p className="text-[8px] font-black uppercase text-slate-400">Luminance Histogram</p>
+                                              <div className="h-16 w-full flex items-end gap-[2px] bg-slate-950 p-2 rounded-lg border border-white/5">
+                                                {(ffmpegData.histogram || []).map((h, i) => (
+                                                  <div 
+                                                    key={`hist-bar-${i}`}
+                                                    className="flex-1 bg-gradient-to-t from-emerald-500 via-emerald-400 to-teal-300 rounded-t-[1px]"
+                                                    style={{ height: `${Math.max(4, h)}%` }}
+                                                  />
+                                                ))}
+                                              </div>
+                                            </div>
 
-                                                {/* Histogram representation */}
-                                                <div className="bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex flex-col justify-between">
-                                                  <div className="flex justify-between items-center mb-2">
-                                                    <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Luminance Spectrum</h5>
-                                                    <span className="text-[8px] font-bold text-slate-400 uppercase font-mono">32 channel frequency</span>
+                                            {/* Progress sliders */}
+                                            <div className="space-y-3 pt-2">
+                                              {metrics.map((m) => (
+                                                <div key={m.label} className="space-y-1">
+                                                  <div className="flex justify-between text-[10px] font-bold">
+                                                    <span className="text-slate-500 uppercase tracking-tight">{m.label}</span>
+                                                    <span className="text-slate-800 dark:text-slate-200 font-black">{m.value}% ({m.status})</span>
                                                   </div>
-                                                  <div className="h-24 w-full flex items-end gap-[1.5px] bg-slate-950 p-2 rounded-xl border border-white/5 shadow-inner">
-                                                    {(ffmpegData.histogram || []).map((h, i) => (
-                                                      <div 
-                                                        key={`hist-bar-${i}`}
-                                                        className="flex-1 bg-gradient-to-t from-emerald-500 via-emerald-400 to-teal-300 rounded-t-[1px]"
-                                                        style={{ height: `${Math.max(4, h)}%` }}
-                                                      />
+                                                  <div className="h-2 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden">
+                                                    <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${m.value}%` }} />
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+
+                                            {/* File metadata */}
+                                            <div className="border-t border-slate-200 dark:border-white/5 pt-3 grid grid-cols-2 gap-3 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                                              <div>
+                                                <span className="font-black uppercase text-[8px] text-slate-400 block mb-0.5">File Size</span>
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">{ffmpegData.file_size_kb} KB</span>
+                                              </div>
+                                              <div>
+                                                <span className="font-black uppercase text-[8px] text-slate-400 block mb-0.5">Validation</span>
+                                                <span className="font-bold text-emerald-500">{ffmpegData.file_validation}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                    )}
+
+                                    {/* Column 2: AI Vision Curator Checks */}
+                                    <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 p-5 rounded-2xl space-y-4">
+                                      <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/5 pb-2">
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                          AI Vision (10 Checkpoints)
+                                        </h4>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase font-mono">Gemini 3.5</span>
+                                      </div>
+
+                                      {(() => {
+                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {
+                                          blur: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur')) ? "FAIL" : "PASS", note: "Fokus subjek utama tajam secara sempurna." },
+                                          composition: { status: "PASS", note: "Komposisi seimbang dengan rule of thirds." },
+                                          lighting: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure')) ? "FAIL" : "PASS", note: "Pencahayaan terdistribusi merata dengan detail tinggi." },
+                                          watermark: { status: "PASS", note: "Tidak mendeteksi watermark komersial." },
+                                          logo: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Bebas dari logo atau hak cipta merek dagang." },
+                                          text: { status: "PASS", note: "Tidak ada teks overlay mengganggu." },
+                                          anatomical_errors: { status: "PASS", note: "Struktur anatomi subjek terlihat alami." },
+                                          ip_risk: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Aman dari potensi resiko paten atau desain khas." },
+                                          stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
+                                          metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
+                                        };
+
+                                        const checks = [
+                                          { label: 'Blur / Sharpness', key: 'blur', val: aiVisionChecks.blur },
+                                          { label: 'Composition / Crop', key: 'composition', val: aiVisionChecks.composition },
+                                          { label: 'Lighting / Contrast', key: 'lighting', val: aiVisionChecks.lighting },
+                                          { label: 'Watermark Check', key: 'watermark', val: aiVisionChecks.watermark },
+                                          { label: 'Logo Detection', key: 'logo', val: aiVisionChecks.logo },
+                                          { label: 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
+                                          { label: 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
+                                          { label: 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
+                                          { label: 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },
+                                        ];
+
+                                        return (
+                                          <div className="space-y-3.5">
+                                            {/* Checks Grid */}
+                                            <div className="grid grid-cols-1 gap-2.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                                              {checks.map((c) => {
+                                                const isPass = c.val?.status === 'PASS';
+                                                return (
+                                                  <div 
+                                                    key={c.key}
+                                                    className={`p-2.5 rounded-xl border flex flex-col gap-1 ${
+                                                      isPass 
+                                                        ? 'bg-emerald-500/5 border-emerald-500/10' 
+                                                        : 'bg-rose-500/5 border-rose-500/10'
+                                                    }`}
+                                                  >
+                                                    <div className="flex items-center justify-between">
+                                                      <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
+                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                                        isPass 
+                                                          ? 'bg-emerald-500/15 text-emerald-600' 
+                                                          : 'bg-rose-500/15 text-rose-600'
+                                                      }`}>
+                                                        {isPass ? 'PASS' : 'FAIL'}
+                                                      </span>
+                                                    </div>
+                                                    <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400 italic">
+                                                      {c.val?.note || "Normal, tidak mendeteksi masalah."}
+                                                    </p>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+
+                                            {/* Metadata Recommendations */}
+                                            {aiVisionChecks.metadata && (
+                                              <div className="border-t border-slate-200 dark:border-white/5 pt-3 space-y-2">
+                                                <div>
+                                                  <span className="font-black uppercase text-[8px] text-slate-400 block mb-0.5">Recommended Title</span>
+                                                  <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100">{aiVisionChecks.metadata.title}</span>
+                                                </div>
+                                                <div>
+                                                  <span className="font-black uppercase text-[8px] text-slate-400 block mb-0.5">Keywords suggestion ({aiVisionChecks.metadata.keywords?.length || 0})</span>
+                                                  <div className="flex flex-wrap gap-1 mt-1 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
+                                                    {aiVisionChecks.metadata.keywords?.map((k, idx) => (
+                                                      <span key={idx} className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded text-[9px] font-semibold">
+                                                        {k}
+                                                      </span>
                                                     ))}
                                                   </div>
                                                 </div>
                                               </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
 
-                                              {/* Checkpoint Details */}
-                                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                                {[
-                                                  { label: t.language === 'Bahasa' ? 'Ketajaman & Sharpness' : 'Blur / Sharpness', val: aiVisionChecks.blur },
-                                                  { label: t.language === 'Bahasa' ? 'Pencahayaan & Kontras' : 'Lighting & Contrast', val: aiVisionChecks.lighting },
-                                                  { label: t.language === 'Bahasa' ? 'Komposisi & Framing' : 'Composition & Crop', val: aiVisionChecks.composition }
-                                                ].map((c, i) => {
-                                                  const isCheckpointPass = c.val?.status === 'PASS';
-                                                  return (
-                                                    <div 
-                                                      key={i}
-                                                      className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                      }`}
-                                                    >
-                                                      <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                          isCheckpointPass 
-                                                            ? 'bg-emerald-500/15 text-emerald-600' 
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                        }`}>
-                                                          {isCheckpointPass ? 'PASS' : 'FAIL'}
-                                                        </span>
-                                                      </div>
-                                                      <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                                        {c.val?.note || "Normal, tidak mendeteksi masalah."}
-                                                      </p>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {currentTab === 'legal' && (
-                                            <div className="space-y-4 animate-fadeIn">
-                                              {/* Legal Status Banner */}
-                                              <div className={`p-4 rounded-2xl border flex items-start gap-3 ${r.legal_status.includes('VIOLATION') ? 'bg-rose-500/5 border-rose-500/20 text-rose-700 dark:text-rose-300' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'}`}>
-                                                <ShieldCheck size={18} className="shrink-0 mt-0.5" />
-                                                <div className="space-y-0.5">
-                                                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60">{t.qc_legal_status}</p>
-                                                  <p className="text-xs font-black">{r.legal_status}</p>
-                                                </div>
-                                              </div>
-
-                                              {/* Legal Checkpoints Grid */}
-                                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                                {[
-                                                  { label: t.language === 'Bahasa' ? 'Watermark Komersial' : 'Watermark Check', val: aiVisionChecks.watermark },
-                                                  { label: t.language === 'Bahasa' ? 'Deteksi Merek & Logo' : 'Logo Detection', val: aiVisionChecks.logo },
-                                                  { label: t.language === 'Bahasa' ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', val: aiVisionChecks.ip_risk }
-                                                ].map((c, i) => {
-                                                  const isCheckpointPass = c.val?.status === 'PASS';
-                                                  return (
-                                                    <div 
-                                                      key={i}
-                                                      className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                      }`}
-                                                    >
-                                                      <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                          isCheckpointPass 
-                                                            ? 'bg-emerald-500/15 text-emerald-600' 
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                        }`}>
-                                                          {isCheckpointPass ? 'PASS' : 'FAIL'}
-                                                        </span>
-                                                      </div>
-                                                      <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                                        {c.val?.note || "Normal, tidak mendeteksi pelanggaran kekayaan intelektual."}
-                                                      </p>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-
-                                              {/* Detektif IP Warnings */}
-                                              <div className="bg-slate-100/30 dark:bg-white/[0.01] border border-slate-200/50 dark:border-white/5 p-4 rounded-2xl space-y-2">
-                                                <h5 className="text-[9px] font-black uppercase text-rose-500 tracking-wider">Known Restrictions Check List</h5>
-                                                <ul className="text-[9px] font-medium text-slate-500 dark:text-slate-400 space-y-1.5 list-disc pl-4">
-                                                  <li><strong>Merek Dagang:</strong> Deteksi visual terhadap logo khas, siluet iPhone/Macbook, logo Converse Chuck Taylor, or Beats by Dre.</li>
-                                                  <li><strong>Landmark Berbayar:</strong> Menara Eiffel (malam hari), Sydney Opera House, Burj Khalifa, Louvre Pyramid, & Atomium dilarang tanpa rilis komersial.</li>
-                                                  <li><strong>Karya Seni Lain:</strong> Mural jalanan, patung kontemporer, grafiti, tato tubuh yang terekspos jelas membutuhkan Property Release.</li>
-                                                </ul>
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {currentTab === 'ai' && (
-                                            <div className="space-y-4 animate-fadeIn">
-                                              {/* AI Vision Scan Analysis Terminal Card */}
-                                              {r.visual_scan_analysis && (
-                                                <div className="bg-slate-950 p-4 rounded-2xl border border-white/10 font-mono text-xs text-slate-300 space-y-2">
-                                                  <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                                                    <span className="text-[8px] uppercase font-black text-slate-400 tracking-wider">PIXEL SCANNER ENGINE LOG</span>
-                                                  </div>
-                                                  <p className="text-[10px] leading-relaxed italic text-emerald-400 font-semibold">
-                                                    &quot;{r.visual_scan_analysis}&quot;
-                                                  </p>
-                                                </div>
-                                              )}
-
-                                              {/* AI Sanity Checkpoints */}
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-                                                {[
-                                                  { label: t.language === 'Bahasa' ? 'Integritas Anatomi' : 'Anatomical Integrity', val: aiVisionChecks.anatomical_errors },
-                                                  { label: t.language === 'Bahasa' ? 'Proporsi & Mekanis' : 'Proportion & Mechanical', val: aiVisionChecks.proportion_defects },
-                                                  { label: t.language === 'Bahasa' ? 'Teks Overlay / Typo' : 'Text Overlay Check', val: aiVisionChecks.text },
-                                                  { label: t.language === 'Bahasa' ? 'Standar Penerimaan' : 'Stock Acceptance', val: aiVisionChecks.stock_acceptance }
-                                                ].map((c, i) => {
-                                                  const isCheckpointPass = c.val?.status === 'PASS';
-                                                  return (
-                                                    <div 
-                                                      key={i}
-                                                      className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                      }`}
-                                                    >
-                                                      <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                          isCheckpointPass 
-                                                            ? 'bg-emerald-500/15 text-emerald-600' 
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                        }`}>
-                                                          {isCheckpointPass ? 'PASS' : 'FAIL'}
-                                                        </span>
-                                                      </div>
-                                                      <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal line-clamp-3" title={c.val?.note}>
-                                                        {c.val?.note || "Aman, tidak mendeteksi anomali rekonstruksi kecerdasan buatan."}
-                                                      </p>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {currentTab === 'seo' && (
-                                            <div className="space-y-4 animate-fadeIn">
-                                              {/* Title Optimization Card */}
-                                              <div className="bg-slate-100/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                  <span className="text-[8px] font-black uppercase text-slate-400">SEO Curation Title</span>
-                                                  <button
-                                                    onClick={() => copyToClipboard(aiVisionChecks.metadata.title, `title-${fileName}`)}
-                                                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 rounded-lg text-[9px] font-black uppercase tracking-wider border border-slate-200/50 dark:border-white/5 transition-all text-emerald-600 shadow-sm"
-                                                  >
-                                                    {copiedState[`title-${fileName}`] === 'COPIED' ? <Check size={10} /> : <Copy size={10} />}
-                                                    {copiedState[`title-${fileName}`] === 'COPIED' ? (t.language === 'Bahasa' ? 'Tersalin' : 'Copied') : (t.language === 'Bahasa' ? 'Salin' : 'Copy')}
-                                                  </button>
-                                                </div>
-                                                <p className="text-xs font-black text-slate-800 dark:text-white leading-relaxed">
-                                                  {aiVisionChecks.metadata.title}
-                                                </p>
-                                              </div>
-
-                                              {/* Keywords Optimization Card */}
-                                              <div className="bg-slate-100/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-3">
-                                                <div className="flex items-center justify-between">
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="text-[8px] font-black uppercase text-slate-400">Suggested Keywords</span>
-                                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded font-mono">
-                                                      {aiVisionChecks.metadata.keywords?.length || 0}
-                                                    </span>
-                                                  </div>
-                                                  {aiVisionChecks.metadata.keywords && aiVisionChecks.metadata.keywords.length > 0 && (
-                                                    <button
-                                                      onClick={() => copyToClipboard(aiVisionChecks.metadata.keywords.join(', '), `kw-${fileName}`)}
-                                                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 rounded-lg text-[9px] font-black uppercase tracking-wider border border-slate-200/50 dark:border-white/5 transition-all text-emerald-600 shadow-sm"
-                                                    >
-                                                      {copiedState[`kw-${fileName}`] === 'COPIED' ? <Check size={10} /> : <Copy size={10} />}
-                                                      {copiedState[`kw-${fileName}`] === 'COPIED' ? (t.language === 'Bahasa' ? 'Tersalin Semua' : 'Copied All') : (t.language === 'Bahasa' ? 'Salin Semua' : 'Copy All')}
-                                                    </button>
-                                                  )}
-                                                </div>
-                                                <div className="flex flex-wrap gap-1 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                                                  {aiVisionChecks.metadata.keywords?.map((k, idx) => (
-                                                    <span 
-                                                      key={idx} 
-                                                      className="px-2 py-0.5 bg-slate-200/60 dark:bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 cursor-pointer text-slate-600 dark:text-slate-300 rounded text-[9.5px] font-bold transition-all border border-slate-200/30 dark:border-white/5"
-                                                    >
-                                                      {k}
-                                                    </span>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )}
+                                  {/* Original detailed feedback & visual scan analysis (preserved for depth) */}
+                                  <div className="space-y-3 border-t border-slate-200 dark:border-white/5 pt-4">
+                                    {r.visual_scan_analysis && (
+                                      <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-2xl">
+                                        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1.5">AI Vision Scan Analysis</p>
+                                        <div className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                                          {r.visual_scan_analysis}
                                         </div>
                                       </div>
-                                    );
-                                  })()}
+                                    )}
+
+                                    <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-2xl">
+                                      <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1.5">{t.qc_detailed_feedback}</p>
+                                      <div className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                                        {r.detailed_feedback}
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </motion.div>
                             )}
