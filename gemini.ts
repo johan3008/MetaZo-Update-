@@ -4357,6 +4357,7 @@ Kurator Adobe Stock dan pembeli premium menghargai video yang berkualitas. Anda 
 ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
 1. Buatlah isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual dari kurator ahli. Sebutkan secara spesifik apa saja objek di dalam video, bagaimana kondisi pencahayaannya secara presisi, bagaimana pergerakan/stabilitasnya, tekstur permukaannya, apa yang membuat komposisinya bagus atau buruk, dan berikan alasan yang sangat kuat layaknya kritikus sinematografi tingkat dewa (seperti output di kurator.dvaren.online). JANGAN gunakan kalimat generik/template yang pendek.
 2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di video ini (contoh: "Noise digital sangat minim, hanya terlihat grain halus yang estetis pada area bayangan di kuadran kanan bawah pada frame 3 dan 4").
+3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName} yang relevan untuk mikrostock.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -4434,9 +4435,17 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 },
                 required: ["type", "x", "y", "intensity", "raw_value"]
             }
+        },
+        metadata: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING },
+                keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["title", "keywords"]
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps", "metadata"]
   };
 
   const imageParts = frames.map(f => processFrameServer(f));
