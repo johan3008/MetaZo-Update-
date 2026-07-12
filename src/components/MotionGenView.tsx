@@ -23,7 +23,7 @@ export const MotionComposition = () => {
   
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-      <div style={{ opacity, transform: 'scale(' + scale + ')', padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
+      <div style={{ opacity, transform: \`scale(\${scale})\`, padding: '20px 40px', backgroundColor: '#e50914', borderRadius: '10px', color: 'white', fontSize: '40px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
         SUBSCRIBE
       </div>
     </div>
@@ -94,40 +94,40 @@ export const MotionComposition = () => {
     };
 
     return (
-        <div className="flex h-full w-full bg-[#0a0a0a] text-white">
+        <div className="flex flex-col lg:flex-row h-full w-full text-slate-900 dark:text-white overflow-hidden pt-20 lg:pt-8">
             {/* Left Panel: Code & Config */}
-            <div className="w-1/2 flex flex-col border-r border-[#333] p-6 gap-6 overflow-y-auto">
+            <div className="w-full lg:w-1/2 flex flex-col p-4 sm:p-6 lg:p-8 gap-6 overflow-y-auto custom-scrollbar border-r border-slate-200/50 dark:border-white/5">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                        <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
                             <Monitor className="w-6 h-6 text-purple-500" />
                             Motion Gen
                         </h2>
-                        <p className="text-sm text-gray-400 mt-1">AI-powered 2D Animation & Coding Vibe Renderer</p>
+                        <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">AI-powered 2D Animation & Coding Vibe Renderer</p>
                     </div>
                 </div>
 
                 {/* AI Prompt Help */}
-                <div className="bg-purple-900/20 border border-purple-500/30 p-4 rounded-xl">
-                    <h3 className="font-bold text-purple-300 flex items-center gap-2 mb-2">
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200/60 dark:border-purple-500/30 p-5 rounded-[1.5rem]">
+                    <h3 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2">
                         <Type className="w-4 h-4" /> Generate from AI
                     </h3>
-                    <p className="text-xs text-gray-400 mb-3">Gunakan ChatGPT atau Claude untuk membuat kode animasi. Cukup salin prompt ini lalu paste hasilnya di bawah.</p>
+                    <p className="text-xs text-slate-600 dark:text-gray-400 mb-4">Gunakan ChatGPT atau Claude untuk membuat kode animasi. Cukup salin prompt ini lalu paste hasilnya di bawah.</p>
                     <button 
                         onClick={copyPrompt}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-lg transition-colors w-full justify-center"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-xl transition-colors w-full justify-center"
                     >
                         <Copy className="w-4 h-4" /> Salin Prompt Ajaib
                     </button>
                 </div>
 
                 {/* Code Editor */}
-                <div className="flex-1 flex flex-col min-h-[250px]">
-                    <div className="flex items-center justify-between bg-[#1a1a1a] px-4 py-2 rounded-t-lg border border-[#333] border-b-0">
-                        <span className="text-xs font-bold text-gray-400 flex items-center gap-2"><Code className="w-4 h-4" /> JSX Code Editor</span>
+                <div className="flex-1 flex flex-col min-h-[250px] bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 rounded-[1.5rem] overflow-hidden shadow-xl shadow-black/5">
+                    <div className="flex items-center justify-between bg-slate-50/80 dark:bg-black/20 px-5 py-3 border-b border-slate-200/80 dark:border-white/5">
+                        <span className="text-xs font-bold text-slate-600 dark:text-gray-400 flex items-center gap-2"><Code className="w-4 h-4" /> JSX Code Editor</span>
                     </div>
                     <textarea 
-                        className="flex-1 bg-[#121212] border border-[#333] p-4 text-sm font-mono text-green-400 focus:outline-none focus:border-purple-500 rounded-b-lg resize-none"
+                        className="flex-1 bg-transparent p-5 text-sm font-mono text-slate-800 dark:text-green-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
                         spellCheck={false}
@@ -135,15 +135,15 @@ export const MotionComposition = () => {
                 </div>
 
                 {/* Configurations */}
-                <div className="bg-[#1a1a1a] p-4 rounded-xl border border-[#333]">
-                    <label className="text-xs font-bold text-gray-400 mb-3 block flex items-center gap-2">
+                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 shadow-xl shadow-black/5">
+                    <label className="text-xs font-bold text-slate-600 dark:text-gray-400 mb-4 block flex items-center gap-2">
                         <SlidersHorizontal className="w-4 h-4" /> Konfigurasi Video
                     </label>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] text-gray-500 block mb-1">Rasio Canvas</label>
+                            <label className="text-[10px] text-slate-500 block mb-1">Rasio Canvas</label>
                             <select 
-                                className="w-full bg-[#222] border border-[#444] rounded p-2 text-white text-sm"
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2.5 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                 value={ratio}
                                 onChange={(e) => setRatio(e.target.value)}
                             >
@@ -153,9 +153,9 @@ export const MotionComposition = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-500 block mb-1">Resolusi Video</label>
+                            <label className="text-[10px] text-slate-500 block mb-1">Resolusi Video</label>
                             <select 
-                                className="w-full bg-[#222] border border-[#444] rounded p-2 text-white text-sm"
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2.5 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                 value={resolution}
                                 onChange={(e) => setResolution(e.target.value)}
                             >
@@ -166,9 +166,9 @@ export const MotionComposition = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-500 block mb-1">Frame Rate</label>
+                            <label className="text-[10px] text-slate-500 block mb-1">Frame Rate</label>
                             <select 
-                                className="w-full bg-[#222] border border-[#444] rounded p-2 text-white text-sm"
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2.5 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                 value={fps}
                                 onChange={(e) => setFps(Number(e.target.value))}
                             >
@@ -178,9 +178,9 @@ export const MotionComposition = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-500 block mb-1">Durasi Video</label>
+                            <label className="text-[10px] text-slate-500 block mb-1">Durasi Video</label>
                             <select 
-                                className="w-full bg-[#222] border border-[#444] rounded p-2 text-white text-sm"
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2.5 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                 value={durationSeconds}
                                 onChange={(e) => setDurationSeconds(Number(e.target.value))}
                             >
@@ -193,39 +193,39 @@ export const MotionComposition = () => {
                 </div>
 
                 {/* Render Mode */}
-                <div className="bg-[#1a1a1a] p-4 rounded-xl border border-[#333]">
-                    <label className="text-xs font-bold text-gray-400 mb-3 block flex items-center gap-2">
+                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 shadow-xl shadow-black/5">
+                    <label className="text-xs font-bold text-slate-600 dark:text-gray-400 mb-4 block flex items-center gap-2">
                         <Settings className="w-4 h-4" /> Render Mode (Client-Side)
                     </label>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-3">
                         <button 
                             onClick={() => setRenderMode('worker-gpu')}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'worker-gpu' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-[1.25rem] text-sm font-bold border transition-colors ${renderMode === 'worker-gpu' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/5 text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-black/40'}`}
                         >
                             <Server className="w-4 h-4" /> 
                             <div className="text-left flex-1">
                                 <div>Worker GPU (FFmpeg)</div>
-                                <div className={`text-[10px] font-normal ${renderMode === 'worker-gpu' ? 'text-indigo-200' : 'text-gray-500'}`}>Background Render. Kualitas Tertinggi.</div>
+                                <div className={`text-[10px] font-normal ${renderMode === 'worker-gpu' ? 'text-indigo-200' : 'text-slate-500'}`}>Background Render. Kualitas Tertinggi.</div>
                             </div>
                         </button>
                         <button 
                             onClick={() => setRenderMode('gpu-ui')}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'gpu-ui' ? 'bg-fuchsia-600 border-fuchsia-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-[1.25rem] text-sm font-bold border transition-colors ${renderMode === 'gpu-ui' ? 'bg-fuchsia-600 border-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/20' : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/5 text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-black/40'}`}
                         >
                             <Cpu className="w-4 h-4" />
                             <div className="text-left flex-1">
                                 <div>GPU UI (Main Thread)</div>
-                                <div className={`text-[10px] font-normal ${renderMode === 'gpu-ui' ? 'text-fuchsia-200' : 'text-gray-500'}`}>Cepat untuk UI presisi (DOM to Image).</div>
+                                <div className={`text-[10px] font-normal ${renderMode === 'gpu-ui' ? 'text-fuchsia-200' : 'text-slate-500'}`}>Cepat untuk UI presisi (DOM to Image).</div>
                             </div>
                         </button>
                         <button 
                             onClick={() => setRenderMode('media-recorder')}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold border transition-colors ${renderMode === 'media-recorder' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-[#222] border-[#444] text-gray-400 hover:bg-[#333]'}`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-[1.25rem] text-sm font-bold border transition-colors ${renderMode === 'media-recorder' ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/5 text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-black/40'}`}
                         >
                             <Video className="w-4 h-4" />
                             <div className="text-left flex-1">
                                 <div>Media Recorder</div>
-                                <div className={`text-[10px] font-normal ${renderMode === 'media-recorder' ? 'text-emerald-200' : 'text-gray-500'}`}>Real-time screen capture. Paling instan.</div>
+                                <div className={`text-[10px] font-normal ${renderMode === 'media-recorder' ? 'text-emerald-200' : 'text-slate-500'}`}>Real-time screen capture. Paling instan.</div>
                             </div>
                         </button>
                     </div>
@@ -235,7 +235,7 @@ export const MotionComposition = () => {
                 <button 
                     onClick={handleRender}
                     disabled={isRendering}
-                    className="mt-4 flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-black rounded-xl text-lg shadow-[0_0_20px_rgba(79,70,229,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-2 flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-black rounded-[1.5rem] text-lg shadow-[0_0_20px_rgba(79,70,229,0.3)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                     {isRendering ? (
                         <><Loader2 className="w-5 h-5 animate-spin" /> Memproses Render...</>
@@ -246,42 +246,42 @@ export const MotionComposition = () => {
             </div>
 
             {/* Right Panel: Preview & Progress */}
-            <div className="w-1/2 flex flex-col items-center justify-center bg-[#050505] p-6 relative">
-                <div className="absolute top-6 left-6 flex items-center gap-2 z-10">
-                    <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
-                    <span className="text-xs font-bold text-gray-400 tracking-wider">LIVE PREVIEW</span>
-                    <span className="text-[10px] bg-[#222] text-gray-400 px-2 py-0.5 rounded ml-2 border border-[#444]">{width}x{height}</span>
+            <div className="w-full lg:w-1/2 flex flex-col items-center justify-center bg-slate-100/50 dark:bg-black/20 p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+                <div className="absolute top-6 left-6 flex items-center gap-2 z-10 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-white/10 shadow-sm">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-gray-300 tracking-wider">LIVE PREVIEW</span>
+                    <span className="text-[10px] bg-slate-200 dark:bg-[#222] text-slate-600 dark:text-gray-400 px-2 py-0.5 rounded-md ml-1">{width}x{height}</span>
                 </div>
                 
                 <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
                     {/* Mengatur rasio kontainer */}
-                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-black rounded-lg border border-[#333] shadow-2xl overflow-hidden relative">
+                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden relative">
                         <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} />
                     </div>
                 </div>
 
                 {/* Render Progress Overlay */}
                 {isRendering && renderProgress && (
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl border border-[#333] m-6">
-                        <div className="bg-[#111] border border-[#333] p-8 rounded-2xl w-full max-w-md shadow-2xl">
-                            <h3 className="text-lg font-black mb-1 flex items-center gap-2">
+                    <div className="absolute inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center m-4 sm:m-6 lg:m-8 rounded-[2rem]">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-[#333] p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
+                            <h3 className="text-lg font-black mb-1 flex items-center gap-2 text-slate-900 dark:text-white">
                                 {renderProgress.status === 'done' ? (
-                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                                 ) : (
                                     <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
                                 )}
                                 Proses Render ({renderMode})
                             </h3>
-                            <p className="text-xs text-gray-400 mb-6 font-mono">{renderProgress.message}</p>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mb-6 font-mono">{renderProgress.message}</p>
                             
-                            <div className="h-3 w-full bg-[#222] rounded-full overflow-hidden">
+                            <div className="h-3 w-full bg-slate-100 dark:bg-[#222] rounded-full overflow-hidden">
                                 <div 
                                     className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 ease-out"
                                     style={{ width: `${renderProgress.progressPercentage}%` }}
                                 ></div>
                             </div>
                             
-                            <div className="flex justify-between mt-2 text-xs font-bold text-gray-500">
+                            <div className="flex justify-between mt-2 text-xs font-bold text-slate-500 dark:text-gray-500">
                                 <span>{renderProgress.progressPercentage}%</span>
                                 <span>Frame {renderProgress.frame} / {renderProgress.totalFrames}</span>
                             </div>
