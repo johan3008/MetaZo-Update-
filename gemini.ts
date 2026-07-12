@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
+import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "./types";
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "./constants";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
