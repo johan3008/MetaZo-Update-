@@ -1387,6 +1387,7 @@ export const ImageQualityCheck: React.FC<{
                                           text: { status: "PASS", note: "Tidak ada teks overlay mengganggu." },
                                           anatomical_errors: { status: "PASS", note: "Struktur anatomi subjek terlihat alami." },
                                           ip_risk: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Aman dari potensi resiko paten atau desain khas." },
+                                          proportion_defects: { status: "PASS", note: "Proporsi geometri dan anatomi subjek proporsional." },
                                           stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
                                           metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
                                         };
@@ -1400,6 +1401,7 @@ export const ImageQualityCheck: React.FC<{
                                           { label: 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
                                           { label: 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
                                           { label: 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
+                                          { label: 'Proportion & Geometry', key: 'proportion_defects', val: aiVisionChecks.proportion_defects },
                                           { label: 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },
                                         ];
 
@@ -1466,17 +1468,17 @@ export const ImageQualityCheck: React.FC<{
                                     {r.visual_scan_analysis && (
                                       <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-2xl">
                                         <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1.5">AI Vision Scan Analysis</p>
-                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                        <div className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                                           {r.visual_scan_analysis}
-                                        </p>
+                                        </div>
                                       </div>
                                     )}
 
                                     <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-2xl">
                                       <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1.5">{t.qc_detailed_feedback}</p>
-                                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                      <div className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                                         {r.detailed_feedback}
-                                      </p>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
