@@ -16,9 +16,9 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height 
 
     useEffect(() => {
         try {
-            // Compile the JSX code using Babel
+            // Compile the JSX code using Babel, ensuring modules are transformed to CommonJS
             const compiledCode = Babel.transform(code, {
-                presets: ['react', 'env']
+                presets: ['react', ['env', { modules: 'commonjs' }]]
             }).code;
             
             const requireMock = (moduleName: string) => {
