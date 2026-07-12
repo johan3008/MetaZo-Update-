@@ -1392,12 +1392,15 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                                     throw new Error("Could not determine video duration");
                                 }
 
-                                // 2. Calculate timestamps (extract frames from Awal, Tengah, and Akhir)
-                                const numFrames = 3;
+                                // 2. Calculate timestamps (extract 6 frames for comprehensive analysis)
+                                const numFrames = 6;
                                 const timestamps = [
-                                    duration * 0.1, // Awal
-                                    duration * 0.5, // Tengah
-                                    duration * 0.9  // Akhir
+                                    duration * 0.1,
+                                    duration * 0.25,
+                                    duration * 0.4,
+                                    duration * 0.6,
+                                    duration * 0.75,
+                                    duration * 0.9
                                 ];
 
                                 // 3. Extract frames with fast seek (-ss BEFORE -i)
