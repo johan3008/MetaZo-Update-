@@ -9,33 +9,7 @@ import crypto from "node:crypto";
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
-const CACHE_FILE_PATH = path.join(process.cwd(), "qa_reports_cache.json");
-let qaCacheMap: Map<string, any> = new Map();
 
-function loadQACache() {
-  try {
-    if (fs.existsSync(CACHE_FILE_PATH)) {
-      const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
-      const obj = JSON.parse(content);
-      qaCacheMap = new Map(Object.entries(obj));
-      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached reports successfully.`);
-    }
-  } catch (err) {
-    console.warn("[QA Cache] Error loading cache file, starting fresh:", err);
-  }
-}
-
-function saveQACache() {
-  try {
-    const obj = Object.fromEntries(qaCacheMap.entries());
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("[QA Cache] Error saving cache file:", err);
-  }
-}
-
-// Initialize cache load
-loadQACache();
 
 // Load environment variables dynamically from local .env file
 try {
@@ -3590,18 +3564,11 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  // Deterministic quality check cache lookup
-  const cacheKeyInput = `${image}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
 
-  // if (qaCacheMap.has(cacheKey)) {
-  //   console.log(`[QA Cache] Hit for image quality check (key: ${cacheKey})`);
-  //   return qaCacheMap.get(cacheKey);
-  // }
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap gambar/vektor komersial yang diunggah.
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap SELURUH area gambar/vektor komersial yang diunggah. Anda WAJIB menganalisis seluruh data gambar secara mendalam sampai ke tingkat piksel (pixel-level analysis). Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas gambar secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
 
 ---
 PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
@@ -3655,6 +3622,10 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Geometri & Polusi Visual AI: Loloskan masalah tekstur kulit (waxy skin) atau cacat bentuk minor jika gambar memiliki gaya sinematik, fantasi, atau hiper-realistis yang menarik minat pembeli. Estetika dan nilai jual (commercial value) JAUH LEBIH PENTING daripada kesempurnaan logika AI tingkat piksel.
    - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Bayangan subjek yang arahnya tidak konsisten dengan sumber cahaya di scene, subjek yang terlihat "ditempel" tanpa kedalaman/depth yang menyatu dengan latar, atau pencahayaan pada subjek yang tidak cocok secara fisik dengan lingkungan sekitarnya = FAIL.
 
+   PENTING - PRINSIP PENILAIAN GENERATIVE AI (REALISTIS & KOMERSIAL):
+   1. Adobe Stock adalah marketplace komersial yang mengutamakan estetika dan daya jual (commercial value). Jangan sekali-kali menolak gambar AI hanya karena mendeteksi bahwa gambar tersebut dibuat oleh AI, jika tidak ada cacat visual fatal yang merusak kegunaan gambar.
+   2. Selama anomali AI sangat minor (seperti tombol kecil yang agak asimetris, lekukan kecil pada keyboard di latar belakang, detail pola berulang yang tidak 100% lurus tapi tidak mencolok), tetap loloskan dengan status PASS.
+
 6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
    CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
 
@@ -3674,6 +3645,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Dokumen Negara, Uang & Identitas: Uang kertas/koin utuh dari negara mana pun sebagai fokus utama (risiko pemalsuan); prangko AS yang diterbitkan setelah 1971, atau prangko yang menampilkan selebriti/karya berhak cipta/logo organisasi olahraga; paspor, SIM, KTP/ID, kartu kredit/debit, buku tabungan bank.
    - Warna & Elemen Non-Logo yang Dilindungi sebagai Trade Dress: Warna coklat UPS pada seragam/truk pengiriman paket (dengan atau tanpa logo terlihat).
    - Hak Pribadi & Tubuh (Biometrics): Tato unik pada subjek manusia (memerlukan property release dari seniman tato & model); wajah manusia yang dapat dikenali tanpa Model Release yang valid untuk penggunaan komersial.
+
+   PENTING - PENGECEKAN ATURAN IP & TRADEMARK SECARA REALISTIS (ADOBE STOCK COMPLIANCE):
+   1. Pengecualian Latar Belakang (Background Rule): Landmark berhak cipta (seperti Menara Eiffel, Burj Khalifa, skyline kota, dll.) atau logo kecil tidak mencolok yang berada jauh di latar belakang, blur (out of focus), atau hanya merupakan bagian minor dari komposisi kota (skyline umum) BUKANLAH dasar penolakan. Berikan penilaian SAFE/PASS. Penolakan IP hanya berlaku jika objek tersebut menjadi subjek utama/fokus utama gambar tanpa property release.
+   2. Pengecualian Produk Generik (Generic Product Rule): Perangkat elektronik (smartphone, laptop, TV, smartwatch), kendaraan (mobil, motor), atau perabot/furnitur yang tidak menampilkan logo resmi dan tidak meniru trade dress secara identik (seperti lekukan BMW grille atau notch khas iPhone) wajib diloloskan sebagai produk generik (SAFE/PASS). Jangan menolak ponsel pintar atau laptop biasa hanya karena bentuknya kotak tipis.
+   3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (kurang dari 1% luas gambar) pada kancing baju, label pakaian kecil, atau rambu jalan yang sangat jauh dan tidak mempromosikan merek tersebut secara mencolok wajib diberikan status SAFE/PASS karena bersifat insidental.
 
 ---
 ATURAN KHUSUS UNTUK VEKTOR (EPS/AI/SVG):
@@ -3706,6 +3682,9 @@ Kurator Adobe Stock dan pembeli premium menghargai gambar yang berkualitas. Anda
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
+
+ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
+Buatlah isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual dari kurator ahli. Sebutkan secara spesifik apa saja objek di dalam gambar, bagaimana kondisi pencahayaannya secara presisi, bagaimana tekstur permukaannya, apa yang membuat komposisinya bagus atau buruk, dan berikan alasan yang sangat kuat layaknya kritikus fotografi tingkat dewa (seperti output di kurator.dvaren.online). JANGAN gunakan kalimat generik/template yang pendek.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -3839,8 +3818,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw response:', text);
     const parsedResult = JSON.parse(text);
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
@@ -4268,19 +4245,10 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  // Quality check deterministic cache lookup
-  const framesDataCombined = Array.isArray(frames) ? frames.join('') : String(frames);
-  const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
-
-  if (qaCacheMap.has(cacheKey)) {
-    console.log(`[QA Cache] Hit for video quality check (key: ${cacheKey})`);
-    return qaCacheMap.get(cacheKey);
-  }
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 3 frame diam yang diekstrak dari bagian Awal, Tengah, dan Akhir video.
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 6 frame diam (gambar) beruntun yang diekstrak secara merata dari sepanjang durasi video (mewakili keseluruhan video dari awal hingga akhir). Analisislah seluruh frame tersebut sebagai satu kesatuan video. Anda WAJIB menganalisis seluruh data frame video secara mendalam sampai ke tingkat piksel (pixel-level analysis). Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas video secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
 
 ---
 PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
@@ -4345,6 +4313,10 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Geometri & Polusi Visual AI: Loloskan masalah tekstur kulit (waxy skin) atau cacat bentuk minor jika video memiliki gaya sinematik yang menarik minat pembeli. Estetika dan nilai jual JAUH LEBIH PENTING daripada kesempurnaan logika AI tingkat piksel.
    - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Loloskan ketidakkonsistenan bayangan minor antar-frame selama video terlihat memukau secara keseluruhan. Berikan FAIL hanya jika render artifact membuat pencahayaan sama sekali tidak cocok secara fisik hingga merusak estetika.
 
+   PENTING - PRINSIP PENILAIAN GENERATIVE AI VIDEO (REALISTIS & KOMERSIAL):
+   1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jangan menolak video AI hanya karena terdeteksi dibuat oleh AI jika tidak ada cacat gerakan atau cacat visual fatal yang merusak kegunaan video.
+   2. Selama anomali AI sangat minor antar-frame (seperti sedikit morphing latar belakang yang wajar, objek statis di latar belakang yang mengalami sedikit perubahan tekstur halus), tetap loloskan dengan status PASS.
+
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
    CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten di setiap frame video: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
 
@@ -4365,6 +4337,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Warna & Elemen Non-Logo yang Dilindungi sebagai Trade Dress: Warna coklat UPS pada seragam/truk pengiriman paket.
    - Hak Pribadi & Tubuh (Biometrics): Tato unik pada subjek manusia (memerlukan property release dari seniman tato & model); wajah manusia yang dapat dikenali tanpa Model Release yang valid untuk penggunaan komersial.
 
+   PENTING - PENGECEKAN ATURAN IP & TRADEMARK VIDEO SECARA REALISTIS (ADOBE STOCK COMPLIANCE):
+   1. Pengecualian Latar Belakang (Background Rule): Landmark berhak cipta (seperti Menara Eiffel, Burj Khalifa, skyline kota, dll.) atau logo kecil tidak mencolok yang berada jauh di latar belakang, blur (out of focus), atau hanya merupakan bagian minor dari komposisi kota (skyline umum) di salah satu frame video BUKANLAH dasar penolakan. Berikan penilaian SAFE/PASS. Penolakan IP hanya berlaku jika objek tersebut menjadi subjek utama/fokus utama video tanpa property release.
+   2. Pengecualian Produk Generik (Generic Product Rule): Perangkat elektronik (smartphone, laptop, TV, smartwatch), kendaraan (mobil, motor), atau perabot/furnitur yang tidak menampilkan logo resmi dan tidak meniru trade dress secara identik (seperti lekukan BMW grille atau notch khas iPhone) wajib diloloskan sebagai produk generik (SAFE/PASS) di video. Jangan menolak ponsel pintar atau laptop biasa hanya karena bentuknya kotak tipis.
+   3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (kurang dari 1% luas gambar) pada pakaian subjek, label kecil, atau rambu jalan yang sangat jauh dan tidak mempromosikan merek tersebut secara mencolok wajib diberikan status SAFE/PASS karena bersifat insidental.
+
 ---
 STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 - PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
@@ -4377,6 +4354,9 @@ Kurator Adobe Stock dan pembeli premium menghargai video yang berkualitas. Anda 
 1. EVALUASI REALISTIS: Lakukan evaluasi secara wajar pada frame yang diberikan. JANGAN MENGARANG atau MENEBAK-NEBAK (hallucinate) cacat yang sebenarnya tidak ada.
 2. JANGAN HALU TENTANG KONSISTENSI (NO HALLUCINATIONS): Jangan mengatakan "objek menghilang" atau "kegagalan logika struktural" secara sembarangan. Buktikan HANYA jika cacatnya 100% nyata dan terlihat secara visual (misalnya ada bagian tubuh yang benar-benar hilang/terpotong). Jika tidak ada bukti cacat visual yang nyata di frame tersebut, jangan buat-buat alasan penolakan!
 3. TOLERANSI WAJAR: Jika video terlihat estetik dan tidak ada kejanggalan visual yang merusak komposisi secara fatal, video tersebut layak lulus (PASS).
+ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
+Buatlah isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual dari kurator ahli. Sebutkan secara spesifik apa saja objek di dalam video, bagaimana kondisi pencahayaannya secara presisi, bagaimana pergerakan/stabilitasnya, tekstur permukaannya, apa yang membuat komposisinya bagus atau buruk, dan berikan alasan yang sangat kuat layaknya kritikus sinematografi tingkat dewa (seperti output di kurator.dvaren.online). JANGAN gunakan kalimat generik/template yang pendek.
+
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
 
@@ -4490,8 +4470,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw video response:', text);
     const parsedResult = JSON.parse(text);
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
