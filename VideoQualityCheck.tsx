@@ -330,101 +330,16 @@ export const VideoQualityCheck: React.FC<{
         </p>
 
         {/* Workflow Info Box */}
-        <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 text-left max-w-xl mx-auto mt-6 shadow-sm">
-          <h4 className="font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2 justify-center text-lg">
-            <Zap size={18} className="text-indigo-500" /> 
-            Workflow Analisis Kualitas Video
+        <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent dark:from-indigo-500/15 dark:via-indigo-500/5 dark:to-transparent border border-indigo-500/30 dark:border-indigo-500/20 rounded-[1.5rem] p-6 shadow-lg shadow-indigo-500/5 text-left max-w-xl mx-auto mt-6">
+          <h4 className="font-bold text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-2 text-sm sm:text-base uppercase tracking-wider">
+            <Zap size={16} className="text-indigo-500" /> 
+            {t.language === 'Bahasa' ? 'Alur Kerja Pemeriksaan Visual (AI)' : 'Visual (AI) Audit Workflow'}
           </h4>
-          
-          <div className="flex flex-col items-center space-y-2">
-            {/* Step 1 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-center shadow-sm">
-              <span className="font-bold text-slate-800 dark:text-white text-sm">Video Upload</span>
-            </div>
-            
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-            
-            {/* Step 2 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 flex items-center justify-center font-bold text-xs border border-violet-200 dark:border-violet-800">1</div>
-              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">FFprobe</h5>
-              <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-4 list-disc marker:text-violet-400 text-left">
-                <li>Resolution</li>
-                <li>FPS</li>
-                <li>Codec</li>
-                <li>Bitrate</li>
-                <li>Pixel format</li>
-                <li>Duration</li>
-                <li>Audio</li>
-              </ul>
-            </div>
-            
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-            
-            {/* Step 3 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-200 dark:border-emerald-800">2</div>
-              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">FFmpeg</h5>
-              <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-4 list-disc marker:text-emerald-400 text-left">
-                <li>Extract frame setiap 1 detik</li>
-                <li>Ambil frame awal, tengah, akhir</li>
-                <li>Detect black frame</li>
-                <li>Detect duplicate frame</li>
-                <li>Detect freeze frame</li>
-                <li>Detect scene change</li>
-              </ul>
-            </div>
-            
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-
-            {/* Step 4 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-200 dark:border-amber-800">3</div>
-              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">AI Vision</h5>
-              <div className="grid grid-cols-2 gap-x-2 text-xs text-slate-500 dark:text-slate-400 pl-4 text-left">
-                <ul className="space-y-1 list-disc marker:text-amber-400">
-                  <li>Blur</li>
-                  <li>Focus</li>
-                  <li>Noise</li>
-                  <li>Compression artifact</li>
-                  <li>Banding</li>
-                  <li>Blocking</li>
-                  <li>Flicker</li>
-                  <li>Exposure</li>
-                </ul>
-                <ul className="space-y-1 list-disc marker:text-amber-400">
-                  <li>White balance</li>
-                  <li>Watermark</li>
-                  <li>Text</li>
-                  <li>AI artifact</li>
-                  <li>Bad anatomy</li>
-                  <li>Camera shake</li>
-                  <li>IP</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-
-            {/* Step 5 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-center shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center font-bold text-xs border border-blue-200 dark:border-blue-800">4</div>
-              <span className="font-bold text-slate-800 dark:text-white text-sm">Quality Engine</span>
-            </div>
-
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-
-            {/* Step 6 */}
-            <div className="bg-indigo-600 dark:bg-indigo-500 w-full sm:w-80 p-3 rounded-xl border border-indigo-700 dark:border-indigo-400 text-center shadow-md">
-              <span className="font-black text-white text-sm tracking-wide">Adobe Stock Risk Score</span>
-            </div>
-
-          </div>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+            {t.language === 'Bahasa' 
+              ? 'Sama seperti aplikasi pembuat metadata, sistem secara otomatis mengekstrak beberapa frame kunci secara lokal di browser menggunakan elemen <canvas>, lalu mengirimkannya ke Vision AI Gemini 3.1 Flash Lite dengan prompt khusus dan aturan kurasi Adobe Stock untuk mendeteksi cacat visual, anomali AI, serta risiko hak cipta.'
+              : 'Just like the metadata generator app, the system automatically extracts several keyframes locally in the browser using the <canvas> element, then sends them to Vision AI Gemini 3.1 Flash Lite with custom prompts and Adobe Stock curation guidelines to detect visual flaws, AI anomalies, and copyright risks.'}
+          </p>
         </div>
       </div>
 
