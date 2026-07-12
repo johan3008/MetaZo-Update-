@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Player } from '@remotion/player';
 import * as Babel from '@babel/standalone';
 import * as Remotion from 'remotion';
+import * as ReactJsxRuntime from 'react/jsx-runtime';
 
 interface LiveRemotionRunnerProps {
     code: string;
@@ -25,6 +26,7 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height 
             const requireMock = (moduleName: string) => {
                 if (moduleName === 'react') return React;
                 if (moduleName === 'remotion') return Remotion;
+                if (moduleName === 'react/jsx-runtime') return ReactJsxRuntime;
                 throw new Error(`Module ${moduleName} is not supported in Live Editor`);
             };
 
