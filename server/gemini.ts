@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
+import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "./types";
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "./constants";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -3649,45 +3649,32 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
 5. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
-   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau gitar, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling. Anatomi yang secara biologis tidak mungkin = FAIL INSTAN.
+   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow), alat elektronik, drone, atau kamera, bagian-bagiannya tidak boleh meleleh/menyatu tidak masuk akal (melted/fused parts). Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
+   - Anatomi Cacat (Deformed Anatomy - SANGAT KETAT): Periksa JARI TANGAN dengan sangat teliti! Jari tangan yang menyatu, bengkok aneh, atau jumlahnya salah (lebih/kurang dari 5 per tangan) adalah alasan penolakan nomor 1 di Adobe. Wajah yang terdistorsi di kejauhan, mata asimetris/juling, atau anggota tubuh menyatu ke objek lain (seperti tangan menyatu dengan controller) = FAIL INSTAN.
    - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
    - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam, atau objek melayang tanpa gravitasi.
-   - Polusi Visual AI: Loloskan HANYA jika masalah tekstur kulit (waxy skin) sangat halus pada gambar bergaya sinematik/fantasi. Namun CACAT BENTUK = FAIL.
+   - Polusi Visual AI: Loloskan HANYA jika masalah tekstur kulit (waxy skin) sangat halus pada gambar bergaya sinematik/fantasi. Namun CACAT BENTUK sekecil apa pun pada tangan/objek = FAIL.
+   - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Bayangan subjek yang arahnya tidak konsisten dengan sumber cahaya di scene, subjek yang terlihat "ditempel" tanpa kedalaman/depth yang menyatu dengan latar, atau pencahayaan pada subjek yang tidak cocok secara fisik dengan lingkungan sekitarnya = FAIL.
 
-6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
-   - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
-   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
-   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
-     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
-     * Landmark atau monumen tertentu tidak dapat diterima, bahkan dengan rilis properti (certain landmarks or monuments cannot be accepted, even with releases).
-     * Arsitektur modern dengan desain yang unik atau mudah dikenali (modern architecture with a unique or recognizable design) ketika ditampilkan sebagai fokus utama tanpa rilis properti.
-     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta milik SETE). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
-     * Burj Al Arab, Burj Khalifa (Dubai)
-     * Sydney Opera House (Australia)
-     * Atomium (Brussels)
-     * Louvre Pyramid (Paris)
-     * Space Needle (Seattle)
-     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
-     * Istana Neuschwanstein (Jerman)
-     * CN Tower (Toronto)
-     * The Shard, London Eye, Tower Bridge (London)
-     * Transamerica Pyramid (San Francisco)
-     * Kuil Sagrada Família (khusus bagian interior)
-     * Taipei 101 (Taiwan)
-     * Menara Kembar Petronas (Malaysia)
-     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual:
-     * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
-     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas:
-     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
-     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
-   - Hak Pribadi & Tubuh (Biometrics):
-     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+   CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
+
+   - Merek & Logo Komersial: Logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun. Contoh: Apple, Nike (swoosh, "Just Do It", desain Jordan), Adidas (tiga strip), Google (termasuk Google Home/Nest), Amazon, Coca-Cola, Mercedes-Benz, BMW, DJI, LV (monogram/checker Louis Vuitton), Burberry (motif "haymarket check"), Tiffany (warna "Tiffany blue" pada kemasan perhiasan), Vans (logo, side stripe, desain Old Skool/Checkerboard), Pantone, Fairtrade, Greenpeace, Instacart, Vorwerk/Thermomix.
+   - Desain Khas & Bentuk Produk (Trade Dress): Desain fisik ikonik sebagai subjek utama, meski tanpa logo terlihat. Contoh: Lego/Duplo (bata & figurin), boneka Barbie, Rubik's Cube, Monopoly, Twister, Funko Pop (kepala kotak besar), Hello Kitty/Sanrio, Elf on the Shelf, Devil Duckie, Tatty Teddy, View-Master, Slinky, permen Hershey's Kisses (bentuk & foil), Crayola (crayon & kemasan), elektronik Apple (bodi iPhone/MacBook/iPad, notch, tombol home), kamera Polaroid klasik, drone DJI Phantom/Mavic, sepatu Converse Chuck Taylor, Dr. Martens (jahitan kuning), sol merah Christian Louboutin, Beats by Dre, Zippo (terbuka/tertutup), korek/termos Stabilo, Weber grill, Duracell (tutup tembaga), Absolut Vodka & Crystal Head Vodka (bentuk botol), Kikkoman (botol & tutup), Chemex, perabot desainer (designer furniture).
+   - Desain Otomotif & Kendaraan Khas: Grille BMW kidney, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik, VW Beetle/Kombi klasik, mesin pertanian John Deere (hijau-kuning) atau Claas (hijau-merah), senjata replika desain Glock.
+   - Karakter Fiksi & Waralaba Berhak Cipta: Karakter Disney/Pixar (termasuk taman & properti Disney), Mickey Mouse, Pokémon, superhero Marvel/DC, Batmobile atau kendaraan mirip tema Batman, Minecraft (logo/block pixelated), Pac-Man, Totoro, frasa "Star Wars" atau "May the Fourth Be With You", tema Warhammer.
+   - Organisasi, Olahraga & Lambang Resmi: Cincin Olimpiade/obor/maskot, FIFA & logo World Cup, UEFA & Euro Cup, NFL/Super Bowl (nama, logo, trofi), Rugby World Cup, CrossFit, lambang PBB (UN emblem), NASA (insignia "meatball", logo "worm", seal, nama misi), palang merah/bulan sabit merah di atas latar putih, lencana/emblem kepolisian atau militer (termasuk US Marine Corps/Semper Fi, RCMP), simbol resmi pemerintah China, logo transportasi umum (MTA New York, London Underground, Paris RATP/Métro, TGV, ICE Deutsche Bahn, BART, CTA Chicago, LA Metro, MBTA Boston, SEPTA Philadelphia, PATH) - nama, logo, skema warna kereta/bus yang khas dilindungi hak cipta.
+   - Selebriti, Tokoh Publik & Body Likeness: Wajah/rupa selebriti yang dapat dikenali untuk penggunaan komersial DILARANG (peniru/impersonator diperbolehkan HANYA dengan model release yang mencantumkan kata "impersonator"). Termasuk larangan menyerupai tokoh sejarah terkenal seperti Albert Einstein sebagai fokus utama.
+   - Bangunan, Landmark & Lokasi Berbayar/Terlarang (SANGAT KETAT - berlaku bahkan dengan property release untuk sebagian besar):
+     * Interior-only restriction (interior dilarang, eksterior umumnya boleh): Notre-Dame de Paris, Hagia Sophia, Colosseum, Sistine Chapel, Sheikh Zayed Grand Mosque, Sagrada Família (interior).
+     * Bangunan/struktur dengan larangan penuh sebagai fokus utama: Menara Eiffel di malam hari (tata cahaya berhak cipta SETE - siang hari aman), Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, CN Tower, The Shard, London Eye, Taipei 101, Menara Kembar Petronas, Empire State Building, Chrysler Building, Flatiron Building, One World Trade Center, Willis Tower (Sears Tower), Grand Central Terminal (termasuk jamnya), Rockefeller Center, Radio City Music Hall, Madison Square Garden, Vessel (NYC), Space Needle, Tokyo Tower, Tokyo Skytree, Shanghai Tower, Neuschwanstein Castle, Graceland, Hollywood Sign & Walk of Fame.
+     * Patung/instalasi seni publik ikonik: Cloud Gate ("The Bean" Chicago), Charging Bull (Wall Street), Christ the Redeemer (Rio), Little Mermaid (Kopenhagen), Merlion (Singapura), Mannekin Pis (Brussels), Fremont Troll (Seattle), Marine Corps War Memorial/Iwo Jima, Martin Luther King Jr. Memorial, Holocaust Memorial (Peter Eisenman).
+     * Lokasi berbayar/bertiket (ticketed/restricted sites) tanpa property release, taman tema (Disney, SeaWorld, Universal), kebun binatang/akuarium berbrand (San Diego Zoo, Monterey Bay Aquarium), museum tertentu (Guggenheim, Getty Center), serta situs warisan arkeologis dengan pembatasan hukum lokal (Machu Picchu, Stonehenge, Chichen Itza, situs warisan Jepang).
+     * Arsitektur modern dengan desain unik/mudah dikenali sebagai fokus utama tanpa property release, meskipun bukan bangunan terkenal secara global.
+   - Karya Seni & Hak Cipta Visual Lainnya: Karya cipta orang lain (lukisan, patung, street art/graffiti, mural, ilustrasi, font spesifik, elemen grafis) yang menjadi fokus utama tanpa izin.
+   - Dokumen Negara, Uang & Identitas: Uang kertas/koin utuh dari negara mana pun sebagai fokus utama (risiko pemalsuan); prangko AS yang diterbitkan setelah 1971, atau prangko yang menampilkan selebriti/karya berhak cipta/logo organisasi olahraga; paspor, SIM, KTP/ID, kartu kredit/debit, buku tabungan bank.
+   - Warna & Elemen Non-Logo yang Dilindungi sebagai Trade Dress: Warna coklat UPS pada seragam/truk pengiriman paket (dengan atau tanpa logo terlihat).
+   - Hak Pribadi & Tubuh (Biometrics): Tato unik pada subjek manusia (memerlukan property release dari seniman tato & model); wajah manusia yang dapat dikenali tanpa Model Release yang valid untuk penggunaan komersial.
 
 ---
 ATURAN KHUSUS UNTUK VEKTOR (EPS/AI/SVG):
@@ -3730,7 +3717,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     type: Type.OBJECT,
     properties: {
         visual_scan_analysis: { type: Type.STRING },
-        legal_status: { type: Type.STRING },
+        legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
         technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
         strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
         overall_score: { type: Type.NUMBER },
@@ -3800,7 +3787,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             },
             required: [
                 "blur", "composition", "lighting", "watermark", "logo", "text",
-                "anatomical_errors", "ip_risk", "stock_acceptance", "metadata"
+                "anatomical_errors", "ip_risk", "proportion_defects", "stock_acceptance", "metadata"
             ]
         },
         heatmaps: {
@@ -4330,6 +4317,8 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
    - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
    - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
+   - Upscaling (Resolusi Palsu): Video yang di-upscale secara paksa dari resolusi rendah ke resolusi lebih tinggi (misal HD dipaksa jadi 4K) WAJIB DITOLAK. Ciri-cirinya: ketajaman detail terlihat "dipaksakan"/lembek meski resolusi filenya besar, tekstur halus terlihat buram atau di-interpolasi, dan detail piksel tidak natural untuk resolusi yang diklaim.
+   - Log/Flat Color Grading Belum Diproses: Footage yang masih dalam gamma Log/flat (kontras sangat rendah, warna pudar keabu-abuan, saturasi sangat minim) tanpa color grading dasar (Rec.709 LUT) yang layak jual = FAIL. Video harus terlihat sudah melalui proses grading warna dasar, bukan flat/log mentah.
 
 3. EXPOSURE & LIGHTING PROBLEMS:
    - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali (misal, langit putih polos tanpa awan, kulit putih terbakar cahaya).
@@ -4350,46 +4339,33 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
 
 6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
-   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau instrumen musik, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis ke poros. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
+   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow), instrumen musik, drone, atau kamera, bagian-bagiannya tidak boleh meleleh/menyatu tidak masuk akal (melted/fused parts). Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
    - Temporal Inconsistency & Morphing (SANGAT FATAL UNTUK VIDEO): Benda atau makhluk hidup yang berubah bentuk (morphing) secara tidak wajar di tengah video, objek yang tiba-tiba muncul/hilang, atau tekstur yang bergeser tidak sesuai dengan pergerakan objek (texture swimming).
-   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling yang berkedip secara aneh di tengah frame. Anatomi yang salah secara biologis = FAIL INSTAN.
+   - Anatomi Cacat & AI Hallucinations (SANGAT KETAT): Periksa JARI TANGAN dengan sangat teliti! Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain (seperti tangan melebur dengan setir/controller), wajah terdistorsi, atau mata juling yang berkedip secara aneh di tengah frame. Anatomi yang salah secara biologis = FAIL INSTAN.
    - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
    - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, atau perspektif arsitektur patah tajam antar frame.
-   - Polusi Visual AI: Loloskan masalah tekstur (waxy skin) HANYA jika sangat halus pada gaya sinematik. Namun CACAT STRUKTUR ATAU MORPHING BENTUK = FAIL.
+   - Polusi Visual AI: Loloskan masalah tekstur (waxy skin) HANYA jika sangat halus pada gaya sinematik. Namun CACAT STRUKTUR, MORPHING BENTUK, ATAU JARI CACAT = FAIL.
+   - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Bayangan subjek yang arahnya tidak konsisten antar-frame dengan sumber cahaya di scene, subjek yang terlihat "ditempel" tanpa kedalaman/depth yang menyatu dengan latar, atau render artifact yang membuat pencahayaan tidak cocok secara fisik dengan lingkungan = FAIL.
 
-7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
-   - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
-   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
-   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
-     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
-     * Landmark atau monumen tertentu tidak dapat diterima, bahkan dengan rilis properti (certain landmarks or monuments cannot be accepted, even with releases).
-     * Arsitektur modern dengan desain yang unik atau mudah dikenali (modern architecture with a unique or recognizable design) ketika ditampilkan sebagai fokus utama tanpa rilis properti.
-     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta milik SETE). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
-     * Burj Al Arab, Burj Khalifa (Dubai)
-     * Sydney Opera House (Australia)
-     * Atomium (Brussels)
-     * Louvre Pyramid (Paris)
-     * Space Needle (Seattle)
-     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
-     * Istana Neuschwanstein (Jerman)
-     * CN Tower (Toronto)
-     * The Shard, London Eye, Tower Bridge (London)
-     * Transamerica Pyramid (San Francisco)
-     * Kuil Sagrada Família (khusus bagian interior)
-     * Taipei 101 (Taiwan)
-     * Menara Kembar Petronas (Malaysia)
-     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual:
-     * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
-     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas:
-     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
-     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
-   - Hak Pribadi & Tubuh (Biometrics):
-     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+   CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten di setiap frame video: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
+
+   - Merek & Logo Komersial: Logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun, termasuk yang hanya tampak sekilas di salah satu frame. Contoh: Apple, Nike (swoosh, "Just Do It"), Adidas (tiga strip), Google, Amazon, Coca-Cola, Mercedes-Benz, BMW, DJI, LV (Louis Vuitton), Burberry, Tiffany blue, Vans, Pantone.
+   - Desain Khas & Bentuk Produk (Trade Dress): Desain fisik ikonik sebagai subjek utama meski tanpa logo terlihat. Contoh: Lego/Duplo, boneka Barbie, Rubik's Cube, Monopoly, Funko Pop, Hello Kitty/Sanrio, elektronik Apple (bodi iPhone/MacBook/iPad), kamera Polaroid klasik, drone DJI, sepatu Converse Chuck Taylor, Dr. Martens, sol merah Christian Louboutin, Beats by Dre, perabot desainer.
+   - Desain Otomotif Khas: Grille BMW kidney, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik, VW Beetle/Kombi klasik, mesin pertanian John Deere/Claas dengan skema warna khasnya.
+   - Karakter Fiksi & Waralaba Berhak Cipta: Karakter Disney/Pixar, Mickey Mouse, Pokémon, superhero Marvel/DC, Batmobile atau kendaraan bertema Batman, Minecraft, Pac-Man, frasa "Star Wars".
+   - Organisasi, Olahraga & Lambang Resmi: Cincin Olimpiade/obor/maskot, FIFA & World Cup, UEFA & Euro Cup, NFL/Super Bowl, NASA (insignia, logo, nama misi), palang merah/bulan sabit merah di latar putih, lencana/emblem kepolisian atau militer, logo transportasi umum (MTA New York, London Underground, Paris RATP/Métro, TGV, ICE Deutsche Bahn, BART, CTA Chicago) - skema warna & desain kereta/bus yang khas juga dilindungi.
+   - Selebriti, Tokoh Publik & Body Likeness: Wajah/rupa selebriti yang dapat dikenali di frame manapun untuk penggunaan komersial DILARANG (peniru/impersonator hanya boleh dengan model release yang mencantumkan kata "impersonator").
+   - Bangunan, Landmark & Lokasi Berbayar/Terlarang (SANGAT KETAT - periksa SEMUA frame, termasuk latar belakang):
+     * Interior-only restriction (interior dilarang, eksterior umumnya boleh): Notre-Dame de Paris, Hagia Sophia, Colosseum, Sistine Chapel, Sheikh Zayed Grand Mosque, Sagrada Família (interior).
+     * Bangunan/struktur dengan larangan penuh sebagai fokus utama: Menara Eiffel di malam hari (siang hari aman), Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, CN Tower, The Shard, London Eye, Taipei 101, Menara Kembar Petronas, Empire State Building, Chrysler Building, One World Trade Center, Willis Tower, Grand Central Terminal, Rockefeller Center, Madison Square Garden, Vessel (NYC), Tokyo Tower/Skytree, Neuschwanstein Castle, Hollywood Sign & Walk of Fame.
+     * Patung/instalasi seni publik ikonik: Cloud Gate ("The Bean"), Charging Bull, Christ the Redeemer, Little Mermaid, Merlion, Mannekin Pis, Fremont Troll, memorial-memorial nasional (MLK, Iwo Jima, Holocaust Memorial).
+     * Lokasi berbayar/bertiket, taman tema (Disney, SeaWorld, Universal), kebun binatang/akuarium berbrand, museum tertentu, situs warisan arkeologis dengan pembatasan lokal (Machu Picchu, Stonehenge, Chichen Itza).
+     * Arsitektur modern dengan desain unik/mudah dikenali sebagai fokus utama tanpa property release.
+   - Karya Seni & Hak Cipta Visual Lainnya: Karya cipta orang lain (lukisan, patung, street art/graffiti, mural, font spesifik, elemen grafis) sebagai fokus utama tanpa izin.
+   - Dokumen Negara, Uang & Identitas: Uang kertas/koin utuh sebagai fokus utama; prangko AS pasca-1971 atau yang menampilkan selebriti/organisasi olahraga; paspor, SIM, KTP/ID, kartu kredit/debit, buku tabungan bank.
+   - Warna & Elemen Non-Logo yang Dilindungi sebagai Trade Dress: Warna coklat UPS pada seragam/truk pengiriman paket.
+   - Hak Pribadi & Tubuh (Biometrics): Tato unik pada subjek manusia (memerlukan property release dari seniman tato & model); wajah manusia yang dapat dikenali tanpa Model Release yang valid untuk penggunaan komersial.
 
 ---
 STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
