@@ -3842,8 +3842,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw response:', text);
     const parsedResult = JSON.parse(text);
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
@@ -4276,10 +4274,7 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
   const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
 
-  if (qaCacheMap.has(cacheKey)) {
-    console.log(`[QA Cache] Hit for video quality check (key: ${cacheKey})`);
-    return qaCacheMap.get(cacheKey);
-  }
+
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
@@ -4496,8 +4491,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw video response:', text);
     const parsedResult = JSON.parse(text);
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
