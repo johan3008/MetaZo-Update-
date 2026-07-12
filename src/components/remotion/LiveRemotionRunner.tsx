@@ -20,13 +20,19 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height 
         try {
             // Compile the JSX code using Babel, ensuring modules are transformed to CommonJS
             const compiledCode = Babel.transform(code, {
-                presets: ['react', ['env', { modules: 'commonjs' }]]
+                presets: [
+                    ['react', { runtime: 'classic' }], 
+                    ['env', { modules: 'commonjs' }]
+                ]
             }).code;
             
             const requireMock = (moduleName: string) => {
-                if (moduleName === 'react') return React;
-                if (moduleName === 'remotion') return Remotion;
-                if (moduleName === 'react/jsx-runtime') return ReactJsxRuntime;
+                if (moduleName === 'react') return { ...React, default: React };
+                if (moduleName === 'remotion') return { ...Remotion, default: Remotion };
+                if (moduleName === 'react/jsx-runtime') {
+                    console.log('ReactJsxRuntime requested:', ReactJsxRuntime);
+                    return { ...ReactJsxRuntime, default: ReactJsxRuntime };
+                }
                 throw new Error(`Module ${moduleName} is not supported in Live Editor`);
             };
 
@@ -36,18 +42,21 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height 
             const exportsObj: any = {};
             const evaluator = new Function('React', 'require', 'exports', safeCode);
             
-            // To provide remotion hooks to the eval
-            // Actually, `require` mock is better if the user code has `const { interpolate } = require('remotion')`
-            // But if they use `import`, Babel transpiles to `require`.
             evaluator(React, requireMock, exportsObj);
+
+            console.log('Evaluated exports:', exportsObj);
 
             if (exportsObj.MotionComposition) {
                 setComponent(() => exportsObj.MotionComposition);
                 setError(null);
+            } else if (exportsObj.default) {
+                setComponent(() => exportsObj.default);
+                setError(null);
             } else {
-                setError("Kode harus mengekspor komponen bernama 'MotionComposition'");
+                setError("Kode harus mengekspor komponen bernama 'MotionComposition' atau default export");
             }
         } catch (err: any) {
+            console.error('Compilation Error:', err);
             setError(err.message || 'Terjadi kesalahan saat kompilasi JSX');
             setComponent(null);
         }
