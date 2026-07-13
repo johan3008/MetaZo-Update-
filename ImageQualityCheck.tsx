@@ -165,9 +165,9 @@ export const ImageQualityCheck: React.FC<{
   };
 
   const loadFromHistory = (item: HistoryItem) => {
-    setReports({ [item.id]: item.report });
+    setReports({ [item.fileName]: item.report });
     setFiles([]); 
-    setExpandedReports(new Set([item.id]));
+    setExpandedReports(new Set([item.fileName]));
     setTimeout(() => {
       document.getElementById('image-quality-reports')?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -1043,6 +1043,7 @@ export const ImageQualityCheck: React.FC<{
                 {Object.entries(reports).map(([fileName, report], rIdx) => {
                   const r = report as QualityReport;
                   const isPassed = r.recommendation === "PASS";
+                  const isIndo = t.language === 'Bahasa';
                   const fileObj = files.find(f => f.name === fileName);
                   const isVideo = fileObj && (fileObj.type.startsWith('video/') || fileObj.name.match(/\.(mp4|mov)$/i));
 
@@ -1227,8 +1228,8 @@ export const ImageQualityCheck: React.FC<{
                                           1
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Asset Loaded</p>
-                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Image Data Source</p>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">{isIndo ? "Aset Dimuat" : "Asset Loaded"}</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">{isIndo ? "Sumber Data Gambar" : "Image Data Source"}</p>
                                         </div>
                                       </div>
                                       
@@ -1241,8 +1242,8 @@ export const ImageQualityCheck: React.FC<{
                                           2
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">FFmpeg Analysis</p>
-                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Resolution, Color, Histogram</p>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">{isIndo ? "Analisis FFmpeg" : "FFmpeg Analysis"}</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">{isIndo ? "Resolusi, Warna, Histogram" : "Resolution, Color, Histogram"}</p>
                                         </div>
                                       </div>
 
@@ -1255,8 +1256,8 @@ export const ImageQualityCheck: React.FC<{
                                           3
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">AI Vision Scan</p>
-                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Blur, IP, Composition</p>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">{isIndo ? "Pindai AI Vision" : "AI Vision Scan"}</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">{isIndo ? "Blur, IP, Komposisi" : "Blur, IP, Composition"}</p>
                                         </div>
                                       </div>
 
@@ -1269,8 +1270,8 @@ export const ImageQualityCheck: React.FC<{
                                           4
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Quality Report</p>
-                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Passed Curator Standards</p>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">{isIndo ? "Laporan Kualitas" : "Quality Report"}</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">{isIndo ? "Standar Kurasi Lolos" : "Passed Curator Standards"}</p>
                                         </div>
                                       </div>
                                     </div>
@@ -1379,31 +1380,43 @@ export const ImageQualityCheck: React.FC<{
                                       </div>
 
                                       {(() => {
-                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {
-                                          blur: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur')) ? "FAIL" : "PASS", note: "Fokus subjek utama tajam secara sempurna." },
-                                          composition: { status: "PASS", note: "Komposisi seimbang dengan rule of thirds." },
-                                          lighting: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure')) ? "FAIL" : "PASS", note: "Pencahayaan terdistribusi merata dengan detail tinggi." },
-                                          watermark: { status: "PASS", note: "Tidak mendeteksi watermark komersial." },
-                                          logo: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Bebas dari logo atau hak cipta merek dagang." },
-                                          text: { status: "PASS", note: "Tidak ada teks overlay mengganggu." },
-                                          anatomical_errors: { status: "PASS", note: "Struktur anatomi subjek terlihat alami." },
-                                          ip_risk: { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: "Aman dari potensi resiko paten atau desain khas." },
-                                          proportion_defects: { status: "PASS", note: "Proporsi geometri dan anatomi subjek proporsional." },
-                                          stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
-                                          metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
-                                        };
+                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || (() => {
+                                          const isBlur = (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur') || i.toLowerCase().includes('sharpness') || i.toLowerCase().includes('tajam') || i.toLowerCase().includes('fokus'));
+                                          const isComposition = (r.technical_issues || []).some(i => i.toLowerCase().includes('composition') || i.toLowerCase().includes('crop') || i.toLowerCase().includes('komposisi') || i.toLowerCase().includes('miring'));
+                                          const isLighting = (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure') || i.toLowerCase().includes('cahaya') || i.toLowerCase().includes('gelap') || i.toLowerCase().includes('terang'));
+                                          const isWatermark = (r.technical_issues || []).some(i => i.toLowerCase().includes('watermark') || i.toLowerCase().includes('tanda air'));
+                                          const isLogo = (r.legal_status || '').includes('VIOLATION') || (r.technical_issues || []).some(i => i.toLowerCase().includes('logo') || i.toLowerCase().includes('brand') || i.toLowerCase().includes('merek'));
+                                          const isText = (r.technical_issues || []).some(i => i.toLowerCase().includes('text') || i.toLowerCase().includes('tulisan') || i.toLowerCase().includes('huruf'));
+                                          const isAnatomy = (r.technical_issues || []).some(i => i.toLowerCase().includes('anatomy') || i.toLowerCase().includes('anatom') || i.toLowerCase().includes('tangan') || i.toLowerCase().includes('jari'));
+                                          const isIpRisk = (r.legal_status || '').includes('VIOLATION') || (r.legal_status || '').includes('AT_RISK') || (r.technical_issues || []).some(i => i.toLowerCase().includes('ip') || i.toLowerCase().includes('patent') || i.toLowerCase().includes('restriction'));
+                                          const isProportion = (r.technical_issues || []).some(i => i.toLowerCase().includes('proportion') || i.toLowerCase().includes('proporsi') || i.toLowerCase().includes('geometry') || i.toLowerCase().includes('geometri'));
+
+                                          return {
+                                            blur: { status: isBlur ? "FAIL" : "PASS", note: isBlur ? (isIndo ? "Terdeteksi masalah fokus, soft focus, atau blur pada subjek utama." : "Focus, soft focus, or blur issues detected on the main subject.") : (isIndo ? "Fokus subjek utama tajam secara sempurna." : "Main subject focus is perfectly sharp.") },
+                                            composition: { status: isComposition ? "FAIL" : "PASS", note: isComposition ? (isIndo ? "Komposisi kurang seimbang atau terdapat pemotongan subjek canggung." : "Composition is unbalanced or awkward subject cropping detected.") : (isIndo ? "Komposisi seimbang dengan rule of thirds." : "Balanced composition matching the rule of thirds.") },
+                                            lighting: { status: isLighting ? "FAIL" : "PASS", note: isLighting ? (isIndo ? "Terdeteksi masalah pencahayaan tidak seimbang, overexposure, atau underexposure." : "Unbalanced lighting, overexposure, or underexposure detected.") : (isIndo ? "Pencahayaan terdistribusi merata dengan detail tinggi." : "Evenly distributed lighting with high details.") },
+                                            watermark: { status: isWatermark ? "FAIL" : "PASS", note: isWatermark ? (isIndo ? "Terdeteksi watermark komersial atau tanda air pada gambar." : "Commercial watermark or text watermark detected.") : (isIndo ? "Tidak mendeteksi watermark komersial." : "No commercial watermarks detected.") },
+                                            logo: { status: isLogo ? "FAIL" : "PASS", note: isLogo ? (isIndo ? "Terdeteksi logo merek dagang atau hak cipta pada gambar." : "Trademark logo or copyright symbol detected on the image.") : (isIndo ? "Bebas dari logo atau hak cipta merek dagang." : "Free of trademark logos or copyright symbols.") },
+                                            text: { status: isText ? "FAIL" : "PASS", note: isText ? (isIndo ? "Terdeteksi teks atau tulisan yang mengganggu estetika komersial." : "Overlay text or writing detected that disrupts commercial aesthetics.") : (isIndo ? "Tidak ada teks overlay mengganggu." : "No disruptive overlay text.") },
+                                            anatomical_errors: { status: isAnatomy ? "FAIL" : "PASS", note: isAnatomy ? (isIndo ? "Terdeteksi anomali struktur tubuh atau anatomi subjek." : "Anatomical anomalies or body structure defects detected.") : (isIndo ? "Struktur anatomi subjek terlihat alami." : "Subject's anatomical structure looks natural.") },
+                                            ip_risk: { status: isIpRisk ? "FAIL" : "PASS", note: isIpRisk ? (isIndo ? "Terdeteksi potensi risiko kekayaan intelektual (IP) atau desain produk khas." : "Potential intellectual property (IP) or unique trade dress design risk detected.") : (isIndo ? "Aman dari potensi resiko paten atau desain khas." : "Safe from potential patent or unique design risks.") },
+                                            proportion_defects: { status: isProportion ? "FAIL" : "PASS", note: isProportion ? (isIndo ? "Terdeteksi ketidaksesuaian proporsi atau cacat geometri pada objek." : "Proportional mismatch or geometrical defects detected on the object.") : (isIndo ? "Proporsi geometri dan anatomi subjek proporsional." : "Geometrical proportions and anatomy are proportional.") },
+                                            stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || (r.recommendation === "PASS" ? (isIndo ? "Gambar memenuhi standar kurator komersial." : "The image meets commercial curator standards.") : (isIndo ? "Gambar ditolak berdasarkan kriteria kurasi." : "The image is rejected based on curation criteria.")) },
+                                            metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
+                                          };
+                                        })();
 
                                         const checks = [
-                                          { label: 'Blur / Sharpness', key: 'blur', val: aiVisionChecks.blur },
-                                          { label: 'Composition / Crop', key: 'composition', val: aiVisionChecks.composition },
-                                          { label: 'Lighting / Contrast', key: 'lighting', val: aiVisionChecks.lighting },
-                                          { label: 'Watermark Check', key: 'watermark', val: aiVisionChecks.watermark },
-                                          { label: 'Logo Detection', key: 'logo', val: aiVisionChecks.logo },
-                                          { label: 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
-                                          { label: 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
-                                          { label: 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
-                                          { label: 'Proportion & Geometry', key: 'proportion_defects', val: aiVisionChecks.proportion_defects },
-                                          { label: 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },
+                                          { label: isIndo ? 'Ketajaman / Fokus' : 'Blur / Sharpness', key: 'blur', val: aiVisionChecks.blur },
+                                          { label: isIndo ? 'Komposisi / Pemotongan' : 'Composition / Crop', key: 'composition', val: aiVisionChecks.composition },
+                                          { label: isIndo ? 'Pencahayaan / Kontras' : 'Lighting / Contrast', key: 'lighting', val: aiVisionChecks.lighting },
+                                          { label: isIndo ? 'Pengecekan Watermark' : 'Watermark Check', key: 'watermark', val: aiVisionChecks.watermark },
+                                          { label: isIndo ? 'Pendeteksian Logo' : 'Logo Detection', key: 'logo', val: aiVisionChecks.logo },
+                                          { label: isIndo ? 'Teks Overlay' : 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
+                                          { label: isIndo ? 'Integritas Anatomi' : 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
+                                          { label: isIndo ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
+                                          { label: isIndo ? 'Proporsi & Geometri' : 'Proportion & Geometry', key: 'proportion_defects', val: aiVisionChecks.proportion_defects },
+                                          { label: isIndo ? 'Penerimaan Stok' : 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },
                                         ];
 
                                         return (

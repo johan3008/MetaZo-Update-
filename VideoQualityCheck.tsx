@@ -82,6 +82,46 @@ export const VideoQualityCheck: React.FC<{
   db
 }) => {
   const [file, setFile] = useState<File | null>(null);
+  const isIndo = t.language === 'Bahasa';
+  const CHECK_ITEMS_LOCALIZED = CHECK_ITEMS.map(item => {
+    let label = item.label;
+    let desc = item.desc;
+    if (!isIndo) {
+      const enMap: Record<string, { label: string, desc: string }> = {
+        blur: { label: 'Blur', desc: 'Checks the focus clarity of the main subject.' },
+        noise: { label: 'Noise', desc: 'Detects excessive digital noise or grain.' },
+        compression_artifacts: { label: 'Compression Artifacts', desc: 'Detects macro-blocking distortion from high video compression.' },
+        blocking: { label: 'Blocking', desc: 'Detects blocky or pixelated distortion.' },
+        banding: { label: 'Banding', desc: 'Checks for color banding/transitions on flat gradients.' },
+        overexposure: { label: 'Overexposed', desc: 'Detects areas that are too bright, losing detail.' },
+        underexposure: { label: 'Underexposed', desc: 'Detects areas that are too dark, losing detail.' },
+        white_balance: { label: 'White Balance', desc: 'Detects color balance issues.' },
+        motion_blur: { label: 'Motion Blur', desc: 'Detects blurring caused by subject movement.' },
+        camera_shake: { label: 'Camera Shake', desc: 'Checks for extreme camera shake or instability.' },
+        out_of_focus: { label: 'Out of Focus', desc: 'Detects soft or missed focus on the main subject.' },
+        flickering: { label: 'Flickering', desc: 'Detects rapid changes in brightness or light flickering.' },
+        duplicate_frame: { label: 'Duplicate Frames', desc: 'Detects repeated static frames.' },
+        empty_frame: { label: 'Empty Frames', desc: 'Detects completely empty frames.' },
+        black_frame: { label: 'Black Frames', desc: 'Detects completely black frames.' },
+        frozen_frame: { label: 'Frozen Frames', desc: 'Detects frozen or stuck frames.' },
+        watermark: { label: 'Watermark', desc: 'Detects watermarks or copyright overlays.' },
+        logo: { label: 'Logo', desc: 'Detects brand logos or copyrighted trademarks.' },
+        text: { label: 'Text', desc: 'Detects distracting overlay text or writings.' },
+        ai_artifact: { label: 'AI Artifacts', desc: 'Detects generative AI inconsistencies or distortions.' },
+        deformed_object: { label: 'Deformed Objects', desc: 'Detects unnatural or deformed geometries.' },
+        bad_anatomy: { label: 'Bad Anatomy', desc: 'Detects disproportionate anatomical structures.' },
+        cropped_subject: { label: 'Cropped Subject', desc: 'Detects awkwardly cropped subjects at frame borders.' },
+        cut_off_object: { label: 'Cut-off Objects', desc: 'Detects main objects cut off by frame boundaries.' },
+        wrong_perspective: { label: 'Wrong Perspective', desc: 'Detects misaligned or incorrect perspective.' },
+        low_aesthetic_quality: { label: 'Low Aesthetic Quality', desc: 'Detects generally low aesthetic or commercial appeal.' }
+      };
+      if (enMap[item.key]) {
+        label = enMap[item.key].label;
+        desc = enMap[item.key].desc;
+      }
+    }
+    return { ...item, label, desc };
+  });
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -452,17 +492,22 @@ export const VideoQualityCheck: React.FC<{
             <div className={`p-6 sm:p-8 flex items-center justify-between border-b ${
               report.recommendation === 'PASS' 
                 ? 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/50 dark:bg-emerald-900/10' 
+                : report.recommendation === 'RETOUCH'
+                ? 'border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'
                 : 'border-red-100 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10'
             }`}>
               <div className="flex items-center gap-4">
                 {report.recommendation === 'PASS' ? (
                   <CheckCircle className="w-10 h-10 text-emerald-500" />
+                ) : report.recommendation === 'RETOUCH' ? (
+                  <AlertCircle className="w-10 h-10 text-amber-500" />
                 ) : (
                   <AlertCircle className="w-10 h-10 text-red-500" />
                 )}
                 <div>
                   <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-                    {report.recommendation === 'PASS' ? 'Lolos (PASS)' : 'Ditolak (FAIL)'}
+                    {report.recommendation === 'PASS' ? 'Lolos (PASS)' : 
+                     report.recommendation === 'RETOUCH' ? 'Perlu Perbaikan (RETOUCH)' : 'Ditolak (FAIL)'}
                   </h3>
                   <div className="flex flex-wrap items-center gap-3 mt-2">
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">Overall: {report.overall_score}/100</span>
@@ -523,10 +568,10 @@ export const VideoQualityCheck: React.FC<{
               {/* Detailed Quality Audit Checklist */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
-                  Hasil Pemeriksaan Kualitas Video ({CHECK_ITEMS.length} Checkpoints)
+                  {isIndo ? 'Hasil Pemeriksaan Kualitas Video' : 'Video Quality Check Results'} ({CHECK_ITEMS.length} Checkpoints)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {CHECK_ITEMS.map((item) => {
+                  {CHECK_ITEMS_LOCALIZED.map((item) => {
                     const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
                     // Fallback to check if the key exists in technical_issues for resilience
                     const isFailedInIssues = report.technical_issues?.some(issue => 
@@ -540,7 +585,9 @@ export const VideoQualityCheck: React.FC<{
                       
                     const note = checkResult 
                       ? checkResult.note 
-                      : (isFailedInIssues ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Normal, tidak mendeteksi masalah.');
+                      : (isFailedInIssues 
+                          ? (isIndo ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Issues detected on this indicator.') 
+                          : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.'));
 
                     return (
                       <div 
@@ -580,7 +627,7 @@ export const VideoQualityCheck: React.FC<{
                 <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-white/5 p-6 rounded-2xl space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/5 pb-2">
                     <h4 className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                      Rekomendasi Judul & Kata Kunci SEO Video
+                      {isIndo ? 'Rekomendasi Judul & Kata Kunci SEO Video' : 'Recommended Title & SEO Keywords'}
                     </h4>
                     <span className="text-[9px] font-bold text-slate-400 uppercase font-mono">v5.0 Expert</span>
                   </div>
@@ -608,7 +655,7 @@ export const VideoQualityCheck: React.FC<{
                 {/* Issues */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400 flex items-center gap-2">
-                    Technical Issues ({report.technical_issues?.length || 0})
+                    {isIndo ? 'Masalah Teknis' : 'Technical Issues'} ({report.technical_issues?.length || 0})
                   </h4>
                   {report.technical_issues?.length > 0 ? (
                     <ul className="space-y-2">
@@ -620,14 +667,14 @@ export const VideoQualityCheck: React.FC<{
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-slate-500 italic">No technical issues detected.</p>
+                    <p className="text-sm text-slate-500 italic">{isIndo ? 'Tidak ada masalah teknis yang terdeteksi.' : 'No technical issues detected.'}</p>
                   )}
                 </div>
 
                 {/* Strengths */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                    Strengths ({report.strengths?.length || 0})
+                    {isIndo ? 'Kelebihan' : 'Strengths'} ({report.strengths?.length || 0})
                   </h4>
                   {report.strengths?.length > 0 ? (
                     <ul className="space-y-2">
@@ -639,7 +686,7 @@ export const VideoQualityCheck: React.FC<{
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-slate-500 italic">No particular strengths highlighted.</p>
+                    <p className="text-sm text-slate-500 italic">{isIndo ? 'Tidak ada kelebihan khusus yang disorot.' : 'No particular strengths highlighted.'}</p>
                   )}
                 </div>
               </div>
