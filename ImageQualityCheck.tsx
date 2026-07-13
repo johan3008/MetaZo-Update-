@@ -91,6 +91,8 @@ export const ImageQualityCheck: React.FC<{
   const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [currentProcessingFile, setCurrentProcessingFile] = useState<string | null>(null);
+  const [failedFiles, setFailedFiles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user && db) {
@@ -583,6 +585,7 @@ export const ImageQualityCheck: React.FC<{
     setProgress(0);
     setError(null);
     setReports({}); // Clear previous
+    setFailedFiles({});
     const newReports: Record<string, QualityReport> = {};
 
     const progressPerFile = 100 / targetFiles.length;
@@ -590,6 +593,7 @@ export const ImageQualityCheck: React.FC<{
     for (let i = 0; i < targetFiles.length; i++) {
       const file = targetFiles[i];
       const startProgress = i * progressPerFile;
+      setCurrentProcessingFile(file.name);
       
       try {
         // Increment internally a bit
@@ -706,11 +710,12 @@ export const ImageQualityCheck: React.FC<{
 
         setProgress(startProgress + progressPerFile);
       } catch (err: any) {
-        setError(err.message);
+        console.error(`Error analyzing ${file.name}:`, err);
+        setFailedFiles(prev => ({ ...prev, [file.name]: err.message || 'Error' }));
       }
     }
+    setCurrentProcessingFile(null);
     setProgress(100);
-    setTimeout(() => setLoading(true), 100); // Trigger a quick refresh state if needed
     setTimeout(() => setLoading(false), 300);
   };
 
@@ -971,7 +976,7 @@ export const ImageQualityCheck: React.FC<{
                                <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex flex-col items-center justify-center">
                                  <FileImage size={16} className="text-slate-400 mb-1" />
                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">EPS</span>
-                               </div>
+                                </div>
                             ) : (
                                <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
                             )
@@ -979,7 +984,29 @@ export const ImageQualityCheck: React.FC<{
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
-                          <p className="text-[9px] text-slate-400 font-black uppercase">{t.qc_pending_audit}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {reports[file.name] ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <p className="text-[9px] text-emerald-500 font-black uppercase">{t.qc_status_completed || 'Selesai'}</p>
+                              </>
+                            ) : currentProcessingFile === file.name ? (
+                              <>
+                                <Loader2 size={10} className="text-violet-500 animate-spin shrink-0" />
+                                <p className="text-[9px] text-violet-500 font-black uppercase animate-pulse">{t.qc_status_processing || 'Menganalisis...'}</p>
+                              </>
+                            ) : failedFiles[file.name] ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-rose-500"></span>
+                                <p className="text-[9px] text-rose-500 font-black uppercase truncate max-w-[120px]">{t.qc_status_error || 'Gagal'}</p>
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
+                                <p className="text-[9px] text-slate-400 font-black uppercase">{t.qc_pending_audit || 'Menunggu Antrean'}</p>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     ))}
@@ -993,7 +1020,7 @@ export const ImageQualityCheck: React.FC<{
         {/* Right Column: Visual Audit Reports */}
         <div className="xl:col-span-8">
           <AnimatePresence mode="wait">
-            {loading ? (
+            {loading && Object.keys(reports).length === 0 ? (
               <motion.div
                 key="loading-qc"
                 initial={{ opacity: 0, y: 20 }}
@@ -1508,6 +1535,39 @@ export const ImageQualityCheck: React.FC<{
                     </motion.div>
                   );
                 })}
+
+                {/* Active Curation Queue Card */}
+                {loading && currentProcessingFile && !reports[currentProcessingFile] && (
+                  <motion.div 
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="group bg-slate-50 dark:bg-slate-900/20 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[2rem] p-5 flex flex-col items-center justify-center min-h-[350px] text-center space-y-4 shadow-sm"
+                  >
+                    <div className="relative w-20 h-20 rounded-2xl overflow-hidden shrink-0 shadow-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                      {previews[currentProcessingFile] ? (
+                        (currentProcessingFile.match(/\.(mp4|mov|webm)$/i) || previews[currentProcessingFile].startsWith('data:video/')) ? (
+                          <video src={`${previews[currentProcessingFile]}#t=1`} className="w-full h-full object-cover" muted playsInline />
+                        ) : (
+                          <img src={previews[currentProcessingFile]} alt="" className="w-full h-full object-cover" />
+                        )
+                      ) : (
+                        <FileImage size={24} className="text-slate-400" />
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 size={24} className="text-white animate-spin" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black text-slate-800 dark:text-white truncate uppercase tracking-tight max-w-[200px] mx-auto">
+                        {currentProcessingFile}
+                      </p>
+                      <p className="text-[9px] font-black text-violet-500 uppercase tracking-[0.2em] mt-2 animate-pulse flex items-center justify-center gap-1.5">
+                        <Loader2 size={10} className="animate-spin text-violet-500 shrink-0" />
+                        {t.qc_status_processing || "Memproses..."}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
