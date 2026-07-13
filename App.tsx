@@ -1267,7 +1267,11 @@ const App: React.FC = () => {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [lastUid, setLastUid] = useState<string | null>(null);
 
-  const [promoCodesForModal, setPromoCodesForModal] = useState<any[]>([]);
+  const [promoCodesForModal, setPromoCodesForModal] = useState<any[]>(() => [
+    { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
+    { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
+    { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
+  ]);
   const [copiedCodeInModal, setCopiedCodeInModal] = useState<string | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
