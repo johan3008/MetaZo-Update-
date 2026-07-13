@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Database, Download, Upload, Cloud, HardDrive, History, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, getDocs, orderBy, limit, where } from '../supabase';
+import { supabase } from '../supabase';
 
 export const BackupManagerPanel: React.FC<{
   user: any;
@@ -72,28 +72,31 @@ export const BackupManagerPanel: React.FC<{
       
       const fetchSupabaseHistory = async () => {
         try {
-          
-          const backupsRef = collection(db, 'metadata_backups');
-          const q = query(backupsRef, where('uid', '==', user.uid), orderBy('created_at', 'desc'), limit(50));
-          const snapshot = await getDocs(q);
-          const data = snapshot.docs.map(doc => {
-            const d = doc.data();
+          if (!supabase) return;
+          const { data, error } = await supabase
+            .from('metadata_backups')
+            .select('*')
+            .eq('uid', user.uid)
+            .order('created_at', { ascending: false })
+            .limit(50);
+          if (error) throw error;
+          const historyList = (data || []).map(row => {
             let parsedItems = [];
             try {
-              parsedItems = typeof d.items === 'string' ? JSON.parse(d.items) : d.items;
+              parsedItems = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
             } catch(e) {}
             return {
-              id: d.id,
-              batchId: d.batch_id,
-              timestamp: d.timestamp,
-              tool: d.tool,
+              id: row.id,
+              batchId: row.batch_id,
+              timestamp: row.timestamp,
+              tool: row.tool,
               items: parsedItems,
-              createdAt: d.created_at
+              createdAt: row.created_at
             };
           });
           
           const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          const filteredCloud = data.filter((batch: any) => {
+          const filteredCloud = historyList.filter((batch: any) => {
             const createdTime = batch.createdAt ? new Date(batch.createdAt).getTime() : Date.now();
             return createdTime >= sevenDaysAgo;
           });

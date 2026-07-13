@@ -7,7 +7,7 @@ import {
   AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
-import { db, collection, getDocs, limit, query } from '../supabase';
+import { supabase } from '../supabase';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
 
@@ -121,41 +121,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const fetchPromos = async () => {
       setIsLoadingPromos(true);
       try {
-        const qSnap = await getDocs(query(collection(db, 'promos'), limit(5)));
+        if (!supabase) return;
+        const { data, error } = await supabase.from('promos').select('*').limit(5);
+        if (error) throw error;
         if (!active) return;
         const list: DashboardPromoCode[] = [];
         const now = new Date();
-        qSnap.forEach((doc) => {
-          const d = doc.data();
-          const usedCount = Number(d.usedCount || 0);
-          const maxUses = Number(d.maxUses || 0);
+        (data || []).forEach((row: any) => {
+          const usedCount = Number(row.used_count || 0);
+          const maxUses = Number(row.max_uses || 0);
           
           // Filter out expired by uses
           if (usedCount >= maxUses) return;
 
           // Filter out which hasn't started yet
-          if (d.startDate) {
-            const start = new Date(d.startDate);
+          if (row.start_date) {
+            const start = new Date(row.start_date);
             if (now < start) return;
           }
 
           // Filter out which has ended
-          if (d.endDate) {
-            const endStr = d.endDate;
+          if (row.end_date) {
+            const endStr = row.end_date;
             const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
             if (now > end) return;
           }
 
           list.push({
-            id: doc.id,
-            code: d.code || doc.id,
-            type: d.type || 'free_premium',
-            value: Number(d.value || 0),
+            id: row.id || row.key || '',
+            code: row.code || row.id || '',
+            type: row.type || 'free_premium',
+            value: Number(row.value || 0),
             maxUses,
             usedCount,
-            description: d.description || '',
-            startDate: d.startDate || '',
-            endDate: d.endDate || '',
+            description: row.description || '',
+            startDate: row.start_date || '',
+            endDate: row.end_date || '',
           });
         });
         setPromoCodes(list);

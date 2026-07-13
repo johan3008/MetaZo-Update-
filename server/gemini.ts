@@ -3616,15 +3616,14 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
 5. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
-   - Structural & Mechanical Failures: Objek buatan AI harus logis, namun Adobe Stock memberikan toleransi pada cacat mekanis/geometri kecil pada gambar yang sangat estetik. Jika itu keyboard, alat elektronik, drone, atau kamera, cacat minor pada tombol atau lekukan (sedikit meleleh/fused) DAPAT DILOLOSKAN selama tidak merusak komposisi utama. Hanya kegagalan struktural yang SANGAT parah dan jelas yang menyebabkan FAIL.
-   - Anatomi Cacat (Deformed Anatomy): Cacat anatomi minor (seperti jari tangan yang agak menyatu, sedikit bengkok, mata sedikit asimetris di kejauhan, atau proporsi yang agak janggal) SERINGKALI DILOLOSKAN oleh Adobe Stock jika gambar tersebut memiliki nilai komersial dan pencahayaan yang luar biasa (highly aesthetic). Jangan terlalu pedantic. Berikan FAIL HANYA jika cacat anatominya sangat mengerikan, berada tepat di titik fokus utama (wajah utama terdistorsi hebat), dan merusak nilai jual gambar sepenuhnya.
-   - Teks Kacau (Gibberish Text): Teks acak (gibberish) pada objek utama yang sangat mencolok = FAIL. Namun, jika teks acak tersebut berada di latar belakang yang blur, atau berukuran sangat kecil (seperti pada tombol kecil), LOLOSKAN.
-   - Geometri & Polusi Visual AI: Loloskan masalah tekstur kulit (waxy skin) atau cacat bentuk minor jika gambar memiliki gaya sinematik, fantasi, atau hiper-realistis yang menarik minat pembeli. Estetika dan nilai jual (commercial value) JAUH LEBIH PENTING daripada kesempurnaan logika AI tingkat piksel.
+   - Structural & Mechanical Failures: Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, sambungan dinding/papan yang miring atau terputus secara aneh, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
+   - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
    - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Bayangan subjek yang arahnya tidak konsisten dengan sumber cahaya di scene, subjek yang terlihat "ditempel" tanpa kedalaman/depth yang menyatu dengan latar, atau pencahayaan pada subjek yang tidak cocok secara fisik dengan lingkungan sekitarnya = FAIL.
 
    PENTING - PRINSIP PENILAIAN GENERATIVE AI (REALISTIS & KOMERSIAL):
-   1. Adobe Stock adalah marketplace komersial yang mengutamakan estetika dan daya jual (commercial value). Jangan sekali-kali menolak gambar AI hanya karena mendeteksi bahwa gambar tersebut dibuat oleh AI, jika tidak ada cacat visual fatal yang merusak kegunaan gambar.
-   2. Selama anomali AI sangat minor (seperti tombol kecil yang agak asimetris, lekukan kecil pada keyboard di latar belakang, detail pola berulang yang tidak 100% lurus tapi tidak mencolok), tetap loloskan dengan status PASS.
+   1. Adobe Stock adalah marketplace komersial yang mengutamakan estetika dan daya jual (commercial value). Jika sebuah gambar memiliki cacat visual yang jelas (seperti teks cakar ayam AI atau laci kabinet meleleh), gambar tersebut wajib dinilai FAIL tanpa toleransi.
+   2. Selama anomali AI sangat minor (seperti tombol kecil yang agak asimetris jauh di latar belakang yang blur), tetap loloskan dengan status PASS.
 
 6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
    CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
@@ -3684,7 +3683,12 @@ Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
 
 ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
-Buatlah isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual dari kurator ahli. Sebutkan secara spesifik apa saja objek di dalam gambar, bagaimana kondisi pencahayaannya secara presisi, bagaimana tekstur permukaannya, apa yang membuat komposisinya bagus atau buruk, dan berikan alasan yang sangat kuat layaknya kritikus fotografi tingkat dewa (seperti output di kurator.dvaren.online). JANGAN gunakan kalimat generik/template yang pendek.
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual. Anda DILARANG HANYA menganalisis subjek utama! Anda WAJIB menganalisis dan mendokumentasikan empat aspek berikut secara terpisah pada gambar:
+      - **Analisis Subjek Utama (Subject)**: Detail ketajaman fokus, detail permukaan, geometri, dan eksposur subjek utama.
+      - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Kerapian, elemen sisa, bokeh, kebersihan latar, dan keberadaan bintik debu/sensor dust.
+      - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, keberadaan area blown-out highlights atau crushed shadows.
+      - **Analisis Kerapian Piksel & Risiko Hukum (Pixel Integrity, IP & AI Risks)**: Noise digital di sudut-sudut gambar, chromatic aberration, micro-logos, teks cakar ayam AI, atau cacat struktur geometri buatan AI di seluruh area gambar.
+2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`ip_risk\`, \`proportion_defects\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang seperti "Fokus subjek utama tajam secara sempurna" atau "Aman dari potensi resiko paten". Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di gambar ini (contoh: "Fokus lensa sangat tajam pada kelopak bunga krisan merah di bagian tengah, dengan latar belakang mengalami de-fokus bokeh yang halus").
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -3793,9 +3797,10 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   let lastError;
 
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. [Unique Session Seed: ${randomSeed}]` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -4306,15 +4311,14 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
 
 6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
-   - Structural & Mechanical Failures: Objek buatan AI harus logis, namun Adobe Stock memberikan toleransi pada cacat mekanis/geometri kecil pada video yang sangat estetik. Jika itu keyboard, alat elektronik, drone, atau kamera, cacat minor pada tombol atau lekukan (sedikit meleleh/fused) DAPAT DILOLOSKAN selama tidak merusak komposisi utama. Hanya kegagalan struktural yang SANGAT parah dan jelas yang menyebabkan FAIL.
-   - Temporal Inconsistency & Morphing: Perhatikan perubahan bentuk (morphing) antar frame. Jika morphing sangat halus dan tidak mengganggu estetika (wajar dalam video AI generatif), DILOLOSKAN. Namun jika wajah manusia atau objek utama berubah bentuk secara mengerikan dan drastis di tengah video = FAIL.
-   - Anatomi Cacat & AI Hallucinations: Cacat anatomi minor (seperti jari tangan yang agak menyatu, sedikit bengkok, atau proporsi yang agak janggal) SERINGKALI DILOLOSKAN oleh Adobe Stock jika video tersebut memiliki nilai komersial dan pencahayaan yang luar biasa. Berikan FAIL HANYA jika cacat anatominya sangat mengerikan, berada tepat di titik fokus utama (wajah utama terdistorsi hebat), dan merusak nilai jual video sepenuhnya.
-   - Teks Kacau (Gibberish Text): Teks acak (gibberish) pada objek utama yang sangat mencolok = FAIL. Namun, jika teks acak tersebut berada di latar belakang yang blur, atau berukuran sangat kecil, LOLOSKAN.
-   - Geometri & Polusi Visual AI: Loloskan masalah tekstur kulit (waxy skin) atau cacat bentuk minor jika video memiliki gaya sinematik yang menarik minat pembeli. Estetika dan nilai jual JAUH LEBIH PENTING daripada kesempurnaan logika AI tingkat piksel.
+   - Structural & Mechanical Failures: Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, sambungan dinding/papan yang miring atau terputus secara aneh, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
+   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
+   - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
+   - Temporal Inconsistency & Morphing: Perhatikan perubahan bentuk (morphing) antar frame. Jika wajah manusia atau objek utama berubah bentuk secara mengerikan dan drastis di tengah video = FAIL.
    - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Loloskan ketidakkonsistenan bayangan minor antar-frame selama video terlihat memukau secara keseluruhan. Berikan FAIL hanya jika render artifact membuat pencahayaan sama sekali tidak cocok secara fisik hingga merusak estetika.
 
    PENTING - PRINSIP PENILAIAN GENERATIVE AI VIDEO (REALISTIS & KOMERSIAL):
-   1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jangan menolak video AI hanya karena terdeteksi dibuat oleh AI jika tidak ada cacat gerakan atau cacat visual fatal yang merusak kegunaan video.
+   1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jika sebuah video memiliki cacat visual yang jelas (seperti teks cakar ayam AI atau laci kabinet meleleh), video tersebut wajib dinilai FAIL tanpa toleransi.
    2. Selama anomali AI sangat minor antar-frame (seperti sedikit morphing latar belakang yang wajar, objek statis di latar belakang yang mengalami sedikit perubahan tekstur halus), tetap loloskan dengan status PASS.
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
@@ -4355,7 +4359,13 @@ Kurator Adobe Stock dan pembeli premium menghargai video yang berkualitas. Anda 
 2. JANGAN HALU TENTANG KONSISTENSI (NO HALLUCINATIONS): Jangan mengatakan "objek menghilang" atau "kegagalan logika struktural" secara sembarangan. Buktikan HANYA jika cacatnya 100% nyata dan terlihat secara visual (misalnya ada bagian tubuh yang benar-benar hilang/terpotong). Jika tidak ada bukti cacat visual yang nyata di frame tersebut, jangan buat-buat alasan penolakan!
 3. TOLERANSI WAJAR: Jika video terlihat estetik dan tidak ada kejanggalan visual yang merusak komposisi secara fatal, video tersebut layak lulus (PASS).
 ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
-Buatlah isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual dari kurator ahli. Sebutkan secara spesifik apa saja objek di dalam video, bagaimana kondisi pencahayaannya secara presisi, bagaimana pergerakan/stabilitasnya, tekstur permukaannya, apa yang membuat komposisinya bagus atau buruk, dan berikan alasan yang sangat kuat layaknya kritikus sinematografi tingkat dewa (seperti output di kurator.dvaren.online). JANGAN gunakan kalimat generik/template yang pendek.
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual. Anda DILARANG HANYA menganalisis subjek utama! Anda WAJIB menganalisis dan mendokumentasikan empat aspek berikut secara terpisah pada 6 frame video:
+      - **Analisis Subjek Utama (Subject)**: Detail ketajaman fokus, pergerakan, geometri, dan kestabilan subjek utama.
+      - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Keadaan latar depan/belakang, noise, compression artifacts, macro-blocking, atau color banding di bidang latar belakang.
+      - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, flickering, serta keberadaan area overexposed/underexposed pada subjek maupun lingkungan.
+      - **Analisis Kestabilan Frame & Risiko Hukum (Stability, IP & AI Risks)**: Guncangan kamera, rolling shutter (jello/skew effect), micro-logos, watermark, teks AI, atau kejanggalan struktur geometri AI antar-frame.
+2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di video ini (contoh: "Noise digital sangat minim, hanya terlihat grain halus yang estetis pada area bayangan di kuadran kanan bawah pada frame 3 dan 4").
+3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName} yang relevan untuk mikrostock.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -4433,9 +4443,17 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 },
                 required: ["type", "x", "y", "intensity", "raw_value"]
             }
+        },
+        metadata: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING },
+                keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["title", "keywords"]
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps", "metadata"]
   };
 
   const imageParts = frames.map(f => processFrameServer(f));
@@ -4445,9 +4463,10 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   let lastError;
 
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}. [Unique Session Seed: ${randomSeed}]` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,

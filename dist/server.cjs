@@ -232,7 +232,7 @@ var TRANSLATIONS = {
     sidebar_prompt_text: "Text Prompt",
     sidebar_prompt_image: "Image Prompt",
     sidebar_prompt_video: "Video Prompt",
-    sidebar_image_check: "Image Check",
+    sidebar_image_check: "Media Quality Check",
     sidebar_calendar_gen: "Calendar Gen",
     sidebar_chat: "Account Chat",
     sidebar_activation_premium: "ACTIVATE PREMIUM",
@@ -669,7 +669,7 @@ var TRANSLATIONS = {
     sidebar_prompt_text: "Prompt Teks",
     sidebar_prompt_image: "Prompt Gambar",
     sidebar_prompt_video: "Prompt Video",
-    sidebar_image_check: "Kurator Adobe Cek",
+    sidebar_image_check: "Cek Gambar & Video",
     sidebar_calendar_gen: "Gen Kalender",
     sidebar_chat: "Chat Akun",
     sidebar_activation_premium: "AKTIVASI PREMIUM",
@@ -1008,31 +1008,7 @@ var TRANSLATIONS = {
 // server/gemini.ts
 var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
-var import_node_crypto = __toESM(require("node:crypto"), 1);
 var apiKeyStorage = new import_node_async_hooks.AsyncLocalStorage();
-var CACHE_FILE_PATH = import_node_path.default.join(process.cwd(), "qa_reports_cache.json");
-var qaCacheMap = /* @__PURE__ */ new Map();
-function loadQACache() {
-  try {
-    if (import_node_fs.default.existsSync(CACHE_FILE_PATH)) {
-      const content = import_node_fs.default.readFileSync(CACHE_FILE_PATH, "utf-8");
-      const obj = JSON.parse(content);
-      qaCacheMap = new Map(Object.entries(obj));
-      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached reports successfully.`);
-    }
-  } catch (err) {
-    console.warn("[QA Cache] Error loading cache file, starting fresh:", err);
-  }
-}
-function saveQACache() {
-  try {
-    const obj = Object.fromEntries(qaCacheMap.entries());
-    import_node_fs.default.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("[QA Cache] Error saving cache file:", err);
-  }
-}
-loadQACache();
 try {
   const envPath = import_node_path.default.join(process.cwd(), ".env");
   if (import_node_fs.default.existsSync(envPath)) {
@@ -4237,11 +4213,9 @@ async function checkImageQuality(image, tolerance = "MEDIUM", language = "Bahasa
   const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes("postscript");
   const isIndonesian = !language || language === "Bahasa" || language === "id" || language === "Indonesian" || language?.toLowerCase() === "indonesian" || language?.toLowerCase() === "id";
   const targetLanguageName = isIndonesian ? "Indonesian (Bahasa Indonesia)" : "English";
-  const cacheKeyInput = `${image}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = import_node_crypto.default.createHash("sha256").update(cacheKeyInput).digest("hex");
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap gambar/vektor komersial yang diunggah.
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap SELURUH area gambar/vektor komersial yang diunggah. Anda WAJIB menganalisis seluruh data gambar secara mendalam sampai ke tingkat piksel (pixel-level analysis). Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas gambar secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
 
 ---
 PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
@@ -4288,46 +4262,40 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
-5. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
-   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau gitar, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling. Anatomi yang secara biologis tidak mungkin = FAIL INSTAN.
-   - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, perspektif arsitektur patah tajam, atau objek melayang tanpa gravitasi.
-   - Polusi Visual AI: Loloskan HANYA jika masalah tekstur kulit (waxy skin) sangat halus pada gambar bergaya sinematik/fantasi. Namun CACAT BENTUK = FAIL.
+5. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
+   - Structural & Mechanical Failures: Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, sambungan dinding/papan yang miring atau terputus secara aneh, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
+   - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
+   - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Bayangan subjek yang arahnya tidak konsisten dengan sumber cahaya di scene, subjek yang terlihat "ditempel" tanpa kedalaman/depth yang menyatu dengan latar, atau pencahayaan pada subjek yang tidak cocok secara fisik dengan lingkungan sekitarnya = FAIL.
 
-6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
-   - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
-   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
-   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
-     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
-     * Landmark atau monumen tertentu tidak dapat diterima, bahkan dengan rilis properti (certain landmarks or monuments cannot be accepted, even with releases).
-     * Arsitektur modern dengan desain yang unik atau mudah dikenali (modern architecture with a unique or recognizable design) ketika ditampilkan sebagai fokus utama tanpa rilis properti.
-     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta milik SETE). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
-     * Burj Al Arab, Burj Khalifa (Dubai)
-     * Sydney Opera House (Australia)
-     * Atomium (Brussels)
-     * Louvre Pyramid (Paris)
-     * Space Needle (Seattle)
-     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
-     * Istana Neuschwanstein (Jerman)
-     * CN Tower (Toronto)
-     * The Shard, London Eye, Tower Bridge (London)
-     * Transamerica Pyramid (San Francisco)
-     * Kuil Sagrada Fam\xEDlia (khusus bagian interior)
-     * Taipei 101 (Taiwan)
-     * Menara Kembar Petronas (Malaysia)
-     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual:
-     * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pok\xE9mon, tokoh anime, superhero Marvel/DC).
-     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas:
-     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
-     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
-   - Hak Pribadi & Tubuh (Biometrics):
-     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+   PENTING - PRINSIP PENILAIAN GENERATIVE AI (REALISTIS & KOMERSIAL):
+   1. Adobe Stock adalah marketplace komersial yang mengutamakan estetika dan daya jual (commercial value). Jika sebuah gambar memiliki cacat visual yang jelas (seperti teks cakar ayam AI atau laci kabinet meleleh), gambar tersebut wajib dinilai FAIL tanpa toleransi.
+   2. Selama anomali AI sangat minor (seperti tombol kecil yang agak asimetris jauh di latar belakang yang blur), tetap loloskan dengan status PASS.
+
+6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+   CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
+
+   - Merek & Logo Komersial: Logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun. Contoh: Apple, Nike (swoosh, "Just Do It", desain Jordan), Adidas (tiga strip), Google (termasuk Google Home/Nest), Amazon, Coca-Cola, Mercedes-Benz, BMW, DJI, LV (monogram/checker Louis Vuitton), Burberry (motif "haymarket check"), Tiffany (warna "Tiffany blue" pada kemasan perhiasan), Vans (logo, side stripe, desain Old Skool/Checkerboard), Pantone, Fairtrade, Greenpeace, Instacart, Vorwerk/Thermomix.
+   - Desain Khas & Bentuk Produk (Trade Dress): Desain fisik ikonik sebagai subjek utama, meski tanpa logo terlihat. Contoh: Lego/Duplo (bata & figurin), boneka Barbie, Rubik's Cube, Monopoly, Twister, Funko Pop (kepala kotak besar), Hello Kitty/Sanrio, Elf on the Shelf, Devil Duckie, Tatty Teddy, View-Master, Slinky, permen Hershey's Kisses (bentuk & foil), Crayola (crayon & kemasan), elektronik Apple (bodi iPhone/MacBook/iPad, notch, tombol home), kamera Polaroid klasik, drone DJI Phantom/Mavic, sepatu Converse Chuck Taylor, Dr. Martens (jahitan kuning), sol merah Christian Louboutin, Beats by Dre, Zippo (terbuka/tertutup), korek/termos Stabilo, Weber grill, Duracell (tutup tembaga), Absolut Vodka & Crystal Head Vodka (bentuk botol), Kikkoman (botol & tutup), Chemex, perabot desainer (designer furniture).
+   - Desain Otomotif & Kendaraan Khas: Grille BMW kidney, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik, VW Beetle/Kombi klasik, mesin pertanian John Deere (hijau-kuning) atau Claas (hijau-merah), senjata replika desain Glock.
+   - Karakter Fiksi & Waralaba Berhak Cipta: Karakter Disney/Pixar (termasuk taman & properti Disney), Mickey Mouse, Pok\xE9mon, superhero Marvel/DC, Batmobile atau kendaraan mirip tema Batman, Minecraft (logo/block pixelated), Pac-Man, Totoro, frasa "Star Wars" atau "May the Fourth Be With You", tema Warhammer.
+   - Organisasi, Olahraga & Lambang Resmi: Cincin Olimpiade/obor/maskot, FIFA & logo World Cup, UEFA & Euro Cup, NFL/Super Bowl (nama, logo, trofi), Rugby World Cup, CrossFit, lambang PBB (UN emblem), NASA (insignia "meatball", logo "worm", seal, nama misi), palang merah/bulan sabit merah di atas latar putih, lencana/emblem kepolisian atau militer (termasuk US Marine Corps/Semper Fi, RCMP), simbol resmi pemerintah China, logo transportasi umum (MTA New York, London Underground, Paris RATP/M\xE9tro, TGV, ICE Deutsche Bahn, BART, CTA Chicago, LA Metro, MBTA Boston, SEPTA Philadelphia, PATH) - nama, logo, skema warna kereta/bus yang khas dilindungi hak cipta.
+   - Selebriti, Tokoh Publik & Body Likeness: Wajah/rupa selebriti yang dapat dikenali untuk penggunaan komersial DILARANG (peniru/impersonator diperbolehkan HANYA dengan model release yang mencantumkan kata "impersonator"). Termasuk larangan menyerupai tokoh sejarah terkenal seperti Albert Einstein sebagai fokus utama.
+   - Bangunan, Landmark & Lokasi Berbayar/Terlarang (SANGAT KETAT - berlaku bahkan dengan property release untuk sebagian besar):
+     * Interior-only restriction (interior dilarang, eksterior umumnya boleh): Notre-Dame de Paris, Hagia Sophia, Colosseum, Sistine Chapel, Sheikh Zayed Grand Mosque, Sagrada Fam\xEDlia (interior).
+     * Bangunan/struktur dengan larangan penuh sebagai fokus utama: Menara Eiffel di malam hari (tata cahaya berhak cipta SETE - siang hari aman), Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, CN Tower, The Shard, London Eye, Taipei 101, Menara Kembar Petronas, Empire State Building, Chrysler Building, Flatiron Building, One World Trade Center, Willis Tower (Sears Tower), Grand Central Terminal (termasuk jamnya), Rockefeller Center, Radio City Music Hall, Madison Square Garden, Vessel (NYC), Space Needle, Tokyo Tower, Tokyo Skytree, Shanghai Tower, Neuschwanstein Castle, Graceland, Hollywood Sign & Walk of Fame.
+     * Patung/instalasi seni publik ikonik: Cloud Gate ("The Bean" Chicago), Charging Bull (Wall Street), Christ the Redeemer (Rio), Little Mermaid (Kopenhagen), Merlion (Singapura), Mannekin Pis (Brussels), Fremont Troll (Seattle), Marine Corps War Memorial/Iwo Jima, Martin Luther King Jr. Memorial, Holocaust Memorial (Peter Eisenman).
+     * Lokasi berbayar/bertiket (ticketed/restricted sites) tanpa property release, taman tema (Disney, SeaWorld, Universal), kebun binatang/akuarium berbrand (San Diego Zoo, Monterey Bay Aquarium), museum tertentu (Guggenheim, Getty Center), serta situs warisan arkeologis dengan pembatasan hukum lokal (Machu Picchu, Stonehenge, Chichen Itza, situs warisan Jepang).
+     * Arsitektur modern dengan desain unik/mudah dikenali sebagai fokus utama tanpa property release, meskipun bukan bangunan terkenal secara global.
+   - Karya Seni & Hak Cipta Visual Lainnya: Karya cipta orang lain (lukisan, patung, street art/graffiti, mural, ilustrasi, font spesifik, elemen grafis) yang menjadi fokus utama tanpa izin.
+   - Dokumen Negara, Uang & Identitas: Uang kertas/koin utuh dari negara mana pun sebagai fokus utama (risiko pemalsuan); prangko AS yang diterbitkan setelah 1971, atau prangko yang menampilkan selebriti/karya berhak cipta/logo organisasi olahraga; paspor, SIM, KTP/ID, kartu kredit/debit, buku tabungan bank.
+   - Warna & Elemen Non-Logo yang Dilindungi sebagai Trade Dress: Warna coklat UPS pada seragam/truk pengiriman paket (dengan atau tanpa logo terlihat).
+   - Hak Pribadi & Tubuh (Biometrics): Tato unik pada subjek manusia (memerlukan property release dari seniman tato & model); wajah manusia yang dapat dikenali tanpa Model Release yang valid untuk penggunaan komersial.
+
+   PENTING - PENGECEKAN ATURAN IP & TRADEMARK SECARA REALISTIS (ADOBE STOCK COMPLIANCE):
+   1. Pengecualian Latar Belakang (Background Rule): Landmark berhak cipta (seperti Menara Eiffel, Burj Khalifa, skyline kota, dll.) atau logo kecil tidak mencolok yang berada jauh di latar belakang, blur (out of focus), atau hanya merupakan bagian minor dari komposisi kota (skyline umum) BUKANLAH dasar penolakan. Berikan penilaian SAFE/PASS. Penolakan IP hanya berlaku jika objek tersebut menjadi subjek utama/fokus utama gambar tanpa property release.
+   2. Pengecualian Produk Generik (Generic Product Rule): Perangkat elektronik (smartphone, laptop, TV, smartwatch), kendaraan (mobil, motor), atau perabot/furnitur yang tidak menampilkan logo resmi dan tidak meniru trade dress secara identik (seperti lekukan BMW grille atau notch khas iPhone) wajib diloloskan sebagai produk generik (SAFE/PASS). Jangan menolak ponsel pintar atau laptop biasa hanya karena bentuknya kotak tipis.
+   3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (kurang dari 1% luas gambar) pada kancing baju, label pakaian kecil, atau rambu jalan yang sangat jauh dan tidak mempromosikan merek tersebut secara mencolok wajib diberikan status SAFE/PASS karena bersifat insidental.
 
 ---
 ATURAN KHUSUS UNTUK VEKTOR (EPS/AI/SVG):
@@ -4352,14 +4320,22 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
-Kurator Adobe Stock dan pembeli premium sangat membenci gambar AI yang terlihat bagus sekilas namun cacat saat di-zoom. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
-1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama (seperti: tombol keyboard, senar/mekanisme instrumen atau busur, bentuk mata/jari, roda kendaraan, tulisan/layar). JANGAN NGAWUR dan jangan abaikan detail.
-2. JIKA ANDA MENEMUKAN KECACATAN SEKECIL APA PUN pada mekanika, teks (gibberish/alien), anatomi (meleleh/menyatu), atau elemen IP, Anda WAJIB MENGGAGALKANNYA (FAIL).
-3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat arsitektur/mekanis/teks pada subjek utama. Kegagalan rendering = FAIL. Ceritakan proses deteksi cacat Anda di visual_scan_analysis dengan jujur dan tajam.
+PENTING - PRIORITASKAN KETELITIAN VISUAL SECARA OBJEKTIF DAN LOGIS:
+Kurator Adobe Stock dan pembeli premium menghargai gambar yang berkualitas. Anda WAJIB bertindak sebagai auditor visual yang realistis, objektif, dan seperti manusia sungguhan.
+1. EVALUASI REALISTIS: Lakukan evaluasi secara wajar. JANGAN MENGARANG atau MENEBAK-NEBAK (hallucinate) cacat yang sebenarnya tidak ada. Jika gambar terlihat nyata dan bagus, berikan PASS.
+2. JANGAN HALU (NO HALLUCINATIONS): Jangan mengatakan objek menghilang, menyatu, atau memiliki teks kacau HANYA karena Anda mencurigai ini adalah AI. Buktikan hanya dari apa yang benar-benar terlihat di piksel gambar. Jika tidak ada bukti cacat di gambar, jangan buat-buat alasan penolakan!
+3. TOLERANSI WAJAR UNTUK KUALITAS: Jika sebuah karya terlihat sangat estetik dan tidak memiliki kejanggalan visual yang merusak komposisi secara nyata, karya tersebut layak lulus (PASS).
 PIXEL HEATMAPS (SANGAT PRESISI):
 Hanya berikan koordinat spesifik jika Anda BENAR-BENAR mendeteksi masalah visual nyata di piksel tersebut. Jangan pernah mengarang heatmap jika gambar berkualitas sempurna. Jika tidak ada masalah, array heatmaps wajib kosong ([]).
 "type" heatmap: pilih dari "noise", "focus", "lighting", "ip_violation", "artifact", "gen_ai_anomaly", "composition".
+
+ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual. Anda DILARANG HANYA menganalisis subjek utama! Anda WAJIB menganalisis dan mendokumentasikan empat aspek berikut secara terpisah pada gambar:
+      - **Analisis Subjek Utama (Subject)**: Detail ketajaman fokus, detail permukaan, geometri, dan eksposur subjek utama.
+      - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Kerapian, elemen sisa, bokeh, kebersihan latar, dan keberadaan bintik debu/sensor dust.
+      - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, keberadaan area blown-out highlights atau crushed shadows.
+      - **Analisis Kerapian Piksel & Risiko Hukum (Pixel Integrity, IP & AI Risks)**: Noise digital di sudut-sudut gambar, chromatic aberration, micro-logos, teks cakar ayam AI, atau cacat struktur geometri buatan AI di seluruh area gambar.
+2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`ip_risk\`, \`proportion_defects\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang seperti "Fokus subjek utama tajam secara sempurna" atau "Aman dari potensi resiko paten". Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di gambar ini (contoh: "Fokus lensa sangat tajam pada kelopak bunga krisan merah di bagian tengah, dengan latar belakang mengalami de-fokus bokeh yang halus").
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -4369,7 +4345,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     type: import_genai.Type.OBJECT,
     properties: {
       visual_scan_analysis: { type: import_genai.Type.STRING },
-      legal_status: { type: import_genai.Type.STRING },
+      legal_status: { type: import_genai.Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
       technical_issues: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.STRING } },
       strengths: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.STRING } },
       overall_score: { type: import_genai.Type.NUMBER },
@@ -4446,6 +4422,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           "text",
           "anatomical_errors",
           "ip_risk",
+          "proportion_defects",
           "stock_acceptance",
           "metadata"
         ]
@@ -4472,9 +4449,10 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   let responseText = "";
   let lastError;
   const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
+  const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: "Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided." }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. [Unique Session Seed: ${randomSeed}]` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -4495,8 +4473,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log("QA raw response:", text);
     const parsedResult = JSON.parse(text);
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
     return parsedResult;
   } catch (e) {
     console.warn("Parse Error:", responseText);
@@ -4876,16 +4852,9 @@ async function checkVideoQuality(frames, tolerance = "MEDIUM", language = "Bahas
   const provider = store && store.provider || "gemini";
   const isIndonesian = !language || language === "Bahasa" || language === "id" || language === "Indonesian" || language?.toLowerCase() === "indonesian" || language?.toLowerCase() === "id";
   const targetLanguageName = isIndonesian ? "Indonesian (Bahasa Indonesia)" : "English";
-  const framesDataCombined = Array.isArray(frames) ? frames.join("") : String(frames);
-  const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = import_node_crypto.default.createHash("sha256").update(cacheKeyInput).digest("hex");
-  if (qaCacheMap.has(cacheKey)) {
-    console.log(`[QA Cache] Hit for video quality check (key: ${cacheKey})`);
-    return qaCacheMap.get(cacheKey);
-  }
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 3 frame diam yang diekstrak dari bagian Awal, Tengah, dan Akhir video.
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 6 frame diam (gambar) beruntun yang diekstrak secara merata dari sepanjang durasi video (mewakili keseluruhan video dari awal hingga akhir). Analisislah seluruh frame tersebut sebagai satu kesatuan video. Anda WAJIB menganalisis seluruh data frame video secara mendalam sampai ke tingkat piksel (pixel-level analysis). Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas video secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
 
 ---
 PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
@@ -4921,6 +4890,8 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
    - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
    - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
+   - Upscaling (Resolusi Palsu): Video yang di-upscale secara paksa dari resolusi rendah ke resolusi lebih tinggi (misal HD dipaksa jadi 4K) WAJIB DITOLAK. Ciri-cirinya: ketajaman detail terlihat "dipaksakan"/lembek meski resolusi filenya besar, tekstur halus terlihat buram atau di-interpolasi, dan detail piksel tidak natural untuk resolusi yang diklaim.
+   - Log/Flat Color Grading Belum Diproses: Footage yang masih dalam gamma Log/flat (kontras sangat rendah, warna pudar keabu-abuan, saturasi sangat minim) tanpa color grading dasar (Rec.709 LUT) yang layak jual = FAIL. Video harus terlihat sudah melalui proses grading warna dasar, bukan flat/log mentah.
 
 3. EXPOSURE & LIGHTING PROBLEMS:
    - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali (misal, langit putih polos tanpa awan, kulit putih terbakar cahaya).
@@ -4940,47 +4911,41 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Flickering: Kedipan cahaya tidak stabil pada frame karena ketidaksamaan frekuensi lampu listrik dengan shutter speed kamera.
    - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
 
-6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS (CRITICAL/FATAL ERRORS):
-   - Structural & Mechanical Failures (Kegagalan Struktural): Objek buatan AI harus logis dan berfungsi secara mekanis di dunia nyata. Jika itu keyboard, tata letak tombol harus logis, bentuknya konsisten, dan huruf/simbolnya BISA DIBACA (TIDAK BOLEH gibberish text). Jika itu busur panah (bow) atau instrumen musik, kabel/senar/katrol harus tersambung secara mekanis dengan benar. Jika itu kendaraan, roda harus bulat sempurna dan terhubung logis ke poros. Setiap kegagalan struktural/mekanis yang mencolok = FAIL INSTAN.
-   - Temporal Inconsistency & Morphing (SANGAT FATAL UNTUK VIDEO): Benda atau makhluk hidup yang berubah bentuk (morphing) secara tidak wajar di tengah video, objek yang tiba-tiba muncul/hilang, atau tekstur yang bergeser tidak sesuai dengan pergerakan objek (texture swimming).
-   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, anggota tubuh menyatu ke objek lain, wajah terdistorsi, atau mata juling yang berkedip secara aneh di tengah frame. Anatomi yang salah secara biologis = FAIL INSTAN.
-   - Teks Kacau (Gibberish Text): Teks pada objek utama (seperti tombol keyboard, papan nama, buku, baju, layar gadget) yang berupa huruf acak, salah eja, atau karakter alien yang tidak terbaca = FAIL INSTAN.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara ekstrim, atau perspektif arsitektur patah tajam antar frame.
-   - Polusi Visual AI: Loloskan masalah tekstur (waxy skin) HANYA jika sangat halus pada gaya sinematik. Namun CACAT STRUKTUR ATAU MORPHING BENTUK = FAIL.
+6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
+   - Structural & Mechanical Failures: Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, sambungan dinding/papan yang miring atau terputus secara aneh, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
+   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
+   - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
+   - Temporal Inconsistency & Morphing: Perhatikan perubahan bentuk (morphing) antar frame. Jika wajah manusia atau objek utama berubah bentuk secara mengerikan dan drastis di tengah video = FAIL.
+   - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Loloskan ketidakkonsistenan bayangan minor antar-frame selama video terlihat memukau secara keseluruhan. Berikan FAIL hanya jika render artifact membuat pencahayaan sama sekali tidak cocok secara fisik hingga merusak estetika.
 
-7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
-   - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
-   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
-   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
-     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
-     * Landmark atau monumen tertentu tidak dapat diterima, bahkan dengan rilis properti (certain landmarks or monuments cannot be accepted, even with releases).
-     * Arsitektur modern dengan desain yang unik atau mudah dikenali (modern architecture with a unique or recognizable design) ketika ditampilkan sebagai fokus utama tanpa rilis properti.
-     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta milik SETE). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
-     * Burj Al Arab, Burj Khalifa (Dubai)
-     * Sydney Opera House (Australia)
-     * Atomium (Brussels)
-     * Louvre Pyramid (Paris)
-     * Space Needle (Seattle)
-     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
-     * Istana Neuschwanstein (Jerman)
-     * CN Tower (Toronto)
-     * The Shard, London Eye, Tower Bridge (London)
-     * Transamerica Pyramid (San Francisco)
-     * Kuil Sagrada Fam\xEDlia (khusus bagian interior)
-     * Taipei 101 (Taiwan)
-     * Menara Kembar Petronas (Malaysia)
-     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual:
-     * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pok\xE9mon, tokoh anime, superhero Marvel/DC).
-     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas:
-     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
-     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
-   - Hak Pribadi & Tubuh (Biometrics):
-     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+   PENTING - PRINSIP PENILAIAN GENERATIVE AI VIDEO (REALISTIS & KOMERSIAL):
+   1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jika sebuah video memiliki cacat visual yang jelas (seperti teks cakar ayam AI atau laci kabinet meleleh), video tersebut wajib dinilai FAIL tanpa toleransi.
+   2. Selama anomali AI sangat minor antar-frame (seperti sedikit morphing latar belakang yang wajar, objek statis di latar belakang yang mengalami sedikit perubahan tekstur halus), tetap loloskan dengan status PASS.
+
+7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html dan Common Reasons for Content Refusal di https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+   CATATAN PENTING: Daftar berikut adalah CONTOH REPRESENTATIF, BUKAN daftar lengkap. Adobe memperbarui daftar known restrictions ini secara berkala dan mencakup ratusan entri spesifik. Terapkan PRINSIP UMUMNYA secara konsisten di setiap frame video: setiap logo/merek yang dapat dikenali, desain produk yang khas/ikonik, karakter fiksi, landmark/bangunan tertentu, lambang resmi organisasi, atau tokoh publik = berisiko FAIL, meskipun namanya tidak eksplisit tercantum di bawah ini.
+
+   - Merek & Logo Komersial: Logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun, termasuk yang hanya tampak sekilas di salah satu frame. Contoh: Apple, Nike (swoosh, "Just Do It"), Adidas (tiga strip), Google, Amazon, Coca-Cola, Mercedes-Benz, BMW, DJI, LV (Louis Vuitton), Burberry, Tiffany blue, Vans, Pantone.
+   - Desain Khas & Bentuk Produk (Trade Dress): Desain fisik ikonik sebagai subjek utama meski tanpa logo terlihat. Contoh: Lego/Duplo, boneka Barbie, Rubik's Cube, Monopoly, Funko Pop, Hello Kitty/Sanrio, elektronik Apple (bodi iPhone/MacBook/iPad), kamera Polaroid klasik, drone DJI, sepatu Converse Chuck Taylor, Dr. Martens, sol merah Christian Louboutin, Beats by Dre, perabot desainer.
+   - Desain Otomotif Khas: Grille BMW kidney, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik, VW Beetle/Kombi klasik, mesin pertanian John Deere/Claas dengan skema warna khasnya.
+   - Karakter Fiksi & Waralaba Berhak Cipta: Karakter Disney/Pixar, Mickey Mouse, Pok\xE9mon, superhero Marvel/DC, Batmobile atau kendaraan bertema Batman, Minecraft, Pac-Man, frasa "Star Wars".
+   - Organisasi, Olahraga & Lambang Resmi: Cincin Olimpiade/obor/maskot, FIFA & World Cup, UEFA & Euro Cup, NFL/Super Bowl, NASA (insignia, logo, nama misi), palang merah/bulan sabit merah di latar putih, lencana/emblem kepolisian atau militer, logo transportasi umum (MTA New York, London Underground, Paris RATP/M\xE9tro, TGV, ICE Deutsche Bahn, BART, CTA Chicago) - skema warna & desain kereta/bus yang khas juga dilindungi.
+   - Selebriti, Tokoh Publik & Body Likeness: Wajah/rupa selebriti yang dapat dikenali di frame manapun untuk penggunaan komersial DILARANG (peniru/impersonator hanya boleh dengan model release yang mencantumkan kata "impersonator").
+   - Bangunan, Landmark & Lokasi Berbayar/Terlarang (SANGAT KETAT - periksa SEMUA frame, termasuk latar belakang):
+     * Interior-only restriction (interior dilarang, eksterior umumnya boleh): Notre-Dame de Paris, Hagia Sophia, Colosseum, Sistine Chapel, Sheikh Zayed Grand Mosque, Sagrada Fam\xEDlia (interior).
+     * Bangunan/struktur dengan larangan penuh sebagai fokus utama: Menara Eiffel di malam hari (siang hari aman), Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, CN Tower, The Shard, London Eye, Taipei 101, Menara Kembar Petronas, Empire State Building, Chrysler Building, One World Trade Center, Willis Tower, Grand Central Terminal, Rockefeller Center, Madison Square Garden, Vessel (NYC), Tokyo Tower/Skytree, Neuschwanstein Castle, Hollywood Sign & Walk of Fame.
+     * Patung/instalasi seni publik ikonik: Cloud Gate ("The Bean"), Charging Bull, Christ the Redeemer, Little Mermaid, Merlion, Mannekin Pis, Fremont Troll, memorial-memorial nasional (MLK, Iwo Jima, Holocaust Memorial).
+     * Lokasi berbayar/bertiket, taman tema (Disney, SeaWorld, Universal), kebun binatang/akuarium berbrand, museum tertentu, situs warisan arkeologis dengan pembatasan lokal (Machu Picchu, Stonehenge, Chichen Itza).
+     * Arsitektur modern dengan desain unik/mudah dikenali sebagai fokus utama tanpa property release.
+   - Karya Seni & Hak Cipta Visual Lainnya: Karya cipta orang lain (lukisan, patung, street art/graffiti, mural, font spesifik, elemen grafis) sebagai fokus utama tanpa izin.
+   - Dokumen Negara, Uang & Identitas: Uang kertas/koin utuh sebagai fokus utama; prangko AS pasca-1971 atau yang menampilkan selebriti/organisasi olahraga; paspor, SIM, KTP/ID, kartu kredit/debit, buku tabungan bank.
+   - Warna & Elemen Non-Logo yang Dilindungi sebagai Trade Dress: Warna coklat UPS pada seragam/truk pengiriman paket.
+   - Hak Pribadi & Tubuh (Biometrics): Tato unik pada subjek manusia (memerlukan property release dari seniman tato & model); wajah manusia yang dapat dikenali tanpa Model Release yang valid untuk penggunaan komersial.
+
+   PENTING - PENGECEKAN ATURAN IP & TRADEMARK VIDEO SECARA REALISTIS (ADOBE STOCK COMPLIANCE):
+   1. Pengecualian Latar Belakang (Background Rule): Landmark berhak cipta (seperti Menara Eiffel, Burj Khalifa, skyline kota, dll.) atau logo kecil tidak mencolok yang berada jauh di latar belakang, blur (out of focus), atau hanya merupakan bagian minor dari komposisi kota (skyline umum) di salah satu frame video BUKANLAH dasar penolakan. Berikan penilaian SAFE/PASS. Penolakan IP hanya berlaku jika objek tersebut menjadi subjek utama/fokus utama video tanpa property release.
+   2. Pengecualian Produk Generik (Generic Product Rule): Perangkat elektronik (smartphone, laptop, TV, smartwatch), kendaraan (mobil, motor), atau perabot/furnitur yang tidak menampilkan logo resmi dan tidak meniru trade dress secara identik (seperti lekukan BMW grille atau notch khas iPhone) wajib diloloskan sebagai produk generik (SAFE/PASS) di video. Jangan menolak ponsel pintar atau laptop biasa hanya karena bentuknya kotak tipis.
+   3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (kurang dari 1% luas gambar) pada pakaian subjek, label kecil, atau rambu jalan yang sangat jauh dan tidak mempromosikan merek tersebut secara mencolok wajib diberikan status SAFE/PASS karena bersifat insidental.
 
 ---
 STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
@@ -4989,11 +4954,20 @@ STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
 *PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ---
-PENTING - PRIORITASKAN INTEGRITAS STRUKTURAL & LOGIKA (ZERO TOLERANCE):
-Kurator Adobe Stock dan pembeli premium sangat membenci video AI yang terlihat bagus sekilas namun cacat atau tidak logis secara struktural/mekanis. Anda WAJIB bertindak sebagai auditor visual yang sangat kejam dan teliti.
-1. ZOOM IN MENTAL & SCAN 100%: Anda WAJIB melakukan simulasi inspeksi zoom-in yang ekstensif pada seluruh objek utama di setiap frame (tombol keyboard, senar/busur, bentuk jari, teks di layar, roda, dll). JANGAN NGAWUR dan jangan abaikan detail!
-2. DETEKSI KECACATAN AKTIF: Jika bentuk benda "meleleh" (morphing), teks berupa gibberish, anggota tubuh menyatu (hallucination), atau ada kegagalan mekanis, Anda WAJIB MENGGAGALKANNYA (FAIL). 
-3. TIDAK ADA KOMPROMI ("No Benefit of the Doubt") untuk cacat anatomi, teks kacau, distorsi kamera aneh, atau objek meleleh di subjek utama. Kegagalan rendering AI = FAIL MUTLAK. Jangan ragu memberikan FAIL. Ceritakan temuan spesifik Anda secara rinci di visual_scan_analysis!
+PENTING - PRIORITASKAN KETELITIAN VISUAL SECARA OBJEKTIF DAN LOGIS:
+Kurator Adobe Stock dan pembeli premium menghargai video yang berkualitas. Anda WAJIB bertindak sebagai auditor visual yang realistis, objektif, dan seperti manusia sungguhan.
+1. EVALUASI REALISTIS: Lakukan evaluasi secara wajar pada frame yang diberikan. JANGAN MENGARANG atau MENEBAK-NEBAK (hallucinate) cacat yang sebenarnya tidak ada.
+2. JANGAN HALU TENTANG KONSISTENSI (NO HALLUCINATIONS): Jangan mengatakan "objek menghilang" atau "kegagalan logika struktural" secara sembarangan. Buktikan HANYA jika cacatnya 100% nyata dan terlihat secara visual (misalnya ada bagian tubuh yang benar-benar hilang/terpotong). Jika tidak ada bukti cacat visual yang nyata di frame tersebut, jangan buat-buat alasan penolakan!
+3. TOLERANSI WAJAR: Jika video terlihat estetik dan tidak ada kejanggalan visual yang merusak komposisi secara fatal, video tersebut layak lulus (PASS).
+ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual. Anda DILARANG HANYA menganalisis subjek utama! Anda WAJIB menganalisis dan mendokumentasikan empat aspek berikut secara terpisah pada 6 frame video:
+      - **Analisis Subjek Utama (Subject)**: Detail ketajaman fokus, pergerakan, geometri, dan kestabilan subjek utama.
+      - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Keadaan latar depan/belakang, noise, compression artifacts, macro-blocking, atau color banding di bidang latar belakang.
+      - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, flickering, serta keberadaan area overexposed/underexposed pada subjek maupun lingkungan.
+      - **Analisis Kestabilan Frame & Risiko Hukum (Stability, IP & AI Risks)**: Guncangan kamera, rolling shutter (jello/skew effect), micro-logos, watermark, teks AI, atau kejanggalan struktur geometri AI antar-frame.
+2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di video ini (contoh: "Noise digital sangat minim, hanya terlihat grain halus yang estetis pada area bayangan di kuadran kanan bawah pada frame 3 dan 4").
+3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName} yang relevan untuk mikrostock.
+
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
 
@@ -5089,18 +5063,27 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           },
           required: ["type", "x", "y", "intensity", "raw_value"]
         }
+      },
+      metadata: {
+        type: import_genai.Type.OBJECT,
+        properties: {
+          title: { type: import_genai.Type.STRING },
+          keywords: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.STRING } }
+        },
+        required: ["title", "keywords"]
       }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps", "metadata"]
   };
   const imageParts = frames.map((f) => processFrameServer(f));
   const modelsToTry = ["gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite-preview", "gemini-flash-latest"];
   let responseText = "";
   let lastError;
   const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
+  const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}. [Unique Session Seed: ${randomSeed}]` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -5121,8 +5104,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log("QA raw video response:", text);
     const parsedResult = JSON.parse(text);
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
     return parsedResult;
   } catch (e) {
     console.warn("Parse Error:", responseText);
@@ -6324,14 +6305,14 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
               if (isNaN(duration) || duration <= 0) {
                 throw new Error("Could not determine video duration");
               }
-              const numFrames = 3;
+              const numFrames = 6;
               const timestamps = [
                 duration * 0.1,
-                // Awal
-                duration * 0.5,
-                // Tengah
+                duration * 0.25,
+                duration * 0.4,
+                duration * 0.6,
+                duration * 0.75,
                 duration * 0.9
-                // Akhir
               ];
               const framePaths = [];
               for (let i = 0; i < numFrames; i++) {
@@ -6498,154 +6479,6 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
     res.status(500).json({ error: error.message || "Gagal menghilangkan suara video." });
   }
 });
-async function analyzeImageWithFFmpeg(tempFilePath) {
-  let ffmpegPath;
-  let ffprobePath;
-  try {
-    ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
-    ffprobePath = _require("@ffprobe-installer/ffprobe").path;
-    if (import_fs.default.existsSync(ffmpegPath)) {
-      try {
-        import_fs.default.chmodSync(ffmpegPath, "0755");
-      } catch (e) {
-      }
-    }
-    if (import_fs.default.existsSync(ffprobePath)) {
-      try {
-        import_fs.default.chmodSync(ffprobePath, "0755");
-      } catch (e) {
-      }
-    }
-  } catch (e) {
-    throw new Error("FFmpeg/FFprobe binaries not found on the server.");
-  }
-  const execPromise = import_util.default.promisify(import_child_process.exec);
-  let resolution = "Unknown";
-  let color_space = "sRGB (Standard)";
-  let fileSizeKb = 0;
-  try {
-    const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
-    const probeData = JSON.parse(probeOut);
-    const stream = probeData.streams?.[0] || {};
-    const width = stream.width || 0;
-    const height = stream.height || 0;
-    if (width && height) {
-      const mp = (width * height / 1e6).toFixed(2);
-      resolution = `${width} x ${height} (${mp} MP)`;
-    }
-    if (stream.pix_fmt) {
-      color_space = `${stream.pix_fmt} (${stream.color_space || "sRGB"} range ${stream.color_range || "N/A"})`;
-    }
-  } catch (probeErr) {
-    console.warn("FFprobe analysis failed:", probeErr);
-  }
-  try {
-    const stats = import_fs.default.statSync(tempFilePath);
-    fileSizeKb = Math.round(stats.size / 1024);
-  } catch (e) {
-  }
-  const rawOutputPath = import_path.default.join(import_path.default.dirname(tempFilePath), `raw_${import_path.default.basename(tempFilePath)}.raw`);
-  let brightnessVal = 50;
-  let brightnessStatus = "Optimal";
-  let contrastVal = 50;
-  let contrastStatus = "Normal";
-  let sharpnessVal = 50;
-  let sharpnessStatus = "Normal";
-  let noiseVal = 0;
-  let noiseStatus = "Low";
-  const histogram = new Array(32).fill(0);
-  let fileValidation = "Valid (Passed FFmpeg Integrity Check)";
-  try {
-    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
-    if (import_fs.default.existsSync(rawOutputPath)) {
-      const bytes = import_fs.default.readFileSync(rawOutputPath);
-      let sum = 0;
-      for (let i = 0; i < bytes.length; i++) {
-        sum += bytes[i];
-      }
-      const avgBrightness = sum / bytes.length;
-      brightnessVal = Math.round(avgBrightness / 255 * 100);
-      if (brightnessVal > 85) brightnessStatus = "Very Bright (Potential Overexposure)";
-      else if (brightnessVal < 20) brightnessStatus = "Very Dark (Potential Underexposure)";
-      else brightnessStatus = "Optimal";
-      let sqSum = 0;
-      for (let i = 0; i < bytes.length; i++) {
-        const diff = bytes[i] - avgBrightness;
-        sqSum += diff * diff;
-      }
-      const stdDev = Math.sqrt(sqSum / bytes.length);
-      contrastVal = Math.min(100, Math.round(stdDev / 64 * 100));
-      if (contrastVal > 80) contrastStatus = "High Contrast";
-      else if (contrastVal < 25) contrastStatus = "Low Contrast";
-      else contrastStatus = "Normal";
-      for (let i = 0; i < bytes.length; i++) {
-        const binIdx = Math.min(31, Math.floor(bytes[i] / 8));
-        histogram[binIdx]++;
-      }
-      const maxBin = Math.max(...histogram) || 1;
-      for (let b = 0; b < 32; b++) {
-        histogram[b] = Math.round(histogram[b] / maxBin * 100);
-      }
-      let diffSum = 0;
-      let count = 0;
-      for (let y = 0; y < 256; y++) {
-        for (let x = 0; x < 255; x++) {
-          const idx1 = y * 256 + x;
-          const idx2 = idx1 + 1;
-          diffSum += Math.abs(bytes[idx1] - bytes[idx2]);
-          count++;
-        }
-      }
-      const avgEdgeEnergy = diffSum / count;
-      sharpnessVal = Math.min(100, Math.round(avgEdgeEnergy / 15 * 100));
-      if (sharpnessVal > 60) sharpnessStatus = "Sharp";
-      else if (sharpnessVal < 20) sharpnessStatus = "Soft Focus";
-      else sharpnessStatus = "Normal";
-      let noiseSum = 0;
-      let noiseCount = 0;
-      for (let y = 0; y < 254; y += 2) {
-        for (let x = 0; x < 254; x += 2) {
-          const p1 = bytes[y * 256 + x];
-          const p2 = bytes[y * 256 + x + 1];
-          const p3 = bytes[(y + 1) * 256 + x];
-          const p4 = bytes[(y + 1) * 256 + x + 1];
-          const avg = (p1 + p2 + p3 + p4) / 4;
-          const varLocal = ((p1 - avg) ** 2 + (p2 - avg) ** 2 + (p3 - avg) ** 2 + (p4 - avg) ** 2) / 4;
-          if (varLocal < 16) {
-            noiseSum += Math.sqrt(varLocal);
-            noiseCount++;
-          }
-        }
-      }
-      const avgNoise = noiseCount > 0 ? noiseSum / noiseCount : 0.5;
-      noiseVal = Math.min(100, Math.round(avgNoise / 4 * 100));
-      if (noiseVal > 40) noiseStatus = "High Noise";
-      else if (noiseVal > 15) noiseStatus = "Medium Noise";
-      else noiseStatus = "Low Noise / Clean";
-    }
-  } catch (ffmpegErr) {
-    console.warn("FFmpeg statistics filter failed:", ffmpegErr);
-    fileValidation = "Validation Warning (FFmpeg decoding limit reached)";
-  } finally {
-    if (import_fs.default.existsSync(rawOutputPath)) {
-      try {
-        import_fs.default.unlinkSync(rawOutputPath);
-      } catch (e) {
-      }
-    }
-  }
-  return {
-    resolution,
-    color_space,
-    histogram,
-    brightness: { value: brightnessVal, status: brightnessStatus },
-    contrast: { value: contrastVal, status: contrastStatus },
-    sharpness: { value: sharpnessVal, status: sharpnessStatus },
-    noise: { value: noiseVal, status: noiseStatus },
-    file_validation: fileValidation,
-    file_size_kb: fileSizeKb
-  };
-}
 app.post("/api/check-image-quality", async (req, res) => {
   let tempFilePath = "";
   let cleanupFn = () => {
@@ -6677,30 +6510,12 @@ app.post("/api/check-image-quality", async (req, res) => {
       console.warn("Server check-image-quality error: Missing image data or fileUrl");
       return res.status(400).json({ error: "Missing image data or fileUrl" });
     }
-    console.log("Server check-image-quality: Running FFmpeg analysis...");
-    let ffmpegStats;
-    try {
-      ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
-    } catch (ffErr) {
-      console.warn("[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:", ffErr);
-      ffmpegStats = {
-        resolution: "Estimated from file structure",
-        color_space: "sRGB (Standard)",
-        histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
-        brightness: { value: 50, status: "Optimal (Estimated by AI)" },
-        contrast: { value: 50, status: "Normal (Estimated by AI)" },
-        sharpness: { value: 50, status: "Normal (Estimated by AI)" },
-        noise: { value: 5, status: "Low Noise / Clean" },
-        file_validation: "Valid (Passed Structure Integrity Check)",
-        file_size_kb: import_fs.default.existsSync(tempFilePath) ? Math.round(import_fs.default.statSync(tempFilePath).size / 1024) : 1024
-      };
-    }
     console.log("Server check-image-quality: Running AI Vision Analysis...");
     const aiVisionStats = await checkImageQuality(imageBase64, tolerance, language, model, fileType);
     console.log("Server check-image-quality: Integration successful");
     const combinedReport = {
       ...aiVisionStats,
-      ffmpeg: ffmpegStats,
+      ffmpeg: null,
       ai_vision: aiVisionStats
     };
     res.json(combinedReport);
@@ -7331,3 +7146,4 @@ if (!process.env.VERCEL) {
 0 && (module.exports = {
   app
 });
+//# sourceMappingURL=server.cjs.map

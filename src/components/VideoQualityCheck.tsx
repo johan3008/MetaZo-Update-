@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, History, Download, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getDailyLimit } from '../../constants';
+import { getHeaders } from '../../services/geminiService';
 
 interface QualityReport {
   visual_scan_analysis?: string;
@@ -16,6 +17,10 @@ interface QualityReport {
   detailed_feedback: string;
   quality_checks?: {
     [key: string]: { status: "PASS" | "FAIL"; note: string } | undefined;
+  };
+  metadata?: {
+    title: string;
+    keywords: string[];
   };
 }
 
@@ -77,6 +82,46 @@ export const VideoQualityCheck: React.FC<{
   db
 }) => {
   const [file, setFile] = useState<File | null>(null);
+  const isIndo = t.language === 'Bahasa';
+  const CHECK_ITEMS_LOCALIZED = CHECK_ITEMS.map(item => {
+    let label = item.label;
+    let desc = item.desc;
+    if (!isIndo) {
+      const enMap: Record<string, { label: string, desc: string }> = {
+        blur: { label: 'Blur', desc: 'Checks the focus clarity of the main subject.' },
+        noise: { label: 'Noise', desc: 'Detects excessive digital noise or grain.' },
+        compression_artifacts: { label: 'Compression Artifacts', desc: 'Detects macro-blocking distortion from high video compression.' },
+        blocking: { label: 'Blocking', desc: 'Detects blocky or pixelated distortion.' },
+        banding: { label: 'Banding', desc: 'Checks for color banding/transitions on flat gradients.' },
+        overexposure: { label: 'Overexposed', desc: 'Detects areas that are too bright, losing detail.' },
+        underexposure: { label: 'Underexposed', desc: 'Detects areas that are too dark, losing detail.' },
+        white_balance: { label: 'White Balance', desc: 'Detects color balance issues.' },
+        motion_blur: { label: 'Motion Blur', desc: 'Detects blurring caused by subject movement.' },
+        camera_shake: { label: 'Camera Shake', desc: 'Checks for extreme camera shake or instability.' },
+        out_of_focus: { label: 'Out of Focus', desc: 'Detects soft or missed focus on the main subject.' },
+        flickering: { label: 'Flickering', desc: 'Detects rapid changes in brightness or light flickering.' },
+        duplicate_frame: { label: 'Duplicate Frames', desc: 'Detects repeated static frames.' },
+        empty_frame: { label: 'Empty Frames', desc: 'Detects completely empty frames.' },
+        black_frame: { label: 'Black Frames', desc: 'Detects completely black frames.' },
+        frozen_frame: { label: 'Frozen Frames', desc: 'Detects frozen or stuck frames.' },
+        watermark: { label: 'Watermark', desc: 'Detects watermarks or copyright overlays.' },
+        logo: { label: 'Logo', desc: 'Detects brand logos or copyrighted trademarks.' },
+        text: { label: 'Text', desc: 'Detects distracting overlay text or writings.' },
+        ai_artifact: { label: 'AI Artifacts', desc: 'Detects generative AI inconsistencies or distortions.' },
+        deformed_object: { label: 'Deformed Objects', desc: 'Detects unnatural or deformed geometries.' },
+        bad_anatomy: { label: 'Bad Anatomy', desc: 'Detects disproportionate anatomical structures.' },
+        cropped_subject: { label: 'Cropped Subject', desc: 'Detects awkwardly cropped subjects at frame borders.' },
+        cut_off_object: { label: 'Cut-off Objects', desc: 'Detects main objects cut off by frame boundaries.' },
+        wrong_perspective: { label: 'Wrong Perspective', desc: 'Detects misaligned or incorrect perspective.' },
+        low_aesthetic_quality: { label: 'Low Aesthetic Quality', desc: 'Detects generally low aesthetic or commercial appeal.' }
+      };
+      if (enMap[item.key]) {
+        label = enMap[item.key].label;
+        desc = enMap[item.key].desc;
+      }
+    }
+    return { ...item, label, desc };
+  });
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -280,14 +325,14 @@ export const VideoQualityCheck: React.FC<{
       const response = await fetch('/api/check-video-quality', {
         method: 'POST',
         headers: { 
-          'X-API-Key': aiOptions?.apiKey || '',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...getHeaders(aiOptions)
         },
         body: JSON.stringify({
           frames: framesBase64,
           tolerance: tolerance,
           language: t.language || 'English',
-          model: aiOptions?.visionModel || 'gemini-3.1-pro-preview'
+          model: aiOptions?.model
         })
       });
 
@@ -325,101 +370,16 @@ export const VideoQualityCheck: React.FC<{
         </p>
 
         {/* Workflow Info Box */}
-        <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 text-left max-w-xl mx-auto mt-6 shadow-sm">
-          <h4 className="font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2 justify-center text-lg">
-            <Zap size={18} className="text-indigo-500" /> 
-            Workflow Analisis Kualitas Video
+        <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent dark:from-indigo-500/15 dark:via-indigo-500/5 dark:to-transparent border border-indigo-500/30 dark:border-indigo-500/20 rounded-[1.5rem] p-6 shadow-lg shadow-indigo-500/5 text-left max-w-xl mx-auto mt-6">
+          <h4 className="font-bold text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-2 text-sm sm:text-base uppercase tracking-wider">
+            <Zap size={16} className="text-indigo-500" /> 
+            {t.language === 'Bahasa' ? 'Alur Kerja Pemeriksaan Visual (AI)' : 'Visual (AI) Audit Workflow'}
           </h4>
-          
-          <div className="flex flex-col items-center space-y-2">
-            {/* Step 1 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-center shadow-sm">
-              <span className="font-bold text-slate-800 dark:text-white text-sm">Video Upload</span>
-            </div>
-            
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-            
-            {/* Step 2 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 flex items-center justify-center font-bold text-xs border border-violet-200 dark:border-violet-800">1</div>
-              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">FFprobe</h5>
-              <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-4 list-disc marker:text-violet-400 text-left">
-                <li>Resolution</li>
-                <li>FPS</li>
-                <li>Codec</li>
-                <li>Bitrate</li>
-                <li>Pixel format</li>
-                <li>Duration</li>
-                <li>Audio</li>
-              </ul>
-            </div>
-            
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-            
-            {/* Step 3 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-200 dark:border-emerald-800">2</div>
-              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">FFmpeg</h5>
-              <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-4 list-disc marker:text-emerald-400 text-left">
-                <li>Extract frame setiap 1 detik</li>
-                <li>Ambil frame awal, tengah, akhir</li>
-                <li>Detect black frame</li>
-                <li>Detect duplicate frame</li>
-                <li>Detect freeze frame</li>
-                <li>Detect scene change</li>
-              </ul>
-            </div>
-            
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-
-            {/* Step 4 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-200 dark:border-amber-800">3</div>
-              <h5 className="font-bold text-slate-800 dark:text-white mb-2 text-center text-sm border-b border-slate-100 dark:border-slate-700 pb-2">AI Vision</h5>
-              <div className="grid grid-cols-2 gap-x-2 text-xs text-slate-500 dark:text-slate-400 pl-4 text-left">
-                <ul className="space-y-1 list-disc marker:text-amber-400">
-                  <li>Blur</li>
-                  <li>Focus</li>
-                  <li>Noise</li>
-                  <li>Compression artifact</li>
-                  <li>Banding</li>
-                  <li>Blocking</li>
-                  <li>Flicker</li>
-                  <li>Exposure</li>
-                </ul>
-                <ul className="space-y-1 list-disc marker:text-amber-400">
-                  <li>White balance</li>
-                  <li>Watermark</li>
-                  <li>Text</li>
-                  <li>AI artifact</li>
-                  <li>Bad anatomy</li>
-                  <li>Camera shake</li>
-                  <li>IP</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-
-            {/* Step 5 */}
-            <div className="bg-white dark:bg-slate-800 w-full sm:w-80 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-center shadow-sm relative">
-              <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center font-bold text-xs border border-blue-200 dark:border-blue-800">4</div>
-              <span className="font-bold text-slate-800 dark:text-white text-sm">Quality Engine</span>
-            </div>
-
-            <div className="text-slate-300 dark:text-slate-600">│</div>
-            <div className="text-slate-300 dark:text-slate-600">▼</div>
-
-            {/* Step 6 */}
-            <div className="bg-indigo-600 dark:bg-indigo-500 w-full sm:w-80 p-3 rounded-xl border border-indigo-700 dark:border-indigo-400 text-center shadow-md">
-              <span className="font-black text-white text-sm tracking-wide">Adobe Stock Risk Score</span>
-            </div>
-
-          </div>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+            {t.language === 'Bahasa' 
+              ? 'Sama seperti aplikasi pembuat metadata, sistem secara otomatis mengekstrak beberapa frame kunci secara lokal di browser menggunakan elemen <canvas>, lalu mengirimkannya ke Vision AI Gemini 3.1 Flash Lite dengan prompt khusus dan aturan kurasi Adobe Stock untuk mendeteksi cacat visual, anomali AI, serta risiko hak cipta.'
+              : 'Just like the metadata generator app, the system automatically extracts several keyframes locally in the browser using the <canvas> element, then sends them to Vision AI Gemini 3.1 Flash Lite with custom prompts and Adobe Stock curation guidelines to detect visual flaws, AI anomalies, and copyright risks.'}
+          </p>
         </div>
       </div>
 
@@ -532,17 +492,22 @@ export const VideoQualityCheck: React.FC<{
             <div className={`p-6 sm:p-8 flex items-center justify-between border-b ${
               report.recommendation === 'PASS' 
                 ? 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/50 dark:bg-emerald-900/10' 
+                : report.recommendation === 'RETOUCH'
+                ? 'border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'
                 : 'border-red-100 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10'
             }`}>
               <div className="flex items-center gap-4">
                 {report.recommendation === 'PASS' ? (
                   <CheckCircle className="w-10 h-10 text-emerald-500" />
+                ) : report.recommendation === 'RETOUCH' ? (
+                  <AlertCircle className="w-10 h-10 text-amber-500" />
                 ) : (
                   <AlertCircle className="w-10 h-10 text-red-500" />
                 )}
                 <div>
                   <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-                    {report.recommendation === 'PASS' ? 'Lolos (PASS)' : 'Ditolak (FAIL)'}
+                    {report.recommendation === 'PASS' ? 'Lolos (PASS)' : 
+                     report.recommendation === 'RETOUCH' ? 'Perlu Perbaikan (RETOUCH)' : 'Ditolak (FAIL)'}
                   </h3>
                   <div className="flex flex-wrap items-center gap-3 mt-2">
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">Overall: {report.overall_score}/100</span>
@@ -603,10 +568,10 @@ export const VideoQualityCheck: React.FC<{
               {/* Detailed Quality Audit Checklist */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
-                  Hasil Pemeriksaan Kualitas Video ({CHECK_ITEMS.length} Checkpoints)
+                  {isIndo ? 'Hasil Pemeriksaan Kualitas Video' : 'Video Quality Check Results'} ({CHECK_ITEMS.length} Checkpoints)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {CHECK_ITEMS.map((item) => {
+                  {CHECK_ITEMS_LOCALIZED.map((item) => {
                     const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
                     // Fallback to check if the key exists in technical_issues for resilience
                     const isFailedInIssues = report.technical_issues?.some(issue => 
@@ -620,7 +585,9 @@ export const VideoQualityCheck: React.FC<{
                       
                     const note = checkResult 
                       ? checkResult.note 
-                      : (isFailedInIssues ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Normal, tidak mendeteksi masalah.');
+                      : (isFailedInIssues 
+                          ? (isIndo ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Issues detected on this indicator.') 
+                          : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.'));
 
                     return (
                       <div 
@@ -655,12 +622,40 @@ export const VideoQualityCheck: React.FC<{
                 </div>
               </div>
 
+              {/* Metadata Recommendations */}
+              {report.metadata && (
+                <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-white/5 p-6 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/5 pb-2">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                      {isIndo ? 'Rekomendasi Judul & Kata Kunci SEO Video' : 'Recommended Title & SEO Keywords'}
+                    </h4>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase font-mono">v5.0 Expert</span>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <span className="font-black uppercase text-[8px] text-slate-400 block mb-0.5">Recommended Title</span>
+                      <span className="text-[12px] font-bold text-slate-800 dark:text-slate-100">{report.metadata.title}</span>
+                    </div>
+                    <div>
+                      <span className="font-black uppercase text-[8px] text-slate-400 block mb-0.5">Keywords suggestion ({report.metadata.keywords?.length || 0})</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+                        {report.metadata.keywords?.map((k, idx) => (
+                          <span key={idx} className="px-2 py-1 bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-semibold">
+                            {k}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Technical Issues & Strengths */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Issues */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400 flex items-center gap-2">
-                    Technical Issues ({report.technical_issues?.length || 0})
+                    {isIndo ? 'Masalah Teknis' : 'Technical Issues'} ({report.technical_issues?.length || 0})
                   </h4>
                   {report.technical_issues?.length > 0 ? (
                     <ul className="space-y-2">
@@ -672,14 +667,14 @@ export const VideoQualityCheck: React.FC<{
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-slate-500 italic">No technical issues detected.</p>
+                    <p className="text-sm text-slate-500 italic">{isIndo ? 'Tidak ada masalah teknis yang terdeteksi.' : 'No technical issues detected.'}</p>
                   )}
                 </div>
 
                 {/* Strengths */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                    Strengths ({report.strengths?.length || 0})
+                    {isIndo ? 'Kelebihan' : 'Strengths'} ({report.strengths?.length || 0})
                   </h4>
                   {report.strengths?.length > 0 ? (
                     <ul className="space-y-2">
@@ -691,7 +686,7 @@ export const VideoQualityCheck: React.FC<{
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-slate-500 italic">No particular strengths highlighted.</p>
+                    <p className="text-sm text-slate-500 italic">{isIndo ? 'Tidak ada kelebihan khusus yang disorot.' : 'No particular strengths highlighted.'}</p>
                   )}
                 </div>
               </div>

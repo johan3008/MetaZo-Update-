@@ -255,7 +255,7 @@ export const MotionComposition = () => {
                 
                 <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
                     {/* Mengatur rasio kontainer */}
-                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="remotion-capture-target bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden relative">
+                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden relative">
                         <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} />
                     </div>
                 </div>

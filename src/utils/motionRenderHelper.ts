@@ -39,7 +39,7 @@ export const startMotionRender = async (
   }
   
   // Find the exact Remotion player container to screenshot.
-  const targetElement = container.querySelector('.remotion-capture-target') as HTMLElement;
+  const targetElement = container.querySelector('.bg-black') as HTMLElement;
   
   if (!targetElement) {
     onProgress({ frame: 0, totalFrames: durationInFrames, status: 'error', progressPercentage: 0, message: 'Elemen Remotion Player tidak ditemukan' });

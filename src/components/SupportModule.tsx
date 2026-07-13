@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MessageSquare, Send } from 'lucide-react';
-import { db, collection, addDoc } from '../supabase';
+import { supabase } from '../supabase';
 
 export const SupportModule: React.FC = () => {
     const [message, setMessage] = useState('');
@@ -10,11 +10,13 @@ export const SupportModule: React.FC = () => {
         if (!message) return;
         setStatus('sending');
         try {
-            await addDoc(collection(db, 'feedback'), {
-                message,
-                timestamp: new Date().toISOString(),
-                userEmail: 'johanchrismant4@gmail.com'
-            });
+            if (supabase) {
+                await supabase.from('feedback').insert({
+                    message,
+                    timestamp: new Date().toISOString(),
+                    user_email: 'johanchrismant4@gmail.com'
+                });
+            }
             setStatus('sent');
             setMessage('');
             setTimeout(() => setStatus('idle'), 3000);
