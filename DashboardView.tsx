@@ -344,8 +344,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Removed PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
 
-      {/* PROMO / VOUCHER HIGHLIGHT BANNER */}
-      {(isLoadingPromos || promoCodes.length > 0) && (
+      {/* PROMO / VOUCHER HIGHLIGHT BANNER — Always visible */}
+      {(() => { console.log('[DashboardView] Promo banner render check:', { isLoadingPromos, promoCodesLen: promoCodes.length }); return true; })() && (
         <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-violet-500/30 text-slate-800 dark:text-white p-6 shadow-lg shadow-black/5 dark:shadow-violet-950/15">
           {/* Background glow effects */}
           <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 dark:bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
@@ -435,7 +435,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => setShowActivation?.(true)}
                 className="w-full py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 active:scale-[0.99] text-white font-extrabold text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg hover:shadow-violet-600/20 flex items-center justify-center space-x-1.5 cursor-pointer"
               >
-                <span>{t.language === 'Bahasa' ? "Dapatkan Promo" : "Get Promo"}</span>
+                <span>{t.language === 'Bahasa' ? "Buka Menu Aktivasi Promo" : "Open Promo Claim Menu"}</span>
                 <ArrowRight size={12} />
               </button>
             </div>
