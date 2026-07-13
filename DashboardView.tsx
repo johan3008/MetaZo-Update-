@@ -345,7 +345,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Removed PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
 
       {/* PROMO / VOUCHER HIGHLIGHT BANNER */}
-      {!isLicensed && (isLoadingPromos || promoCodes.length > 0) && (
+      {(isLoadingPromos || promoCodes.length > 0) && (
         <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-violet-500/30 text-slate-800 dark:text-white p-6 shadow-lg shadow-black/5 dark:shadow-violet-950/15">
           {/* Background glow effects */}
           <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 dark:bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
