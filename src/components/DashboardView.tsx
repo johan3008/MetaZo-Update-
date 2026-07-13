@@ -121,29 +121,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const fetchPromos = async () => {
       setIsLoadingPromos(true);
       try {
-        if (!supabase) return;
+        if (!supabase) {
+          setPromoCodes([]);
+          setIsLoadingPromos(false);
+          return;
+        }
         const { data, error } = await supabase.from('promos').select('*').limit(5);
         if (error) throw error;
         if (!active) return;
         const list: DashboardPromoCode[] = [];
         const now = new Date();
         (data || []).forEach((row: any) => {
-          const usedCount = Number(row.used_count || 0);
-          const maxUses = Number(row.max_uses || 0);
+          const usedCount = Number(row.used_count ?? row.usedCount ?? 0);
+          const maxUses = Number(row.max_uses ?? row.maxUses ?? 0);
           
           // Filter out expired by uses
           if (usedCount >= maxUses) return;
 
           // Filter out which hasn't started yet
-          if (row.start_date) {
-            const start = new Date(row.start_date);
+          const startDate = row.start_date || row.startDate;
+          if (startDate) {
+            const start = new Date(startDate);
             if (now < start) return;
           }
 
           // Filter out which has ended
-          if (row.end_date) {
-            const endStr = row.end_date;
-            const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
+          const endDateStr = row.end_date || row.endDate;
+          if (endDateStr) {
+            const end = endDateStr.includes('T') ? new Date(endDateStr) : new Date(endDateStr + 'T23:59:59');
             if (now > end) return;
           }
 
@@ -155,13 +160,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             maxUses,
             usedCount,
             description: row.description || '',
-            startDate: row.start_date || '',
-            endDate: row.end_date || '',
+            startDate: startDate || '',
+            endDate: endDateStr || '',
           });
         });
-        setPromoCodes(list);
+        if (list.length > 0) {
+          setPromoCodes(list);
+        } else {
+          setPromoCodes([]);
+        }
       } catch (error) {
         console.warn("Failed to load promos for dashboard view:", error);
+        setPromoCodes([]);
       } finally {
         if (active) setIsLoadingPromos(false);
       }
@@ -326,8 +336,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Removed PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
 
-      {/* PROMO / VOUCHER HIGHLIGHT BANNER */}
-      {!isLicensed && (isLoadingPromos || promoCodes.length > 0) && (
+      {/* PROMO / VOUCHER HIGHLIGHT BANNER — Always visible */}
+      {promoCodes.length > 0 && (
         <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-violet-500/30 text-slate-800 dark:text-white p-6 shadow-lg shadow-black/5 dark:shadow-violet-950/15">
           {/* Background glow effects */}
           <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 dark:bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
