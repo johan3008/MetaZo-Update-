@@ -112,11 +112,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setCurrentSlide(prev => (prev === 0 ? slides.length - 1 : prev - 1));
     }
   };
-  const [promoCodes, setPromoCodes] = React.useState<DashboardPromoCode[]>(() => [
-    { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
-    { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
-    { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
-  ]);
+  const [promoCodes, setPromoCodes] = React.useState<DashboardPromoCode[]>([]);
   const [isLoadingPromos, setIsLoadingPromos] = React.useState(false);
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
 
@@ -124,14 +120,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     let active = true;
     const fetchPromos = async () => {
       setIsLoadingPromos(true);
-      const seedPromos = [
-        { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
-        { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
-        { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
-      ];
       try {
         if (!supabase) {
-          setPromoCodes(seedPromos);
+          setPromoCodes([]);
           setIsLoadingPromos(false);
           return;
         }
@@ -175,11 +166,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         if (list.length > 0) {
           setPromoCodes(list);
         } else {
-          setPromoCodes(seedPromos);
+          setPromoCodes([]);
         }
       } catch (error) {
-        console.warn("Failed to load promos for dashboard view, using fallback seed:", error);
-        setPromoCodes(seedPromos);
+        console.warn("Failed to load promos for dashboard view:", error);
+        setPromoCodes([]);
       } finally {
         if (active) setIsLoadingPromos(false);
       }
