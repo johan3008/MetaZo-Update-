@@ -1834,6 +1834,16 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                         }
                         combinedReport.overall_score = Math.min(combinedReport.overall_score || 50, 59);
                         combinedReport.recommendation = "FAIL";
+                        combinedReport.detailed_feedback = `${warningMsg}\n\n${combinedReport.detailed_feedback || ''}`;
+                        
+                        if (combinedReport.ai_vision_checks) {
+                            if (!combinedReport.ai_vision_checks.stock_acceptance) {
+                                combinedReport.ai_vision_checks.stock_acceptance = { status: "FAIL", note: warningMsg };
+                            } else {
+                                combinedReport.ai_vision_checks.stock_acceptance.status = "FAIL";
+                                combinedReport.ai_vision_checks.stock_acceptance.note = `${warningMsg} ${combinedReport.ai_vision_checks.stock_acceptance.note || ''}`;
+                            }
+                        }
                     }
                 }
             }
