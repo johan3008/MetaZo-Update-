@@ -1817,37 +1817,6 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 ai_vision: aiVisionStats
             };
 
-            // Hard validation check for resolution (for non-vectors)
-            if (!isVector && ffmpegStats) {
-                const match = ffmpegStats.resolution.match(/\(([\d\.]+)\s*MP\)/);
-                if (match) {
-                    const mp = parseFloat(match[1]);
-                    if (mp < 4.0) {
-                        const warningMsg = language === 'English' 
-                            ? `Low resolution: ${ffmpegStats.resolution}. Adobe Stock requires at least 4.0 Megapixels.`
-                            : `Resolusi rendah: ${ffmpegStats.resolution}. Adobe Stock membutuhkan minimal 4.0 Megapixel.`;
-                        if (!combinedReport.technical_issues) {
-                            combinedReport.technical_issues = [];
-                        }
-                        if (!combinedReport.technical_issues.includes(warningMsg)) {
-                            combinedReport.technical_issues.push(warningMsg);
-                        }
-                        combinedReport.overall_score = Math.min(combinedReport.overall_score || 50, 59);
-                        combinedReport.recommendation = "FAIL";
-                        combinedReport.detailed_feedback = `${warningMsg}\n\n${combinedReport.detailed_feedback || ''}`;
-                        
-                        if (combinedReport.ai_vision_checks) {
-                            if (!combinedReport.ai_vision_checks.stock_acceptance) {
-                                combinedReport.ai_vision_checks.stock_acceptance = { status: "FAIL", note: warningMsg };
-                            } else {
-                                combinedReport.ai_vision_checks.stock_acceptance.status = "FAIL";
-                                combinedReport.ai_vision_checks.stock_acceptance.note = `${warningMsg} ${combinedReport.ai_vision_checks.stock_acceptance.note || ''}`;
-                            }
-                        }
-                    }
-                }
-            }
-            
             res.json(combinedReport);
         } catch (e: any) {
             console.warn('Server check-image-quality error:', e);
