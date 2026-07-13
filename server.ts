@@ -1800,12 +1800,43 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             
             console.log('Server check-image-quality: Integration successful');
             
+            let ffmpegStats = null;
+            const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
+            if (!isVector && tempFilePath) {
+                try {
+                    ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
+                } catch (ffmpegErr) {
+                    console.warn('FFmpeg image analysis failed:', ffmpegErr);
+                }
+            }
+
             // Combine results while ensuring backward compatibility
             const combinedReport = {
                 ...aiVisionStats,
-                ffmpeg: null,
+                ffmpeg: ffmpegStats,
                 ai_vision: aiVisionStats
             };
+
+            // Hard validation check for resolution (for non-vectors)
+            if (!isVector && ffmpegStats) {
+                const match = ffmpegStats.resolution.match(/\(([\d\.]+)\s*MP\)/);
+                if (match) {
+                    const mp = parseFloat(match[1]);
+                    if (mp < 4.0) {
+                        const warningMsg = language === 'English' 
+                            ? `Low resolution: ${ffmpegStats.resolution}. Adobe Stock requires at least 4.0 Megapixels.`
+                            : `Resolusi rendah: ${ffmpegStats.resolution}. Adobe Stock membutuhkan minimal 4.0 Megapixel.`;
+                        if (!combinedReport.technical_issues) {
+                            combinedReport.technical_issues = [];
+                        }
+                        if (!combinedReport.technical_issues.includes(warningMsg)) {
+                            combinedReport.technical_issues.push(warningMsg);
+                        }
+                        combinedReport.overall_score = Math.min(combinedReport.overall_score || 50, 59);
+                        combinedReport.recommendation = "FAIL";
+                    }
+                }
+            }
             
             res.json(combinedReport);
         } catch (e: any) {
