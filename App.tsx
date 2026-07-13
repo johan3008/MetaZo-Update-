@@ -36,8 +36,8 @@ import UTIF from 'utif';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { 
-  doc, onSnapshot, setDoc, getDoc, updateDoc, getDocs, collection, query, where, serverTimestamp, orderBy, limit, addDoc,
-  db, auth, handleFirestoreError, OperationType, onAuthStateChanged, User, signOut, deleteField 
+  supabase,
+  auth, onAuthStateChanged, User, signOut
 } from './src/supabase';
 import { LoginScreen } from './src/components/LoginScreen';
 import { Meteors } from './src/components/Meteors';
@@ -1093,122 +1093,62 @@ const App: React.FC = () => {
     }
     return 'mixed';
   });
+  // Guard: timestamp of last user-initiated preference change — cloud sync is blocked for 5s after user changes
+  const userPrefsLastChanged = useRef<number>(0);
   const [titleLength, setTitleLength] = useState<'short' | 'medium' | 'long'>(() => (localStorage.getItem('mz_title_length') as 'short' | 'medium' | 'long') || 'medium');
   const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
-  // 1. Mark current user as online
+  // 1. Mark current user online & fetch active user count (Supabase native)
   useEffect(() => {
-    if (!auth.currentUser) return;
-    
-    const userRef = doc(db, 'users', auth.currentUser.uid);
-    
+    if (!auth.currentUser || !supabase) return;
+    const uid = auth.currentUser.uid;
+
     const markOnline = async () => {
-        try {
-            await setDoc(userRef, { 
-              lastSeen: new Date().getTime(),
-              email: auth.currentUser?.email || '',
-              displayName: auth.currentUser?.displayName || ''
-            }, { merge: true });
-        } catch (e) {
-            console.info('Error marking online:', e);
-        }
+      try {
+        await supabase.from('users').upsert({
+          id: uid,
+          email: auth.currentUser?.email || '',
+          display_name: auth.currentUser?.displayName || '',
+          last_seen: new Date().toISOString(),
+        }, { onConflict: 'id' });
+      } catch (e) {
+        console.info('Error marking online:', e);
+      }
     };
-    
+
+    const fetchActiveUsers = async () => {
+      try {
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data } = await supabase
+          .from('users')
+          .select('email, display_name')
+          .gt('last_seen', fiveMinAgo);
+        if (data) {
+          const names = data
+            .map((u: any) => u.display_name || (u.email ? u.email.split('@')[0] : ''))
+            .filter((n: string) => n && n !== 'sandbox.google.user');
+          setActiveUsers(names);
+          setActiveAccountsCount(names.length || 1);
+        }
+      } catch (e) {
+        // silent fail — not critical
+      }
+    };
+
     markOnline();
-    const interval = setInterval(markOnline, 60000); // 1 minute
-    
+    fetchActiveUsers();
+    const interval = setInterval(() => { markOnline(); fetchActiveUsers(); }, 60000);
+
     const handleBeforeUnload = () => {
-        setDoc(userRef, { lastSeen: 0 }, { merge: true }).catch(() => {});
+      supabase?.from('users').update({ last_seen: '1970-01-01T00:00:00Z' }).eq('id', uid).then(() => {});
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-        clearInterval(interval);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [auth.currentUser]);
-
-  // 2. Fetch truly active (online) users REALTIME
-  useEffect(() => {
-    const usersRef = collection(db, 'users');
-    
-    // We use a periodic timer to force re-evaluation of the 5-minute timeout locally,
-    // so we don't rely only on database updates to remove inactive users.
-    let currentUsersList = [];
-    
-    const evaluateSnapshot = (snapshot) => {
-        const uniqueUsers = new Set<string>();
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            let isUserOnline = false;
-            
-            if (data.lastSeen !== undefined && data.lastSeen !== null) {
-                let lastSeenTime = 0;
-                if (typeof data.lastSeen === 'number') {
-                    lastSeenTime = data.lastSeen;
-                } else if (data.lastSeen.toMillis) {
-                    lastSeenTime = data.lastSeen.toMillis();
-                } else if (typeof data.lastSeen === 'string') {
-                    lastSeenTime = new Date(data.lastSeen).getTime();
-                } else if (data.lastSeen.seconds) {
-                    lastSeenTime = data.lastSeen.seconds * 1000;
-                }
-                
-                if (lastSeenTime === 0) {
-                    isUserOnline = false;
-                } else if (lastSeenTime > fiveMinutesAgo) {
-                    isUserOnline = true;
-                } else if (lastSeenTime <= fiveMinutesAgo) {
-                    isUserOnline = false;
-                }
-            }
-            
-            if (isUserOnline) {
-                const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
-                if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') {
-                    uniqueUsers.add(nameToShow);
-                }
-            }
-        });
-        
-        const usersList = Array.from(uniqueUsers);
-        
-        if (auth.currentUser) {
-            const myName = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
-            if (myName !== 'Unknown' && myName !== 'sandbox.google.user' && !usersList.includes(myName)) {
-                usersList.push(myName);
-            }
-        }
-        
-        currentUsersList = usersList;
-        setActiveUsers(prev => {
-            if (JSON.stringify(prev) === JSON.stringify(usersList)) return prev;
-            return usersList;
-        });
-        setActiveAccountsCount(usersList.length);
-    };
-
-    let lastSnapshot = null;
-    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
-        lastSnapshot = snapshot;
-        evaluateSnapshot(snapshot);
-    }, (error) => {
-        console.error("Active accounts realtime error:", error);
-    });
-    
-    const forceUpdateInterval = setInterval(() => {
-        if (lastSnapshot) {
-            evaluateSnapshot(lastSnapshot);
-        }
-    }, 30000);
 
     return () => {
-        unsubscribe();
-        clearInterval(forceUpdateInterval);
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [auth.currentUser]);
 
@@ -1220,41 +1160,39 @@ const App: React.FC = () => {
     return 'en';
   });
 
+  // Debounce helper for saving settings to Supabase (safe merge)
+  const saveSettingsToSupabase = useCallback((patch: Record<string, any>) => {
+    if (!auth.currentUser || !supabase) return;
+    const uid = auth.currentUser.uid;
+    supabase.from('users').select('settings').eq('id', uid).single()
+      .then(({ data }: any) => {
+        const currentSettings = data?.settings || {};
+        const updatedSettings = { ...currentSettings, ...patch };
+        return supabase!.from('users').update({ settings: updatedSettings, updated_at: new Date().toISOString() }).eq('id', uid);
+      })
+      .then(({ error }) => { if (error) console.info('settings_save', error.message); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('mz_ui_language', uiLanguage);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.uiLanguage': uiLanguage
-      }).catch(() => {});
-    }
-  }, [uiLanguage]);
+    saveSettingsToSupabase({ uiLanguage });
+  }, [uiLanguage, saveSettingsToSupabase]);
 
   useEffect(() => {
     localStorage.setItem('mz_keyword_mode', keywordMode);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.keywordMode': keywordMode
-      }).catch(() => {});
-    }
-  }, [keywordMode]);
+    saveSettingsToSupabase({ keywordMode });
+  }, [keywordMode, saveSettingsToSupabase]);
 
   useEffect(() => {
     localStorage.setItem('mz_title_length', titleLength);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.titleLength': titleLength
-      }).catch(() => {});
-    }
-  }, [titleLength]);
+    saveSettingsToSupabase({ titleLength });
+  }, [titleLength, saveSettingsToSupabase]);
 
   useEffect(() => {
     localStorage.setItem('mz_metadata_language', metadataLanguage);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.metadataLanguage': metadataLanguage
-      }).catch(() => {});
-    }
-  }, [metadataLanguage]);
+    saveSettingsToSupabase({ metadataLanguage });
+  }, [metadataLanguage, saveSettingsToSupabase]);
 
   // Cek status R2 saat aplikasi dimuat
   useEffect(() => {
@@ -1414,22 +1352,16 @@ const App: React.FC = () => {
     const key = `${type}${suffix}`;
     localStorage.setItem(`mz_daily_gen_${key}_${dateStr}`, String(newVal));
     
-    if (user) {
-      const userRef = doc(db, 'users', user.uid);
-      updateDoc(userRef, {
-        [`dailyUsage.${dateStr}.${key}`]: newVal,
-        updatedAt: new Date().toISOString()
-      }).catch(err => {
-        // Fallback setDoc
-        setDoc(userRef, {
-          dailyUsage: {
-            [dateStr]: {
-              [key]: newVal
-            }
-          },
-          updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(() => {});
-      });
+    if (user && supabase) {
+      // Fetch current daily_usage, merge new count, then update
+      supabase.from('users').select('daily_usage').eq('id', user.uid).single()
+        .then(({ data: u }: any) => {
+          const usage = u?.daily_usage || {};
+          const today = usage[dateStr] || {};
+          today[key] = newVal;
+          usage[dateStr] = today;
+          return supabase!.from('users').update({ daily_usage: usage, updated_at: new Date().toISOString() }).eq('id', user.uid);
+        }).catch(() => {});
     }
     
     refreshDailyCounts();
@@ -1443,387 +1375,230 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Live real-time sync user profile (license key & subscription/trial status) from Firestore
+  // Live sync user profile (license key & subscription status) from Supabase \u2014 one-time fetch on login
   useEffect(() => {
     setHasSyncedProfile(false);
-    if (!user) {
+    if (!user || !supabase) {
       setCloudDailyCounts({});
+      if (!user) setHasSyncedProfile(true);
       return;
     }
 
     const dateStr = getTodayDateString();
-    
-    // Check if quota exceeded today
-    const lastQuotaError = localStorage.getItem('last_firestore_quota_error');
-    if (lastQuotaError && lastQuotaError === new Date().toDateString()) {
-      console.warn("Skipping Firestore user read due to previous quota error");
-      setHasSyncedProfile(true);
-      return;
-    }
+    const uid = user.uid;
+    const email = user.email || '';
 
-    const findActiveKeyForEmail = async (email: string): Promise<string> => {
-      if (!email) return '';
-      const keysRef = collection(db, 'keys');
-      const emailLower = email.toLowerCase();
-      const emailCap = emailLower.charAt(0).toUpperCase() + emailLower.slice(1);
-      
-      const checkEmail = async (targetEmail: string) => {
-        try {
-          const qSnap = await getDocs(query(keysRef, where('activatedBy', '==', targetEmail), where('activated', '==', true)));
-          if (!qSnap.empty) return qSnap.docs[0].id;
-        } catch (err) {
-          console.warn('Error querying keys collection:', err);
+    const findActiveKeyForEmail = async (targetEmail: string): Promise<string> => {
+      if (!targetEmail) return '';
+      try {
+        const variants = [targetEmail, targetEmail.toLowerCase(), targetEmail.charAt(0).toUpperCase() + targetEmail.slice(1).toLowerCase()];
+        for (const v of [...new Set(variants)]) {
+          const { data } = await supabase!
+            .from('keys')
+            .select('id')
+            .eq('activated_by', v)
+            .eq('activated', true)
+            .limit(1);
+          if (data && data.length > 0) return data[0].id;
         }
-        return '';
-      };
-
-      let found = await checkEmail(email);
-      if (found) return found;
-      
-      if (emailLower !== email) {
-        found = await checkEmail(emailLower);
-        if (found) return found;
+      } catch (err) {
+        console.warn('Error querying keys:', err);
       }
-      
-      if (emailCap !== email && emailCap !== emailLower) {
-        found = await checkEmail(emailCap);
-        if (found) return found;
-      }
-      
       return '';
     };
-    
-    const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribeUser = onSnapshot(userDocRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        
-        // 1. Sync license key (with local backup protection & keys collection fallback)
-        const localKey = localStorage.getItem('mz_license_key') || '';
-        const cloudKey = data.licenseKey || '';
-        const cancelled = (data.cancelledSubscription === true && !cloudKey && !localKey) || (data.cancelledSubscription !== false && localStorage.getItem('mz_cancelled_subscription') === 'true' && !cloudKey && !localKey);
 
-        if (cancelled) {
-          setMzLicenseKey(() => '');
-          localStorage.removeItem('mz_license_key');
-          localStorage.setItem('mz_cancelled_subscription', 'true');
-          setHasSyncedProfile(true);
-        } else {
-          const processKey = (activeKey: string) => {
-            if (activeKey) {
-              setMzLicenseKey(() => activeKey);
-              setIsCheckingLicense(true);
-              localStorage.setItem('mz_license_key', activeKey);
-              localStorage.removeItem('mz_cancelled_subscription');
-              
-              if (cloudKey !== activeKey || data.cancelledSubscription) {
-                setDoc(userDocRef, {
-                  licenseKey: activeKey,
-                  cancelledSubscription: false,
-                  updatedAt: new Date().toISOString()
-                }, { merge: true }).catch(e => console.info('db_op', e));
-              }
-            } else {
-              setMzLicenseKey(() => '');
-              setHasSyncedProfile(true);
-            }
-          };
+    const syncUserProfile = async () => {
+      try {
+        const { data: userData } = await supabase!
+          .from('users')
+          .select('*')
+          .eq('id', uid)
+          .single();
 
-          if (cloudKey) {
-            processKey(cloudKey);
+        if (userData) {
+          // 1. Sync license key
+          const localKey = localStorage.getItem('mz_license_key') || '';
+          const cloudKey = userData.license_key || '';
+          const cancelled = userData.cancelled_subscription === true && !cloudKey && !localKey;
+
+          if (cancelled) {
+            setMzLicenseKey(() => '');
+            localStorage.removeItem('mz_license_key');
+            localStorage.setItem('mz_cancelled_subscription', 'true');
+            setHasSyncedProfile(true);
           } else {
-            // cloudKey is empty. A reseller might have just assigned a key to this email!
-            // Priority: Cloud Email Key > Local Cached Key
-            findActiveKeyForEmail(user.email || '').then((foundKey) => {
-              if (foundKey) {
-                processKey(foundKey);
+            const processKey = async (activeKey: string) => {
+              if (activeKey) {
+                setMzLicenseKey(() => activeKey);
+                setIsCheckingLicense(true);
+                localStorage.setItem('mz_license_key', activeKey);
+                localStorage.removeItem('mz_cancelled_subscription');
+                if (cloudKey !== activeKey) {
+                  await supabase!.from('users').update({
+                    license_key: activeKey,
+                    cancelled_subscription: false,
+                    updated_at: new Date().toISOString()
+                  }).eq('id', uid);
+                }
               } else {
-                processKey(localKey);
+                setMzLicenseKey(() => '');
+                setHasSyncedProfile(true);
               }
+            };
+
+            if (cloudKey) {
+              await processKey(cloudKey);
+            } else {
+              const foundKey = await findActiveKeyForEmail(email);
+              await processKey(foundKey || localKey);
+            }
+          }
+
+          // 2. Sync trialStart
+          if (userData.trial_start) {
+            localStorage.setItem('mz_trial_start', userData.trial_start);
+            setTrialDaysLeft(99999);
+          }
+
+          // 3. Sync daily usage for today
+          const dailyUsage = userData.daily_usage || {};
+          if (dailyUsage[dateStr]) {
+            const usageToday = dailyUsage[dateStr];
+            setCloudDailyCounts((prev) => {
+              if (JSON.stringify(prev) === JSON.stringify(usageToday)) return prev;
+              return usageToday;
             });
+            Object.keys(usageToday).forEach((typeKey) => {
+              localStorage.setItem(`mz_daily_gen_${typeKey}_${dateStr}`, String(usageToday[typeKey]));
+            });
+          } else {
+            setCloudDailyCounts((prev) => Object.keys(prev).length === 0 ? prev : {});
           }
-        }
 
-        // 2. Sync trialStart
-        if (data.trialStart) {
-          localStorage.setItem('mz_trial_start', data.trialStart);
-          setTrialDaysLeft(99999);
-        }
+          // 4. Sync Settings (no race-condition risk \u2014 one-time read)
+          const settings = userData.settings || {};
+          const syncKey = (cloudValue: string | undefined, localStorageKey: string, setterList: any) => {
+            if (cloudValue === undefined) return;
+            const localValue = localStorage.getItem(localStorageKey) || '';
+            if (cloudValue !== localValue) {
+              if (cloudValue === '') { localStorage.removeItem(localStorageKey); setterList([]); }
+              else { localStorage.setItem(localStorageKey, cloudValue); setterList(cloudValue.split(',').map((k: string) => k.trim()).filter(Boolean)); }
+            }
+          };
+          syncKey(settings.gemini_api_key, 'gemini_api_key', setGeminiKeysList);
+          syncKey(settings.groq_api_key, 'groq_api_key', setGroqKeysList);
+          syncKey(settings.mistral_api_key, 'mistral_api_key', setMistralKeysList);
+          syncKey(settings.openai_api_key, 'openai_api_key', setOpenaiKeysList);
+          syncKey(settings.openrouter_api_key, 'openrouter_api_key', setOpenrouterKeysList);
+          syncKey(settings.blackbox_api_key, 'blackbox_api_key', setBlackboxKeysList);
+          syncKey(settings.nvidia_api_key, 'nvidia_api_key', setNvidiaKeysList);
+          syncKey(settings.bluesminds_api_key, 'bluesminds_api_key', setBluesmindsKeysList);
+          syncKey(settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
 
-        // 3. Sync daily gen counts for today
-        if (data.dailyUsage && data.dailyUsage[dateStr]) {
-          const usageToday = data.dailyUsage[dateStr];
-          setCloudDailyCounts((prev) => {
-            if (JSON.stringify(prev) === JSON.stringify(usageToday)) return prev;
-            return usageToday;
-          });
-          // Sync to localStorage for offline access/backup
-          Object.keys(usageToday).forEach((typeKey) => {
-            localStorage.setItem(`mz_daily_gen_${typeKey}_${dateStr}`, String(usageToday[typeKey]));
-          });
+          const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+          if (settings.ai_provider && validProviders.includes(settings.ai_provider)) {
+            const localProv = localStorage.getItem('ai_provider') || 'gemini';
+            if (settings.ai_provider !== localProv) {
+              localStorage.setItem('ai_provider', settings.ai_provider);
+              setSelectedProvider(settings.ai_provider as any);
+            }
+          }
+          const syncPref = (val: string | undefined, key: string, setter: any, validator?: (v: string) => boolean) => {
+            if (!val) return;
+            if (validator && !validator(val)) return;
+            if (val !== (localStorage.getItem(key) || '')) { localStorage.setItem(key, val); setter(val); }
+          };
+          syncPref(settings.uiLanguage, 'mz_ui_language', setUiLanguage, (v) => v === 'id' || v === 'en');
+          syncPref(settings.keywordMode, 'mz_keyword_mode', setKeywordMode, (v) => ['mixed','single','multi'].includes(v));
+          syncPref(settings.titleLength, 'mz_title_length', setTitleLength, (v) => ['short','medium','long'].includes(v));
+          syncPref(settings.metadataLanguage, 'mz_metadata_language', setMetadataLanguage);
+
+          setHasCustomKeySaved(
+            ['gemini_api_key','groq_api_key','mistral_api_key','openai_api_key','openrouter_api_key','blackbox_api_key','nvidia_api_key','bluesminds_api_key','aivene_api_key']
+              .some(k => (localStorage.getItem(k) || '').length > 0)
+          );
+
         } else {
-          setCloudDailyCounts((prev) => Object.keys(prev).length === 0 ? prev : {});
-        }
-
-        // 4. Sync Settings
-        if (data.settings) {
-          let settingsChanged = false;
-          
-          const syncKey = (cloudValue: string | undefined, localKey: string, setterList: any) => {
-            if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                if (cloudValue === '') {
-                  localStorage.removeItem(localKey);
-                  setterList([]);
-                } else {
-                  localStorage.setItem(localKey, cloudValue);
-                  setterList(cloudValue.split(',').map((k:string)=>k.trim()).filter(Boolean));
-                }
-                settingsChanged = true;
-              }
-            }
-          };
-
-          syncKey(data.settings.gemini_api_key, 'gemini_api_key', setGeminiKeysList);
-          syncKey(data.settings.groq_api_key, 'groq_api_key', setGroqKeysList);
-          syncKey(data.settings.mistral_api_key, 'mistral_api_key', setMistralKeysList);
-          syncKey(data.settings.openai_api_key, 'openai_api_key', setOpenaiKeysList);
-          syncKey(data.settings.openrouter_api_key, 'openrouter_api_key', setOpenrouterKeysList);
-          syncKey(data.settings.blackbox_api_key, 'blackbox_api_key', setBlackboxKeysList);
-          syncKey(data.settings.nvidia_api_key, 'nvidia_api_key', setNvidiaKeysList);
-          syncKey(data.settings.bluesminds_api_key, 'bluesminds_api_key', setBluesmindsKeysList);
-          syncKey(data.settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
-
-          if (data.settings.ai_provider !== undefined) {
-            const localProvider = localStorage.getItem('ai_provider') || 'gemini';
-            const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
-            const cloudProvider = validProviders.includes(data.settings.ai_provider) ? data.settings.ai_provider : 'gemini';
-            if (cloudProvider !== localProvider) {
-              localStorage.setItem('ai_provider', cloudProvider);
-              setSelectedProvider(cloudProvider as any);
-              settingsChanged = true;
-            }
-          }
-
-          const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
-            if (cloudValue !== undefined) {
-              let sanitizedValue = cloudValue;
-              if (localKey === 'mz_keyword_mode') {
-                if (cloudValue !== 'mixed' && cloudValue !== 'single' && cloudValue !== 'multi') {
-                  sanitizedValue = 'mixed';
-                }
-              }
-              const localValue = localStorage.getItem(localKey) || '';
-              if (sanitizedValue !== localValue) {
-                localStorage.setItem(localKey, sanitizedValue);
-                setter(sanitizedValue);
-              }
-            }
-          };
-
-          syncPreference(data.settings.uiLanguage, 'mz_ui_language', setUiLanguage);
-          syncPreference(data.settings.keywordMode, 'mz_keyword_mode', setKeywordMode);
-          syncPreference(data.settings.titleLength, 'mz_title_length', setTitleLength);
-          syncPreference(data.settings.metadataLanguage, 'mz_metadata_language', setMetadataLanguage);
-
-          if (settingsChanged) {
-             setHasCustomKeySaved(
-                (localStorage.getItem('gemini_api_key') || '').length > 0 ||
-                (localStorage.getItem('groq_api_key') || '').length > 0 ||
-                (localStorage.getItem('mistral_api_key') || '').length > 0 ||
-                (localStorage.getItem('openai_api_key') || '').length > 0 ||
-                (localStorage.getItem('openrouter_api_key') || '').length > 0 ||
-                (localStorage.getItem('blackbox_api_key') || '').length > 0 ||
-                (localStorage.getItem('nvidia_api_key') || '').length > 0 ||
-                (localStorage.getItem('bluesminds_api_key') || '').length > 0 ||
-                (localStorage.getItem('aivene_api_key') || '').length > 0
-             );
-          }
-        }
-      } else {
-        // Init cloud user profile if missing
-        const localKey = localStorage.getItem('mz_license_key') || '';
-        
-        const proceedWithInit = (finalKey: string) => {
+          // No user doc found \u2014 create one
+          const localKey = localStorage.getItem('mz_license_key') || '';
+          const foundKey = localKey || await findActiveKeyForEmail(email);
           const localTrialStart = localStorage.getItem('mz_trial_start') || new Date().toISOString();
           localStorage.setItem('mz_trial_start', localTrialStart);
           setTrialDaysLeft(99999);
 
-          // Prepopulate standard daily counts to cloud if any
           const initialUsage: any = {};
-          const tools = [
-            ToolType.IMAGE, 
-            ToolType.VIDEO, 
-            ToolType.VECTOR, 
-            ToolType.PROMPT_GEN,
-            ToolType.PROMPT_IMAGE,
-            ToolType.PROMPT_VIDEO,
-            ToolType.PROMPT_IMAGE_CHECK,
-            ToolType.CALENDAR_GEN,
-            ToolType.MUTE_VIDEO
-          ];
-          tools.forEach((t) => {
-            const val = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`);
-            if (val) {
-              initialUsage[t] = parseInt(val) || 0;
-            }
-          });
+          const tools = [ToolType.IMAGE, ToolType.VIDEO, ToolType.VECTOR, ToolType.PROMPT_GEN, ToolType.PROMPT_IMAGE, ToolType.PROMPT_VIDEO, ToolType.PROMPT_IMAGE_CHECK, ToolType.CALENDAR_GEN, ToolType.MUTE_VIDEO];
+          tools.forEach((t) => { const v = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`); if (v) initialUsage[t] = parseInt(v) || 0; });
 
-          // Prepopulate settings to cloud
           const initialSettings = {
-             gemini_api_key: localStorage.getItem('gemini_api_key') || '',
-             groq_api_key: localStorage.getItem('groq_api_key') || '',
-             mistral_api_key: localStorage.getItem('mistral_api_key') || '',
-             openai_api_key: localStorage.getItem('openai_api_key') || '',
-             openrouter_api_key: localStorage.getItem('openrouter_api_key') || '',
-             blackbox_api_key: localStorage.getItem('blackbox_api_key') || '',
-             nvidia_api_key: localStorage.getItem('nvidia_api_key') || '',
-             bluesminds_api_key: localStorage.getItem('bluesminds_api_key') || '',
-             aivene_api_key: localStorage.getItem('aivene_api_key') || '',
-             ai_provider: localStorage.getItem('ai_provider') || 'gemini',
-             mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
-             mz_groq_model: localStorage.getItem('mz_groq_model') || '',
-             mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
-             mz_aivene_model: localStorage.getItem('mz_aivene_model') || '',
-              uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
-              keywordMode: (() => {
-                 const saved = localStorage.getItem('mz_keyword_mode');
-                 if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
-                   return saved;
-                 }
-                 return 'mixed';
-               })(),
-              titleLength: localStorage.getItem('mz_title_length') || 'medium',
-              metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en'
+            gemini_api_key: localStorage.getItem('gemini_api_key') || '',
+            groq_api_key: localStorage.getItem('groq_api_key') || '',
+            mistral_api_key: localStorage.getItem('mistral_api_key') || '',
+            openai_api_key: localStorage.getItem('openai_api_key') || '',
+            openrouter_api_key: localStorage.getItem('openrouter_api_key') || '',
+            blackbox_api_key: localStorage.getItem('blackbox_api_key') || '',
+            nvidia_api_key: localStorage.getItem('nvidia_api_key') || '',
+            bluesminds_api_key: localStorage.getItem('bluesminds_api_key') || '',
+            aivene_api_key: localStorage.getItem('aivene_api_key') || '',
+            ai_provider: localStorage.getItem('ai_provider') || 'gemini',
+            mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
+            mz_groq_model: localStorage.getItem('mz_groq_model') || '',
+            mz_nvidia_model: localStorage.getItem('mz_nvidia_model') || '',
+            mz_aivene_model: localStorage.getItem('mz_aivene_model') || '',
+            uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
+            keywordMode: (['mixed','single','multi'].includes(localStorage.getItem('mz_keyword_mode') || '')) ? localStorage.getItem('mz_keyword_mode') : 'mixed',
+            titleLength: localStorage.getItem('mz_title_length') || 'medium',
+            metadataLanguage: localStorage.getItem('mz_metadata_language') || 'en',
           };
 
-          const resolvedKey = finalKey || '';
-          if (resolvedKey) {
-            localStorage.removeItem('mz_cancelled_subscription');
-          }
-          const isCancelled = resolvedKey ? false : (localStorage.getItem('mz_cancelled_subscription') === 'true');
-          if (resolvedKey) {
-            setMzLicenseKey((prev) => {
-            
-            return resolvedKey;
-          });
-            setIsCheckingLicense(true);
-            localStorage.setItem('mz_license_key', resolvedKey);
-          }
+          if (foundKey) { setMzLicenseKey(() => foundKey); setIsCheckingLicense(true); localStorage.setItem('mz_license_key', foundKey); }
 
-          setDoc(userDocRef, {
+          await supabase!.from('users').upsert({
+            id: uid,
             email: user.email,
-            displayName: user.displayName || '',
-            licenseKey: resolvedKey,
-            cancelledSubscription: isCancelled,
-            trialStart: localTrialStart,
-            dailyUsage: {
-              [dateStr]: initialUsage
-            },
+            display_name: user.displayName || '',
+            license_key: foundKey || '',
+            cancelled_subscription: !foundKey && localStorage.getItem('mz_cancelled_subscription') === 'true',
+            trial_start: localTrialStart,
+            daily_usage: { [dateStr]: initialUsage },
             settings: initialSettings,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-              }, { merge: true })
-              .then(() => {
-                if (!resolvedKey) {
-                  setHasSyncedProfile(true);
-                }
-              })
-              .catch(err => {
-                console.info('db_op', err);
-                handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
-                if (!resolvedKey) {
-                  setHasSyncedProfile(true);
-                }
-              });
-        };
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
 
-        if (localKey) {
-          proceedWithInit(localKey);
-        } else {
-          findActiveKeyForEmail(user.email || '').then((foundKey) => {
-            if (foundKey) {
-              setMzLicenseKey((prev) => {
-                  
-                  return foundKey;
-                });
-              setIsCheckingLicense(true);
-              localStorage.setItem('mz_license_key', foundKey);
-              proceedWithInit(foundKey);
-            } else {
-              proceedWithInit('');
-            }
-          });
+          if (!foundKey) setHasSyncedProfile(true);
         }
+      } catch (error: any) {
+        console.warn('Supabase user profile load error:', error?.message || error);
+        setHasSyncedProfile(true);
       }
-    }, (error) => {
-      console.warn("Firestore user load error:", error);
-      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-    });
+    };
 
-    return () => unsubscribeUser();
+    syncUserProfile();
   }, [user]);
+
+
 
   // Keep daily counts refreshed when cloudDailyCounts changes
   useEffect(() => {
     refreshDailyCounts();
   }, [cloudDailyCounts, refreshDailyCounts]);
 
-  // Sync branding from Firestore
+  // Branding: load from localStorage (set by admin/reseller via SaaSPortal)
   useEffect(() => {
-    const docRef = doc(db, 'branding', 'main');
-    getDoc(docRef).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        if (data.appName) {
-          setMzAppName(data.appName);
-          localStorage.setItem('mz_reseller_app_name', data.appName);
-        }
-        if (data.appSubtitle) {
-          setMzAppSubtitle(data.appSubtitle);
-          localStorage.setItem('mz_reseller_app_subtitle', data.appSubtitle);
-        }
-        if (data.whatsAppLink) {
-          setMzWhatsApp(data.whatsAppLink);
-          localStorage.setItem('mz_reseller_whatsapp', data.whatsAppLink);
-        }
-        if (data.pricingTier) {
-          setMzPriceText(data.pricingTier);
-          localStorage.setItem('mz_reseller_price', data.pricingTier);
-        }
-        if (data.licenseSeed) {
-          setMzLicenseSeed(data.licenseSeed);
-          localStorage.setItem('mz_reseller_seed', data.licenseSeed);
-        }
-        if (data.payInfo) {
-          let payInfoToSave = data.payInfo;
-          if (payInfoToSave.includes('BCA 817')) {
-            payInfoToSave = 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom';
-            setDoc(docRef, { payInfo: payInfoToSave }, { merge: true }).catch(() => {});
-          }
-          localStorage.setItem('mz_reseller_pay_info', payInfoToSave);
-          // dispatch custom event to notify SaaSPortal
-          window.dispatchEvent(new CustomEvent('mz_pay_info_updated', { detail: payInfoToSave }));
-        }
-      } else {
-        // Init fallback bootstrap
-        setDoc(docRef, {
-          appName: 'MetaZo PRO',
-          appSubtitle: 'AI-Powered Metadata Assistant',
-          whatsAppLink: 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr',
-          pricingTier: 'Rp 149.000 / Bulan',
-          licenseSeed: 'MZPRO-COMMERCIAL-2026',
-          payInfo: 'Bank Neo Commerce 5859459216848654 a/n Johan Chrismant Bernandus Gultom\nE-Wallet Dana 082275408171 a/n Johan Chrismant Bernandus Gultom',
-          updatedAt: new Date().toISOString()
-              }, { merge: true }).catch(err => {
-          console.info('db_op', err);
-          handleFirestoreError(err, OperationType.WRITE, 'branding/main');
-        });
-      }
-    }).catch((error) => {
-      console.warn('Firestore branding load error, keeping local cached entries:', error);
-    });
+    // Load cached branding values from localStorage (populated by SaaSPortal or admin)
+    const appName = localStorage.getItem('mz_reseller_app_name');
+    const appSubtitle = localStorage.getItem('mz_reseller_app_subtitle');
+    const whatsapp = localStorage.getItem('mz_reseller_whatsapp');
+    const price = localStorage.getItem('mz_reseller_price');
+    const seed = localStorage.getItem('mz_reseller_seed');
+    const payInfo = localStorage.getItem('mz_reseller_pay_info');
+    if (appName) setMzAppName(appName);
+    if (appSubtitle) setMzAppSubtitle(appSubtitle);
+    if (whatsapp) setMzWhatsApp(whatsapp);
+    if (price) setMzPriceText(price);
+    if (seed) setMzLicenseSeed(seed);
+    if (payInfo) window.dispatchEvent(new CustomEvent('mz_pay_info_updated', { detail: payInfo }));
   }, []);
 
   // Trial Period tracking (Unlimited Trial Days)
@@ -1838,61 +1613,37 @@ const App: React.FC = () => {
     }
   }, [isMzLicensed, trialDaysLeft]);
 
-  // Fetch active promo codes for the Login Promo modal in realtime
+  // Fetch active promo codes — one-time Supabase fetch with localStorage cache fallback
   useEffect(() => {
     if (!user) return;
-    const unsubPromos = onSnapshot(query(collection(db, 'promos'), limit(15)), (qSnap) => {
-      const list: any[] = [];
-      const now = new Date();
-      qSnap.forEach((doc) => {
-        const data = doc.data();
-        const usedCount = Number(data.usedCount) || 0;
-        const maxUses = Number(data.maxUses) || 99999;
-        
-        if (usedCount >= maxUses) return;
-        
-        if (data.endDate) {
-          const endStr = data.endDate;
-          const end = endStr.includes('T') ? new Date(endStr) : new Date(endStr + 'T23:59:59');
-          if (now > end) return;
-        }
-        
-        list.push({ id: doc.id, ...data });
-      });
-      setPromoCodesForModal(list);
-      localStorage.setItem('mz_promos_cache', JSON.stringify(list));
-    }, (err) => {
-      const errMsg = err?.message || (err && typeof err === 'object' && 'message' in err ? String((err as any).message) : '') || String(err);
-      const errCode = (err && typeof err === 'object' && 'code' in err ? String((err as any).code) : '');
-      const isPermissionErr = errMsg.toLowerCase().includes('permission') || 
-                              errMsg.toLowerCase().includes('denied') ||
-                              errCode.toLowerCase().includes('permission') ||
-                              errCode.toLowerCase().includes('denied');
-      if (!isPermissionErr) {
-        console.warn("Failed to subscribe to promos for modal, loading cached:", err);
-      }
-      
-      if (isPermissionErr) {
-        setPromoCodesForModal([]);
-        return;
-      }
-
-      let cached = localStorage.getItem('mz_promos_cache');
-      if (!cached) {
-        const seedPromos = [
-          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", createdAt: new Date().toISOString(), startDate: "2026-01-01", endDate: "2027-12-31" }
-        ];
-        localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
-        cached = JSON.stringify(seedPromos);
-      }
+    const loadPromos = async () => {
+      const seedPromos = [
+        { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
+        { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
+        { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
+      ];
       try {
-        setPromoCodesForModal(JSON.parse(cached));
-      } catch(e) {}
-    });
-
-    return () => unsubPromos();
+        if (supabase) {
+          const { data } = await supabase.from('promos').select('*').limit(15);
+          if (data && data.length > 0) {
+            const now = new Date();
+            const active = data.filter((p: any) => {
+              if ((p.used_count || 0) >= (p.max_uses || 99999)) return false;
+              if (p.end_date) { const end = new Date(p.end_date + (p.end_date.includes('T') ? '' : 'T23:59:59')); if (now > end) return false; }
+              return true;
+            });
+            setPromoCodesForModal(active);
+            localStorage.setItem('mz_promos_cache', JSON.stringify(active));
+            return;
+          }
+        }
+      } catch (e) { /* silent — fallback below */ }
+      // Fallback: localStorage cache or seed promos
+      const cached = localStorage.getItem('mz_promos_cache');
+      try { setPromoCodesForModal(cached ? JSON.parse(cached) : seedPromos); } catch(e) { setPromoCodesForModal(seedPromos); }
+      if (!cached) localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
+    };
+    loadPromos();
   }, [user]);
 
   // Login promo modal removed per user request
@@ -2019,19 +1770,16 @@ const App: React.FC = () => {
         localStorage.removeItem(`mz_daily_gen_${type}_TRIAL_${dateStr}`);
       });
 
-      if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        
-        // Remove free trial counts from db
-        const updates: any = {
-          licenseKey: '',
-          updatedAt: new Date().toISOString()
-        };
-        Object.values(ToolType).forEach(type => {
-          updates[`dailyUsage.${dateStr}.${type}_TRIAL`] = deleteField();
-        });
-        
-        updateDoc(userRef, updates).catch(() => {});
+      if (user && supabase) {
+        // Fetch current usage, remove TRIAL fields, clear license_key
+        supabase.from('users').select('daily_usage').eq('id', user.uid).single()
+          .then(({ data: u }: any) => {
+            const usage = u?.daily_usage || {};
+            const today = usage[dateStr] || {};
+            Object.values(ToolType).forEach(type => { delete today[`${type}_TRIAL`]; });
+            usage[dateStr] = today;
+            return supabase!.from('users').update({ license_key: '', daily_usage: usage, updated_at: new Date().toISOString() }).eq('id', user.uid);
+          }).catch(() => {});
       }
       setIsCheckingLicense(false);
       setHasSyncedProfile(true);
@@ -2040,86 +1788,58 @@ const App: React.FC = () => {
       refreshDailyCounts();
     };
 
-    getDoc(doc(db, 'keys', k))
-      .then(dSnap => {
-        console.log("License check: key", k, "exists:", dSnap.exists());
-        if (dSnap.exists()) {
-          const data = dSnap.data();
-          console.log("License check: data:", data);
-          if (data.activated) {
-            // Check if this key belongs to another account (1 key 1 account restriction)
-            const currentEmail = user?.email || '';
-            const keyActivatedBy = data.activatedBy || '';
-            const firstActivatedBy = data.firstActivatedBy || '';
-            const ownerId = firstActivatedBy || keyActivatedBy;
-            const isEmail = (str: string) => str.includes('@');
-            let isRejected = false;
+    // License validation via Supabase keys table
+    supabase?.from('keys').select('*').eq('id', k).single()
+      .then(({ data: keyData, error: keyErr }: any) => {
+        if (keyErr || !keyData) { clearLicenseKey(); return; }
+        if (!keyData.activated) { clearLicenseKey(); return; }
 
-            if (user) {
-              if (!ownerId || ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
-                // Valid! If it's a UID, upgrade it to email
-                if (ownerId === user.uid && currentEmail) {
-                  updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
-                } else if (!ownerId && currentEmail) {
-                  updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
-                }
-              } else if (ownerId === devId) {
-                if (currentEmail) {
-                  updateDoc(doc(db, 'keys', k), { activatedBy: currentEmail, firstActivatedBy: currentEmail }).catch(e => console.info('db_op', e));
-                }
-              } else {
-                // Reject key if it belongs to another user
-                isRejected = true;
-              }
-            } else {
-              if (ownerId && isEmail(ownerId)) {
-                setIsMzLicensed(false);
-                setIsCheckingLicense(false);
-                setHasSyncedProfile(true);
-                return;
-              } else if (ownerId && ownerId !== devId) {
-                // Reject key if it belongs to another device
-                isRejected = true;
-              }
+        const currentEmail = user?.email || '';
+        const keyActivatedBy = keyData.activated_by || '';
+        const firstActivatedBy = keyData.first_activated_by || '';
+        const ownerId = firstActivatedBy || keyActivatedBy;
+        const isEmail = (str: string) => str.includes('@');
+        let isRejected = false;
+
+        if (user) {
+          if (!ownerId || ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
+            if ((ownerId === user.uid || !ownerId) && currentEmail) {
+              supabase?.from('keys').update({ activated_by: currentEmail, first_activated_by: currentEmail }).eq('id', k).then(() => {});
             }
-
-            if (isRejected) {
-              clearLicenseKey();
-              return;
-            }
-
-            // Link device-bound activation to user's email when they log in
-            if (user && user.email && (!ownerId || !isEmail(ownerId))) {
-              updateDoc(doc(db, 'keys', k), { activatedBy: user.email, firstActivatedBy: user.email }).catch(e => console.info('db_op', e));
-            }
-
-            // Check if 30days subscription is expired
-            if (data.duration === '30days' && data.activatedAt) {
-              const activatedTime = new Date(data.activatedAt).getTime();
-              const nowTime = new Date().getTime();
-              const elapsedMs = nowTime - activatedTime;
-              const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-              const remainingDays = 30 - elapsedDays;
-
-              if (remainingDays <= 0) {
-                clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
-                return;
-              }
-              setSubDaysLeft(Math.max(0, remainingDays));
-            } else {
-              setSubDaysLeft(null);
-            }
-            setIsMzLicensed(true);
+          } else if (ownerId === devId && currentEmail) {
+            supabase?.from('keys').update({ activated_by: currentEmail, first_activated_by: currentEmail }).eq('id', k).then(() => {});
           } else {
-            clearLicenseKey();
+            isRejected = true;
           }
         } else {
-          clearLicenseKey();
+          if (ownerId && isEmail(ownerId)) {
+            setIsMzLicensed(false); setIsCheckingLicense(false); setHasSyncedProfile(true); return;
+          } else if (ownerId && ownerId !== devId) {
+            isRejected = true;
+          }
         }
+
+        if (isRejected) { clearLicenseKey(); return; }
+
+        if (user?.email && (!ownerId || !isEmail(ownerId))) {
+          supabase?.from('keys').update({ activated_by: user.email, first_activated_by: user.email }).eq('id', k).then(() => {});
+        }
+
+        if (keyData.duration === '30days' && keyData.activated_at) {
+          const activatedTime = new Date(keyData.activated_at).getTime();
+          const elapsedDays = (Date.now() - activatedTime) / (1000 * 60 * 60 * 24);
+          if (elapsedDays >= 30) {
+            clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
+            return;
+          }
+          setSubDaysLeft(Math.max(0, 30 - elapsedDays));
+        } else {
+          setSubDaysLeft(null);
+        }
+        setIsMzLicensed(true);
       })
       .catch(err => {
         console.warn('License validator connection error, retaining local state:', err);
-        // Retain local state only if a local key is present and was previously active
         setIsMzLicensed((prev) => prev && !!localStorage.getItem('mz_license_key'));
       })
       .finally(() => {
@@ -2564,19 +2284,23 @@ const App: React.FC = () => {
       cleanAivene.length > 0
     );
 
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.gemini_api_key': cleanGemini.join(','),
-        'settings.groq_api_key': cleanGroq.join(','),
-        'settings.mistral_api_key': cleanMistral.join(','),
-        'settings.openai_api_key': cleanOpenai.join(','),
-        'settings.openrouter_api_key': cleanOpenrouter.join(','),
-        'settings.blackbox_api_key': cleanBlackbox.join(','),
-        'settings.nvidia_api_key': cleanNvidia.join(','),
-        'settings.bluesminds_api_key': cleanBluesminds.join(','),
-        'settings.aivene_api_key': cleanAivene.join(','),
-        'settings.ai_provider': selectedProvider,
-      }).catch(err => console.info('db_op', err));
+    if (auth.currentUser && supabase) {
+      supabase.from('users').select('settings').eq('id', auth.currentUser.uid).single()
+        .then(({ data: u }: any) => {
+          const s = u?.settings || {};
+          return supabase!.from('users').update({ settings: { ...s,
+            gemini_api_key: cleanGemini.join(','),
+            groq_api_key: cleanGroq.join(','),
+            mistral_api_key: cleanMistral.join(','),
+            openai_api_key: cleanOpenai.join(','),
+            openrouter_api_key: cleanOpenrouter.join(','),
+            blackbox_api_key: cleanBlackbox.join(','),
+            nvidia_api_key: cleanNvidia.join(','),
+            bluesminds_api_key: cleanBluesminds.join(','),
+            aivene_api_key: cleanAivene.join(','),
+            ai_provider: selectedProvider,
+          }}).eq('id', auth.currentUser!.uid);
+        }).catch(err => console.info('db_op', err));
     }
 
     setShowSettingsModal(false);
@@ -2607,19 +2331,16 @@ const App: React.FC = () => {
     setHasCustomKeySaved(false);
     setKeyTestResults({});
 
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.gemini_api_key': '',
-        'settings.groq_api_key': '',
-        'settings.mistral_api_key': '',
-        'settings.openai_api_key': '',
-        'settings.openrouter_api_key': '',
-        'settings.blackbox_api_key': '',
-        'settings.nvidia_api_key': '',
-        'settings.bluesminds_api_key': '',
-        'settings.aivene_api_key': '',
-        'settings.ai_provider': 'gemini',
-      }).catch(err => console.info('db_op', err));
+    if (auth.currentUser && supabase) {
+      supabase.from('users').select('settings').eq('id', auth.currentUser.uid).single()
+        .then(({ data: u }: any) => {
+          const s = u?.settings || {};
+          return supabase!.from('users').update({ settings: { ...s,
+            gemini_api_key: '', groq_api_key: '', mistral_api_key: '', openai_api_key: '',
+            openrouter_api_key: '', blackbox_api_key: '', nvidia_api_key: '',
+            bluesminds_api_key: '', aivene_api_key: '', ai_provider: 'gemini',
+          }}).eq('id', auth.currentUser!.uid);
+        }).catch(err => console.info('db_op', err));
     }
   };
 
@@ -3731,13 +3452,15 @@ const App: React.FC = () => {
       created_at: new Date().toISOString()
     };
     
-    addDoc(collection(db, 'metadata_backups'), newBackup)
-      .then((docRef) => {
-        console.log('[Supabase] Auto-backup saved successfully:', batchId);
-      })
-      .catch(err => {
-        console.warn('[Supabase] Auto-backup failed:', err);
-      });
+    if (supabase) {
+      supabase.from('metadata_backups').insert(newBackup)
+        .then(() => {
+          console.log('[Supabase] Auto-backup saved successfully:', batchId);
+        })
+        .catch(err => {
+          console.warn('[Supabase] Auto-backup failed:', err);
+        });
+    }
 
   };
 
@@ -4095,9 +3818,8 @@ const App: React.FC = () => {
           activeUsers={activeUsers}
           onSignOut={async () => {
             try {
-              if (auth.currentUser) {
-                const userRef = doc(db, 'users', auth.currentUser.uid);
-                await updateDoc(userRef, { lastSeen: 0 }).catch(()=>console.info("onSignOut update error"));
+              if (auth.currentUser && supabase) {
+                await supabase.from('users').update({ last_seen: '1970-01-01T00:00:00Z' }).eq('id', auth.currentUser.uid);
               }
               await signOut(auth);
               localStorage.removeItem('mz_license_key');
@@ -4604,11 +4326,7 @@ const App: React.FC = () => {
                   setSelectedProvider(val);
                   setActiveSettingsTab(val);
                   localStorage.setItem('ai_provider', val);
-                  if (auth.currentUser) {
-                    updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                      'settings.ai_provider': val
-                    }).catch(() => {});
-                  }
+                  saveSettingsToSupabase({ ai_provider: val });
                 }}
                 className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
               >
@@ -4741,11 +4459,7 @@ const App: React.FC = () => {
                           const val = e.target.value as any;
                           setSelectedGeminiModel(val);
                           localStorage.setItem('mz_gemini_model', val);
-                          if (auth.currentUser) {
-                            updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                              'settings.mz_gemini_model': val
-                            }).catch(() => {});
-                          }
+                          saveSettingsToSupabase({ mz_gemini_model: val });
                       }}
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
@@ -5307,11 +5021,7 @@ const App: React.FC = () => {
                         const val = e.target.value;
                         setSelectedNvidiaModel(val);
                         localStorage.setItem('mz_nvidia_model', val);
-                        if (auth.currentUser) {
-                          updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                            'settings.mz_nvidia_model': val
-                          }).catch(() => {});
-                        }
+                        saveSettingsToSupabase({ mz_nvidia_model: val });
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
@@ -5578,11 +5288,7 @@ const App: React.FC = () => {
                       onChange={(e) => {
                         setSelectedAiveneModel(e.target.value);
                         localStorage.setItem('mz_aivene_model', e.target.value);
-                        if (auth.currentUser) {
-                          updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                            'settings.mz_aivene_model': e.target.value
-                          }).catch(() => {});
-                        }
+                        saveSettingsToSupabase({ mz_aivene_model: e.target.value });
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all cursor-pointer"
                     >
@@ -5632,11 +5338,7 @@ const App: React.FC = () => {
                           const val = e.target.value as any;
                           setSelectedGroqModel(val);
                           localStorage.setItem('mz_groq_model', val);
-                          if (auth.currentUser) {
-                            updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                              'settings.mz_groq_model': val
-                            }).catch(() => {});
-                          }
+                          saveSettingsToSupabase({ mz_groq_model: val });
                       }}
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
