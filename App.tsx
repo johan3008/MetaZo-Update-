@@ -1617,7 +1617,6 @@ const App: React.FC = () => {
 
   // Fetch active promo codes — one-time Supabase fetch with localStorage cache fallback
   useEffect(() => {
-    if (!user) return;
     const loadPromos = async () => {
       const seedPromos = [
         { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
@@ -1646,7 +1645,7 @@ const App: React.FC = () => {
       if (!cached) localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
     };
     loadPromos();
-  }, [user]);
+  }, []);
 
   // Login promo modal removed per user request
 
@@ -3695,6 +3694,7 @@ const App: React.FC = () => {
         language={uiLanguage}
         setLanguage={setUiLanguage}
         t={t} 
+        promoCodes={promoCodesForModal}
       />
     );
   }
