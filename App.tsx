@@ -37,6 +37,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { 
   supabase,
+  db,
   auth, onAuthStateChanged, User, signOut
 } from './src/supabase';
 import { LoginScreen } from './src/components/LoginScreen';
@@ -1109,9 +1110,10 @@ const App: React.FC = () => {
       try {
         await supabase.from('users').upsert({
           id: uid,
+          uid: uid,
           email: auth.currentUser?.email || '',
-          display_name: auth.currentUser?.displayName || '',
-          last_seen: new Date().toISOString(),
+          displayName: auth.currentUser?.displayName || '',
+          lastSeen: new Date().toISOString(),
         }, { onConflict: 'id' });
       } catch (e) {
         console.info('Error marking online:', e);
@@ -1123,11 +1125,11 @@ const App: React.FC = () => {
         const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const { data } = await supabase
           .from('users')
-          .select('email, display_name')
-          .gt('last_seen', fiveMinAgo);
+          .select('email, displayName')
+          .gt('lastSeen', fiveMinAgo);
         if (data) {
           const names = data
-            .map((u: any) => u.display_name || (u.email ? u.email.split('@')[0] : ''))
+            .map((u: any) => u.displayName || (u.email ? u.email.split('@')[0] : ''))
             .filter((n: string) => n && n !== 'sandbox.google.user');
           setActiveUsers(names);
           setActiveAccountsCount(names.length || 1);
@@ -1142,7 +1144,7 @@ const App: React.FC = () => {
     const interval = setInterval(() => { markOnline(); fetchActiveUsers(); }, 60000);
 
     const handleBeforeUnload = () => {
-      supabase?.from('users').update({ last_seen: '1970-01-01T00:00:00Z' }).eq('id', uid).then(() => {});
+      supabase?.from('users').update({ lastSeen: '1970-01-01T00:00:00Z' }).eq('id', uid).then(() => {});
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
@@ -1168,7 +1170,7 @@ const App: React.FC = () => {
       .then(({ data }: any) => {
         const currentSettings = data?.settings || {};
         const updatedSettings = { ...currentSettings, ...patch };
-        return supabase!.from('users').update({ settings: updatedSettings, updated_at: new Date().toISOString() }).eq('id', uid);
+        return supabase!.from('users').update({ settings: updatedSettings, updatedAt: new Date().toISOString() }).eq('id', uid);
       })
       .then(({ error }) => { if (error) console.info('settings_save', error.message); })
       .catch(() => {});
@@ -1353,14 +1355,14 @@ const App: React.FC = () => {
     localStorage.setItem(`mz_daily_gen_${key}_${dateStr}`, String(newVal));
     
     if (user && supabase) {
-      // Fetch current daily_usage, merge new count, then update
-      supabase.from('users').select('daily_usage').eq('id', user.uid).single()
+      // Fetch current dailyUsage, merge new count, then update
+      supabase.from('users').select('dailyUsage').eq('id', user.uid).single()
         .then(({ data: u }: any) => {
-          const usage = u?.daily_usage || {};
+          const usage = u?.dailyUsage || {};
           const today = usage[dateStr] || {};
           today[key] = newVal;
           usage[dateStr] = today;
-          return supabase!.from('users').update({ daily_usage: usage, updated_at: new Date().toISOString() }).eq('id', user.uid);
+          return supabase!.from('users').update({ dailyUsage: usage, updatedAt: new Date().toISOString() }).eq('id', user.uid);
         }).catch(() => {});
     }
     
@@ -1396,7 +1398,7 @@ const App: React.FC = () => {
           const { data } = await supabase!
             .from('keys')
             .select('id')
-            .eq('activated_by', v)
+            .eq('activatedBy', v)
             .eq('activated', true)
             .limit(1);
           if (data && data.length > 0) return data[0].id;
@@ -1418,8 +1420,8 @@ const App: React.FC = () => {
         if (userData) {
           // 1. Sync license key
           const localKey = localStorage.getItem('mz_license_key') || '';
-          const cloudKey = userData.license_key || '';
-          const cancelled = userData.cancelled_subscription === true && !cloudKey && !localKey;
+          const cloudKey = userData.licenseKey || '';
+          const cancelled = userData.cancelledSubscription === true && !cloudKey && !localKey;
 
           if (cancelled) {
             setMzLicenseKey(() => '');
@@ -1435,9 +1437,9 @@ const App: React.FC = () => {
                 localStorage.removeItem('mz_cancelled_subscription');
                 if (cloudKey !== activeKey) {
                   await supabase!.from('users').update({
-                    license_key: activeKey,
-                    cancelled_subscription: false,
-                    updated_at: new Date().toISOString()
+                    licenseKey: activeKey,
+                    cancelledSubscription: false,
+                    updatedAt: new Date().toISOString()
                   }).eq('id', uid);
                 }
               } else {
@@ -1455,13 +1457,13 @@ const App: React.FC = () => {
           }
 
           // 2. Sync trialStart
-          if (userData.trial_start) {
-            localStorage.setItem('mz_trial_start', userData.trial_start);
+          if (userData.trialStart) {
+            localStorage.setItem('mz_trial_start', userData.trialStart);
             setTrialDaysLeft(99999);
           }
 
           // 3. Sync daily usage for today
-          const dailyUsage = userData.daily_usage || {};
+          const dailyUsage = userData.dailyUsage || {};
           if (dailyUsage[dateStr]) {
             const usageToday = dailyUsage[dateStr];
             setCloudDailyCounts((prev) => {
@@ -1555,15 +1557,15 @@ const App: React.FC = () => {
 
           await supabase!.from('users').upsert({
             id: uid,
+            uid: uid,
             email: user.email,
-            display_name: user.displayName || '',
-            license_key: foundKey || '',
-            cancelled_subscription: !foundKey && localStorage.getItem('mz_cancelled_subscription') === 'true',
-            trial_start: localTrialStart,
-            daily_usage: { [dateStr]: initialUsage },
+            displayName: user.displayName || '',
+            licenseKey: foundKey || '',
+            cancelledSubscription: !foundKey && localStorage.getItem('mz_cancelled_subscription') === 'true',
+            trialStart: localTrialStart,
+            dailyUsage: { [dateStr]: initialUsage },
             settings: initialSettings,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           }, { onConflict: 'id' });
 
           if (!foundKey) setHasSyncedProfile(true);
@@ -1771,14 +1773,14 @@ const App: React.FC = () => {
       });
 
       if (user && supabase) {
-        // Fetch current usage, remove TRIAL fields, clear license_key
-        supabase.from('users').select('daily_usage').eq('id', user.uid).single()
+        // Fetch current dailyUsage, remove TRIAL fields, clear licenseKey
+        supabase.from('users').select('dailyUsage').eq('id', user.uid).single()
           .then(({ data: u }: any) => {
-            const usage = u?.daily_usage || {};
+            const usage = u?.dailyUsage || {};
             const today = usage[dateStr] || {};
             Object.values(ToolType).forEach(type => { delete today[`${type}_TRIAL`]; });
             usage[dateStr] = today;
-            return supabase!.from('users').update({ license_key: '', daily_usage: usage, updated_at: new Date().toISOString() }).eq('id', user.uid);
+            return supabase!.from('users').update({ licenseKey: '', dailyUsage: usage, updatedAt: new Date().toISOString() }).eq('id', user.uid);
           }).catch(() => {});
       }
       setIsCheckingLicense(false);
@@ -1795,8 +1797,8 @@ const App: React.FC = () => {
         if (!keyData.activated) { clearLicenseKey(); return; }
 
         const currentEmail = user?.email || '';
-        const keyActivatedBy = keyData.activated_by || '';
-        const firstActivatedBy = keyData.first_activated_by || '';
+        const keyActivatedBy = keyData.activatedBy || '';
+        const firstActivatedBy = keyData.firstActivatedBy || '';
         const ownerId = firstActivatedBy || keyActivatedBy;
         const isEmail = (str: string) => str.includes('@');
         let isRejected = false;
@@ -1804,10 +1806,10 @@ const App: React.FC = () => {
         if (user) {
           if (!ownerId || ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
             if ((ownerId === user.uid || !ownerId) && currentEmail) {
-              supabase?.from('keys').update({ activated_by: currentEmail, first_activated_by: currentEmail }).eq('id', k).then(() => {});
+              supabase?.from('keys').update({ activatedBy: currentEmail, firstActivatedBy: currentEmail }).eq('id', k).then(() => {});
             }
           } else if (ownerId === devId && currentEmail) {
-            supabase?.from('keys').update({ activated_by: currentEmail, first_activated_by: currentEmail }).eq('id', k).then(() => {});
+            supabase?.from('keys').update({ activatedBy: currentEmail, firstActivatedBy: currentEmail }).eq('id', k).then(() => {});
           } else {
             isRejected = true;
           }
@@ -1822,11 +1824,11 @@ const App: React.FC = () => {
         if (isRejected) { clearLicenseKey(); return; }
 
         if (user?.email && (!ownerId || !isEmail(ownerId))) {
-          supabase?.from('keys').update({ activated_by: user.email, first_activated_by: user.email }).eq('id', k).then(() => {});
+          supabase?.from('keys').update({ activatedBy: user.email, firstActivatedBy: user.email }).eq('id', k).then(() => {});
         }
 
-        if (keyData.duration === '30days' && keyData.activated_at) {
-          const activatedTime = new Date(keyData.activated_at).getTime();
+        if (keyData.duration === '30days' && keyData.activatedAt) {
+          const activatedTime = new Date(keyData.activatedAt).getTime();
           const elapsedDays = (Date.now() - activatedTime) / (1000 * 60 * 60 * 24);
           if (elapsedDays >= 30) {
             clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
@@ -3819,7 +3821,7 @@ const App: React.FC = () => {
           onSignOut={async () => {
             try {
               if (auth.currentUser && supabase) {
-                await supabase.from('users').update({ last_seen: '1970-01-01T00:00:00Z' }).eq('id', auth.currentUser.uid);
+                await supabase.from('users').update({ lastSeen: '1970-01-01T00:00:00Z' }).eq('id', auth.currentUser.uid);
               }
               await signOut(auth);
               localStorage.removeItem('mz_license_key');
