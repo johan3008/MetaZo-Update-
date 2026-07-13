@@ -1247,9 +1247,15 @@ const App: React.FC = () => {
   const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr');
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
-  const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
-  const [isMzLicensedState, setIsMzLicensed] = useState(() => { const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase(); return !!k; });
-  const isMzLicensed = isMzLicensedState || !!mzLicenseKey;
+  const [mzLicenseKey, setMzLicenseKey] = useState(() => {
+    const k = (localStorage.getItem('mz_license_key') || '').trim();
+    return (k.toUpperCase() === 'NULL' || k.toUpperCase() === 'UNDEFINED' || k.toUpperCase() === 'NONE') ? '' : k;
+  });
+  const [isMzLicensedState, setIsMzLicensed] = useState(() => {
+    const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase();
+    return !!k && k !== 'NULL' && k !== 'UNDEFINED' && k !== 'NONE' && k !== '';
+  });
+  const isMzLicensed = isMzLicensedState && !!mzLicenseKey;
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
@@ -1640,9 +1646,15 @@ const App: React.FC = () => {
         }
       } catch (e) { /* silent — fallback below */ }
       // Fallback: localStorage cache or seed promos
-      const cached = localStorage.getItem('mz_promos_cache');
-      try { setPromoCodesForModal(cached ? JSON.parse(cached) : seedPromos); } catch(e) { setPromoCodesForModal(seedPromos); }
-      if (!cached) localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
+      const cachedStr = localStorage.getItem('mz_promos_cache');
+      let cachedArray = null;
+      try { if (cachedStr) cachedArray = JSON.parse(cachedStr); } catch(e) {}
+      if (cachedArray && Array.isArray(cachedArray) && cachedArray.length > 0) {
+        setPromoCodesForModal(cachedArray);
+      } else {
+        setPromoCodesForModal(seedPromos);
+        localStorage.setItem('mz_promos_cache', JSON.stringify(seedPromos));
+      }
     };
     loadPromos();
   }, []);

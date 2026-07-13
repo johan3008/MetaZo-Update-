@@ -120,8 +120,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     let active = true;
     const fetchPromos = async () => {
       setIsLoadingPromos(true);
+      const seedPromos = [
+        { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
+        { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
+        { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
+      ];
       try {
-        if (!supabase) return;
+        if (!supabase) {
+          setPromoCodes(seedPromos);
+          setIsLoadingPromos(false);
+          return;
+        }
         const { data, error } = await supabase.from('promos').select('*').limit(5);
         if (error) throw error;
         if (!active) return;
@@ -159,11 +168,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             endDate: row.end_date || '',
           });
         });
-        const seedPromos = [
-          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
-        ];
         if (list.length > 0) {
           setPromoCodes(list);
         } else {
@@ -171,11 +175,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
       } catch (error) {
         console.warn("Failed to load promos for dashboard view, using fallback seed:", error);
-        const seedPromos = [
-          { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
-          { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
-        ];
         setPromoCodes(seedPromos);
       } finally {
         if (active) setIsLoadingPromos(false);
