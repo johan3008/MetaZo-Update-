@@ -1279,7 +1279,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (user?.uid !== lastUid) {
-      setHasInitiallyLoaded(false);
+      // Only reset loading state on actual account switches, not on initial auth resolution
+      if (lastUid !== null) {
+        setHasInitiallyLoaded(false);
+      }
       setLastUid(user?.uid || null);
     }
   }, [user?.uid, lastUid]);
@@ -3855,7 +3858,7 @@ const App: React.FC = () => {
 
         {/* Core Dashboard Stage */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full relative">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={activeTool}
               initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
