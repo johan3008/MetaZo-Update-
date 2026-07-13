@@ -1397,11 +1397,11 @@ const App: React.FC = () => {
         for (const v of [...new Set(variants)]) {
           const { data } = await supabase!
             .from('keys')
-            .select('id')
+            .select('key')
             .eq('activatedBy', v)
             .eq('activated', true)
             .limit(1);
-          if (data && data.length > 0) return data[0].id;
+          if (data && data.length > 0) return data[0].key;
         }
       } catch (err) {
         console.warn('Error querying keys:', err);
@@ -1791,7 +1791,7 @@ const App: React.FC = () => {
     };
 
     // License validation via Supabase keys table
-    supabase?.from('keys').select('*').eq('id', k).single()
+    supabase?.from('keys').select('*').eq('key', k).single()
       .then(({ data: keyData, error: keyErr }: any) => {
         if (keyErr || !keyData) { clearLicenseKey(); return; }
         if (!keyData.activated) { clearLicenseKey(); return; }
@@ -1806,10 +1806,10 @@ const App: React.FC = () => {
         if (user) {
           if (!ownerId || ownerId.toLowerCase() === currentEmail.toLowerCase() || ownerId === user.uid) {
             if ((ownerId === user.uid || !ownerId) && currentEmail) {
-              supabase?.from('keys').update({ activatedBy: currentEmail, firstActivatedBy: currentEmail }).eq('id', k).then(() => {});
+              supabase?.from('keys').update({ activatedBy: currentEmail, firstActivatedBy: currentEmail }).eq('key', k).then(() => {});
             }
           } else if (ownerId === devId && currentEmail) {
-            supabase?.from('keys').update({ activatedBy: currentEmail, firstActivatedBy: currentEmail }).eq('id', k).then(() => {});
+            supabase?.from('keys').update({ activatedBy: currentEmail, firstActivatedBy: currentEmail }).eq('key', k).then(() => {});
           } else {
             isRejected = true;
           }
@@ -1824,7 +1824,7 @@ const App: React.FC = () => {
         if (isRejected) { clearLicenseKey(); return; }
 
         if (user?.email && (!ownerId || !isEmail(ownerId))) {
-          supabase?.from('keys').update({ activatedBy: user.email, firstActivatedBy: user.email }).eq('id', k).then(() => {});
+          supabase?.from('keys').update({ activatedBy: user.email, firstActivatedBy: user.email }).eq('key', k).then(() => {});
         }
 
         if (keyData.duration === '30days' && keyData.activatedAt) {
