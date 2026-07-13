@@ -435,7 +435,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => setShowActivation?.(true)}
                 className="w-full py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 active:scale-[0.99] text-white font-extrabold text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg hover:shadow-violet-600/20 flex items-center justify-center space-x-1.5 cursor-pointer"
               >
-                <span>{t.language === 'Bahasa' ? "Buka Menu Aktivasi Promo" : "Open Promo Claim Menu"}</span>
+                <span>{t.language === 'Bahasa' ? "Dapatkan Promo" : "Get Promo"}</span>
                 <ArrowRight size={12} />
               </button>
             </div>
