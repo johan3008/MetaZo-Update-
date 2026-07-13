@@ -12,7 +12,7 @@ interface QualityReport {
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
-  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact"; x: number; y: number; intensity: number; raw_value: string }[];
+  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
   ffmpeg?: {
     resolution: string;
     color_space: string;
@@ -1111,14 +1111,18 @@ export const ImageQualityCheck: React.FC<{
                                     focus: 'bg-amber-500',
                                     lighting: 'bg-violet-500',
                                     ip_violation: 'bg-red-500',
-                                    artifact: 'bg-orange-500'
+                                    artifact: 'bg-orange-500',
+                                    gen_ai_anomaly: 'bg-pink-500',
+                                    composition: 'bg-blue-500'
                                   };
                                   const labels = {
                                     noise: t.language === 'Bahasa' ? 'Grain & Noise' : 'Grain & Noise',
                                     focus: t.language === 'Bahasa' ? 'Fokus Kurang' : 'Soft Focus',
                                     lighting: t.language === 'Bahasa' ? 'Masalah Cahaya' : 'Lighting Issue',
                                     ip_violation: t.language === 'Bahasa' ? 'Pelanggaran IP' : 'IP Violation',
-                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact'
+                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact',
+                                    gen_ai_anomaly: t.language === 'Bahasa' ? 'Anomali AI' : 'AI Anomaly',
+                                    composition: t.language === 'Bahasa' ? 'Komposisi' : 'Composition'
                                   };
                                   return (
                                     <motion.div
