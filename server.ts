@@ -11,6 +11,7 @@ import "@ffprobe-installer/linux-x64/package.json";
 
 
 import express from 'express';
+import Tesseract from 'tesseract.js';
 import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
 import { exec, spawn } from 'child_process';
@@ -45,6 +46,27 @@ ffmpeg.setFfprobePath(_require('@ffprobe-installer/ffprobe').path);
 }
 
 
+
+
+async function scanImageTextLocal(imagePath: string): Promise<string> {
+    try {
+        const result = await Tesseract.recognize(imagePath, 'eng');
+        const lines = result.data.lines;
+        if (!lines || lines.length === 0) return "No text detected by local OCR.";
+        
+        let report = "Local OCR Bounding Box Data:\n";
+        for (const line of lines) {
+            const bbox = line.bbox;
+            if (line.text.trim().length > 0) {
+                report += `- Text: "${line.text.trim()}" | Coordinates (px): [X: ${Math.round(bbox.x0)} to ${Math.round(bbox.x1)}, Y: ${Math.round(bbox.y0)} to ${Math.round(bbox.y1)}]\n`;
+            }
+        }
+        return report;
+    } catch (err) {
+        console.warn('Tesseract OCR failed:', err);
+        return "Local OCR scan failed or skipped.";
+    }
+}
 
 // TRICK: Strict Queue to prevent Server OOM.
 // Ghostscript is extremely memory hungry. If 5 requests come at once, 5 GS processes will spawn,
@@ -1448,6 +1470,13 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                                 }
 
                                 const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
+                                
+                                // Run Local OCR Scan on the first frame to assist IP/Text validation
+                                if (framePaths.length > 0) {
+                                    const localOcrData = await scanImageTextLocal(framePaths[0]);
+                                    videoMetadata.local_ocr_data = localOcrData;
+                                }
+
                                 fs.rmSync(outDir, { recursive: true, force: true });
 
                                 if (!isDone) {
@@ -1835,11 +1864,18 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
             let zoomedImageBase64 = null;
             const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
+            let imageMetadata: any = {};
             
             if (!isVector && tempFilePath) {
                 try {
+                    const localOcrData = await scanImageTextLocal(tempFilePath);
+                    imageMetadata.local_ocr_data = localOcrData;
+                } catch (e) {
+                    console.warn('OCR error', e);
+                }
+                try {
                     const zoomedPath = tempFilePath.replace(/\.(\w+)$/, '_zoomed.$1');
-                    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "crop=iw/2:ih/2:iw/4:ih/4,scale=iw:-1" -q:v 2 "${zoomedPath}" -y`);
+                    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "crop=min(500\\,iw):min(500\\,ih),scale=iw*2:-1" -q:v 2 "${zoomedPath}" -y`);
                     const zoomedBuffer = fs.readFileSync(zoomedPath);
                     const mime = fileType || (tempFilePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
                     zoomedImageBase64 = `data:${mime};base64,${zoomedBuffer.toString('base64')}`;
@@ -1850,8 +1886,10 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
-            const imagePayload = zoomedImageBase64 ? [imageBase64, zoomedImageBase64] : imageBase64;
-            const aiVisionStats = await checkImageQuality(imagePayload, tolerance, language, model, fileType);
+            const finalImageInput = zoomedImageBase64 ? [imageBase64, zoomedImageBase64] : imageBase64;
+            
+            // Call AI analysis passing imageMetadata
+            const aiVisionStats = await checkImageQuality(finalImageInput, tolerance, language, model, fileType, imageMetadata);
             
             console.log('Server check-image-quality: Integration successful');
             
