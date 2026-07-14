@@ -267,13 +267,13 @@ const startTabKeepAlive = () => {
         keepAliveVideoEl.play().then(() => {
             // --- TRIK LICIK 5: PICTURE-IN-PICTURE (PiP) PHANTOM ---
             if (document.pictureInPictureEnabled && !document.pictureInPictureElement) {
-                keepAliveVideoEl?.requestPictureInPicture().catch(() => {});
+                keepAliveVideoEl?.requestPictureInPicture().then(undefined, () => {});
             }
-        }).catch(() => {});
+        }).then(undefined, () => {});
 
         // --- OS LEVEL WAKE LOCK ---
         if ('wakeLock' in navigator) {
-            (navigator as any).wakeLock.request('screen').catch(() => {});
+            (navigator as any).wakeLock.request('screen').then(undefined, () => {});
         }
     } catch (e) {
         console.error("Keep-alive audio/video failed", e);
@@ -288,7 +288,7 @@ const stopTabKeepAlive = () => {
         if (keepAliveVideoEl) {
             keepAliveVideoEl.pause();
             if (document.pictureInPictureElement === keepAliveVideoEl) {
-                document.exitPictureInPicture().catch(() => {});
+                document.exitPictureInPicture().then(undefined, () => {});
             }
         }
         if (keepAliveOscillator) {
@@ -874,7 +874,7 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
             oscillator.start();
             
             if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
+                audioCtx.resume().then(undefined, () => {});
             }
         } catch (e) {
             console.warn("AudioContext trick failed", e);
@@ -900,7 +900,7 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
             if (audioSource) audioSource.disconnect();
             if (gainNode) gainNode.disconnect();
             if (audioCtx && audioCtx.state !== 'closed') {
-                audioCtx.close().catch(() => {});
+                audioCtx.close().then(undefined, () => {});
             }
         };
 
@@ -1173,7 +1173,7 @@ const App: React.FC = () => {
         return supabase!.from('users').update({ settings: updatedSettings, updatedAt: new Date().toISOString() }).eq('id', uid);
       })
       .then(({ error }) => { if (error) console.info('settings_save', error.message); })
-      .catch(() => {});
+      .then(undefined, () => {});
   }, []);
 
   useEffect(() => {
@@ -1376,7 +1376,7 @@ const App: React.FC = () => {
           today[key] = newVal;
           usage[dateStr] = today;
           return supabase!.from('users').update({ dailyUsage: usage, updatedAt: new Date().toISOString() }).eq('id', user.uid);
-        }).catch(() => {});
+        }).then(undefined, () => {});
     }
     
     refreshDailyCounts();
@@ -1799,7 +1799,7 @@ const App: React.FC = () => {
             Object.values(ToolType).forEach(type => { delete today[`${type}_TRIAL`]; });
             usage[dateStr] = today;
             return supabase!.from('users').update({ licenseKey: '', dailyUsage: usage, updatedAt: new Date().toISOString() }).eq('id', user.uid);
-          }).catch(() => {});
+          }).then(undefined, () => {});
       }
       setIsCheckingLicense(false);
       setHasSyncedProfile(true);
@@ -1858,14 +1858,20 @@ const App: React.FC = () => {
         }
         setIsMzLicensed(true);
       })
-      .catch(err => {
+      .then(undefined, err => {
         console.warn('License validator connection error, retaining local state:', err);
         setIsMzLicensed((prev) => prev && !!localStorage.getItem('mz_license_key'));
       })
-      .finally(() => {
-        setIsCheckingLicense(false);
-        setHasSyncedProfile(true);
-      });
+      .then(
+        () => {
+          setIsCheckingLicense(false);
+          setHasSyncedProfile(true);
+        },
+        () => {
+          setIsCheckingLicense(false);
+          setHasSyncedProfile(true);
+        }
+      );
   }, [mzLicenseKey, user, isCheckingAuth]);
 
   // Passcode logic removed for UID-based Admin Access
@@ -2320,7 +2326,7 @@ const App: React.FC = () => {
             aivene_api_key: cleanAivene.join(','),
             ai_provider: selectedProvider,
           }}).eq('id', auth.currentUser!.uid);
-        }).catch(err => console.info('db_op', err));
+        }).then(undefined, err => console.info('db_op', err));
     }
 
     setShowSettingsModal(false);
@@ -2360,7 +2366,7 @@ const App: React.FC = () => {
             openrouter_api_key: '', blackbox_api_key: '', nvidia_api_key: '',
             bluesminds_api_key: '', aivene_api_key: '', ai_provider: 'gemini',
           }}).eq('id', auth.currentUser!.uid);
-        }).catch(err => console.info('db_op', err));
+        }).then(undefined, err => console.info('db_op', err));
     }
   };
 
@@ -3280,7 +3286,7 @@ const App: React.FC = () => {
     if ('locks' in navigator) {
         navigator.locks.request('vixer-hard-processing', async () => {
             await processingLoop();
-        }).catch(err => {
+        }).then(undefined, err => {
             console.warn("Web Locks API failed, falling back to normal loop.", err);
             processingLoop();
         });
@@ -3477,7 +3483,7 @@ const App: React.FC = () => {
         .then(() => {
           console.log('[Supabase] Auto-backup saved successfully:', batchId);
         })
-        .catch(err => {
+        .then(undefined, err => {
           console.warn('[Supabase] Auto-backup failed:', err);
         });
     }
@@ -3879,6 +3885,7 @@ const App: React.FC = () => {
               unprocessedFilesCount={filesToGenerateCount}
               generationMode={generationMode}
               isLicensed={isMzLicensed}
+              trialDaysLeft={trialDaysLeft}
               appName={mzAppName}
               pricingTier={autoPricingTier}
               whatsAppLink={mzWhatsApp}
