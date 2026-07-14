@@ -176,21 +176,86 @@ const PROHIBITED_KEYWORDS_SET = new Set([
   'instagram', 'youtube', 'whatsapp', 'brand', 'trademark', 'logo', 'copyright', 'intellectual', 'property'
 ]);
 
+const IP_REPLACEMENT_DICT: Record<string, string> = {
+  'iphone': 'smartphone',
+  'ipad': 'tablet device',
+  'macbook': 'laptop computer',
+  'mac': 'computer',
+  'ios': 'mobile operating system',
+  'android': 'mobile device',
+  'microsoft': 'software company',
+  'windows': 'operating system',
+  'xbox': 'gaming console',
+  'playstation': 'gaming console',
+  'sony': 'electronics brand',
+  'samsung': 'mobile device',
+  'nike': 'sportswear',
+  'adidas': 'athletic apparel',
+  'gucci': 'luxury fashion',
+  'rolex': 'luxury watch',
+  'cocacola': 'cola beverage',
+  'coca-cola': 'cola beverage',
+  'pepsi': 'cola beverage',
+  'starbucks': 'coffee cup',
+  'amazon': 'online shopping',
+  'google': 'search engine',
+  'meta': 'virtual reality',
+  'oculus': 'vr headset',
+  'meta quest': 'vr headset',
+  'facebook': 'social media',
+  'instagram': 'social media',
+  'twitter': 'social network',
+  'tiktok': 'social video',
+  'netflix': 'streaming service',
+  'disney': 'entertainment',
+  'marvel': 'superhero',
+  'canon': 'camera',
+  'nikon': 'camera',
+  'adobe': 'software',
+  'shutterstock': 'stock photo',
+  'getty': 'stock photo',
+  'midjourney': 'generative ai',
+  'firefly': 'generative ai',
+  'stablediffusion': 'generative ai',
+  'dalle': 'generative ai',
+  'llama': 'ai model',
+  'chatgpt': 'chatbot',
+  'openai': 'ai company',
+  'youtube': 'video sharing',
+  'whatsapp': 'messaging app',
+  'lego': 'interlocking toy bricks'
+};
+
 /**
- * Checks if a word is a prohibited brand, IP, standard name, or contains a color.
+ * Checks if a word is prohibited, and optionally returns a generic commercial replacement.
  */
-function isProhibitedKeyword(word: string): boolean {
-  if (!word) return true;
+function sanitizeKeyword(word: string): { isProhibited: boolean; replacement?: string } {
+  if (!word) return { isProhibited: true };
   const lower = word.toLowerCase().trim();
-  if (PROHIBITED_KEYWORDS_SET.has(lower)) return true;
+  
+  if (IP_REPLACEMENT_DICT[lower]) {
+    return { isProhibited: true, replacement: IP_REPLACEMENT_DICT[lower] };
+  }
+  
+  if (PROHIBITED_KEYWORDS_SET.has(lower)) return { isProhibited: true };
   
   // Exclude keywords containing color names
   const parts = lower.split(/[\s-_]+/);
   if (parts.some(part => COLOR_KEYWORDS.has(part))) {
-    return true;
+    return { isProhibited: true };
   }
   
-  return false;
+  return { isProhibited: false };
+}
+
+// Stop words for Title extraction
+const TITLE_STOP_WORDS = new Set(['the', 'a', 'an', 'is', 'on', 'with', 'in', 'at', 'by', 'for', 'of', 'and', 'or', 'to', 'this', 'that', 'it', 'from', 'as', 'are', 'was', 'were']);
+
+function extractMainWordsFromTitle(title: string): string[] {
+  if (!title) return [];
+  const words = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').split(/\s+/);
+  const mainWords = words.filter(w => w.length > 2 && !TITLE_STOP_WORDS.has(w));
+  return Array.from(new Set(mainWords)).slice(0, 5); // take up to 5 unique main words
 }
 
 function getHeuristicCategories(title: string, keywords: string[]): {
@@ -448,13 +513,18 @@ function ensureKeywordCount(
   if (Array.isArray(keywords)) {
     keywords.forEach(k => {
       if (typeof k === 'string') {
-        const clean = k.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
-        if (clean.length > 1 && !isProhibitedKeyword(clean)) {
+        const cleanRaw = k.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
+        const sanitizeRes = sanitizeKeyword(cleanRaw);
+        const clean = sanitizeRes.replacement || cleanRaw;
+        
+        if (clean.length > 1 && (!sanitizeRes.isProhibited || sanitizeRes.replacement)) {
           if (keywordMode === 'single' && clean.includes(' ')) {
             // Split multi-words into individual single words
             const pieces = clean.split(/\s+/);
-            pieces.forEach(p => {
-              if (p.length > 1 && !isProhibitedKeyword(p)) {
+            pieces.forEach(pRaw => {
+              const sanitizeP = sanitizeKeyword(pRaw);
+              const p = sanitizeP.replacement || pRaw;
+              if (p.length > 1 && (!sanitizeP.isProhibited || sanitizeP.replacement)) {
                 // Check for exact and near duplicates (plurals/singulars)
                 const isDuplicate = uniqueKeywords.some(existing => 
                   existing === p || 
@@ -537,7 +607,12 @@ function ensureKeywordCount(
       .replace(/[^a-z0-9\s]/g, '')
       .split(/\s+/)
       .map(w => w.trim())
-      .filter(w => w.length > 1 && !STOP_WORDS.has(w) && !isProhibitedKeyword(w));
+      .filter(w => {
+        if (w.length <= 1 || STOP_WORDS.has(w)) return false;
+        const s = sanitizeKeyword(w);
+        return !s.isProhibited || !!s.replacement;
+      })
+      .map(w => sanitizeKeyword(w).replacement || w);
   };
 
   // Build candidate sources in order of priority:
@@ -610,21 +685,25 @@ function ensureKeywordCount(
         if (uniqueKeywords.length >= targetCount) break;
         if (typeof word === 'string') {
           let cleanWord = word.trim().toLowerCase();
-          if (cleanWord.length > 1 && !isProhibitedKeyword(cleanWord)) {
-            if (keywordMode === 'multi' && !cleanWord.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(cleanWord)) % modifiers.length];
-              cleanWord = `${cleanWord} ${mod}`;
-            }
-            if (!uniqueKeywords.includes(cleanWord)) {
-              uniqueKeywords.push(cleanWord);
+          if (cleanWord.length > 1) {
+            const s = sanitizeKeyword(cleanWord);
+            if (!s.isProhibited || s.replacement) {
+              let finalWord = s.replacement || cleanWord;
+              if (keywordMode === 'multi' && !finalWord.includes(' ')) {
+                const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
+                const mod = modifiers[Math.abs(hashString(finalWord)) % modifiers.length];
+                finalWord = `${finalWord} ${mod}`;
+              }
+              if (!uniqueKeywords.includes(finalWord)) {
+                uniqueKeywords.push(finalWord);
+              }
             }
           }
+        }
         }
       }
     }
   }
-
   return uniqueKeywords.slice(0, targetCount);
 }
 
@@ -1689,6 +1768,7 @@ OUTPUT FORMAT:
   "shutterstock_category_1": "",
   "shutterstock_category_2": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
+  "has_copy_space": false,
   "confidence_score": 0.95
 }`;
 
@@ -1748,21 +1828,27 @@ OUTPUT FORMAT:
       
       data.keywords.forEach((k: any) => {
         if (typeof k === 'string') {
-          const cleanPhrase = k.toLowerCase()
+          const cleanPhraseRaw = k.toLowerCase()
                                .trim()
                                .replace(/[^a-z0-9\s-]/g, '')
                                .replace(/\s+/g, ' ');
-          if (cleanPhrase.length > 1) {
+          
+          if (cleanPhraseRaw.length > 1) {
+            const sanitizePhrase = sanitizeKeyword(cleanPhraseRaw);
+            const cleanPhrase = sanitizePhrase.replacement || cleanPhraseRaw;
+            
             if (keywordMode === 'single') {
               // Split any phrase into individual single words
               const pieces = cleanPhrase.split(/\s+/);
-              pieces.forEach(word => {
-                if (word.length > 1 && !isProhibitedKeyword(word)) {
+              pieces.forEach(wordRaw => {
+                const sanitizeWord = sanitizeKeyword(wordRaw);
+                const word = sanitizeWord.replacement || wordRaw;
+                if (word.length > 1 && (!sanitizeWord.isProhibited || sanitizeWord.replacement)) {
                   cleanedKeywords.push(word);
                 }
               });
             } else {
-              if (!isProhibitedKeyword(cleanPhrase)) {
+              if (!sanitizePhrase.isProhibited || sanitizePhrase.replacement) {
                 cleanedKeywords.push(cleanPhrase);
               }
             }
@@ -1784,12 +1870,36 @@ OUTPUT FORMAT:
         if (!allowedTerms || allowedTerms.length < 5) return true;
         const words = keyword.split(/\s+/);
         const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-        return hasMatchingWord && !isProhibitedKeyword(keyword);
+        const s = sanitizeKeyword(keyword);
+        return hasMatchingWord && (!s.isProhibited || !!s.replacement);
       });
 
        // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
-      const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-      const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+      const remainingKeywords = uniqueKeywords.filter((k: string) => {
+        const s = sanitizeKeyword(k);
+        return !rigorouslyFilteredKeywords.includes(k) && (!s.isProhibited || !!s.replacement);
+      });
+      
+      let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+      
+      // Feature A: Auto-Inject Commercial Copy Space
+      if (data.has_copy_space) {
+        const copySpaceKeywords = ["copy space", "negative space", "design space"];
+        copySpaceKeywords.forEach(csk => {
+            if (!finalKeywordList.includes(csk)) {
+                finalKeywordList.unshift(csk);
+            }
+        });
+      }
+
+      // Feature C: Sync Title to 5 Keywords
+      const titleMainWords = extractMainWordsFromTitle(data.title);
+      // Remove them from current list if they exist so we can force them at the beginning
+      finalKeywordList = finalKeywordList.filter(k => !titleMainWords.includes(k));
+      // Unshift them back in reverse order so they appear at indices 0-4
+      for (let i = titleMainWords.length - 1; i >= 0; i--) {
+        finalKeywordList.unshift(titleMainWords[i]);
+      }
 
       data.keywords = ensureKeywordCount(
         finalKeywordList,
@@ -2314,6 +2424,7 @@ OUTPUT FORMAT:
       "shutterstock_category_1": "",
       "shutterstock_category_2": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
+      "has_copy_space": false,
       "confidence_score": 0.95
     }
   ]
@@ -2408,21 +2519,27 @@ OUTPUT FORMAT:
             let cleanedKeywords: string[] = [];
             metadata.keywords.forEach((k: any) => {
                 if (typeof k === 'string') {
-                    const cleanPhrase = k.toLowerCase()
+                    const cleanPhraseRaw = k.toLowerCase()
                                          .trim()
                                          .replace(/[^a-z0-9\s-]/g, '')
                                          .replace(/\s+/g, ' ');
-                    if (cleanPhrase.length > 1) {
+                    
+                    if (cleanPhraseRaw.length > 1) {
+                        const sanitizePhrase = sanitizeKeyword(cleanPhraseRaw);
+                        const cleanPhrase = sanitizePhrase.replacement || cleanPhraseRaw;
+                        
                         if (keywordMode === 'single') {
                             // Split any phrase into individual single words
                             const pieces = cleanPhrase.split(/\s+/);
-                            pieces.forEach(word => {
-                                if (word.length > 1 && !isProhibitedKeyword(word)) {
+                            pieces.forEach(wordRaw => {
+                                const sanitizeWord = sanitizeKeyword(wordRaw);
+                                const word = sanitizeWord.replacement || wordRaw;
+                                if (word.length > 1 && (!sanitizeWord.isProhibited || sanitizeWord.replacement)) {
                                     cleanedKeywords.push(word);
                                 }
                             });
                         } else {
-                            if (!isProhibitedKeyword(cleanPhrase)) {
+                            if (!sanitizePhrase.isProhibited || sanitizePhrase.replacement) {
                                 cleanedKeywords.push(cleanPhrase);
                             }
                         }
@@ -2444,11 +2561,33 @@ OUTPUT FORMAT:
               if (!allowedTerms || allowedTerms.length < 5) return true;
               const words = keyword.split(/\s+/);
               const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-              return hasMatchingWord && !isProhibitedKeyword(keyword);
+              const s = sanitizeKeyword(keyword);
+              return hasMatchingWord && (!s.isProhibited || !!s.replacement);
             });
 
-            const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-            const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+            const remainingKeywords = uniqueKeywords.filter((k: string) => {
+              const s = sanitizeKeyword(k);
+              return !rigorouslyFilteredKeywords.includes(k) && (!s.isProhibited || !!s.replacement);
+            });
+            
+            let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+            
+            // Feature A: Auto-Inject Commercial Copy Space
+            if (metadata.has_copy_space) {
+              const copySpaceKeywords = ["copy space", "negative space", "design space"];
+              copySpaceKeywords.forEach(csk => {
+                  if (!finalKeywordList.includes(csk)) {
+                      finalKeywordList.unshift(csk);
+                  }
+              });
+            }
+            
+            // Feature C: Sync Title to 5 Keywords
+            const titleMainWords = extractMainWordsFromTitle(metadata.title);
+            finalKeywordList = finalKeywordList.filter(k => !titleMainWords.includes(k));
+            for (let i = titleMainWords.length - 1; i >= 0; i--) {
+              finalKeywordList.unshift(titleMainWords[i]);
+            }
 
             metadata.keywords = ensureKeywordCount(
               finalKeywordList,
