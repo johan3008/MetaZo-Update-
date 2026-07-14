@@ -698,8 +698,8 @@ function ensureKeywordCount(
                 uniqueKeywords.push(finalWord);
               }
             }
+            }
           }
-        }
         }
       }
     }

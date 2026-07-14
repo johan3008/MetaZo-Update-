@@ -326,23 +326,69 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      // 1. Ekstrak frame secara lokal dari keseluruhan durasi video
-      const base64Frames = await extractVideoFrames(file, 4);
+      let response;
+      let uploadedUrl = null;
+      let getUrlData = null;
 
-      // 2. Kirim kumpulan frame gambar ke endpoint backend
-      const response = await fetch('/api/check-video-quality', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...getHeaders(aiOptions)
-        },
-        body: JSON.stringify({
-          frames: base64Frames, // Mengirim 4 frame sekaligus
-          tolerance,
-          language: t.language || 'English',
-          model: aiOptions?.model || 'gemini-3.1-pro-preview'
-        })
-      });
+      if (r2Configured) {
+        try {
+          const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
+          if (getUrlRes.ok) {
+            getUrlData = await getUrlRes.json().catch(() => ({}));
+            if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+              console.log(`[Video Audit] Uploading raw video to Cloudflare R2: ${file.name}`);
+              const putRes = await fetch(getUrlData.uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type || 'video/mp4' }
+              });
+              if (putRes.ok) {
+                uploadedUrl = getUrlData.fileUrl;
+              } else {
+                console.warn(`[Video Audit] PUT to R2 failed: ${putRes.status}`);
+              }
+            }
+          }
+        } catch (uploadErr) {
+          console.warn("[Video Audit] Failed to upload to Cloudflare R2", uploadErr);
+        }
+      }
+
+      if (uploadedUrl) {
+        // Send R2 fileUrl to backend to bypass Vercel payload limits
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getHeaders(aiOptions)
+          },
+          body: JSON.stringify({
+            fileUrl: uploadedUrl,
+            pathKey: getUrlData?.pathKey,
+            tolerance,
+            language: t.language || 'English',
+            model: aiOptions?.model || 'gemini-3.1-pro-preview'
+          })
+        });
+      } else {
+        // Fallback: Ekstrak frame secara lokal dari keseluruhan durasi video
+        console.log(`[Video Audit] R2 not available, falling back to local canvas extraction...`);
+        const base64Frames = await extractVideoFrames(file, 4);
+
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getHeaders(aiOptions)
+          },
+          body: JSON.stringify({
+            frames: base64Frames, // Mengirim 4 frame sekaligus
+            tolerance,
+            language: t.language || 'English',
+            model: aiOptions?.model || 'gemini-3.1-pro-preview'
+          })
+        });
+      }
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -384,8 +430,8 @@ export const VideoQualityCheck: React.FC<{
           </h4>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
             {t.language === 'Bahasa' 
-              ? 'Sama seperti aplikasi pembuat metadata, sistem secara otomatis mengekstrak beberapa frame kunci secara lokal di browser menggunakan elemen <canvas>, lalu mengirimkannya ke Vision AI Gemini 3.1 Flash Lite dengan prompt khusus dan aturan kurasi Adobe Stock untuk mendeteksi cacat visual, anomali AI, serta risiko hak cipta.'
-              : 'Just like the metadata generator app, the system automatically extracts several keyframes locally in the browser using the <canvas> element, then sends them to Vision AI Gemini 3.1 Flash Lite with custom prompts and Adobe Stock curation guidelines to detect visual flaws, AI anomalies, and copyright risks.'}
+              ? 'Untuk melewati batasan upload 4.5MB dari Vercel, sistem akan langsung mengunggah file video mentah Anda ke Cloudflare R2 secara aman. Backend kemudian akan mengunduhnya untuk mengekstrak beberapa frame kunci, lalu mengirimkannya ke Vision AI Gemini 3.1 Flash Lite dengan aturan kurasi Adobe Stock.'
+              : 'To bypass Vercel\'s 4.5MB upload payload limit, the system directly uploads your raw video file to Cloudflare R2 securely. The backend then downloads it to extract keyframes and sends them to Vision AI Gemini 3.1 Flash Lite with Adobe Stock curation guidelines.'}
           </p>
         </div>
       </div>

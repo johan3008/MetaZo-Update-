@@ -653,59 +653,73 @@ export const ImageQualityCheck: React.FC<{
         let uploadedUrl = null;
         let getUrlData = null;
 
-        // Try R2 upload for standard images to prevent Vercel 4.5MB payload limits
+        // Try R2 upload for standard images and videos to prevent Vercel 4.5MB payload limits
         const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
-        let extractedVideoFrames: string[] | null = null;
         
-        if (isVideo) {
-           console.log(`[Video Audit in Image] Mengirim file video ke backend (FFmpeg) untuk diekstrak...`);
-           // Video will be sent via FormData below
-        } else if (!file.name.match(/\.(eps|ai)$/i)) {
+        if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
-            // Upload FULL RESOLUTION file to R2 for 100% valid zoom analysis
+            // Upload FULL RESOLUTION file to R2 for 100% valid zoom analysis or Video FFmpeg streaming
             let uploadBlob: Blob | File = file;
 
-            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
+            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || (isVideo ? 'video/mp4' : 'image/jpeg'))}`);
             if (getUrlRes.ok) {
               getUrlData = await getUrlRes.json().catch(() => ({}));
               if (getUrlData.uploadUrl && getUrlData.fileUrl) {
-                console.log(`[Image Audit] Uploading to Cloudflare R2: ${file.name}`);
+                console.log(`[Audit] Uploading to Cloudflare R2: ${file.name}`);
                 const putRes = await fetch(getUrlData.uploadUrl, {
                   method: 'PUT',
                   body: uploadBlob,
-                  headers: { 'Content-Type': uploadBlob.type || 'image/jpeg' }
+                  headers: { 'Content-Type': uploadBlob.type || (isVideo ? 'video/mp4' : 'image/jpeg') }
                 });
                 if (putRes.ok) {
                   uploadedUrl = getUrlData.fileUrl;
                 } else {
-                  console.warn(`[Image Audit] PUT to R2 failed: ${putRes.status}`);
+                  console.warn(`[Audit] PUT to R2 failed: ${putRes.status}`);
                 }
               }
             }
           } catch (uploadErr) {
-            console.warn("[Image Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
+            console.warn("[Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
           }
         }
 
         let response;
         
         if (isVideo) {
-          console.log(`[Video Audit in Image] Mengekstrak frame video secara lokal...`);
-          const extractedFrames = await extractVideoFrames(file, 4);
-          
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              ...getHeaders(aiOptions) 
-            },
-            body: JSON.stringify({
-              frames: extractedFrames,
-              tolerance,
-              language: t.language || 'English',
-              model: aiOptions?.model || 'gemini-3.1-pro-preview'
-            })
-          });
+          if (uploadedUrl) {
+            console.log(`[Video Audit in Image] Menggunakan URL R2...`);
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getHeaders(aiOptions) 
+              },
+              body: JSON.stringify({
+                fileUrl: uploadedUrl,
+                pathKey: getUrlData?.pathKey,
+                tolerance,
+                language: t.language || 'English',
+                model: aiOptions?.model || 'gemini-3.1-pro-preview'
+              })
+            });
+          } else {
+            console.log(`[Video Audit in Image] R2 unavailable, mengekstrak frame video secara lokal...`);
+            const extractedFrames = await extractVideoFrames(file, 4);
+            
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getHeaders(aiOptions) 
+              },
+              body: JSON.stringify({
+                frames: extractedFrames,
+                tolerance,
+                language: t.language || 'English',
+                model: aiOptions?.model || 'gemini-3.1-pro-preview'
+              })
+            });
+          }
         } else if (uploadedUrl) {
           response = await fetch('/api/check-image-quality', {
             method: 'POST',
