@@ -475,61 +475,7 @@ export const ImageQualityCheck: React.FC<{
     });
   };
 
-  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(videoFile);
-      video.muted = true;
-      video.playsInline = true;
-      
-      const frames: string[] = [];
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      video.onloadedmetadata = () => {
-        const scale = Math.min(1, 1280 / video.videoWidth);
-        canvas.width = video.videoWidth * scale;
-        canvas.height = video.videoHeight * scale;
-        
-        const duration = video.duration;
-        if (!duration || !isFinite(duration) || duration <= 0) {
-            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
-            return;
-        }
 
-        const targetTimes = [
-            duration * 0.1,
-            duration * 0.25,
-            duration * 0.4,
-            duration * 0.6,
-            duration * 0.75,
-            duration * 0.9
-        ];
-        
-        let currentTimeIndex = 0;
-        
-        video.onseeked = () => {
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            frames.push(dataUrl);
-          }
-          
-          currentTimeIndex++;
-          if (currentTimeIndex < targetTimes.length) {
-            video.currentTime = targetTimes[currentTimeIndex];
-          } else {
-            URL.revokeObjectURL(video.src);
-            resolve(frames);
-          }
-        };
-        
-        video.currentTime = targetTimes[currentTimeIndex];
-      };
-      
-      video.onerror = () => reject(new Error("Gagal memutar/memuat video untuk diekstrak."));
-    });
-  };
 
   const handleFilesSelected = async (selectedFiles: FileList | File[]) => {
     // Revoke old object URLs
@@ -621,26 +567,12 @@ export const ImageQualityCheck: React.FC<{
         let extractedVideoFrames: string[] | null = null;
         
         if (isVideo) {
-           console.log(`[Video Audit in Image] Mengekstrak frame video melalui Browser Frontend...`);
-           extractedVideoFrames = await extractFramesFromVideo(file);
+           console.log(`[Video Audit in Image] Mengirim file video ke backend (FFmpeg) untuk diekstrak...`);
+           // Video will be sent via FormData below
         } else if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
+            // Upload FULL RESOLUTION file to R2 for 100% valid zoom analysis
             let uploadBlob: Blob | File = file;
-            
-            try {
-              const arr = base64Image.split(',');
-              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-              const bstr = atob(arr[1]);
-              let n = bstr.length;
-              const u8arr = new Uint8Array(n);
-              while (n--) {
-                u8arr[n] = bstr.charCodeAt(n);
-              }
-              uploadBlob = new Blob([u8arr], { type: mime });
-            } catch (e) {
-              console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
-              uploadBlob = file;
-            }
 
             const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
             if (getUrlRes.ok) {
@@ -666,16 +598,17 @@ export const ImageQualityCheck: React.FC<{
 
         let response;
         
-        if (isVideo && extractedVideoFrames) {
+        if (isVideo) {
+          const formData = new FormData();
+          formData.append('video', file);
+          formData.append('tolerance', tolerance);
+          formData.append('language', t.language || 'English');
+          formData.append('model', aiOptions?.model || 'gemini-3.1-pro-preview');
+          
           response = await fetch('/api/check-video-quality', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-            body: JSON.stringify({
-              frames: extractedVideoFrames,
-              tolerance,
-              language: t.language || 'English',
-              model: aiOptions?.model || 'gemini-3.1-pro-preview'
-            })
+            headers: { ...getHeaders(aiOptions) },
+            body: formData
           });
         } else if (uploadedUrl) {
           response = await fetch('/api/check-image-quality', {

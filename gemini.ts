@@ -3570,11 +3570,11 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
 2. Modul AI Anomaly Detection: Mencari distorsi sirkuit dan cacat logika.
 3. Modul Pixel Analysis: Memastikan gradasi warna neon tidak pecah (banding) saat diexport ke JPEG.
 
-Fokuskan analisis Anda SECARA KETAT pada 4 kategori berikut:
+Fokuskan analisis Anda SECARA KETAT pada 4 kategori berikut (PENTING: Lakukan inspeksi visual Anda seolah-olah gambar diperbesar/Zoom 100% ke resolusi piksel aslinya. Jangan menganalisis gambar layaknya thumbnail. Teliti ujung objek, tekstur mikroskopis, dan noise level secara mendalam!):
 1. Intellectual Property (IP) & Teks: Cari teks bahasa Inggris generik yang menyerupai brand terkenal, teks non-Inggris (seperti Katakana/Kanji) yang terdistorsi atau tidak bermakna (gibberish), dan teks mikro pada UI yang blur.
-2. Artefak Generative AI: Deteksi garis geometris yang asimetris, sirkuit acak yang meleleh/putus, atau ketidaksempurnaan detail digital.
+2. Artefak Generative AI: Deteksi garis geometris yang asimetris, sirkuit acak yang meleleh/putus, atau ketidaksempurnaan detail digital pada perbesaran 100%.
 3. Logika Visual & Anatomi: Periksa ketidaksesuaian pantulan cermin, proporsi tubuh, atau perspektif objek.
-4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding atau posterization.
+4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding, posterization, atau noise luminance pada crop 100%.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di 4 kategori ini; MEDIUM: cacat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual masih tinggi).
 
@@ -3729,7 +3729,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imagePart = processFrameServer(image);
   
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -4331,7 +4331,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = frames.map(f => processFrameServer(f));
   
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
