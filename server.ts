@@ -1325,6 +1325,7 @@ app.get('/api/debug-uploads', (req, res) => {
             let language = '';
             let model = '';
             let frames: any[] = [];
+            let videoMetadata: any = null;
             let extractionSuccess = false;
 
             if (req.body.frames) {
@@ -1385,23 +1386,42 @@ app.get('/api/debug-uploads', (req, res) => {
 const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                                 const execPromise = util.promisify(exec);
 
-                                // 1. Get duration
-                                const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
-                                const duration = parseFloat(probeOut.trim());
+                                // 1. Get duration and metadata
+                                const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -select_streams v:0 -show_entries format=duration,bit_rate:stream=codec_name,width,height,r_frame_rate -of json "${videoPath}"`);
+                                const probeData = JSON.parse(probeOut);
+                                const duration = parseFloat(probeData.format?.duration);
                                 if (isNaN(duration) || duration <= 0) {
                                     throw new Error("Could not determine video duration");
                                 }
+                                
+                                const videoStream = probeData.streams?.[0] || {};
+                                videoMetadata = {
+                                    duration: duration,
+                                    codec: videoStream.codec_name || 'unknown',
+                                    resolution: `${videoStream.width || 0}x${videoStream.height || 0}`,
+                                    fps: videoStream.r_frame_rate || 'unknown',
+                                    bitrate: probeData.format?.bit_rate || 'unknown'
+                                };
 
-                                // 2. Calculate timestamps (extract 6 frames for comprehensive analysis)
-                                const numFrames = 6;
-                                const timestamps = [
-                                    duration * 0.1,
-                                    duration * 0.25,
-                                    duration * 0.4,
-                                    duration * 0.6,
-                                    duration * 0.75,
-                                    duration * 0.9
-                                ];
+                                // 1.5. Local Full-Frame Analysis (Stuttering / Freeze Detection)
+                                let localStutterAnalysis = "No severe stuttering or freezing detected locally.";
+                                try {
+                                    // Detect if any frame is frozen for >= 0.1 seconds (approx 3 frames at 30fps)
+                                    const { stderr: freezeOut } = await execPromise(`"${ffmpegPath}" -v warning -i "${videoPath}" -vf "freezedetect=n=-60dB:d=0.1" -f null -`);
+                                    if (freezeOut.includes('lavfi.freezedetect.freeze_start')) {
+                                        localStutterAnalysis = "WARNING: Severe stuttering, frozen frames, or frame drops detected by local FFmpeg scanning.";
+                                    }
+                                } catch (e) {
+                                    console.warn('Local freeze detect failed:', e);
+                                }
+                                videoMetadata.local_stutter_analysis = localStutterAnalysis;
+
+                                // 2. Calculate timestamps (1 frame per second, max 15 frames for AI Cloud API limits)
+                                const numFrames = Math.min(Math.max(Math.floor(duration), 1), 15);
+                                const timestamps = [];
+                                for (let i = 0; i < numFrames; i++) {
+                                    timestamps.push(duration * ((i + 0.5) / numFrames));
+                                }
 
                                 // 3. Extract frames with fast seek (-ss BEFORE -i)
                                 const framePaths = [];
@@ -1440,7 +1460,10 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
             if (extractionSuccess && frames && frames.length > 0) {
                 console.log('Server check-video-quality: Analyzing frames with Gemini...');
-                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model);
+                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata);
+                if (videoMetadata) {
+                    data.technical_metadata = videoMetadata;
+                }
                 console.log('Server check-video-quality: Analysis successful');
                 cleanupFn();
                 res.json(data);

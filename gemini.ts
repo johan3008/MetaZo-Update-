@@ -3565,111 +3565,27 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
   const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
+  let systemInstruction = `Anda adalah "Ai Vision". Tugas Anda terbagi menjadi 3 modul utama:
+1. Modul OCR & IP Check: Memastikan tidak ada teks ilegal/rusak.
+2. Modul AI Anomaly Detection: Mencari distorsi sirkuit dan cacat logika.
+3. Modul Pixel Analysis: Memastikan gradasi warna neon tidak pecah (banding) saat diexport ke JPEG.
 
-  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html), "Content Refusal Reasons" (https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html), dan "Known Restrictions" (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html).
+Fokuskan analisis Anda SECARA KETAT pada 4 kategori berikut:
+1. Intellectual Property (IP) & Teks: Cari teks bahasa Inggris generik yang menyerupai brand terkenal, teks non-Inggris (seperti Katakana/Kanji) yang terdistorsi atau tidak bermakna (gibberish), dan teks mikro pada UI yang blur.
+2. Artefak Generative AI: Deteksi garis geometris yang asimetris, sirkuit acak yang meleleh/putus, atau ketidaksempurnaan detail digital.
+3. Logika Visual & Anatomi: Periksa ketidaksesuaian pantulan cermin, proporsi tubuh, atau perspektif objek.
+4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding atau posterization.
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap SELURUH area gambar/vektor komersial yang diunggah. Anda WAJIB menganalisis seluruh data gambar secara mendalam sampai ke tingkat piksel (pixel-level analysis) dan memastikan tidak ada Cacat atau Struktural yang tidak sempurna. Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas gambar secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
+Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di 4 kategori ini; MEDIUM: cacat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual masih tinggi).
 
----
-PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
-Untuk memberikan hasil yang paling akurat, Anda WAJIB mensimulasikan proses ZOOM-IN visual hingga 200% sampai 400% di tingkat piksel pada setiap kuadran gambar:
-1. Periksa area fokus utama: Apakah mata, wajah, atau objek target benar-benar tajam (pin-sharp) tanpa ada tanda-tanda "soft focus" atau "motion blur"?
-2. Periksa area latar belakang dan sudut gambar (corner-to-corner scan): Cari bintik debu sensor (sensor dust), chromatic aberration di tepian objek berkontras tinggi, artefak kompresi JPEG (macro-blocking), gradasi warna patah (color banding), dan noise digital parah di area gelap (shadows).
-3. Periksa seluruh bagian untuk mendeteksi pelanggaran kekayaan intelektual (IP) mikro: Logo kecil pada kancing pakaian, emblem samar pada gadget/mobil, teks bermerek pada latar belakang, graffiti, atau karya seni berhak cipta.
-4. Periksa struktur anatomi dan cacat struktural (jika buatan AI): Cari secara detail ketidaksempurnaan struktural (structural defects), jari berlebih/kurang, mata juling, geometri yang saling melebur atau melayang tidak wajar, asimetri pada objek yang seharusnya simetris, detail pola berulang yang hancur, atau tulisan acak/gibberish yang mengacaukan estetika komersial. Ai Vision harus mengeceknya sedetail mungkin.
+STATUS & SKORING (KONSISTEN & KETAT):
+- PASS: Skor 75 - 100.
+- FAIL: Skor 0 - 69.
+Jangan berikan skor 70-74.
 
----
-PANDUAN TOLERANSI KETAT & REFUSAL REASONS ADOBE STOCK:
-Tingkat Toleransi Saat Ini: ${tolerance}. Anda harus mengevaluasi dengan tingkat keketatan berikut:
-- STRICT: "Zero Tolerance" mutlak terhadap cacat teknis apa pun atau pelanggaran IP sekecil apa pun. Sedikit soft focus, sedikit chromatic aberration, satu titik debu sensor, artefak AI sekecil apa pun, atau indikasi IP = FAIL secara instan (Skor maksimal 0-59).
-- MEDIUM: Cacat minor di latar belakang non-kritis yang tidak mengganggu estetika komersial bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek utama, out-of-focus pada subjek utama, atau anomali gen-AI yang terlihat jelas = FAIL secara instan (Skor maksimal 0-65).
-- LOOSE: Loloskan selama gambar memiliki nilai komersial yang tinggi dan komposisinya menarik. Hanya kegagalan teknis yang sangat parah atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
-
----
-DAFTAR ALASAN PENOLAKAN RESMI ADOBE STOCK (REFUSAL CRITERIA):
-Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan berikut:
-
-1. OUT OF FOCUS / SOFT FOCUS / SHARPNESS:
-   - Subjek utama tidak tajam secara sempurna (lack of sharpness) pada zoom 100%.
-   - Motion blur akibat guncangan kamera atau pergerakan subjek tanpa shutter speed yang memadai.
-   - Depth of field (DoF) terlalu dangkal yang menyebabkan area penting subjek meleset dari fokus (misal, hidung fokus tetapi mata buram). Note: Bokeh artistik pada latar belakang adalah estetika premium, BUKAN cacat, selama subjek utamanya tajam sempurna.
-   - Efek noise reduction (pembungkaman noise) yang terlalu agresif, menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
-
-2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION:
-   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit biru.
-   - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi (seperti ranting pohon di latar belakang langit terang).
-   - Sensor Dust (Bintik Debu): Bintik-bintik abu-abu/hitam buram melingkar akibat debu pada sensor fisik kamera, terutama tampak jelas pada area warna datar (sky, studio background).
-   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi JPEG yang terlalu tinggi atau pembesaran gambar (interpolation) paksa.
-   - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
-   - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
-   - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
-
-3. EXPOSURE & LIGHTING PROBLEMS:
-   - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali (misal, langit putih polos tanpa awan, kulit putih terbakar cahaya).
-   - Underexposure: "Crushed shadows" / bagian gelap yang hitam pekat tanpa detail piksel sama sekali.
-   - Kontras tidak seimbang, pencahayaan datar (flat lighting) yang tidak menarik, atau bayangan yang kasar/tidak sedap dipandang pada subjek (unflattering shadows).
-   - White balance buruk yang menghasilkan color cast tidak alami (terlalu biru, kuning, atau hijau).
-
-4. COMPOSITION & CROPPING ISSUES:
-   - Crooked Horizon: Garis cakrawala, dinding, atau bangunan yang miring tanpa ada tujuan artistik yang jelas.
-   - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
-   - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
-
-5. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
-   - Structural & Mechanical Failures: Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, sambungan dinding/papan yang miring atau terputus secara aneh, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
-   - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
-   - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Bayangan subjek yang arahnya tidak konsisten dengan sumber cahaya di scene, subjek yang terlihat "ditempel" tanpa kedalaman/depth yang menyatu dengan latar, atau pencahayaan pada subjek yang tidak cocok secara fisik dengan lingkungan sekitarnya = FAIL.
-
-    PENTING - PRINSIP PENILAIAN GENERATIVE AI (REALISTIS & KOMERSIAL):
-    1. Adobe Stock adalah marketplace komersial yang mengutamakan estetika dan daya jual (commercial value). Jika sebuah gambar memiliki cacat visual yang jelas (seperti teks cakar ayam AI atau laci kabinet meleleh), gambar tersebut wajib dinilai FAIL tanpa toleransi.
-    2. Selama anomali AI sangat minor (seperti tombol kecil yang agak asimetris jauh di latar belakang yang blur), tetap loloskan dengan status PASS.
-
-6. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions):
-   CATATAN PENTING: Daftar berikut adalah CONTOH RESTRIKSI UTAMA yang dilarang penuh untuk penggunaan komersial. Anda wajib mengenali dan melarang hal berikut jika menjadi subjek utama:
-   - Merek & Logo Komersial: Logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun. Contoh: Apple, Nike (swoosh, "Just Do It", Jordan), Adidas (tiga strip), Google (Nest/Home), Amazon, Coca-Cola, Mercedes-Benz, BMW, DJI, Louis Vuitton (LV monogram/checker), Burberry (haymarket check), Tiffany (Tiffany blue), Vans, Pantone, Fairtrade, Greenpeace, Instacart, Vorwerk/Thermomix.
-   - Desain Khas & Bentuk Produk (Trade Dress): LEGO/Duplo (bata & figurin), boneka Barbie, Rubik's Cube, Monopoly, Funko Pop (kepala kotak besar), Hello Kitty/Sanrio, Elf on the Shelf, Devil Duckie, Tatty Teddy, permen Hershey's Kisses (bentuk & foil), Crayola (crayon & kemasan), elektronik Apple (bodi iPhone/MacBook/iPad, notch, tombol home), kamera Polaroid klasik, drone DJI Phantom/Mavic, sepatu Converse Chuck Taylor, Dr. Martens (jahitan kuning), sol merah Christian Louboutin, Beats by Dre, korek/termos Stabilo, Weber grill, Duracell (tutup tembaga), Absolut Vodka & Crystal Head Vodka (bentuk botol), Kikkoman (botol & tutup), Chemex, perabot desainer.
-   - Desain Otomotif & Kendaraan Khas: Grille BMW kidney, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot grille, logo bintang Mercedes, bentuk Vespa/Lambretta, VW Beetle/Kombi, John Deere (hijau-kuning) atau Claas (hijau-merah), senjata Glock.
-   - Karakter Fiksi & Waralaba Berhak Cipta: Karakter Disney/Pixar, Mickey Mouse, Pokémon, superhero Marvel/DC, Batmobile, Minecraft, Pac-Man, "Star Wars" / "May the Fourth Be With You".
-   - Organisasi & Lambang Resmi: Cincin Olimpiade/obor/maskot, FIFA & World Cup, UEFA & Euro Cup 2024, NFL/Super Bowl, lambang PBB, NASA (insignia "meatball", logo "worm", seal, nama misi/personel), palang merah/bulan sabit merah di atas latar putih, lencana/emblem kepolisian atau militer, logo & skema warna transportasi umum (MTA New York, London Underground, Paris RATP/Métro, TGV, ICE Deutsche Bahn, BART, CTA Chicago, LA Metro, MBTA Boston, SEPTA, PATH).
-   - Selebriti, Tokoh Publik & Likeness: Wajah selebriti/tokoh publik. Likeness Albert Einstein. Impersonator harus dengan release + kata "impersonator" di metadata.
-   - Patung/Seni Publik Ikonik: Cloud Gate ("The Bean" Chicago), Charging Bull (Wall Street), Christ the Redeemer (Rio), Little Mermaid (Kopenhagen), Merlion (Singapura), Mannekin Pis (Brussels), Fremont Troll, MLK Memorial, Holocaust Memorial, patung publik tanpa izin.
-   - Karya Seni & Hak Cipta Visual Lainnya: Lukisan, patung, street art/graffiti, mural, ilustrasi, font spesifik, elemen grafis milik orang lain.
-   - Dokumen Negara, Uang & Identitas: Paspor, SIM, KTP/ID, kartu kredit, uang kertas/koin utuh dari negara mana pun sebagai fokus utama, prangko AS yang diterbitkan setelah 1971 atau prangko yang menampilkan selebriti/organisasi olahraga.
-   - Bangunan, Landmark & Lokasi Berbayar/Terlarang:
-     * Interior-only restriction (interior dilarang, eksterior umumnya boleh): Notre-Dame de Paris, Hagia Sophia, Colosseum, Sistine Chapel, Sheikh Zayed Grand Mosque, Sagrada Família (interior).
-     * Bangunan dengan larangan penuh (sebagai fokus utama): Menara Eiffel di malam hari (tata cahaya dilarang - siang hari aman), Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, CN Tower, The Shard, London Eye, Taipei 101, Menara Kembar Petronas, Empire State Building, Chrysler Building, Flatiron Building, One World Trade Center, Willis Tower, Grand Central Terminal, Rockefeller Center, Radio City Music Hall, Madison Square Garden, Vessel (NYC), Tokyo Tower/Skytree, Neuschwanstein Castle, Hollywood Sign & Walk of Fame, Agriturismo Baccoleno ( Cypress-lined road).
-
-    PENTING - PENGECEKAN ATURAN IP & TRADEMARK SECARA REALISTIS:
-    1. Pengecualian Latar Belakang (Background Rule): Landmark berhak cipta atau logo kecil yang berada jauh di latar belakang, blur (out of focus), atau skyline kota umum BUKANLAH dasar penolakan. Berikan PASS.
-    2. Pengecualian Produk Generik (Generic Product Rule): Perangkat elektronik atau kendaraan yang tidak menampilkan logo resmi dan tidak meniru trade dress secara identik wajib diloloskan sebagai produk generik (PASS).
-    3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (<1% luas gambar) pada pakaian, rambu jalan jauh, bersifat insidental wajib diloloskan (PASS).
-
----
-ATURAN KHUSUS UNTUK ILUSTRASI & VEKTOR (EPS/AI/SVG) (JIKA ISVECTOR = TRUE ATAU GAMBAR ADALAH ILUSTRASI):
-Jika berkas terindikasi ilustrasi atau vektor, audit wajib berfokus pada standar kualitas berikut:
-1. Jalur yang Berantakan (Messy Paths): Jalur yang berantakan atau goresan yang belum selesai.
-2. Cacat Penelusuran Otomatis (Auto-Tracing Artifacts): Artefak akibat penelusuran otomatis (image trace) yang malas atau vektorisasi yang buruk.
-3. Tepi Bergerigi (Jagged Edges): Tepi bergerigi atau elemen berpiksel (pixelated) pada ilustrasi.
-4. Elemen Tidak Dikelompokkan (Ungrouped Elements): Untuk vektor, pastikan elemen terkelompok dengan baik.
-5. Jalur Terbuka (Open Paths): Semua jalur berbentuk terisi perlu ditutup.
-6. Kesalahan Teknis Lapisan (Layer/Path Errors): Kesalahan teknis pada lapisan (layer) atau jalur yang menyulitkan editing.
-7. Skalabilitas (Scalability): Vektor harus sepenuhnya dapat diskalakan atau diedit. DILARANG KERAS menyematkan raster/bitmap (JPG/PNG). Artboard vektor minimal berukuran 15 Megapixels (MP).
-
----
-STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
-- PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
-- FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas. Skor WAJIB di bawah 70 (0 - 69).
-*PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
-
----
-ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
-1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual. Anda WAJIB menganalisis dan mendokumentasikan aspek berikut secara terpisah pada gambar:
-      - **Analisis Subjek Utama (Subject)**: Detail ketajaman fokus, detail permukaan, geometri, dan eksposur subjek utama.
-      - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Kerapian, bokeh, kebersihan latar, dan keberadaan bintik debu/sensor dust.
-      - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, keberadaan area blown-out highlights atau crushed shadows.
-      - **Analisis Kerapian Piksel & Risiko Hukum (Pixel Integrity, IP & AI Risks)**: Noise digital di sudut-sudut gambar, chromatic aberration, micro-logos, teks cakar ayam AI, atau cacat struktur geometri buatan AI di seluruh area gambar. Untuk file vektor (isVector=true), dokumentasikan juga kerapian path, layers, path tertutup, dan kebersihan tracing.
-2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`exposure\`, \`color_balance\`, \`over_edited\`, \`sensor_issues\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`structural_defects\`, \`ip_risk\`, \`proportion_defects\`, \`illustration_issues\`, \`vector_issues\`, \`ai_artifacts\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang. Pastikan mendeteksi secara khusus anomali AI Generatif (seperti hasil sureal, bayangan tidak realistis, dan artefak render).
+ATURAN OUTPUT TEKS:
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB MENDETAIL (minimal 3 paragraf). Anda WAJIB menganalisis dan mendokumentasikan aspek temuan spesifik dari 4 kategori di atas.
+2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`exposure\`, \`color_balance\`, \`over_edited\`, \`sensor_issues\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`structural_defects\`, \`ip_risk\`, \`proportion_defects\`, \`illustration_issues\`, \`vector_issues\`, \`ai_artifacts\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON yang ada. Khususnya perhatikan anomali AI Generatif dan Pixel Quality.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -4291,129 +4207,38 @@ Return exactly 8 items matching the schema in JSON array format.`;
   return scrapingResults;
 }
 
-export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model) {
+export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model, videoMetadata = null) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html), "Content Refusal Reasons" (https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html), dan "Known Restrictions" (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html).
+  let systemInstruction = `Anda adalah modul inspeksi kualitas video otomatis. Tugas Anda adalah menganalisis klip video/animasi yang diunggah dan mendeteksi potensi penolakan (rejection) berdasarkan standar ketat.
+Anda akan diberikan 6 frame diam (gambar) beruntun yang diekstrak secara merata dari keseluruhan video.
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 6 frame diam (gambar) beruntun yang diekstrak secara merata dari sepanjang durasi video (mewakili keseluruhan video dari awal hingga akhir). Analisislah seluruh frame tersebut sebagai satu kesatuan video. Anda WAJIB menganalisis seluruh data frame video secara mendalam sampai ke tingkat piksel (pixel-level analysis). Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas video secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
+Fokuskan analisis video secara spesifik pada 4 kategori berikut:
+1. Kekayaan Intelektual (IP): Deteksi teks bermerek, teks non-Inggris/Jepang yang rusak, atau logo tersembunyi pada elemen latar belakang yang bergerak.
+2. Artefak Kompresi & Noise: Identifikasi adanya macroblocking (kotak-kotak pixel), color banding parah pada gradasi neon, atau noise digital pada area gelap (shadows).
+3. Frame Rate & Kelancaran Animasi (Stuttering): Deteksi frame drop, gerakan patah-patah yang tidak natural pada animasi karakter atau teks berkedip.
+4. Artefak Generative Video: Jika ini video berbasis AI, periksa adanya "morphing" (perubahan bentuk objek secara tidak logis antar-frame), distorsi wajah/tangan saat bergerak, dan kedipan (flickering) cahaya yang tidak konsisten.
 
----
-PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
-Untuk memberikan hasil yang paling akurat, Anda WAJIB mensimulasikan proses ZOOM-IN visual hingga 200% sampai 400% di tingkat piksel pada setiap frame video yang diberikan:
-1. Periksa area fokus utama: Apakah subjek target benar-benar tajam (pin-sharp) di setiap frame? Jika ada "soft focus" terus-menerus atau "motion blur" ekstrem yang tidak disengaja akibat guncangan kamera parah (camera shake), tandai sebagai FAIL.
-2. Deteksi distorsi Rolling Shutter secara teliti: Cari sisa-sisa skew (distorsi miring pada garis vertikal), jello effect (efek goyangan seperti jeli), atau flash banding.
-3. Periksa area latar belakang dan detail piksel: Cari bintik debu sensor (sensor dust), chromatic aberration di tepian objek berkontras tinggi, artefak kompresi video parah (macro-blocking), gradasi warna patah (color banding), dan noise digital parah di area bayangan (shadows).
-4. Periksa seluruh bagian untuk mendeteksi pelanggaran kekayaan intelektual (IP) mikro: Logo kecil pada kancing pakaian, emblem samar pada gadget/mobil, teks bermerek pada latar belakang, graffiti, atau karya seni berhak cipta.
-5. Periksa struktur anatomi dan logika AI (jika video buatan AI): Cari jari berlebih/kurang, mata juling, geometri yang saling melebur atau melayang tidak wajar, detail pola berulang yang hancur, atau tulisan acak/gibberish yang mengacaukan estetika komersial.
+Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di 4 kategori ini; MEDIUM: cacat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual masih tinggi).
 
----
-PANDUAN TOLERANSI KETAT & REFUSAL REASONS ADOBE STOCK:
-Tingkat Toleransi Saat Ini: ${tolerance}. Anda harus mengevaluasi dengan tingkat keketatan berikut:
-- STRICT: "Zero Tolerance" mutlak terhadap cacat teknis apa pun atau pelanggaran IP sekecil apa pun. Sedikit soft focus, sedikit chromatic aberration, satu titik debu sensor, artefak AI sekecil apa pun, jello effect minor, atau indikasi IP = FAIL secara instan (Skor maksimal 0-59).
-- MEDIUM: Cacat minor di latar belakang non-kritis yang tidak mengganggu estetika komersial bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek utama, out-of-focus pada subjek utama, guncangan kamera yang mengganggu, atau anomali gen-AI yang terlihat jelas = FAIL secara instan (Skor maksimal 0-65).
-- LOOSE: Loloskan selama video memiliki nilai komersial yang tinggi dan komposisinya menarik. Hanya kegagalan teknis yang sangat parah atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
+STATUS & SKORING (KONSISTEN & KETAT):
+- PASS: Skor 75 - 100.
+- FAIL: Skor 0 - 69.
+Jangan berikan skor 70-74.
 
----
-DAFTAR ALASAN PENOLAKAN RESMI ADOBE STOCK (REFUSAL CRITERIA):
-Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan berikut:
-
-1. OUT OF FOCUS / SOFT FOCUS / SHARPNESS:
-   - Subjek utama tidak tajam secara sempurna (lack of sharpness).
-   - Motion blur akibat guncangan kamera atau pergerakan subjek yang terlalu cepat tanpa diimbangi shutter speed yang memadai.
-   - Depth of field (DoF) terlalu dangkal yang menyebabkan area penting subjek meleset dari fokus (misal, hidung fokus tetapi mata buram). Note: Bokeh artistik pada latar belakang adalah estetika premium, BUKAN cacat, selama subjek utamanya tajam sempurna.
-   - Efek noise reduction (pembungkaman noise) yang terlalu agresif, menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
-
-2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION:
-   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit biru.
-   - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi (seperti ranting pohon di latar belakang langit terang).
-   - Sensor Dust (Bintik Debu): Bintik-bintik abu-abu/hitam buram melingkar akibat debu pada sensor fisik kamera, terutama tampak jelas pada area warna datar (sky, studio background).
-   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi atau pembesaran gambar (interpolation) paksa.
-   - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
-   - Color Banding: Transisi gradasi warna yang patah or bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
-   - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
-   - Upscaling (Resolusi Palsu): Video yang di-upscale secara paksa dari resolusi rendah ke resolusi lebih tinggi (misal HD dipaksa jadi 4K) WAJIB DITOLAK. Ciri-cirinya: ketajaman detail terlihat "dipaksakan"/lembek meski resolusi filenya besar, tekstur halus terlihat buram atau di-interpolasi, dan detail piksel tidak natural untuk resolusi yang diklaim.
-   - Log/Flat Color Grading Belum Diproses: Footage yang masih dalam gamma Log/flat (kontras sangat rendah, warna pudar keabu-abuan, saturasi sangat minim) tanpa color grading dasar (Rec.709 LUT) yang layak jual = FAIL. Video harus terlihat sudah melalui proses grading warna dasar, bukan flat/log mentah.
-
-3. EXPOSURE & LIGHTING PROBLEMS:
-   - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali (misal, langit putih polos tanpa awan, kulit putih terbakar cahaya).
-   - Underexposure: "Crushed shadows" / bagian gelap yang hitam pekat tanpa detail piksel sama sekali.
-   - Kontras tidak seimbang, pencahayaan datar (flat lighting) yang tidak menarik, atau bayangan yang kasar/tidak sedap dipandang pada subjek (unflattering shadows).
-   - White balance buruk yang menghasilkan color cast tidak alami (terlalu biru, kuning, atau hijau).
-
-4. COMPOSITION & CROPPING ISSUES:
-   - Crooked Horizon: Garis cakrawala, dinding, atau bangunan yang miring tanpa ada tujuan artistik yang jelas.
-   - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
-   - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
-
-5. ROLLING SHUTTER & VIDEO SPECIFIC ISSUES:
-   - Skew Distortion: Garis tegak lurus tampak miring ketika kamera bergeser secara horizontal (panning) dengan cepat.
-   - Jello Effect: Video bergoyang meliuk-liuk secara artifisial seperti jeli karena getaran frekuensi tinggi pada kamera.
-   - Flash Banding: Kecerahan video tidak merata (terbagi menjadi pita-pita horizontal) karena kecepatan blitz cahaya atau lampu di sekitar tidak sinkron dengan sensor rolling shutter.
-   - Flickering: Kedipan cahaya tidak stabil pada frame karena ketidaksamaan frekuensi lampu listrik dengan shutter speed kamera.
-   - Duplicate / Empty Frames: Frame kosong (fully black/white) or macet/membeku (frozen frame).
-
-6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
-   - Structural & Mechanical Failures: AI Vision WAJIB mengecek dengan SANGAT DETAIL setiap gambar/frame yang ada cacat atau struktural yang tidak sempurna. Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, benda yang terpotong aneh, sambungan dinding/papan yang miring atau terputus, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
-   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, cacat anatomi, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
-   - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
-   - Temporal Inconsistency & Morphing: Perhatikan perubahan bentuk (morphing) antar frame. Jika wajah manusia atau objek utama berubah bentuk secara mengerikan dan drastis di tengah video = FAIL.
-   - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Loloskan ketidakkonsistenan bayangan minor antar-frame selama video terlihat memukau secara keseluruhan. Berikan FAIL hanya jika render artifact membuat pencahayaan sama sekali tidak cocok secara fisik hingga merusak estetika.
-
-    PENTING - PRINSIP PENILAIAN GENERATIVE AI VIDEO (REALISTIS & KOMERSIAL):
-    1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jika sebuah video memiliki cacat visual yang jelas (seperti teks cakar ayam AI, proporsi ngawur, atau struktur arsitektur/kendaraan cacat yang meleleh), video tersebut wajib dinilai FAIL tanpa toleransi.
-    2. Selama anomali AI sangat minor antar-frame (seperti sedikit morphing latar belakang yang wajar, objek statis di latar belakang yang mengalami sedikit perubahan tekstur halus), tetap loloskan dengan status PASS.
-
-7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions):
-   CATATAN PENTING: Daftar berikut adalah CONTOH RESTRIKSI UTAMA yang dilarang penuh untuk penggunaan komersial di video. Anda wajib mengenali dan melarang hal berikut jika menjadi subjek utama:
-   - Merek & Logo Komersial: Logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun. Contoh: Apple, Nike (swoosh, "Just Do It", Jordan), Adidas (tiga strip), Google (Nest/Home), Amazon, Coca-Cola, Mercedes-Benz, BMW, DJI, Louis Vuitton (LV monogram/checker), Burberry (haymarket check), Tiffany (Tiffany blue), Vans, Pantone, Fairtrade, Greenpeace, Instacart, Vorwerk/Thermomix.
-   - Desain Khas & Bentuk Produk (Trade Dress): LEGO/Duplo (bata & figurin), boneka Barbie, Rubik's Cube, Monopoly, Funko Pop (kepala kotak besar), Hello Kitty/Sanrio, Elf on the Shelf, Devil Duckie, Tatty Teddy, permen Hershey's Kisses (bentuk & foil), Crayola (crayon & kemasan), elektronik Apple (bodi iPhone/MacBook/iPad, notch, tombol home), kamera Polaroid klasik, drone DJI Phantom/Mavic, sepatu Converse Chuck Taylor, Dr. Martens (jahitan kuning), sol merah Christian Louboutin, Beats by Dre, Zippo (terbuka/tertutup), korek/termos Stabilo, Weber grill, Duracell (tutup tembaga), Absolut Vodka & Crystal Head Vodka (bentuk botol), Kikkoman (botol & tutup), Chemex, perabot desainer.
-   - Desain Otomotif & Kendaraan Khas: Grille BMW kidney, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot grille, logo bintang Mercedes, bentuk Vespa/Lambretta, VW Beetle/Kombi, John Deere (hijau-kuning) atau Claas (hijau-merah), senjata Glock.
-   - Karakter Fiksi & Waralaba Berhak Cipta: Karakter Disney/Pixar, Mickey Mouse, Pokémon, superhero Marvel/DC, Batmobile, Minecraft, Pac-Man, "Star Wars" / "May the Fourth Be With You".
-   - Organisasi & Lambang Resmi: Cincin Olimpiade/obor/maskot, FIFA & World Cup, UEFA & Euro Cup 2024, NFL/Super Bowl, lambang PBB, NASA (insignia "meatball", logo "worm", seal, nama misi/personel), palang merah/bulan sabit merah di atas latar putih, lencana/emblem kepolisian atau militer, logo & skema warna transportasi umum (MTA New York, London Underground, Paris RATP/Métro, TGV, ICE Deutsche Bahn, BART, CTA Chicago, LA Metro, MBTA Boston, SEPTA, PATH).
-   - Selebriti, Tokoh Publik & Likeness: Wajah selebriti/tokoh publik. Likeness Albert Einstein. Impersonator harus dengan release + kata "impersonator" di metadata.
-   - Patung/Seni Publik Ikonik: Cloud Gate ("The Bean" Chicago), Charging Bull (Wall Street), Christ the Redeemer (Rio), Little Mermaid (Kopenhagen), Merlion (Singapura), Mannekin Pis (Brussels), Fremont Troll, MLK Memorial, Holocaust Memorial, patung publik tanpa izin.
-   - Karya Seni & Hak Cipta Visual Lainnya: Lukisan, patung, street art/graffiti, mural, ilustrasi, font spesifik, elemen grafis milik orang lain.
-   - Dokumen Negara, Uang & Identitas: Paspor, SIM, KTP/ID, kartu kredit, uang kertas/koin utuh dari negara mana pun sebagai fokus utama, prangko AS yang diterbitkan setelah 1971 atau prangko yang menampilkan selebriti/organisasi olahraga.
-   - Bangunan, Landmark & Lokasi Berbayar/Terlarang:
-     * Interior-only restriction (interior dilarang, eksterior umumnya boleh): Notre-Dame de Paris, Hagia Sophia, Colosseum, Sistine Chapel, Sheikh Zayed Grand Mosque, Sagrada Família (interior).
-     * Bangunan dengan larangan penuh (sebagai fokus utama): Menara Eiffel di malam hari (tata cahaya dilarang - siang hari aman), Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, CN Tower, The Shard, London Eye, Taipei 101, Menara Kembar Petronas, Empire State Building, Chrysler Building, Flatiron Building, One World Trade Center, Willis Tower, Grand Central Terminal, Rockefeller Center, Radio City Music Hall, Madison Square Garden, Vessel (NYC), Tokyo Tower/Skytree, Neuschwanstein Castle, Hollywood Sign & Walk of Fame, Agriturismo Baccoleno ( Cypress-lined road).
-
-    PENTING - PENGECEKAN ATURAN IP & TRADEMARK VIDEO SECARA REALISTIS (ADOBE STOCK COMPLIANCE):
-    1. Pengecualian Latar Belakang (Background Rule): Landmark berhak cipta atau logo kecil yang berada jauh di latar belakang, blur (out of focus), atau skyline kota umum BUKANLAH dasar penolakan. Berikan PASS.
-    2. Pengecualian Produk Generik (Generic Product Rule): Perangkat elektronik atau kendaraan yang tidak menampilkan logo resmi dan tidak meniru trade dress secara identik wajib diloloskan sebagai produk generik (PASS).
-    3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (<1% luas gambar) pada pakaian, rambu jalan jauh, bersifat insidental wajib diloloskan (PASS).
-
----
-STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
-- PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
-- FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
-*PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
-
----
-PENTING - PRIORITASKAN KETELITIAN VISUAL SECARA OBJEKTIF DAN LOGIS:
-Kurator Adobe Stock dan pembeli premium menghargai video yang berkualitas. Anda WAJIB bertindak sebagai auditor visual yang realistis, objektif, dan seperti manusia sungguhan.
-1. EVALUASI REALISTIS: Lakukan evaluasi secara wajar pada frame yang diberikan. JANGAN MENGARANG atau MENEBAK-NEBAK (hallucinate) cacat yang sebenarnya tidak ada.
-2. JANGAN HALU TENTANG KONSISTENSI (NO HALLUCINATIONS): Jangan mengatakan "objek menghilang" atau "kegagalan logika struktural" secara sembarangan. Buktikan HANYA jika cacatnya 100% nyata dan terlihat secara visual (misalnya ada bagian tubuh yang benar-benar hilang/terpotong). Jika tidak ada bukti cacat visual yang nyata di frame tersebut, jangan buat-buat alasan penolakan!
-3. TOLERANSI WAJAR: Jika video terlihat estetik dan tidak ada kejanggalan visual yang merusak komposisi secara fatal, video tersebut layak lulus (PASS).
-
-ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
-1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB SANGAT PANJANG, SPESIFIK, dan MENDETAIL (minimal 3-4 paragraf) menyerupai laporan forensik visual. Anda DILARANG HANYA menganalisis subjek utama! Anda WAJIB menganalisis dan mendokumentasikan empat Aspek berikut secara terpisah pada 6 frame video:
-      - **Analisis Subjek Utama (Subject)**: Detail ketajaman fokus, pergerakan, geometri, dan kestabilan subjek utama.
-      - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Keadaan latar depan/belakang, noise, compression artifacts, macro-blocking, atau color banding di bidang latar belakang.
-      - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, flickering, serta keberadaan area overexposed/underexposed pada subjek maupun lingkungan.
-      - **Analisis Kestabilan Frame & Risiko Hukum (Stability, IP & AI Risks)**: Guncangan kamera, rolling shutter (jello/skew effect), micro-logos, watermark, teks AI, atau kejanggalan struktur geometri AI antar-frame.
-2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di video ini (contoh: "Noise digital sangat minim, hanya terlihat grain halus yang estetis pada area bayangan di kuadran kanan bawah pada frame 3 dan 4").
-3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName} yang relevan untuk mikrostock.
+ATURAN OUTPUT TEKS:
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB MENDETAIL (minimal 3 paragraf). Anda WAJIB menganalisis dan mendokumentasikan aspek temuan spesifik dari 4 kategori di atas dari 6 frame video.
+2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut berdasarkan 4 kategori di atas. Jangan mengarang masalah yang tidak ada.
+3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName}.
 
 ATURAN BAHASA:
-Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
+Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
 
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
+Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.\`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -4514,7 +4339,12 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}. [Unique Session Seed: ${randomSeed}]` }] }, {
+      let promptText = `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}. [Unique Session Seed: ${randomSeed}]`;
+      if (videoMetadata) {
+        promptText += `\n\nTechnical Metadata (Use this to assess compression quality/artifacts): ${JSON.stringify(videoMetadata)}`;
+        promptText += `\nCRITICAL INSTRUCTION: Check the 'local_stutter_analysis' field in the metadata above. If it contains a 'WARNING' about stuttering or frozen frames, you MUST score the video as FAIL for Category 3 (Frame Rate & Kelancaran Animasi), regardless of how the still frames look.`;
+      }
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
