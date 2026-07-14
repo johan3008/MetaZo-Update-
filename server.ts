@@ -1833,6 +1833,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
             
             let imageBase64 = "";
+            let zoomedImageBase64 = null;
             if (fileUrl) {
                 console.log(`Server check-image-quality: Downloading file from storage: ${fileUrl}`);
                 const ext = fileType?.includes('png') ? '.png' : fileType?.includes('gif') ? '.gif' : '.jpg';
@@ -1854,15 +1855,19 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 const tempFileName = `img_${crypto.randomBytes(8).toString('hex')}.${fileExt}`;
                 tempFilePath = path.join(tempDir, tempFileName);
 
-                const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+                let baseImage = image;
+                if (Array.isArray(image)) {
+                    baseImage = image[0];
+                    zoomedImageBase64 = image[1];
+                }
+
+                const base64Data = baseImage.replace(/^data:image\/\w+;base64,/, "");
                 fs.writeFileSync(tempFilePath, Buffer.from(base64Data, 'base64'));
-                imageBase64 = image;
+                imageBase64 = baseImage;
             } else {
                 console.warn('Server check-image-quality error: Missing image data or fileUrl');
                 return res.status(400).json({ error: 'Missing image data or fileUrl' });
             }
-
-            let zoomedImageBase64 = null;
             const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
             let imageMetadata: any = {};
             
@@ -1873,14 +1878,16 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 } catch (e) {
                     console.warn('OCR error', e);
                 }
-                try {
-                    const zoomedPath = tempFilePath.replace(/\.(\w+)$/, '_zoomed.$1');
-                    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "crop=min(500\\,iw):min(500\\,ih),scale=iw*2:-1" -q:v 2 "${zoomedPath}" -y`);
-                    const zoomedBuffer = fs.readFileSync(zoomedPath);
-                    const mime = fileType || (tempFilePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
-                    zoomedImageBase64 = `data:${mime};base64,${zoomedBuffer.toString('base64')}`;
-                } catch (e) {
-                    console.warn('Failed to create zoomed image crop:', e);
+                if (!zoomedImageBase64) {
+                    try {
+                        const zoomedPath = tempFilePath.replace(/\.(\w+)$/, '_zoomed.$1');
+                        await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "crop=min(500\\,iw):min(500\\,ih),scale=iw*2:-1" -q:v 2 "${zoomedPath}" -y`);
+                        const zoomedBuffer = fs.readFileSync(zoomedPath);
+                        const mime = fileType || (tempFilePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
+                        zoomedImageBase64 = `data:${mime};base64,${zoomedBuffer.toString('base64')}`;
+                    } catch (e) {
+                        console.warn('Failed to create zoomed image crop:', e);
+                    }
                 }
             }
 
@@ -1894,7 +1901,6 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             console.log('Server check-image-quality: Integration successful');
             
             let ffmpegStats = null;
-            const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
             if (!isVector && tempFilePath) {
                 try {
                     ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
