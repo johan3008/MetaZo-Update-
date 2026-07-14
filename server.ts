@@ -1403,18 +1403,32 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                                     bitrate: probeData.format?.bit_rate || 'unknown'
                                 };
 
-                                // 1.5. Local Full-Frame Analysis (Stuttering / Freeze Detection)
-                                let localStutterAnalysis = "No severe stuttering or freezing detected locally.";
+                                // 1.5. Local Full-Frame Technical Analysis (Stutter, Black Frame, Audio)
+                                let localTechnicalAnalysis = [];
                                 try {
-                                    // Detect if any frame is frozen for >= 0.1 seconds (approx 3 frames at 30fps)
-                                    const { stderr: freezeOut } = await execPromise(`"${ffmpegPath}" -v warning -i "${videoPath}" -vf "freezedetect=n=-60dB:d=0.1" -f null -`);
-                                    if (freezeOut.includes('lavfi.freezedetect.freeze_start')) {
-                                        localStutterAnalysis = "WARNING: Severe stuttering, frozen frames, or frame drops detected by local FFmpeg scanning.";
+                                    // Detect freeze/stutter & black frames
+                                    const { stderr: filterOut } = await execPromise(`"${ffmpegPath}" -v warning -i "${videoPath}" -vf "freezedetect=n=-60dB:d=0.1,blackdetect=d=0.05:pix_th=0.1" -f null -`);
+                                    
+                                    if (filterOut.includes('lavfi.freezedetect.freeze_start')) {
+                                        localTechnicalAnalysis.push("WARNING: Severe stuttering, frozen frames, or frame drops detected by local FFmpeg scanning.");
                                     }
+                                    if (filterOut.includes('black_start:')) {
+                                        localTechnicalAnalysis.push("WARNING: Empty black frames detected by local FFmpeg scanning.");
+                                    }
+
+                                    // Audio clipping check (if audio stream exists)
+                                    try {
+                                        const { stderr: audioOut } = await execPromise(`"${ffmpegPath}" -v warning -i "${videoPath}" -af "volumedetect" -vn -f null -`);
+                                        if (audioOut.includes('max_volume: 0.0 dB')) {
+                                            localTechnicalAnalysis.push("WARNING: Audio clipping / distortion detected. Volume peaked at 0.0 dB.");
+                                        }
+                                    } catch (err) { /* ignore if no audio stream exists */ }
+
                                 } catch (e) {
-                                    console.warn('Local freeze detect failed:', e);
+                                    console.warn('Local tech scan failed:', e);
                                 }
-                                videoMetadata.local_stutter_analysis = localStutterAnalysis;
+                                
+                                videoMetadata.local_stutter_analysis = localTechnicalAnalysis.length > 0 ? localTechnicalAnalysis.join(' ') : "No severe technical issues (freeze, black frame, audio clipping) detected locally.";
 
                                 // 2. Calculate timestamps (1 frame per second, max 15 frames for AI Cloud API limits)
                                 const numFrames = Math.min(Math.max(Math.floor(duration), 1), 15);
@@ -1423,11 +1437,13 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                                     timestamps.push(duration * ((i + 0.5) / numFrames));
                                 }
 
-                                // 3. Extract frames with fast seek (-ss BEFORE -i)
+                                // 3. Extract frames with hybrid scaling (50% normal, 50% zoomed 200%)
                                 const framePaths = [];
                                 for (let i = 0; i < numFrames; i++) {
                                     const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
-                                    await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
+                                    // Even indices: Normal view. Odd indices: 200% Zoomed center crop.
+                                    const scaleFilter = (i % 2 === 0) ? "scale=1280:-1" : "crop=iw/2:ih/2:iw/4:ih/4,scale=1280:-1";
+                                    await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -vf "${scaleFilter}" "${fPath}" -y`);
                                     framePaths.push(fPath);
                                 }
 
@@ -1817,9 +1833,25 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 return res.status(400).json({ error: 'Missing image data or fileUrl' });
             }
 
+            let zoomedImageBase64 = null;
+            const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
+            
+            if (!isVector && tempFilePath) {
+                try {
+                    const zoomedPath = tempFilePath.replace(/\.(\w+)$/, '_zoomed.$1');
+                    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "crop=iw/2:ih/2:iw/4:ih/4,scale=iw:-1" -q:v 2 "${zoomedPath}" -y`);
+                    const zoomedBuffer = fs.readFileSync(zoomedPath);
+                    const mime = fileType || (tempFilePath.endsWith('.png') ? 'image/png' : 'image/jpeg');
+                    zoomedImageBase64 = `data:${mime};base64,${zoomedBuffer.toString('base64')}`;
+                } catch (e) {
+                    console.warn('Failed to create zoomed image crop:', e);
+                }
+            }
+
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
-            const aiVisionStats = await checkImageQuality(imageBase64, tolerance, language, model, fileType);
+            const imagePayload = zoomedImageBase64 ? [imageBase64, zoomedImageBase64] : imageBase64;
+            const aiVisionStats = await checkImageQuality(imagePayload, tolerance, language, model, fileType);
             
             console.log('Server check-image-quality: Integration successful');
             

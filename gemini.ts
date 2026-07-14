@@ -3557,7 +3557,7 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   }));
 }
 
-export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string, fileType?: string) {
+export async function checkImageQuality(image: string | string[], tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string, fileType?: string) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
@@ -3570,11 +3570,11 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
 2. Modul AI Anomaly Detection: Mencari distorsi sirkuit dan cacat logika.
 3. Modul Pixel Analysis: Memastikan gradasi warna neon tidak pecah (banding) saat diexport ke JPEG.
 
-Fokuskan analisis Anda SECARA KETAT pada 4 kategori berikut (PENTING: Lakukan inspeksi visual Anda seolah-olah gambar diperbesar/Zoom 100% ke resolusi piksel aslinya. Jangan menganalisis gambar layaknya thumbnail. Teliti ujung objek, tekstur mikroskopis, dan noise level secara mendalam!):
+Fokuskan analisis Anda SECARA KETAT pada 4 kategori berikut (PENTING: Lakukan inspeksi visual Anda seolah-olah gambar diperbesar/Zoom 100% ke resolusi piksel aslinya. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang secara fisik di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan kecacatan mikroskopis!):
 1. Intellectual Property (IP) & Teks: Cari teks bahasa Inggris generik yang menyerupai brand terkenal, teks non-Inggris (seperti Katakana/Kanji) yang terdistorsi atau tidak bermakna (gibberish), dan teks mikro pada UI yang blur.
-2. Artefak Generative AI: Deteksi garis geometris yang asimetris, sirkuit acak yang meleleh/putus, atau ketidaksempurnaan detail digital pada perbesaran 100%.
+2. Artefak Generative AI: Deteksi garis geometris yang asimetris, sirkuit acak yang meleleh/putus, atau ketidaksempurnaan detail digital pada perbesaran tinggi.
 3. Logika Visual & Anatomi: Periksa ketidaksesuaian pantulan cermin, proporsi tubuh, atau perspektif objek.
-4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding, posterization, atau noise luminance pada crop 100%.
+4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding, posterization, atau noise luminance pada crop 100% atau 200%.
 
 Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di 4 kategori ini; MEDIUM: cacat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual masih tinggi).
 
@@ -3727,7 +3727,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
   };
 
-  const imagePart = processFrameServer(image);
+  const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
   const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
   let responseText = "";
@@ -3737,7 +3737,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. [Unique Session Seed: ${randomSeed}]` }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. [Unique Session Seed: ${randomSeed}]` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -4215,7 +4215,8 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
   let systemInstruction = `Anda adalah modul inspeksi kualitas video otomatis. Tugas Anda adalah menganalisis klip video/animasi yang diunggah dan mendeteksi potensi penolakan (rejection) berdasarkan standar ketat.
-Anda akan diberikan 6 frame diam (gambar) beruntun yang diekstrak secara merata dari keseluruhan video.
+Anda akan diberikan kumpulan frame diam (gambar) yang diekstrak secara merata dari keseluruhan video. 
+CATATAN PENTING: Sistem mengekstrak frame secara hibrida. Separuh dari frame yang Anda terima adalah tampilan normal (100%), dan separuh sisanya adalah potongan tengah yang secara fisik di-ZOOM 200%. Anda WAJIB menggunakan frame yang di-zoom 200% ini untuk menginspeksi artefak kompresi, pixel banding, noise, dan kecacatan struktural aneh pada skala mikroskopis!
 
 Fokuskan analisis video secara spesifik pada 4 kategori berikut:
 1. Kekayaan Intelektual (IP): Deteksi teks bermerek, teks non-Inggris/Jepang yang rusak, atau logo tersembunyi pada elemen latar belakang yang bergerak.
@@ -4231,8 +4232,8 @@ STATUS & SKORING (KONSISTEN & KETAT):
 Jangan berikan skor 70-74.
 
 ATURAN OUTPUT TEKS:
-1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB MENDETAIL (minimal 3 paragraf). Anda WAJIB menganalisis dan mendokumentasikan aspek temuan spesifik dari 4 kategori di atas dari 6 frame video.
-2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut berdasarkan 4 kategori di atas. Jangan mengarang masalah yang tidak ada.
+1. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB MENDETAIL (minimal 3 paragraf). Anda WAJIB menganalisis dan mendokumentasikan aspek temuan spesifik dari 4 kategori di atas. Sebutkan secara eksplisit temuan Anda pada pandangan Zoom 200%.
+2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap frame video tersebut berdasarkan 4 kategori di atas. Jangan mengarang masalah yang tidak ada.
 3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName}.
 
 ATURAN BAHASA:
@@ -4342,7 +4343,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let promptText = `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}. [Unique Session Seed: ${randomSeed}]`;
       if (videoMetadata) {
         promptText += `\n\nTechnical Metadata (Use this to assess compression quality/artifacts): ${JSON.stringify(videoMetadata)}`;
-        promptText += `\nCRITICAL INSTRUCTION: Check the 'local_stutter_analysis' field in the metadata above. If it contains a 'WARNING' about stuttering or frozen frames, you MUST score the video as FAIL for Category 3 (Frame Rate & Kelancaran Animasi), regardless of how the still frames look.`;
+        promptText += `\nCRITICAL INSTRUCTION: Check the 'local_stutter_analysis' field in the metadata above. If it contains a 'WARNING' about stuttering, black frames, or audio clipping, you MUST score the video as FAIL for Category 2 or 3, regardless of how the still frames look.`;
       }
       const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
         systemInstruction,
