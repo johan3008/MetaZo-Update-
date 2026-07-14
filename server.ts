@@ -11,7 +11,7 @@ import "@ffprobe-installer/linux-x64/package.json";
 
 
 import express from 'express';
-import Tesseract from 'tesseract.js';
+
 import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
 import { exec, spawn } from 'child_process';
@@ -50,6 +50,14 @@ ffmpeg.setFfprobePath(_require('@ffprobe-installer/ffprobe').path);
 
 async function scanImageTextLocal(imagePath: string): Promise<string> {
     try {
+        // Dynamically import tesseract.js so the server doesn't crash if it's not installed
+        let Tesseract: any;
+        try {
+            const mod = await import('tesseract.js');
+            Tesseract = mod.default || mod;
+        } catch {
+            return "Local OCR scan skipped (tesseract.js not available in this environment).";
+        }
         const result = await Tesseract.recognize(imagePath, 'eng');
         const lines = result.data.lines;
         if (!lines || lines.length === 0) return "No text detected by local OCR.";

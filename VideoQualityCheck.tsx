@@ -217,7 +217,8 @@ export const VideoQualityCheck: React.FC<{
     fetch(`/api/r2-status?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => setR2Configured(!!data.configured))
-      .catch(() => setR2Configured(false));
+      .catch(() => setR2Configured(null));
+
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
