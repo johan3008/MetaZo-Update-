@@ -133,6 +133,7 @@ export const VideoQualityCheck: React.FC<{
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal'>('visual');
 
   useEffect(() => {
     if (user && db) {
@@ -247,6 +248,118 @@ export const VideoQualityCheck: React.FC<{
     }
   };
 
+  const extractVideoFrames = (videoFile: File, numFrames = 5): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(videoFile);
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      
+      video.style.position = 'fixed';
+      video.style.top = '-9999px';
+      video.style.opacity = '0';
+      document.body.appendChild(video);
+
+      const frames: string[] = [];
+      let isResolved = false;
+      let timestamps: number[] = [];
+      let currentIdx = 0;
+
+      const cleanup = () => {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        URL.revokeObjectURL(url);
+      };
+
+      const timeoutId = setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          cleanup();
+          reject(new Error("Video frame extraction timed out"));
+        }
+      }, 45000);
+
+      video.onloadedmetadata = () => {
+        const duration = video.duration || 1;
+        for (let i = 0; i < numFrames; i++) {
+          timestamps.push(duration * ((i + 1) / (numFrames + 1)));
+        }
+        video.currentTime = timestamps[0];
+      };
+
+      video.onseeked = () => {
+        if (isResolved) return;
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1280;
+          let width = video.videoWidth || 640;
+          let height = video.videoHeight || 480;
+
+          if (width > MAX_WIDTH) {
+             height *= MAX_WIDTH / width;
+             width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+             ctx.drawImage(video, 0, 0, width, height);
+             
+             let frameData = '';
+             // Simulate physical zoom for odd indices if resolution is high enough
+             if (currentIdx % 2 !== 0 && width >= 400 && height >= 400) {
+                 const cropCanvas = document.createElement('canvas');
+                 const cw = width / 2;
+                 const ch = height / 2;
+                 cropCanvas.width = cw;
+                 cropCanvas.height = ch;
+                 const cctx = cropCanvas.getContext('2d');
+                 if (cctx) {
+                    cctx.drawImage(video, width/4, height/4, cw, ch, 0, 0, cw, ch);
+                    frameData = cropCanvas.toDataURL('image/jpeg', 0.85);
+                 } else {
+                    frameData = canvas.toDataURL('image/jpeg', 0.85);
+                 }
+             } else {
+                 frameData = canvas.toDataURL('image/jpeg', 0.85);
+             }
+             frames.push(frameData);
+          }
+
+          currentIdx++;
+          if (currentIdx < timestamps.length) {
+             video.currentTime = timestamps[currentIdx];
+          } else {
+             isResolved = true;
+             clearTimeout(timeoutId);
+             cleanup();
+             resolve(frames);
+          }
+        } catch (e) {
+          if (!isResolved) {
+              isResolved = true;
+              clearTimeout(timeoutId);
+              cleanup();
+              reject(e);
+          }
+        }
+      };
+
+      video.onerror = () => {
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeoutId);
+          cleanup();
+          reject(new Error("Failed to load video file"));
+        }
+      };
+
+      video.src = url;
+      video.load();
+    });
+  };
+
 
   const analyzeVideo = async () => {
     if (!file) return;
@@ -261,20 +374,22 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      console.log(`[Video Audit] Mengirim file video ke backend (FFmpeg) untuk diekstrak dan dianalisis...`);
-      
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('tolerance', tolerance);
-      formData.append('language', t.language || 'English');
-      formData.append('model', aiOptions?.model || 'gemini-3.1-pro-preview');
+      console.log(`[Video Audit] Mengekstrak frame video secara lokal di browser...`);
+      const extractedFrames = await extractVideoFrames(file, 5);
+      console.log(`[Video Audit] Berhasil mengekstrak ${extractedFrames.length} frame. Mengirim ke backend...`);
 
       const response = await fetch('/api/check-video-quality', {
         method: 'POST',
         headers: { 
+          'Content-Type': 'application/json',
           ...getHeaders(aiOptions)
         },
-        body: formData
+        body: JSON.stringify({
+          frames: extractedFrames,
+          tolerance,
+          language: t.language || 'English',
+          model: aiOptions?.model || 'gemini-3.1-pro-preview'
+        })
       });
 
 
@@ -508,27 +623,54 @@ export const VideoQualityCheck: React.FC<{
 
               {/* Detailed Quality Audit Checklist */}
               <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
-                  {isIndo ? 'Hasil Pemeriksaan Kualitas Video' : 'Video Quality Check Results'} ({CHECK_ITEMS.length} Checkpoints)
-                </h4>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                  <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 shrink-0">
+                    {isIndo ? 'Hasil Pemeriksaan Kualitas Video' : 'Video Quality Check Results'} ({CHECK_ITEMS.length} Checkpoints)
+                  </h4>
+                  
+                  {/* Category Tabs */}
+                  <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto">
+                    <button 
+                      onClick={() => setActiveCategory('visual')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'visual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Teknis Visual' : 'Technical Visual'}
+                    </button>
+                    <button 
+                      onClick={() => setActiveCategory('ai')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'ai' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Integritas AI & Objek' : 'AI & Object Integrity'}
+                    </button>
+                    <button 
+                      onClick={() => setActiveCategory('legal')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'legal' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Hukum & Komersial' : 'Legal & Commercial'}
+                    </button>
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {CHECK_ITEMS_LOCALIZED.map((item) => {
+                  {CHECK_ITEMS_LOCALIZED
+                    .filter(item => {
+                       const cats = {
+                          visual: ['blur', 'noise', 'compression_artifacts', 'blocking', 'banding', 'overexposure', 'underexposure', 'white_balance', 'motion_blur', 'camera_shake', 'out_of_focus', 'flickering', 'duplicate_frame', 'empty_frame', 'black_frame', 'frozen_frame', 'low_framerate', 'visible_transitions', 'log_profile', 'upscaled_video'],
+                          ai: ['ai_artifact', 'deformed_object', 'bad_anatomy', 'cropped_subject', 'cut_off_object', 'wrong_perspective'],
+                          legal: ['watermark', 'logo', 'text', 'low_aesthetic_quality']
+                       };
+                       return cats[activeCategory].includes(item.key);
+                    })
+                    .map((item) => {
                     const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
-                    // Fallback to check if the key exists in technical_issues for resilience
-                    const isFailedInIssues = report.technical_issues?.some(issue => 
-                      issue.toLowerCase().includes(item.key.toLowerCase().replace('_', ' ')) ||
-                      issue.toLowerCase().includes(item.label.toLowerCase())
-                    );
                     
                     const isPass = checkResult 
                       ? checkResult.status === 'PASS' 
-                      : !isFailedInIssues;
+                      : true;
                       
                     const note = checkResult 
                       ? checkResult.note 
-                      : (isFailedInIssues 
-                          ? (isIndo ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Issues detected on this indicator.') 
-                          : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.'));
+                      : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.');
 
                     return (
                       <div 

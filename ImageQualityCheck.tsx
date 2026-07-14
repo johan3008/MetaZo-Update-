@@ -241,7 +241,116 @@ export const ImageQualityCheck: React.FC<{
     setShowHeatmaps(new Set());
   };
 
-  const resizeAndProcess = (file: File): Promise<string> => {
+  const extractVideoFrames = (videoFile: File, numFrames = 5): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(videoFile);
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.style.position = 'fixed';
+      video.style.top = '-9999px';
+      video.style.opacity = '0';
+      document.body.appendChild(video);
+
+      const frames: string[] = [];
+      let isResolved = false;
+      let timestamps: number[] = [];
+      let currentIdx = 0;
+
+      const cleanup = () => {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        URL.revokeObjectURL(url);
+      };
+
+      const timeoutId = setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          cleanup();
+          reject(new Error("Video frame extraction timed out"));
+        }
+      }, 45000);
+
+      video.onloadedmetadata = () => {
+        const duration = video.duration || 1;
+        for (let i = 0; i < numFrames; i++) {
+          timestamps.push(duration * ((i + 1) / (numFrames + 1)));
+        }
+        video.currentTime = timestamps[0];
+      };
+
+      video.onseeked = () => {
+        if (isResolved) return;
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1280;
+          let width = video.videoWidth || 640;
+          let height = video.videoHeight || 480;
+
+          if (width > MAX_WIDTH) {
+             height *= MAX_WIDTH / width;
+             width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+             ctx.drawImage(video, 0, 0, width, height);
+             let frameData = '';
+             if (currentIdx % 2 !== 0 && width >= 400 && height >= 400) {
+                 const cropCanvas = document.createElement('canvas');
+                 const cw = width / 2;
+                 const ch = height / 2;
+                 cropCanvas.width = cw;
+                 cropCanvas.height = ch;
+                 const cctx = cropCanvas.getContext('2d');
+                 if (cctx) {
+                    cctx.drawImage(video, width/4, height/4, cw, ch, 0, 0, cw, ch);
+                    frameData = cropCanvas.toDataURL('image/jpeg', 0.85);
+                 } else {
+                    frameData = canvas.toDataURL('image/jpeg', 0.85);
+                 }
+             } else {
+                 frameData = canvas.toDataURL('image/jpeg', 0.85);
+             }
+             frames.push(frameData);
+          }
+
+          currentIdx++;
+          if (currentIdx < timestamps.length) {
+             video.currentTime = timestamps[currentIdx];
+          } else {
+             isResolved = true;
+             clearTimeout(timeoutId);
+             cleanup();
+             resolve(frames);
+          }
+        } catch (e) {
+          if (!isResolved) {
+              isResolved = true;
+              clearTimeout(timeoutId);
+              cleanup();
+              reject(e);
+          }
+        }
+      };
+
+      video.onerror = () => {
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeoutId);
+          cleanup();
+          reject(new Error("Failed to load video file"));
+        }
+      };
+
+      video.src = url;
+      video.load();
+    });
+  };
+
+  const resizeAndProcess = (file: File): Promise<string | [string, string]> => {
     return new Promise((resolve, reject) => {
       // 1. Handle Video (MP4, MOV, etc.)
       if (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i)) {
@@ -460,9 +569,34 @@ export const ImageQualityCheck: React.FC<{
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          
+          let resultBase64 = reader.result as string;
+          let zoomedBase64: string | null = null;
+          
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
+            resultBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            
+            // Create 400x400 physical crop from original center
+            const cropSize = 400;
+            if (img.width >= cropSize && img.height >= cropSize) {
+                const cropCanvas = document.createElement('canvas');
+                cropCanvas.width = cropSize;
+                cropCanvas.height = cropSize;
+                const cropCtx = cropCanvas.getContext('2d');
+                if (cropCtx) {
+                    const startX = (img.width / 2) - (cropSize / 2);
+                    const startY = (img.height / 2) - (cropSize / 2);
+                    cropCtx.drawImage(img, startX, startY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+                    zoomedBase64 = cropCanvas.toDataURL('image/jpeg', 0.95);
+                }
+            }
+            
+            if (zoomedBase64) {
+               resolve([resultBase64, zoomedBase64]);
+               return;
+            }
+            resolve(resultBase64);
           } else {
             resolve(reader.result as string);
           }
@@ -553,7 +687,9 @@ export const ImageQualityCheck: React.FC<{
         // Increment internally a bit
         setProgress(startProgress + 5);
         
-        const base64Image = await resizeAndProcess(file);
+        const processedResult = await resizeAndProcess(file);
+        const base64Image = Array.isArray(processedResult) ? processedResult[0] : processedResult;
+        const imagePayload = processedResult;
         if (file.name.match(/\.(eps|ai)$/i)) {
           setPreviews(prev => ({ ...prev, [file.name]: base64Image }));
         }
@@ -599,16 +735,21 @@ export const ImageQualityCheck: React.FC<{
         let response;
         
         if (isVideo) {
-          const formData = new FormData();
-          formData.append('video', file);
-          formData.append('tolerance', tolerance);
-          formData.append('language', t.language || 'English');
-          formData.append('model', aiOptions?.model || 'gemini-3.1-pro-preview');
+          console.log(`[Video Audit in Image] Mengekstrak frame video secara lokal...`);
+          const extractedFrames = await extractVideoFrames(file, 5);
           
           response = await fetch('/api/check-video-quality', {
             method: 'POST',
-            headers: { ...getHeaders(aiOptions) },
-            body: formData
+            headers: { 
+              'Content-Type': 'application/json',
+              ...getHeaders(aiOptions) 
+            },
+            body: JSON.stringify({
+              frames: extractedFrames,
+              tolerance,
+              language: t.language || 'English',
+              model: aiOptions?.model || 'gemini-3.1-pro-preview'
+            })
           });
         } else if (uploadedUrl) {
           response = await fetch('/api/check-image-quality', {
@@ -628,7 +769,7 @@ export const ImageQualityCheck: React.FC<{
             method: 'POST',
             headers: getHeaders(aiOptions),
             body: JSON.stringify({ 
-              image: base64Image, 
+              image: imagePayload, 
               tolerance, 
               language: t.language || 'English', 
               model: aiOptions?.model,
@@ -1352,40 +1493,7 @@ export const ImageQualityCheck: React.FC<{
                                       </div>
 
                                       {(() => {
-                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || (() => {
-                                          const isBlur = (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur') || i.toLowerCase().includes('sharpness') || i.toLowerCase().includes('tajam') || i.toLowerCase().includes('fokus'));
-                                          const isComposition = (r.technical_issues || []).some(i => i.toLowerCase().includes('composition') || i.toLowerCase().includes('crop') || i.toLowerCase().includes('komposisi') || i.toLowerCase().includes('miring'));
-                                          const isLighting = (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure') || i.toLowerCase().includes('cahaya') || i.toLowerCase().includes('gelap') || i.toLowerCase().includes('terang'));
-                                          const isWatermark = (r.technical_issues || []).some(i => i.toLowerCase().includes('watermark') || i.toLowerCase().includes('tanda air'));
-                                          const isLogo = (r.legal_status || '').includes('VIOLATION') || (r.technical_issues || []).some(i => i.toLowerCase().includes('logo') || i.toLowerCase().includes('brand') || i.toLowerCase().includes('merek'));
-                                          const isText = (r.technical_issues || []).some(i => i.toLowerCase().includes('text') || i.toLowerCase().includes('tulisan') || i.toLowerCase().includes('huruf'));
-                                          const isAnatomy = (r.technical_issues || []).some(i => i.toLowerCase().includes('anatomy') || i.toLowerCase().includes('anatom') || i.toLowerCase().includes('tangan') || i.toLowerCase().includes('jari'));
-                                          const isIpRisk = (r.legal_status || '').includes('VIOLATION') || (r.legal_status || '').includes('AT_RISK') || (r.technical_issues || []).some(i => i.toLowerCase().includes('ip') || i.toLowerCase().includes('patent') || i.toLowerCase().includes('restriction'));
-                                          const isProportion = (r.technical_issues || []).some(i => i.toLowerCase().includes('proportion') || i.toLowerCase().includes('proporsi') || i.toLowerCase().includes('geometry') || i.toLowerCase().includes('geometri'));
-                                          const isExposure = (r.technical_issues || []).some(i => i.toLowerCase().includes('exposure') || i.toLowerCase().includes('paparan'));
-                                          const isColorBalance = (r.technical_issues || []).some(i => i.toLowerCase().includes('color') || i.toLowerCase().includes('warna') || i.toLowerCase().includes('saturation') || i.toLowerCase().includes('saturasi'));
-                                          const isOverEdited = (r.technical_issues || []).some(i => i.toLowerCase().includes('edit') || i.toLowerCase().includes('sharpen') || i.toLowerCase().includes('asah'));
-                                          const isSensorIssues = (r.technical_issues || []).some(i => i.toLowerCase().includes('sensor') || i.toLowerCase().includes('dust') || i.toLowerCase().includes('debu'));
-
-                                          return {
-                                            blur: { status: isBlur ? "FAIL" : "PASS", note: isBlur ? (isIndo ? "Terdeteksi masalah fokus, soft focus, atau blur pada subjek utama." : "Focus, soft focus, or blur issues detected on the main subject.") : (isIndo ? "Fokus subjek utama tajam secara sempurna." : "Main subject focus is perfectly sharp.") },
-                                            exposure: { status: isExposure ? "FAIL" : "PASS", note: isExposure ? (isIndo ? "Terdeteksi masalah paparan berlebihan (overexposure) atau kurang paparan (underexposure)." : "Overexposure or underexposure issues detected.") : (isIndo ? "Paparan cahaya seimbang." : "Exposure is balanced.") },
-                                            color_balance: { status: isColorBalance ? "FAIL" : "PASS", note: isColorBalance ? (isIndo ? "Keseimbangan putih buruk, warna tidak alami, atau saturasi berlebihan/kurang." : "Poor white balance, unnatural colors, or over/under saturation.") : (isIndo ? "Warna dan saturasi tampak alami." : "Colors and saturation appear natural.") },
-                                            over_edited: { status: isOverEdited ? "FAIL" : "PASS", note: isOverEdited ? (isIndo ? "Gambar diedit secara berlebihan, penajaman artifisial, atau filter berlebihan." : "Image is over-edited, artificially sharpened, or overly filtered.") : (isIndo ? "Editing dan penajaman terlihat natural." : "Editing and sharpening look natural.") },
-                                            sensor_issues: { status: isSensorIssues ? "FAIL" : "PASS", note: isSensorIssues ? (isIndo ? "Bintik debu sensor terlihat atau ada masalah pada sensor." : "Sensor dust spots visible or sensor issues detected.") : (isIndo ? "Bebas dari bintik debu sensor." : "Free from sensor dust spots.") },
-                                            composition: { status: isComposition ? "FAIL" : "PASS", note: isComposition ? (isIndo ? "Komposisi kurang seimbang atau terdapat pemotongan subjek canggung." : "Composition is unbalanced or awkward subject cropping detected.") : (isIndo ? "Komposisi seimbang dengan rule of thirds." : "Balanced composition matching the rule of thirds.") },
-                                            lighting: { status: isLighting ? "FAIL" : "PASS", note: isLighting ? (isIndo ? "Terdeteksi masalah pencahayaan tidak seimbang, overexposure, atau underexposure." : "Unbalanced lighting, overexposure, or underexposure detected.") : (isIndo ? "Pencahayaan terdistribusi merata dengan detail tinggi." : "Evenly distributed lighting with high details.") },
-                                            watermark: { status: isWatermark ? "FAIL" : "PASS", note: isWatermark ? (isIndo ? "Terdeteksi watermark komersial atau tanda air pada gambar." : "Commercial watermark or text watermark detected.") : (isIndo ? "Tidak mendeteksi watermark komersial." : "No commercial watermarks detected.") },
-                                            logo: { status: isLogo ? "FAIL" : "PASS", note: isLogo ? (isIndo ? "Terdeteksi logo merek dagang atau hak cipta pada gambar." : "Trademark logo or copyright symbol detected on the image.") : (isIndo ? "Bebas dari logo atau hak cipta merek dagang." : "Free of trademark logos or copyright symbols.") },
-                                            text: { status: isText ? "FAIL" : "PASS", note: isText ? (isIndo ? "Terdeteksi teks atau tulisan yang mengganggu estetika komersial." : "Overlay text or writing detected that disrupts commercial aesthetics.") : (isIndo ? "Tidak ada teks overlay mengganggu." : "No disruptive overlay text.") },
-                                            anatomical_errors: { status: isAnatomy ? "FAIL" : "PASS", note: isAnatomy ? (isIndo ? "Terdeteksi anomali struktur tubuh atau anatomi subjek." : "Anatomical anomalies or body structure defects detected.") : (isIndo ? "Struktur anatomi subjek terlihat alami." : "Subject's anatomical structure looks natural.") },
-                                            structural_defects: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('structural') || i.toLowerCase().includes('cacat struktural') || i.toLowerCase().includes('meleleh')) ? "FAIL" : "PASS", note: (r.technical_issues || []).some(i => i.toLowerCase().includes('structural') || i.toLowerCase().includes('cacat struktural') || i.toLowerCase().includes('meleleh')) ? (isIndo ? "Terdeteksi cacat struktural yang tidak logis (objek menyatu, melayang, cacat geometri)." : "Illogical structural defects detected (merged objects, floating geometry).") : (isIndo ? "Struktur dan geometri terlihat masuk akal dan solid." : "Structure and geometry appear solid and logical.") },
-                                            ip_risk: { status: isIpRisk ? "FAIL" : "PASS", note: isIpRisk ? (isIndo ? "Terdeteksi potensi risiko kekayaan intelektual (IP) atau desain produk khas." : "Potential intellectual property (IP) or unique trade dress design risk detected.") : (isIndo ? "Aman dari potensi resiko paten atau desain khas." : "Safe from potential patent or unique design risks.") },
-                                            proportion_defects: { status: isProportion ? "FAIL" : "PASS", note: isProportion ? (isIndo ? "Terdeteksi ketidaksesuaian proporsi atau cacat geometri pada objek." : "Proportional mismatch or geometrical defects detected on the object.") : (isIndo ? "Proporsi geometri dan anatomi subjek proporsional." : "Geometrical proportions and anatomy are proportional.") },
-                                            stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || (r.recommendation === "PASS" ? (isIndo ? "Gambar memenuhi standar kurator komersial." : "The image meets commercial curator standards.") : (isIndo ? "Gambar ditolak berdasarkan kriteria kurasi." : "The image is rejected based on curation criteria.")) },
-                                            metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
-                                          };
-                                        })();
+                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {};
 
                                         const checks = [
                                           { label: isIndo ? 'Ketajaman / Fokus' : 'Blur / Sharpness', key: 'blur', val: aiVisionChecks.blur },
