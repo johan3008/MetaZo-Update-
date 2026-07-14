@@ -4364,7 +4364,6 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
 
   let systemInstruction = `Anda adalah modul inspeksi kualitas video otomatis. Tugas Anda adalah menganalisis klip video/animasi yang diunggah dan mendeteksi potensi penolakan (rejection) berdasarkan standar ketat.
 Anda akan diberikan kumpulan frame diam (gambar) yang diekstrak secara merata dari keseluruhan video. 
-CATATAN PENTING: Sistem mengekstrak frame secara hibrida. Separuh dari frame yang Anda terima adalah tampilan normal (100%), dan separuh sisanya adalah potongan tengah yang secara fisik di-ZOOM 200%. Anda WAJIB menggunakan frame yang di-zoom 200% ini untuk menginspeksi artefak kompresi, pixel banding, noise, dan kecacatan struktural aneh pada skala mikroskopis!
 
 Fokuskan analisis video secara spesifik pada 4 kategori berikut:
 1. Kekayaan Intelektual (IP): Deteksi teks bermerek, teks non-Inggris/Jepang yang rusak, atau logo tersembunyi pada elemen latar belakang yang bergerak. WAJIB: Jika ada tulisan/teks apa pun di dalam video, Anda HARUS menuliskannya secara eksplisit (Lakukan OCR) ke dalam laporan Anda! Teks yang cacat/alien adalah pelanggaran berat.
@@ -4380,7 +4379,7 @@ STATUS & SKORING (KONSISTEN & KETAT):
 Jangan berikan skor 70-74.
 
 ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Sinematografi Senior. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan "ada cacat" atau "video buram", tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat color banding pada frame 2 akibat kompresi warna neon", "gerakan lengan di frame 4 ke 5 mengalami morphing AI yang tidak logis"). Anda WAJIB membedah temuan dari 4 kategori di atas dengan ketajaman tingkat tinggi, termasuk laporan Anda pada pandangan Zoom 200%.
+1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Sinematografi Senior. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan "ada cacat" atau "video buram", tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat color banding pada frame 2 akibat kompresi warna neon", "gerakan lengan di frame 4 ke 5 mengalami morphing AI yang tidak logis"). Anda WAJIB membedah temuan dari 4 kategori di atas dengan ketajaman tingkat tinggi.
 2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap frame video tersebut berdasarkan 4 kategori di atas. Jangan mengarang masalah yang tidak ada.
 3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName}.
 

@@ -248,9 +248,9 @@ export const VideoQualityCheck: React.FC<{
     }
   };
 
-  const extractVideoFrames = (videoFile: File, numFrames = 5): Promise<string[]> => {
+  const extractVideoFrames = (file: File, frameCount: number = 4): Promise<string[]> => {
     return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(videoFile);
+      const url = URL.createObjectURL(file);
       const video = document.createElement('video');
       video.muted = true;
       video.playsInline = true;
@@ -258,101 +258,53 @@ export const VideoQualityCheck: React.FC<{
       
       video.style.position = 'fixed';
       video.style.top = '-9999px';
-      video.style.opacity = '0';
       document.body.appendChild(video);
 
       const frames: string[] = [];
-      let isResolved = false;
-      let timestamps: number[] = [];
-      let currentIdx = 0;
-
-      const cleanup = () => {
-        if (video.parentNode) video.parentNode.removeChild(video);
-        URL.revokeObjectURL(url);
-      };
-
-      const timeoutId = setTimeout(() => {
-        if (!isResolved) {
-          isResolved = true;
-          cleanup();
-          reject(new Error("Video frame extraction timed out"));
-        }
-      }, 45000);
+      let currentStep = 0;
 
       video.onloadedmetadata = () => {
-        const duration = video.duration || 1;
-        for (let i = 0; i < numFrames; i++) {
-          timestamps.push(duration * ((i + 1) / (numFrames + 1)));
+        // Tentukan waktu penayangan frame secara merata di sepanjang video
+        // Contoh untuk 4 frame: Awal (1s), 33%, 66%, Akhir (90%)
+        seekToNextFrame();
+      };
+
+      const seekToNextFrame = () => {
+        if (currentStep >= frameCount) {
+          cleanup();
+          resolve(frames);
+          return;
         }
-        video.currentTime = timestamps[0];
+        // Hitung posisi timestamp berdasarkan durasi video
+        const targetTime = (video.duration / (frameCount + 1)) * (currentStep + 1);
+        video.currentTime = targetTime;
       };
 
       video.onseeked = () => {
-        if (isResolved) return;
         try {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1280;
-          let width = video.videoWidth || 640;
-          let height = video.videoHeight || 480;
-
-          if (width > MAX_WIDTH) {
-             height *= MAX_WIDTH / width;
-             width = MAX_WIDTH;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
+          canvas.width = 800; // Ukuran optimal untuk AI Vision tanpa boros token
+          canvas.height = 450;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-             ctx.drawImage(video, 0, 0, width, height);
-             
-             let frameData = '';
-             // Simulate physical zoom for odd indices if resolution is high enough
-             if (currentIdx % 2 !== 0 && width >= 400 && height >= 400) {
-                 const cropCanvas = document.createElement('canvas');
-                 const cw = width / 2;
-                 const ch = height / 2;
-                 cropCanvas.width = cw;
-                 cropCanvas.height = ch;
-                 const cctx = cropCanvas.getContext('2d');
-                 if (cctx) {
-                    cctx.drawImage(video, width/4, height/4, cw, ch, 0, 0, cw, ch);
-                    frameData = cropCanvas.toDataURL('image/jpeg', 0.85);
-                 } else {
-                    frameData = canvas.toDataURL('image/jpeg', 0.85);
-                 }
-             } else {
-                 frameData = canvas.toDataURL('image/jpeg', 0.85);
-             }
-             frames.push(frameData);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL('image/jpeg', 0.8));
           }
-
-          currentIdx++;
-          if (currentIdx < timestamps.length) {
-             video.currentTime = timestamps[currentIdx];
-          } else {
-             isResolved = true;
-             clearTimeout(timeoutId);
-             cleanup();
-             resolve(frames);
-          }
+          currentStep++;
+          seekToNextFrame();
         } catch (e) {
-          if (!isResolved) {
-              isResolved = true;
-              clearTimeout(timeoutId);
-              cleanup();
-              reject(e);
-          }
+          reject(e);
         }
       };
 
       video.onerror = () => {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeoutId);
-          cleanup();
-          reject(new Error("Failed to load video file"));
-        }
+        cleanup();
+        reject(new Error("Gagal memuat berkas video"));
+      };
+
+      const cleanup = () => {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        URL.revokeObjectURL(url);
       };
 
       video.src = url;
@@ -374,10 +326,10 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      console.log(`[Video Audit] Mengekstrak frame video secara lokal di browser...`);
-      const extractedFrames = await extractVideoFrames(file, 5);
-      console.log(`[Video Audit] Berhasil mengekstrak ${extractedFrames.length} frame. Mengirim ke backend...`);
+      // 1. Ekstrak frame secara lokal dari keseluruhan durasi video
+      const base64Frames = await extractVideoFrames(file, 4);
 
+      // 2. Kirim kumpulan frame gambar ke endpoint backend
       const response = await fetch('/api/check-video-quality', {
         method: 'POST',
         headers: { 
@@ -385,17 +337,16 @@ export const VideoQualityCheck: React.FC<{
           ...getHeaders(aiOptions)
         },
         body: JSON.stringify({
-          frames: extractedFrames,
+          frames: base64Frames, // Mengirim 4 frame sekaligus
           tolerance,
           language: t.language || 'English',
           model: aiOptions?.model || 'gemini-3.1-pro-preview'
         })
       });
 
-
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed to analyze video: ${response.statusText}`);
+        throw new Error(errData.error || "Gagal menganalisis kualitas video.");
       }
 
       const data = await response.json();
