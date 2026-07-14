@@ -3568,7 +3568,7 @@ export async function checkImageQuality(image: string, tolerance: 'STRICT' | 'ME
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html), "Content Refusal Reasons" (https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html), dan "Known Restrictions" (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap SELURUH area gambar/vektor komersial yang diunggah. Anda WAJIB menganalisis seluruh data gambar secara mendalam sampai ke tingkat piksel (pixel-level analysis). Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas gambar secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap SELURUH area gambar/vektor komersial yang diunggah. Anda WAJIB menganalisis seluruh data gambar secara mendalam sampai ke tingkat piksel (pixel-level analysis) dan memastikan tidak ada Cacat atau Struktural yang tidak sempurna. Pemeriksaan tidak boleh hanya terfokus pada subjek utama (subject) atau objek utama (object) saja, melainkan Anda wajib memindai setiap piksel di seluruh kanvas gambar secara merata: mulai dari latar depan (foreground), latar belakang (background), tepian bingkai (borders), area bayangan (shadows), area terang (highlights), tekstur permukaan halus, hingga sudut-sudut gambar (corner-to-corner scan).
 
 ---
 PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
@@ -3576,7 +3576,7 @@ Untuk memberikan hasil yang paling akurat, Anda WAJIB mensimulasikan proses ZOOM
 1. Periksa area fokus utama: Apakah mata, wajah, atau objek target benar-benar tajam (pin-sharp) tanpa ada tanda-tanda "soft focus" atau "motion blur"?
 2. Periksa area latar belakang dan sudut gambar (corner-to-corner scan): Cari bintik debu sensor (sensor dust), chromatic aberration di tepian objek berkontras tinggi, artefak kompresi JPEG (macro-blocking), gradasi warna patah (color banding), dan noise digital parah di area gelap (shadows).
 3. Periksa seluruh bagian untuk mendeteksi pelanggaran kekayaan intelektual (IP) mikro: Logo kecil pada kancing pakaian, emblem samar pada gadget/mobil, teks bermerek pada latar belakang, graffiti, atau karya seni berhak cipta.
-4. Periksa struktur anatomi dan logika AI (jika buatan AI): Cari jari berlebih/kurang, mata juling, geometri yang saling melebur atau melayang tidak wajar, detail pola berulang yang hancur, atau tulisan acak/gibberish yang mengacaukan estetika komersial.
+4. Periksa struktur anatomi dan cacat struktural (jika buatan AI): Cari secara detail ketidaksempurnaan struktural (structural defects), jari berlebih/kurang, mata juling, geometri yang saling melebur atau melayang tidak wajar, asimetri pada objek yang seharusnya simetris, detail pola berulang yang hancur, atau tulisan acak/gibberish yang mengacaukan estetika komersial. Ai Vision harus mengeceknya sedetail mungkin.
 
 ---
 PANDUAN TOLERANSI KETAT & REFUSAL REASONS ADOBE STOCK:
@@ -3667,7 +3667,7 @@ ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
       - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Kerapian, bokeh, kebersihan latar, dan keberadaan bintik debu/sensor dust.
       - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, keberadaan area blown-out highlights atau crushed shadows.
       - **Analisis Kerapian Piksel & Risiko Hukum (Pixel Integrity, IP & AI Risks)**: Noise digital di sudut-sudut gambar, chromatic aberration, micro-logos, teks cakar ayam AI, atau cacat struktur geometri buatan AI di seluruh area gambar. Untuk file vektor (isVector=true), dokumentasikan juga kerapian path, layers, path tertutup, dan kebersihan tracing.
-2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`ip_risk\`, \`proportion_defects\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di gambar ini.
+2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`structural_defects\`, \`ip_risk\`, \`proportion_defects\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di gambar ini. Khusus untuk \`structural_defects\`, berikan rincian mendalam jika terdapat cacat geometri atau bentuk struktural yang tidak wajar.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -3723,6 +3723,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                     required: ["status", "note"]
                 },
                 ip_risk: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                structural_defects: {
                     type: Type.OBJECT,
                     properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
                     required: ["status", "note"]
@@ -4289,14 +4294,14 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Duplicate / Empty Frames: Frame kosong (fully black/white) or macet/membeku (frozen frame).
 
 6. GENERATIVE AI & STRUCTURAL QUALITY STANDARDS:
-   - Structural & Mechanical Failures: Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, sambungan dinding/papan yang miring atau terputus secara aneh, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
-   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
+   - Structural & Mechanical Failures: AI Vision WAJIB mengecek dengan SANGAT DETAIL setiap gambar/frame yang ada cacat atau struktural yang tidak sempurna. Objek buatan AI harus logis dan realistis secara struktural. Cacat geometri atau kegagalan mekanis yang jelas (seperti laci kabinet file yang meleleh, kaki meja melayang, bingkai jendela bengkok secara tidak alami, benda yang terpotong aneh, sambungan dinding/papan yang miring atau terputus, atau detail tombol/geometri yang melebur kasar) WAJIB dinilai sebagai kegagalan teknis parah = FAIL.
+   - Anatomi Cacat & AI Hallucinations: Jari tangan berlebih/kurang, mata asimetris/juling, bagian tubuh menyatu, cacat anatomi, atau proporsi anatomi manusia/hewan yang janggal di area mana pun pada gambar = FAIL.
    - Teks Kacau (Gibberish Text): Teks acak (gibberish), huruf tidak terbaca, coretan seperti tulisan, atau teks AI yang rusak/cakar ayam pada objek utama maupun pada kertas tempel, buku, papan, atau latar belakang yang terlihat jelas = FAIL. Adobe Stock menolak segala jenis teks tidak terbaca yang dihasilkan AI karena merusak estetika dan nilai komersial gambar.
    - Temporal Inconsistency & Morphing: Perhatikan perubahan bentuk (morphing) antar frame. Jika wajah manusia atau objek utama berubah bentuk secara mengerikan dan drastis di tengah video = FAIL.
    - Bayangan & Pencahayaan Tidak Realistis (Unrealistic Shadows/Depth/Lighting): Loloskan ketidakkonsistenan bayangan minor antar-frame selama video terlihat memukau secara keseluruhan. Berikan FAIL hanya jika render artifact membuat pencahayaan sama sekali tidak cocok secara fisik hingga merusak estetika.
 
     PENTING - PRINSIP PENILAIAN GENERATIVE AI VIDEO (REALISTIS & KOMERSIAL):
-    1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jika sebuah video memiliki cacat visual yang jelas (seperti teks cakar ayam AI atau laci kabinet meleleh), video tersebut wajib dinilai FAIL tanpa toleransi.
+    1. Adobe Stock mengutamakan estetika dan daya jual (commercial value) video. Jika sebuah video memiliki cacat visual yang jelas (seperti teks cakar ayam AI, proporsi ngawur, atau struktur arsitektur/kendaraan cacat yang meleleh), video tersebut wajib dinilai FAIL tanpa toleransi.
     2. Selama anomali AI sangat minor antar-frame (seperti sedikit morphing latar belakang yang wajar, objek statis di latar belakang yang mengalami sedikit perubahan tekstur halus), tetap loloskan dengan status PASS.
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions):

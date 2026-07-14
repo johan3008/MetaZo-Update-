@@ -1,6 +1,6 @@
-import { getDailyLimit } from '../../constants';
+import { getDailyLimit } from '@/constants.tsx';
 import React, { useState, useEffect } from 'react';
-import { getHeaders } from '../../services/geminiService';
+import { getHeaders } from '@/services/geminiService.ts';
 import { Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -55,7 +55,7 @@ interface HistoryItem {
   report: QualityReport;
 }
 
-import { FeatureGuideButton } from './FeatureGuideModal';
+import { FeatureGuideButton } from './FeatureGuideModal.tsx';
 
 export const ImageQualityCheck: React.FC<{ 
   t: any; 
@@ -1430,6 +1430,7 @@ export const ImageQualityCheck: React.FC<{
                                             logo: { status: isLogo ? "FAIL" : "PASS", note: isLogo ? (isIndo ? "Terdeteksi logo merek dagang atau hak cipta pada gambar." : "Trademark logo or copyright symbol detected on the image.") : (isIndo ? "Bebas dari logo atau hak cipta merek dagang." : "Free of trademark logos or copyright symbols.") },
                                             text: { status: isText ? "FAIL" : "PASS", note: isText ? (isIndo ? "Terdeteksi teks atau tulisan yang mengganggu estetika komersial." : "Overlay text or writing detected that disrupts commercial aesthetics.") : (isIndo ? "Tidak ada teks overlay mengganggu." : "No disruptive overlay text.") },
                                             anatomical_errors: { status: isAnatomy ? "FAIL" : "PASS", note: isAnatomy ? (isIndo ? "Terdeteksi anomali struktur tubuh atau anatomi subjek." : "Anatomical anomalies or body structure defects detected.") : (isIndo ? "Struktur anatomi subjek terlihat alami." : "Subject's anatomical structure looks natural.") },
+                                            structural_defects: { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('structural') || i.toLowerCase().includes('cacat struktural') || i.toLowerCase().includes('meleleh')) ? "FAIL" : "PASS", note: (r.technical_issues || []).some(i => i.toLowerCase().includes('structural') || i.toLowerCase().includes('cacat struktural') || i.toLowerCase().includes('meleleh')) ? (isIndo ? "Terdeteksi cacat struktural yang tidak logis (objek menyatu, melayang, cacat geometri)." : "Illogical structural defects detected (merged objects, floating geometry).") : (isIndo ? "Struktur dan geometri terlihat masuk akal dan solid." : "Structure and geometry appear solid and logical.") },
                                             ip_risk: { status: isIpRisk ? "FAIL" : "PASS", note: isIpRisk ? (isIndo ? "Terdeteksi potensi risiko kekayaan intelektual (IP) atau desain produk khas." : "Potential intellectual property (IP) or unique trade dress design risk detected.") : (isIndo ? "Aman dari potensi resiko paten atau desain khas." : "Safe from potential patent or unique design risks.") },
                                             proportion_defects: { status: isProportion ? "FAIL" : "PASS", note: isProportion ? (isIndo ? "Terdeteksi ketidaksesuaian proporsi atau cacat geometri pada objek." : "Proportional mismatch or geometrical defects detected on the object.") : (isIndo ? "Proporsi geometri dan anatomi subjek proporsional." : "Geometrical proportions and anatomy are proportional.") },
                                             stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || (r.recommendation === "PASS" ? (isIndo ? "Gambar memenuhi standar kurator komersial." : "The image meets commercial curator standards.") : (isIndo ? "Gambar ditolak berdasarkan kriteria kurasi." : "The image is rejected based on curation criteria.")) },
@@ -1445,6 +1446,7 @@ export const ImageQualityCheck: React.FC<{
                                           { label: isIndo ? 'Pendeteksian Logo' : 'Logo Detection', key: 'logo', val: aiVisionChecks.logo },
                                           { label: isIndo ? 'Teks Overlay' : 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
                                           { label: isIndo ? 'Integritas Anatomi' : 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
+                                          { label: isIndo ? 'Cacat Struktural' : 'Structural Defects', key: 'structural_defects', val: aiVisionChecks.structural_defects },
                                           { label: isIndo ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
                                           { label: isIndo ? 'Proporsi & Geometri' : 'Proportion & Geometry', key: 'proportion_defects', val: aiVisionChecks.proportion_defects },
                                           { label: isIndo ? 'Penerimaan Stok' : 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },
