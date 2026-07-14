@@ -3646,13 +3646,15 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
     3. Pengecualian Logo Mikro & Teks Insidental: Logo atau nama merek berukuran mikroskopis (<1% luas gambar) pada pakaian, rambu jalan jauh, bersifat insidental wajib diloloskan (PASS).
 
 ---
-ATURAN KHUSUS UNTUK VEKTOR (EPS/AI/SVG) (JIKA ISVECTOR = TRUE):
-Jika berkas yang diperiksa terindikasi vektor (isVector = true), audit wajib berfokus pada standar kualitas vektor profesional Adobe Stock:
-1. Gaps in Shape Paths (Jalur Terbuka): Pastikan semua jalur/path bentuk tertutup sempurna. Jalur terbuka (open paths) atau celah kecil yang tidak sengaja akan menyebabkan penolakan instan.
-2. Embedded Raster Images (Gambar Bitmap Tersemat): Vektor harus 100% scalable. DILARANG KERAS menyematkan (embed) gambar raster/bitmap (seperti foto JPG/PNG) di dalam berkas EPS/AI.
-3. Auto-Tracing Artifacts (Cacat Penelusuran Otomatis): Garis-garis kasar, pola berantakan, dan ribuan titik anchor yang menumpuk tak beraturan akibat proses "Image Trace" otomatis secara malas adalah alasan penolakan utama. Gunakan jalur bersih buatan tangan (clean hand-drawn paths).
-4. Layer Berantakan & Sampah Path: Adanya sisa-sisa titik anchor yang terisolasi, path kosong tak terlihat, atau struktur grup/layer yang sangat kacau dan sulit diedit oleh pembeli.
-5. Resolusi Artboard Vektor: Artboard vektor harus setidaknya 15 Megapixels (MP) agar dapat diekspor ke resolusi tinggi tanpa pecah.
+ATURAN KHUSUS UNTUK ILUSTRASI & VEKTOR (EPS/AI/SVG) (JIKA ISVECTOR = TRUE ATAU GAMBAR ADALAH ILUSTRASI):
+Jika berkas terindikasi ilustrasi atau vektor, audit wajib berfokus pada standar kualitas berikut:
+1. Jalur yang Berantakan (Messy Paths): Jalur yang berantakan atau goresan yang belum selesai.
+2. Cacat Penelusuran Otomatis (Auto-Tracing Artifacts): Artefak akibat penelusuran otomatis (image trace) yang malas atau vektorisasi yang buruk.
+3. Tepi Bergerigi (Jagged Edges): Tepi bergerigi atau elemen berpiksel (pixelated) pada ilustrasi.
+4. Elemen Tidak Dikelompokkan (Ungrouped Elements): Untuk vektor, pastikan elemen terkelompok dengan baik.
+5. Jalur Terbuka (Open Paths): Semua jalur berbentuk terisi perlu ditutup.
+6. Kesalahan Teknis Lapisan (Layer/Path Errors): Kesalahan teknis pada lapisan (layer) atau jalur yang menyulitkan editing.
+7. Skalabilitas (Scalability): Vektor harus sepenuhnya dapat diskalakan atau diedit. DILARANG KERAS menyematkan raster/bitmap (JPG/PNG). Artboard vektor minimal berukuran 15 Megapixels (MP).
 
 ---
 STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
@@ -3667,7 +3669,7 @@ ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
       - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Kerapian, bokeh, kebersihan latar, dan keberadaan bintik debu/sensor dust.
       - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, keberadaan area blown-out highlights atau crushed shadows.
       - **Analisis Kerapian Piksel & Risiko Hukum (Pixel Integrity, IP & AI Risks)**: Noise digital di sudut-sudut gambar, chromatic aberration, micro-logos, teks cakar ayam AI, atau cacat struktur geometri buatan AI di seluruh area gambar. Untuk file vektor (isVector=true), dokumentasikan juga kerapian path, layers, path tertutup, dan kebersihan tracing.
-2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`structural_defects\`, \`ip_risk\`, \`proportion_defects\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di gambar ini. Khusus untuk \`structural_defects\`, berikan rincian mendalam jika terdapat cacat geometri atau bentuk struktural yang tidak wajar.
+2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`exposure\`, \`color_balance\`, \`over_edited\`, \`sensor_issues\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`structural_defects\`, \`ip_risk\`, \`proportion_defects\`, \`illustration_issues\`, \`vector_issues\`, \`ai_artifacts\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar tersebut. JANGAN gunakan kalimat template pendek/berulang. Pastikan mendeteksi secara khusus anomali AI Generatif (seperti hasil sureal, bayangan tidak realistis, dan artefak render).
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
@@ -3698,6 +3700,26 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                     required: ["status", "note"]
                 },
                 lighting: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                exposure: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                color_balance: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                over_edited: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                sensor_issues: {
                     type: Type.OBJECT,
                     properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
                     required: ["status", "note"]
@@ -3737,6 +3759,21 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                     properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
                     required: ["status", "note"]
                 },
+                illustration_issues: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                vector_issues: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
+                ai_artifacts: {
+                    type: Type.OBJECT,
+                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
+                    required: ["status", "note"]
+                },
                 stock_acceptance: {
                     type: Type.OBJECT,
                     properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
@@ -3752,8 +3789,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 }
             },
             required: [
-                "blur", "composition", "lighting", "watermark", "logo", "text",
-                "anatomical_errors", "ip_risk", "proportion_defects", "stock_acceptance", "metadata"
+                "blur", "composition", "lighting", "exposure", "color_balance", "over_edited", "sensor_issues", "watermark", "logo", "text",
+                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "ai_artifacts", "stock_acceptance", "metadata"
             ]
         },
         heatmaps: {
@@ -3807,6 +3844,33 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw response:', text);
     const parsedResult = JSON.parse(text);
+    
+    // Strict enforcement: if ANY check fails, force recommendation to FAIL
+    if (parsedResult.ai_vision_checks) {
+      let anyFail = false;
+      let anyIpFail = false;
+      
+      for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
+        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
+          anyFail = true;
+          if (['watermark', 'logo', 'ip_risk'].includes(key)) {
+            anyIpFail = true;
+          }
+        }
+      }
+      
+      if (anyFail) {
+        parsedResult.recommendation = "FAIL";
+        if (parsedResult.overall_score >= 70) {
+          parsedResult.overall_score = 69; // force score below 70
+        }
+      }
+      
+      if (anyIpFail) {
+        parsedResult.legal_status = "VIOLATION";
+      }
+    }
+
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
@@ -4343,7 +4407,7 @@ ATURAN OUTPUT TEKS (SANGAT MENDETAIL):
       - **Analisis Latar Belakang & Latar Depan (Background & Foreground)**: Keadaan latar depan/belakang, noise, compression artifacts, macro-blocking, atau color banding di bidang latar belakang.
       - **Analisis Pencahayaan & Warna (Lighting, Contrast, & Color)**: Keseimbangan kontras, white balance, flickering, serta keberadaan area overexposed/underexposed pada subjek maupun lingkungan.
       - **Analisis Kestabilan Frame & Risiko Hukum (Stability, IP & AI Risks)**: Guncangan kamera, rolling shutter (jello/skew effect), micro-logos, watermark, teks AI, atau kejanggalan struktur geometri AI antar-frame.
-2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di video ini (contoh: "Noise digital sangat minim, hanya terlihat grain halus yang estetis pada area bayangan di kuadran kanan bawah pada frame 3 dan 4").
+2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap 6 frame video tersebut. JANGAN gunakan kalimat template pendek/berulang. Deskripsikan apa yang Anda amati secara fisik pada aspek tersebut di video ini (contoh: "Noise digital sangat minim, hanya terlihat grain halus yang estetis pada area bayangan di kuadran kanan bawah pada frame 3 dan 4").
 3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName} yang relevan untuk mikrostock.
 
 ATURAN BAHASA:
@@ -4398,7 +4462,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
+                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                low_framerate: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                visible_transitions: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                log_profile: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                upscaled_video: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
             },
             required: [
                 "blur", "noise", "compression_artifacts", "blocking", "banding", 
@@ -4406,7 +4474,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 "camera_shake", "out_of_focus", "flickering", "duplicate_frame",
                 "empty_frame", "black_frame", "frozen_frame", "watermark",
                 "logo", "text", "ai_artifact", "deformed_object", "bad_anatomy",
-                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality"
+                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality",
+                "low_framerate", "visible_transitions", "log_profile", "upscaled_video"
             ]
         },
         heatmaps: {
@@ -4468,6 +4537,33 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw video response:', text);
     const parsedResult = JSON.parse(text);
+    
+    // Strict enforcement: if ANY check fails, force recommendation to FAIL
+    if (parsedResult.quality_checks) {
+      let anyFail = false;
+      let anyIpFail = false;
+      
+      for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
+        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
+          anyFail = true;
+          if (['watermark', 'logo', 'text'].includes(key)) {
+            anyIpFail = true;
+          }
+        }
+      }
+      
+      if (anyFail) {
+        parsedResult.recommendation = "FAIL";
+        if (parsedResult.overall_score >= 70) {
+          parsedResult.overall_score = 69; // force score below 70
+        }
+      }
+      
+      if (anyIpFail) {
+        parsedResult.legal_status = "VIOLATION";
+      }
+    }
+
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);

@@ -1177,24 +1177,54 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('mz_ui_language', uiLanguage);
-    saveSettingsToSupabase({ uiLanguage });
+    if (localStorage.getItem('mz_ui_language') !== uiLanguage) {
+      userPrefsLastChanged.current = Date.now();
+      localStorage.setItem('mz_ui_language', uiLanguage);
+      saveSettingsToSupabase({ uiLanguage });
+    }
   }, [uiLanguage, saveSettingsToSupabase]);
 
   useEffect(() => {
-    localStorage.setItem('mz_keyword_mode', keywordMode);
-    saveSettingsToSupabase({ keywordMode });
+    if (localStorage.getItem('mz_keyword_mode') !== keywordMode) {
+      userPrefsLastChanged.current = Date.now();
+      localStorage.setItem('mz_keyword_mode', keywordMode);
+      saveSettingsToSupabase({ keywordMode });
+    }
   }, [keywordMode, saveSettingsToSupabase]);
 
   useEffect(() => {
-    localStorage.setItem('mz_title_length', titleLength);
-    saveSettingsToSupabase({ titleLength });
+    if (localStorage.getItem('mz_title_length') !== titleLength) {
+      userPrefsLastChanged.current = Date.now();
+      localStorage.setItem('mz_title_length', titleLength);
+      saveSettingsToSupabase({ titleLength });
+    }
   }, [titleLength, saveSettingsToSupabase]);
 
   useEffect(() => {
-    localStorage.setItem('mz_metadata_language', metadataLanguage);
-    saveSettingsToSupabase({ metadataLanguage });
+    if (localStorage.getItem('mz_metadata_language') !== metadataLanguage) {
+      userPrefsLastChanged.current = Date.now();
+      localStorage.setItem('mz_metadata_language', metadataLanguage);
+      saveSettingsToSupabase({ metadataLanguage });
+    }
   }, [metadataLanguage, saveSettingsToSupabase]);
+
+  // Listen for storage events (e.g. from other tabs) to keep settings synced
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'mz_keyword_mode' && e.newValue) {
+        if (['mixed', 'single', 'multi'].includes(e.newValue)) setKeywordMode(e.newValue as any);
+      } else if (e.key === 'mz_title_length' && e.newValue) {
+        if (['short', 'medium', 'long'].includes(e.newValue)) setTitleLength(e.newValue as any);
+      } else if (e.key === 'mz_metadata_language' && e.newValue) {
+        setMetadataLanguage(e.newValue);
+      } else if (e.key === 'mz_ui_language' && e.newValue) {
+        if (['en', 'id'].includes(e.newValue)) setUiLanguage(e.newValue as any);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
 
   // Cek status R2 saat aplikasi dimuat
   useEffect(() => {
@@ -2450,18 +2480,35 @@ const App: React.FC = () => {
               if (state && state.files && state.files.length > 0) {
                   console.log("Resuming batch from IndexedDB...");
                   
-                  // Reset stuck states. If a file was extracting/generating during the crash, mark it as failed
-                  // so it doesn't hang the UI forever.
+                  // Reset stuck states and clean up dead blob URLs that cannot survive a page reload
                   const cleanedFiles = state.files.map((f: any) => {
-                      if (f.isExtracting || f.isGenerating) {
+                      let newThumbnail = f.thumbnail;
+                      let newAnalysisFrames = f.analysisFrames;
+                      
+                      const ext = f.file?.name?.split('.').pop()?.toLowerCase() || '';
+                      const isRegularImage = ['jpg', 'jpeg', 'png', 'webp', 'bmp'].includes(ext);
+                      
+                      if (isRegularImage && f.file) {
+                          try { newThumbnail = URL.createObjectURL(f.file); } catch(e) {}
+                      } else {
+                          if (typeof newThumbnail === 'string' && newThumbnail.startsWith('blob:')) newThumbnail = undefined;
+                          if (Array.isArray(newAnalysisFrames)) {
+                              newAnalysisFrames = newAnalysisFrames.filter(url => !(typeof url === 'string' && url.startsWith('blob:')));
+                              if (newAnalysisFrames.length === 0) newAnalysisFrames = undefined;
+                          }
+                      }
+
+                      let updatedFile = { ...f, thumbnail: newThumbnail, analysisFrames: newAnalysisFrames };
+
+                      if (updatedFile.isExtracting || updatedFile.isGenerating) {
                           return { 
-                              ...f, 
+                              ...updatedFile, 
                               isExtracting: false, 
                               isGenerating: false, 
-                              error: f.error || "Gagal diproses karena server kehabisan memori. Silakan coba lagi." 
+                              error: updatedFile.error || "Gagal diproses karena server kehabisan memori. Silakan coba lagi." 
                           };
                       }
-                      return f;
+                      return updatedFile;
                   });
                   
                   updateFiles(() => cleanedFiles);

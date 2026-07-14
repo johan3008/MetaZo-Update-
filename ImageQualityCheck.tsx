@@ -36,10 +36,18 @@ interface QualityReport {
       blur?: { status: "PASS" | "FAIL"; note: string };
       composition?: { status: "PASS" | "FAIL"; note: string };
       lighting?: { status: "PASS" | "FAIL"; note: string };
+      exposure?: { status: "PASS" | "FAIL"; note: string };
+      color_balance?: { status: "PASS" | "FAIL"; note: string };
+      over_edited?: { status: "PASS" | "FAIL"; note: string };
+      sensor_issues?: { status: "PASS" | "FAIL"; note: string };
       watermark?: { status: "PASS" | "FAIL"; note: string };
       logo?: { status: "PASS" | "FAIL"; note: string };
       text?: { status: "PASS" | "FAIL"; note: string };
       anatomical_errors?: { status: "PASS" | "FAIL"; note: string };
+      structural_defects?: { status: "PASS" | "FAIL"; note: string };
+      illustration_issues?: { status: "PASS" | "FAIL"; note: string };
+      vector_issues?: { status: "PASS" | "FAIL"; note: string };
+      ai_artifacts?: { status: "PASS" | "FAIL"; note: string };
       ip_risk?: { status: "PASS" | "FAIL"; note: string };
       proportion_defects?: { status: "PASS" | "FAIL"; note: string };
       stock_acceptance?: { status: "PASS" | "FAIL"; note: string };
@@ -1421,9 +1429,17 @@ export const ImageQualityCheck: React.FC<{
                                           const isAnatomy = (r.technical_issues || []).some(i => i.toLowerCase().includes('anatomy') || i.toLowerCase().includes('anatom') || i.toLowerCase().includes('tangan') || i.toLowerCase().includes('jari'));
                                           const isIpRisk = (r.legal_status || '').includes('VIOLATION') || (r.legal_status || '').includes('AT_RISK') || (r.technical_issues || []).some(i => i.toLowerCase().includes('ip') || i.toLowerCase().includes('patent') || i.toLowerCase().includes('restriction'));
                                           const isProportion = (r.technical_issues || []).some(i => i.toLowerCase().includes('proportion') || i.toLowerCase().includes('proporsi') || i.toLowerCase().includes('geometry') || i.toLowerCase().includes('geometri'));
+                                          const isExposure = (r.technical_issues || []).some(i => i.toLowerCase().includes('exposure') || i.toLowerCase().includes('paparan'));
+                                          const isColorBalance = (r.technical_issues || []).some(i => i.toLowerCase().includes('color') || i.toLowerCase().includes('warna') || i.toLowerCase().includes('saturation') || i.toLowerCase().includes('saturasi'));
+                                          const isOverEdited = (r.technical_issues || []).some(i => i.toLowerCase().includes('edit') || i.toLowerCase().includes('sharpen') || i.toLowerCase().includes('asah'));
+                                          const isSensorIssues = (r.technical_issues || []).some(i => i.toLowerCase().includes('sensor') || i.toLowerCase().includes('dust') || i.toLowerCase().includes('debu'));
 
                                           return {
                                             blur: { status: isBlur ? "FAIL" : "PASS", note: isBlur ? (isIndo ? "Terdeteksi masalah fokus, soft focus, atau blur pada subjek utama." : "Focus, soft focus, or blur issues detected on the main subject.") : (isIndo ? "Fokus subjek utama tajam secara sempurna." : "Main subject focus is perfectly sharp.") },
+                                            exposure: { status: isExposure ? "FAIL" : "PASS", note: isExposure ? (isIndo ? "Terdeteksi masalah paparan berlebihan (overexposure) atau kurang paparan (underexposure)." : "Overexposure or underexposure issues detected.") : (isIndo ? "Paparan cahaya seimbang." : "Exposure is balanced.") },
+                                            color_balance: { status: isColorBalance ? "FAIL" : "PASS", note: isColorBalance ? (isIndo ? "Keseimbangan putih buruk, warna tidak alami, atau saturasi berlebihan/kurang." : "Poor white balance, unnatural colors, or over/under saturation.") : (isIndo ? "Warna dan saturasi tampak alami." : "Colors and saturation appear natural.") },
+                                            over_edited: { status: isOverEdited ? "FAIL" : "PASS", note: isOverEdited ? (isIndo ? "Gambar diedit secara berlebihan, penajaman artifisial, atau filter berlebihan." : "Image is over-edited, artificially sharpened, or overly filtered.") : (isIndo ? "Editing dan penajaman terlihat natural." : "Editing and sharpening look natural.") },
+                                            sensor_issues: { status: isSensorIssues ? "FAIL" : "PASS", note: isSensorIssues ? (isIndo ? "Bintik debu sensor terlihat atau ada masalah pada sensor." : "Sensor dust spots visible or sensor issues detected.") : (isIndo ? "Bebas dari bintik debu sensor." : "Free from sensor dust spots.") },
                                             composition: { status: isComposition ? "FAIL" : "PASS", note: isComposition ? (isIndo ? "Komposisi kurang seimbang atau terdapat pemotongan subjek canggung." : "Composition is unbalanced or awkward subject cropping detected.") : (isIndo ? "Komposisi seimbang dengan rule of thirds." : "Balanced composition matching the rule of thirds.") },
                                             lighting: { status: isLighting ? "FAIL" : "PASS", note: isLighting ? (isIndo ? "Terdeteksi masalah pencahayaan tidak seimbang, overexposure, atau underexposure." : "Unbalanced lighting, overexposure, or underexposure detected.") : (isIndo ? "Pencahayaan terdistribusi merata dengan detail tinggi." : "Evenly distributed lighting with high details.") },
                                             watermark: { status: isWatermark ? "FAIL" : "PASS", note: isWatermark ? (isIndo ? "Terdeteksi watermark komersial atau tanda air pada gambar." : "Commercial watermark or text watermark detected.") : (isIndo ? "Tidak mendeteksi watermark komersial." : "No commercial watermarks detected.") },
@@ -1442,11 +1458,18 @@ export const ImageQualityCheck: React.FC<{
                                           { label: isIndo ? 'Ketajaman / Fokus' : 'Blur / Sharpness', key: 'blur', val: aiVisionChecks.blur },
                                           { label: isIndo ? 'Komposisi / Pemotongan' : 'Composition / Crop', key: 'composition', val: aiVisionChecks.composition },
                                           { label: isIndo ? 'Pencahayaan / Kontras' : 'Lighting / Contrast', key: 'lighting', val: aiVisionChecks.lighting },
+                                          { label: isIndo ? 'Paparan (Exposure)' : 'Exposure Check', key: 'exposure', val: aiVisionChecks.exposure || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
+                                          { label: isIndo ? 'Warna & Saturasi' : 'Color Balance', key: 'color_balance', val: aiVisionChecks.color_balance || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
+                                          { label: isIndo ? 'Over-editing / Filter' : 'Over-edited Check', key: 'over_edited', val: aiVisionChecks.over_edited || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
+                                          { label: isIndo ? 'Debu Sensor / Artefak' : 'Sensor Dust Issues', key: 'sensor_issues', val: aiVisionChecks.sensor_issues || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
                                           { label: isIndo ? 'Pengecekan Watermark' : 'Watermark Check', key: 'watermark', val: aiVisionChecks.watermark },
                                           { label: isIndo ? 'Pendeteksian Logo' : 'Logo Detection', key: 'logo', val: aiVisionChecks.logo },
                                           { label: isIndo ? 'Teks Overlay' : 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
                                           { label: isIndo ? 'Integritas Anatomi' : 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
                                           { label: isIndo ? 'Cacat Struktural' : 'Structural Defects', key: 'structural_defects', val: aiVisionChecks.structural_defects },
+                                          { label: isIndo ? 'Cacat Ilustrasi (Tepi/Jalur)' : 'Illustration Issues', key: 'illustration_issues', val: aiVisionChecks.illustration_issues || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy/bukan ilustrasi)' : 'Passed (legacy/not illustration)' } },
+                                          { label: isIndo ? 'Standar Vektor (Path/Skala)' : 'Vector Standards', key: 'vector_issues', val: aiVisionChecks.vector_issues || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy/bukan vektor)' : 'Passed (legacy/not vector)' } },
+                                          { label: isIndo ? 'Artefak Render AI' : 'AI Render Artifacts', key: 'ai_artifacts', val: aiVisionChecks.ai_artifacts || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
                                           { label: isIndo ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
                                           { label: isIndo ? 'Proporsi & Geometri' : 'Proportion & Geometry', key: 'proportion_defects', val: aiVisionChecks.proportion_defects },
                                           { label: isIndo ? 'Penerimaan Stok' : 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },

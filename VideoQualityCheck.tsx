@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, History, Download, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getDailyLimit } from '../../constants';
-import { getHeaders } from '../../services/geminiService';
+import { getDailyLimit } from '@/constants.tsx';
+import { getHeaders } from '@/services/geminiService.ts';
 
 interface QualityReport {
   visual_scan_analysis?: string;
@@ -57,7 +57,11 @@ const CHECK_ITEMS = [
   { key: 'cropped_subject', label: 'Cropped subject', desc: 'Mendeteksi bagian tubuh subjek yang terpotong tidak proporsional.' },
   { key: 'cut_off_object', label: 'Cut-off object', desc: 'Mendeteksi objek utama yang terpotong bingkai.' },
   { key: 'wrong_perspective', label: 'Wrong perspective', desc: 'Mendeteksi perspektif yang tidak sejajar.' },
-  { key: 'low_aesthetic_quality', label: 'Low aesthetic quality', desc: 'Mendeteksi kualitas estetika rendah secara umum.' }
+  { key: 'low_aesthetic_quality', label: 'Low aesthetic quality', desc: 'Mendeteksi kualitas estetika rendah secara umum.' },
+  { key: 'low_framerate', label: 'Low framerate', desc: 'Mendeteksi kecepatan bingkai video yang rendah.' },
+  { key: 'visible_transitions', label: 'Visible transitions', desc: 'Mendeteksi transisi, efek, atau efek overlay yang terlihat jelas.' },
+  { key: 'log_profile', label: 'Log profile / Flat Color', desc: 'Mendeteksi video dengan gamma logaritmik tanpa penyesuaian warna.' },
+  { key: 'upscaled_video', label: 'Upscaled video', desc: 'Mendeteksi peningkatan resolusi paksa (misal dari HD ke 4K).' }
 ];
 
 export const VideoQualityCheck: React.FC<{ 
