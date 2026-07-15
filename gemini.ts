@@ -9,7 +9,33 @@ import crypto from "node:crypto";
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
+const CACHE_FILE_PATH = path.join(process.cwd(), "qa_reports_cache.json");
+let qaCacheMap: Map<string, any> = new Map();
 
+function loadQACache() {
+  try {
+    if (fs.existsSync(CACHE_FILE_PATH)) {
+      const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
+      const obj = JSON.parse(content);
+      qaCacheMap = new Map(Object.entries(obj));
+      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached reports successfully.`);
+    }
+  } catch (err) {
+    console.warn("[QA Cache] Error loading cache file, starting fresh:", err);
+  }
+}
+
+function saveQACache() {
+  try {
+    const obj = Object.fromEntries(qaCacheMap.entries());
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[QA Cache] Error saving cache file:", err);
+  }
+}
+
+// Initialize cache load
+loadQACache();
 
 // Load environment variables dynamically from local .env file
 try {
@@ -176,86 +202,21 @@ const PROHIBITED_KEYWORDS_SET = new Set([
   'instagram', 'youtube', 'whatsapp', 'brand', 'trademark', 'logo', 'copyright', 'intellectual', 'property'
 ]);
 
-const IP_REPLACEMENT_DICT: Record<string, string> = {
-  'iphone': 'smartphone',
-  'ipad': 'tablet device',
-  'macbook': 'laptop computer',
-  'mac': 'computer',
-  'ios': 'mobile operating system',
-  'android': 'mobile device',
-  'microsoft': 'software company',
-  'windows': 'operating system',
-  'xbox': 'gaming console',
-  'playstation': 'gaming console',
-  'sony': 'electronics brand',
-  'samsung': 'mobile device',
-  'nike': 'sportswear',
-  'adidas': 'athletic apparel',
-  'gucci': 'luxury fashion',
-  'rolex': 'luxury watch',
-  'cocacola': 'cola beverage',
-  'coca-cola': 'cola beverage',
-  'pepsi': 'cola beverage',
-  'starbucks': 'coffee cup',
-  'amazon': 'online shopping',
-  'google': 'search engine',
-  'meta': 'virtual reality',
-  'oculus': 'vr headset',
-  'meta quest': 'vr headset',
-  'facebook': 'social media',
-  'instagram': 'social media',
-  'twitter': 'social network',
-  'tiktok': 'social video',
-  'netflix': 'streaming service',
-  'disney': 'entertainment',
-  'marvel': 'superhero',
-  'canon': 'camera',
-  'nikon': 'camera',
-  'adobe': 'software',
-  'shutterstock': 'stock photo',
-  'getty': 'stock photo',
-  'midjourney': 'generative ai',
-  'firefly': 'generative ai',
-  'stablediffusion': 'generative ai',
-  'dalle': 'generative ai',
-  'llama': 'ai model',
-  'chatgpt': 'chatbot',
-  'openai': 'ai company',
-  'youtube': 'video sharing',
-  'whatsapp': 'messaging app',
-  'lego': 'interlocking toy bricks'
-};
-
 /**
- * Checks if a word is prohibited, and optionally returns a generic commercial replacement.
+ * Checks if a word is a prohibited brand, IP, standard name, or contains a color.
  */
-function sanitizeKeyword(word: string): { isProhibited: boolean; replacement?: string } {
-  if (!word) return { isProhibited: true };
+function isProhibitedKeyword(word: string): boolean {
+  if (!word) return true;
   const lower = word.toLowerCase().trim();
-  
-  if (IP_REPLACEMENT_DICT[lower]) {
-    return { isProhibited: true, replacement: IP_REPLACEMENT_DICT[lower] };
-  }
-  
-  if (PROHIBITED_KEYWORDS_SET.has(lower)) return { isProhibited: true };
+  if (PROHIBITED_KEYWORDS_SET.has(lower)) return true;
   
   // Exclude keywords containing color names
   const parts = lower.split(/[\s-_]+/);
   if (parts.some(part => COLOR_KEYWORDS.has(part))) {
-    return { isProhibited: true };
+    return true;
   }
   
-  return { isProhibited: false };
-}
-
-// Stop words for Title extraction
-const TITLE_STOP_WORDS = new Set(['the', 'a', 'an', 'is', 'on', 'with', 'in', 'at', 'by', 'for', 'of', 'and', 'or', 'to', 'this', 'that', 'it', 'from', 'as', 'are', 'was', 'were']);
-
-function extractMainWordsFromTitle(title: string): string[] {
-  if (!title) return [];
-  const words = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').split(/\s+/);
-  const mainWords = words.filter(w => w.length > 2 && !TITLE_STOP_WORDS.has(w));
-  return Array.from(new Set(mainWords)).slice(0, 5); // take up to 5 unique main words
+  return false;
 }
 
 function getHeuristicCategories(title: string, keywords: string[]): {
@@ -513,18 +474,13 @@ function ensureKeywordCount(
   if (Array.isArray(keywords)) {
     keywords.forEach(k => {
       if (typeof k === 'string') {
-        const cleanRaw = k.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
-        const sanitizeRes = sanitizeKeyword(cleanRaw);
-        const clean = sanitizeRes.replacement || cleanRaw;
-        
-        if (clean.length > 1 && (!sanitizeRes.isProhibited || sanitizeRes.replacement)) {
+        const clean = k.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
+        if (clean.length > 1 && !isProhibitedKeyword(clean)) {
           if (keywordMode === 'single' && clean.includes(' ')) {
             // Split multi-words into individual single words
             const pieces = clean.split(/\s+/);
-            pieces.forEach(pRaw => {
-              const sanitizeP = sanitizeKeyword(pRaw);
-              const p = sanitizeP.replacement || pRaw;
-              if (p.length > 1 && (!sanitizeP.isProhibited || sanitizeP.replacement)) {
+            pieces.forEach(p => {
+              if (p.length > 1 && !isProhibitedKeyword(p)) {
                 // Check for exact and near duplicates (plurals/singulars)
                 const isDuplicate = uniqueKeywords.some(existing => 
                   existing === p || 
@@ -607,12 +563,7 @@ function ensureKeywordCount(
       .replace(/[^a-z0-9\s]/g, '')
       .split(/\s+/)
       .map(w => w.trim())
-      .filter(w => {
-        if (w.length <= 1 || STOP_WORDS.has(w)) return false;
-        const s = sanitizeKeyword(w);
-        return !s.isProhibited || !!s.replacement;
-      })
-      .map(w => sanitizeKeyword(w).replacement || w);
+      .filter(w => w.length > 1 && !STOP_WORDS.has(w) && !isProhibitedKeyword(w));
   };
 
   // Build candidate sources in order of priority:
@@ -685,25 +636,21 @@ function ensureKeywordCount(
         if (uniqueKeywords.length >= targetCount) break;
         if (typeof word === 'string') {
           let cleanWord = word.trim().toLowerCase();
-          if (cleanWord.length > 1) {
-            const s = sanitizeKeyword(cleanWord);
-            if (!s.isProhibited || s.replacement) {
-              let finalWord = s.replacement || cleanWord;
-              if (keywordMode === 'multi' && !finalWord.includes(' ')) {
-                const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-                const mod = modifiers[Math.abs(hashString(finalWord)) % modifiers.length];
-                finalWord = `${finalWord} ${mod}`;
-              }
-              if (!uniqueKeywords.includes(finalWord)) {
-                uniqueKeywords.push(finalWord);
-              }
+          if (cleanWord.length > 1 && !isProhibitedKeyword(cleanWord)) {
+            if (keywordMode === 'multi' && !cleanWord.includes(' ')) {
+              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
+              const mod = modifiers[Math.abs(hashString(cleanWord)) % modifiers.length];
+              cleanWord = `${cleanWord} ${mod}`;
             }
+            if (!uniqueKeywords.includes(cleanWord)) {
+              uniqueKeywords.push(cleanWord);
             }
           }
         }
       }
     }
   }
+
   return uniqueKeywords.slice(0, targetCount);
 }
 
@@ -747,7 +694,7 @@ async function callOpenAICompatibleWithRetry(params: {
     if (!apiKey && provider === 'nvidia') {
       console.warn('NVIDIA key missing. Fallback to Gemini.');
       const fallbackResult = await getAIClient().models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3.1-pro-preview',
         contents: params.contents,
         config: params.config
       });
@@ -1070,16 +1017,14 @@ function getAIClient(): any {
           let apiContents = [];
           if (Array.isArray(contents)) {
             if (contents.length > 0 && contents[0].parts) {
-              // Already structured as [{role, parts}] — pass through as-is
               apiContents = contents;
             } else {
-              // Flat array of part objects — wrap with role
-              apiContents = [{ role: 'user', parts: contents }];
+              apiContents = [{ parts: contents }];
             }
           } else if (contents.parts) {
-            apiContents = [{ role: 'user', parts: contents.parts }];
+            apiContents = [contents];
           } else {
-            apiContents = [{ role: 'user', parts: [contents] }];
+            apiContents = [{ parts: [contents] }];
           }
 
           const apiPayload: any = {
@@ -1230,14 +1175,6 @@ const callGeminiWithRetry = async (
 ): Promise<any> => {
   let lastError: any;
   let currentModel = modelName;
-  // Normalize any legacy/invalid gemini-3.1-* names to official 2.5 series
-  if (currentModel === 'gemini-3.1-flash-lite' || currentModel === 'gemini-3.1-flash-lite-preview') {
-    currentModel = 'gemini-2.5-flash';
-  } else if (currentModel === 'gemini-3.1-pro-preview' || currentModel === 'gemini-3.1-flash') {
-    currentModel = 'gemini-2.5-pro';
-  } else if (currentModel === 'gemini-3.5-flash') {
-    currentModel = 'gemini-2.5-flash';
-  }
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await getAIClient().models.generateContent({
@@ -1271,7 +1208,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+          const rotationModels = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -1331,8 +1268,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -1437,7 +1374,7 @@ export const generateStockMetadata = async (
     mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
   }
 
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   
   const visionSystemInstruction = `ROLE:
@@ -1568,8 +1505,8 @@ ABSOLUTE RULES:
 2. If this input represents target keywords (e.g., specific words like "blue, ocean, sunset"), you MUST heavily prioritize and integrate these exact target keywords into both the Title and the Keywords list naturally and prominently.` : "";
 
   const mediaContext = mediaTypeContext;
-  const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata SEO specialist. 
-Your ultimate goal is to DOMINATE SEARCH ALGORITHMS. You must maximize the discoverability of visual assets and aggressively optimize them for search-engine algorithms to rank on the absolute FIRST PAGE of microstock marketplaces. Every word must carry high SEO weight.
+  const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
+Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
 ${mediaContext}${customPromptCommand}
@@ -1582,8 +1519,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
 
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES (DOMINATE SEARCH ALGORITHMS):
-- DOMINATE SEARCH ALGORITHMS: You must aggressively optimize the title and keywords to dominate search algorithms. Use the highest-converting, most frequently searched commercial terms by actual buyers.
+MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
 - SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
@@ -1696,8 +1632,8 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   console.log(`[JohMeta Pipeline] Stage 4, 5 & 6: Auditing, Ranking, and Final Validation...`);
   console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadata, null, 2));
 
-  const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata SEO specialist. 
-Your ultimate goal is to DOMINATE SEARCH ALGORITHMS. You must aggressively maximize the discoverability of visual assets and optimize them to rank on the absolute FIRST PAGE. Every word validated must carry high SEO weight.
+  const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
+Your goal is to maximize the discoverability of visual assets.
 OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
@@ -1775,7 +1711,6 @@ OUTPUT FORMAT:
   "shutterstock_category_1": "",
   "shutterstock_category_2": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
-  "has_copy_space": false,
   "confidence_score": 0.95
 }`;
 
@@ -1835,27 +1770,21 @@ OUTPUT FORMAT:
       
       data.keywords.forEach((k: any) => {
         if (typeof k === 'string') {
-          const cleanPhraseRaw = k.toLowerCase()
+          const cleanPhrase = k.toLowerCase()
                                .trim()
                                .replace(/[^a-z0-9\s-]/g, '')
                                .replace(/\s+/g, ' ');
-          
-          if (cleanPhraseRaw.length > 1) {
-            const sanitizePhrase = sanitizeKeyword(cleanPhraseRaw);
-            const cleanPhrase = sanitizePhrase.replacement || cleanPhraseRaw;
-            
+          if (cleanPhrase.length > 1) {
             if (keywordMode === 'single') {
               // Split any phrase into individual single words
               const pieces = cleanPhrase.split(/\s+/);
-              pieces.forEach(wordRaw => {
-                const sanitizeWord = sanitizeKeyword(wordRaw);
-                const word = sanitizeWord.replacement || wordRaw;
-                if (word.length > 1 && (!sanitizeWord.isProhibited || sanitizeWord.replacement)) {
+              pieces.forEach(word => {
+                if (word.length > 1 && !isProhibitedKeyword(word)) {
                   cleanedKeywords.push(word);
                 }
               });
             } else {
-              if (!sanitizePhrase.isProhibited || sanitizePhrase.replacement) {
+              if (!isProhibitedKeyword(cleanPhrase)) {
                 cleanedKeywords.push(cleanPhrase);
               }
             }
@@ -1877,36 +1806,12 @@ OUTPUT FORMAT:
         if (!allowedTerms || allowedTerms.length < 5) return true;
         const words = keyword.split(/\s+/);
         const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-        const s = sanitizeKeyword(keyword);
-        return hasMatchingWord && (!s.isProhibited || !!s.replacement);
+        return hasMatchingWord && !isProhibitedKeyword(keyword);
       });
 
        // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
-      const remainingKeywords = uniqueKeywords.filter((k: string) => {
-        const s = sanitizeKeyword(k);
-        return !rigorouslyFilteredKeywords.includes(k) && (!s.isProhibited || !!s.replacement);
-      });
-      
-      let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-      
-      // Feature A: Auto-Inject Commercial Copy Space
-      if (data.has_copy_space) {
-        const copySpaceKeywords = ["copy space", "negative space", "design space"];
-        copySpaceKeywords.forEach(csk => {
-            if (!finalKeywordList.includes(csk)) {
-                finalKeywordList.unshift(csk);
-            }
-        });
-      }
-
-      // Feature C: Sync Title to 5 Keywords
-      const titleMainWords = extractMainWordsFromTitle(data.title);
-      // Remove them from current list if they exist so we can force them at the beginning
-      finalKeywordList = finalKeywordList.filter(k => !titleMainWords.includes(k));
-      // Unshift them back in reverse order so they appear at indices 0-4
-      for (let i = titleMainWords.length - 1; i >= 0; i--) {
-        finalKeywordList.unshift(titleMainWords[i]);
-      }
+      const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
+      const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
 
       data.keywords = ensureKeywordCount(
         finalKeywordList,
@@ -1978,8 +1883,8 @@ export const generateBatchStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -2074,7 +1979,7 @@ export const generateBatchStockMetadata = async (
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -2431,7 +2336,6 @@ OUTPUT FORMAT:
       "shutterstock_category_1": "",
       "shutterstock_category_2": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
-      "has_copy_space": false,
       "confidence_score": 0.95
     }
   ]
@@ -2526,27 +2430,21 @@ OUTPUT FORMAT:
             let cleanedKeywords: string[] = [];
             metadata.keywords.forEach((k: any) => {
                 if (typeof k === 'string') {
-                    const cleanPhraseRaw = k.toLowerCase()
+                    const cleanPhrase = k.toLowerCase()
                                          .trim()
                                          .replace(/[^a-z0-9\s-]/g, '')
                                          .replace(/\s+/g, ' ');
-                    
-                    if (cleanPhraseRaw.length > 1) {
-                        const sanitizePhrase = sanitizeKeyword(cleanPhraseRaw);
-                        const cleanPhrase = sanitizePhrase.replacement || cleanPhraseRaw;
-                        
+                    if (cleanPhrase.length > 1) {
                         if (keywordMode === 'single') {
                             // Split any phrase into individual single words
                             const pieces = cleanPhrase.split(/\s+/);
-                            pieces.forEach(wordRaw => {
-                                const sanitizeWord = sanitizeKeyword(wordRaw);
-                                const word = sanitizeWord.replacement || wordRaw;
-                                if (word.length > 1 && (!sanitizeWord.isProhibited || sanitizeWord.replacement)) {
+                            pieces.forEach(word => {
+                                if (word.length > 1 && !isProhibitedKeyword(word)) {
                                     cleanedKeywords.push(word);
                                 }
                             });
                         } else {
-                            if (!sanitizePhrase.isProhibited || sanitizePhrase.replacement) {
+                            if (!isProhibitedKeyword(cleanPhrase)) {
                                 cleanedKeywords.push(cleanPhrase);
                             }
                         }
@@ -2568,33 +2466,11 @@ OUTPUT FORMAT:
               if (!allowedTerms || allowedTerms.length < 5) return true;
               const words = keyword.split(/\s+/);
               const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-              const s = sanitizeKeyword(keyword);
-              return hasMatchingWord && (!s.isProhibited || !!s.replacement);
+              return hasMatchingWord && !isProhibitedKeyword(keyword);
             });
 
-            const remainingKeywords = uniqueKeywords.filter((k: string) => {
-              const s = sanitizeKeyword(k);
-              return !rigorouslyFilteredKeywords.includes(k) && (!s.isProhibited || !!s.replacement);
-            });
-            
-            let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-            
-            // Feature A: Auto-Inject Commercial Copy Space
-            if (metadata.has_copy_space) {
-              const copySpaceKeywords = ["copy space", "negative space", "design space"];
-              copySpaceKeywords.forEach(csk => {
-                  if (!finalKeywordList.includes(csk)) {
-                      finalKeywordList.unshift(csk);
-                  }
-              });
-            }
-            
-            // Feature C: Sync Title to 5 Keywords
-            const titleMainWords = extractMainWordsFromTitle(metadata.title);
-            finalKeywordList = finalKeywordList.filter(k => !titleMainWords.includes(k));
-            for (let i = titleMainWords.length - 1; i >= 0; i--) {
-              finalKeywordList.unshift(titleMainWords[i]);
-            }
+            const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
+            const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
 
             metadata.keywords = ensureKeywordCount(
               finalKeywordList,
@@ -2913,7 +2789,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -3383,10 +3259,10 @@ export const analyzeImageToPrompt = async (
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
 CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image to extract its core subject, commercial concept, and design/photographic niche.
-2. ABSOLUTELY NO DIRECT REPLICATION: Do not just literally describe the original image. Extract its core commercial niche (e.g., "minimalist organic skincare flatlay", "cozy coffee shop interior").
-3. RADICAL NICHE VARIATION: Generate a highly professional, optimized text-to-image prompt that creates a COMPLETELY NEW SCENARIO within the exact same niche. Change the subjects' poses, the specific objects, the time of day, or the camera angle radically. It must be a highly varied, unique concept that sells to the same target market, NOT a clone of the input image. Ensure every regeneration yields a distinctly different creative interpretation.
-4. TECHNICAL BASELINE: Technical facts (lens, lighting, style) must match the niche, but the visual setup must be completely unique.
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
+2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
+3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
+4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
 
 STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
 - Subject (The main entity)
@@ -3423,7 +3299,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let response;
   let lastError;
   let responseText = "";
@@ -3432,12 +3308,11 @@ CRITICAL RULES:
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const randomSalt = Math.random().toString(36).substring(7);
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}. Inject radical creative variation based on the niche. [Seed: ${randomSalt}]` }] }, {
+      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.85
+        temperature: 0.0
       });
       responseText = response.text || "{}";
       break;
@@ -3480,10 +3355,10 @@ export const analyzeBatchImageToPrompt = async (
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
 
 CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image to extract its core subject, commercial concept, and design/photographic niche.
-2. ABSOLUTELY NO DIRECT REPLICATION: Do not just literally describe the original image. Extract its core commercial niche (e.g., "minimalist organic skincare flatlay", "cozy coffee shop interior").
-3. RADICAL NICHE VARIATION: Generate a highly professional, optimized text-to-image prompt that creates a COMPLETELY NEW SCENARIO within the exact same niche. Change the subjects' poses, the specific objects, the time of day, or the camera angle radically. It must be a highly varied, unique concept that sells to the same target market, NOT a clone of the input image. Ensure every regeneration yields a distinctly different creative interpretation.
-4. TECHNICAL BASELINE: Technical facts (lens, lighting, style) must match the niche, but the visual setup must be completely unique.
+1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
+2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
+3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
+4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
 
 FOR EACH IMAGE, EXTRACT AND ANALYZE:
 - Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
@@ -3520,7 +3395,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -3528,12 +3403,11 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      const randomSalt = Math.random().toString(36).substring(7);
       const res = await callGeminiWithRetry(modelName, { parts }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.85
+        temperature: 0.0
       });
       responseText = res.text || "[]";
       break;
@@ -3618,7 +3492,7 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
 
   let responseText = "";
   // Forcing Gemini for Video Analysis to ensure consistency and prevent variations across providers
-  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
+  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
     responseMimeType: "application/json",
     responseSchema,
     temperature: 0.0,
@@ -3634,7 +3508,6 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const randomSalt = Math.random().toString(36).substring(7);
   const prompt = `Act as a world-class Hollywood Director. Create 50 high-end, cinematic text-to-video prompts for: "${keyword}".
   
   BEST PROMPT STRUCTURE (MANDATORY):
@@ -3645,12 +3518,10 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   - Camera: Technical precision (Anamorphic, 85mm, T-stop settings implied).
   
   RULES:
-  - RADICAL VARIATION: Ensure every shot is completely distinct from the others in scenario, camera angle, and action.
   - NO GENERIC SHOTS. Every shot must look like a masterpiece.
   - Focus on "The Unseen": Capture angles that stock footage usually lacks.
   - English only.
   
-  [Seed: ${randomSalt}]
   Return exactly 50 prompts in JSON array format.`;
 
   const responseSchema = {
@@ -3676,14 +3547,13 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
       contents: prompt,
       responseMimeType: "application/json",
       responseSchema,
-      config: { temperature: 0.85 },
+      config: { temperature: 0.8 },
       model
     });
   } else {
-    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
+    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
       responseMimeType: "application/json",
-      responseSchema,
-      temperature: 0.85
+      responseSchema
     });
     responseText = response.text || "[]";
   }
@@ -3703,41 +3573,47 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
   }));
 }
 
-export async function checkImageQuality(image: string | string[], tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', language: string = 'Bahasa', model?: string, fileType?: string, imageMetadata?: any) {
+export async function checkImageQuality(
+  image: string | string[], 
+  tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', 
+  language: string = 'Bahasa', 
+  model?: string, 
+  fileType?: string, 
+  imageMetadata?: any
+) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const isVideo = fileType?.startsWith('video/') || fileType?.match(/^(mp4|mov)$/i);
-  const isVector = fileType?.match(/^(eps|ai|svg)$/i) || fileType?.includes('postscript');
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
-  let systemInstruction = `Anda adalah "Ai Vision". Tugas Anda terbagi menjadi 3 modul utama:
-1. Modul OCR & IP Check: Memastikan tidak ada teks ilegal/rusak.
-2. Modul AI Anomaly Detection: Mencari distorsi sirkuit dan cacat logika.
-3. Modul Pixel Analysis: Memastikan gradasi warna neon tidak pecah (banding) saat diexport ke JPEG.
 
-Fokuskan analisis Anda SECARA KETAT pada 4 kategori berikut (PENTING: Lakukan inspeksi visual Anda seolah-olah gambar diperbesar/Zoom 100% ke resolusi piksel aslinya. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang secara fisik di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan kecacatan mikroskopis!):
-1. Intellectual Property (IP) & Teks: Cari teks bahasa Inggris generik yang menyerupai brand terkenal, teks non-Inggris (seperti Katakana/Kanji) yang terdistorsi atau tidak bermakna (gibberish), dan teks mikro pada UI yang blur. WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskannya secara eksplisit (Lakukan OCR) ke dalam laporan Anda! Teks yang cacat/alien adalah pelanggaran berat.
-2. Artefak Generative AI: Deteksi garis geometris yang asimetris, sirkuit acak yang meleleh/putus, atau ketidaksempurnaan detail digital pada perbesaran tinggi.
-3. Logika Visual & Anatomi: Periksa ketidaksesuaian pantulan cermin, proporsi tubuh, atau perspektif objek.
-4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding, posterization, atau noise luminance pada crop 100% atau 200%.
+  let systemInstruction = `Anda adalah "Ai Vision", sebuah modul kurator dan inspeksi kualitas tingkat lanjut untuk aset mikrostock komersial (Adobe Stock & Shutterstock).
+Tugas Anda terbagi menjadi 3 modul utama:
+1. Modul OCR & Brand Safety Check: Memastikan tidak ada teks/logo ilegal, terdistorsi, atau melanggar hak cipta.
+2. Modul AI Anomaly Detection: Mencari keanehan struktur digital, sirkuit meleleh, dan cacat logika visual AI.
+3. Modul Pixel Analysis: Memastikan kualitas piksel mikro, ketajaman, dan gradasi warna tidak pecah.
 
-Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di 4 kategori ini; MEDIUM: cacat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual masih tinggi).
+Fokuskan analisis Anda SECARA KETAT pada kategori berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
+1. Intellectual Property (IP) & Teks: Cari teks generik menyerupai brand terkenal, teks non-Inggris yang terdistorsi/gibberish, dan logo tersembunyi. WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
+2. Artefak Generative AI: Deteksi garis geometris asimetris, sirkuit digital acak yang meleleh, atau keanehan render digital.
+3. Logika Visual & Anatomi: Periksa ketidaksesuaian pantulan cermin, proporsi tubuh/jari tangan, atau perspektif objek yang cacat.
+4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding, posterization, atau luminance noise parah.
+
+Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di kategori ini; MEDIUM: cacat sangat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual tinggi).
 
 STATUS & SKORING (KONSISTEN & KETAT):
 - PASS: Skor 75 - 100.
-- FAIL: Skor 0 - 69.
-Jangan berikan skor 70-74.
+- FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
 
 ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan "ada cacat" atau "gambar bagus", tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat luminance noise pada area bayangan/shadow", "perspektif jari telunjuk tidak logis secara struktural"). Anda WAJIB membedah aspek temuan dari 4 kategori di atas dengan ketajaman tingkat tinggi.
-2. Untuk setiap item di dalam \`ai_vision_checks\` (seperti \`blur\`, \`composition\`, \`lighting\`, \`exposure\`, \`color_balance\`, \`over_edited\`, \`sensor_issues\`, \`watermark\`, \`logo\`, \`text\`, \`anatomical_errors\`, \`structural_defects\`, \`ip_risk\`, \`proportion_defects\`, \`illustration_issues\`, \`vector_issues\`, \`ai_artifacts\`, \`stock_acceptance\`), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON yang ada. Khususnya perhatikan anomali AI Generatif dan Pixel Quality.
+1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat luminance noise pada area shadow latar belakang", "perspektif jari telunjuk tidak logis secara struktural"). Bedah aspek temuan dengan ketajaman tinggi.
+2. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
 
 ATURAN BAHASA:
-Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, legal_status, technical_issues, strengths, detailed_feedback, dan note pada ai_vision_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
+Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
 
 ATURAN HEATMAPS:
-Untuk bagian heatmaps, bayangkan gambar dibagi menjadi grid 3x3 (Total 9 area: Top-Left, Top-Center, Top-Right, Middle-Left, dsb). Petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
+Untuk bagian heatmaps, petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
 
 Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
 
@@ -3749,101 +3625,29 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
         strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
         overall_score: { type: Type.NUMBER },
-        recommendation: { type: Type.STRING, enum: ["PASS_COMMERCIAL", "PASS_EDITORIAL_ONLY", "FAIL_REJECT"] },
+        recommendation: { type: Type.STRING, enum: ["PASS", "FAIL"] },
         detailed_feedback: { type: Type.STRING },
         ai_vision_checks: {
             type: Type.OBJECT,
             properties: {
-                blur: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                composition: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                lighting: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                exposure: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                color_balance: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                over_edited: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                sensor_issues: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                watermark: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                logo: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                text: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                anatomical_errors: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                ip_risk: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                structural_defects: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                proportion_defects: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                illustration_issues: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                vector_issues: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                ai_artifacts: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
-                stock_acceptance: {
-                    type: Type.OBJECT,
-                    properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } },
-                    required: ["status", "note"]
-                },
+                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                composition: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                lighting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                exposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                color_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                over_edited: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                sensor_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                anatomical_errors: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                ip_risk: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                structural_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                proportion_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                illustration_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                vector_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                ai_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                stock_acceptance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 metadata: {
                     type: Type.OBJECT,
                     properties: {
@@ -3878,26 +3682,31 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
+  // Normalisasi Model ke Seri Resmi Terupdate
   const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  let activeModel = model;
+  if (activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
+    activeModel = 'gemini-2.5-pro'; // Normalisasi ke model visual pro terkuat
+  }
+
+  const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
   const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  
   for (const modelName of modelsToTryList) {
     try {
       let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
       if (imageMetadata) {
-        promptText += `\n\nTechnical Metadata (Local OCR / Tech Scan): ${JSON.stringify(imageMetadata)}`;
-        promptText += `\nCRITICAL INSTRUCTION: You MUST use the exact 'local_ocr_data' coordinates in your heatmap mapping if any text violates IP or is gibberish.`;
+        promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
       
       const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.2,
-        topK: 40,
+        temperature: 0.1,
         topP: 0.85
       });
       responseText = res.text || "{}";
@@ -3912,11 +3721,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   if (!responseText) throw lastError;
   
   try {
-    const text = responseText;
-    console.log('QA raw response:', text);
-    const parsedResult = JSON.parse(text);
+    const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Strict enforcement: if ANY check fails, force recommendation to FAIL
+    // Sinkronisasi Sistem Rejection Otomatis Backend
     if (parsedResult.ai_vision_checks) {
       let anyFail = false;
       let anyIpFail = false;
@@ -3924,7 +3731,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
-          if (['watermark', 'logo', 'ip_risk'].includes(key)) {
+          if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
             anyIpFail = true;
           }
         }
@@ -3933,10 +3740,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       if (anyFail) {
         parsedResult.recommendation = "FAIL";
         if (parsedResult.overall_score >= 70) {
-          parsedResult.overall_score = 69; // force score below 70
+          parsedResult.overall_score = 69; 
         }
       }
-      
       if (anyIpFail) {
         parsedResult.legal_status = "VIOLATION";
       }
@@ -3944,7 +3750,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
     return parsedResult;
   } catch(e) {
-    console.warn("Parse Error:", responseText);
+    console.warn("Parse Error on QA response:", responseText);
     throw e;
   }
 }
@@ -4008,7 +3814,7 @@ Output strictly in JSON format.`;
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -4017,7 +3823,7 @@ Output strictly in JSON format.`;
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -4068,7 +3874,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -4077,7 +3883,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -4137,7 +3943,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`;
       model
     });
   } else {
-    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', promptContents, {
+    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', promptContents, {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
@@ -4268,7 +4074,7 @@ Strictly return your answer as a JSON array matching the schema.`;
         }
       };
 
-      const response = await callGeminiWithRetry('gemini-2.5-pro', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
+      const response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -4311,7 +4117,7 @@ Return exactly 8 items matching the schema in JSON array format.`;
           }
         };
 
-        const responseNoGrounding = await callGeminiWithRetry('gemini-2.5-pro', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
+        const responseNoGrounding = await callGeminiWithRetry('gemini-3.1-pro-preview', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
           systemInstruction: systemInstructionNoGrounding,
           responseMimeType: "application/json",
           responseSchema,
@@ -4362,39 +4168,137 @@ Return exactly 8 items matching the schema in JSON array format.`;
   return scrapingResults;
 }
 
-export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model, videoMetadata = null) {
+export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  let systemInstruction = `Anda adalah modul inspeksi kualitas video otomatis. Tugas Anda adalah menganalisis klip video/animasi yang diunggah dan mendeteksi potensi penolakan (rejection) berdasarkan standar ketat.
-Anda akan diberikan kumpulan frame diam (gambar) yang diekstrak secara merata dari keseluruhan video. 
+  // Quality check deterministic cache lookup
+  const framesDataCombined = Array.isArray(frames) ? frames.join('') : String(frames);
+  const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
+  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
 
-Fokuskan analisis video secara spesifik pada 4 kategori berikut:
-1. Kekayaan Intelektual (IP): Deteksi teks bermerek, teks non-Inggris/Jepang yang rusak, atau logo tersembunyi pada elemen latar belakang yang bergerak. WAJIB: Jika ada tulisan/teks apa pun di dalam video, Anda HARUS menuliskannya secara eksplisit (Lakukan OCR) ke dalam laporan Anda! Teks yang cacat/alien adalah pelanggaran berat.
-2. Artefak Kompresi & Noise: Identifikasi adanya macroblocking (kotak-kotak pixel), color banding parah pada gradasi neon, atau noise digital pada area gelap (shadows).
-3. Frame Rate & Kelancaran Animasi (Stuttering): Deteksi frame drop, gerakan patah-patah yang tidak natural pada animasi karakter atau teks berkedip.
-4. Artefak Generative Video: Jika ini video berbasis AI, periksa adanya "morphing" (perubahan bentuk objek secara tidak logis antar-frame), distorsi wajah/tangan saat bergerak, dan kedipan (flickering) cahaya yang tidak konsisten.
+  if (qaCacheMap.has(cacheKey)) {
+    console.log(`[QA Cache] Hit for video quality check (key: ${cacheKey})`);
+    return qaCacheMap.get(cacheKey);
+  }
 
-Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di 4 kategori ini; MEDIUM: cacat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual masih tinggi).
+  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
-STATUS & SKORING (KONSISTEN & KETAT):
-- PASS: Skor 75 - 100.
-- FAIL: Skor 0 - 69.
-Jangan berikan skor 70-74.
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 3 frame diam yang diekstrak dari bagian Awal, Tengah, dan Akhir video.
 
-ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Sinematografi Senior. Isi dari field \`visual_scan_analysis\` dan \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan "ada cacat" atau "video buram", tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat color banding pada frame 2 akibat kompresi warna neon", "gerakan lengan di frame 4 ke 5 mengalami morphing AI yang tidak logis"). Anda WAJIB membedah temuan dari 4 kategori di atas dengan ketajaman tingkat tinggi.
-2. Untuk setiap item di dalam \`quality_checks\` (seperti \`blur\`, \`noise\`, \`blocking\`, \`banding\`, \`overexposure\`, \`low_framerate\`, \`visible_transitions\`, \`log_profile\`, \`upscaled_video\`, dll.), tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap frame video tersebut berdasarkan 4 kategori di atas. Jangan mengarang masalah yang tidak ada.
-3. Pada objek \`metadata\`, berikan rekomendasi \`title\` komersial yang deskriptif untuk video ini dalam ${targetLanguageName}, serta minimal 10-15 \`keywords\` (kata kunci SEO) komersial dalam ${targetLanguageName}.
+---
+ATURAN ANTI-HALUSINASI & ANTI-SIMULASI (CRITICAL):
+1. JANGAN PERNAH MENEBAK atau membuat asumsi palsu (simulasi). Jika elemen atau subjek tertentu tidak ada dalam video, Anda WAJIB menandai status checkpoint tersebut sebagai "UNKNOWN" dan menjelaskan di bagian note bahwa elemen tersebut tidak tersedia/tidak relevan untuk dievaluasi pada aset ini.
+   Contoh:
+   - Jika video adalah pemandangan alam (landscape) tanpa ada manusia/makhluk hidup, maka status "bad_anatomy" WAJIB diisi "UNKNOWN" dengan note: "Tidak ada subjek manusia atau makhluk hidup dalam video untuk dievaluasi."
+   - Jika video tidak mengandung teks/huruf, status "text" WAJIB diisi "UNKNOWN" dengan note: "Tidak ada teks dalam video."
+   - Jika tidak ada komponen mekanis/mesin/arsitektur, status "deformed_object" WAJIB diisi "UNKNOWN" dengan note: "Tidak ada elemen mekanis atau geometris struktural pada video."
+2. Evaluasi harus didasarkan 100% pada bukti visual riil yang terlihat di piksel frame video yang Anda terima, bukan pada ekspektasi teoritis atau asumsi acak.
+
+---
+PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
+Untuk memberikan hasil yang paling akurat, Anda WAJIB mensimulasikan proses ZOOM-IN visual hingga 200% sampai 400% di tingkat piksel pada setiap frame video yang diberikan:
+1. Periksa area fokus utama: Apakah subjek target benar-benar tajam (pin-sharp) di setiap frame? Jika ada "soft focus" terus-menerus atau "motion blur" ekstrem yang tidak disengaja akibat guncangan kamera parah (camera shake), tandai sebagai FAIL.
+2. Deteksi distorsi Rolling Shutter secara teliti: Cari sisa-sisa skew (distorsi miring pada garis vertikal), jello effect (efek goyangan seperti jeli), atau flash banding.
+3. Periksa area latar belakang dan detail piksel: Cari bintik debu sensor (sensor dust), chromatic aberration di tepian objek berkontras tinggi, artefak kompresi video parah (macro-blocking), gradasi warna patah (color banding), dan noise digital parah di area bayangan (shadows).
+4. Periksa seluruh bagian untuk mendeteksi pelanggaran kekayaan intelektual (IP) mikro: Logo kecil pada kancing pakaian, emblem samar pada gadget/mobil, teks bermerek pada latar belakang, graffiti, atau karya seni berhak cipta.
+5. Periksa struktur anatomi dan logika AI (jika video buatan AI): Cari jari berlebih/kurang, mata juling, geometri yang saling melebur atau melayang tidak wajar, detail pola berulang yang hancur, atau tulisan acak/gibberish yang mengacaukan estetika komersial.
+
+---
+PANDUAN TOLERANSI KETAT & REFUSAL REASONS ADOBE STOCK:
+Tingkat Toleransi Saat Ini: ${tolerance}. Anda harus mengevaluasi dengan tingkat keketatan berikut:
+- STRICT: "Zero Tolerance" mutlak terhadap cacat teknis apa pun atau pelanggaran IP sekecil apa pun. Sedikit soft focus, sedikit chromatic aberration, satu titik debu sensor, artefak AI sekecil apa pun, jello effect minor, atau indikasi IP = FAIL secara instan (Skor maksimal 0-59).
+- MEDIUM: Cacat minor di latar belakang non-kritis yang tidak mengganggu estetika komersial bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek utama, out-of-focus pada subjek utama, guncangan kamera yang mengganggu, atau anomali gen-AI yang terlihat jelas = FAIL secara instan (Skor maksimal 0-65).
+- LOOSE: Loloskan selama video memiliki nilai komersial yang tinggi dan komposisinya menarik. Hanya kegagalan teknis yang sangat parah atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
+
+---
+DAFTAR ALASAN PENOLAKAN RESMI ADOBE STOCK (REFUSAL CRITERIA):
+Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan berikut:
+
+1. OUT OF FOCUS / SOFT FOCUS / SHARPNESS:
+   - Subjek utama tidak tajam secara sempurna (lack of sharpness).
+   - Motion blur akibat guncangan kamera atau pergerakan subjek yang terlalu cepat tanpa diimbangi shutter speed yang memadai.
+   - Depth of field (DoF) terlalu dangkal yang menyebabkan area penting subjek meleset dari fokus (misal, hidung fokus tetapi mata buram). Note: Bokeh artistik pada latar belakang adalah estetika premium, BUKAN cacat, selama subjek utamanya tajam sempurna.
+   - Efek noise reduction (pembungkaman noise) yang terlalu agresif, menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
+
+2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION:
+   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit biru.
+   - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi (seperti ranting pohon di latar belakang langit terang).
+   - Sensor Dust (Bintik Debu): Bintik-bintik abu-abu/hitam buram melingkar akibat debu pada sensor fisik kamera, terutama tampak jelas pada area warna datar (sky, studio background).
+   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi atau pembesaran gambar (interpolation) paksa.
+   - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
+   - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
+   - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
+
+3. EXPOSURE & LIGHTING PROBLEMS:
+   - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali (misal, langit putih polos tanpa awan, kulit putih terbakar cahaya).
+   - Underexposure: "Crushed shadows" / bagian gelap yang hitam pekat tanpa detail piksel sama sekali.
+   - Kontras tidak seimbang, pencahayaan datar (flat lighting) yang tidak menarik, atau bayangan yang kasar/tidak sedap dipandang pada subjek (unflattering shadows).
+   - White balance buruk yang menghasilkan color cast tidak alami (terlalu biru, kuning, atau hijau).
+
+4. COMPOSITION & CROPPING ISSUES:
+   - Crooked Horizon: Garis cakrawala, dinding, atau bangunan yang miring tanpa ada tujuan artistik yang jelas.
+   - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
+   - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
+
+5. ROLLING SHUTTER & VIDEO SPECIFIC ISSUES:
+   - Skew Distortion: Garis tegak lurus tampak miring ketika kamera bergeser secara horizontal (panning) dengan cepat.
+   - Jello Effect: Video bergoyang meliuk-liuk secara artifisial seperti jeli karena getaran frekuensi tinggi pada kamera.
+   - Flash Banding: Kecerahan video tidak merata (terbagi menjadi pita-pita horizontal) karena kecepatan blitz cahaya atau lampu di sekitar tidak sinkron dengan sensor rolling shutter.
+   - Flickering: Kedipan cahaya tidak stabil pada frame karena ketidaksamaan frekuensi lampu listrik dengan shutter speed kamera.
+   - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
+
+6. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI):
+   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, tangan/kaki meliuk atau menyatu secara tidak logis, mata asimetris/juling, gigi berlebih, bentuk telinga abnormal.
+   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text.
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh, perspektif arsitektur patah atau melintir tidak masuk akal, bayangan tidak konsisten dengan sumber cahaya, pola berulang yang tiba-tiba terputus atau rusak.
+   - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details).
+
+7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
+   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
+   - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
+   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
+   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
+     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
+     * Landmark atau monumen tertentu tidak dapat diterima, bahkan dengan rilis properti (certain landmarks or monuments cannot be accepted, even with releases).
+     * Arsitektur modern dengan desain yang unik atau mudah dikenali (modern architecture with a unique or recognizable design) ketika ditampilkan sebagai fokus utama tanpa rilis properti.
+     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta milik SETE). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
+     * Burj Al Arab, Burj Khalifa (Dubai)
+     * Sydney Opera House (Australia)
+     * Atomium (Brussels)
+     * Louvre Pyramid (Paris)
+     * Space Needle (Seattle)
+     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
+     * Istana Neuschwanstein (Jerman)
+     * CN Tower (Toronto)
+     * The Shard, London Eye, Tower Bridge (London)
+     * Transamerica Pyramid (San Francisco)
+     * Kuil Sagrada Família (khusus bagian interior)
+     * Taipei 101 (Taiwan)
+     * Menara Kembar Petronas (Malaysia)
+     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
+   - Karya Seni Berhak Cipta & Hak Cipta Visual:
+     * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
+     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
+     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
+   - Dokumen Negara, Uang & Identitas:
+     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
+     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
+   - Hak Pribadi & Tubuh (Biometrics):
+     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
+     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+
+---
+STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
+- PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
+- FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
+*PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
 
 ATURAN BAHASA:
-Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
-
-ATURAN HEATMAPS:
-Untuk bagian heatmaps, bayangkan gambar dibagi menjadi grid 3x3 (Total 9 area: Top-Left, Top-Center, Top-Right, Middle-Left, dsb). Petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
+Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
 
 Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
 
@@ -4414,42 +4318,38 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         overall_score: { type: Type.NUMBER },
         technical_score: { type: Type.NUMBER },
         visual_score: { type: Type.NUMBER },
-        recommendation: { type: Type.STRING, enum: ["PASS_COMMERCIAL", "PASS_EDITORIAL_ONLY", "FAIL_REJECT"] },
+        recommendation: { type: Type.STRING, enum: ["PASS", "FAIL", "RETOUCH"] },
         adobe_stock_readiness: { type: Type.STRING, enum: ["Ready", "Needs Improvement", "Reject Risk"] },
         detailed_feedback: { type: Type.STRING },
         quality_checks: {
             type: Type.OBJECT,
             properties: {
-                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                overexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                underexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                camera_shake: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                out_of_focus: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                flickering: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                duplicate_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                empty_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                black_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                frozen_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                low_framerate: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                visible_transitions: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                log_profile: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                upscaled_video: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
+                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                overexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                underexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                camera_shake: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                out_of_focus: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                flickering: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                duplicate_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                empty_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                black_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                frozen_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
             },
             required: [
                 "blur", "noise", "compression_artifacts", "blocking", "banding", 
@@ -4457,8 +4357,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 "camera_shake", "out_of_focus", "flickering", "duplicate_frame",
                 "empty_frame", "black_frame", "frozen_frame", "watermark",
                 "logo", "text", "ai_artifact", "deformed_object", "bad_anatomy",
-                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality",
-                "low_framerate", "visible_transitions", "log_profile", "upscaled_video"
+                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality"
             ]
         },
         heatmaps: {
@@ -4474,41 +4373,27 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 },
                 required: ["type", "x", "y", "intensity", "raw_value"]
             }
-        },
-        metadata: {
-            type: Type.OBJECT,
-            properties: {
-                title: { type: Type.STRING },
-                keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["title", "keywords"]
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps", "metadata"]
+    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
   };
 
   const imageParts = frames.map(f => processFrameServer(f));
   
-  const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-  const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
   for (const modelName of modelsToTryList) {
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
-      if (videoMetadata) {
-        promptText += `\n\nTechnical Metadata (Use this to assess compression quality/artifacts): ${JSON.stringify(videoMetadata)}`;
-        promptText += `\nCRITICAL INSTRUCTION: Check the 'local_stutter_analysis' field in the metadata above. If it contains a 'WARNING' about stuttering, black frames, or audio clipping, you MUST score the video as FAIL for Category 2 or 3. Also, use the exact 'local_ocr_data' coordinates in your heatmap mapping if any text violates IP or is gibberish.`;
-      }
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.2,
-        topK: 40,
-        topP: 0.85
+        temperature: 0.0,
+        topK: 1,
+        topP: 0.1
       });
       responseText = res.text || "{}";
       break;
@@ -4525,33 +4410,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw video response:', text);
     const parsedResult = JSON.parse(text);
-    
-    // Strict enforcement: if ANY check fails, force recommendation to FAIL
-    if (parsedResult.quality_checks) {
-      let anyFail = false;
-      let anyIpFail = false;
-      
-      for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
-        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
-          anyFail = true;
-          if (['watermark', 'logo', 'text'].includes(key)) {
-            anyIpFail = true;
-          }
-        }
-      }
-      
-      if (anyFail) {
-        parsedResult.recommendation = "FAIL";
-        if (parsedResult.overall_score >= 70) {
-          parsedResult.overall_score = 69; // force score below 70
-        }
-      }
-      
-      if (anyIpFail) {
-        parsedResult.legal_status = "VIOLATION";
-      }
-    }
-
+    qaCacheMap.set(cacheKey, parsedResult);
+    saveQACache();
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
