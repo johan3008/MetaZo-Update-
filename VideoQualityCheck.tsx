@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, History, Download, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getDailyLimit } from '@/constants.tsx';
-import { getHeaders } from '@/services/geminiService.ts';
+import { getDailyLimit } from '../../constants';
+import { getHeaders } from '../../services/geminiService';
 
 interface QualityReport {
   visual_scan_analysis?: string;
-  recommendation: "PASS" | "FAIL" | "RETOUCH";
+  recommendation: "PASS" | "FAIL" | "RETOUCH" | "PASS_COMMERCIAL" | "PASS_EDITORIAL_ONLY" | "FAIL_REJECT"; // Ditambahkan dukungan skema backend gemini.ts
   overall_score: number;
   technical_score?: number;
   visual_score?: number;
@@ -87,6 +87,7 @@ export const VideoQualityCheck: React.FC<{
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const isIndo = t.language === 'Bahasa';
+  
   const CHECK_ITEMS_LOCALIZED = CHECK_ITEMS.map(item => {
     let label = item.label;
     let desc = item.desc;
@@ -117,7 +118,11 @@ export const VideoQualityCheck: React.FC<{
         cropped_subject: { label: 'Cropped Subject', desc: 'Detects awkwardly cropped subjects at frame borders.' },
         cut_off_object: { label: 'Cut-off Objects', desc: 'Detects main objects cut off by frame boundaries.' },
         wrong_perspective: { label: 'Wrong Perspective', desc: 'Detects misaligned or incorrect perspective.' },
-        low_aesthetic_quality: { label: 'Low Aesthetic Quality', desc: 'Detects generally low aesthetic or commercial appeal.' }
+        low_aesthetic_quality: { label: 'Low Aesthetic Quality', desc: 'Detects generally low aesthetic or commercial appeal.' },
+        low_framerate: { label: 'Low Framerate', desc: 'Detects low video framerate.' },
+        visible_transitions: { label: 'Visible Transitions', desc: 'Detects visible transitions, effects, or overlays.' },
+        log_profile: { label: 'Log profile / Flat Color', desc: 'Detects logarithmic gamma video without color grading.' },
+        upscaled_video: { label: 'Upscaled Video', desc: 'Detects forced/artificial resolution upscaling.' }
       };
       if (enMap[item.key]) {
         label = enMap[item.key].label;
@@ -126,6 +131,7 @@ export const VideoQualityCheck: React.FC<{
     }
     return { ...item, label, desc };
   });
+
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +140,15 @@ export const VideoQualityCheck: React.FC<{
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal'>('visual');
+
+  // Helper untuk membaca normalisasi rekomendasi status
+  const checkIsPass = (rec?: string) => {
+    return rec === 'PASS' || rec === 'PASS_COMMERCIAL' || rec === 'PASS_EDITORIAL_ONLY';
+  };
+
+  const checkIsRetouch = (rec?: string) => {
+    return rec === 'RETOUCH' || rec === 'Needs Improvement';
+  };
 
   useEffect(() => {
     if (user && db) {
@@ -209,8 +224,10 @@ export const VideoQualityCheck: React.FC<{
 
   const loadFromHistory = (item: HistoryItem) => {
     setReport(item.report);
-    setFile(null); // Clear current file as we are viewing history
-    document.getElementById('quality-report-section')?.scrollIntoView({ behavior: 'smooth' });
+    setFile(null); 
+    setTimeout(() => {
+      document.getElementById('quality-report-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   useEffect(() => {
@@ -218,7 +235,6 @@ export const VideoQualityCheck: React.FC<{
       .then(res => res.json())
       .then(data => setR2Configured(!!data.configured))
       .catch(() => setR2Configured(null));
-
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -265,8 +281,6 @@ export const VideoQualityCheck: React.FC<{
       let currentStep = 0;
 
       video.onloadedmetadata = () => {
-        // Tentukan waktu penayangan frame secara merata di sepanjang video
-        // Contoh untuk 4 frame: Awal (1s), 33%, 66%, Akhir (90%)
         seekToNextFrame();
       };
 
@@ -276,7 +290,6 @@ export const VideoQualityCheck: React.FC<{
           resolve(frames);
           return;
         }
-        // Hitung posisi timestamp berdasarkan durasi video
         const targetTime = (video.duration / (frameCount + 1)) * (currentStep + 1);
         video.currentTime = targetTime;
       };
@@ -284,7 +297,7 @@ export const VideoQualityCheck: React.FC<{
       video.onseeked = () => {
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = 800; // Ukuran optimal untuk AI Vision tanpa boros token
+          canvas.width = 800; 
           canvas.height = 450;
           const ctx = canvas.getContext('2d');
           if (ctx) {
@@ -313,7 +326,6 @@ export const VideoQualityCheck: React.FC<{
     });
   };
 
-
   const analyzeVideo = async () => {
     if (!file) return;
 
@@ -337,7 +349,6 @@ export const VideoQualityCheck: React.FC<{
           if (getUrlRes.ok) {
             getUrlData = await getUrlRes.json().catch(() => ({}));
             if (getUrlData.uploadUrl && getUrlData.fileUrl) {
-              console.log(`[Video Audit] Uploading raw video to Cloudflare R2: ${file.name}`);
               const putRes = await fetch(getUrlData.uploadUrl, {
                 method: 'PUT',
                 body: file,
@@ -345,8 +356,6 @@ export const VideoQualityCheck: React.FC<{
               });
               if (putRes.ok) {
                 uploadedUrl = getUrlData.fileUrl;
-              } else {
-                console.warn(`[Video Audit] PUT to R2 failed: ${putRes.status}`);
               }
             }
           }
@@ -355,8 +364,9 @@ export const VideoQualityCheck: React.FC<{
         }
       }
 
+      const activeModel = aiOptions?.model === 'gemini-3.1-pro-preview' || aiOptions?.model === 'gemini-3.1-flash' ? 'gemini-2.5-pro' : (aiOptions?.model || 'gemini-2.5-pro');
+
       if (uploadedUrl) {
-        // Send R2 fileUrl to backend to bypass Vercel payload limits
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
           headers: { 
@@ -368,14 +378,11 @@ export const VideoQualityCheck: React.FC<{
             pathKey: getUrlData?.pathKey,
             tolerance,
             language: t.language || 'English',
-            model: aiOptions?.model || 'gemini-3.1-pro-preview'
+            model: activeModel
           })
         });
       } else {
-        // Fallback: Ekstrak frame secara lokal dari keseluruhan durasi video
-        console.log(`[Video Audit] R2 not available, falling back to local canvas extraction...`);
         const base64Frames = await extractVideoFrames(file, 4);
-
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
           headers: { 
@@ -383,10 +390,10 @@ export const VideoQualityCheck: React.FC<{
             ...getHeaders(aiOptions)
           },
           body: JSON.stringify({
-            frames: base64Frames, // Mengirim 4 frame sekaligus
+            frames: base64Frames, 
             tolerance,
             language: t.language || 'English',
-            model: aiOptions?.model || 'gemini-3.1-pro-preview'
+            model: activeModel
           })
         });
       }
@@ -418,7 +425,7 @@ export const VideoQualityCheck: React.FC<{
           Video Quality Check
         </h2>
         <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">
-          {t.language === 'Bahasa' 
+          {isIndo 
             ? 'Audit otomatis 26 checkpoint kualitas video (blur, noise, overexposure, watermark, AI artifacts, dan masalah legal/teknis lainnya) untuk kelayakan agensi mikrostok global seperti Adobe Stock.'
             : 'Automated 26 checkpoints video quality audit (blur, noise, overexposure, watermark, AI artifacts, and other legal/technical issues) for global microstock agency approval standards.'}
         </p>
@@ -427,12 +434,12 @@ export const VideoQualityCheck: React.FC<{
         <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent dark:from-indigo-500/15 dark:via-indigo-500/5 dark:to-transparent border border-indigo-500/30 dark:border-indigo-500/20 rounded-[1.5rem] p-6 shadow-lg shadow-indigo-500/5 text-left max-w-xl mx-auto mt-6">
           <h4 className="font-bold text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-2 text-sm sm:text-base uppercase tracking-wider">
             <Zap size={16} className="text-indigo-500" /> 
-            {t.language === 'Bahasa' ? 'Alur Kerja Pemeriksaan Visual (AI)' : 'Visual (AI) Audit Workflow'}
+            {isIndo ? 'Alur Kerja Pemeriksaan Visual (AI)' : 'Visual (AI) Audit Workflow'}
           </h4>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-            {t.language === 'Bahasa' 
-              ? 'Untuk melewati batasan upload 4.5MB dari Vercel, sistem akan langsung mengunggah file video mentah Anda ke Cloudflare R2 secara aman. Backend kemudian akan mengunduhnya untuk mengekstrak beberapa frame kunci, lalu mengirimkannya ke Vision AI Gemini 3.1 Flash Lite dengan aturan kurasi Adobe Stock.'
-              : 'To bypass Vercel\'s 4.5MB upload payload limit, the system directly uploads your raw video file to Cloudflare R2 securely. The backend then downloads it to extract keyframes and sends them to Vision AI Gemini 3.1 Flash Lite with Adobe Stock curation guidelines.'}
+            {isIndo 
+              ? 'Untuk melewati batasan upload 4.5MB dari Vercel, sistem akan langsung mengunggah file video mentah Anda ke Cloudflare R2 secara aman. Backend kemudian akan mengunduhnya untuk mengekstrak beberapa frame kunci, lalu mengirimkannya ke Vision AI Gemini 2.5 Pro dengan aturan kurasi Adobe Stock.'
+              : 'To bypass Vercel\'s 4.5MB upload payload limit, the system directly uploads your raw video file to Cloudflare R2 securely. The backend then downloads it to extract keyframes and sends them to Vision AI Gemini 2.5 Pro with Adobe Stock curation guidelines.'}
           </p>
         </div>
       </div>
@@ -499,7 +506,7 @@ export const VideoQualityCheck: React.FC<{
         </div>
       )}
 
-      {/* Error Message */}
+      {/* R2 Warning */}
       {r2Configured === false && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
@@ -509,10 +516,10 @@ export const VideoQualityCheck: React.FC<{
           <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <h4 className="text-[10px] font-black tracking-wider uppercase text-amber-700 dark:text-amber-400">
-              {t.language === 'Bahasa' ? 'SARAN KONFIGURASI CLOUDFLARE R2' : 'CLOUDFLARE R2 RECOMMENDED'}
+              {isIndo ? 'SARAN KONFIGURASI CLOUDFLARE R2' : 'CLOUDFLARE R2 RECOMMENDED'}
             </h4>
             <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-              {t.language === 'Bahasa' 
+              {isIndo 
                 ? 'Vercel membatasi ukuran request maksimum 4.5MB. Untuk menganalisis file video beresolusi tinggi atau file besar tanpa batasan ukuran payload, silakan konfigurasikan Cloudflare R2 di Settings menu.'
                 : 'Vercel limits request payloads to 4.5MB. To analyze high-resolution videos or large files with no file size limitations, please configure Cloudflare R2 in the Settings menu.'
               }
@@ -539,29 +546,30 @@ export const VideoQualityCheck: React.FC<{
       <AnimatePresence>
         {report && (
           <motion.div 
+            id="quality-report-section"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden"
           >
             <div className={`p-6 sm:p-8 flex items-center justify-between border-b ${
-              report.recommendation === 'PASS' 
+              checkIsPass(report.recommendation) 
                 ? 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/50 dark:bg-emerald-900/10' 
-                : report.recommendation === 'RETOUCH'
+                : checkIsRetouch(report.recommendation)
                 ? 'border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'
                 : 'border-red-100 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10'
             }`}>
               <div className="flex items-center gap-4">
-                {report.recommendation === 'PASS' ? (
+                {checkIsPass(report.recommendation) ? (
                   <CheckCircle className="w-10 h-10 text-emerald-500" />
-                ) : report.recommendation === 'RETOUCH' ? (
+                ) : checkIsRetouch(report.recommendation) ? (
                   <AlertCircle className="w-10 h-10 text-amber-500" />
                 ) : (
                   <AlertCircle className="w-10 h-10 text-red-500" />
                 )}
                 <div>
                   <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-                    {report.recommendation === 'PASS' ? 'Lolos (PASS)' : 
-                     report.recommendation === 'RETOUCH' ? 'Perlu Perbaikan (RETOUCH)' : 'Ditolak (FAIL)'}
+                    {checkIsPass(report.recommendation) ? 'Lolos (PASS)' : 
+                     checkIsRetouch(report.recommendation) ? 'Perlu Perbaikan (RETOUCH)' : 'Ditolak (FAIL)'}
                   </h3>
                   <div className="flex flex-wrap items-center gap-3 mt-2">
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">Overall: {report.overall_score}/100</span>
@@ -811,8 +819,8 @@ export const VideoQualityCheck: React.FC<{
               >
                 <div className="flex items-center space-x-4 min-w-0">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    item.report.recommendation === 'PASS' ? 'bg-emerald-500' :
-                    item.report.recommendation === 'RETOUCH' ? 'bg-amber-500' : 'bg-red-500'
+                    checkIsPass(item.report.recommendation) ? 'bg-emerald-500' :
+                    checkIsRetouch(item.report.recommendation) ? 'bg-amber-500' : 'bg-red-500'
                   }`} />
                   <div className="truncate">
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
