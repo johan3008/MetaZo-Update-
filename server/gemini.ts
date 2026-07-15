@@ -3620,8 +3620,8 @@ export async function checkImageQuality(
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kurator.dvaren.online dan pedoman kurasi Adobe Stock & Shutterstock komersial.
-Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurator.dvaren.online yang sangat ketat:
+  let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kurasi tercanggih di industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
+Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
 1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang, logo pada produk/pakaian, plat nomor, tanda tangan, wajah tanpa model release, serta teks/watermark ilegal.
 2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh atau lebih dari 5).
 3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
@@ -3639,7 +3639,7 @@ STATUS & SKORING (KONSISTEN & KETAT):
 - FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
 
 ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior dari kurator.dvaren.online. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat noda sensor/sensor dust spot pada area langit", "terdapat luminance noise pada area shadow latar belakang", "perspektif jari telunjuk tidak logis secara struktural", "terjadi sirkuit meleleh atau melted details pada perhiasan"). Bedah aspek temuan dengan ketajaman tinggi.
+1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat noda sensor/sensor dust spot pada area langit", "terdapat luminance noise pada area shadow latar belakang", "perspektif jari telunjuk tidak logis secara struktural", "terjadi sirkuit meleleh atau melted details pada perhiasan"). Bedah aspek temuan dengan ketajaman tinggi.
 2. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
 
 ATURAN BAHASA:
@@ -3719,35 +3719,57 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
-
-  let activeModel = model;
-  if (activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
-    activeModel = 'gemini-2.5-pro'; // Normalisasi ke model visual pro terkuat
-  }
-
-  const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
   const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  
-  for (const modelName of modelsToTryList) {
+
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
       let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
       if (imageMetadata) {
         promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
       
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+      responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.1,
-        topP: 0.85
+        config: { temperature: 0.1 },
+        model: activeModel
       });
-      responseText = res.text || "{}";
-      break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
+      console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
+    }
+  } else {
+    let activeModel = model;
+    if (activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
+      activeModel = 'gemini-2.5-pro'; // Normalisasi ke model visual pro terkuat
+    }
+
+    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
+    
+    for (const modelName of modelsToTryList) {
+      try {
+        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
+        if (imageMetadata) {
+          promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
+        }
+        
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.1,
+          topP: 0.85
+        });
+        responseText = res.text || "{}";
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
+        if (err.message && err.message.includes('API_KEY')) throw err;
+      }
     }
   }
 
@@ -4417,23 +4439,40 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   let responseText = "";
   let lastError;
 
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-  for (const modelName of modelsToTryList) {
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+      responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        contents: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }],
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.0,
-        topK: 1,
-        topP: 0.1
+        config: { temperature: 0.0 },
+        model: activeModel
       });
-      responseText = res.text || "{}";
-      break;
-    } catch (err) {
+    } catch (err: any) {
       lastError = err;
-      console.warn(`[checkVideoQuality] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
+      console.error(`[checkVideoQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
+    }
+  } else {
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    for (const modelName of modelsToTryList) {
+      try {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.0,
+          topK: 1,
+          topP: 0.1
+        });
+        responseText = res.text || "{}";
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[checkVideoQuality] Failed with ${modelName}:`, err.message || err);
+        if (err.message && err.message.includes('API_KEY')) throw err;
+      }
     }
   }
 
