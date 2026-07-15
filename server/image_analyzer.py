@@ -9,21 +9,32 @@ from skimage.restoration import estimate_sigma
 
 def main():
     try:
-        # Read the entire stdin
-        input_data = sys.stdin.read().strip()
-        if not input_data:
-            print(json.dumps({"error": "No input received via stdin"}))
-            return
+        import os
+        img = None
+        file_size_kb = 0
 
-        # Strip data URL prefix if present (e.g. "data:image/jpeg;base64,")
-        if ',' in input_data:
-            input_data = input_data.split(',', 1)[1]
+        # Check if a file path is passed as an argument
+        if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
+            file_path = sys.argv[1]
+            file_size_kb = int(os.path.getsize(file_path) / 1024)
+            img = Image.open(file_path)
+        else:
+            # Read the entire stdin
+            input_data = sys.stdin.read().strip()
+            if not input_data:
+                print(json.dumps({"error": "No input received via stdin or arguments"}))
+                return
 
-        image_bytes = base64.b64decode(input_data)
-        file_size_kb = int(len(image_bytes) / 1024)
+            # Strip data URL prefix if present (e.g. "data:image/jpeg;base64,")
+            if ',' in input_data:
+                input_data = input_data.split(',', 1)[1]
 
-        # Load image in memory using PIL
-        img = Image.open(BytesIO(image_bytes))
+            image_bytes = base64.b64decode(input_data)
+            file_size_kb = int(len(image_bytes) / 1024)
+
+            # Load image in memory using PIL
+            img = Image.open(BytesIO(image_bytes))
+
         width, height = img.size
         mp = (width * height) / 1000000.0
         resolution = f"{width} x {height} ({mp:.2f} MP)"
