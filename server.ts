@@ -1753,12 +1753,16 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         }
     });
 
-    function analyzeImageWithPython(imageBase64: string): Promise<any> {
+    function analyzeImageWithPython(tempFilePath: string): Promise<any> {
         return new Promise((resolve, reject) => {
             const pythonScriptPath = path.join(__dirname_safe, 'server/image_analyzer.py');
-            const pythonProcess = spawn('python3', [pythonScriptPath]);
+            const pythonProcess = spawn('python3', [pythonScriptPath, tempFilePath]);
             let stdoutData = '';
             let stderrData = '';
+
+            pythonProcess.on('error', (err) => {
+                reject(new Error(`Failed to spawn Python process: ${err.message}`));
+            });
 
             pythonProcess.stdout.on('data', (data) => {
                 stdoutData += data.toString();
@@ -1782,10 +1786,6 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                     reject(new Error(`Failed to parse Python output: ${err.message}. Raw output: ${stdoutData}`));
                 }
             });
-
-            // Write base64 image data to stdin and end the stream
-            pythonProcess.stdin.write(imageBase64);
-            pythonProcess.stdin.end();
         });
     }
 
@@ -1991,7 +1991,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             console.log('Server check-image-quality: Running in-memory Python PIL + Scikit-Image analysis...');
             let ffmpegStats;
             try {
-                ffmpegStats = await analyzeImageWithPython(imageBase64);
+                ffmpegStats = await analyzeImageWithPython(tempFilePath);
             } catch (pyErr: any) {
                 console.warn('[Image Audit] Python in-memory analysis failed, falling back to FFmpeg:', pyErr);
                 try {
