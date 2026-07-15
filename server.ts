@@ -1753,6 +1753,42 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         }
     });
 
+    function analyzeImageWithPython(imageBase64: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const pythonScriptPath = path.join(__dirname_safe, 'server/image_analyzer.py');
+            const pythonProcess = spawn('python3', [pythonScriptPath]);
+            let stdoutData = '';
+            let stderrData = '';
+
+            pythonProcess.stdout.on('data', (data) => {
+                stdoutData += data.toString();
+            });
+
+            pythonProcess.stderr.on('data', (data) => {
+                stderrData += data.toString();
+            });
+
+            pythonProcess.on('close', (code) => {
+                if (code !== 0) {
+                    return reject(new Error(`Python process exited with code ${code}. Stderr: ${stderrData}`));
+                }
+                try {
+                    const parsed = JSON.parse(stdoutData.trim());
+                    if (parsed.error) {
+                        return reject(new Error(parsed.error));
+                    }
+                    resolve(parsed);
+                } catch (err: any) {
+                    reject(new Error(`Failed to parse Python output: ${err.message}. Raw output: ${stdoutData}`));
+                }
+            });
+
+            // Write base64 image data to stdin and end the stream
+            pythonProcess.stdin.write(imageBase64);
+            pythonProcess.stdin.end();
+        });
+    }
+
     async function analyzeImageWithFFmpeg(tempFilePath: string) {
         let ffmpegPath: string;
         let ffprobePath: string;
@@ -1951,24 +1987,29 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 return res.status(400).json({ error: 'Missing image data or fileUrl' });
             }
 
-            // 2. Perform FFmpeg + FFprobe analysis
-            console.log('Server check-image-quality: Running FFmpeg analysis...');
+            // 2. Perform in-memory Python PIL + Scikit-Image analysis
+            console.log('Server check-image-quality: Running in-memory Python PIL + Scikit-Image analysis...');
             let ffmpegStats;
             try {
-                ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
-            } catch (ffErr: any) {
-                console.warn('[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:', ffErr);
-                ffmpegStats = {
-                    resolution: "Estimated from file structure",
-                    color_space: "sRGB (Standard)",
-                    histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
-                    brightness: { value: 50, status: "Optimal (Estimated by AI)" },
-                    contrast: { value: 50, status: "Normal (Estimated by AI)" },
-                    sharpness: { value: 50, status: "Normal (Estimated by AI)" },
-                    noise: { value: 5, status: "Low Noise / Clean" },
-                    file_validation: "Valid (Passed Structure Integrity Check)",
-                    file_size_kb: fs.existsSync(tempFilePath) ? Math.round(fs.statSync(tempFilePath).size / 1024) : 1024
-                };
+                ffmpegStats = await analyzeImageWithPython(imageBase64);
+            } catch (pyErr: any) {
+                console.warn('[Image Audit] Python in-memory analysis failed, falling back to FFmpeg:', pyErr);
+                try {
+                    ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
+                } catch (ffErr: any) {
+                    console.warn('[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:', ffErr);
+                    ffmpegStats = {
+                        resolution: "Estimated from file structure",
+                        color_space: "sRGB (Standard)",
+                        histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
+                        brightness: { value: 50, status: "Optimal (Estimated by AI)" },
+                        contrast: { value: 50, status: "Normal (Estimated by AI)" },
+                        sharpness: { value: 50, status: "Normal (Estimated by AI)" },
+                        noise: { value: 5, status: "Low Noise / Clean" },
+                        file_validation: "Valid (Passed Structure Integrity Check)",
+                        file_size_kb: fs.existsSync(tempFilePath) ? Math.round(fs.statSync(tempFilePath).size / 1024) : 1024
+                    };
+                }
             }
 
             // 3. Run AI Vision Analysis (Gemini)
