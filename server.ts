@@ -884,7 +884,25 @@ app.get('/api/debug-uploads', (req, res) => {
 
             if (!modelsResponse.ok) {
                 const errText = await modelsResponse.text();
-                return res.status(400).json({ error: `Gagal verifikasi Groq: ${errText}` });
+                let errorMsg = errText;
+                try {
+                    const parsed = JSON.parse(errText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    }
+                } catch (_) {}
+
+                if (modelsResponse.status === 401 || modelsResponse.status === 403 || errorMsg.toLowerCase().includes('invalid_api_key') || errorMsg.toLowerCase().includes('unauthorized')) {
+                    return res.status(400).json({ error: 'API Key Groq tidak valid atau salah. Silakan periksa kembali.' });
+                }
+                if (modelsResponse.status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key Groq valid! Namun kuota / limit penggunaan Groq Anda telah habis.'
+                    });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi Groq: ${errorMsg}` });
             }
 
             // Test completion with the specified model
@@ -901,13 +919,28 @@ app.get('/api/debug-uploads', (req, res) => {
             });
 
             if (testResponse.ok) {
-                return res.json({ success: true, message: 'Groq API Key valid! (llama-3.3-70b-versatile model available and working)' });
+                return res.json({ success: true, message: 'API Key Groq valid!' });
             } else {
                 const errText = await testResponse.text();
-                if (errText.includes('model_not_found')) {
-                   return res.status(400).json({ error: `Groq verified but model llama-4-scout-17b is unavailable: ${errText}` });
+                let errorMsg = errText;
+                try {
+                    const parsed = JSON.parse(errText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    }
+                } catch (_) {}
+
+                if (testResponse.status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key Groq valid! Namun kuota / limit penggunaan Groq Anda telah habis.'
+                    });
                 }
-                return res.status(400).json({ error: `Gagal verifikasi Groq (completion): ${errText}` });
+                if (errorMsg.includes('model_not_found') || testResponse.status === 404) {
+                    return res.status(400).json({ error: `API Key Groq valid, namun model llama-3.3-70b-versatile tidak tersedia pada akun Anda.` });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi Groq (completion): ${errorMsg}` });
             }
         } catch (e: any) {
             console.error('Test Groq API Key error exception:', e);
@@ -929,15 +962,34 @@ app.get('/api/debug-uploads', (req, res) => {
             });
 
             if (response.ok) {
-                return res.json({ success: true, message: 'Mistral API Key valid!' });
+                return res.json({ success: true, message: 'API Key Mistral valid!' });
             }
             const errText = await response.text();
-            return res.status(400).json({ error: `Gagal verifikasi Mistral: ${errText}` });
+            let errorMsg = errText;
+            try {
+                const parsed = JSON.parse(errText);
+                if (parsed.error && parsed.error.message) {
+                    errorMsg = parsed.error.message;
+                }
+            } catch (_) {}
+
+            if (response.status === 401 || response.status === 403 || errorMsg.toLowerCase().includes('invalid') || errorMsg.toLowerCase().includes('unauthorized')) {
+                return res.status(400).json({ error: 'API Key Mistral tidak valid atau salah. Silakan periksa kembali.' });
+            }
+            if (response.status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                return res.json({
+                    success: true,
+                    quotaExceeded: true,
+                    message: 'API Key Mistral valid! Namun kuota / limit penggunaan Mistral Anda telah habis.'
+                });
+            }
+            return res.status(400).json({ error: `Gagal verifikasi Mistral: ${errorMsg}` });
         } catch (e: any) {
             console.error('Test Mistral API Key error:', e);
             res.status(500).json({ error: e.message || 'Error testing Mistral API Key' });
         }
     });
+
     app.post('/api/test-openai-key', async (req, res) => {
         try {
             const { apiKey } = req.body;
@@ -958,16 +1010,35 @@ app.get('/api/debug-uploads', (req, res) => {
             });
 
             if (testResponse.ok) {
-                return res.json({ success: true, message: 'OpenAI API Key valid!' });
+                return res.json({ success: true, message: 'API Key OpenAI valid!' });
             } else {
                 const errText = await testResponse.text();
-                return res.status(400).json({ error: `Gagal verifikasi OpenAI API: ${errText}` });
+                let errorMsg = errText;
+                try {
+                    const parsed = JSON.parse(errText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    }
+                } catch (_) {}
+
+                if (testResponse.status === 401 || testResponse.status === 403 || errorMsg.toLowerCase().includes('invalid_api_key') || errorMsg.toLowerCase().includes('unauthorized')) {
+                    return res.status(400).json({ error: 'API Key OpenAI tidak valid atau salah. Silakan periksa kembali.' });
+                }
+                if (testResponse.status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded') || errorMsg.toLowerCase().includes('insufficient_quota')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key OpenAI valid! Namun kuota / kredit akun OpenAI Anda telah habis.'
+                    });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi OpenAI API: ${errorMsg}` });
             }
         } catch (e: any) {
             console.warn('Test OpenAI API Key error exception:', e);
-            res.status(500).json({ error: 'Internal Server Error' });
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
+
     app.post('/api/test-openrouter-key', async (req, res) => {
         try {
             const { apiKey } = req.body;
@@ -988,16 +1059,37 @@ app.get('/api/debug-uploads', (req, res) => {
             });
 
             if (testResponse.ok) {
-                return res.json({ success: true, message: 'OpenRouter API Key valid!' });
+                return res.json({ success: true, message: 'API Key OpenRouter valid!' });
             } else {
                 const errText = await testResponse.text();
-                return res.status(400).json({ error: `Gagal verifikasi OpenRouter API: ${errText}` });
+                let errorMsg = errText;
+                try {
+                    const parsed = JSON.parse(errText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    } else if (parsed.error && typeof parsed.error === 'string') {
+                        errorMsg = parsed.error;
+                    }
+                } catch (_) {}
+
+                if (testResponse.status === 401 || testResponse.status === 403 || errorMsg.toLowerCase().includes('invalid') || errorMsg.toLowerCase().includes('unauthorized')) {
+                    return res.status(400).json({ error: 'API Key OpenRouter tidak valid atau salah. Silakan periksa kembali.' });
+                }
+                if (testResponse.status === 402 || testResponse.status === 429 || errorMsg.toLowerCase().includes('credit') || errorMsg.toLowerCase().includes('balance') || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key OpenRouter valid! Namun saldo atau kuota akun OpenRouter Anda telah habis.'
+                    });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi OpenRouter API: ${errorMsg}` });
             }
         } catch (e: any) {
             console.warn('Test OpenRouter API Key error exception:', e);
-            res.status(500).json({ error: 'Internal Server Error' });
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
+
     app.post('/api/test-blackbox-key', async (req, res) => {
         try {
             const { apiKey } = req.body;
@@ -1018,16 +1110,35 @@ app.get('/api/debug-uploads', (req, res) => {
             });
 
             if (testResponse.ok) {
-                return res.json({ success: true, message: 'Blackbox API Key valid!' });
+                return res.json({ success: true, message: 'API Key Blackbox valid!' });
             } else {
                 const errText = await testResponse.text();
-                return res.status(400).json({ error: `Gagal verifikasi Blackbox API: ${errText}` });
+                let errorMsg = errText;
+                try {
+                    const parsed = JSON.parse(errText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    }
+                } catch (_) {}
+
+                if (testResponse.status === 401 || testResponse.status === 403 || errorMsg.toLowerCase().includes('invalid') || errorMsg.toLowerCase().includes('unauthorized')) {
+                    return res.status(400).json({ error: 'API Key Blackbox tidak valid atau salah. Silakan periksa kembali.' });
+                }
+                if (testResponse.status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key Blackbox valid! Namun kuota penggunaan Blackbox Anda telah habis.'
+                    });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi Blackbox API: ${errorMsg}` });
             }
         } catch (e: any) {
             console.warn('Test Blackbox API Key error exception:', e);
-            res.status(500).json({ error: 'Internal Server Error' });
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
+
     app.post('/api/test-nvidia-key', async (req, res) => {
         try {
             const { apiKey } = req.body;
@@ -1048,14 +1159,32 @@ app.get('/api/debug-uploads', (req, res) => {
             });
 
             if (testResponse.ok) {
-                return res.json({ success: true, message: 'NVIDIA API Key valid! (Models working)' });
+                return res.json({ success: true, message: 'API Key NVIDIA valid!' });
             } else {
                 const errText = await testResponse.text();
-                return res.status(400).json({ error: `Gagal verifikasi NVIDIA API: ${errText}` });
+                let errorMsg = errText;
+                try {
+                    const parsed = JSON.parse(errText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    }
+                } catch (_) {}
+
+                if (testResponse.status === 401 || testResponse.status === 403 || errorMsg.toLowerCase().includes('invalid') || errorMsg.toLowerCase().includes('unauthorized')) {
+                    return res.status(400).json({ error: 'API Key NVIDIA tidak valid atau salah. Silakan periksa kembali.' });
+                }
+                if (testResponse.status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key NVIDIA valid! Namun kuota / kredit akun NVIDIA Anda telah habis.'
+                    });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi NVIDIA API: ${errorMsg}` });
             }
         } catch (e: any) {
             console.warn('Test NVIDIA API Key error exception:', e);
-            res.status(500).json({ error: 'Internal Server Error' });
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
 
@@ -1124,15 +1253,34 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             if (success) {
-                return res.json({ success: true, message: 'Bluesminds API Key valid! (gpt-4o active)' });
+                return res.json({ success: true, message: 'API Key Bluesminds valid!' });
             } else {
-                return res.status(400).json({ error: `Gagal verifikasi Bluesminds API (Status ${lastStatus}): ${lastText}` });
+                let errorMsg = lastText;
+                try {
+                    const parsed = JSON.parse(lastText);
+                    if (parsed.error && parsed.error.message) {
+                        errorMsg = parsed.error.message;
+                    }
+                } catch (_) {}
+
+                if (lastStatus === 401 || lastStatus === 403 || errorMsg.toLowerCase().includes('invalid') || errorMsg.toLowerCase().includes('unauthorized')) {
+                    return res.status(400).json({ error: 'API Key Bluesminds tidak valid atau salah. Silakan periksa kembali.' });
+                }
+                if (lastStatus === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                    return res.json({
+                        success: true,
+                        quotaExceeded: true,
+                        message: 'API Key Bluesminds valid! Namun kuota / limit penggunaan Bluesminds Anda telah habis.'
+                    });
+                }
+                return res.status(400).json({ error: `Gagal verifikasi Bluesminds API (Status ${lastStatus}): ${errorMsg}` });
             }
         } catch (e: any) {
             console.warn('Test Bluesminds API Key error exception:', e);
-            res.status(500).json({ error: 'Internal Server Error' });
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
+
     app.post('/api/test-aivene-key', async (req, res) => {
         try {
             const { apiKey } = req.body;
@@ -1156,23 +1304,34 @@ app.get('/api/debug-uploads', (req, res) => {
 
             const status = testResponse.status;
             const text = await testResponse.text();
+            let errorMsg = text;
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed.error && parsed.error.message) {
+                    errorMsg = parsed.error.message;
+                }
+            } catch (_) {}
 
             if (testResponse.ok) {
-                return res.json({ success: true });
+                return res.json({ success: true, message: 'API Key Aivene valid!' });
             }
 
-            if (status === 401 || status === 403 || (status === 400 && text.toLowerCase().includes('invalid'))) {
-                return res.status(status).json({ error: `API Key tidak valid atau unauthorized (Status: ${status})` });
+            if (status === 401 || status === 403 || (status === 400 && errorMsg.toLowerCase().includes('invalid')) || errorMsg.toLowerCase().includes('unauthorized')) {
+                return res.status(400).json({ error: 'API Key Aivene tidak valid atau salah. Silakan periksa kembali.' });
             }
             
-            if (status === 429) {
-                return res.status(429).json({ error: 'Quota limit reached / Too Many Requests' });
+            if (status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                return res.json({
+                    success: true,
+                    quotaExceeded: true,
+                    message: 'API Key Aivene valid! Namun kuota / limit penggunaan Aivene Anda telah habis.'
+                });
             }
             
-            return res.status(status).json({ error: `Terjadi error dari Aivene (Status: ${status})` });
-        } catch (e) {
+            return res.status(status).json({ error: `Terjadi error dari Aivene (Status: ${status}): ${errorMsg}` });
+        } catch (e: any) {
             console.warn('Test Aivene API Key error exception:', e);
-            res.status(500).json({ error: 'Internal Server Error' });
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
 
