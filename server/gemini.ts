@@ -124,7 +124,7 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'mistral', 'openai', 'openrouter', 'nvidia', 'bluesminds', 'aivene']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'openai', 'openrouter', 'nvidia', 'bluesminds', 'aivene']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -2840,7 +2840,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           model
         });
         
-        const parsed = JSON.parse(text);
+        const parsed = JSON.parse(extractJSON(text));
         let promptArray = [];
         if (parsed && Array.isArray(parsed.prompts)) {
             promptArray = parsed.prompts;
@@ -2880,7 +2880,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           });
 
           const text = response.text || "{}";
-          const parsed = JSON.parse(text);
+          const parsed = JSON.parse(extractJSON(text));
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
             return processPromptResults(parsed, count, subject, userNegativePrompt);
           }
@@ -3362,13 +3362,7 @@ CRITICAL RULES:
   }
 
   try {
-    let text = responseText;
-    // Clean potential markdown backticks
-    if (text.includes("```")) {
-      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    }
-    
-    const data = JSON.parse(text);
+    const data = JSON.parse(extractJSON(responseText));
     return data as { prompt: string; description: string };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
@@ -3457,12 +3451,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
 
   try {
-    let text = responseText;
-    if (text.includes("```")) {
-      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    }
-    
-    const data = JSON.parse(text);
+    const data = JSON.parse(extractJSON(responseText));
     return data as { prompt: string; description: string }[];
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
@@ -3593,7 +3582,7 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
 
   let parsed;
   try {
-     parsed = JSON.parse(responseText) as Omit<VideoPrompt, 'id'>[];
+     parsed = JSON.parse(extractJSON(responseText)) as Omit<VideoPrompt, 'id'>[];
   } catch(e) {
      console.warn("Parse error for hollywood prompts:", e);
      parsed = [];
@@ -3883,7 +3872,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Australia Day (26 January)',
         'Chinese New Year / Lunar New Year (often late January or early February)',
         'Winter Sports / Ski Season Themes',
-        'New Year Resolutions, Fitness, and Healthy Eating themes'
+        'New Year Resolutions, Fitness, and Healthy Eating themes',
+        'World Braille Day (4 January)',
+        'National Youth Day (India - 12 January)',
+        'International Customs Day (26 January)',
+        'Winter Solstice / Cold Climate Stock Photography',
+        'Back-to-work / Corporate start of year planning'
       ]
     },
     'february': {
@@ -3896,7 +3890,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Super Bowl (USA)',
         'Rio Carnival / Venice Carnival (February/March)',
         'Black History Month (USA)',
-        'Lantern Festival'
+        'Lantern Festival',
+        'World Cancer Day (4 February)',
+        'President\'s Day (USA - third Monday)',
+        'National Science Day (India - 28 February)',
+        'International Mother Language Day (21 February)',
+        'Winter foliage, snowy forest scenery, cozy winter cabin'
       ]
     },
     'march': {
@@ -3909,7 +3908,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Cherry Blossom Season / Sakura (Japan - late March)',
         'Spring Equinox (20/21 March)',
         'World Water Day (22 March)',
-        'Ramadan (lunar-based, sometimes in March/April)'
+        'Ramadan (lunar-based, sometimes in March/April)',
+        'Pi Day (14 March)',
+        'International Day of Happiness (20 March)',
+        'World Wildlife Day (3 March)',
+        'World Consumer Rights Day (15 March)',
+        'Spring fashion, outdoor hiking, blossom background patterns'
       ]
     },
     'april': {
@@ -3922,7 +3926,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Songkran Water Festival (Thailand - 13-15 April)',
         'Anzac Day (25 April)',
         'King\'s Day / Koningsdag (Netherlands - 27 April)',
-        'Spring Cleaning and gardening themes'
+        'Spring Cleaning and gardening themes',
+        'World Health Day (7 April)',
+        'World Book Day (23 April)',
+        'Eid al-Fitr (lunar-based, often April or nearby)',
+        'International Jazz Day (30 April)',
+        'Fresh organic vegetables, farming, ecological energy concepts'
       ]
     },
     'may': {
@@ -3935,7 +3944,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Vesak Day (often May)',
         'Memorial Day (USA - late May)',
         'Cannes Film Festival',
-        'Start of Summer / Spring flowers themes'
+        'Start of Summer / Spring flowers themes',
+        'World Red Cross Day (8 May)',
+        'World Telecommunication Day (17 May)',
+        'National Bike Month / Outdoor cycling themes',
+        'Graduation and academic success stock photos',
+        'Wedding season prep, bridal photography, spring picnics'
       ]
     },
     'june': {
@@ -3948,7 +3962,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Juneteenth (USA - 19 June)',
         'Summer Solstice / Midsummer (21 June)',
         'International Yoga Day (21 June)',
-        'Music festivals, graduation, and school holiday startup themes'
+        'Music festivals, graduation, and school holiday startup themes',
+        'World Oceans Day (8 June)',
+        'World Blood Donor Day (14 June)',
+        'Midsummer festivals (Nordic countries)',
+        'Camping, camping equipment, family road trips',
+        'Healthy lifestyle, running, fitness in the park'
       ]
     },
     'july': {
@@ -3960,7 +3979,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Bastille Day (France - 14 July)',
         'Tanabata Star Festival (Japan - 7 July)',
         'Nelson Mandela International Day (18 July)',
-        'Summer Travel, Beach, and Outdoor Recreation themes'
+        'Summer Travel, Beach, and Outdoor Recreation themes',
+        'World Population Day (11 July)',
+        'Parents\' Day (fourth Sunday of July)',
+        'World Emoji Day (17 July)',
+        'Summer cocktails, pool parties, sunscreen, sunglasses flatlays',
+        'Tropical vacation, cruise ship travel, coconut trees, ocean waves'
       ]
     },
     'august': {
@@ -3973,7 +3997,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'La Tomatina (Spain - last Wednesday of August)',
         'Obon Festival (Japan - mid August)',
         'Back-to-School shopping season startup',
-        'Late Summer beach and relaxation themes'
+        'Late Summer beach and relaxation themes',
+        'International Youth Day (12 August)',
+        'World Photography Day (19 August)',
+        'Women\'s Equality Day (USA - 26 August)',
+        'Summer harvesting, golden wheat fields, sunflowers',
+        'Camping under the stars, stargazing, meteor shower photography'
       ]
     },
     'september': {
@@ -3985,7 +4014,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Oktoberfest (Germany - starts late September)',
         'Autumn Equinox (21-23 September)',
         'Teachers\' Day (various dates)',
-        'Back to school, cozy autumn vibes, harvesting season themes'
+        'Back to school, cozy autumn vibes, harvesting season themes',
+        'World Tourism Day (27 September)',
+        'International Day of Peace (21 September)',
+        'Rosh Hashanah / Yom Kippur (Jewish New Year)',
+        'Apple picking, colorful autumn leaves, flatlay styling',
+        'Warm coffee, woolen sweaters, cozy indoor reading vibes'
       ]
     },
     'oktober': {
@@ -3997,7 +4031,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Columbus Day / Indigenous Peoples\' Day (USA - mid October)',
         'Diwali (often October or November)',
         'Halloween (31 October)',
-        'Pumpkin patch, autumn foliage, horror/spooky, and cozy sweater themes'
+        'Pumpkin patch, autumn foliage, horror/spooky, and cozy sweater themes',
+        'World Mental Health Day (10 October)',
+        'World Food Day (16 October)',
+        'United Nations Day (24 October)',
+        'Cozy fireplaces, hot cocoa, rain outside, cinnamon spice',
+        'Foggy morning landscapes, misty forests, hiking adventures'
       ]
     },
     'november': {
@@ -4009,7 +4048,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Veterans Day / Remembrance Day (11 November)',
         'Thanksgiving (USA - fourth Thursday of November)',
         'Black Friday & Cyber Monday (late November)',
-        'Movember (Men\'s health awareness month)'
+        'Movember (Men\'s health awareness month)',
+        'World Children\'s Day (20 November)',
+        'World Diabetes Day (14 November)',
+        'Thanksgiving preparation, roasting turkey, home dining setups',
+        'Winter fashion trends, coats, scarfs, boots',
+        'Holiday shopping, online shopping, delivery boxes, retail sales'
       ]
     },
     'december': {
@@ -4021,7 +4065,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
         'Christmas Eve & Christmas Day (24-25 December)',
         'Boxing Day (26 December)',
         'New Year\'s Eve (31 December)',
-        'Winter holidays, cozy fireplace, snow scenery, shopping, and family reunion themes'
+        'Winter holidays, cozy fireplace, snow scenery, shopping, and family reunion themes',
+        'World AIDS Day (1 December)',
+        'International Mountain Day (11 December)',
+        'Human Rights Day (10 December)',
+        'New Year resolutions preparation, planners, calendars',
+        'Cozy socks, knitting, baking cookies, gingerbread houses, warm winter drinks'
       ]
     }
   };
@@ -4030,16 +4079,16 @@ export async function generateCalendarEvents(month: string, model?: string) {
   let key = 'january';
   if (cleanMonth.includes('jan')) key = 'january';
   else if (cleanMonth.includes('feb')) key = 'february';
-  else if (cleanMonth.includes('mar') || cleanMonth.includes('met')) key = 'march';
+  else if (cleanMonth.includes('mar') || cleanMonth.includes('met') || cleanMonth.includes('maret')) key = 'march';
   else if (cleanMonth.includes('apr')) key = 'april';
   else if (cleanMonth.includes('mei') || cleanMonth.includes('may')) key = 'may';
   else if (cleanMonth.includes('jun')) key = 'june';
   else if (cleanMonth.includes('jul')) key = 'july';
-  else if (cleanMonth.includes('agu') || cleanMonth.includes('aug')) key = 'august';
+  else if (cleanMonth.includes('agu') || cleanMonth.includes('aug') || cleanMonth.includes('agustus')) key = 'august';
   else if (cleanMonth.includes('sep')) key = 'september';
-  else if (cleanMonth.includes('okt') || cleanMonth.includes('oct')) key = 'oktober';
+  else if (cleanMonth.includes('okt') || cleanMonth.includes('oct') || cleanMonth.includes('oktober')) key = 'oktober';
   else if (cleanMonth.includes('nov')) key = 'november';
-  else if (cleanMonth.includes('des') || cleanMonth.includes('dec')) key = 'december';
+  else if (cleanMonth.includes('des') || cleanMonth.includes('dec') || cleanMonth.includes('desember')) key = 'december';
   else {
     const found = Object.keys(MONTH_GUIDELINES).find(k => k.includes(cleanMonth) || cleanMonth.includes(k));
     if (found) key = found;
@@ -4129,7 +4178,95 @@ Output strictly in JSON format.`;
     }
   }
 
-  return JSON.parse(extractJSON(responseText));
+  let parsed: any;
+  try {
+    parsed = JSON.parse(extractJSON(responseText));
+  } catch (err) {
+    console.error("Failed to parse calendar events JSON:", err, responseText);
+    parsed = {};
+  }
+
+  // Ensure parsed has events
+  if (!parsed || !Array.isArray(parsed.events)) {
+    parsed = { events: [] };
+  }
+
+  // Filter out events that belong to other months
+  const otherMonthsEn = Object.keys(MONTH_GUIDELINES).filter(m => m !== key);
+  const otherMonthsId = otherMonthsEn.map(m => MONTH_GUIDELINES[m]?.idName.toLowerCase()).filter(Boolean);
+  const otherMonthKeywords = [...otherMonthsEn, ...otherMonthsId];
+
+  let filteredEvents = parsed.events.filter((event: any) => {
+    if (!event || !event.name) return false;
+    
+    const nameLower = event.name.toLowerCase();
+    const dateLower = (event.date || "").toLowerCase();
+
+    // Check if the date belongs to another month strictly
+    const hasOtherMonthInDate = otherMonthKeywords.some(mWord => {
+      const regex = new RegExp(`\\b${mWord}\\b`, 'i');
+      return regex.test(dateLower) || regex.test(nameLower);
+    });
+
+    if (hasOtherMonthInDate) {
+      const hasOurMonthEn = new RegExp(`\\b${targetMonthEn}\\b`, 'i').test(dateLower) || new RegExp(`\\b${targetMonthEn}\\b`, 'i').test(nameLower);
+      const hasOurMonthId = new RegExp(`\\b${targetMonthId}\\b`, 'i').test(dateLower) || new RegExp(`\\b${targetMonthId}\\b`, 'i').test(nameLower);
+      if (hasOurMonthEn || hasOurMonthId) {
+        return true; // Keep cross-month events
+      }
+      return false; // Exclude
+    }
+
+    return true;
+  });
+
+  // If we have less than 6 events, supplement with curated typical events for the month
+  if (filteredEvents.length < 6) {
+    console.log(`Supplementing calendar events with curated fallbacks for: ${targetMonthEn}`);
+    const fallbackEvents = info.typicalEvents.map((ev: string) => {
+      let name = ev;
+      let date = targetMonthEn;
+      let location = "Global";
+      
+      const dateMatch = ev.match(/\(([^)]+)\)/);
+      if (dateMatch) {
+        const inside = dateMatch[1];
+        if (['usa', 'india', 'netherlands', 'france', 'spain', 'japan', 'thailand', 'indonesia', 'germany', 'canada'].some(c => inside.toLowerCase().includes(c))) {
+          location = inside;
+        } else {
+          date = inside;
+        }
+        name = ev.replace(/\s*\([^)]+\)/g, '').trim();
+      }
+
+      return {
+        name,
+        date,
+        location,
+        commercial_potential: `High demand for stock photos, vectors, and footage covering ${name} themes and celebrations globally.`,
+        suggested_topics: [name.toLowerCase(), "celebration", "commercial", "lifestyle", "seasonal"]
+      };
+    });
+
+    // Merge only unique ones
+    fallbackEvents.forEach(fb => {
+      if (!filteredEvents.some((existing: any) => existing.name.toLowerCase().includes(fb.name.toLowerCase()) || fb.name.toLowerCase().includes(existing.name.toLowerCase()))) {
+        filteredEvents.push(fb);
+      }
+    });
+  }
+
+  // Polish the final date format
+  filteredEvents = filteredEvents.map((event: any) => {
+    let dateStr = event.date || "";
+    if (!dateStr || dateStr.toLowerCase() === "tbd" || dateStr.toLowerCase() === "various" || dateStr.toLowerCase() === "global") {
+      event.date = targetMonthEn;
+    }
+    return event;
+  });
+
+  parsed.events = filteredEvents;
+  return parsed;
 }
 
 export async function generateEventKeywords(eventName: string, eventDetails: string, model?: string) {
@@ -4189,7 +4326,7 @@ Rules:
     }
   }
 
-  return JSON.parse(responseText);
+  return JSON.parse(extractJSON(responseText));
 }
 
 export async function suggestKeywords(
@@ -4249,7 +4386,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`;
   }
 
   try {
-    const parsed = JSON.parse(responseText);
+    const parsed = JSON.parse(extractJSON(responseText));
     return parsed.keywords || [];
   } catch (err) {
     console.warn("Failed to parse suggested keywords:", err);
@@ -4722,7 +4859,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const text = responseText;
     console.log('QA raw video response:', text);
-    const parsedResult = JSON.parse(text);
+    const parsedResult = JSON.parse(extractJSON(text));
     qaCacheMap.set(cacheKey, parsedResult);
     saveQACache();
     return parsedResult;
