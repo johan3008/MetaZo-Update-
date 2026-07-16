@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { HOLIDAYS_DATA } from "./holidaysData.ts";
+import { EXTRA_HOLIDAYS_DATA } from "./extraHolidaysData.ts";
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
 import fs from "node:fs";
 import path from "node:path";
@@ -4135,7 +4136,9 @@ export async function generateCalendarEvents(month: string, model?: string) {
   // Retrieve curated holidays from our unified data compilation source
   let holidayKey = key;
   if (key === 'oktober') holidayKey = 'october';
-  const curatedHolidays = HOLIDAYS_DATA[holidayKey] || [];
+  const baseHolidays = HOLIDAYS_DATA[holidayKey] || [];
+  const extraHolidays = EXTRA_HOLIDAYS_DATA[holidayKey] || [];
+  const curatedHolidays = [...baseHolidays, ...extraHolidays];
   const curatedHolidaysStr = curatedHolidays.map((h, i) => `${i + 1}. ${h.name} (${h.date}) - Location: ${h.location}`).join('\n');
 
   const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
