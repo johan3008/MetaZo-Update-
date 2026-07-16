@@ -285,7 +285,7 @@ export const VideoQualityCheck: React.FC<{
         }
       }
 
-      const activeModel = aiOptions?.model === 'gemini-3.1-pro-preview' || aiOptions?.model === 'gemini-3.1-flash' ? 'gemini-2.5-pro' : (aiOptions?.model || 'gemini-2.5-pro');
+      const activeModel = aiOptions?.model || 'gemini-3.5-flash';
 
       if (uploadedUrl) {
         response = await fetch('/api/check-video-quality', {
