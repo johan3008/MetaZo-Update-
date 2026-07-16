@@ -1,6 +1,6 @@
-import { getDailyLimit } from '../../constants';
+import { getDailyLimit } from '@/constants.tsx';
 import React, { useState, useEffect } from 'react';
-import { getHeaders } from '../../services/geminiService';
+import { getHeaders } from '@/services/geminiService.ts';
 import { Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, History, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -12,7 +12,7 @@ interface QualityReport {
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
-  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact"; x: number; y: number; intensity: number; raw_value: string }[];
+  heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
   ffmpeg?: {
     resolution: string;
     color_space: string;
@@ -36,10 +36,18 @@ interface QualityReport {
       blur?: { status: "PASS" | "FAIL"; note: string };
       composition?: { status: "PASS" | "FAIL"; note: string };
       lighting?: { status: "PASS" | "FAIL"; note: string };
+      exposure?: { status: "PASS" | "FAIL"; note: string };
+      color_balance?: { status: "PASS" | "FAIL"; note: string };
+      over_edited?: { status: "PASS" | "FAIL"; note: string };
+      sensor_issues?: { status: "PASS" | "FAIL"; note: string };
       watermark?: { status: "PASS" | "FAIL"; note: string };
       logo?: { status: "PASS" | "FAIL"; note: string };
       text?: { status: "PASS" | "FAIL"; note: string };
       anatomical_errors?: { status: "PASS" | "FAIL"; note: string };
+      structural_defects?: { status: "PASS" | "FAIL"; note: string };
+      illustration_issues?: { status: "PASS" | "FAIL"; note: string };
+      vector_issues?: { status: "PASS" | "FAIL"; note: string };
+      ai_artifacts?: { status: "PASS" | "FAIL"; note: string };
       ip_risk?: { status: "PASS" | "FAIL"; note: string };
       proportion_defects?: { status: "PASS" | "FAIL"; note: string };
       stock_acceptance?: { status: "PASS" | "FAIL"; note: string };
@@ -55,7 +63,7 @@ interface HistoryItem {
   report: QualityReport;
 }
 
-import { FeatureGuideButton } from './FeatureGuideModal';
+import { FeatureGuideButton } from './FeatureGuideModal.tsx';
 
 export const ImageQualityCheck: React.FC<{ 
   t: any; 
@@ -91,6 +99,8 @@ export const ImageQualityCheck: React.FC<{
   const [showHeatmaps, setShowHeatmaps] = useState<Set<string>>(new Set());
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [currentProcessingFile, setCurrentProcessingFile] = useState<string | null>(null);
+  const [failedFiles, setFailedFiles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user && db) {
@@ -177,7 +187,7 @@ export const ImageQualityCheck: React.FC<{
     fetch(`/api/r2-status?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => setR2Configured(!!data.configured))
-      .catch(() => setR2Configured(false));
+      .catch(() => setR2Configured(null));
   }, []);
 
   const toggleHeatmap = (fileName: string) => {
@@ -231,7 +241,71 @@ export const ImageQualityCheck: React.FC<{
     setShowHeatmaps(new Set());
   };
 
-  const resizeAndProcess = (file: File): Promise<string> => {
+  const extractVideoFrames = (file: File, frameCount: number = 4): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      
+      video.style.position = 'fixed';
+      video.style.top = '-9999px';
+      document.body.appendChild(video);
+
+      const frames: string[] = [];
+      let currentStep = 0;
+
+      video.onloadedmetadata = () => {
+        // Tentukan waktu penayangan frame secara merata di sepanjang video
+        // Contoh untuk 4 frame: Awal (1s), 33%, 66%, Akhir (90%)
+        seekToNextFrame();
+      };
+
+      const seekToNextFrame = () => {
+        if (currentStep >= frameCount) {
+          cleanup();
+          resolve(frames);
+          return;
+        }
+        // Hitung posisi timestamp berdasarkan durasi video
+        const targetTime = (video.duration / (frameCount + 1)) * (currentStep + 1);
+        video.currentTime = targetTime;
+      };
+
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 800; // Ukuran optimal untuk AI Vision tanpa boros token
+          canvas.height = 450;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL('image/jpeg', 0.8));
+          }
+          currentStep++;
+          seekToNextFrame();
+        } catch (e) {
+          reject(e);
+        }
+      };
+
+      video.onerror = () => {
+        cleanup();
+        reject(new Error("Gagal memuat berkas video"));
+      };
+
+      const cleanup = () => {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        URL.revokeObjectURL(url);
+      };
+
+      video.src = url;
+      video.load();
+    });
+  };
+
+  const resizeAndProcess = (file: File): Promise<string | [string, string]> => {
     return new Promise((resolve, reject) => {
       // 1. Handle Video (MP4, MOV, etc.)
       if (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov)$/i)) {
@@ -450,9 +524,34 @@ export const ImageQualityCheck: React.FC<{
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          
+          let resultBase64 = reader.result as string;
+          let zoomedBase64: string | null = null;
+          
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
+            resultBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            
+            // Create 400x400 physical crop from original center
+            const cropSize = 400;
+            if (img.width >= cropSize && img.height >= cropSize) {
+                const cropCanvas = document.createElement('canvas');
+                cropCanvas.width = cropSize;
+                cropCanvas.height = cropSize;
+                const cropCtx = cropCanvas.getContext('2d');
+                if (cropCtx) {
+                    const startX = (img.width / 2) - (cropSize / 2);
+                    const startY = (img.height / 2) - (cropSize / 2);
+                    cropCtx.drawImage(img, startX, startY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+                    zoomedBase64 = cropCanvas.toDataURL('image/jpeg', 0.95);
+                }
+            }
+            
+            if (zoomedBase64) {
+               resolve([resultBase64, zoomedBase64]);
+               return;
+            }
+            resolve(resultBase64);
           } else {
             resolve(reader.result as string);
           }
@@ -465,61 +564,7 @@ export const ImageQualityCheck: React.FC<{
     });
   };
 
-  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(videoFile);
-      video.muted = true;
-      video.playsInline = true;
-      
-      const frames: string[] = [];
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      video.onloadedmetadata = () => {
-        const scale = Math.min(1, 1280 / video.videoWidth);
-        canvas.width = video.videoWidth * scale;
-        canvas.height = video.videoHeight * scale;
-        
-        const duration = video.duration;
-        if (!duration || !isFinite(duration) || duration <= 0) {
-            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
-            return;
-        }
 
-        const targetTimes = [
-            duration * 0.1,
-            duration * 0.25,
-            duration * 0.4,
-            duration * 0.6,
-            duration * 0.75,
-            duration * 0.9
-        ];
-        
-        let currentTimeIndex = 0;
-        
-        video.onseeked = () => {
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            frames.push(dataUrl);
-          }
-          
-          currentTimeIndex++;
-          if (currentTimeIndex < targetTimes.length) {
-            video.currentTime = targetTimes[currentTimeIndex];
-          } else {
-            URL.revokeObjectURL(video.src);
-            resolve(frames);
-          }
-        };
-        
-        video.currentTime = targetTimes[currentTimeIndex];
-      };
-      
-      video.onerror = () => reject(new Error("Gagal memutar/memuat video untuk diekstrak."));
-    });
-  };
 
   const handleFilesSelected = async (selectedFiles: FileList | File[]) => {
     // Revoke old object URLs
@@ -583,6 +628,7 @@ export const ImageQualityCheck: React.FC<{
     setProgress(0);
     setError(null);
     setReports({}); // Clear previous
+    setFailedFiles({});
     const newReports: Record<string, QualityReport> = {};
 
     const progressPerFile = 100 / targetFiles.length;
@@ -590,12 +636,15 @@ export const ImageQualityCheck: React.FC<{
     for (let i = 0; i < targetFiles.length; i++) {
       const file = targetFiles[i];
       const startProgress = i * progressPerFile;
+      setCurrentProcessingFile(file.name);
       
       try {
         // Increment internally a bit
         setProgress(startProgress + 5);
         
-        const base64Image = await resizeAndProcess(file);
+        const processedResult = await resizeAndProcess(file);
+        const base64Image = Array.isArray(processedResult) ? processedResult[0] : processedResult;
+        const imagePayload = processedResult;
         if (file.name.match(/\.(eps|ai)$/i)) {
           setPreviews(prev => ({ ...prev, [file.name]: base64Image }));
         }
@@ -604,67 +653,73 @@ export const ImageQualityCheck: React.FC<{
         let uploadedUrl = null;
         let getUrlData = null;
 
-        // Try R2 upload for standard images to prevent Vercel 4.5MB payload limits
+        // Try R2 upload for standard images and videos to prevent Vercel 4.5MB payload limits
         const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
-        let extractedVideoFrames: string[] | null = null;
         
-        if (isVideo) {
-           console.log(`[Video Audit in Image] Mengekstrak frame video melalui Browser Frontend...`);
-           extractedVideoFrames = await extractFramesFromVideo(file);
-        } else if (!file.name.match(/\.(eps|ai)$/i)) {
+        if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
+            // Upload FULL RESOLUTION file to R2 for 100% valid zoom analysis or Video FFmpeg streaming
             let uploadBlob: Blob | File = file;
-            
-            try {
-              const arr = base64Image.split(',');
-              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-              const bstr = atob(arr[1]);
-              let n = bstr.length;
-              const u8arr = new Uint8Array(n);
-              while (n--) {
-                u8arr[n] = bstr.charCodeAt(n);
-              }
-              uploadBlob = new Blob([u8arr], { type: mime });
-            } catch (e) {
-              console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
-              uploadBlob = file;
-            }
 
-            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
+            const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || (isVideo ? 'video/mp4' : 'image/jpeg'))}`);
             if (getUrlRes.ok) {
               getUrlData = await getUrlRes.json().catch(() => ({}));
               if (getUrlData.uploadUrl && getUrlData.fileUrl) {
-                console.log(`[Image Audit] Uploading to Cloudflare R2: ${file.name}`);
+                console.log(`[Audit] Uploading to Cloudflare R2: ${file.name}`);
                 const putRes = await fetch(getUrlData.uploadUrl, {
                   method: 'PUT',
                   body: uploadBlob,
-                  headers: { 'Content-Type': uploadBlob.type || 'image/jpeg' }
+                  headers: { 'Content-Type': uploadBlob.type || (isVideo ? 'video/mp4' : 'image/jpeg') }
                 });
                 if (putRes.ok) {
                   uploadedUrl = getUrlData.fileUrl;
                 } else {
-                  console.warn(`[Image Audit] PUT to R2 failed: ${putRes.status}`);
+                  console.warn(`[Audit] PUT to R2 failed: ${putRes.status}`);
                 }
               }
             }
           } catch (uploadErr) {
-            console.warn("[Image Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
+            console.warn("[Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
           }
         }
 
         let response;
         
-        if (isVideo && extractedVideoFrames) {
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-            body: JSON.stringify({
-              frames: extractedVideoFrames,
-              tolerance,
-              language: t.language || 'English',
-              model: aiOptions?.model || 'gemini-3.1-pro-preview'
-            })
-          });
+        if (isVideo) {
+          if (uploadedUrl) {
+            console.log(`[Video Audit in Image] Menggunakan URL R2...`);
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getHeaders(aiOptions) 
+              },
+              body: JSON.stringify({
+                fileUrl: uploadedUrl,
+                pathKey: getUrlData?.pathKey,
+                tolerance,
+                language: t.language || 'English',
+                model: aiOptions?.model || 'gemini-3.1-pro-preview'
+              })
+            });
+          } else {
+            console.log(`[Video Audit in Image] R2 unavailable, mengekstrak frame video secara lokal...`);
+            const extractedFrames = await extractVideoFrames(file, 4);
+            
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getHeaders(aiOptions) 
+              },
+              body: JSON.stringify({
+                frames: extractedFrames,
+                tolerance,
+                language: t.language || 'English',
+                model: aiOptions?.model || 'gemini-3.1-pro-preview'
+              })
+            });
+          }
         } else if (uploadedUrl) {
           response = await fetch('/api/check-image-quality', {
             method: 'POST',
@@ -683,7 +738,7 @@ export const ImageQualityCheck: React.FC<{
             method: 'POST',
             headers: getHeaders(aiOptions),
             body: JSON.stringify({ 
-              image: base64Image, 
+              image: imagePayload, 
               tolerance, 
               language: t.language || 'English', 
               model: aiOptions?.model,
@@ -706,11 +761,12 @@ export const ImageQualityCheck: React.FC<{
 
         setProgress(startProgress + progressPerFile);
       } catch (err: any) {
-        setError(err.message);
+        console.error(`Error analyzing ${file.name}:`, err);
+        setFailedFiles(prev => ({ ...prev, [file.name]: err.message || 'Error' }));
       }
     }
+    setCurrentProcessingFile(null);
     setProgress(100);
-    setTimeout(() => setLoading(true), 100); // Trigger a quick refresh state if needed
     setTimeout(() => setLoading(false), 300);
   };
 
@@ -971,7 +1027,7 @@ export const ImageQualityCheck: React.FC<{
                                <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex flex-col items-center justify-center">
                                  <FileImage size={16} className="text-slate-400 mb-1" />
                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">EPS</span>
-                               </div>
+                                </div>
                             ) : (
                                <img src={previews[file.name]} alt="" className="w-full h-full object-cover" />
                             )
@@ -979,7 +1035,29 @@ export const ImageQualityCheck: React.FC<{
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
-                          <p className="text-[9px] text-slate-400 font-black uppercase">{t.qc_pending_audit}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {reports[file.name] ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <p className="text-[9px] text-emerald-500 font-black uppercase">{t.qc_status_completed || 'Selesai'}</p>
+                              </>
+                            ) : currentProcessingFile === file.name ? (
+                              <>
+                                <Loader2 size={10} className="text-violet-500 animate-spin shrink-0" />
+                                <p className="text-[9px] text-violet-500 font-black uppercase animate-pulse">{t.qc_status_processing || 'Menganalisis...'}</p>
+                              </>
+                            ) : failedFiles[file.name] ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-rose-500"></span>
+                                <p className="text-[9px] text-rose-500 font-black uppercase truncate max-w-[120px]">{t.qc_status_error || 'Gagal'}</p>
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
+                                <p className="text-[9px] text-slate-400 font-black uppercase">{t.qc_pending_audit || 'Menunggu Antrean'}</p>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     ))}
@@ -993,7 +1071,7 @@ export const ImageQualityCheck: React.FC<{
         {/* Right Column: Visual Audit Reports */}
         <div className="xl:col-span-8">
           <AnimatePresence mode="wait">
-            {loading ? (
+            {loading && Object.keys(reports).length === 0 ? (
               <motion.div
                 key="loading-qc"
                 initial={{ opacity: 0, y: 20 }}
@@ -1111,14 +1189,18 @@ export const ImageQualityCheck: React.FC<{
                                     focus: 'bg-amber-500',
                                     lighting: 'bg-violet-500',
                                     ip_violation: 'bg-red-500',
-                                    artifact: 'bg-orange-500'
+                                    artifact: 'bg-orange-500',
+                                    gen_ai_anomaly: 'bg-pink-500',
+                                    composition: 'bg-blue-500'
                                   };
                                   const labels = {
                                     noise: t.language === 'Bahasa' ? 'Grain & Noise' : 'Grain & Noise',
                                     focus: t.language === 'Bahasa' ? 'Fokus Kurang' : 'Soft Focus',
                                     lighting: t.language === 'Bahasa' ? 'Masalah Cahaya' : 'Lighting Issue',
                                     ip_violation: t.language === 'Bahasa' ? 'Pelanggaran IP' : 'IP Violation',
-                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact'
+                                    artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact',
+                                    gen_ai_anomaly: t.language === 'Bahasa' ? 'Anomali AI' : 'AI Anomaly',
+                                    composition: t.language === 'Bahasa' ? 'Komposisi' : 'Composition'
                                   };
                                   return (
                                     <motion.div
@@ -1380,40 +1462,24 @@ export const ImageQualityCheck: React.FC<{
                                       </div>
 
                                       {(() => {
-                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || (() => {
-                                          const isBlur = (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur') || i.toLowerCase().includes('sharpness') || i.toLowerCase().includes('tajam') || i.toLowerCase().includes('fokus'));
-                                          const isComposition = (r.technical_issues || []).some(i => i.toLowerCase().includes('composition') || i.toLowerCase().includes('crop') || i.toLowerCase().includes('komposisi') || i.toLowerCase().includes('miring'));
-                                          const isLighting = (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure') || i.toLowerCase().includes('cahaya') || i.toLowerCase().includes('gelap') || i.toLowerCase().includes('terang'));
-                                          const isWatermark = (r.technical_issues || []).some(i => i.toLowerCase().includes('watermark') || i.toLowerCase().includes('tanda air'));
-                                          const isLogo = (r.legal_status || '').includes('VIOLATION') || (r.technical_issues || []).some(i => i.toLowerCase().includes('logo') || i.toLowerCase().includes('brand') || i.toLowerCase().includes('merek'));
-                                          const isText = (r.technical_issues || []).some(i => i.toLowerCase().includes('text') || i.toLowerCase().includes('tulisan') || i.toLowerCase().includes('huruf'));
-                                          const isAnatomy = (r.technical_issues || []).some(i => i.toLowerCase().includes('anatomy') || i.toLowerCase().includes('anatom') || i.toLowerCase().includes('tangan') || i.toLowerCase().includes('jari'));
-                                          const isIpRisk = (r.legal_status || '').includes('VIOLATION') || (r.legal_status || '').includes('AT_RISK') || (r.technical_issues || []).some(i => i.toLowerCase().includes('ip') || i.toLowerCase().includes('patent') || i.toLowerCase().includes('restriction'));
-                                          const isProportion = (r.technical_issues || []).some(i => i.toLowerCase().includes('proportion') || i.toLowerCase().includes('proporsi') || i.toLowerCase().includes('geometry') || i.toLowerCase().includes('geometri'));
-
-                                          return {
-                                            blur: { status: isBlur ? "FAIL" : "PASS", note: isBlur ? (isIndo ? "Terdeteksi masalah fokus, soft focus, atau blur pada subjek utama." : "Focus, soft focus, or blur issues detected on the main subject.") : (isIndo ? "Fokus subjek utama tajam secara sempurna." : "Main subject focus is perfectly sharp.") },
-                                            composition: { status: isComposition ? "FAIL" : "PASS", note: isComposition ? (isIndo ? "Komposisi kurang seimbang atau terdapat pemotongan subjek canggung." : "Composition is unbalanced or awkward subject cropping detected.") : (isIndo ? "Komposisi seimbang dengan rule of thirds." : "Balanced composition matching the rule of thirds.") },
-                                            lighting: { status: isLighting ? "FAIL" : "PASS", note: isLighting ? (isIndo ? "Terdeteksi masalah pencahayaan tidak seimbang, overexposure, atau underexposure." : "Unbalanced lighting, overexposure, or underexposure detected.") : (isIndo ? "Pencahayaan terdistribusi merata dengan detail tinggi." : "Evenly distributed lighting with high details.") },
-                                            watermark: { status: isWatermark ? "FAIL" : "PASS", note: isWatermark ? (isIndo ? "Terdeteksi watermark komersial atau tanda air pada gambar." : "Commercial watermark or text watermark detected.") : (isIndo ? "Tidak mendeteksi watermark komersial." : "No commercial watermarks detected.") },
-                                            logo: { status: isLogo ? "FAIL" : "PASS", note: isLogo ? (isIndo ? "Terdeteksi logo merek dagang atau hak cipta pada gambar." : "Trademark logo or copyright symbol detected on the image.") : (isIndo ? "Bebas dari logo atau hak cipta merek dagang." : "Free of trademark logos or copyright symbols.") },
-                                            text: { status: isText ? "FAIL" : "PASS", note: isText ? (isIndo ? "Terdeteksi teks atau tulisan yang mengganggu estetika komersial." : "Overlay text or writing detected that disrupts commercial aesthetics.") : (isIndo ? "Tidak ada teks overlay mengganggu." : "No disruptive overlay text.") },
-                                            anatomical_errors: { status: isAnatomy ? "FAIL" : "PASS", note: isAnatomy ? (isIndo ? "Terdeteksi anomali struktur tubuh atau anatomi subjek." : "Anatomical anomalies or body structure defects detected.") : (isIndo ? "Struktur anatomi subjek terlihat alami." : "Subject's anatomical structure looks natural.") },
-                                            ip_risk: { status: isIpRisk ? "FAIL" : "PASS", note: isIpRisk ? (isIndo ? "Terdeteksi potensi risiko kekayaan intelektual (IP) atau desain produk khas." : "Potential intellectual property (IP) or unique trade dress design risk detected.") : (isIndo ? "Aman dari potensi resiko paten atau desain khas." : "Safe from potential patent or unique design risks.") },
-                                            proportion_defects: { status: isProportion ? "FAIL" : "PASS", note: isProportion ? (isIndo ? "Terdeteksi ketidaksesuaian proporsi atau cacat geometri pada objek." : "Proportional mismatch or geometrical defects detected on the object.") : (isIndo ? "Proporsi geometri dan anatomi subjek proporsional." : "Geometrical proportions and anatomy are proportional.") },
-                                            stock_acceptance: { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || (r.recommendation === "PASS" ? (isIndo ? "Gambar memenuhi standar kurator komersial." : "The image meets commercial curator standards.") : (isIndo ? "Gambar ditolak berdasarkan kriteria kurasi." : "The image is rejected based on curation criteria.")) },
-                                            metadata: { title: "Stock photography showing details", keywords: r.strengths || [] }
-                                          };
-                                        })();
+                                        const aiVisionChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {};
 
                                         const checks = [
                                           { label: isIndo ? 'Ketajaman / Fokus' : 'Blur / Sharpness', key: 'blur', val: aiVisionChecks.blur },
                                           { label: isIndo ? 'Komposisi / Pemotongan' : 'Composition / Crop', key: 'composition', val: aiVisionChecks.composition },
                                           { label: isIndo ? 'Pencahayaan / Kontras' : 'Lighting / Contrast', key: 'lighting', val: aiVisionChecks.lighting },
+                                          { label: isIndo ? 'Paparan (Exposure)' : 'Exposure Check', key: 'exposure', val: aiVisionChecks.exposure || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
+                                          { label: isIndo ? 'Warna & Saturasi' : 'Color Balance', key: 'color_balance', val: aiVisionChecks.color_balance || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
+                                          { label: isIndo ? 'Over-editing / Filter' : 'Over-edited Check', key: 'over_edited', val: aiVisionChecks.over_edited || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
+                                          { label: isIndo ? 'Debu Sensor / Artefak' : 'Sensor Dust Issues', key: 'sensor_issues', val: aiVisionChecks.sensor_issues || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
                                           { label: isIndo ? 'Pengecekan Watermark' : 'Watermark Check', key: 'watermark', val: aiVisionChecks.watermark },
                                           { label: isIndo ? 'Pendeteksian Logo' : 'Logo Detection', key: 'logo', val: aiVisionChecks.logo },
                                           { label: isIndo ? 'Teks Overlay' : 'Text Overlay Check', key: 'text', val: aiVisionChecks.text },
                                           { label: isIndo ? 'Integritas Anatomi' : 'Anatomical Integrity', key: 'anatomical_errors', val: aiVisionChecks.anatomical_errors },
+                                          { label: isIndo ? 'Cacat Struktural' : 'Structural Defects', key: 'structural_defects', val: aiVisionChecks.structural_defects },
+                                          { label: isIndo ? 'Cacat Ilustrasi (Tepi/Jalur)' : 'Illustration Issues', key: 'illustration_issues', val: aiVisionChecks.illustration_issues || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy/bukan ilustrasi)' : 'Passed (legacy/not illustration)' } },
+                                          { label: isIndo ? 'Standar Vektor (Path/Skala)' : 'Vector Standards', key: 'vector_issues', val: aiVisionChecks.vector_issues || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy/bukan vektor)' : 'Passed (legacy/not vector)' } },
+                                          { label: isIndo ? 'Artefak Render AI' : 'AI Render Artifacts', key: 'ai_artifacts', val: aiVisionChecks.ai_artifacts || { status: 'PASS', note: isIndo ? 'Sesuai standar (legacy)' : 'Passed (legacy)' } },
                                           { label: isIndo ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', key: 'ip_risk', val: aiVisionChecks.ip_risk },
                                           { label: isIndo ? 'Proporsi & Geometri' : 'Proportion & Geometry', key: 'proportion_defects', val: aiVisionChecks.proportion_defects },
                                           { label: isIndo ? 'Penerimaan Stok' : 'Stock Acceptance', key: 'stock_acceptance', val: aiVisionChecks.stock_acceptance },
@@ -1504,6 +1570,39 @@ export const ImageQualityCheck: React.FC<{
                     </motion.div>
                   );
                 })}
+
+                {/* Active Curation Queue Card */}
+                {loading && currentProcessingFile && !reports[currentProcessingFile] && (
+                  <motion.div 
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="group bg-slate-50 dark:bg-slate-900/20 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[2rem] p-5 flex flex-col items-center justify-center min-h-[350px] text-center space-y-4 shadow-sm"
+                  >
+                    <div className="relative w-20 h-20 rounded-2xl overflow-hidden shrink-0 shadow-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                      {previews[currentProcessingFile] ? (
+                        (currentProcessingFile.match(/\.(mp4|mov|webm)$/i) || previews[currentProcessingFile].startsWith('data:video/')) ? (
+                          <video src={`${previews[currentProcessingFile]}#t=1`} className="w-full h-full object-cover" muted playsInline />
+                        ) : (
+                          <img src={previews[currentProcessingFile]} alt="" className="w-full h-full object-cover" />
+                        )
+                      ) : (
+                        <FileImage size={24} className="text-slate-400" />
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 size={24} className="text-white animate-spin" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black text-slate-800 dark:text-white truncate uppercase tracking-tight max-w-[200px] mx-auto">
+                        {currentProcessingFile}
+                      </p>
+                      <p className="text-[9px] font-black text-violet-500 uppercase tracking-[0.2em] mt-2 animate-pulse flex items-center justify-center gap-1.5">
+                        <Loader2 size={10} className="animate-spin text-violet-500 shrink-0" />
+                        {t.qc_status_processing || "Memproses..."}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
