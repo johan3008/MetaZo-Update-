@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, History, Download, Trash2 } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, Download, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getDailyLimit } from '../../constants';
 import { getHeaders } from '../../services/geminiService';
@@ -138,7 +138,6 @@ export const VideoQualityCheck: React.FC<{
   const [isDragging, setIsDragging] = useState(false);
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal'>('visual');
 
   // Helper untuk membaca normalisasi rekomendasi status
@@ -150,85 +149,7 @@ export const VideoQualityCheck: React.FC<{
     return rec === 'RETOUCH' || rec === 'Needs Improvement';
   };
 
-  useEffect(() => {
-    if (user && db) {
-      import('../supabase').then(({ doc, getDoc }) => {
-        getDoc(doc(db, 'users', user.uid)).then(docSnap => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.videoQualityHistory && Array.isArray(data.videoQualityHistory)) {
-              setHistory(data.videoQualityHistory);
-            }
-          }
-        }).catch(err => console.warn("Failed to load video quality history:", err));
-      });
-    }
-  }, [user, db]);
 
-  const saveToHistory = (newReport: QualityReport, fileName: string) => {
-    const newItem: HistoryItem = {
-      id: `vq-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      fileName,
-      report: newReport
-    };
-    const updated = [newItem, ...history.slice(0, 29)];
-    setHistory(updated);
-    
-    if (user && db) {
-      import('../supabase').then(({ doc, updateDoc }) => {
-        updateDoc(doc(db, 'users', user.uid), {
-          videoQualityHistory: updated
-        }).catch(err => console.warn('db_op', err));
-      });
-    }
-  };
-
-  const exportHistoryToJSON = () => {
-    try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
-      const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", `metazo_video_quality_history_${new Date().toISOString().split('T')[0]}.json`);
-      document.body.appendChild(downloadAnchorNode);
-      downloadAnchorNode.click();
-      downloadAnchorNode.remove();
-    } catch (e) {
-      console.error("Export failed", e);
-    }
-  };
-
-  const handleClearHistory = () => {
-    setHistory([]);
-    if (user && db) {
-       import('../supabase').then(({ doc, updateDoc }) => {
-        updateDoc(doc(db, 'users', user.uid), {
-          videoQualityHistory: []
-        }).catch(err => console.warn('db_op', err));
-      });
-    }
-  };
-
-  const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = history.filter(item => item.id !== id);
-    setHistory(updated);
-    if (user && db) {
-      import('../supabase').then(({ doc, updateDoc }) => {
-        updateDoc(doc(db, 'users', user.uid), {
-          videoQualityHistory: updated
-        }).catch(err => console.warn('db_op', err));
-      });
-    }
-  };
-
-  const loadFromHistory = (item: HistoryItem) => {
-    setReport(item.report);
-    setFile(null); 
-    setTimeout(() => {
-      document.getElementById('quality-report-section')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
 
   useEffect(() => {
     fetch(`/api/r2-status?t=${Date.now()}`)
@@ -405,7 +326,6 @@ export const VideoQualityCheck: React.FC<{
 
       const data = await response.json();
       setReport(data);
-      saveToHistory(data, file.name);
 
       if (incrementDailyCount) {
           incrementDailyCount(1);
@@ -783,74 +703,6 @@ export const VideoQualityCheck: React.FC<{
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* History Section */}
-      {history.length > 0 && (
-        <section className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-lg mt-8">
-          <div className="px-8 py-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <History size={16} className="text-slate-400" />
-              <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">Analysis History</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={exportHistoryToJSON}
-                className="p-2 text-slate-400 hover:text-indigo-500 transition-colors"
-                title="Backup History"
-              >
-                <Download size={16} />
-              </button>
-              <button 
-                onClick={handleClearHistory}
-                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                title="Clear History"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-          
-          <div className="divide-y divide-slate-200 dark:divide-white/5">
-            {history.map((item) => (
-              <div 
-                key={item.id}
-                className="group flex items-center justify-between p-4 sm:px-8 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                onClick={() => loadFromHistory(item)}
-              >
-                <div className="flex items-center space-x-4 min-w-0">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    checkIsPass(item.report.recommendation) ? 'bg-emerald-500' :
-                    checkIsRetouch(item.report.recommendation) ? 'bg-amber-500' : 'bg-red-500'
-                  }`} />
-                  <div className="truncate">
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                      {item.fileName || 'Untitled Video'}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {item.timestamp}
-                      </p>
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                        Score: {item.report.overall_score}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-4">
-                  <button 
-                    onClick={(e) => handleDeleteHistoryItem(item.id, e)}
-                    className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete item"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 };
