@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
+import { HOLIDAYS_DATA } from "./holidaysData.ts";
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
 import fs from "node:fs";
 import path from "node:path";
@@ -858,7 +859,7 @@ async function callOpenAICompatibleWithRetry(params: {
           console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
         }
 
-        const fetchTimeout = provider === 'nvidia' ? 25000 : 15000;
+        const fetchTimeout = (provider === 'nvidia' || provider === 'mistral') ? 45000 : 35000;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers,
@@ -3865,216 +3866,244 @@ export async function generateCalendarEvents(month: string, model?: string) {
       enName: 'January',
       idName: 'Januari',
       typicalEvents: [
-        'New Year\'s Day (1 January)',
-        'World Braille Day (4 January)',
-        'Orthodox Christmas (7 January)',
-        'National Youth Day (India - 12 January)',
-        'International Day of Education (24 January)',
-        'Republic Day (India - 26 January)',
-        'Australia Day (26 January)',
-        'International Customs Day (26 January)',
-        'International Holocaust Remembrance Day (27 January)',
-        'Winter Sports / Ski Season Themes',
+        'New Year\'s Day (1 January) - Global/World',
+        'World Braille Day (4 January) - Global/UN',
+        'Epiphany / Three Kings Day (6 January) - Spain, Mexico, Europe',
+        'Orthodox Christmas (7 January) - Eastern Europe, Russia',
+        'National Youth Day (12 January) - India',
+        'Martin Luther King Jr. Day (mid January / 19 January 2026) - USA',
+        'International Day of Education (24 January) - Global/UNESCO',
+        'Republic Day (26 January) - India',
+        'Australia Day (26 January) - Australia',
+        'International Customs Day (26 January) - Global',
+        'International Holocaust Remembrance Day (27 January) - Global/UN',
+        'Street Art and Winter Festivals - Northern Hemisphere',
+        'Winter Sports, Skiing, and Snowboard season trends',
         'New Year Resolutions, Fitness, and Healthy Eating themes',
-        'Back-to-work / Corporate start of year planning'
+        'Back-to-work, Career start, and Corporate start of year planning'
       ]
     },
     'february': {
       enName: 'February',
       idName: 'Februari',
       typicalEvents: [
-        'World Cancer Day (4 February)',
-        'International Day of Women and Girls in Science (11 February)',
-        'World Radio Day (13 February)',
-        'Valentine\'s Day (14 February)',
-        'Chinese New Year / Lunar New Year / Imlek (17 February 2026)',
-        'Ramadan starts (approx. 18 February 2026)',
-        'World Day of Social Justice (20 February)',
-        'International Mother Language Day (21 February)',
-        'Super Bowl (USA)',
-        'President\'s Day (USA - third Monday)',
-        'National Science Day (India - 28 February)',
-        'Winter foliage, snowy forest scenery, cozy winter cabin'
+        'World Cancer Day (4 February) - Global/UN',
+        'Singapore National Day Prep / Heritage starts (February) - Singapore',
+        'International Day of Women and Girls in Science (11 February) - Global/UN',
+        'World Radio Day (13 February) - Global/UNESCO',
+        'Isra Mi\'raj / Ascension of Prophet Muhammad (14 February 2026) - Indonesia/Global',
+        'Valentine\'s Day (14 February) - Global/World',
+        'Chinese New Year / Lunar New Year / Imlek (17 February 2026) - China, Singapore, Indonesia, Global',
+        'Ramadan starts (approx. 18 February 2026) - Global/Islamic',
+        'World Day of Social Justice (20 February) - Global/UN',
+        'International Mother Language Day (21 February) - Global/UNESCO',
+        'Super Bowl Sunday (mid February) - USA',
+        'President\'s Day (third Monday of February) - USA',
+        'National Science Day (28 February) - India',
+        'Carnival of Rio de Janeiro / Venice Carnival (late February/March) - Brazil, Italy, Global',
+        'Black History Month (all February) - USA, Canada',
+        'Cozy cabin, fireplace, winter foliage, snowy forest scenery'
       ]
     },
     'march': {
       enName: 'March',
       idName: 'Maret',
       typicalEvents: [
-        'Zero Discrimination Day (1 March)',
-        'World Wildlife Day (3 March)',
-        'International Women\'s Day (8 March)',
-        'Pi Day / International Day of Mathematics (14 March)',
-        'Holi Festival (India - March)',
-        'St. Patrick\'s Day (17 March)',
-        'International Day of Happiness (20 March)',
-        'Eid al-Fitr / Hari Raya Idul Fitri (20 March 2026)',
-        'Spring Equinox (20 March)',
-        'World Poetry Day (21 March)',
-        'World Water Day (22 March)',
-        'World Meteorological Day (23 March)',
-        'Cherry Blossom Season / Sakura (Japan - late March)',
-        'Spring fashion, outdoor hiking, blossom background patterns'
+        'Zero Discrimination Day (1 March) - Global/UN',
+        'World Wildlife Day (3 March) - Global/UN',
+        'International Women\'s Day (8 March) - Global/World',
+        'Pi Day / International Day of Mathematics (14 March) - Global',
+        'Holi Festival of Colors (March) - India, Global',
+        'St. Patrick\'s Day (17 March) - Ireland, USA, Global',
+        'Nyepi / Balinese Day of Silence (19 March 2026) - Indonesia/Bali',
+        'International Day of Happiness (20 March) - Global/UN',
+        'Eid al-Fitr / Hari Raya Idul Fitri (20 March 2026) - Indonesia, Malaysia, Global/Islamic',
+        'Spring Equinox (20 March) - Northern Hemisphere',
+        'Autumn Equinox (20 March) - Southern Hemisphere',
+        'World Poetry Day (21 March) - Global/UNESCO',
+        'World Water Day (22 March) - Global/UN',
+        'World Meteorological Day (23 March) - Global/UN',
+        'World Theatre Day (27 March) - Global',
+        'Cherry Blossom Season / Sakura (late March) - Japan, South Korea, USA',
+        'Spring Fashion lines, outdoor hiking, blossom background patterns'
       ]
     },
     'april': {
       enName: 'April',
       idName: 'April',
       typicalEvents: [
-        'April Fools\' Day (1 April)',
-        'Good Friday (3 April 2026)',
-        'Easter Sunday (5 April 2026)',
-        'World Health Day (7 April)',
-        'Songkran Water Festival (Thailand - 13-15 April)',
-        'International Day of Human Space Flight (12 April)',
-        'World Heritage Day (18 April)',
-        'Earth Day / International Mother Earth Day (22 April)',
-        'World Book and Copyright Day (23 April)',
-        'Anzac Day (25 April)',
-        'King\'s Day / Koningsdag (Netherlands - 27 April)',
-        'International Jazz Day (30 April)',
-        'Spring Cleaning and gardening themes',
-        'Fresh organic vegetables, farming, ecological energy concepts'
+        'April Fools\' Day (1 April) - Global/World',
+        'Good Friday (3 April 2026) - Global/Christian',
+        'Easter Sunday (5 April 2026) - Global/Christian',
+        'World Health Day (7 April) - Global/WHO',
+        'Songkran Water Festival (13-15 April) - Thailand',
+        'International Day of Human Space Flight (12 April) - Global/UN',
+        'World Heritage Day (18 April) - Global/UNESCO',
+        'Kartini Day (21 April) - Indonesia',
+        'Earth Day / International Mother Earth Day (22 April) - Global/World',
+        'World Book and Copyright Day (23 April) - Global/UNESCO',
+        'Anzac Day (25 April) - Australia, New Zealand',
+        'King\'s Day / Koningsdag (27 April) - Netherlands',
+        'International Jazz Day (30 April) - Global/UNESCO',
+        'Spring Gardening, outdoor farming, fresh organic vegetables',
+        'Ecological energy, green environment, spring cleaning themes'
       ]
     },
     'may': {
       enName: 'May',
       idName: 'Mei',
       typicalEvents: [
-        'International Workers\' Day / May Day (1 May)',
-        'World Press Freedom Day (3 May)',
-        'Cinco de Mayo (5 May)',
-        'Mother\'s Day (second Sunday of May - 10 May 2026)',
-        'International Day of Families (15 May)',
-        'World Telecommunication Day (17 May)',
-        'International Museum Day (18 May)',
-        'Cultural Diversity Day (21 May)',
-        'Eid al-Adha / Hari Raya Haji / Idul Adha (27 May 2026)',
-        'Vesak Day / Hari Waisak (31 May 2026)',
-        'Memorial Day (USA - 25 May 2026)',
-        'Cannes Film Festival (May)',
-        'Wedding season prep, bridal photography, spring picnics'
+        'International Workers\' Day / May Day (1 May) - Global/World',
+        'World Press Freedom Day (3 May) - Global/UN',
+        'Cinco de Mayo (5 May) - Mexico, USA',
+        'Mother\'s Day (second Sunday of May - 10 May 2026) - USA, Indonesia, Global',
+        'Kenaikan Isa Almasih / Ascension Day of Jesus Christ (14 May 2026) - Indonesia, Global',
+        'International Day of Families (15 May) - Global/UN',
+        'World Telecommunication Day (17 May) - Global/UN',
+        'International Museum Day (18 May) - Global/ICOM',
+        'Cultural Diversity Day (21 May) - Global/UNESCO',
+        'Memorial Day (last Monday of May - 25 May 2026) - USA',
+        'Eid al-Adha / Hari Raya Haji / Idul Adha (27 May 2026) - Indonesia, Singapore, Global/Islamic',
+        'Vesak Day / Hari Waisak (31 May 2026) - Global/Buddhist',
+        'Cannes Film Festival (all May) - France, Global',
+        'Wedding season, bridal shower, spring picnics, outdoor graduation parties'
       ]
     },
     'june': {
       enName: 'June',
       idName: 'Juni',
       typicalEvents: [
-        'Global Day of Parents (1 June)',
-        'World Environment Day (5 June)',
-        'World Oceans Day (8 June)',
-        'World Blood Donor Day (14 June)',
-        'Father\'s Day (third Sunday of June - 21 June 2026)',
-        'Juneteenth (USA - 19 June)',
-        'Summer Solstice / Midsummer (21 June)',
-        'International Yoga Day / World Music Day (21 June)',
-        'Public Service Day (23 June)',
-        'Micro, Small and Medium-sized Enterprises Day (27 June)',
-        'Global Pride Month (all June)',
-        'Music festivals, graduation, and school holiday startup themes',
-        'Camping, camping equipment, family road trips, healthy outdoor fitness'
+        'Global Day of Parents (1 June) - Global/UN',
+        'World Environment Day (5 June) - Global/UNEP',
+        'World Oceans Day (8 June) - Global/UN',
+        'World Blood Donor Day (14 June) - Global/WHO',
+        'Father\'s Day (third Sunday of June - 21 June 2026) - USA, Canada, UK, Global',
+        'Juneteenth (19 June) - USA',
+        'Summer Solstice / Midsummer (21 June) - Northern Hemisphere',
+        'International Yoga Day (21 June) - Global/UN',
+        'World Music Day / Fête de la Musique (21 June) - Global/World',
+        'Public Service Day (23 June) - Global/UN',
+        'Micro, Small and Medium-sized Enterprises Day (27 June) - Global/UN',
+        'Asteroid Day (30 June) - Global/UN',
+        'Global Pride Month (all June) - Global/World',
+        'Camping, hiking equipment, family road trips, healthy outdoor fitness',
+        'Music festivals, graduation season, beach setup, school holiday starts'
       ]
     },
     'july': {
       enName: 'July',
       idName: 'Juli',
       typicalEvents: [
-        'Canada Day (1 July)',
-        'Independence Day / 4th of July (USA - 4 July)',
-        'World Population Day (11 July)',
-        'Bastille Day (France - 14 July)',
-        'Tahun Baru Islam / Islamic New Year (16 July 2026)',
-        'World Emoji Day (17 July)',
-        'Nelson Mandela International Day (18 July)',
-        'Hari Asyura / Ashura (25 July 2026)',
-        'World Drowning Prevention Day (25 July)',
-        'International Day of Friendship (30 July)',
-        'Summer Travel, Beach, and Outdoor Recreation themes',
-        'Summer cocktails, pool parties, sunscreen, tropical vacation vibes'
+        'Canada Day (1 July) - Canada',
+        'Independence Day / 4th of July (4 July) - USA',
+        'World Population Day (11 July) - Global/UN',
+        'Bastille Day (14 July) - France',
+        'Tahun Baru Islam / Islamic New Year 1448H (16 July 2026) - Indonesia, Global/Islamic',
+        'World Emoji Day (17 July) - Global/World',
+        'Nelson Mandela International Day (18 July) - Global/UN',
+        'Independence Day of Colombia (20 July) - Colombia',
+        'Hari Asyura / Ashura (25 July 2026) - Global/Islamic',
+        'World Drowning Prevention Day (25 July) - Global/UN',
+        'Independence Day of Peru (28 July) - Peru',
+        'International Day of Friendship (30 July) - Global/UN',
+        'Summer Travel, Beach parties, sunscreen, sunglasses flatlays',
+        'Tropical vacation, cruise ship travel, coconut trees, ocean wave landscape'
       ]
     },
     'august': {
       enName: 'August',
       idName: 'Agustus',
       typicalEvents: [
-        'World Breastfeeding Week (1-7 August)',
-        'Singapore National Day (9 August)',
-        'International Day of the World\'s Indigenous Peoples (9 August)',
-        'International Youth Day (12 August)',
-        'Independence Day (India - 15 August)',
-        'Hari Kemerdekaan Indonesia (17 Agustus)',
-        'World Humanitarian Day (19 August)',
-        'World Photography Day (19 August)',
-        'Maulid Nabi Muhammad / Mawlid al-Nabi (25 August 2026)',
-        'Women\'s Equality Day (USA - 26 August)',
-        'La Tomatina (Spain - last Wednesday of August)',
-        'Obon Festival (Japan - mid August)',
-        'Back-to-School shopping season startup, late summer relaxation'
+        'National Day of Switzerland (1 August) - Switzerland',
+        'World Breastfeeding Week (1-7 August) - Global/UN',
+        'Singapore National Day (9 August) - Singapore',
+        'International Day of the World\'s Indigenous Peoples (9 August) - Global/UN',
+        'International Youth Day (12 August) - Global/UN',
+        'Independence Day of India (15 August) - India',
+        'Hari Kemerdekaan Republik Indonesia (17 Agustus) - Indonesia',
+        'World Humanitarian Day (19 August) - Global/UN',
+        'World Photography Day (19 August) - Global/World',
+        'Maulid Nabi Muhammad / Mawlid al-Nabi (25 August 2026) - Indonesia, Global/Islamic',
+        'Women\'s Equality Day (26 August) - USA',
+        'La Tomatina (last Wednesday of August) - Spain',
+        'Obon Festival (mid August) - Japan',
+        'Back-to-School shopping season startup, autumn semester preparation',
+        'Late summer harvesting, golden wheat fields, sunflowers, stargazing'
       ]
     },
     'september': {
       enName: 'September',
       idName: 'September',
       typicalEvents: [
-        'Labor Day (USA/Canada - 7 September 2026)',
-        'International Literacy Day (8 September)',
-        'Rosh Hashanah / Jewish New Year (11-13 September 2026)',
-        'Yom Kippur (20-21 September 2026)',
-        'International Day of Peace (21 September)',
-        'Autumn Equinox (22 September)',
-        'Mid-Autumn Festival / Mooncake Festival (25 September 2026)',
-        'Oktoberfest begins (Germany - mid September)',
-        'World Tourism Day (27 September)',
-        'Back to school, cozy autumn vibes, harvesting season themes, apple picking'
+        'Independence Day of Brazil (7 September) - Brazil',
+        'Labor Day (first Monday of September / 7 September 2026) - USA, Canada',
+        'International Literacy Day (8 September) - Global/UNESCO',
+        'Rosh Hashanah / Jewish New Year (11-13 September 2026) - Israel, Global/Jewish',
+        'Yom Kippur (20-21 September 2026) - Israel, Global/Jewish',
+        'International Day of Peace (21 September) - Global/UN',
+        'Autumn Equinox (22 September) - Northern Hemisphere',
+        'Spring Equinox (22 September) - Southern Hemisphere',
+        'National Day of Saudi Arabia (23 September) - Saudi Arabia',
+        'Mid-Autumn Festival / Mooncake Festival (25 September 2026) - China, Singapore, East Asia',
+        'Oktoberfest starts (mid September to early October) - Germany, Global',
+        'World Tourism Day (27 September) - Global/UNWTO',
+        'Cozy autumn vibes, back to school, harvesting season, apple picking',
+        'Warm coffee, woolen sweaters, cozy indoor reading, colorful falling leaves'
       ]
     },
     'oktober': {
       enName: 'October',
       idName: 'Oktober',
       typicalEvents: [
-        'International Day of Older Persons (1 October)',
-        'International Coffee Day (1 October)',
-        'Golden Week (China - 1-7 October)',
-        'World Teachers\' Day (5 October)',
-        'World Mental Health Day (10 October)',
-        'International Day of the Girl Child (11 October)',
-        'World Food Day (16 October)',
-        'United Nations Day (24 October)',
-        'Halloween (31 October)',
-        'Pumpkin patch, autumn foliage, horror/spooky, and cozy sweater themes',
-        'Cozy fireplaces, hot cocoa, foggy morning landscapes'
+        'International Day of Older Persons (1 October) - Global/UN',
+        'International Coffee Day (1 October) - Global/World',
+        'Hari Batik Nasional (2 October) - Indonesia',
+        'Golden Week National Holiday (1-7 October) - China',
+        'World Teachers\' Day (5 October) - Global/UNESCO',
+        'World Mental Health Day (10 October) - Global/WHO',
+        'International Day of the Girl Child (11 October) - Global/UN',
+        'Thanksgiving Day (second Monday of October) - Canada',
+        'World Food Day (16 October) - Global/FAO',
+        'United Nations Day (24 October) - Global/UN',
+        'Hari Sumpah Pemuda (28 October) - Indonesia',
+        'Halloween (31 October) - USA, UK, Global/World',
+        'Pumpkin patch, autumn foliage, horror, spooky, and cozy sweater themes',
+        'Cozy fireplaces, hot cocoa, foggy morning landscapes, mist forest hiking'
       ]
     },
     'november': {
       enName: 'November',
       idName: 'November',
       typicalEvents: [
-        'World Vegan Day (1 November)',
-        'Día de los Muertos / Day of the Dead (Mexico - 1-2 November)',
-        'Diwali / Deepavali (8 November 2026)',
-        'Veterans Day / Remembrance Day (11 November)',
-        'World Diabetes Day (14 November)',
-        'World Children\'s Day (20 November)',
-        'Thanksgiving (USA - 26 November 2026)',
-        'Black Friday & Cyber Monday (late November)',
-        'Movember (Men\'s health awareness month)',
-        'Holiday shopping, online shopping, winter fashion trends'
+        'World Vegan Day (1 November) - Global/World',
+        'Día de los Muertos / Day of the Dead (1-2 November) - Mexico, Latin America',
+        'Diwali / Deepavali Festival of Lights (8 November 2026) - India, Singapore, Global',
+        'Hari Pahlawan / National Heroes Day (10 November) - Indonesia',
+        'Veterans Day / Remembrance Day (11 November) - USA, Canada, UK',
+        'World Diabetes Day (14 November) - Global/UN',
+        'World Children\'s Day (20 November) - Global/UNICEF',
+        'Thanksgiving Day (fourth Thursday of November / 26 November 2026) - USA',
+        'Black Friday & Cyber Monday (late November / 27-30 November 2026) - Global',
+        'Movember Men\'s Health Awareness (all November) - Global/World',
+        'Holiday shopping, retail sales, delivery boxes, winter fashion boots and coats'
       ]
     },
     'december': {
       enName: 'December',
       idName: 'Desember',
       typicalEvents: [
-        'World AIDS Day (1 December)',
-        'Hanukkah (4-12 December 2026)',
-        'Human Rights Day (10 December)',
-        'International Mountain Day (11 December)',
-        'Winter Solstice (21 December)',
-        'Christmas Eve & Christmas Day (24-25 December)',
-        'Boxing Day (26 December)',
-        'New Year\'s Eve (31 December)',
-        'Winter holidays, cozy fireplace, snow scenery, and family reunion themes',
-        'New Year resolutions preparation, gingerbread houses, warm winter drinks'
+        'World AIDS Day (1 December) - Global/UN',
+        'Hanukkah Festival of Lights (4-12 December 2026) - Global/Jewish',
+        'Human Rights Day (10 December) - Global/UN',
+        'International Mountain Day (11 December) - Global/UN',
+        'Winter Solstice (21 December) - Northern Hemisphere',
+        'Hari Ibu / National Mother\'s Day (22 December) - Indonesia',
+        'Christmas Eve (24 December) - Global/Christian',
+        'Christmas Day (25 December) - Global/Christian',
+        'Boxing Day (26 December) - UK, Canada, Australia',
+        'New Year\'s Eve (31 December) - Global/World',
+        'Winter holidays, cozy fireplace, snow scenery, holiday baking, gingerbread houses',
+        'New Year resolutions planning, calendar books, diary planners'
       ]
     }
   };
@@ -4103,6 +4132,12 @@ export async function generateCalendarEvents(month: string, model?: string) {
   const targetMonthId = info.idName;
   const typicalEventsStr = info.typicalEvents.map(e => `- ${e}`).join('\n');
 
+  // Retrieve curated holidays from our unified data compilation source
+  let holidayKey = key;
+  if (key === 'oktober') holidayKey = 'october';
+  const curatedHolidays = HOLIDAYS_DATA[holidayKey] || [];
+  const curatedHolidaysStr = curatedHolidays.map((h, i) => `${i + 1}. ${h.name} (${h.date}) - Location: ${h.location}`).join('\n');
+
   const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
 Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month.
 
@@ -4127,19 +4162,16 @@ CRITICAL MONTH MATCHING & ALIGNMENT RULES (MUST FOLLOW STRICTLY):
 2. Target Month: The user has selected the month of "${targetMonthEn}" (also known as "${targetMonthId}").
    - You MUST ONLY generate events, holidays, observances, and festivals that ACTUALLY and historically occur during this specific month (${targetMonthEn}) in the year 2026.
    - You are STRICTLY FORBIDDEN from listing events that happen in other months.
-   - Some reference events and seasonal topics for this month in 2026 include:
-${typicalEventsStr}
 
-3. BE COMPREHENSIVE: Do not just list 5-10 events. Find as many important events as possible (aim for at least 15-20 if valid) based on official UN observances, UNESCO days, world calendars, and national celebrations covering:
-   - Global Holidays & UN Observances (e.g., Earth Day, World Press Freedom Day, World Mental Health Day).
-   - National Days and Independence Days of major countries (e.g., Kemerdekaan Indonesia 17 August, US Independence Day 4 July).
-   - Religious Festivals (Eid, Diwali, Lunar New Year, Christmas, Easter, etc.).
-   - Major Sports Events or Cultural Carnivals.
-   - Seasonal Transitions (Start of Summer, Winter solstice).
+3. PRE-SEEDED WORLD HOLIDAYS (UN, UNESCO, TimeAndDate):
+   To ensure perfect alignment, you MUST include and enrich the following verified global and regional celebrations for this month:
+${curatedHolidaysStr}
 
-4. Focus on events with high commercial value for stock contributors (photos, videos, vector illustrations).
+4. BE COMPREHENSIVE: In addition to the pre-seeded holidays, search for and include other important niche events, cultural celebrations, or national days occurring in this month. Aim for a total of 15-20 highly commercial events.
 
-5. For each event, provide:
+5. Focus on events with high commercial value for stock contributors (photos, videos, vector illustrations).
+
+6. For each event, provide:
    - name: Clear name of the event.
    - date: Date or date range (MUST be within the month of ${targetMonthEn} in 2026).
    - location: Country name or "Global/World".
@@ -4172,15 +4204,19 @@ Output strictly in JSON format.`;
   let responseText = "";
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({
-      systemInstruction,
-      contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
-      responseMimeType: "application/json",
-      responseSchema,
-      config: { temperature: 0.8 },
-      model
-    });
-    responseText = res;
+    try {
+      const res = await callOpenAICompatibleWithRetry({
+        systemInstruction,
+        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+        responseMimeType: "application/json",
+        responseSchema,
+        config: { temperature: 0.8 },
+        model
+      });
+      responseText = res;
+    } catch (err) {
+      console.warn("LLM generation failed, falling back to local curated database:", err);
+    }
   } else {
     try {
       const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
@@ -4192,22 +4228,27 @@ Output strictly in JSON format.`;
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.8
-      });
-      responseText = res.text || "{}";
+      try {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.8
+        });
+        responseText = res.text || "{}";
+      } catch (err2) {
+        console.warn("LLM generation failed, falling back to local curated database:", err2);
+      }
     }
   }
 
-  let parsed: any;
-  try {
-    parsed = JSON.parse(extractJSON(responseText));
-  } catch (err) {
-    console.error("Failed to parse calendar events JSON:", err, responseText);
-    parsed = {};
+  let parsed: any = { events: [] };
+  if (responseText) {
+    try {
+      parsed = JSON.parse(extractJSON(responseText));
+    } catch (err) {
+      console.error("Failed to parse calendar events JSON:", err, responseText);
+    }
   }
 
   // Ensure parsed has events
@@ -4220,11 +4261,25 @@ Output strictly in JSON format.`;
   const otherMonthsId = otherMonthsEn.map(m => MONTH_GUIDELINES[m]?.idName.toLowerCase()).filter(Boolean);
   const otherMonthKeywords = [...otherMonthsEn, ...otherMonthsId];
 
-  let filteredEvents = parsed.events.filter((event: any) => {
+  const isTargetMay = targetMonthEn.toLowerCase() === 'may';
+
+  const llmEvents = parsed.events.filter((event: any) => {
     if (!event || !event.name) return false;
     
     const nameLower = event.name.toLowerCase();
     const dateLower = (event.date || "").toLowerCase();
+
+    // Guard against July/June Hari Raya Haji bug:
+    if (!isTargetMay) {
+      if (
+        nameLower.includes("hari raya haji") || 
+        nameLower.includes("eid al-adha") || 
+        nameLower.includes("idul adha") || 
+        nameLower.includes("qurban")
+      ) {
+        return false; // Exclude entirely if it's not May!
+      }
+    }
 
     // Check if the date belongs to another month strictly
     const hasOtherMonthInDate = otherMonthKeywords.some(mWord => {
@@ -4244,52 +4299,61 @@ Output strictly in JSON format.`;
     return true;
   });
 
-  // If we have less than 6 events, supplement with curated typical events for the month
-  if (filteredEvents.length < 6) {
-    console.log(`Supplementing calendar events with curated fallbacks for: ${targetMonthEn}`);
-    const fallbackEvents = info.typicalEvents.map((ev: string) => {
-      let name = ev;
-      let date = targetMonthEn;
-      let location = "Global";
-      
-      const dateMatch = ev.match(/\(([^)]+)\)/);
-      if (dateMatch) {
-        const inside = dateMatch[1];
-        if (['usa', 'india', 'netherlands', 'france', 'spain', 'japan', 'thailand', 'indonesia', 'germany', 'canada'].some(c => inside.toLowerCase().includes(c))) {
-          location = inside;
-        } else {
-          date = inside;
-        }
-        name = ev.replace(/\s*\([^)]+\)/g, '').trim();
-      }
+  // UNIFIED MERGE ENGINE:
+  // Build the final list of events starting with the curated absolute golden registry
+  const finalEvents: any[] = [];
 
-      return {
-        name,
-        date,
-        location,
-        commercial_potential: `High demand for stock photos, vectors, and footage covering ${name} themes and celebrations globally.`,
-        suggested_topics: [name.toLowerCase(), "celebration", "commercial", "lifestyle", "seasonal"]
-      };
-    });
+  // Seed with curated gold standard list
+  curatedHolidays.forEach((goldEvent) => {
+    // Look for a corresponding event returned by LLM to harvest its rich descriptions if available
+    const matchedLLM = llmEvents.find((le: any) => 
+      le.name.toLowerCase().includes(goldEvent.name.toLowerCase()) || 
+      goldEvent.name.toLowerCase().includes(le.name.toLowerCase())
+    );
 
-    // Merge only unique ones
-    fallbackEvents.forEach(fb => {
-      if (!filteredEvents.some((existing: any) => existing.name.toLowerCase().includes(fb.name.toLowerCase()) || fb.name.toLowerCase().includes(existing.name.toLowerCase()))) {
-        filteredEvents.push(fb);
-      }
-    });
-  }
-
-  // Polish the final date format
-  filteredEvents = filteredEvents.map((event: any) => {
-    let dateStr = event.date || "";
-    if (!dateStr || dateStr.toLowerCase() === "tbd" || dateStr.toLowerCase() === "various" || dateStr.toLowerCase() === "global") {
-      event.date = targetMonthEn;
+    if (matchedLLM) {
+      finalEvents.push({
+        name: goldEvent.name,
+        date: goldEvent.date, // STRICTLY ENFORCE GOLD DATE
+        location: goldEvent.location, // STRICTLY ENFORCE GOLD LOCATION
+        commercial_potential: matchedLLM.commercial_potential || goldEvent.commercial_potential,
+        suggested_topics: Array.isArray(matchedLLM.suggested_topics) && matchedLLM.suggested_topics.length > 0
+          ? matchedLLM.suggested_topics
+          : goldEvent.suggested_topics
+      });
+    } else {
+      finalEvents.push({ ...goldEvent });
     }
-    return event;
   });
 
-  parsed.events = filteredEvents;
+  // Now add any EXTRA validated events from LLM that aren't already represented in finalEvents
+  llmEvents.forEach((le: any) => {
+    const isAlreadyPresent = finalEvents.some((fe) => 
+      fe.name.toLowerCase().includes(le.name.toLowerCase()) || 
+      le.name.toLowerCase().includes(fe.name.toLowerCase())
+    );
+
+    if (!isAlreadyPresent) {
+      // Ensure the date of the extra event has the target month name or is valid
+      let dateStr = le.date || "";
+      if (!dateStr || dateStr.toLowerCase() === "tbd" || dateStr.toLowerCase() === "various" || dateStr.toLowerCase() === "global") {
+        le.date = `${targetMonthEn} 2026`;
+      }
+      finalEvents.push(le);
+    }
+  });
+
+  // CHRONOLOGICAL SORTING:
+  // Sort events by day of the month so the calendar renders beautifully and professionally.
+  finalEvents.sort((a, b) => {
+    const dayA = a.date.match(/^(\d+)/);
+    const dayB = b.date.match(/^(\d+)/);
+    const numA = dayA ? parseInt(dayA[1], 10) : 99;
+    const numB = dayB ? parseInt(dayB[1], 10) : 99;
+    return numA - numB;
+  });
+
+  parsed.events = finalEvents;
   return parsed;
 }
 
