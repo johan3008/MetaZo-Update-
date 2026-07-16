@@ -1111,6 +1111,7 @@ const App: React.FC = () => {
   const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
+  const lastLocalUpdate = useRef<Record<string, number>>({});
 
   // 1. Mark current user as online
   useEffect(() => {
@@ -1235,6 +1236,7 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    lastLocalUpdate.current['mz_ui_language'] = Date.now();
     localStorage.setItem('mz_ui_language', uiLanguage);
     if (auth.currentUser) {
       updateDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -1244,6 +1246,7 @@ const App: React.FC = () => {
   }, [uiLanguage]);
 
   useEffect(() => {
+    lastLocalUpdate.current['mz_keyword_mode'] = Date.now();
     localStorage.setItem('mz_keyword_mode', keywordMode);
     if (auth.currentUser) {
       updateDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -1253,6 +1256,7 @@ const App: React.FC = () => {
   }, [keywordMode]);
 
   useEffect(() => {
+    lastLocalUpdate.current['mz_title_length'] = Date.now();
     localStorage.setItem('mz_title_length', titleLength);
     if (auth.currentUser) {
       updateDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -1262,6 +1266,7 @@ const App: React.FC = () => {
   }, [titleLength]);
 
   useEffect(() => {
+    lastLocalUpdate.current['mz_metadata_language'] = Date.now();
     localStorage.setItem('mz_metadata_language', metadataLanguage);
     if (auth.currentUser) {
       updateDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -1829,6 +1834,12 @@ const App: React.FC = () => {
 
           const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
             if (cloudValue !== undefined) {
+              // Ignore cloud updates if the user has recently updated this setting locally (within the last 10 seconds)
+              const lastChange = lastLocalUpdate.current[localKey] || 0;
+              if (Date.now() - lastChange < 10000) {
+                return;
+              }
+
               let sanitizedValue = cloudValue;
               if (localKey === 'mz_keyword_mode') {
                 if (cloudValue !== 'mixed' && cloudValue !== 'single' && cloudValue !== 'multi') {
