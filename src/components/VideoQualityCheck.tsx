@@ -6,7 +6,7 @@ import { getHeaders } from '../../services/geminiService';
 
 interface QualityReport {
   visual_scan_analysis?: string;
-  recommendation: "PASS" | "FAIL" | "RETOUCH";
+  recommendation: "PASS" | "FAIL" | "RETOUCH" | "PASS_COMMERCIAL" | "PASS_EDITORIAL_ONLY" | "FAIL_REJECT"; // Ditambahkan dukungan skema backend gemini.ts
   overall_score: number;
   technical_score?: number;
   visual_score?: number;
@@ -57,7 +57,11 @@ const CHECK_ITEMS = [
   { key: 'cropped_subject', label: 'Cropped subject', desc: 'Mendeteksi bagian tubuh subjek yang terpotong tidak proporsional.' },
   { key: 'cut_off_object', label: 'Cut-off object', desc: 'Mendeteksi objek utama yang terpotong bingkai.' },
   { key: 'wrong_perspective', label: 'Wrong perspective', desc: 'Mendeteksi perspektif yang tidak sejajar.' },
-  { key: 'low_aesthetic_quality', label: 'Low aesthetic quality', desc: 'Mendeteksi kualitas estetika rendah secara umum.' }
+  { key: 'low_aesthetic_quality', label: 'Low aesthetic quality', desc: 'Mendeteksi kualitas estetika rendah secara umum.' },
+  { key: 'low_framerate', label: 'Low framerate', desc: 'Mendeteksi kecepatan bingkai video yang rendah.' },
+  { key: 'visible_transitions', label: 'Visible transitions', desc: 'Mendeteksi transisi, efek, atau efek overlay yang terlihat jelas.' },
+  { key: 'log_profile', label: 'Log profile / Flat Color', desc: 'Mendeteksi video dengan gamma logaritmik tanpa penyesuaian warna.' },
+  { key: 'upscaled_video', label: 'Upscaled video', desc: 'Mendeteksi peningkatan resolusi paksa (misal dari HD ke 4K).' }
 ];
 
 export const VideoQualityCheck: React.FC<{ 
@@ -83,6 +87,7 @@ export const VideoQualityCheck: React.FC<{
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const isIndo = t.language === 'Bahasa';
+  
   const CHECK_ITEMS_LOCALIZED = CHECK_ITEMS.map(item => {
     let label = item.label;
     let desc = item.desc;
@@ -113,7 +118,11 @@ export const VideoQualityCheck: React.FC<{
         cropped_subject: { label: 'Cropped Subject', desc: 'Detects awkwardly cropped subjects at frame borders.' },
         cut_off_object: { label: 'Cut-off Objects', desc: 'Detects main objects cut off by frame boundaries.' },
         wrong_perspective: { label: 'Wrong Perspective', desc: 'Detects misaligned or incorrect perspective.' },
-        low_aesthetic_quality: { label: 'Low Aesthetic Quality', desc: 'Detects generally low aesthetic or commercial appeal.' }
+        low_aesthetic_quality: { label: 'Low Aesthetic Quality', desc: 'Detects generally low aesthetic or commercial appeal.' },
+        low_framerate: { label: 'Low Framerate', desc: 'Detects low video framerate.' },
+        visible_transitions: { label: 'Visible Transitions', desc: 'Detects visible transitions, effects, or overlays.' },
+        log_profile: { label: 'Log profile / Flat Color', desc: 'Detects logarithmic gamma video without color grading.' },
+        upscaled_video: { label: 'Upscaled Video', desc: 'Detects forced/artificial resolution upscaling.' }
       };
       if (enMap[item.key]) {
         label = enMap[item.key].label;
@@ -122,6 +131,7 @@ export const VideoQualityCheck: React.FC<{
     }
     return { ...item, label, desc };
   });
+
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +139,16 @@ export const VideoQualityCheck: React.FC<{
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal'>('visual');
+
+  // Helper untuk membaca normalisasi rekomendasi status
+  const checkIsPass = (rec?: string) => {
+    return rec === 'PASS' || rec === 'PASS_COMMERCIAL' || rec === 'PASS_EDITORIAL_ONLY';
+  };
+
+  const checkIsRetouch = (rec?: string) => {
+    return rec === 'RETOUCH' || rec === 'Needs Improvement';
+  };
 
   useEffect(() => {
     if (user && db) {
@@ -204,15 +224,17 @@ export const VideoQualityCheck: React.FC<{
 
   const loadFromHistory = (item: HistoryItem) => {
     setReport(item.report);
-    setFile(null); // Clear current file as we are viewing history
-    document.getElementById('quality-report-section')?.scrollIntoView({ behavior: 'smooth' });
+    setFile(null); 
+    setTimeout(() => {
+      document.getElementById('quality-report-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   useEffect(() => {
     fetch(`/api/r2-status?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => setR2Configured(!!data.configured))
-      .catch(() => setR2Configured(false));
+      .catch(() => setR2Configured(null));
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,61 +265,64 @@ export const VideoQualityCheck: React.FC<{
     }
   };
 
-  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
+  const extractVideoFrames = (file: File, frameCount: number = 4): Promise<string[]> => {
     return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
       const video = document.createElement('video');
-      video.src = URL.createObjectURL(videoFile);
       video.muted = true;
       video.playsInline = true;
+      video.preload = 'auto';
       
-      const frames: string[] = [];
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      video.onloadedmetadata = () => {
-        // Resize to 1280px width max to save payload bandwidth
-        const scale = Math.min(1, 1280 / video.videoWidth);
-        canvas.width = video.videoWidth * scale;
-        canvas.height = video.videoHeight * scale;
-        
-        const duration = video.duration;
-        if (!duration || !isFinite(duration) || duration <= 0) {
-            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
-            return;
-        }
+      video.style.position = 'fixed';
+      video.style.top = '-9999px';
+      document.body.appendChild(video);
 
-        const targetTimes = [
-            0.1, // Awal
-            duration / 2, // Tengah
-            Math.max(0, duration - 0.5) // Akhir
-        ];
-        
-        let currentTimeIndex = 0;
-        
-        video.onseeked = () => {
+      const frames: string[] = [];
+      let currentStep = 0;
+
+      video.onloadedmetadata = () => {
+        seekToNextFrame();
+      };
+
+      const seekToNextFrame = () => {
+        if (currentStep >= frameCount) {
+          cleanup();
+          resolve(frames);
+          return;
+        }
+        const targetTime = (video.duration / (frameCount + 1)) * (currentStep + 1);
+        video.currentTime = targetTime;
+      };
+
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 800; 
+          canvas.height = 450;
+          const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Get JPEG base64
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            frames.push(dataUrl);
+            frames.push(canvas.toDataURL('image/jpeg', 0.8));
           }
-          
-          currentTimeIndex++;
-          if (currentTimeIndex < targetTimes.length) {
-            video.currentTime = targetTimes[currentTimeIndex];
-          } else {
-            URL.revokeObjectURL(video.src);
-            resolve(frames);
-          }
-        };
-        
-        // Start extraction
-        video.currentTime = targetTimes[currentTimeIndex];
+          currentStep++;
+          seekToNextFrame();
+        } catch (e) {
+          reject(e);
+        }
       };
-      
+
       video.onerror = () => {
-        reject(new Error("Gagal memutar/memuat video untuk diekstrak. Format mungkin tidak didukung browser."));
+        cleanup();
+        reject(new Error("Gagal memuat berkas video"));
       };
+
+      const cleanup = () => {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        URL.revokeObjectURL(url);
+      };
+
+      video.src = url;
+      video.load();
     });
   };
 
@@ -314,32 +339,68 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      console.log(`[Video Audit] Mengekstrak frame video melalui Browser Frontend...`);
-      
-      // Lakukan ekstraksi frame secara lokal di Browser!
-      // Vercel tidak lagi perlu menggunakan FFmpeg di Backend
-      const framesBase64 = await extractFramesFromVideo(file);
-      
-      console.log(`[Video Audit] Berhasil mengekstrak ${framesBase64.length} frame. Mengirim ke API...`);
+      let response;
+      let uploadedUrl = null;
+      let getUrlData = null;
 
-      const response = await fetch('/api/check-video-quality', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...getHeaders(aiOptions)
-        },
-        body: JSON.stringify({
-          frames: framesBase64,
-          tolerance: tolerance,
-          language: t.language || 'English',
-          model: aiOptions?.model
-        })
-      });
+      if (r2Configured) {
+        try {
+          const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
+          if (getUrlRes.ok) {
+            getUrlData = await getUrlRes.json().catch(() => ({}));
+            if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+              const putRes = await fetch(getUrlData.uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type || 'video/mp4' }
+              });
+              if (putRes.ok) {
+                uploadedUrl = getUrlData.fileUrl;
+              }
+            }
+          }
+        } catch (uploadErr) {
+          console.warn("[Video Audit] Failed to upload to Cloudflare R2", uploadErr);
+        }
+      }
 
+      const activeModel = aiOptions?.model === 'gemini-3.1-pro-preview' || aiOptions?.model === 'gemini-3.1-flash' ? 'gemini-2.5-pro' : (aiOptions?.model || 'gemini-2.5-pro');
+
+      if (uploadedUrl) {
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getHeaders(aiOptions)
+          },
+          body: JSON.stringify({
+            fileUrl: uploadedUrl,
+            pathKey: getUrlData?.pathKey,
+            tolerance,
+            language: t.language || 'English',
+            model: activeModel
+          })
+        });
+      } else {
+        const base64Frames = await extractVideoFrames(file, 4);
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getHeaders(aiOptions)
+          },
+          body: JSON.stringify({
+            frames: base64Frames, 
+            tolerance,
+            language: t.language || 'English',
+            model: activeModel
+          })
+        });
+      }
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed to analyze video: ${response.statusText}`);
+        throw new Error(errData.error || "Gagal menganalisis kualitas video.");
       }
 
       const data = await response.json();
@@ -364,7 +425,7 @@ export const VideoQualityCheck: React.FC<{
           Video Quality Check
         </h2>
         <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">
-          {t.language === 'Bahasa' 
+          {isIndo 
             ? 'Audit otomatis 26 checkpoint kualitas video (blur, noise, overexposure, watermark, AI artifacts, dan masalah legal/teknis lainnya) untuk kelayakan agensi mikrostok global seperti Adobe Stock.'
             : 'Automated 26 checkpoints video quality audit (blur, noise, overexposure, watermark, AI artifacts, and other legal/technical issues) for global microstock agency approval standards.'}
         </p>
@@ -373,12 +434,12 @@ export const VideoQualityCheck: React.FC<{
         <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent dark:from-indigo-500/15 dark:via-indigo-500/5 dark:to-transparent border border-indigo-500/30 dark:border-indigo-500/20 rounded-[1.5rem] p-6 shadow-lg shadow-indigo-500/5 text-left max-w-xl mx-auto mt-6">
           <h4 className="font-bold text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-2 text-sm sm:text-base uppercase tracking-wider">
             <Zap size={16} className="text-indigo-500" /> 
-            {t.language === 'Bahasa' ? 'Alur Kerja Pemeriksaan Visual (AI)' : 'Visual (AI) Audit Workflow'}
+            {isIndo ? 'Alur Kerja Pemeriksaan Visual (AI)' : 'Visual (AI) Audit Workflow'}
           </h4>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-            {t.language === 'Bahasa' 
-              ? 'Sama seperti aplikasi pembuat metadata, sistem secara otomatis mengekstrak beberapa frame kunci secara lokal di browser menggunakan elemen <canvas>, lalu mengirimkannya ke Vision AI Gemini 3.1 Flash Lite dengan prompt khusus dan aturan kurasi Adobe Stock untuk mendeteksi cacat visual, anomali AI, serta risiko hak cipta.'
-              : 'Just like the metadata generator app, the system automatically extracts several keyframes locally in the browser using the <canvas> element, then sends them to Vision AI Gemini 3.1 Flash Lite with custom prompts and Adobe Stock curation guidelines to detect visual flaws, AI anomalies, and copyright risks.'}
+            {isIndo 
+              ? 'Untuk melewati batasan upload 4.5MB dari Vercel, sistem akan langsung mengunggah file video mentah Anda ke Cloudflare R2 secara aman. Backend kemudian akan mengunduhnya untuk mengekstrak beberapa frame kunci, lalu mengirimkannya ke Vision AI Gemini 2.5 Pro dengan aturan kurasi Adobe Stock.'
+              : 'To bypass Vercel\'s 4.5MB upload payload limit, the system directly uploads your raw video file to Cloudflare R2 securely. The backend then downloads it to extract keyframes and sends them to Vision AI Gemini 2.5 Pro with Adobe Stock curation guidelines.'}
           </p>
         </div>
       </div>
@@ -445,7 +506,7 @@ export const VideoQualityCheck: React.FC<{
         </div>
       )}
 
-      {/* Error Message */}
+      {/* R2 Warning */}
       {r2Configured === false && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
@@ -455,10 +516,10 @@ export const VideoQualityCheck: React.FC<{
           <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <h4 className="text-[10px] font-black tracking-wider uppercase text-amber-700 dark:text-amber-400">
-              {t.language === 'Bahasa' ? 'SARAN KONFIGURASI CLOUDFLARE R2' : 'CLOUDFLARE R2 RECOMMENDED'}
+              {isIndo ? 'SARAN KONFIGURASI CLOUDFLARE R2' : 'CLOUDFLARE R2 RECOMMENDED'}
             </h4>
             <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-              {t.language === 'Bahasa' 
+              {isIndo 
                 ? 'Vercel membatasi ukuran request maksimum 4.5MB. Untuk menganalisis file video beresolusi tinggi atau file besar tanpa batasan ukuran payload, silakan konfigurasikan Cloudflare R2 di Settings menu.'
                 : 'Vercel limits request payloads to 4.5MB. To analyze high-resolution videos or large files with no file size limitations, please configure Cloudflare R2 in the Settings menu.'
               }
@@ -485,29 +546,30 @@ export const VideoQualityCheck: React.FC<{
       <AnimatePresence>
         {report && (
           <motion.div 
+            id="quality-report-section"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden"
           >
             <div className={`p-6 sm:p-8 flex items-center justify-between border-b ${
-              report.recommendation === 'PASS' 
+              checkIsPass(report.recommendation) 
                 ? 'border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/50 dark:bg-emerald-900/10' 
-                : report.recommendation === 'RETOUCH'
+                : checkIsRetouch(report.recommendation)
                 ? 'border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'
                 : 'border-red-100 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10'
             }`}>
               <div className="flex items-center gap-4">
-                {report.recommendation === 'PASS' ? (
+                {checkIsPass(report.recommendation) ? (
                   <CheckCircle className="w-10 h-10 text-emerald-500" />
-                ) : report.recommendation === 'RETOUCH' ? (
+                ) : checkIsRetouch(report.recommendation) ? (
                   <AlertCircle className="w-10 h-10 text-amber-500" />
                 ) : (
                   <AlertCircle className="w-10 h-10 text-red-500" />
                 )}
                 <div>
                   <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-                    {report.recommendation === 'PASS' ? 'Lolos (PASS)' : 
-                     report.recommendation === 'RETOUCH' ? 'Perlu Perbaikan (RETOUCH)' : 'Ditolak (FAIL)'}
+                    {checkIsPass(report.recommendation) ? 'Lolos (PASS)' : 
+                     checkIsRetouch(report.recommendation) ? 'Perlu Perbaikan (RETOUCH)' : 'Ditolak (FAIL)'}
                   </h3>
                   <div className="flex flex-wrap items-center gap-3 mt-2">
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">Overall: {report.overall_score}/100</span>
@@ -567,27 +629,54 @@ export const VideoQualityCheck: React.FC<{
 
               {/* Detailed Quality Audit Checklist */}
               <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
-                  {isIndo ? 'Hasil Pemeriksaan Kualitas Video' : 'Video Quality Check Results'} ({CHECK_ITEMS.length} Checkpoints)
-                </h4>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                  <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 shrink-0">
+                    {isIndo ? 'Hasil Pemeriksaan Kualitas Video' : 'Video Quality Check Results'} ({CHECK_ITEMS.length} Checkpoints)
+                  </h4>
+                  
+                  {/* Category Tabs */}
+                  <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto">
+                    <button 
+                      onClick={() => setActiveCategory('visual')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'visual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Teknis Visual' : 'Technical Visual'}
+                    </button>
+                    <button 
+                      onClick={() => setActiveCategory('ai')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'ai' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Integritas AI & Objek' : 'AI & Object Integrity'}
+                    </button>
+                    <button 
+                      onClick={() => setActiveCategory('legal')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'legal' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Hukum & Komersial' : 'Legal & Commercial'}
+                    </button>
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {CHECK_ITEMS_LOCALIZED.map((item) => {
+                  {CHECK_ITEMS_LOCALIZED
+                    .filter(item => {
+                       const cats = {
+                          visual: ['blur', 'noise', 'compression_artifacts', 'blocking', 'banding', 'overexposure', 'underexposure', 'white_balance', 'motion_blur', 'camera_shake', 'out_of_focus', 'flickering', 'duplicate_frame', 'empty_frame', 'black_frame', 'frozen_frame', 'low_framerate', 'visible_transitions', 'log_profile', 'upscaled_video'],
+                          ai: ['ai_artifact', 'deformed_object', 'bad_anatomy', 'cropped_subject', 'cut_off_object', 'wrong_perspective'],
+                          legal: ['watermark', 'logo', 'text', 'low_aesthetic_quality']
+                       };
+                       return cats[activeCategory].includes(item.key);
+                    })
+                    .map((item) => {
                     const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
-                    // Fallback to check if the key exists in technical_issues for resilience
-                    const isFailedInIssues = report.technical_issues?.some(issue => 
-                      issue.toLowerCase().includes(item.key.toLowerCase().replace('_', ' ')) ||
-                      issue.toLowerCase().includes(item.label.toLowerCase())
-                    );
                     
                     const isPass = checkResult 
                       ? checkResult.status === 'PASS' 
-                      : !isFailedInIssues;
+                      : true;
                       
                     const note = checkResult 
                       ? checkResult.note 
-                      : (isFailedInIssues 
-                          ? (isIndo ? 'Terdeteksi adanya masalah pada indikator ini.' : 'Issues detected on this indicator.') 
-                          : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.'));
+                      : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.');
 
                     return (
                       <div 
@@ -730,8 +819,8 @@ export const VideoQualityCheck: React.FC<{
               >
                 <div className="flex items-center space-x-4 min-w-0">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    item.report.recommendation === 'PASS' ? 'bg-emerald-500' :
-                    item.report.recommendation === 'RETOUCH' ? 'bg-amber-500' : 'bg-red-500'
+                    checkIsPass(item.report.recommendation) ? 'bg-emerald-500' :
+                    checkIsRetouch(item.report.recommendation) ? 'bg-amber-500' : 'bg-red-500'
                   }`} />
                   <div className="truncate">
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
