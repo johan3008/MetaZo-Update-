@@ -2811,7 +2811,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -3321,7 +3321,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
   let responseText = "";
@@ -3411,7 +3411,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -3751,7 +3751,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
   // Normalisasi Model ke Seri Resmi Terupdate
-  const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -3776,10 +3776,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    let activeModel = model;
-    if (activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
-      activeModel = 'gemini-2.5-pro'; // Normalisasi ke model visual pro terkuat
-    }
+    const activeModel = model || 'gemini-3.5-flash';
 
     const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
     
@@ -4905,7 +4902,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = frames.map(f => processFrameServer(f));
   
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
