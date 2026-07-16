@@ -828,7 +828,7 @@ async function callOpenAICompatibleWithRetry(params: {
     }
 
     let tryCount = 0;
-    while (tryCount < 3) {
+    while (tryCount < 2) {
       try {
         console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
 
@@ -847,7 +847,7 @@ async function callOpenAICompatibleWithRetry(params: {
           console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
         }
 
-        const fetchTimeout = (provider === 'nvidia' || provider === 'mistral') ? 45000 : 35000;
+        const fetchTimeout = (provider === 'nvidia' || provider === 'mistral') ? 30000 : 25000;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers,
@@ -903,21 +903,20 @@ async function callOpenAICompatibleWithRetry(params: {
         const errorMsg = String(err.message || "").toLowerCase();
 
         // Handle API key rotation on limit or auth errors
-        const shouldRotate = errorMsg.includes('429') || errorMsg.includes('quota') || 
+        const isRateLimit = errorMsg.includes('429') && (errorMsg.includes('try again') || errorMsg.includes('retry in') || errorMsg.includes('wait'));
+        const shouldRotate = (errorMsg.includes('429') && !isRateLimit) || errorMsg.includes('quota') || 
                              errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || 
-                             errorMsg.includes('403') || errorMsg.includes('401') ||
-                             (provider === 'nvidia' && errorMsg.includes('404'));
+                             errorMsg.includes('403') || errorMsg.includes('401');
         
         if (shouldRotate) {
            console.warn(`[${provider.toUpperCase()}] Error requires rotation: ${errorMsg}. Trying next key.`);
            if (providerState && providerState.keys && keysList.length > 1) {
               providerState.activeIndex = (providerState.activeIndex + 1) % keysList.length;
               break;
+           } else {
+              throw err;
            }
         }
-
-        // Handle API key rotation on limit or auth errors (already handled above)
-        // Removing redundant logic that was previously here.
 
         // Automatic model fallback and exponential backoff
         tryCount++;
@@ -928,6 +927,7 @@ async function callOpenAICompatibleWithRetry(params: {
                                  errorMsg.includes('timeout') || 
                                  errorMsg.includes('exceeded') || 
                                  errorMsg.includes('fetch failed') ||
+                                 errorMsg.includes('400') || errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('invalid') ||
                                  errorMsg.includes('500') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504') || errorMsg.includes('524') || errorMsg.includes('upstream_error') ||
                                  errorMsg.includes('extra data') ||
                                  errorMsg.includes('empty response content') ||
@@ -941,9 +941,9 @@ async function callOpenAICompatibleWithRetry(params: {
           continue;
         }
 
-        if (tryCount < 3 && isRetryableError) {
+        if (tryCount < 2 && isRetryableError) {
           const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/3) after ${backoff / 1000}s...`);
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/2) after ${backoff / 1000}s...`);
           await new Promise(resolve => setTimeout(resolve, backoff));
           continue;
         }
@@ -1123,15 +1123,6 @@ function getAIClient(): any {
               const statusCode = err.status || err.code;
               const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
               
-              if (statusCode === 429) {
-                const retryMatch = errorMsg.match(/retry in ([\d\.]+)s/i) || errorMsg.match(/retrydelay['":\s]+([\d\.]+)s/i);
-                if (retryMatch && retryMatch[1]) {
-                  const delay = parseFloat(retryMatch[1]) * 1000 + 1000;
-                  console.log(`[Key Rotation - GEMINI] Rate limited, waiting ${delay}ms before next attempt/key rotation`);
-                  await new Promise(r => setTimeout(r, delay));
-                }
-              }
-
               if (statusCode === 429 || statusCode === 403 || errorMsg.includes("quota") || errorMsg.includes("exceeded") || errorMsg.includes("resource_exhausted") || errorMsg.includes("limit") || errorMsg.includes("api key")) {
               if (store && store.gemini && keysList.length > 1) {
                   store.gemini.activeIndex = (store.gemini.activeIndex + 1) % keysList.length;
@@ -1141,6 +1132,15 @@ function getAIClient(): any {
                   store.activeIndex = (store.activeIndex + 1) % keysList.length;
                   console.warn(`[Key Rotation] Rotating key in generateContent to index ${store.activeIndex}`);
                   continue;
+                }
+              }
+              
+              if (statusCode === 429) {
+                const retryMatch = errorMsg.match(/retry in ([\d\.]+)s/i) || errorMsg.match(/retrydelay['":\s]+([\d\.]+)s/i);
+                if (retryMatch && retryMatch[1]) {
+                  const delay = parseFloat(retryMatch[1]) * 1000 + 1000;
+                  console.log(`[Key Rotation - GEMINI] Rate limited, waiting ${delay}ms before throwing`);
+                  await new Promise(r => setTimeout(r, delay));
                 }
               }
               throw err;
@@ -1160,7 +1160,7 @@ const callGeminiWithRetry = async (
   modelName: string,
   contents: any,
   config: any,
-  maxAttempts: number = 8
+  maxAttempts: number = 3
 ): Promise<any> => {
   let lastError: any;
   let currentModel = modelName;
@@ -1174,10 +1174,22 @@ const callGeminiWithRetry = async (
     } catch (err: any) {
       lastError = err;
       const statusCode = err.status || err.code;
+      const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
+
+      // Handle invalid model names or hallucinated models
+      if (statusCode === 400 || statusCode === 404) {
+          if (errorMsg.includes("model") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("support")) {
+              const fallback = 'gemini-2.5-flash';
+              if (currentModel !== fallback) {
+                  console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Falling back to ${fallback}.`);
+                  currentModel = fallback;
+                  continue; // retry immediately
+              }
+          }
+      }
       
       // Retry on Quota (429) or Server Errors (500, 503, 504)
       if (statusCode === 429 || statusCode >= 500) {
-        const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
         
         let customDelay = 0;
         const retryMatch = errorMsg.match(/retry in ([\d\.]+)s/i) || errorMsg.match(/retrydelay['":\s]+([\d\.]+)s/i);
