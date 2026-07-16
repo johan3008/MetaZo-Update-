@@ -4170,7 +4170,7 @@ CRITICAL MONTH MATCHING & ALIGNMENT RULES (MUST FOLLOW STRICTLY):
    To ensure perfect alignment, you MUST include and enrich the following verified global and regional celebrations for this month:
 ${curatedHolidaysStr}
 
-4. BE COMPREHENSIVE: In addition to the pre-seeded holidays, search for and include other important niche events, cultural celebrations, or national days occurring in this month. Aim for a total of 15-20 highly commercial events.
+4. BE COMPREHENSIVE: In addition to the pre-seeded holidays, search for and include other important niche events, cultural celebrations, or national days occurring in this month. You MUST return at least 25 to 30 highly distinct, real, non-simulated, and commercially valuable global and local events. We want a rich, detailed, global and local representation with no "sometimes few, sometimes many" variation.
 
 5. Focus on events with high commercial value for stock contributors (photos, videos, vector illustrations).
 
@@ -4210,7 +4210,7 @@ Output strictly in JSON format.`;
     try {
       const res = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.8 },
@@ -4222,7 +4222,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -4232,7 +4232,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err: any) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
