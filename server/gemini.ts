@@ -3659,11 +3659,44 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
      * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
    - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
+   - Teks Tidak Terbaca & Gibberish (CRITICAL): Periksa apakah terdapat teks yang tidak terbaca, karakter rusak, kata-kata yang berantakan, atau ejaan aneh (gibberish text) pada papan tulis (whiteboard), catatan tempel (sticky notes), poster, buku, kemasan produk, atau bagian mana pun di dalam gambar. Ini adalah cacat visual generatif AI yang sangat umum dan fatal untuk komersial. Jika gambar mengandung teks berantakan (seperti karakter huruf yang hancur, kata yang tidak bermakna/gibberish, atau gabungan huruf acak), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
 
 6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
    - Masalah Anatomi (Anatomy errors): Jari tangan melengkung tidak wajar, jumlah jari berlebih atau kurang, mata juling, bentuk wajah atau mata asimetris ekstrem, anggota tubuh ganda/tumpang antit, atau sendi yang terkilir secara aneh.
    - Detail yang Meleleh (Melted details): Tekstur ornamen, kacamata, perhiasan, pola pakaian, tulisan, atau detail struktural latar belakang yang meleleh, menyatu secara tidak logis, atau kehilangan keterpisahan spasial yang rapi.
+   - Teks & Karakter Rusak (Gibberish Text): Karakter huruf yang rusak/cacat/terdistorsi, kata-kata tak terbaca, teks hancur atau tidak bermakna di papan tulis (whiteboards), bagan diagram, catatan dinding, atau sticky notes.
+   - Kecacatan Proporsi & Perspektif (Proportion & Perspective Defects) [CRITICAL]: Periksa distorsi proporsi objek fisik, furnitur, ruangan, atau elemen arsitektur (misalnya: ukuran kursi yang terlalu besar atau terlalu kecil dibandingkan meja, tinggi meja yang tidak logis, bentuk sandaran atau kaki kursi yang melengkung aneh, jendela atau pintu yang miring/asimetris tidak logis, kemiringan lantai yang tidak lurus, atau posisi ubin yang bergeser). Periksa juga distorsi proporsi tubuh manusia atau hewan (seperti kepala yang terlalu besar/kecil dibandingkan tubuh, panjang lengan atau kaki yang tidak simetris, atau ukuran kursi yang tidak selaras dengan subjek yang duduk). Jika terdapat kesalahan proporsi yang mencolok atau kegagalan perspektif fisik, status pemeriksaan "proportion_defects", "structural_defects", dan "ai_artifacts" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
    - Kehilangan detail komersial: Tekstur datar yang terlihat terlalu sintetis, sirkuit acak tak bertujuan, objek melayang yang tidak logis (hallucinated objects), atau distorsi geometris pada garis lurus bangunan.
+
+7. INTEGRASI PENUH PANDUAN STANDAR & KEBIJAKAN ADOBE STOCK (CRITICAL):
+   Anda wajib menyelaraskan keputusan kurasi secara ketat dengan tiga dokumen panduan kontributor Adobe Stock resmi berikut:
+   
+   A. Standar Teknis & Kualitas Penolakan Konten (Ref: https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
+      - Out of Focus & Sharpness: Subjek utama wajib in-focus tajam sempurna. Tolak (FAIL) jika terdapat soft focus menyeluruh, camera shake/motion blur tak sengaja, atau kesalahan titik fokus (miss-focus) yang mengaburkan detail subjek.
+      - Exposure & Lighting: Tolak jika terjadi overexposure parah (blown-out highlights/detail putih hilang) atau underexposure parah (crushed shadows/area gelap berlumpur tanpa detail visual). Hindari kontras yang terlampau keras (harsh/extreme contrast) atau flat lighting yang membosankan.
+      - Noise & Grain: Tolak bintik derau yang mengganggu pada area shadow, langit rata, atau permukaan datar akibat pengaturan ISO tinggi. Reduksi noise yang berlebihan hingga subjek tampak mulus tidak alami seperti lilin/plastik (plastic/waxy look) juga WAJIB ditolak.
+      - Image Artifacts & Aberration: Deteksi kompresi JPEG kasar (pixelation, macro-blocks), color banding (gradasi warna terpotong/patah pada langit), aberasi kromatik (magenta/green color fringing pada tepian kontras tinggi), bintik kotoran sensor (sensor dust spots), dan over-sharpening halos.
+      - Masalah Scan & Analog (Jika relevan): Garis Newton rings, goresan fisik, debu pemindaian slide/klise, atau pola gelombang moire.
+      
+   B. Alasan Umum Penolakan Konten (Ref: https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+      - Intellectual Property & Brand Safety: Logo komersial, nama merek dagang, desain produk yang khas (seperti iPhone camera bumps, Adidas stripes, LEGO studs, bodi kamera Polaroid klasik beserta bingkai putihnya, jahitan kuning Dr. Martens, red soles Christian Louboutin, logo Beats "b", Converse rubber toes).
+      - Desain Otomotif Terlindungi: Kisi radiator (grille) BMW, Rolls-Royce, Jeep 7-slot, ornamen kap mesin ikonik, bentuk motor Vespa/Lambretta yang sangat khas.
+      - Karya Seni Berhak Cipta: Mural, grafiti, patung kontemporer (seperti Charging Bull Wall Street, Cloud Gate Chicago), lukisan museum modern, karakter fiksi Disney, Hello Kitty, Pokémon, Marvel, DC.
+      - Dokumen & Mata Uang: Mata uang kertas/logam modern dari negara mana pun (terutama jika difoto datar), prangko, SIM, paspor, kartu identitas nasional, kartu kredit/debit, buku tabungan.
+      - Unusable/Lack of Utility: Gambar yang tidak memiliki subjek jelas, kabur berlebih, berantakan tanpa arah komposisi, atau tidak memiliki potensi komersial.
+      - Judul & Kata Kunci Tidak Patuh: Metadata berisi nama model kamera, merek dagang, URL, kata berulang-ulang yang tidak relevan (keyword stuffing), atau kata kunci yang menyesatkan.
+      
+   C. Kebijakan & Batasan Hak Cipta Terkenal Resmi (Ref: https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
+      - Batasan Landmark & Bangunan Ikonik yang SANGAT KETAT:
+        * Menara Eiffel di malam hari (tata cahaya berhak cipta) dilarang keras (FAIL). Siang hari diperbolehkan (PASS).
+        * Burj Al Arab, Burj Khalifa (Dubai) dilarang keras.
+        * Sydney Opera House (Australia) dilarang keras.
+        * Atomium (Brussels), Louvre Pyramid (Paris), Space Needle (Seattle) dilarang keras.
+        * Hollywood Sign & Hollywood Walk of Fame (Los Angeles) dilarang keras.
+        * Istana Neuschwanstein (Jerman), CN Tower (Toronto), London Eye, Tower Bridge, The Shard (London) dilarang keras.
+        * Transamerica Pyramid (San Francisco), Taipei 101 (Taiwan), Petronas Twin Towers (Malaysia) dilarang keras.
+        * Bagian Interior Kuil Sagrada Família (Barcelona) dilarang keras.
+        * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
 
 PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
 Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:
