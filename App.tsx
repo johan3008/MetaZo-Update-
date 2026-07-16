@@ -1111,7 +1111,6 @@ const App: React.FC = () => {
   const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
-  const lastLocalUpdate = useRef<Record<string, number>>({});
 
   // 1. Mark current user as online
   useEffect(() => {
@@ -1236,43 +1235,19 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    lastLocalUpdate.current['mz_ui_language'] = Date.now();
     localStorage.setItem('mz_ui_language', uiLanguage);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.uiLanguage': uiLanguage
-      }).catch(() => {});
-    }
   }, [uiLanguage]);
 
   useEffect(() => {
-    lastLocalUpdate.current['mz_keyword_mode'] = Date.now();
     localStorage.setItem('mz_keyword_mode', keywordMode);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.keywordMode': keywordMode
-      }).catch(() => {});
-    }
   }, [keywordMode]);
 
   useEffect(() => {
-    lastLocalUpdate.current['mz_title_length'] = Date.now();
     localStorage.setItem('mz_title_length', titleLength);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.titleLength': titleLength
-      }).catch(() => {});
-    }
   }, [titleLength]);
 
   useEffect(() => {
-    lastLocalUpdate.current['mz_metadata_language'] = Date.now();
     localStorage.setItem('mz_metadata_language', metadataLanguage);
-    if (auth.currentUser) {
-      updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        'settings.metadataLanguage': metadataLanguage
-      }).catch(() => {});
-    }
   }, [metadataLanguage]);
 
   // Cek status R2 saat aplikasi dimuat
@@ -1832,32 +1807,7 @@ const App: React.FC = () => {
           syncKey(data.settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
 
 
-          const syncPreference = (cloudValue: string | undefined, localKey: string, setter: any) => {
-            if (cloudValue !== undefined) {
-              // Ignore cloud updates if the user has recently updated this setting locally (within the last 10 seconds)
-              const lastChange = lastLocalUpdate.current[localKey] || 0;
-              if (Date.now() - lastChange < 10000) {
-                return;
-              }
-
-              let sanitizedValue = cloudValue;
-              if (localKey === 'mz_keyword_mode') {
-                if (cloudValue !== 'mixed' && cloudValue !== 'single' && cloudValue !== 'multi') {
-                  sanitizedValue = 'mixed';
-                }
-              }
-              const localValue = localStorage.getItem(localKey) || '';
-              if (sanitizedValue !== localValue) {
-                localStorage.setItem(localKey, sanitizedValue);
-                setter(sanitizedValue);
-              }
-            }
-          };
-
-          syncPreference(data.settings.uiLanguage, 'mz_ui_language', setUiLanguage);
-          syncPreference(data.settings.keywordMode, 'mz_keyword_mode', setKeywordMode);
-          syncPreference(data.settings.titleLength, 'mz_title_length', setTitleLength);
-          syncPreference(data.settings.metadataLanguage, 'mz_metadata_language', setMetadataLanguage);
+          // Local settings are fully decoupled from Firestore real-time sync
 
           if (settingsChanged) {
              setHasCustomKeySaved(
