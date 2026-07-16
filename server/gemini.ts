@@ -1241,11 +1241,44 @@ const callGeminiWithRetry = async (
   throw lastError;
 };
 
-const processFrameServer = (frame: string) => {
-  const [mimePart, dataPart] = frame.split(';base64,');
+const processFrameServer = (frame: any) => {
+  if (typeof frame !== 'string') {
+    console.error('[processFrameServer] Expected string, got:', typeof frame, frame);
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: ''
+      }
+    };
+  }
+  
+  if (!frame.includes(';base64,')) {
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: frame
+      }
+    };
+  }
+  
+  const parts = frame.split(';base64,');
+  if (parts.length < 2) {
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: frame
+      }
+    };
+  }
+  
+  const mimePart = parts[0];
+  const dataPart = parts[1];
+  const mimeSplit = mimePart.split(':');
+  const mimeType = mimeSplit.length > 1 ? mimeSplit[1] : 'image/jpeg';
+  
   return {
     inlineData: {
-      mimeType: mimePart.split(':')[1],
+      mimeType,
       data: dataPart
     }
   };
@@ -3587,30 +3620,87 @@ export async function checkImageQuality(
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  let systemInstruction = `Anda adalah "Ai Vision", sebuah modul kurator dan inspeksi kualitas tingkat lanjut untuk aset mikrostock komersial (Adobe Stock & Shutterstock).
-Tugas Anda terbagi menjadi 3 modul utama:
-1. Modul OCR & Brand Safety Check: Memastikan tidak ada teks/logo ilegal, terdistorsi, atau melanggar hak cipta.
-2. Modul AI Anomaly Detection: Mencari keanehan struktur digital, sirkuit meleleh, dan cacat logika visual AI.
-3. Modul Pixel Analysis: Memastikan kualitas piksel mikro, ketajaman, dan gradasi warna tidak pecah.
+  let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
 
-Fokuskan analisis Anda SECARA KETAT pada kategori berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
-1. Intellectual Property (IP) & Teks: Cari teks generik menyerupai brand terkenal, teks non-Inggris yang terdistorsi/gibberish, dan logo tersembunyi. WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
-2. Artefak Generative AI: Deteksi garis geometris asimetris, sirkuit digital acak yang meleleh, atau keanehan render digital.
-3. Logika Visual & Anatomi: Periksa ketidaksesuaian pantulan cermin, proporsi tubuh/jari tangan, atau perspektif objek yang cacat.
-4. Kualitas Teknis Pixel: Identifikasi area gradasi warna yang rentan mengalami color banding, posterization, atau luminance noise parah.
+Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
+1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang, logo pada produk/pakaian, plat nomor, tanda tangan, wajah tanpa model release, serta teks/watermark ilegal.
+2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh atau lebih dari 5).
+3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
 
-Tingkat Toleransi Saat Ini: ${tolerance}. (STRICT: Zero Tolerance terhadap cacat di kategori ini; MEDIUM: cacat sangat minor ditoleransi; LOOSE: loloskan selama nilai estetika visual tinggi).
+Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
+1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
+   - Subjek utama wajib memiliki fokus yang tajam sempurna (pin-sharp atau tack-sharp).
+   - Deteksi motion blur yang tidak disengaja akibat pergerakan kamera lambat (camera shake) atau shutter speed subjek yang tidak memadai.
+   - Deteksi "soft focus" di mana subjek utama tampak kabur atau tidak terdefinisi secara detail.
+   - Pengecualian: Depth of Field (DoF) dangkal yang disengaja diperbolehkan hanya jika bagian subjek yang penting tetap fokus tajam sempurna (tack-sharp).
+2. EXPOSURE & LIGHTING ISSUES (Masalah Eksposur & Pencahayaan):
+   - Overexposure: Blown highlights/highlights clipping (kehilangan detail pada area terang).
+   - Underexposure: Crushed shadows/muddy shadows (gelap berlumpur dengan noise tinggi atau detail shadow terpotong).
+   - Kontras berlebih (harsh contrast) yang menghilangkan kemulusan gradasi atau pencahayaan datar (flat/muddy lighting) yang membosankan.
+3. NOISE & GRAIN (Masalah Derau):
+   - Deteksi luminance noise (derau bintik pasir) yang kasar dan chromatic/color noise (bintik warna piksel merah/hijau/biru yang tidak semestinya, terutama pada area bayangan) akibat ISO tinggi atau pemrosesan berlebih.
+   - Deteksi "over-aggressive noise reduction" (pengurangan derau berlebih) yang menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
+4. IMAGE ARTIFACTS (Artefak Gambar & Teknis):
+   - Artefak kompresi JPEG: Pixelation parah, blockiness (makro-blok), gradasi patah (color banding/posterization) di area langit atau latar belakang halus.
+   - Chromatic Aberration: Color fringing (pembiasan warna magenta/hijau) di tepian objek berkontras tinggi.
+   - Noda sensor (sensor dust spots): Bintik atau lingkaran abu-abu buram yang samar di langit polos atau area latar belakang seragam akibat sensor kamera kotor.
+   - Over-sharpening: Efek lingkaran cahaya (halos) putih/terang di sekeliling tepian subjek akibat penajaman digital berlebih.
+
+5. INTELLECTUAL PROPERTY & BRAND SAFETY (Kekayaan Intelektual, Hukum & Batasan Terkenal Resmi):
+   - Merek & Logo Komersial: Logo, merek dagang, nama brand, produk bermerek (seperti ponsel dengan tombol khas, pola strip sepatu tertentu, plat nomor kendaraan), karya seni berhak cipta, tato tanpa rilis artis, serta bangunan/arsitektur yang membutuhkan Property Release (seperti gedung ikonik atau properti pribadi yang khas).
+   - Desain Fisik & Bentuk Produk Khas: Desain fisik khas dari produk komersial modern, seperti mainan (lego bricks, boneka Barbie), barang fesyen, elektronik (desain bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
+   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik.
+   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
+     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
+     * Landmark atau monumen tertentu tidak dapat diterima sama sekali karena batasan hak cipta desain bangunan modern atau pengelola tempat.
+     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
+     * Burj Al Arab, Burj Khalifa (Dubai)
+     * Sydney Opera House (Australia)
+     * Atomium (Brussels)
+     * Louvre Pyramid (Paris)
+     * Space Needle (Seattle)
+     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
+     * Istana Neuschwanstein (Jerman)
+     * CN Tower (Toronto)
+     * The Shard, London Eye, Tower Bridge (London)
+     * Transamerica Pyramid (San Francisco)
+     * Kuil Sagrada Família (khusus bagian interior)
+     * Taipei 101 (Taiwan)
+     * Menara Kembar Petronas (Malaysia)
+     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
+   - Karya Seni Berhak Cipta & Hak Cipta Visual:
+     * Karya cipta ciptaan orang lain (copyrighted works), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
+     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
+     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
+   - Dokumen Negara, Uang & Identitas:
+     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
+     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
+   - Hak Pribadi & Tubuh (Biometrics):
+     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
+     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+   - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
+
+6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
+   - Masalah Anatomi (Anatomy errors): Jari tangan melengkung tidak wajar, jumlah jari berlebih atau kurang, mata juling, bentuk wajah atau mata asimetris ekstrem, anggota tubuh ganda/tumpang antit, atau sendi yang terkilir secara aneh.
+   - Detail yang Meleleh (Melted details): Tekstur ornamen, kacamata, perhiasan, pola pakaian, tulisan, atau detail struktural latar belakang yang meleleh, menyatu secara tidak logis, atau kehilangan keterpisahan spasial yang rapi.
+   - Kehilangan detail komersial: Tekstur datar yang terlihat terlalu sintetis, sirkuit acak tak bertujuan, objek melayang yang tidak logis (hallucinated objects), atau distorsi geometris pada garis lurus bangunan.
+
+PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
+Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:
+- STRICT (Toleransi Nol / Zero Tolerance): Anda harus menerapkan standar tertinggi tanpa toleransi terhadap cacat sekecil apa pun. Jika terdapat sedikit saja soft focus, sedikit noise pada shadow, anomali AI mikro di latar belakang, atau potensi pelanggaran IP/Kekayaan Intelektual sekecil apa pun, aset wajib dinyatakan FAIL dengan skor maksimal 0-59.
+- MEDIUM (Standar Industri): Cacat teknis yang sangat minor di luar fokus utama (seperti noise halus yang wajar atau soft focus pada latar belakang artistik) dapat ditoleransi. Namun, kesalahan fokus pada subjek utama, anomali AI yang terlihat jelas, atau pelanggaran IP/Kekayaan Intelektual apa pun wajib dinyatakan FAIL dengan skor maksimal 0-65.
+- LOOSE (Toleransi Longgar / Estetika Tinggi): Utamakan keindahan artistik dan nilai jual komersial secara keseluruhan. Cacat teknis sedang (seperti noise sedang, soft focus ringan pada subjek sekunder, anomali AI minor yang tersembunyi) diperbolehkan lolos (PASS) asalkan subjek utama terlihat luar biasa indah, memiliki komposisi menawan, dan daya tarik komersial yang tinggi. Hanya kegagalan teknis yang fatal atau pelanggaran IP yang sangat terang-terangan yang menyebabkan status FAIL (skor maksimal 0-69).
 
 STATUS & SKORING (KONSISTEN & KETAT):
 - PASS: Skor 75 - 100.
 - FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
 
 ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat luminance noise pada area shadow latar belakang", "perspektif jari telunjuk tidak logis secara struktural"). Bedah aspek temuan dengan ketajaman tinggi.
+1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat noda sensor/sensor dust spot pada area langit", "terdapat luminance noise pada area shadow latar belakang", "perspektif jari telunjuk tidak logis secara struktural", "terjadi sirkuit meleleh atau melted details pada perhiasan"). Bedah aspek temuan dengan ketajaman tinggi.
 2. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
 
 ATURAN BAHASA:
-Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
+` + `Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
 
 ATURAN HEATMAPS:
 Untuk bagian heatmaps, petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
@@ -3686,35 +3776,57 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
-
-  let activeModel = model;
-  if (activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
-    activeModel = 'gemini-2.5-pro'; // Normalisasi ke model visual pro terkuat
-  }
-
-  const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
   const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  
-  for (const modelName of modelsToTryList) {
+
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
       let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
       if (imageMetadata) {
         promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
       
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+      responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.1,
-        topP: 0.85
+        config: { temperature: 0.1 },
+        model: activeModel
       });
-      responseText = res.text || "{}";
-      break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
+      console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
+    }
+  } else {
+    let activeModel = model;
+    if (activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash' || activeModel === 'gemini-3.5-flash') {
+      activeModel = 'gemini-2.5-pro'; // Normalisasi ke model visual pro terkuat
+    }
+
+    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
+    
+    for (const modelName of modelsToTryList) {
+      try {
+        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
+        if (imageMetadata) {
+          promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
+        }
+        
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.1,
+          topP: 0.85
+        });
+        responseText = res.text || "{}";
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
+        if (err.message && err.message.includes('API_KEY')) throw err;
+      }
     }
   }
 
@@ -3758,21 +3870,205 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 export async function generateCalendarEvents(month: string, model?: string) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  
-  const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
-Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month. 
 
-Rules:
-1. BE COMPREHENSIVE: Do not just list 5-10 events. Find as many important events as possible (aim for at least 15-20 if valid) covering:
+  const MONTH_GUIDELINES: Record<string, { enName: string; idName: string; typicalEvents: string[] }> = {
+    'january': {
+      enName: 'January',
+      idName: 'Januari',
+      typicalEvents: [
+        'New Year\'s Day (1 January)',
+        'Orthodox Christmas (7 January)',
+        'Martin Luther King Jr. Day (USA - mid January)',
+        'Republic Day (India - 26 January)',
+        'Australia Day (26 January)',
+        'Chinese New Year / Lunar New Year (often late January or early February)',
+        'Winter Sports / Ski Season Themes',
+        'New Year Resolutions, Fitness, and Healthy Eating themes'
+      ]
+    },
+    'february': {
+      enName: 'February',
+      idName: 'Februari',
+      typicalEvents: [
+        'Groundhog Day (2 February)',
+        'Lunar New Year / Chinese New Year (often February)',
+        'Valentine\'s Day (14 February)',
+        'Super Bowl (USA)',
+        'Rio Carnival / Venice Carnival (February/March)',
+        'Black History Month (USA)',
+        'Lantern Festival'
+      ]
+    },
+    'march': {
+      enName: 'March',
+      idName: 'Maret',
+      typicalEvents: [
+        'Holi Festival (India)',
+        'International Women\'s Day (8 March)',
+        'St. Patrick\'s Day (17 March)',
+        'Cherry Blossom Season / Sakura (Japan - late March)',
+        'Spring Equinox (20/21 March)',
+        'World Water Day (22 March)',
+        'Ramadan (lunar-based, sometimes in March/April)'
+      ]
+    },
+    'april': {
+      enName: 'April',
+      idName: 'April',
+      typicalEvents: [
+        'April Fools\' Day (1 April)',
+        'Good Friday & Easter (often April)',
+        'Earth Day (22 April)',
+        'Songkran Water Festival (Thailand - 13-15 April)',
+        'Anzac Day (25 April)',
+        'King\'s Day / Koningsdag (Netherlands - 27 April)',
+        'Spring Cleaning and gardening themes'
+      ]
+    },
+    'may': {
+      enName: 'May',
+      idName: 'Mei',
+      typicalEvents: [
+        'International Workers\' Day / May Day (1 May)',
+        'Cinco de Mayo (5 May)',
+        'Mother\'s Day (major countries - second Sunday of May)',
+        'Vesak Day (often May)',
+        'Memorial Day (USA - late May)',
+        'Cannes Film Festival',
+        'Start of Summer / Spring flowers themes'
+      ]
+    },
+    'june': {
+      enName: 'June',
+      idName: 'Juni',
+      typicalEvents: [
+        'Global Pride Month (June)',
+        'World Environment Day (5 June)',
+        'Father\'s Day (major countries - third Sunday of June)',
+        'Juneteenth (USA - 19 June)',
+        'Summer Solstice / Midsummer (21 June)',
+        'International Yoga Day (21 June)',
+        'Music festivals, graduation, and school holiday startup themes'
+      ]
+    },
+    'july': {
+      enName: 'July',
+      idName: 'Juli',
+      typicalEvents: [
+        'Canada Day (1 July)',
+        'Independence Day / 4th of July (USA - 4 July)',
+        'Bastille Day (France - 14 July)',
+        'Tanabata Star Festival (Japan - 7 July)',
+        'Nelson Mandela International Day (18 July)',
+        'Summer Travel, Beach, and Outdoor Recreation themes'
+      ]
+    },
+    'august': {
+      enName: 'August',
+      idName: 'Agustus',
+      typicalEvents: [
+        'Singapore National Day (9 August)',
+        'Hari Kemerdekaan Indonesia (17 Agustus)',
+        'Raksha Bandhan (India - August)',
+        'La Tomatina (Spain - last Wednesday of August)',
+        'Obon Festival (Japan - mid August)',
+        'Back-to-School shopping season startup',
+        'Late Summer beach and relaxation themes'
+      ]
+    },
+    'september': {
+      enName: 'September',
+      idName: 'September',
+      typicalEvents: [
+        'Labor Day (USA/Canada - first Monday of September)',
+        'Mid-Autumn Festival / Mooncake Festival (often September)',
+        'Oktoberfest (Germany - starts late September)',
+        'Autumn Equinox (21-23 September)',
+        'Teachers\' Day (various dates)',
+        'Back to school, cozy autumn vibes, harvesting season themes'
+      ]
+    },
+    'oktober': {
+      enName: 'October',
+      idName: 'Oktober',
+      typicalEvents: [
+        'Golden Week (China - early October)',
+        'Oktoberfest (Germany - early October)',
+        'Columbus Day / Indigenous Peoples\' Day (USA - mid October)',
+        'Diwali (often October or November)',
+        'Halloween (31 October)',
+        'Pumpkin patch, autumn foliage, horror/spooky, and cozy sweater themes'
+      ]
+    },
+    'november': {
+      enName: 'November',
+      idName: 'November',
+      typicalEvents: [
+        'Day of the Dead / Día de los Muertos (Mexico - 1-2 November)',
+        'Bonfire Night / Guy Fawkes Night (UK - 5 November)',
+        'Veterans Day / Remembrance Day (11 November)',
+        'Thanksgiving (USA - fourth Thursday of November)',
+        'Black Friday & Cyber Monday (late November)',
+        'Movember (Men\'s health awareness month)'
+      ]
+    },
+    'december': {
+      enName: 'December',
+      idName: 'Desember',
+      typicalEvents: [
+        'Hanukkah (often December)',
+        'Winter Solstice (21/22 December)',
+        'Christmas Eve & Christmas Day (24-25 December)',
+        'Boxing Day (26 December)',
+        'New Year\'s Eve (31 December)',
+        'Winter holidays, cozy fireplace, snow scenery, shopping, and family reunion themes'
+      ]
+    }
+  };
+
+  const cleanMonth = month.trim().toLowerCase();
+  let key = 'january';
+  if (cleanMonth.includes('jan')) key = 'january';
+  else if (cleanMonth.includes('feb')) key = 'february';
+  else if (cleanMonth.includes('mar') || cleanMonth.includes('met')) key = 'march';
+  else if (cleanMonth.includes('apr')) key = 'april';
+  else if (cleanMonth.includes('mei') || cleanMonth.includes('may')) key = 'may';
+  else if (cleanMonth.includes('jun')) key = 'june';
+  else if (cleanMonth.includes('jul')) key = 'july';
+  else if (cleanMonth.includes('agu') || cleanMonth.includes('aug')) key = 'august';
+  else if (cleanMonth.includes('sep')) key = 'september';
+  else if (cleanMonth.includes('okt') || cleanMonth.includes('oct')) key = 'oktober';
+  else if (cleanMonth.includes('nov')) key = 'november';
+  else if (cleanMonth.includes('des') || cleanMonth.includes('dec')) key = 'december';
+  else {
+    const found = Object.keys(MONTH_GUIDELINES).find(k => k.includes(cleanMonth) || cleanMonth.includes(k));
+    if (found) key = found;
+  }
+
+  const info = MONTH_GUIDELINES[key] || { enName: month, idName: month, typicalEvents: [] };
+  const targetMonthEn = info.enName;
+  const targetMonthId = info.idName;
+  const typicalEventsStr = info.typicalEvents.map(e => `- ${e}`).join('\n');
+
+  const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
+Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month.
+
+CRITICAL MONTH MATCHING RULES (MUST FOLLOW STRICTLY):
+1. Target Month: The user has selected the month of "${targetMonthEn}" (also known as "${targetMonthId}").
+   - You MUST ONLY generate events, holidays, observances, and festivals that ACTUALLY and historically occur during this specific month (${targetMonthEn}).
+   - You are STRICTLY FORBIDDEN from listing events that happen in other months. For example, if the target month is January, do NOT list Christmas (December) or Halloween (October).
+   - Some reference events and seasonal topics for this month include:
+${typicalEventsStr}
+2. BE COMPREHENSIVE: Do not just list 5-10 events. Find as many important events as possible (aim for at least 15-20 if valid) covering:
    - Global Holidays (e.g., Earth Day, New Year).
    - National Days and Independence Days of major countries.
    - Religious Festivals (Eid, Diwali, Lunar New Year, Christmas, etc.).
    - Major Sports Events or Cultural Carnivals.
    - Seasonal Transitions (Start of Summer, Winter solstice).
-2. Focus on events with high commercial value for stock contributors.
-3. For each event, provide:
+3. Focus on events with high commercial value for stock contributors.
+4. For each event, provide:
    - name: Clear name of the event.
-   - date: Date or date range.
+   - date: Date or date range (MUST be within the month of ${targetMonthEn}).
    - location: Country name or "Global/World".
    - commercial_potential: A detailed explanation of why stock buyers need content for this (e.g., "High demand for authentic family dinner photos").
    - suggested_topics: 5-8 specific short keywords or subjects (max 1-3 words each, e.g., "family dinner", "fireworks", "traditional dress"). DO NOT use long sentences.
@@ -3805,7 +4101,7 @@ Output strictly in JSON format.`;
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+      contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
       responseMimeType: "application/json",
       responseSchema,
       config: { temperature: 0.8 },
@@ -3814,7 +4110,7 @@ Output strictly in JSON format.`;
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -3823,7 +4119,7 @@ Output strictly in JSON format.`;
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -3833,7 +4129,7 @@ Output strictly in JSON format.`;
     }
   }
 
-  return JSON.parse(responseText);
+  return JSON.parse(extractJSON(responseText));
 }
 
 export async function generateEventKeywords(eventName: string, eventDetails: string, model?: string) {
@@ -4185,7 +4481,7 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     return qaCacheMap.get(cacheKey);
   }
 
-  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kurator Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help: "Quality and Technical Standards Reasons for Content Refusal" (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
+  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal).
 
 Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 3 frame diam yang diekstrak dari bagian Awal, Tengah, dan Akhir video.
 
@@ -4384,23 +4680,40 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   let responseText = "";
   let lastError;
 
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-  for (const modelName of modelsToTryList) {
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+      responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
+        contents: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }],
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.0,
-        topK: 1,
-        topP: 0.1
+        config: { temperature: 0.0 },
+        model: activeModel
       });
-      responseText = res.text || "{}";
-      break;
-    } catch (err) {
+    } catch (err: any) {
       lastError = err;
-      console.warn(`[checkVideoQuality] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
+      console.error(`[checkVideoQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
+    }
+  } else {
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    for (const modelName of modelsToTryList) {
+      try {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.0,
+          topK: 1,
+          topP: 0.1
+        });
+        responseText = res.text || "{}";
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[checkVideoQuality] Failed with ${modelName}:`, err.message || err);
+        if (err.message && err.message.includes('API_KEY')) throw err;
+      }
     }
   }
 
