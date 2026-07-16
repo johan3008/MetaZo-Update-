@@ -3870,21 +3870,205 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 export async function generateCalendarEvents(month: string, model?: string) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  
-  const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
-Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month. 
 
-Rules:
-1. BE COMPREHENSIVE: Do not just list 5-10 events. Find as many important events as possible (aim for at least 15-20 if valid) covering:
+  const MONTH_GUIDELINES: Record<string, { enName: string; idName: string; typicalEvents: string[] }> = {
+    'january': {
+      enName: 'January',
+      idName: 'Januari',
+      typicalEvents: [
+        'New Year\'s Day (1 January)',
+        'Orthodox Christmas (7 January)',
+        'Martin Luther King Jr. Day (USA - mid January)',
+        'Republic Day (India - 26 January)',
+        'Australia Day (26 January)',
+        'Chinese New Year / Lunar New Year (often late January or early February)',
+        'Winter Sports / Ski Season Themes',
+        'New Year Resolutions, Fitness, and Healthy Eating themes'
+      ]
+    },
+    'february': {
+      enName: 'February',
+      idName: 'Februari',
+      typicalEvents: [
+        'Groundhog Day (2 February)',
+        'Lunar New Year / Chinese New Year (often February)',
+        'Valentine\'s Day (14 February)',
+        'Super Bowl (USA)',
+        'Rio Carnival / Venice Carnival (February/March)',
+        'Black History Month (USA)',
+        'Lantern Festival'
+      ]
+    },
+    'march': {
+      enName: 'March',
+      idName: 'Maret',
+      typicalEvents: [
+        'Holi Festival (India)',
+        'International Women\'s Day (8 March)',
+        'St. Patrick\'s Day (17 March)',
+        'Cherry Blossom Season / Sakura (Japan - late March)',
+        'Spring Equinox (20/21 March)',
+        'World Water Day (22 March)',
+        'Ramadan (lunar-based, sometimes in March/April)'
+      ]
+    },
+    'april': {
+      enName: 'April',
+      idName: 'April',
+      typicalEvents: [
+        'April Fools\' Day (1 April)',
+        'Good Friday & Easter (often April)',
+        'Earth Day (22 April)',
+        'Songkran Water Festival (Thailand - 13-15 April)',
+        'Anzac Day (25 April)',
+        'King\'s Day / Koningsdag (Netherlands - 27 April)',
+        'Spring Cleaning and gardening themes'
+      ]
+    },
+    'may': {
+      enName: 'May',
+      idName: 'Mei',
+      typicalEvents: [
+        'International Workers\' Day / May Day (1 May)',
+        'Cinco de Mayo (5 May)',
+        'Mother\'s Day (major countries - second Sunday of May)',
+        'Vesak Day (often May)',
+        'Memorial Day (USA - late May)',
+        'Cannes Film Festival',
+        'Start of Summer / Spring flowers themes'
+      ]
+    },
+    'june': {
+      enName: 'June',
+      idName: 'Juni',
+      typicalEvents: [
+        'Global Pride Month (June)',
+        'World Environment Day (5 June)',
+        'Father\'s Day (major countries - third Sunday of June)',
+        'Juneteenth (USA - 19 June)',
+        'Summer Solstice / Midsummer (21 June)',
+        'International Yoga Day (21 June)',
+        'Music festivals, graduation, and school holiday startup themes'
+      ]
+    },
+    'july': {
+      enName: 'July',
+      idName: 'Juli',
+      typicalEvents: [
+        'Canada Day (1 July)',
+        'Independence Day / 4th of July (USA - 4 July)',
+        'Bastille Day (France - 14 July)',
+        'Tanabata Star Festival (Japan - 7 July)',
+        'Nelson Mandela International Day (18 July)',
+        'Summer Travel, Beach, and Outdoor Recreation themes'
+      ]
+    },
+    'august': {
+      enName: 'August',
+      idName: 'Agustus',
+      typicalEvents: [
+        'Singapore National Day (9 August)',
+        'Hari Kemerdekaan Indonesia (17 Agustus)',
+        'Raksha Bandhan (India - August)',
+        'La Tomatina (Spain - last Wednesday of August)',
+        'Obon Festival (Japan - mid August)',
+        'Back-to-School shopping season startup',
+        'Late Summer beach and relaxation themes'
+      ]
+    },
+    'september': {
+      enName: 'September',
+      idName: 'September',
+      typicalEvents: [
+        'Labor Day (USA/Canada - first Monday of September)',
+        'Mid-Autumn Festival / Mooncake Festival (often September)',
+        'Oktoberfest (Germany - starts late September)',
+        'Autumn Equinox (21-23 September)',
+        'Teachers\' Day (various dates)',
+        'Back to school, cozy autumn vibes, harvesting season themes'
+      ]
+    },
+    'oktober': {
+      enName: 'October',
+      idName: 'Oktober',
+      typicalEvents: [
+        'Golden Week (China - early October)',
+        'Oktoberfest (Germany - early October)',
+        'Columbus Day / Indigenous Peoples\' Day (USA - mid October)',
+        'Diwali (often October or November)',
+        'Halloween (31 October)',
+        'Pumpkin patch, autumn foliage, horror/spooky, and cozy sweater themes'
+      ]
+    },
+    'november': {
+      enName: 'November',
+      idName: 'November',
+      typicalEvents: [
+        'Day of the Dead / Día de los Muertos (Mexico - 1-2 November)',
+        'Bonfire Night / Guy Fawkes Night (UK - 5 November)',
+        'Veterans Day / Remembrance Day (11 November)',
+        'Thanksgiving (USA - fourth Thursday of November)',
+        'Black Friday & Cyber Monday (late November)',
+        'Movember (Men\'s health awareness month)'
+      ]
+    },
+    'december': {
+      enName: 'December',
+      idName: 'Desember',
+      typicalEvents: [
+        'Hanukkah (often December)',
+        'Winter Solstice (21/22 December)',
+        'Christmas Eve & Christmas Day (24-25 December)',
+        'Boxing Day (26 December)',
+        'New Year\'s Eve (31 December)',
+        'Winter holidays, cozy fireplace, snow scenery, shopping, and family reunion themes'
+      ]
+    }
+  };
+
+  const cleanMonth = month.trim().toLowerCase();
+  let key = 'january';
+  if (cleanMonth.includes('jan')) key = 'january';
+  else if (cleanMonth.includes('feb')) key = 'february';
+  else if (cleanMonth.includes('mar') || cleanMonth.includes('met')) key = 'march';
+  else if (cleanMonth.includes('apr')) key = 'april';
+  else if (cleanMonth.includes('mei') || cleanMonth.includes('may')) key = 'may';
+  else if (cleanMonth.includes('jun')) key = 'june';
+  else if (cleanMonth.includes('jul')) key = 'july';
+  else if (cleanMonth.includes('agu') || cleanMonth.includes('aug')) key = 'august';
+  else if (cleanMonth.includes('sep')) key = 'september';
+  else if (cleanMonth.includes('okt') || cleanMonth.includes('oct')) key = 'oktober';
+  else if (cleanMonth.includes('nov')) key = 'november';
+  else if (cleanMonth.includes('des') || cleanMonth.includes('dec')) key = 'december';
+  else {
+    const found = Object.keys(MONTH_GUIDELINES).find(k => k.includes(cleanMonth) || cleanMonth.includes(k));
+    if (found) key = found;
+  }
+
+  const info = MONTH_GUIDELINES[key] || { enName: month, idName: month, typicalEvents: [] };
+  const targetMonthEn = info.enName;
+  const targetMonthId = info.idName;
+  const typicalEventsStr = info.typicalEvents.map(e => `- ${e}`).join('\n');
+
+  const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
+Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month.
+
+CRITICAL MONTH MATCHING RULES (MUST FOLLOW STRICTLY):
+1. Target Month: The user has selected the month of "${targetMonthEn}" (also known as "${targetMonthId}").
+   - You MUST ONLY generate events, holidays, observances, and festivals that ACTUALLY and historically occur during this specific month (${targetMonthEn}).
+   - You are STRICTLY FORBIDDEN from listing events that happen in other months. For example, if the target month is January, do NOT list Christmas (December) or Halloween (October).
+   - Some reference events and seasonal topics for this month include:
+${typicalEventsStr}
+2. BE COMPREHENSIVE: Do not just list 5-10 events. Find as many important events as possible (aim for at least 15-20 if valid) covering:
    - Global Holidays (e.g., Earth Day, New Year).
    - National Days and Independence Days of major countries.
    - Religious Festivals (Eid, Diwali, Lunar New Year, Christmas, etc.).
    - Major Sports Events or Cultural Carnivals.
    - Seasonal Transitions (Start of Summer, Winter solstice).
-2. Focus on events with high commercial value for stock contributors.
-3. For each event, provide:
+3. Focus on events with high commercial value for stock contributors.
+4. For each event, provide:
    - name: Clear name of the event.
-   - date: Date or date range.
+   - date: Date or date range (MUST be within the month of ${targetMonthEn}).
    - location: Country name or "Global/World".
    - commercial_potential: A detailed explanation of why stock buyers need content for this (e.g., "High demand for authentic family dinner photos").
    - suggested_topics: 5-8 specific short keywords or subjects (max 1-3 words each, e.g., "family dinner", "fireworks", "traditional dress"). DO NOT use long sentences.
@@ -3917,7 +4101,7 @@ Output strictly in JSON format.`;
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+      contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
       responseMimeType: "application/json",
       responseSchema,
       config: { temperature: 0.8 },
@@ -3926,7 +4110,7 @@ Output strictly in JSON format.`;
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -3935,7 +4119,7 @@ Output strictly in JSON format.`;
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara for the month of ${month}. Be very detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -3945,7 +4129,7 @@ Output strictly in JSON format.`;
     }
   }
 
-  return JSON.parse(responseText);
+  return JSON.parse(extractJSON(responseText));
 }
 
 export async function generateEventKeywords(eventName: string, eventDetails: string, model?: string) {
