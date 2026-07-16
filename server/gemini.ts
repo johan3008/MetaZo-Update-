@@ -15,25 +15,12 @@ const CACHE_FILE_PATH = path.join(process.cwd(), "qa_reports_cache.json");
 let qaCacheMap: Map<string, any> = new Map();
 
 function loadQACache() {
-  try {
-    if (fs.existsSync(CACHE_FILE_PATH)) {
-      const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
-      const obj = JSON.parse(content);
-      qaCacheMap = new Map(Object.entries(obj));
-      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached reports successfully.`);
-    }
-  } catch (err) {
-    console.warn("[QA Cache] Error loading cache file, starting fresh:", err);
-  }
+  // Caching is disabled to ensure pure, real-time 100% real AI vision analysis
+  console.log("[QA Cache] Caching disabled to ensure pure real-time 100% real AI vision analysis.");
 }
 
 function saveQACache() {
-  try {
-    const obj = Object.fromEntries(qaCacheMap.entries());
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("[QA Cache] Error saving cache file:", err);
-  }
+  // Caching is disabled to ensure pure, real-time 100% real AI vision analysis
 }
 
 // Initialize cache load
@@ -3767,12 +3754,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
-  const randomSeed = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
+      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
         promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
@@ -3782,7 +3768,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.1 },
+        config: { temperature: 0.0, topP: 0.1 },
         model: activeModel
       });
     } catch (err: any) {
@@ -3799,7 +3785,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English). [Unique Session Seed: ${randomSeed}]`;
+        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
@@ -3808,8 +3794,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
-          temperature: 0.1,
-          topP: 0.85
+          temperature: 0.0,
+          topK: 1,
+          topP: 0.1
         });
         responseText = res.text || "{}";
         break;
@@ -3826,10 +3813,13 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Sinkronisasi Sistem Rejection Otomatis Backend
+    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
       let anyFail = false;
       let anyIpFail = false;
+      let hasCriticalFail = false;
+      
+      const criticalKeys = ['blur', 'lighting', 'exposure', 'over_edited', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'watermark', 'logo', 'text', 'ip_risk'];
       
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
@@ -3837,15 +3827,36 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
             anyIpFail = true;
           }
+          if (criticalKeys.includes(key)) {
+            hasCriticalFail = true;
+          }
         }
       }
       
-      if (anyFail) {
-        parsedResult.recommendation = "FAIL";
-        if (parsedResult.overall_score >= 70) {
-          parsedResult.overall_score = 69; 
+      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
+      if (tolerance === 'STRICT') {
+        if (anyFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) {
+            parsedResult.overall_score = 69;
+          }
+        }
+      } else if (tolerance === 'MEDIUM') {
+        if (hasCriticalFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) {
+            parsedResult.overall_score = 69;
+          }
+        }
+      } else if (tolerance === 'LOOSE') {
+        if (anyIpFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) {
+            parsedResult.overall_score = 69;
+          }
         }
       }
+      
       if (anyIpFail) {
         parsedResult.legal_status = "VIOLATION";
       }
@@ -4699,16 +4710,6 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  // Quality check deterministic cache lookup
-  const framesDataCombined = Array.isArray(frames) ? frames.join('') : String(frames);
-  const cacheKeyInput = `${framesDataCombined}_${tolerance}_${targetLanguageName}_${model || "default"}`;
-  const cacheKey = crypto.createHash('sha256').update(cacheKeyInput).digest('hex');
-
-  if (qaCacheMap.has(cacheKey)) {
-    console.log(`[QA Cache] Hit for video quality check (key: ${cacheKey})`);
-    return qaCacheMap.get(cacheKey);
-  }
-
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal).
 
 Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 3 frame diam yang diekstrak dari bagian Awal, Tengah, dan Akhir video.
@@ -4951,8 +4952,60 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const text = responseText;
     console.log('QA raw video response:', text);
     const parsedResult = JSON.parse(extractJSON(text));
-    qaCacheMap.set(cacheKey, parsedResult);
-    saveQACache();
+    
+    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE) untuk Video
+    if (parsedResult.quality_checks) {
+      let anyFail = false;
+      let anyIpFail = false;
+      let hasCriticalFail = false;
+
+      // Kunci kritis untuk kualitas video dalam mode MEDIUM
+      const criticalKeys = ['blur', 'out_of_focus', 'camera_shake', 'flickering', 'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object'];
+
+      for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
+        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
+          anyFail = true;
+          if (['watermark', 'logo', 'text'].includes(key)) {
+            anyIpFail = true;
+          }
+          if (criticalKeys.includes(key)) {
+            hasCriticalFail = true;
+          }
+        }
+      }
+
+      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
+      if (tolerance === 'STRICT') {
+        if (anyFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
+          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
+          parsedResult.adobe_stock_readiness = "Reject Risk";
+        }
+      } else if (tolerance === 'MEDIUM') {
+        if (hasCriticalFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
+          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
+          parsedResult.adobe_stock_readiness = "Reject Risk";
+        }
+      } else if (tolerance === 'LOOSE') {
+        if (anyIpFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
+          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
+          parsedResult.adobe_stock_readiness = "Reject Risk";
+        }
+      }
+
+      if (anyIpFail) {
+        parsedResult.legal_status = "VIOLATION";
+      }
+    }
+    
     return parsedResult;
   } catch(e) {
     console.warn("Parse Error:", responseText);
