@@ -3655,7 +3655,9 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
    - Hak Pribadi & Tubuh (Biometrics):
      * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk.
+     * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
+     * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
    - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
 
 6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
@@ -4811,7 +4813,9 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
      * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
    - Hak Pribadi & Tubuh (Biometrics):
      * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah manusia tanpa Model Release yang valid (jika komersial).
+     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk.
+     * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
+     * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
 
 ---
 STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
