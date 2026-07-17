@@ -398,56 +398,52 @@ export const ImageQualityCheck: React.FC<{
 
   const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
     return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(videoFile);
-      video.muted = true;
-      video.playsInline = true;
-      
-      const frames: string[] = [];
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      video.onloadedmetadata = () => {
-        const scale = Math.min(1, 1280 / video.videoWidth);
-        canvas.width = video.videoWidth * scale;
-        canvas.height = video.videoHeight * scale;
+        const worker = new Worker(new URL('../workers/videoWorker.ts', import.meta.url), { type: 'module' });
+        const jobId = Date.now();
         
-        const duration = video.duration;
-        if (!duration || !isFinite(duration) || duration <= 0) {
-            reject(new Error("Durasi video tidak valid atau tidak terbaca."));
-            return;
-        }
-
-        const targetTimes = [
-            0.1,
-            duration * 0.25,
-            duration * 0.5,
-            duration * 0.75,
-            Math.max(0, duration - 0.5)
-        ];
-        
-        let currentTimeIndex = 0;
-        
-        video.onseeked = () => {
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            frames.push(dataUrl);
-          }
-          
-          currentTimeIndex++;
-          if (currentTimeIndex < targetTimes.length) {
-            video.currentTime = targetTimes[currentTimeIndex];
-          } else {
-            URL.revokeObjectURL(video.src);
-            resolve(frames);
-          }
+        worker.onmessage = (e) => {
+            if (e.data.id !== jobId) return;
+            
+            if (e.data.type === 'progress') {
+                console.log(`[FFmpeg] ${e.data.message || 'Processing: ' + Math.round((e.data.progress || 0) * 100) + '%'}`);
+                return;
+            }
+            
+            if (e.data.success) {
+                const blobs: Blob[] = e.data.framesBlobs;
+                
+                const promises = blobs.map(blob => {
+                    return new Promise<string>((res, rej) => {
+                        const reader = new FileReader();
+                        reader.onload = () => res(reader.result as string);
+                        reader.onerror = rej;
+                        reader.readAsDataURL(blob);
+                    });
+                });
+                
+                Promise.all(promises).then(dataUrls => {
+                    worker.terminate();
+                    resolve(dataUrls);
+                }).catch(err => {
+                    worker.terminate();
+                    reject(err);
+                });
+            } else {
+                worker.terminate();
+                reject(new Error(e.data.error || "Failed to extract frames with FFmpeg"));
+            }
         };
         
-        video.currentTime = targetTimes[currentTimeIndex];
-      };
-      
-      video.onerror = () => reject(new Error("Gagal memutar/memuat video untuk diekstrak."));
+        worker.onerror = (err) => {
+            worker.terminate();
+            reject(err);
+        };
+        
+        worker.postMessage({
+            type: 'extract',
+            file: videoFile,
+            id: jobId
+        });
     });
   };
 
@@ -539,7 +535,7 @@ export const ImageQualityCheck: React.FC<{
         let extractedVideoFrames: string[] | null = null;
         
         if (isVideo) {
-           console.log(`[Video Audit in Image] Mengekstrak frame video melalui Browser Frontend...`);
+           console.log(`[Video Audit in Image] Mengekstrak frame video melalui FFmpeg.wasm...`);
            extractedVideoFrames = await extractFramesFromVideo(file);
         } else if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
