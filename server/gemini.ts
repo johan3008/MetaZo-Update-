@@ -1275,7 +1275,13 @@ const processFrameServer = (frame: any) => {
   const mimePart = parts[0];
   const dataPart = parts[1];
   const mimeSplit = mimePart.split(':');
-  const mimeType = mimeSplit.length > 1 ? mimeSplit[1] : 'image/jpeg';
+  let mimeType = mimeSplit.length > 1 ? mimeSplit[1] : 'image/jpeg';
+  
+  // Gemini Vision only supports specific image types. Fallback to jpeg for others like application/postscript
+  const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  if (!validMimes.includes(mimeType)) {
+    mimeType = 'image/jpeg';
+  }
   
   return {
     inlineData: {
