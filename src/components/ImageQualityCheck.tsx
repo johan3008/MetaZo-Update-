@@ -420,7 +420,9 @@ export const ImageQualityCheck: React.FC<{
 
         const targetTimes = [
             0.1,
-            duration / 2,
+            duration * 0.25,
+            duration * 0.5,
+            duration * 0.75,
             Math.max(0, duration - 0.5)
         ];
         
