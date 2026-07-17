@@ -50,7 +50,8 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Cyberpunk', label: 'Cyberpunk (Futuristik Retro)', icon: '⚡' },
   { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' },
   { id: 'Embroidery', label: 'Embroidery (Seni Bordir)', icon: '🧵' },
-  { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' }
+  { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
+  { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' }
 ];
 
 const PNG_STYLE_OPTIONS = [
