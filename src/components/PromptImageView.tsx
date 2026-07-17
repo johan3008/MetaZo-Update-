@@ -37,6 +37,11 @@ const STYLE_OPTIONS = (t: any) => [
   { id: 'Fine Art', label: t.style_fine_art || 'Fine Art', icon: '🏛️', desc: 'Artistic' },
   { id: '3D Render', label: '3D Render', icon: '🧊', desc: 'Octane Engine' },
   { id: 'Anime', label: 'Anime', icon: '🌸', desc: 'Japanese' },
+  { id: 'Embroidery', label: 'Embroidery', icon: '🧵', desc: 'Needlework' },
+  { id: 'Disney Cartoon', label: 'Disney Cartoon', icon: '🏰', desc: 'Animation' },
+  { id: 'Dark Horror Aesthetic', label: 'Dark Horror', icon: '🦇', desc: 'Macabre' },
+  { id: 'Lego Style', label: 'Lego Style', icon: '🧱', desc: 'Bricks' },
+  { id: 'Voxel Art', label: 'Voxel Art', icon: '🟩', desc: 'Cubes' }
 ];
 
 export const PromptImageView: React.FC<PromptImageViewProps> = ({ 
