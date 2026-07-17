@@ -3626,7 +3626,7 @@ export async function checkImageQuality(
 Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
 1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang, logo pada produk/pakaian, plat nomor, tanda tangan, wajah tanpa model release, serta teks/watermark ilegal.
 2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh atau lebih dari 5).
-3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots). PENTING (CRITICAL): Issues that can impact the technical quality of images include exposure issues, soft focus, excessive filtering or artifacts/noise. Jika ditemukan masalah ini, maka status kualitas teknis dan stock_acceptance WAJIB di-set ke FAIL.
+3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
 
 Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
 1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
@@ -4824,9 +4824,7 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
-5. ROLLING SHUTTER, STABILITY & VIDEO SPECIFIC ISSUES:
-   - PENTING (CRITICAL): Sesuai dengan Rules Adobe Stock Maintain video quality: High-quality video content should be stable, clear, and technically consistent. Jika terdapat unintentional shaking (guncangan tak disengaja/kamera tidak stabil tanpa tripod/stabilizer), empty black or white frame, masalah format/color grading, compression artifact, audio issues, skew distortion, jello effects, atau flash banding, maka status technical_issues dan recommendation WAJIB di-set ke FAIL.
-   - Analisis Seluruh Cuplikan (Analyze Entire Video): Anda wajib mengevaluasi konsistensi kualitas di seluruh frame video, bukan hanya satu frame.
+5. ROLLING SHUTTER & VIDEO SPECIFIC ISSUES:
    - Skew Distortion: Garis tegak lurus tampak miring ketika kamera bergeser secara horizontal (panning) dengan cepat.
    - Jello Effect: Video bergoyang meliuk-liuk secara artifisial seperti jeli karena getaran frekuensi tinggi pada kamera.
    - Flash Banding: Kecerahan video tidak merata (terbagi menjadi pita-pita horizontal) karena kecepatan blitz cahaya atau lampu di sekitar tidak sinkron dengan sensor rolling shutter.
@@ -4834,10 +4832,9 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Duplicate / Empty Frames: Frame kosong (fully black/white) atau macet/membeku (frozen frame).
 
 6. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI):
-   - PENTING (CRITICAL): Jika terdapat distorsi fisika yang mustahil (seperti objek padat menembus objek lain, percikan api/sparks yang bergerak lambat/seperti benda padat aneh, material yang meleleh tidak logis), maka status ai_artifact, deformed_object, dan recommendation WAJIB di-set ke FAIL.
    - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, tangan/kaki meliuk atau menyatu secara tidak logis, mata asimetris/juling, gigi berlebih, bentuk telinga abnormal.
    - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh (seperti benda padat melebur menjadi cairan), hukum fisika yang salah (seperti percikan logam/sparks yang memantul seperti kerupuk/benda padat ringan, gravitasi tidak logis), tekstur kain yang meleleh tersulut api tapi bentuknya seperti plastik cair, perspektif arsitektur patah, bayangan tidak konsisten dengan sumber cahaya. Video AI yang menampilkan percikan api (sparks) palsu yang tampak aneh WAJIB FAIL.
+   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh, perspektif arsitektur patah atau melintir tidak masuk akal, bayangan tidak konsisten dengan sumber cahaya, pola berulang yang tiba-tiba terputus atau rusak.
    - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details).
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
