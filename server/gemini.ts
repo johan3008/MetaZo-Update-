@@ -4805,10 +4805,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Efek noise reduction (pembungkaman noise) yang terlalu agresif, menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
 
 2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION:
-   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit biru.
+   - PENTING (CRITICAL) UNTUK VIDEO: Jika terdapat noise berlebih pada area warna polos atau artifact kompresi yang membuat batas gelembung/objek menjadi bergerigi (pixelated) atau kotor, maka WAJIB DITOLAK (FAIL). Video makro/close-up air atau cairan dengan lighting terang namun kotor oleh noise adalah ciri khas penolakan "Compression Artifacts" atau "Noise" di Adobe Stock.
+   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit biru atau cairan kuning.
    - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi (seperti ranting pohon di latar belakang langit terang).
    - Sensor Dust (Bintik Debu): Bintik-bintik abu-abu/hitam buram melingkar akibat debu pada sensor fisik kamera, terutama tampak jelas pada area warna datar (sky, studio background).
-   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi atau pembesaran gambar (interpolation) paksa.
+   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi atau pembesaran gambar (interpolation) paksa, sangat fatal pada batas gelembung cairan.
    - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
    - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
    - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
@@ -5020,7 +5021,12 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let hasCriticalFail = false;
 
       // Kunci kritis untuk kualitas video dalam mode MEDIUM
-      const criticalKeys = ['blur', 'out_of_focus', 'camera_shake', 'flickering', 'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object'];
+      const criticalKeys = [
+        'blur', 'out_of_focus', 'camera_shake', 'flickering', 'watermark', 'logo', 'text', 
+        'ai_artifact', 'bad_anatomy', 'deformed_object', 'noise', 'compression_artifacts', 
+        'technical_issues', 'banding', 'blocking', 'motion_blur', 'overexposure', 'underexposure', 
+        'low_aesthetic_quality'
+      ];
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
