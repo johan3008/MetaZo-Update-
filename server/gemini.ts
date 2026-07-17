@@ -4824,8 +4824,9 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
-5. ROLLING SHUTTER & VIDEO SPECIFIC ISSUES:
-   - PENTING (CRITICAL): Jika terdapat more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues, maka status technical_issues dan recommendation WAJIB di-set ke FAIL.
+5. ROLLING SHUTTER, STABILITY & VIDEO SPECIFIC ISSUES:
+   - PENTING (CRITICAL): Sesuai dengan Rules Adobe Stock Maintain video quality: High-quality video content should be stable, clear, and technically consistent. Jika terdapat unintentional shaking (guncangan tak disengaja/kamera tidak stabil tanpa tripod/stabilizer), empty black or white frame, masalah format/color grading, compression artifact, audio issues, skew distortion, jello effects, atau flash banding, maka status technical_issues dan recommendation WAJIB di-set ke FAIL.
+   - Analisis Seluruh Cuplikan (Analyze Entire Video): Anda wajib mengevaluasi konsistensi kualitas di seluruh frame video, bukan hanya satu frame.
    - Skew Distortion: Garis tegak lurus tampak miring ketika kamera bergeser secara horizontal (panning) dengan cepat.
    - Jello Effect: Video bergoyang meliuk-liuk secara artifisial seperti jeli karena getaran frekuensi tinggi pada kamera.
    - Flash Banding: Kecerahan video tidak merata (terbagi menjadi pita-pita horizontal) karena kecepatan blitz cahaya atau lampu di sekitar tidak sinkron dengan sensor rolling shutter.
