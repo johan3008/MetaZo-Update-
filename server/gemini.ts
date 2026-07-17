@@ -3626,7 +3626,7 @@ export async function checkImageQuality(
 Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
 1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang, logo pada produk/pakaian, plat nomor, tanda tangan, wajah tanpa model release, serta teks/watermark ilegal.
 2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh atau lebih dari 5).
-3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
+3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots). PENTING (CRITICAL): Issues that can impact the technical quality of images include exposure issues, soft focus, excessive filtering or artifacts/noise. Jika ditemukan masalah ini, maka status kualitas teknis dan stock_acceptance WAJIB di-set ke FAIL.
 
 Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
 1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
@@ -4825,6 +4825,7 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
 
 5. ROLLING SHUTTER & VIDEO SPECIFIC ISSUES:
+   - PENTING (CRITICAL): Jika terdapat more technical issues, such as unintentional shaking, empty black or white frame, compression and/or audio issues, maka status kualitas teknis dan stock_acceptance WAJIB di-set ke FAIL.
    - Skew Distortion: Garis tegak lurus tampak miring ketika kamera bergeser secara horizontal (panning) dengan cepat.
    - Jello Effect: Video bergoyang meliuk-liuk secara artifisial seperti jeli karena getaran frekuensi tinggi pada kamera.
    - Flash Banding: Kecerahan video tidak merata (terbagi menjadi pita-pita horizontal) karena kecepatan blitz cahaya atau lampu di sekitar tidak sinkron dengan sensor rolling shutter.
