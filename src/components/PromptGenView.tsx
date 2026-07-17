@@ -48,7 +48,9 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Abstract', label: 'Abstract (Abstrak)', icon: '⛰️' },
   { id: 'Vintage Photography', label: 'Vintage Photography (Klasik)', icon: '🎞️' },
   { id: 'Cyberpunk', label: 'Cyberpunk (Futuristik Retro)', icon: '⚡' },
-  { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' }
+  { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' },
+  { id: 'Embroidery', label: 'Embroidery (Seni Bordir)', icon: '🧵' },
+  { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' }
 ];
 
 const PNG_STYLE_OPTIONS = [
