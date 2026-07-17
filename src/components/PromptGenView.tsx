@@ -53,7 +53,8 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
-  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
+  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
+  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
 ];
 
 const PNG_STYLE_OPTIONS = [
