@@ -90,10 +90,12 @@ self.onmessage = async (e: MessageEvent) => {
         
         const seekTimes = [
             duration * 0.1,
+            duration * 0.25,
             duration * 0.5,
-            duration * 0.9
+            duration * 0.75,
+            Math.max(0, duration - 0.5)
         ];
-        const frameWidth = 320;
+        const frameWidth = 1280;
         const framesBlobs: Blob[] = [];
         
         for (let i = 0; i < seekTimes.length; i++) {
