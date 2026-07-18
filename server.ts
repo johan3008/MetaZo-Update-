@@ -18,6 +18,7 @@ import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { exiftool } from 'exiftool-vendored';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
@@ -1523,6 +1524,17 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
 
+            let videoFile = null;
+            if (!extractionSuccess && videoPath) {
+                try {
+                    console.log('Server check-video-quality: Uploading raw video to Gemini...');
+                    videoFile = await uploadVideoToGemini(videoPath, req.file ? req.file.mimetype : 'video/mp4');
+                    extractionSuccess = true;
+                } catch (uploadErr: any) {
+                    console.warn('[Video Audit Fallback] Upload to Gemini File API failed:', uploadErr);
+                }
+            }
+
             if (!extractionSuccess && ffmpeg) {
                 try {
                     console.log('Server check-video-quality: Extracting frames...');
@@ -1595,9 +1607,26 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 console.warn('[Video Audit Fallback] FFmpeg not initialized and no frames provided. Using fallback simulation audit.');
             }
 
-            if (extractionSuccess && frames && frames.length > 0) {
+            if (extractionSuccess && (videoFile || (frames && frames.length > 0))) {
                 console.log('Server check-video-quality: Analyzing frames with Gemini...');
-                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model);
+                let videoMetadata = null;
+                if (videoPath) {
+                    try {
+                        console.log('Server check-video-quality: Extracting ExifTool metadata...');
+                        videoMetadata = await exiftool.read(videoPath);
+                        // Clean up noisy or binary metadata to save prompt tokens
+                        delete videoMetadata.Directory;
+                        delete videoMetadata.SourceFile;
+                        delete videoMetadata.FileName;
+                        delete videoMetadata.FileAccessDate;
+                        delete videoMetadata.FileModifyDate;
+                        delete videoMetadata.FileInodeChangeDate;
+                        delete videoMetadata.FilePermissions;
+                    } catch (exifErr) {
+                        console.warn('[Video Audit] ExifTool extraction failed:', exifErr);
+                    }
+                }
+                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile);
                 console.log('Server check-video-quality: Analysis successful');
                 cleanupFn();
                 res.json(data);
