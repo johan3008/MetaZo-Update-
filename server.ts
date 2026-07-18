@@ -1364,14 +1364,58 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/extract-exif', upload.single('file'), async (req, res) => {
+        let tempFilePath = "";
+        let cleanupFn = () => {};
+        try {
+            let filePath = "";
+            if (req.file) {
+                filePath = req.file.path;
+                tempFilePath = filePath;
+                cleanupFn = () => {
+                    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+                };
+            } else if (req.body.fileUrl) {
+                const { fileUrl, pathKey, fileType } = req.body;
+                const ext = fileType?.includes('png') ? '.png' : fileType?.includes('gif') ? '.gif' : '.jpg';
+                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
+                filePath = downloadResult.localPath;
+                tempFilePath = filePath;
+                cleanupFn = downloadResult.cleanup;
+            } else {
+                return res.status(400).json({ error: 'No file uploaded or fileUrl provided' });
+            }
+
+            console.log(`[ExifTool API] Extracting metadata from: ${filePath}`);
+            const { exiftool } = require('exiftool-vendored');
+            const exifData = await exiftool.read(filePath);
+            
+            // Clean up noisy tags to save tokens
+            delete exifData.Directory;
+            delete exifData.SourceFile;
+            delete exifData.FileName;
+            delete exifData.FileAccessDate;
+            delete exifData.FileModifyDate;
+            delete exifData.FileInodeChangeDate;
+            delete exifData.FilePermissions;
+
+            res.json({ success: true, metadata: exifData });
+        } catch (e: any) {
+            console.warn('[ExifTool API] Error extracting EXIF:', e);
+            res.status(500).json({ error: e.message || 'Error extracting EXIF' });
+        } finally {
+            cleanupFn();
+        }
+    });
+
     app.post('/api/generate-metadata', async (req, res) => {
         try {
-            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance } = req.body;
+            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata } = req.body;
             if (!frames || !Array.isArray(frames)) {
                 return res.status(400).json({ error: 'Missing or invalid frames' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance);
+            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
             res.json(metadata);
         } catch (e: any) {
             console.warn('Server generate-metadata error:', e);
