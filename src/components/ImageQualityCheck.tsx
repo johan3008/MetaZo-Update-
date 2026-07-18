@@ -396,57 +396,6 @@ export const ImageQualityCheck: React.FC<{
     });
   };
 
-  const extractFramesFromVideo = (videoFile: File): Promise<string[]> => {
-    return new Promise((resolve, reject) => {
-        const worker = new Worker(new URL('../workers/videoWorker.ts', import.meta.url), { type: 'module' });
-        const jobId = Date.now();
-        
-        worker.onmessage = (e) => {
-            if (e.data.id !== jobId) return;
-            
-            if (e.data.type === 'progress') {
-                console.log(`[FFmpeg] ${e.data.message || 'Processing: ' + Math.round((e.data.progress || 0) * 100) + '%'}`);
-                return;
-            }
-            
-            if (e.data.success) {
-                const blobs: Blob[] = e.data.framesBlobs;
-                
-                const promises = blobs.map(blob => {
-                    return new Promise<string>((res, rej) => {
-                        const reader = new FileReader();
-                        reader.onload = () => res(reader.result as string);
-                        reader.onerror = rej;
-                        reader.readAsDataURL(blob);
-                    });
-                });
-                
-                Promise.all(promises).then(dataUrls => {
-                    worker.terminate();
-                    resolve(dataUrls);
-                }).catch(err => {
-                    worker.terminate();
-                    reject(err);
-                });
-            } else {
-                worker.terminate();
-                reject(new Error(e.data.error || "Failed to extract frames with FFmpeg"));
-            }
-        };
-        
-        worker.onerror = (err) => {
-            worker.terminate();
-            reject(err);
-        };
-        
-        worker.postMessage({
-            type: 'extract',
-            file: videoFile,
-            id: jobId
-        });
-    });
-  };
-
   const handleFilesSelected = async (selectedFiles: FileList | File[]) => {
     // Revoke old object URLs
     Object.keys(previews).forEach(key => URL.revokeObjectURL(previews[key]));
@@ -532,35 +481,35 @@ export const ImageQualityCheck: React.FC<{
 
         // Try R2 upload for standard images to prevent Vercel 4.5MB payload limits
         const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|mov|webm)$/i);
-        let extractedVideoFrames: string[] | null = null;
         
-        if (isVideo) {
-           console.log(`[Video Audit in Image] Mengekstrak frame video melalui FFmpeg.wasm...`);
-           extractedVideoFrames = await extractFramesFromVideo(file);
-        } else if (!file.name.match(/\.(eps|ai)$/i)) {
+        if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
             let uploadBlob: Blob | File = file;
             
-            try {
-              const arr = base64Image.split(',');
-              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-              const bstr = atob(arr[1]);
-              let n = bstr.length;
-              const u8arr = new Uint8Array(n);
-              while (n--) {
-                u8arr[n] = bstr.charCodeAt(n);
-              }
-              uploadBlob = new Blob([u8arr], { type: mime });
-            } catch (e) {
-              console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
-              uploadBlob = file;
+            if (!isVideo) {
+                try {
+                  const arr = base64Image.split(',');
+                  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+                  const bstr = atob(arr[1]);
+                  let n = bstr.length;
+                  const u8arr = new Uint8Array(n);
+                  while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                  }
+                  uploadBlob = new Blob([u8arr], { type: mime });
+                } catch (e) {
+                  console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
+                  uploadBlob = file;
+                }
+            } else {
+                uploadBlob = file; // Direct upload for video
             }
 
             const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
             if (getUrlRes.ok) {
               getUrlData = await getUrlRes.json().catch(() => ({}));
               if (getUrlData.uploadUrl && getUrlData.fileUrl) {
-                console.log(`[Image Audit] Uploading to Cloudflare R2: ${file.name}`);
+                console.log(`[Media Audit] Uploading to Cloudflare R2: ${file.name}`);
                 const putRes = await fetch(getUrlData.uploadUrl, {
                   method: 'PUT',
                   body: uploadBlob,
@@ -569,28 +518,42 @@ export const ImageQualityCheck: React.FC<{
                 if (putRes.ok) {
                   uploadedUrl = getUrlData.fileUrl;
                 } else {
-                  console.warn(`[Image Audit] PUT to R2 failed: ${putRes.status}`);
+                  console.warn(`[Media Audit] PUT to R2 failed: ${putRes.status}`);
                 }
               }
             }
           } catch (uploadErr) {
-            console.warn("[Image Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
+            console.warn("[Media Audit] Failed to upload to Cloudflare R2, falling back to base64 payload:", uploadErr);
           }
         }
 
         let response;
         
-        if (isVideo && extractedVideoFrames) {
-          response = await fetch('/api/check-video-quality', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-            body: JSON.stringify({
-              frames: extractedVideoFrames,
-              tolerance,
-              language: t.language || 'English',
-              model: aiOptions?.model || 'gemini-3.1-pro-preview'
-            })
-          });
+        if (isVideo) {
+          if (uploadedUrl) {
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+              body: JSON.stringify({
+                fileUrl: uploadedUrl,
+                pathKey: getUrlData?.pathKey,
+                tolerance,
+                language: t.language || 'English',
+                model: aiOptions?.model || 'gemini-3.1-pro-preview'
+              })
+            });
+          } else {
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('tolerance', tolerance);
+            formData.append('language', t.language || 'English');
+            if (aiOptions?.model) formData.append('model', aiOptions.model);
+            response = await fetch('/api/check-video-quality', {
+              method: 'POST',
+              headers: getHeaders(aiOptions),
+              body: formData
+            });
+          }
         } else if (uploadedUrl) {
           response = await fetch('/api/check-image-quality', {
             method: 'POST',
