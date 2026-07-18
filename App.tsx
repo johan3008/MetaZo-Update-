@@ -3342,6 +3342,27 @@ const App: React.FC = () => {
         if (!analysisFrames || analysisFrames.length === 0) {
             throw new Error("Tidak ada data visual untuk dianalisis.");
         }
+
+        let exifMetadata = fileItem.exifMetadata;
+        if (!exifMetadata && fileItem.file && fileItem.file.size > 0) {
+            try {
+                const formData = new FormData();
+                formData.append('file', fileItem.file);
+                const exifRes = await fetch('/api/extract-exif', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (exifRes.ok) {
+                    const exifJson = await exifRes.json();
+                    if (exifJson.success && exifJson.metadata) {
+                        exifMetadata = exifJson.metadata;
+                        updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, exifMetadata } : f));
+                    }
+                }
+            } catch (exifErr) {
+                console.warn("Failed to extract EXIF on server:", exifErr);
+            }
+        }
         
         let retryCount = 0;
         const maxRetries = 10; // Allow multiple retries for rate limits
@@ -3378,7 +3399,7 @@ const App: React.FC = () => {
                 bluesmindsKeys: bluesmindsKeysList,
                 aiveneKeys: aiveneKeysList
               };
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -3458,8 +3479,8 @@ const App: React.FC = () => {
           }
         }, 120);
 
-        // 2. Extract frames for those that need it
-        const itemsToProcess: { id: string, frames: string[] }[] = [];
+        // 2. Extract frames and EXIF for those that need it
+        const itemsToProcess: { id: string, frames: string[], exifMetadata?: any }[] = [];
         for (const fileItem of chunk) {
             let frames = fileItem.analysisFrames;
             if (!frames || frames.length === 0) {
@@ -3474,8 +3495,30 @@ const App: React.FC = () => {
                     continue;
                 }
             }
+
+            let exifMetadata = fileItem.exifMetadata;
+            if (!exifMetadata && fileItem.file && fileItem.file.size > 0) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', fileItem.file);
+                    const exifRes = await fetch('/api/extract-exif', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (exifRes.ok) {
+                        const exifJson = await exifRes.json();
+                        if (exifJson.success && exifJson.metadata) {
+                            exifMetadata = exifJson.metadata;
+                            updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, exifMetadata } : f));
+                        }
+                    }
+                } catch (exifErr) {
+                    console.warn("Failed to extract EXIF in batch:", exifErr);
+                }
+            }
+
             if (frames && frames.length > 0) {
-                itemsToProcess.push({ id: fileItem.id, frames });
+                itemsToProcess.push({ id: fileItem.id, frames, exifMetadata });
             }
         }
 
