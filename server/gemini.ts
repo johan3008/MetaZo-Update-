@@ -3686,7 +3686,7 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
    - Teks Tidak Terbaca & Gibberish (CRITICAL): Periksa apakah terdapat teks yang tidak terbaca, karakter rusak, kata-kata yang berantakan, atau ejaan aneh (gibberish text) pada papan tulis (whiteboard), catatan tempel (sticky notes), poster, buku, kemasan produk, atau bagian mana pun di dalam gambar. Ini adalah cacat visual generatif AI yang sangat umum dan fatal untuk komersial. Jika gambar mengandung teks berantakan (seperti karakter huruf yang hancur, kata yang tidak bermakna/gibberish, atau gabungan huruf acak), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
 
 6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
-   - Masalah Anatomi (Anatomy errors): Jari tangan melengkung tidak wajar, jumlah jari berlebih atau kurang, mata juling, bentuk wajah atau mata asimetris ekstrem, anggota tubuh ganda/tumpang antit, atau sendi yang terkilir secara aneh.
+   - Masalah Anatomi (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, tangan/jari yang meleleh dan berbaur secara mustahil dengan objek lain (seperti bola, pasir, air, alat olahraga), sendi terkilir aneh, atau anggota tubuh ganda, status pemeriksaan "anatomical_errors" dan "ai_artifacts" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
    - Detail yang Meleleh (Melted details): Tekstur ornamen, kacamata, perhiasan, pola pakaian, tulisan, atau detail struktural latar belakang yang meleleh, menyatu secara tidak logis, atau kehilangan keterpisahan spasial yang rapi.
    - Teks & Karakter Rusak (Gibberish Text): Karakter huruf yang rusak/cacat/terdistorsi, kata-kata tak terbaca, teks hancur atau tidak bermakna di papan tulis (whiteboards), bagan diagram, catatan dinding, atau sticky notes.
    - Kecacatan Proporsi & Perspektif (Proportion & Perspective Defects) [CRITICAL]: Periksa distorsi proporsi objek fisik, furnitur, ruangan, atau elemen arsitektur (misalnya: ukuran kursi yang terlalu besar atau terlalu kecil dibandingkan meja, tinggi meja yang tidak logis, bentuk sandaran atau kaki kursi yang melengkung aneh, jendela atau pintu yang miring/asimetris tidak logis, kemiringan lantai yang tidak lurus, atau posisi ubin yang bergeser). Periksa juga distorsi proporsi tubuh manusia atau hewan (seperti kepala yang terlalu besar/kecil dibandingkan tubuh, panjang lengan atau kaki yang tidak simetris, atau ukuran kursi yang tidak selaras dengan subjek yang duduk). Jika terdapat kesalahan proporsi yang mencolok atau kegagalan perspektif fisik, status pemeriksaan "proportion_defects", "structural_defects", dan "ai_artifacts" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
@@ -3733,8 +3733,9 @@ STATUS & SKORING (KONSISTEN & KETAT):
 - FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
 
 ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS dan ANALITIS layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi (misal: "terdapat noda sensor/sensor dust spot pada area langit", "terdapat luminance noise pada area shadow latar belakang", "perspektif jari telunjuk tidak logis secara struktural", "terjadi sirkuit meleleh atau melted details pada perhiasan"). Bedah aspek temuan dengan ketajaman tinggi.
-2. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan hasil analisis nyata terhadap gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
+1. Jadilah SANGAT CERDAS, ANALITIS, dan FAKTUAL layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi berdasarkan BUKTI VISUAL NYATA yang ada pada gambar.
+2. DILARANG KERAS MENEBAK, BERHALUSINASI, ATAU MEMBUAT ASUMSI (NO GUESSING OR HALLUCINATION). JANGAN melaporkan cacat anatomi, teks rusak, watermark, logo, cacat komposisi, atau masalah pencahayaan/warna jika masalah tersebut TIDAK BENAR-BENAR TERLIHAT dengan jelas di dalam gambar. Jika gambar terlihat bagus dan aman, nyatakan dengan jujur dan berikan status PASS. Kegagalan mematuhi aturan ini akan merusak kredibilitas sistem kurasi.
+3. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan BUKAN TEBAKAN, melainkan hasil pengamatan faktual terhadap piksel gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
 
 ATURAN BAHASA:
 ` + `Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
@@ -3905,7 +3906,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           }
         }
       } else if (tolerance === 'LOOSE') {
-        if (anyIpFail) {
+        if (anyIpFail || hasCriticalFail) {
           parsedResult.recommendation = "FAIL";
           if (parsedResult.overall_score >= 70) {
             parsedResult.overall_score = 69;
