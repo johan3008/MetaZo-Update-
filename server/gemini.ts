@@ -1567,13 +1567,13 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
-1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
 2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 3. Use easy-to-read phrases, NOT formal sentence structures.
 4. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms.
+1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself). ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
 3. Limit to 200 characters.
 
@@ -1710,7 +1710,7 @@ Rules for Titles:
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
-- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
+- Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
@@ -1720,7 +1720,7 @@ Rules for Titles:
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
-2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
+2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself). ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
 4. Limit to 200 characters.
 
@@ -2187,7 +2187,7 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
-1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", or "Continuous line drawing of".
+1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
 2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 3. Use easy-to-read phrases, NOT formal sentence structures.
 4. DO NOT treat the title like a list of keywords. No commas separating words.
@@ -2335,7 +2335,7 @@ Rules for Titles:
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
-- Do not use marketing language such as "best", "amazing", "stunning", "beautiful", or "perfect".
+- Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
