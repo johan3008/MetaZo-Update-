@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, Download, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { TechnicalMetricsView } from './TechnicalMetricsView';
 import { getDailyLimit } from '../../constants';
 import { getHeaders } from '../../services/geminiService';
 
@@ -21,6 +22,47 @@ interface QualityReport {
   metadata?: {
     title: string;
     keywords: string[];
+  };
+  technical_details?: {
+    ffprobe: {
+      duration: number;
+      size: number;
+      bitrate: number;
+      video: {
+        codec: string;
+        profile: string;
+        width: number;
+        height: number;
+        fps: number;
+        avg_fps: number;
+        color_range: string;
+        color_space: string;
+        color_transfer: string;
+        color_primaries: string;
+      };
+      audio?: {
+        codec: string;
+        sample_rate: number;
+        channels: number;
+      };
+    };
+    filters: {
+      black_frames_detected: boolean;
+      black_frames: Array<{ start: number; end: number; duration: number }>;
+      frozen_frames_detected: boolean;
+      frozen_frames: Array<{ start: number; duration: number }>;
+    };
+    frameAnalysis: Array<{
+      frameIndex: number;
+      sharpness: number;
+      blurStatus: 'SHARP' | 'SOFT' | 'BLURRED';
+      overexposurePercent: number;
+      underexposurePercent: number;
+      averageLuminance: number;
+      averageColor: { r: number; g: number; b: number };
+    }>;
+    stabilityIndex: number;
+    stabilityStatus: 'STABLE' | 'UNSTABLE' | 'FLICKERING';
   };
 }
 
@@ -138,7 +180,7 @@ export const VideoQualityCheck: React.FC<{
   const [isDragging, setIsDragging] = useState(false);
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal'>('visual');
+  const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal' | 'technical'>('visual');
 
   // Helper untuk membaca normalisasi rekomendasi status
   const checkIsPass = (rec?: string) => {
@@ -303,19 +345,19 @@ export const VideoQualityCheck: React.FC<{
           })
         });
       } else {
-        const base64Frames = await extractVideoFrames(file, 4);
+        if (file.size > 4.5 * 1024 * 1024) {
+          throw new Error('File terlalu besar (> 4.5MB). Silakan konfigurasikan Cloudflare R2 dengan benar (termasuk CORS) untuk file besar.');
+        }
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('tolerance', tolerance);
+        formData.append('language', t.language || 'English');
+        formData.append('model', activeModel);
+
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...getHeaders(aiOptions)
-          },
-          body: JSON.stringify({
-            frames: base64Frames, 
-            tolerance,
-            language: t.language || 'English',
-            model: activeModel
-          })
+          headers: getHeaders(aiOptions),
+          body: formData
         });
       }
 
@@ -555,7 +597,7 @@ export const VideoQualityCheck: React.FC<{
                   </h4>
                   
                   {/* Category Tabs */}
-                  <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto">
+                  <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto gap-1">
                     <button 
                       onClick={() => setActiveCategory('visual')}
                       className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'visual' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -574,61 +616,71 @@ export const VideoQualityCheck: React.FC<{
                     >
                       {isIndo ? 'Hukum & Komersial' : 'Legal & Commercial'}
                     </button>
+                    <button 
+                      onClick={() => setActiveCategory('technical')}
+                      className={`whitespace-nowrap flex-1 lg:flex-none px-3 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all ${activeCategory === 'technical' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      {isIndo ? 'Analisis FFmpeg & OpenCV' : 'FFmpeg & OpenCV Details'}
+                    </button>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {CHECK_ITEMS_LOCALIZED
-                    .filter(item => {
-                       const cats = {
-                          visual: ['blur', 'noise', 'compression_artifacts', 'blocking', 'banding', 'overexposure', 'underexposure', 'white_balance', 'motion_blur', 'camera_shake', 'out_of_focus', 'flickering', 'duplicate_frame', 'empty_frame', 'black_frame', 'frozen_frame', 'low_framerate', 'visible_transitions', 'log_profile', 'upscaled_video'],
-                          ai: ['ai_artifact', 'deformed_object', 'bad_anatomy', 'cropped_subject', 'cut_off_object', 'wrong_perspective'],
-                          legal: ['watermark', 'logo', 'text', 'low_aesthetic_quality']
-                       };
-                       return cats[activeCategory].includes(item.key);
-                    })
-                    .map((item) => {
-                    const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
-                    
-                    const isPass = checkResult 
-                      ? checkResult.status === 'PASS' 
-                      : true;
+                {activeCategory === 'technical' ? (
+                  <TechnicalMetricsView report={report} isIndo={isIndo} />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {CHECK_ITEMS_LOCALIZED
+                      .filter(item => {
+                         const cats = {
+                            visual: ['blur', 'noise', 'compression_artifacts', 'blocking', 'banding', 'overexposure', 'underexposure', 'white_balance', 'motion_blur', 'camera_shake', 'out_of_focus', 'flickering', 'duplicate_frame', 'empty_frame', 'black_frame', 'frozen_frame', 'low_framerate', 'visible_transitions', 'log_profile', 'upscaled_video'],
+                            ai: ['ai_artifact', 'deformed_object', 'bad_anatomy', 'cropped_subject', 'cut_off_object', 'wrong_perspective'],
+                            legal: ['watermark', 'logo', 'text', 'low_aesthetic_quality']
+                         };
+                         return cats[activeCategory as 'visual' | 'ai' | 'legal'].includes(item.key);
+                      })
+                      .map((item) => {
+                      const checkResult = report.quality_checks?.[item.key as keyof typeof report.quality_checks];
                       
-                    const note = checkResult 
-                      ? checkResult.note 
-                      : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.');
+                      const isPass = checkResult 
+                        ? checkResult.status === 'PASS' 
+                        : true;
+                        
+                      const note = checkResult 
+                        ? checkResult.note 
+                        : (isIndo ? 'Normal, tidak mendeteksi masalah.' : 'Normal, no issues detected.');
 
-                    return (
-                      <div 
-                        key={item.key} 
-                        className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
-                          isPass 
-                            ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/20 hover:bg-emerald-50/30' 
-                            : 'bg-red-50/20 dark:bg-red-950/10 border-red-100 dark:border-red-900/20 hover:bg-red-50/30'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{item.label}</span>
-                            <span className={`flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                              isPass 
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                            }`}>
-                              {isPass ? 'OK' : 'FAIL'}
-                            </span>
+                      return (
+                        <div 
+                          key={item.key} 
+                          className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                            isPass 
+                              ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/20 hover:bg-emerald-50/30' 
+                              : 'bg-red-50/20 dark:bg-red-950/10 border-red-100 dark:border-red-900/20 hover:bg-red-50/30'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{item.label}</span>
+                              <span className={`flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                isPass 
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                              }`}>
+                                {isPass ? 'OK' : 'FAIL'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 leading-relaxed">
+                              {item.desc}
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 leading-relaxed">
-                            {item.desc}
-                          </p>
+                          <div className="text-xs text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-slate-800/40 p-2 rounded-lg mt-1 italic">
+                            {note}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-slate-800/40 p-2 rounded-lg mt-1 italic">
-                          {note}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Metadata Recommendations */}
