@@ -438,6 +438,41 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   );
 };
 
+const ExifCollapse: React.FC<{ exif?: any }> = ({ exif }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  if (!exif || Object.keys(exif).length === 0) return null;
+
+  return (
+    <div className="mt-2.5 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-black/10 font-sans">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 flex items-center justify-between text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest hover:bg-slate-100/50 dark:hover:bg-slate-850/50 transition-colors focus:outline-none"
+      >
+        <span className="flex items-center gap-1.5">
+          <span>📊</span>
+          <span>Technical EXIF Metadata</span>
+        </span>
+        <span className="text-[9px] font-extrabold normal-case bg-slate-200/80 dark:bg-slate-800 px-2 py-0.5 rounded-full">{isOpen ? 'Hide info' : 'View info'}</span>
+      </button>
+      {isOpen && (
+        <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 max-h-[220px] overflow-y-auto text-[10px] font-mono text-slate-600 dark:text-slate-400 space-y-1.5 bg-white dark:bg-black/25">
+          {Object.entries(exif).map(([key, val]) => {
+            if (typeof val === 'object' && val !== null) {
+              val = JSON.stringify(val);
+            }
+            return (
+              <div key={key} className="flex justify-between border-b border-slate-100 dark:border-slate-800/40 pb-1 gap-4">
+                <span className="font-extrabold text-slate-700 dark:text-slate-300 shrink-0">{key}</span>
+                <span className="text-right truncate max-w-[250px] font-semibold text-slate-500 dark:text-slate-400" title={String(val)}>{String(val)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface ReviewQueueProps {
   files: FileItem[];
   activeTool: ToolType;
@@ -866,6 +901,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                       )}
                     </div>
                   </div>
+
+                  <ExifCollapse exif={file.exifMetadata} />
 
                   {file.title && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
