@@ -1695,7 +1695,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
      * Depictions of ticketed locations or restricted sites without required property releases are STRICTLY FORBIDDEN.
      * Certain landmarks or monuments cannot be accepted or named, even with releases (e.g., Menara Eiffel di malam hari, Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, Hollywood Sign, Istana Neuschwanstein, Kuil Sagrada Família interior).
      * Modern architecture with a unique or recognizable design must never be referred to by its trademarked/proprietary name when shown as the primary focus without a release.
-     * Copyrighted works, including art, sculptures, street art, illustrations, fonts, or graphic elements created by others, must never be named or referenced.
+     * Copyrighted works, including art, sculptures, street art, illustrations, fonts, or graphic elements created by others, must never be named or referenced. (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE).
 2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
@@ -3626,6 +3626,11 @@ export async function checkImageQuality(
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
+  let metadataInstruction = "";
+  if (videoMetadata) {
+    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Video yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(videoMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat (misal: cek resolusi, frame rate, durasi, codec, audio, atau tag software/kamera penciptanya) untuk melengkapi temuan audit visual Anda.`;
+  }
+
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
 
 Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
@@ -3653,7 +3658,8 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
    - Over-sharpening: Efek lingkaran cahaya (halos) putih/terang di sekeliling tepian subjek akibat penajaman digital berlebih.
 
 5. INTELLECTUAL PROPERTY & BRAND SAFETY (Kekayaan Intelektual, Hukum & Batasan Terkenal Resmi):
-   - Merek & Logo Komersial: Logo, merek dagang, nama brand, produk bermerek (seperti ponsel dengan tombol khas, pola strip sepatu tertentu, plat nomor kendaraan), karya seni berhak cipta, tato tanpa rilis artis, serta bangunan/arsitektur yang membutuhkan Property Release (seperti gedung ikonik atau properti pribadi yang khas).
+   - PUBLIC DOMAIN EXCEPTION (PENGECUALIAN AMAN): Dokumen sejarah, teks kuno, dan dokumen pemerintah dari domain publik (seperti The Constitution, The Bill of Rights, Declaration of Independence, naskah kuno, peta sejarah) adalah 100% AMAN dan TIDAK MELANGGAR IP. Jangan flag dokumen publik atau sejarah sebagai pelanggaran IP.
+   - Merek & Logo Komersial: Logo, merek dagang, nama brand, produk bermerek, karya seni berhak cipta (seperti ilustrasi/font modern), tato tanpa rilis artis, serta bangunan/arsitektur yang membutuhkan Property Release. PENGECUALIAN: Tulisan tangan/kaligrafi/font kuno pada dokumen sejarah publik domain adalah AMAN.
    - Desain Fisik & Bentuk Produk Khas: Desain fisik khas dari produk komersial modern, seperti mainan (lego bricks, boneka Barbie), barang fesyen, elektronik (desain bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
    - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik.
    - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
@@ -3678,7 +3684,7 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Karya cipta ciptaan orang lain (copyrighted works), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
      * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
      * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas:
+   - Dokumen Negara, Uang & Identitas: PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN. PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN.
      * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
      * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
    - Hak Pribadi & Tubuh (Biometrics):
@@ -3709,8 +3715,8 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
    B. Alasan Umum Penolakan Konten (Ref: https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
       - Intellectual Property & Brand Safety: Logo komersial, nama merek dagang, desain produk yang khas (seperti iPhone camera bumps, Adidas stripes, LEGO studs, bodi kamera Polaroid klasik beserta bingkai putihnya, jahitan kuning Dr. Martens, red soles Christian Louboutin, logo Beats "b", Converse rubber toes).
       - Desain Otomotif Terlindungi: Kisi radiator (grille) BMW, Rolls-Royce, Jeep 7-slot, ornamen kap mesin ikonik, bentuk motor Vespa/Lambretta yang sangat khas.
-      - Karya Seni Berhak Cipta: Mural, grafiti, patung kontemporer (seperti Charging Bull Wall Street, Cloud Gate Chicago), lukisan museum modern, karakter fiksi Disney, Hello Kitty, Pokémon, Marvel, DC.
-      - Dokumen & Mata Uang: Mata uang kertas/logam modern dari negara mana pun (terutama jika difoto datar), prangko, SIM, paspor, kartu identitas nasional, kartu kredit/debit, buku tabungan.
+      - Karya Seni Berhak Cipta: Mural, grafiti, patung kontemporer (seperti Charging Bull Wall Street, Cloud Gate Chicago), lukisan museum modern, karakter fiksi Disney, Hello Kitty, Pokémon, Marvel, DC, ilustrasi karya orang lain, elemen grafis buatan pihak ketiga, atau font berhak cipta (TETAPI tulisan tangan kaligrafi sejarah yang bersifat publik domain adalah AMAN).
+      - Dokumen & Mata Uang: Mata uang kertas/logam modern dari negara mana pun (terutama jika difoto datar), prangko, SIM, paspor, kartu identitas nasional, kartu kredit/debit, buku tabungan. CATATAN: Dokumen sejarah seperti Bill of Rights atau Konstitusi adalah AMAN dan bukan pelanggaran.
       - Unusable/Lack of Utility: Gambar yang tidak memiliki subjek jelas, kabur berlebih, berantakan tanpa arah komposisi, atau tidak memiliki potensi komersial.
       - Judul & Kata Kunci Tidak Patuh: Metadata berisi nama model kamera, merek dagang, URL, kata berulang-ulang yang tidak relevan (keyword stuffing), atau kata kunci yang menyesatkan.
       
@@ -4764,7 +4770,7 @@ Return exactly 8 items matching the schema in JSON array format.`;
   return scrapingResults;
 }
 
-export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model) {
+export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model, videoMetadata = null, videoFile = null) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
@@ -4773,7 +4779,7 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan 5 frame diam yang diekstrak mewakili seluruh durasi video (awal, 25%, 50%, 75%, dan akhir). Karena Anda melihat serangkaian 5 frame, Anda dapat melihat BUKTI VISUAL PERGERAKAN atau PERUBAHAN.
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap cuplikan video komersial berdasarkan frame diam yang diekstrak mewakili durasi video. Karena Anda melihat serangkaian frame, Anda dapat melihat BUKTI VISUAL PERGERAKAN atau PERUBAHAN.${metadataInstruction}
 
 ---
 ATURAN ANTI-HALUSINASI & ANTI-SIMULASI (CRITICAL):
@@ -4848,7 +4854,8 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details) pada tekstur benda (misalnya pola sisa potongan yang tidak masuk akal atau sisa patahan melayang).
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, atau kemasan produk yang dapat dikenali sekecil apa pun (misalnya logo Apple, Nike swoosh, strip tiga Adidas, logo Coca-Cola, Mercedes-Benz, BMW, Google, dll). Wajib tolak secara instan jika ada logo merek yang terlihat jelas maupun samar-samar.
+   - PUBLIC DOMAIN EXCEPTION (PENGECUALIAN AMAN): Dokumen sejarah, teks kuno, dan dokumen pemerintah dari domain publik (seperti The Constitution, The Bill of Rights, Declaration of Independence, naskah kuno, peta sejarah) adalah 100% AMAN dan TIDAK MELANGGAR IP. Jangan flag dokumen publik atau sejarah sebagai pelanggaran IP.
+   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, karya seni orang lain, font berhak cipta modern, atau kemasan produk yang dapat dikenali. Wajib tolak secara instan. PENGECUALIAN: Tulisan tangan kaligrafi atau font kuno dalam dokumen sejarah (The Constitution, Bill of Rights) adalah 100% AMAN.
    - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
    - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
    - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
@@ -4970,7 +4977,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
   };
 
-  const imageParts = frames.map(f => processFrameServer(f));
+  const imageParts = videoFile ? [{ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } }] : (frames && frames.length > 0 ? frames.map(f => processFrameServer(f)) : []);
+  const evalText = videoFile 
+    ? `Act as an objective Adobe Stock QA curator. Evaluate this video thoroughly. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found as detailed_feedback. Ensure your entire response is written in ${language}.`
+    : `Act as an objective Adobe Stock QA curator. Evaluate these ${frames ? frames.length : 0} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.`;
+
   
   const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
@@ -4981,7 +4992,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     try {
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }],
+        contents: [...imageParts, { text: evalText }],
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.0 },
@@ -4995,7 +5006,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       try {
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: `Act as an objective Adobe Stock QA curator. Evaluate these ${frames.length} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.` }] }, {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: evalText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -5083,4 +5094,48 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     console.warn("Parse Error:", responseText);
     throw e;
   }
+}
+
+
+export async function uploadVideoToGemini(localFilePath: string, mimeType: string = 'video/mp4') {
+  const store = apiKeyStorage.getStore();
+  let key = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (store) {
+    if (store.gemini && Array.isArray(store.gemini.keys) && store.gemini.keys.length > 0) {
+      key = store.gemini.keys[store.gemini.activeIndex || 0] || key;
+    } else if (typeof store === 'string') {
+      key = store;
+    } else if (Array.isArray(store.keys) && store.keys.length > 0) {
+      key = store.keys[store.activeIndex || 0] || key;
+    }
+  }
+  
+  if (!key) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+  
+  const { GoogleGenAI } = require('@google/genai');
+  const ai = new GoogleGenAI({ apiKey: key });
+  
+  console.log('[Gemini File API] Uploading video...', localFilePath);
+  const uploadResult = await ai.files.upload({
+    file: localFilePath,
+    mimeType: mimeType
+  });
+  
+  console.log('[Gemini File API] Upload successful. Waiting for processing... File URI:', uploadResult.uri);
+  
+  let fileInfo = await ai.files.get({ name: uploadResult.name });
+  let attempts = 0;
+  while (fileInfo.state === 'PROCESSING' && attempts < 30) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    fileInfo = await ai.files.get({ name: uploadResult.name });
+    attempts++;
+  }
+  
+  if (fileInfo.state === 'FAILED') {
+    throw new Error("Video processing failed in Gemini API");
+  }
+  
+  return { fileUri: fileInfo.uri, mimeType: fileInfo.mimeType, name: fileInfo.name };
 }
