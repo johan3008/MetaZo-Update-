@@ -3627,8 +3627,8 @@ export async function checkImageQuality(
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
   let metadataInstruction = "";
-  if (videoMetadata) {
-    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Video yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(videoMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat (misal: cek resolusi, frame rate, durasi, codec, audio, atau tag software/kamera penciptanya) untuk melengkapi temuan audit visual Anda.`;
+  if (imageMetadata) {
+    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Gambar yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda.`;
   }
 
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
@@ -4776,6 +4776,11 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
+
+  let metadataInstruction = "";
+  if (videoMetadata) {
+    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Video yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(videoMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat (misal: cek resolusi, frame rate, durasi, codec, audio, atau tag software/kamera penciptanya) untuk melengkapi temuan audit visual Anda.`;
+  }
 
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal).
 
