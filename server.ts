@@ -18,13 +18,13 @@ import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { exiftool } from 'exiftool-vendored';
+
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
@@ -1510,16 +1510,32 @@ app.get('/api/debug-uploads', (req, res) => {
                 model = bodyModel;
                 
                 if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
-                    console.log(`[Video Audit] Generating pre-signed URL for direct streaming: ${pathKey}`);
+                    console.log(`[Video Audit] Downloading video from R2 to local for Gemini & ExifTool: ${pathKey}`);
                     const command = new GetObjectCommand({
                         Bucket: process.env.S3_BUCKET_NAME,
                         Key: pathKey
                     });
-                    videoPath = await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+                    const s3Client = getS3Client();
+                    const response = await s3Client.send(command);
+                    const tempFilePath = path.join(uploadDir, `dl_${Date.now()}_${path.basename(pathKey)}`);
+                    
+                    const writeStream = fs.createWriteStream(tempFilePath);
+                    const { finished } = await import('stream/promises');
+                    if (response.Body) {
+                        (response.Body as any).pipe(writeStream);
+                        await finished(writeStream);
+                    } else {
+                        throw new Error("R2 Download body is empty");
+                    }
+                    
+                    videoPath = tempFilePath;
+                    cleanupFn = () => {
+                        try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) {}
+                    };
                 } else {
                     videoPath = fileUrl;
+                    cleanupFn = () => {};
                 }
-                cleanupFn = () => {};
             } else {
                 return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
@@ -1613,6 +1629,7 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 if (videoPath) {
                     try {
                         console.log('Server check-video-quality: Extracting ExifTool metadata...');
+                        const { exiftool } = require('exiftool-vendored');
                         videoMetadata = await exiftool.read(videoPath);
                         // Clean up noisy or binary metadata to save prompt tokens
                         delete videoMetadata.Directory;
