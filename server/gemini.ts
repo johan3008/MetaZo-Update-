@@ -1301,7 +1301,8 @@ export const generateStockMetadata = async (
   keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
-  aiModelPerformance?: 'speed' | 'detail'
+  aiModelPerformance?: 'speed' | 'detail',
+  exifMetadata?: any
 ): Promise<StockMetadata> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -1319,6 +1320,11 @@ export const generateStockMetadata = async (
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
   
   const imageParts = frames.map(frame => processFrameServer(frame));
+
+  let exifInstruction = "";
+  if (exifMetadata && Object.keys(exifMetadata).length > 0) {
+    exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+  }
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
@@ -1481,7 +1487,7 @@ OUTPUT FORMAT:
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
-}`;
+}${exifInstruction}`;
 
   const promptText = toolType === ToolType.VIDEO 
     ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
@@ -1551,7 +1557,7 @@ ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
-${mediaContext}${customPromptCommand}
+${mediaContext}${customPromptCommand}${exifInstruction}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -1909,7 +1915,7 @@ OUTPUT FORMAT:
 };
 
 export const generateBatchStockMetadata = async (
-  items: { id: string, frames: string[] }[],
+  items: { id: string, frames: string[], exifMetadata?: any }[],
   keywordCount: number | string,
   customPrompt: string = "",
   toolType: ToolType = ToolType.IMAGE,
@@ -2105,17 +2111,25 @@ OUTPUT FORMAT:
         ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
         : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
+      let itemVisionInstruction = visionSystemInstruction;
+      let itemExifDesc = "";
+      if (item.exifMetadata && Object.keys(item.exifMetadata).length > 0) {
+        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(item.exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+        itemVisionInstruction += exifInstruction;
+        itemExifDesc = `\nASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:\n${JSON.stringify(item.exifMetadata, null, 2)}`;
+      }
+
       try {
           const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
             parts: [...imageParts, { text: promptText }] 
           }, {
-            systemInstruction: visionSystemInstruction,
+            systemInstruction: itemVisionInstruction,
             responseMimeType: "application/json",
             temperature: 0.0,
             topP: 0.8 });
           
           let facts = visionResponse.text || "{}";
-          visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}`);
+          visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}${itemExifDesc}`);
           let parsedFacts: any = {};
           try {
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
