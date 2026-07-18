@@ -1687,10 +1687,21 @@ const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                         console.warn('[Video Audit] ExifTool extraction failed:', exifErr);
                     }
                 }
-                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile);
+                let technicalReport = null;
+                if (videoPath && frames && frames.length > 0) {
+                    try {
+                        console.log('Server check-video-quality: Running videoAnalyzer...');
+                        const { analyzeVideoTechnically } = await import('./server/videoAnalyzer.ts');
+                        technicalReport = await analyzeVideoTechnically(videoPath, frames);
+                        console.log('Server check-video-quality: videoAnalyzer completed successfully');
+                    } catch (techErr) {
+                        console.warn('[Video Audit] Technical analysis failed, proceeding without it:', techErr);
+                    }
+                }
+                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport);
                 console.log('Server check-video-quality: Analysis successful');
                 cleanupFn();
-                res.json(data);
+                res.json({ ...data, technical_details: technicalReport });
             } else {
                 cleanupFn();
                 return res.status(500).json({ error: 'Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi).' });
