@@ -4784,7 +4784,7 @@ Return exactly 8 items matching the schema in JSON array format.`;
   return scrapingResults;
 }
 
-export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model, videoMetadata = null, videoFile = null) {
+export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model, videoMetadata = null, videoFile = null, videoTechnicalReport = null) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
@@ -4796,9 +4796,14 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Video yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(videoMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat (misal: cek resolusi, frame rate, durasi, codec, audio, atau tag software/kamera penciptanya) untuk melengkapi temuan audit visual Anda.`;
   }
 
+  let technicalInstruction = "";
+  if (videoTechnicalReport) {
+    technicalInstruction = `\n\n[DATA ANALISA TEKNIS FISIK (FFMPEG & PENGUKURAN PIKSEL)]\nBerikut adalah data analisa teknis objektif riil dari file Video yang dihitung secara matematis menggunakan FFprobe, filter FFmpeg (kedipan/black_frame/freeze_frame), dan deteksi piksel (ketajaman/blur Laplacian, overexposure/underexposure piksel):\n\`\`\`json\n${JSON.stringify(videoTechnicalReport, null, 2)}\n\`\`\`\nJadikan data analisa teknis objektif di atas sebagai panduan mutlak untuk mengisi quality_checks yang sesuai secara 100% akurat tanpa halusinasi. Jika filter mendeteksi black frame atau frozen frame, sesuaikan status check tersebut ke 'FAIL' secara kesepakatan dan jelaskan sebabnya secara detail.`;
+  }
+
   let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal).
 
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap isi video secara utuh (keseluruhan pergerakan, transisi, dan durasi). Analisislah seluruh aspek raw video ini secara mendetail dari awal hingga akhir.${metadataInstruction}
+Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap isi video secara utuh (keseluruhan pergerakan, transisi, dan durasi). Analisislah seluruh aspek raw video ini secara mendetail dari awal hingga akhir.${metadataInstruction}${technicalInstruction}
 
 ---
 ATURAN ANTI-HALUSINASI & ANTI-SIMULASI (CRITICAL):
