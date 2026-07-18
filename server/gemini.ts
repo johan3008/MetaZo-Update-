@@ -1538,11 +1538,13 @@ OUTPUT FORMAT:
   // --- TAHAP 2 & 3: PROVIDER 2 (GPT ROLE) & PROVIDER 3 (CLAUDE ROLE) — CONTENT GENERATION ---
   console.log(`[JohMeta Pipeline] Stage 2 & 3: Generating Content (Title, Description, Keywords)...`);
   
-  const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / ANCHOR / TARGET KEYWORDS:
-The user has provided a custom instruction, command, or target keywords: "${customPrompt}"
-ABSOLUTE RULES:
-1. If this input is a custom command or instruction (e.g., "describe as retro", "make the title poetic", "focus on elegance", "exclude blue color", "emphasize commercial utility", etc.), you MUST strictly follow, apply, and prioritize this directive when generating the Title, Description, and Keywords!
-2. If this input represents target keywords (e.g., specific words like "blue, ocean, sunset"), you MUST heavily prioritize and integrate these exact target keywords into both the Title and the Keywords list naturally and prominently.` : "";
+  const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / CONCEPT KEY (ABSOLUTE PRIORITY):
+The user has provided a custom instruction, concept key, or target keywords: "${customPrompt}"
+ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
+1. ALIGN WITH CONCEPT: You MUST deeply adapt and shape the ENTIRE metadata (Title, Description, and Keywords) to strictly follow and embody this exact instruction or concept key.
+2. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), you MUST act as an expert human graphic designer. Describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
+3. INTEGRATE TARGET KEYWORDS: If the input contains specific target keywords, you MUST heavily prioritize and integrate those exact words naturally into both the Title and the Keywords list.
+4. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset (do not hallucinate elements that aren't there, but frame the existing elements through the lens of the custom instruction).` : "";
 
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
@@ -2157,11 +2159,13 @@ OUTPUT FORMAT:
 
   const mediaContext = toolType === ToolType.VIDEO ? "CRITICAL: Sequential frames from a single VIDEO. Analyze continuous motion and storyline across frames." : (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "VECTOR illustration. Focus on ACTUAL SUBJECT MATTER explicitly visible inside the illustration for categorization." : "Photograph or digital artwork.");
   
-  const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / ANCHOR / TARGET KEYWORDS:
-The user has provided a custom instruction, command, or target keywords: "${customPrompt}"
-ABSOLUTE RULES:
-1. If this input is a custom command or instruction (e.g., "describe as retro", "make the title poetic", "focus on elegance", "exclude blue color", "emphasize commercial utility", etc.), you MUST strictly follow, apply, and prioritize this directive when generating the Title, Description, and Keywords!
-2. If this input represents target keywords (e.g., specific words like "blue, ocean, sunset"), you MUST heavily prioritize and integrate these exact target keywords into both the Title and the Keywords list naturally and prominently.` : "";
+  const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / CONCEPT KEY (ABSOLUTE PRIORITY):
+The user has provided a custom instruction, concept key, or target keywords: "${customPrompt}"
+ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
+1. ALIGN WITH CONCEPT: You MUST deeply adapt and shape the ENTIRE metadata (Title, Description, and Keywords) to strictly follow and embody this exact instruction or concept key.
+2. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), you MUST act as an expert human graphic designer. Describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
+3. INTEGRATE TARGET KEYWORDS: If the input contains specific target keywords, you MUST heavily prioritize and integrate those exact words naturally into both the Title and the Keywords list.
+4. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset (do not hallucinate elements that aren't there, but frame the existing elements through the lens of the custom instruction).` : "";
 
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
