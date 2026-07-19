@@ -2238,6 +2238,8 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
     app.get('/api/inspirations', async (req, res) => {
         try {
             const inspirations = [
+                { text: "Graphic Design template for a Summer Sale, featuring a large empty circular copy space in the center, vibrant neon pink and orange abstract geometric waves, floating 3D spheres, sleek borders, and a minimal frame, perfect for social media advertisement.", label: "Promo Template 📣" },
+                { text: "Graphic Design template for a celebratory event, featuring a vast clean minimalist blue and white background with a clear visual hierarchy, festive floating ribbons, colorful balloons, gold confetti, and elegant borders, ideal for a banner or poster.", label: "Festive Template 🎉" },
                 { text: "Low angle shot of a diverse business team brainstorming around a glass table in a modern sunlit office, skyscrapers visible in the background, candid interaction.", label: "Team Strategy 📈" },
                 { text: "Wide shot of an elderly traveler looking out the window of a scenic train traversing the Swiss Alps, capturing the awe and reflection, soft interior lighting.", label: "Alpine Journey 🏔️" },
                 { text: "Close-up macro shot of a barista meticulously pouring latte art into a ceramic cup, focus on the espresso stream and delicate patterns, warm cafe environment.", label: "Coffee Craft ☕" },
