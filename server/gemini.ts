@@ -2756,9 +2756,7 @@ CRITICAL BACKGROUND MODE SETTINGS:
 - The user requests fully composed visual scenes with complex background environments or scenic backdrops.
 ${currentDirective}
 - You MUST describe rich scenic environments (e.g., matching the style context "${styleCategory}") behind the subject.
-- Do NOT isolate the subject on flat background. Integrate it with scenic depth and ambient environments.
-- CREATIVE OVER CREATIVE DIRECTIVE (MANDATORY): You MUST design highly creative, imaginative, unique, and artistically stylized conceptual interpretations of the scene rather than basic generic landscapes or standard setups. Avoid plain, obvious, and boring composition. Instead, infuse gorgeous creative metaphors, surreal environmental elements, rich lighting contrasts, complex architectural or natural structures, or stunning stylized atmospheric depth depending on the selected style.
-- Make each background scene stand out as a highly unique standalone masterpiece so that reviews on Adobe Stock never flag them as "similar content" or "repetitive designs". Each concept must be distinctly original.`;
+- Do NOT isolate the subject on flat background. Integrate it with scenic depth and ambient environments.`;
   }
 
   let userNegInstruction = "";
