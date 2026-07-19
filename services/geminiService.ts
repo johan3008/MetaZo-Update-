@@ -178,6 +178,54 @@ export const generateBatchStockMetadata = async (
   }
 };
 
+export interface MotionGenHistoryItem {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface MotionGenResult {
+  title: string;
+  summary: string;
+  code: string;
+}
+
+export const generateMotionCode = async (
+  prompt: string,
+  params?: {
+    currentCode?: string;
+    fps?: number;
+    durationSeconds?: number;
+    width?: number;
+    height?: number;
+    history?: MotionGenHistoryItem[];
+  },
+  options?: ServiceOptions
+): Promise<MotionGenResult> => {
+  const response = await fetchWithRetry('/api/generate-motion-code', {
+    method: 'POST',
+    headers: getHeaders(options),
+    body: JSON.stringify({
+      prompt,
+      currentCode: params?.currentCode,
+      fps: params?.fps,
+      durationSeconds: params?.durationSeconds,
+      width: params?.width,
+      height: params?.height,
+      history: params?.history,
+      model: options?.model
+    })
+  }, 2);
+
+  const rawText = await response.text();
+
+  try {
+    return JSON.parse(rawText);
+  } catch (e) {
+    console.log('[API DEBUG] /api/generate-motion-code JSON parse error');
+    throw new Error(`Invalid JSON response from server: ${rawText.substring(0, 150)}`);
+  }
+};
+
 export const fetchCalendarEvents = async (month: string, options?: ServiceOptions): Promise<{ events: any[] }> => {
   const response = await fetch('/api/generate-calendar-events', {
     method: 'POST',

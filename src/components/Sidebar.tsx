@@ -694,6 +694,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <VolumeX size={14} className={activeTool === ToolType.MUTE_VIDEO ? "text-rose-400" : "text-slate-400"} />
                       <span>{t.sidebar_mute_video || "Mute Video Gen"}</span></button>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.MOTION_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.MOTION_GEN 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-purple-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Monitor size={14} className={activeTool === ToolType.MOTION_GEN ? "text-purple-400" : "text-slate-400"} />
+                      <span>Motion Gen (Remotion)</span></button>
                   </nav>
                 </div>
 
