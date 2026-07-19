@@ -2707,7 +2707,7 @@ export const generateOptimizedPrompt = async (options: {
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
     "Pixel Art": ' - Focus on visible square pixels, limited color palette, 8-bit or 16-bit retro game aesthetics, and sharp pixelated edges.',
-    "Isometric": ' - Focus on 3D objects viewed from a fixed 45-degree isometric angle, clean structural lines, and organized geometric composition.',
+    "Isometric": ' - Style Guide: Focus on isometric illustration with pseudo-3D look (tampilan 3D semu) without any camera perspective (orthographic parallel projection, objects do not shrink in the distance). Symmetrical 30-degree angles on left and right horizontal axes with straight vertical lines. Show three sides of the objects simultaneously (top and two sides) to provide depth. Maintain highly consistent modular scale and geometric proportions (using cubes, cylinders, and clean blocks with sharp corners and precise alignments). Use simple flat or semi-flat shading (flat shading, minimal/no gradients) with clear color contrast on different faces of the object to distinguish sides. Clean details, highly readable vector-like design, minimalist clean outlines. Keywords to include: isometric style, 3D isometric, orthographic parallel projection, pseudo-3D, 30-degree isometric view, flat shading, clean vector-like style.',
     "Claymation Style": ' - Focus on hand-molded clay textures, fingerprint details, stop-motion animation aesthetic, and soft organic physical materials.',
     "Origami Style": ' - Focus on folded paper textures, sharp creases, geometric paper construction, and delicate paper material appearance.',
     "HandDrawn Sketch": ' - Focus on pencil or ink strokes, charcoal textures, artistic hatching, and the look of a sketchbook drawing.',
@@ -2743,6 +2743,8 @@ CRITICAL PNG MODE SETTINGS:
 - The user requests PNG Asset style generation.
 - All generated prompt variations MUST strictly place the main subject "${subject}" isolated on a solid ${pngBgColor} background.
 - Focus on a premium, high-end commercial presentation of the subject with exquisite detailing, high fidelity, and ultra-clean studio quality.
+- CREATIVE OVER CREATIVE DIRECTIVE (MANDATORY): You MUST design highly creative, imaginative, unique, and artistically stylized conceptual interpretations of the subject rather than basic generic flat vectors or simple objects. Avoid plain, obvious, and boring representation. Instead, infuse gorgeous creative metaphors, rich futuristic elements, intricate miniature details, elegant mechanical gear work, complex origami folds, or stunning isometric stylized dioramas depending on the selected style.
+- Make each PNG asset stand out as a highly unique standalone masterpiece so that reviews on Adobe Stock never flag them as "similar content" or "repetitive designs". Each concept must be distinctly original.
 - The arrangement and styling are fully flexible—let the AI design the composition dynamically, prioritizing a professional, high-end visual asset.
 - You must explicitly append tags such as "isolated on a plain ${pngBgColor} background", "solid flat ${pngBgColor} backdrop", or "pure solid ${pngBgColor} background, no shadows" into the prompt variations.
 ${currentDirective}
@@ -2795,7 +2797,7 @@ Rules for the Generated Prompts:
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
 3. WORD COUNT CONSTRAINT: Each generated prompt SHOULD be between ${minWords} and ${maxWords} words long. Adjust the level of detail to strictly match this requested length profile.
-4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property.
+4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property (IP). Under any circumstances, NEVER include any brand names, trademarked names, manufacturer names, or proprietary product lines (e.g., Apple, Nike, Adidas, BMW, Vespa, LEGO, GoPro, iPhone). Use completely generic descriptions instead (e.g., "sleek modern smartphone" instead of "iPhone", "classic retro European scooter" instead of "Vespa", "athletic sports sneakers" instead of "Nike shoes").
 5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
@@ -2816,7 +2818,9 @@ Rules for the Generated Prompts:
       * If the Selected Style is "Photorealistic", the output prompts MUST be strictly realistic, looking like sharp, candid, organic real-world captures with lifelike skin/surface textures, natural sunlight or soft studio strobes, and genuine human behaviors. Do NOT inject theatrical movie color grading or artificial film flares.
       * NEVER mix, swap, or blur the lines between Cinematic and Photorealistic style prompts! Keep them completely distinct and accurate to their true style definition.
     - PNG ASSET VARIATION (OBJECT COUNT & ARRANGEMENTS):
-      * For PNG/isolated asset mode, you MUST inject extreme variety in subject count and arrangement. Stagger the variations so that some prompts describe a single standalone object, some describe exactly two related or complementary objects, and some describe an elegant flat lay, dynamic grouping, or a neat set of 3+ objects. This ensures a rich, diverse asset pack and completely prevents "similar content" rejection.
+      * For PNG/isolated asset mode, you MUST inject extreme variety in subject count and arrangement, and apply the "Creative Over Creative" methodology.
+      * "Creative Over Creative" means you reject boring, standard or generic asset descriptions. Instead, design highly stylized, imaginative, and intellectually unique visual configurations of the subject.
+      * Stagger the variations so that some prompts describe a single standalone highly-detailed premium object, some describe exactly two related or complementary objects interacting creatively, and some describe an elegant flat lay, dynamic grouping, or a neat stylized set of 3+ objects. This ensures an extremely rich, diverse asset pack and completely prevents "similar content" rejection.
     - Share your best, most varied work.
 11. ADOBE STOCK CONTENT STRATEGY (MUST FOLLOW STRICTLY):
 You are an Adobe Stock content strategist. Before generating prompts, avoid concepts that are already heavily saturated on Adobe Stock.
@@ -3327,6 +3331,7 @@ CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
 2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
 3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
 4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
+5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the image contains recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
 
 STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
 - Subject (The main entity)
@@ -3417,6 +3422,7 @@ CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
 2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
 3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
 4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
+5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the images contain recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
 
 FOR EACH IMAGE, EXTRACT AND ANALYZE:
 - Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
@@ -5162,126 +5168,4 @@ export async function uploadVideoToGemini(localFilePath: string, mimeType: strin
   }
   
   return { fileUri: fileInfo.uri, mimeType: fileInfo.mimeType, name: fileInfo.name };
-}
-
-// ============================================================================
-// MOTION GEN (REMOTION) - "Vibe Coding" AI Motion Graphics Generator
-// ============================================================================
-export async function generateMotionCode(
-  userPrompt: string,
-  options?: {
-    currentCode?: string;
-    model?: string;
-    fps?: number;
-    durationSeconds?: number;
-    width?: number;
-    height?: number;
-    history?: { role: 'user' | 'assistant'; content: string }[];
-  }
-) {
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
-  const model = options?.model;
-
-  const fps = options?.fps || 30;
-  const durationInFrames = (options?.durationSeconds || 5) * fps;
-  const width = options?.width || 1920;
-  const height = options?.height || 1080;
-
-  const systemInstruction = `You are "MotionGen AI", an elite senior Motion Graphics Engineer specialized in writing Remotion (React video framework) compositions. You do "vibe coding": the user describes a motion graphics/video idea in plain, casual language (often Indonesian), and you turn it directly into working, polished, production-ready Remotion code. No back-and-forth, no clarifying questions — just ship great code.
-
-STRICT TECHNICAL RULES (the code runs inside a sandboxed in-browser Babel transpiler, NOT a real Node/Remotion project, so it has ONLY 'react' and 'remotion' available as importable modules):
-1. Output EXACTLY ONE React functional component named "MotionComposition" and export it with: export const MotionComposition = () => { ... }
-2. You MAY import ONLY from 'react' and 'remotion'. NEVER import images, fonts, audio, video files, external assets, external npm packages (no framer-motion, no gsap, no three.js, no lottie, no icon libraries), and NEVER use require() for anything other than 'react'/'remotion'.
-3. From 'remotion' you may use: useCurrentFrame, useVideoConfig, interpolate, spring, Easing, AbsoluteFill, Sequence, Series, random, Img (only if using a public https image URL is truly necessary; prefer pure CSS/SVG instead).
-4. Always read fps/width/height/durationInFrames from useVideoConfig() inside the component rather than hardcoding, so the animation adapts to the configured canvas.
-5. Build ALL visuals using inline CSS-in-JS (style objects), CSS gradients, SVG shapes/paths drawn inline, and typography. Do not rely on any external image, logo, or font file.
-6. Animate using frame-driven math: interpolate() for tweening, spring() for bouncy/elastic motion, and Sequence for staged/multi-scene timelines. Extrapolate with 'clamp' unless a loop is intended.
-7. Design like a professional motion designer: clear visual hierarchy, tasteful color palettes/gradients, easing curves (not linear unless intentional), staggered entrances, subtle parallax/depth, and a cohesive theme matching the user's request.
-8. The component MUST be self-contained, deterministic (no Math.random(), no Date.now(); use Remotion's random() with a fixed seed if randomness is needed), and must not use browser-only APIs (no window, document, fetch, setTimeout inside render).
-9. Never use TypeScript type annotations (the sandbox transpiles JSX only, not TS) — write plain modern JavaScript (ES2020+) with JSX.
-10. If the user is asking to MODIFY previously generated code (a "currentCode" is provided below), treat it as the base: keep what already works and only change what the user is asking for, still returning the FULL updated component (never a diff/partial snippet).
-
-Respond ONLY with a JSON object with this exact shape (no markdown fences, no extra commentary):
-{
-  "title": "Short catchy title for this motion graphic (max 6 words, match user's language)",
-  "summary": "One short friendly sentence (in the same language the user used) describing what you built or changed",
-  "code": "the full JSX source code string described above"
-}`;
-
-  const contextParts: string[] = [];
-  contextParts.push(`Video canvas target: ${width}x${height} px, ${fps} fps, ${durationInFrames} frames total (${(durationInFrames / fps).toFixed(1)} seconds).`);
-  if (options?.currentCode && options.currentCode.trim().length > 0) {
-    contextParts.push(`CURRENT EXISTING CODE (this is the base you are editing/iterating on):\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
-  }
-  if (options?.history && options.history.length > 0) {
-    const trimmedHistory = options.history.slice(-6);
-    contextParts.push(`Recent conversation history for extra context:\n${trimmedHistory.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.content}`).join('\n')}`);
-  }
-  contextParts.push(`User's new request: "${userPrompt}"`);
-
-  const fullContents = contextParts.join('\n\n');
-
-  const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING },
-      summary: { type: Type.STRING },
-      code: { type: Type.STRING }
-    },
-    required: ["title", "summary", "code"]
-  };
-
-  let responseText = "";
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({
-      systemInstruction,
-      contents: fullContents,
-      responseMimeType: "application/json",
-      responseSchema,
-      config: { temperature: 0.9 },
-      model
-    });
-    responseText = res;
-  } else {
-    try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.9
-      }, 2);
-      responseText = res.text || "{}";
-    } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.9
-      }, 1);
-      responseText = res.text || "{}";
-    }
-  }
-
-  const parsed = JSON.parse(extractJSON(responseText));
-
-  // Basic safety/sanity cleanup: strip markdown fences if the model added them anyway
-  if (typeof parsed.code === 'string') {
-    parsed.code = parsed.code
-      .replace(/^```(jsx|javascript|js|tsx)?\s*/i, '')
-      .replace(/```\s*$/i, '')
-      .trim();
-
-    if (!/MotionComposition/.test(parsed.code)) {
-      throw new Error('AI response did not include a MotionComposition export. Please try again.');
-    }
-  } else {
-    throw new Error('AI response missing code field. Please try again.');
-  }
-
-  return {
-    title: parsed.title || 'Untitled Motion',
-    summary: parsed.summary || '',
-    code: parsed.code as string
-  };
 }
