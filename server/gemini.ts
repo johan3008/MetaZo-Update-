@@ -795,6 +795,10 @@ async function callOpenAICompatibleWithRetry(params: {
       payload.top_p = params.config.topP;
     }
 
+    if (params.config?.seed !== undefined) {
+      payload.seed = params.config.seed;
+    }
+
     if (SUPPORTS_JSON_MODE.has(provider)) {
       payload.response_format = { type: "json_object" };
     }
@@ -1033,6 +1037,15 @@ function getAIClient(): any {
             }
             if (typeof params.config.topP === 'number') {
               apiPayload.generationConfig.topP = params.config.topP;
+            }
+            if (typeof params.config.topK === 'number') {
+              apiPayload.generationConfig.topK = params.config.topK;
+            }
+            if (typeof params.config.seed === 'number') {
+              apiPayload.generationConfig.seed = params.config.seed;
+            }
+            if (params.config.safetySettings) {
+              apiPayload.safetySettings = params.config.safetySettings;
             }
             if (params.config.systemInstruction) {
               if (typeof params.config.systemInstruction === 'string') {
@@ -2860,6 +2873,14 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
   const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
+  const safetySettings = [
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+  ];
+
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     let attempts = 0;
     const maxAttempts = 2;
@@ -2871,7 +2892,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
-          config: { temperature: 0.85 },
+          config: { temperature: 0.95, seed: seed, topP: 0.99 },
           model
         });
         
@@ -2902,16 +2923,20 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     for (const modelName of modelsToTryList) {
       let attempts = 0;
       const maxAttempts = 2;
-      while (attempts < maxAttempts) {
+      for (let attemptIdx = 0; attemptIdx < maxAttempts; attemptIdx++) {
         try {
-          console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attempts + 1}/${maxAttempts})...`);
+          console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attemptIdx + 1}/${maxAttempts})...`);
           const response = await callGeminiWithRetry(modelName, {
             parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }]
           }, {
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.85
+            temperature: 0.95,
+            seed: seed,
+            topP: 0.99,
+            topK: 100,
+            safetySettings: safetySettings
           });
 
           const text = response.text || "{}";
