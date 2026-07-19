@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface PromptGenViewProps {
   t: any;
@@ -32,6 +33,7 @@ interface PromptHistoryItem {
   styleExplanation: string[];
   promptMode?: 'background' | 'png';
   pngBgColor?: 'white' | 'black' | 'transparent';
+  flatIconType?: 'sheet' | 'single';
 }
 
 const BACKGROUND_STYLE_OPTIONS = [
@@ -48,13 +50,7 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Abstract', label: 'Abstract (Abstrak)', icon: '⛰️' },
   { id: 'Vintage Photography', label: 'Vintage Photography (Klasik)', icon: '🎞️' },
   { id: 'Cyberpunk', label: 'Cyberpunk (Futuristik Retro)', icon: '⚡' },
-  { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' },
-  { id: 'Embroidery', label: 'Embroidery (Seni Bordir)', icon: '🧵' },
-  { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
-  { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
-  { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
-  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
-  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
+  { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' }
 ];
 
 const PNG_STYLE_OPTIONS = [
@@ -70,9 +66,7 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Origami Style', label: 'Origami Style (Seni Origami)', icon: '📄' },
   { id: 'Glassmorphism', label: 'Glassmorphism (Efek Kaca)', icon: '🔮' },
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' },
-  { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' },
-  { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
-  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
+  { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' }
 ];
 
 export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
@@ -107,6 +101,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [pngBgColor, setPngBgColor] = useState<'white' | 'black' | 'transparent'>('white');
   const [bgNegativePrompt, setBgNegativePrompt] = useState('blurry, low quality, worst quality, text, watermark, signature, bad proportions, bad anatomy');
   const [pngNegativePrompt, setPngNegativePrompt] = useState('scenery, context backdrop, ground shadow, drop shadow, ambient background, blurry, watermark, text');
+  const [flatIconType, setFlatIconType] = useState<'sheet' | 'single'>('single');
+  const [showFlatIconModal, setShowFlatIconModal] = useState(false);
   
   const currentStyleOptions = promptMode === 'background' ? BACKGROUND_STYLE_OPTIONS : PNG_STYLE_OPTIONS;
   
@@ -366,7 +362,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           maxWords,
           userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim(),
           model: aiOptions?.model,
-          seed
+          seed,
+          flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined
         })
       });
 
@@ -404,7 +401,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         negativePrompt: data.negativePrompt || '',
         styleExplanation: data.styleExplanation || [],
         promptMode,
-        pngBgColor
+        pngBgColor,
+        flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined
       };
       saveToHistory(historyItem);
       
@@ -696,7 +694,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-[1.5rem] blur opacity-0 group-hover:opacity-100 transition duration-500 ease-in-out"></div>
                   <select
                     value={styleCategory}
-                    onChange={(e) => setStyleCategory(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setStyleCategory(val);
+                      if (promptMode === 'png' && val === 'Flat Icon') {
+                        setShowFlatIconModal(true);
+                      }
+                    }}
                     className="relative w-full rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none shadow-sm transition-all z-10"
                   >
                     {currentStyleOptions.map((opt) => (
@@ -722,7 +726,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         <button
                           key={opt.id}
                           type="button"
-                          onClick={() => setStyleCategory(opt.id)}
+                          onClick={() => {
+                            setStyleCategory(opt.id);
+                            if (promptMode === 'png' && opt.id === 'Flat Icon') {
+                              setShowFlatIconModal(true);
+                            }
+                          }}
                           className={`px-3 py-2 rounded-[1.5rem] text-[10px] font-extrabold uppercase transition-all duration-200 flex items-center gap-1.5 border cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-md shadow-black/5 font-semibold scale-[1.02]'
@@ -740,32 +749,76 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
               {/* PNG Background Dropdown Option - Only visible when promptMode === 'png' */}
               {promptMode === 'png' && (
-                <div className="space-y-3 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-[1.5rem] animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
-                    <span>{t.prompt_png_bg_label}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 rounded font-semibold font-mono">PNG Style</span>
-                  </label>
-                  
-                  <div className="relative">
-                    <select
-                      value={pngBgColor}
-                      onChange={(e) => setPngBgColor(e.target.value as any)}
-                      className="w-full rounded-[1.5rem] border border-emerald-550/20 dark:border-emerald-500/30 bg-white dark:bg-slate-950 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
-                    >
-                      <option value="white">{t.prompt_png_bg_white}</option>
-                      <option value="black">{t.prompt_png_bg_black}</option>
-                      <option value="transparent">{t.prompt_png_bg_transparent}</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                      </svg>
+                <div className="space-y-4">
+                  <div className="space-y-3 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-[1.5rem] animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                      <span>{t.prompt_png_bg_label}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 rounded font-semibold font-mono">PNG Style</span>
+                    </label>
+                    
+                    <div className="relative">
+                      <select
+                        value={pngBgColor}
+                        onChange={(e) => setPngBgColor(e.target.value as any)}
+                        className="w-full rounded-[1.5rem] border border-emerald-550/20 dark:border-emerald-500/30 bg-white dark:bg-slate-950 p-3.5 text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none"
+                      >
+                        <option value="white">{t.prompt_png_bg_white}</option>
+                        <option value="black">{t.prompt_png_bg_black}</option>
+                        <option value="transparent">{t.prompt_png_bg_transparent}</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                        </svg>
+                      </div>
                     </div>
+                    
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                      {t.prompt_png_bg_desc}
+                    </p>
                   </div>
-                  
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                    {t.prompt_png_bg_desc}
-                  </p>
+
+                  {styleCategory === 'Flat Icon' && (
+                    <div className="p-4 bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/20 dark:border-teal-500/30 rounded-[1.5rem] space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+                          Format Flat Icon
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowFlatIconModal(true)}
+                          className="text-[10px] px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-all border border-teal-500/20"
+                        >
+                          <Sliders size={10} />
+                          Ubah
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-950 rounded-xl border border-teal-500/10">
+                        <div className="p-2 bg-teal-500/10 text-teal-550 rounded-lg">
+                          {flatIconType === 'sheet' ? (
+                            <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            {flatIconType === 'sheet' ? 'Icon Sheet (Collection Icon)' : 'Single Icon'}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                            {flatIconType === 'sheet' 
+                              ? 'Koleksi beberapa ikon bertema serupa dalam satu lembar.' 
+                              : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1256,6 +1309,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       setVariation(item.variation);
                       setPromptMode(item.promptMode || 'background');
                       setPngBgColor(item.pngBgColor || 'white');
+                      if (item.flatIconType) {
+                        setFlatIconType(item.flatIconType);
+                      }
                       setResult({
                         prompts: item.prompts || [],
                         negativePrompt: item.negativePrompt,
@@ -1292,9 +1348,151 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               </div>
             )}
           </div>
-
         </div>
       </div>
+
+      {/* Flat Icon Style Option Modal Selection */}
+      <AnimatePresence>
+        {showFlatIconModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop with Blur */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFlatIconModal(false)}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            />
+            
+            {/* Modal Body Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden z-10"
+            >
+              {/* Decorative top colored bar */}
+              <div className="h-2 bg-gradient-to-r from-teal-500 to-emerald-500" />
+              
+              {/* Content Container */}
+              <div className="p-6 space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">🎨</span>
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 leading-tight">
+                        Pilih Format Flat Icon
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+                        Gaya Flat Icon PNG Asset
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFlatIconModal(false)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                {/* Options list */}
+                <div className="space-y-3">
+                  {/* Option 1: Single Icon */}
+                  <div
+                    onClick={() => {
+                      setFlatIconType('single');
+                      setShowFlatIconModal(false);
+                    }}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex items-start gap-4 text-left ${
+                      flatIconType === 'single'
+                        ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-500/10'
+                        : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10 bg-slate-50 dark:bg-black/15'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-xl border ${
+                      flatIconType === 'single'
+                        ? 'bg-emerald-500 text-white border-emerald-400/25'
+                        : 'bg-white dark:bg-slate-950 text-slate-500 border-slate-200/50 dark:border-white/5'
+                    }`}>
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                          Single Icon
+                        </span>
+                        {flatIconType === 'single' && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full font-bold">
+                            Aktif
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                        Menghasilkan satu ikon tunggal terpusat pada bidang gambar. Sangat cocok jika Anda membutuhkan satu aset visual independen.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Icon Sheet */}
+                  <div
+                    onClick={() => {
+                      setFlatIconType('sheet');
+                      setShowFlatIconModal(false);
+                    }}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex items-start gap-4 text-left ${
+                      flatIconType === 'sheet'
+                        ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-500/10'
+                        : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10 bg-slate-50 dark:bg-black/15'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-xl border ${
+                      flatIconType === 'sheet'
+                        ? 'bg-emerald-500 text-white border-emerald-400/25'
+                        : 'bg-white dark:bg-slate-950 text-slate-500 border-slate-200/50 dark:border-white/5'
+                    }`}>
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                          Icon Sheet (Collection Icon)
+                        </span>
+                        {flatIconType === 'sheet' && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full font-bold">
+                            Aktif
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                        Menghasilkan lembar koleksi berisi beberapa ikon sejenis dalam bentuk grid. Sangat ideal untuk set ikon promosi atau presentasi katalog.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Button actions */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFlatIconModal(false)}
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all cursor-pointer"
+                  >
+                    Simpan Pilihan
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
