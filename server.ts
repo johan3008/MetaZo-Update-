@@ -2,13 +2,10 @@ import "@ffmpeg-installer/ffmpeg";
 import "@ffprobe-installer/ffprobe";
 import "fluent-ffmpeg";
 
-// Vercel NFT hack to include binaries without crashing Windows local dev
-try {
-  import("@ffmpeg-installer/linux-x64/package.json").catch(() => {});
-  import("@ffprobe-installer/linux-x64/package.json").catch(() => {});
-} catch (e) {
-  // Ignored for Windows dev
-}
+// Vercel NFT hack to include binaries
+import "@ffmpeg-installer/linux-x64/package.json";
+import "@ffprobe-installer/linux-x64/package.json";
+
 
 // Vercel NFT hack to include binaries
 
@@ -27,7 +24,7 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
@@ -1451,7 +1448,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-prompt', async (req, res) => {
         try {
-            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed } = req.body;
+            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType } = req.body;
             if (!subject) {
                 return res.status(400).json({ error: 'Missing subject field' });
             }
@@ -1465,7 +1462,8 @@ app.get('/api/debug-uploads', (req, res) => {
                 minWords,
                 maxWords,
                 model,
-                seed: typeof seed === 'number' ? seed : undefined
+                seed: typeof seed === 'number' ? seed : undefined,
+                flatIconType
             });
             res.json(promptData);
         } catch (e: any) {
@@ -2216,32 +2214,6 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating keywords' });
-            }
-        }
-    });
-
-    app.post('/api/generate-motion-code', async (req, res) => {
-        try {
-            const { prompt, currentCode, model, fps, durationSeconds, width, height, history } = req.body;
-            if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-                return res.status(400).json({ error: 'Missing prompt field' });
-            }
-            const result = await generateMotionCode(prompt, {
-                currentCode,
-                model,
-                fps,
-                durationSeconds,
-                width,
-                height,
-                history
-            });
-            res.json(result);
-        } catch (e: any) {
-            console.warn('Server generate-motion-code error:', e);
-            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
-                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
-            } else {
-                res.status(500).json({ error: e.message || 'Error generating motion graphics code' });
             }
         }
     });
