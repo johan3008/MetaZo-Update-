@@ -2665,6 +2665,7 @@ export const generateOptimizedPrompt = async (options: {
   maxWords?: number;
   model?: string;
   seed?: number;
+  flatIconType?: 'sheet' | 'single';
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -2676,7 +2677,8 @@ export const generateOptimizedPrompt = async (options: {
     minWords = 10,
     maxWords = 70,
     model = undefined,
-    seed = Math.floor(Math.random() * 1000000)
+    seed = Math.floor(Math.random() * 1000000),
+    flatIconType = undefined
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
@@ -2745,6 +2747,14 @@ export const generateOptimizedPrompt = async (options: {
   };
 
   const currentDirective = styleSpecificDirectives[styleCategory] || '';
+  let flatIconDirective = '';
+  if (styleCategory === 'Flat Icon' && isPngMode && flatIconType) {
+    if (flatIconType === 'sheet') {
+      flatIconDirective = ' - ICON COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a flat design icon collection sheet, showing a clean grid array, set, or organized group of multiple matching, cohesive flat icons or related pictograms on the same plain background, sharing a unified flat visual theme and color palette.';
+    } else {
+      flatIconDirective = ' - SINGLE STANDALONE ICON REQUIREMENT: Every prompt variation MUST describe exactly ONE single standalone individual flat design icon or centered pictogram, with absolutely NO other icons, NO multiple items, and NO grid sheet/collections in the composition.';
+    }
+  }
 
   if (isPngMode) {
     const stickerPrevention = styleCategory !== "Sticker Illustration" 
@@ -2761,6 +2771,7 @@ CRITICAL PNG MODE SETTINGS:
 - The arrangement and styling are fully flexible—let the AI design the composition dynamically, prioritizing a professional, high-end visual asset.
 - You must explicitly append tags such as "isolated on a plain ${pngBgColor} background", "solid flat ${pngBgColor} backdrop", or "pure solid ${pngBgColor} background, no shadows" into the prompt variations.
 ${currentDirective}
+${flatIconDirective}
 ${stickerPrevention}
 - Extremely important: Do NOT describe any background scenery, environmental elements, horizon lines, decorative interiors, or context elements. The subject must float on a pure solid ${pngBgColor} background.`;
   } else {
