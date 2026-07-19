@@ -5169,3 +5169,125 @@ export async function uploadVideoToGemini(localFilePath: string, mimeType: strin
   
   return { fileUri: fileInfo.uri, mimeType: fileInfo.mimeType, name: fileInfo.name };
 }
+
+// ============================================================================
+// MOTION GEN (REMOTION) - "Vibe Coding" AI Motion Graphics Generator
+// ============================================================================
+export async function generateMotionCode(
+  userPrompt: string,
+  options?: {
+    currentCode?: string;
+    model?: string;
+    fps?: number;
+    durationSeconds?: number;
+    width?: number;
+    height?: number;
+    history?: { role: 'user' | 'assistant'; content: string }[];
+  }
+) {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  const model = options?.model;
+
+  const fps = options?.fps || 30;
+  const durationInFrames = (options?.durationSeconds || 5) * fps;
+  const width = options?.width || 1920;
+  const height = options?.height || 1080;
+
+  const systemInstruction = `You are "MotionGen AI", an elite senior Motion Graphics Engineer specialized in writing Remotion (React video framework) compositions. You do "vibe coding": the user describes a motion graphics/video idea in plain, casual language (often Indonesian), and you turn it directly into working, polished, production-ready Remotion code. No back-and-forth, no clarifying questions — just ship great code.
+
+STRICT TECHNICAL RULES (the code runs inside a sandboxed in-browser Babel transpiler, NOT a real Node/Remotion project, so it has ONLY 'react' and 'remotion' available as importable modules):
+1. Output EXACTLY ONE React functional component named "MotionComposition" and export it with: export const MotionComposition = () => { ... }
+2. You MAY import ONLY from 'react' and 'remotion'. NEVER import images, fonts, audio, video files, external assets, external npm packages (no framer-motion, no gsap, no three.js, no lottie, no icon libraries), and NEVER use require() for anything other than 'react'/'remotion'.
+3. From 'remotion' you may use: useCurrentFrame, useVideoConfig, interpolate, spring, Easing, AbsoluteFill, Sequence, Series, random, Img (only if using a public https image URL is truly necessary; prefer pure CSS/SVG instead).
+4. Always read fps/width/height/durationInFrames from useVideoConfig() inside the component rather than hardcoding, so the animation adapts to the configured canvas.
+5. Build ALL visuals using inline CSS-in-JS (style objects), CSS gradients, SVG shapes/paths drawn inline, and typography. Do not rely on any external image, logo, or font file.
+6. Animate using frame-driven math: interpolate() for tweening, spring() for bouncy/elastic motion, and Sequence for staged/multi-scene timelines. Extrapolate with 'clamp' unless a loop is intended.
+7. Design like a professional motion designer: clear visual hierarchy, tasteful color palettes/gradients, easing curves (not linear unless intentional), staggered entrances, subtle parallax/depth, and a cohesive theme matching the user's request.
+8. The component MUST be self-contained, deterministic (no Math.random(), no Date.now(); use Remotion's random() with a fixed seed if randomness is needed), and must not use browser-only APIs (no window, document, fetch, setTimeout inside render).
+9. Never use TypeScript type annotations (the sandbox transpiles JSX only, not TS) — write plain modern JavaScript (ES2020+) with JSX.
+10. If the user is asking to MODIFY previously generated code (a "currentCode" is provided below), treat it as the base: keep what already works and only change what the user is asking for, still returning the FULL updated component (never a diff/partial snippet).
+
+Respond ONLY with a JSON object with this exact shape (no markdown fences, no extra commentary):
+{
+  "title": "Short catchy title for this motion graphic (max 6 words, match user's language)",
+  "summary": "One short friendly sentence (in the same language the user used) describing what you built or changed",
+  "code": "the full JSX source code string described above"
+}`;
+
+  const contextParts: string[] = [];
+  contextParts.push(`Video canvas target: ${width}x${height} px, ${fps} fps, ${durationInFrames} frames total (${(durationInFrames / fps).toFixed(1)} seconds).`);
+  if (options?.currentCode && options.currentCode.trim().length > 0) {
+    contextParts.push(`CURRENT EXISTING CODE (this is the base you are editing/iterating on):\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+  }
+  if (options?.history && options.history.length > 0) {
+    const trimmedHistory = options.history.slice(-6);
+    contextParts.push(`Recent conversation history for extra context:\n${trimmedHistory.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.content}`).join('\n')}`);
+  }
+  contextParts.push(`User's new request: "${userPrompt}"`);
+
+  const fullContents = contextParts.join('\n\n');
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      title: { type: Type.STRING },
+      summary: { type: Type.STRING },
+      code: { type: Type.STRING }
+    },
+    required: ["title", "summary", "code"]
+  };
+
+  let responseText = "";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const res = await callOpenAICompatibleWithRetry({
+      systemInstruction,
+      contents: fullContents,
+      responseMimeType: "application/json",
+      responseSchema,
+      config: { temperature: 0.9 },
+      model
+    });
+    responseText = res;
+  } else {
+    try {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.9
+      }, 2);
+      responseText = res.text || "{}";
+    } catch (err: any) {
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.9
+      }, 1);
+      responseText = res.text || "{}";
+    }
+  }
+
+  const parsed = JSON.parse(extractJSON(responseText));
+
+  // Basic safety/sanity cleanup: strip markdown fences if the model added them anyway
+  if (typeof parsed.code === 'string') {
+    parsed.code = parsed.code
+      .replace(/^```(jsx|javascript|js|tsx)?\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+
+    if (!/MotionComposition/.test(parsed.code)) {
+      throw new Error('AI response did not include a MotionComposition export. Please try again.');
+    }
+  } else {
+    throw new Error('AI response missing code field. Please try again.');
+  }
+
+  return {
+    title: parsed.title || 'Untitled Motion',
+    summary: parsed.summary || '',
+    code: parsed.code as string
+  };
+}
