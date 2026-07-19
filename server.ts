@@ -2,10 +2,15 @@ import "@ffmpeg-installer/ffmpeg";
 import "@ffprobe-installer/ffprobe";
 import "fluent-ffmpeg";
 
-// Vercel NFT hack to include binaries
-// import "@ffmpeg-installer/linux-x64/package.json";
-// import "@ffprobe-installer/linux-x64/package.json";
-
+// Vercel NFT hack to include binaries without crashing Windows local dev
+import { createRequire } from 'module';
+const customRequire = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
+try {
+  customRequire("@ffmpeg-installer/linux-x64/package.json");
+  customRequire("@ffprobe-installer/linux-x64/package.json");
+} catch (e) {
+  // Ignored for Windows dev
+}
 
 // Vercel NFT hack to include binaries
 
