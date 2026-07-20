@@ -46,6 +46,7 @@ interface PromptVideoViewProps {
   setShowLimitModal?: (show: boolean) => void;
   user?: any;
   db?: any;
+  uiLanguage?: string;
 }
 
 export const PromptVideoView: React.FC<PromptVideoViewProps> = ({ 
@@ -56,7 +57,8 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   incrementDailyCount,
   setShowLimitModal,
   user,
-  db
+  db,
+  uiLanguage = 'en'
 }) => {
   const [keyword, setKeyword] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -139,6 +141,13 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   const handleAnalyze = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!keyword.trim() || isAnalyzing) return;
+
+    if (!isLicensed) {
+      setError(uiLanguage === 'id' 
+        ? "Fitur 'Analisis Gerak' hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!" 
+        : "The 'Analyze Motion' feature is only available for Premium/Subscription users. Please upgrade your account!");
+      return;
+    }
 
     if (!isLicensed && dailyGenCount >= 30) {
       setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate.`);
@@ -456,9 +465,22 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
-                  onClick={(e) => { e.preventDefault(); handleAnalyze(); }}
-                  className="h-12 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-violet-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
+                  disabled={isAnalyzing || isGeneratingPrompts || (isLicensed && !keyword.trim())}
+                  onClick={(e) => { 
+                    e.preventDefault(); 
+                    if (!isLicensed) {
+                      setError(uiLanguage === 'id' 
+                        ? "Fitur 'Analisis Gerak' hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!" 
+                        : "The 'Analyze Motion' feature is only available for Premium/Subscription users. Please upgrade your account!");
+                      return;
+                    }
+                    handleAnalyze(); 
+                  }}
+                  className={`h-12 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center justify-center space-x-2 ${
+                    !isLicensed 
+                      ? 'bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer border border-amber-500/35'
+                      : 'bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 shadow-lg shadow-violet-600/20 active:scale-95'
+                  }`}
                 >
                   {isAnalyzing ? (
                     <>
@@ -468,7 +490,7 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
                   ) : (
                     <>
                       <ShieldAlert size={16} />
-                      <span>{t.video_studio_btn_analyze}</span>
+                      <span>{t.video_studio_btn_analyze} {!isLicensed && '🔒'}</span>
                     </>
                   )}
                 </button>
