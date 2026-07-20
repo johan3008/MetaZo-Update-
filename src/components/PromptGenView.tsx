@@ -77,6 +77,16 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
 ];
 
+const PREMIUM_ONLY_STYLES = [
+  'Embroidery',
+  'Disney Cartoon',
+  'Dark Horror Aesthetic',
+  'Lego Style',
+  'Voxel Art',
+  'Graphic Design',
+  'Line Art'
+];
+
 export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
   t, 
   prefilledSubject, 
@@ -328,6 +338,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const handleGenerate = async () => {
     if (!isLicensed && dailyGenCount >= getDailyLimit()) {
       setError(t.prompt_error_trial);
+      return;
+    }
+
+    if (!isLicensed && PREMIUM_ONLY_STYLES.includes(styleCategory)) {
+      setError(uiLanguage === 'id' 
+        ? `Gaya "${styleCategory}" hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!` 
+        : `The style "${styleCategory}" is only available for Premium/Subscription users. Please upgrade your account!`);
       return;
     }
 
@@ -704,6 +721,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     value={styleCategory}
                     onChange={(e) => {
                       const val = e.target.value;
+                      if (PREMIUM_ONLY_STYLES.includes(val) && !isLicensed) {
+                        setError(uiLanguage === 'id'
+                          ? `Gaya "${val}" adalah fitur Premium. Silakan upgrade akun Anda!`
+                          : `The style "${val}" is a Premium feature. Please upgrade your account!`);
+                        return;
+                      }
                       setStyleCategory(val);
                       if (promptMode === 'png' && val === 'Flat Icon') {
                         setShowFlatIconModal(true);
@@ -711,11 +734,19 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     }}
                     className="relative w-full rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none shadow-sm transition-all z-10"
                   >
-                    {currentStyleOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id} className="dark:bg-slate-900 font-medium text-slate-800 dark:text-slate-200">
-                        {opt.icon} &nbsp; {opt.label}
-                      </option>
-                    ))}
+                    {currentStyleOptions.map((opt) => {
+                      const isLocked = PREMIUM_ONLY_STYLES.includes(opt.id) && !isLicensed;
+                      return (
+                        <option 
+                          key={opt.id} 
+                          value={opt.id} 
+                          disabled={isLocked}
+                          className="dark:bg-slate-900 font-medium text-slate-800 dark:text-slate-200 disabled:text-slate-400 disabled:bg-slate-100 dark:disabled:bg-slate-950/40"
+                        >
+                          {opt.icon} &nbsp; {opt.label} {isLocked ? ' 🔒 (Premium)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-emerald-500 z-20">
                     <ChevronRight className="rotate-90" size={16} />
@@ -730,24 +761,34 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <div className="grid grid-cols-2 xs:flex xs:flex-wrap gap-1.5">
                     {currentStyleOptions.map((opt) => {
                       const isSelected = styleCategory === opt.id;
+                      const isLocked = PREMIUM_ONLY_STYLES.includes(opt.id) && !isLicensed;
                       return (
                         <button
                           key={opt.id}
                           type="button"
                           onClick={() => {
+                            if (isLocked) {
+                              setError(uiLanguage === 'id'
+                                ? `Gaya "${opt.id}" adalah fitur Premium. Silakan upgrade akun Anda!`
+                                : `The style "${opt.id}" is a Premium feature. Please upgrade your account!`);
+                              return;
+                            }
                             setStyleCategory(opt.id);
                             if (promptMode === 'png' && opt.id === 'Flat Icon') {
                               setShowFlatIconModal(true);
                             }
                           }}
                           className={`px-3 py-2 rounded-[1.5rem] text-[10px] font-extrabold uppercase transition-all duration-200 flex items-center gap-1.5 border cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-md shadow-black/5 font-semibold scale-[1.02]'
-                              : 'bg-slate-50 dark:bg-black/15 text-slate-500 dark:text-slate-400 border-slate-200/60 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5'
+                            isLocked
+                              ? 'bg-slate-100 dark:bg-black/10 text-slate-400 dark:text-slate-500 border-slate-200/40 dark:border-white/5 opacity-60 cursor-not-allowed'
+                              : isSelected
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shadow-md shadow-black/5 font-semibold scale-[1.02]'
+                                : 'bg-slate-50 dark:bg-black/15 text-slate-500 dark:text-slate-400 border-slate-200/60 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5'
                           }`}
                         >
                           <span>{opt.icon}</span>
                           <span>{opt.id}</span>
+                          {isLocked && <span className="text-[10px] text-amber-500" title="Premium">🔒</span>}
                         </button>
                       );
                     })}
