@@ -4396,6 +4396,7 @@ const App: React.FC = () => {
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE, amount)}
               setShowLimitModal={setShowLimitModal}
               aiOptions={commonAiOptions}
+              uiLanguage={uiLanguage}
             />
           ) : activeTool === ToolType.PROMPT_VIDEO ? (
             <PromptVideoView 
@@ -4407,6 +4408,7 @@ const App: React.FC = () => {
               aiOptions={commonAiOptions}
               user={user}
               db={db}
+              uiLanguage={uiLanguage}
             />
           ) : activeTool === ToolType.PROMPT_IMAGE_CHECK ? (
             <ImageCheckView 
