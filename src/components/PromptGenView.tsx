@@ -50,7 +50,13 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Abstract', label: 'Abstract (Abstrak)', icon: '⛰️' },
   { id: 'Vintage Photography', label: 'Vintage Photography (Klasik)', icon: '🎞️' },
   { id: 'Cyberpunk', label: 'Cyberpunk (Futuristik Retro)', icon: '⚡' },
-  { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' }
+  { id: 'SteamPunk', label: 'SteamPunk (Retro Industri)', icon: '⚙️' },
+  { id: 'Embroidery', label: 'Embroidery (Seni Bordir)', icon: '🧵' },
+  { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
+  { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
+  { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
+  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
+  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
 ];
 
 const PNG_STYLE_OPTIONS = [
@@ -66,7 +72,9 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Origami Style', label: 'Origami Style (Seni Origami)', icon: '📄' },
   { id: 'Glassmorphism', label: 'Glassmorphism (Efek Kaca)', icon: '🔮' },
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' },
-  { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' }
+  { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' },
+  { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
+  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
 ];
 
 export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
