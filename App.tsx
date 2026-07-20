@@ -26,6 +26,7 @@ import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
+import { MotionGenView } from './src/components/MotionGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -1009,6 +1010,7 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'epsconverter': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
+    case 'motiongen': return ToolType.MOTION_GEN;
     default: return null;
   }
 };
@@ -1103,7 +1105,7 @@ const App: React.FC = () => {
   const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => {
     const saved = localStorage.getItem('mz_keyword_mode');
     if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
-      return saved as any;
+      return saved;
     }
     return 'mixed';
   });
@@ -1580,7 +1582,8 @@ const App: React.FC = () => {
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.CALENDAR_GEN,
-      ToolType.MUTE_VIDEO
+      ToolType.MUTE_VIDEO,
+      ToolType.MOTION_GEN
     ];
     return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
   }, [getDailyCount]);
@@ -1600,7 +1603,8 @@ const App: React.FC = () => {
       [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
       [ToolType.VECTOR_EPS]: 0,
       [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN),
-      [ToolType.MUTE_VIDEO]: getDailyCount(ToolType.MUTE_VIDEO)
+      [ToolType.MUTE_VIDEO]: getDailyCount(ToolType.MUTE_VIDEO),
+      [ToolType.MOTION_GEN]: getDailyCount(ToolType.MOTION_GEN)
     });
   }, [getDailyCount]);
 
@@ -1843,7 +1847,8 @@ const App: React.FC = () => {
             ToolType.PROMPT_VIDEO,
             ToolType.PROMPT_IMAGE_CHECK,
             ToolType.CALENDAR_GEN,
-            ToolType.MUTE_VIDEO
+            ToolType.MUTE_VIDEO,
+            ToolType.MOTION_GEN
           ];
           tools.forEach((t) => {
             const val = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`);
@@ -1871,7 +1876,7 @@ const App: React.FC = () => {
               uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
               keywordMode: (() => {
                  const saved = localStorage.getItem('mz_keyword_mode');
-                 if (saved === 'mixed' || saved === 'single' || saved === 'multi' || saved === 'research' || saved === 'seo_boost') {
+                 if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
                    return saved;
                  }
                  return 'mixed';
@@ -3163,8 +3168,8 @@ const App: React.FC = () => {
                           const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('meta-zo-update.vercel.app');
                           if (isVercel) {
                               throw new Error(
-                                  `File terlalu besar — Vercel menolak body > 4.5MB.\n\n` +
-                                  `✅ SOLUSI: Tambahkan Cloudflare R2 ke Vercel Environment Variables:\n` +
+                                  `File terlalu besar â€” Vercel menolak body > 4.5MB.\n\n` +
+                                  `âœ… SOLUSI: Tambahkan Cloudflare R2 ke Vercel Environment Variables:\n` +
                                   `  S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com\n` +
                                   `  S3_ACCESS_KEY_ID=...\n` +
                                   `  S3_SECRET_ACCESS_KEY=...\n` +
@@ -4445,6 +4450,15 @@ const App: React.FC = () => {
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
             />
+          ) : activeTool === ToolType.MOTION_GEN ? (
+            <MotionGenView 
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.MOTION_GEN] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MOTION_GEN, amount)}
+              setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
+              aiOptions={commonAiOptions}
+            />
           ) : (
             <>
               {/* Welcome Intro Row */}
@@ -4520,7 +4534,7 @@ const App: React.FC = () => {
                 filesWithErrorCount={filesWithErrorCount} 
               />
 
-              {/* ⚠️ R2 WARNING BANNER — muncul jika R2 belum dikonfigurasi */}
+              {/* âš ï¸ R2 WARNING BANNER â€” muncul jika R2 belum dikonfigurasi */}
               {[ToolType.VECTOR, ToolType.VIDEO, ToolType.IMAGE, ToolType.MUTE_VIDEO].includes(activeTool) && r2Status === false && (
                 <div className="flex items-start gap-3 px-4 py-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2 duration-300">
                   <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -4550,7 +4564,7 @@ const App: React.FC = () => {
                     onClick={() => setR2Status(null)}
                     className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
                     title="Tutup"
-                  >×</button>
+                  >Ã—</button>
                 </div>
               )}
 
@@ -4867,7 +4881,7 @@ const App: React.FC = () => {
             >
               {(['appearance', selectedProvider, 'faq_billing', ...(isAdminAccount ? ['reseller'] : [])] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '�� Tampilan & Tema' : '�� Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? '�� FAQ Tagihan & Langganan' : '�� Billing & Subscription FAQ') : tab === 'reseller' ? '�� Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ Tampilan & Tema' : 'ï¿½ï¿½ Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ FAQ Tagihan & Langganan' : 'ï¿½ï¿½ Billing & Subscription FAQ') : tab === 'reseller' ? 'ï¿½ï¿½ Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
@@ -4952,8 +4966,8 @@ const App: React.FC = () => {
                     {matchSystemTheme && (
                       <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide block mt-1 text-center">
                         {uiLanguage === 'id' 
-                          ? "⚠️ Mengubah tema manual akan mematikan 'Cocokkan Tema Sistem'." 
-                          : "⚠️ Selecting a manual theme will turn off 'Match System Theme'."}
+                          ? "âš ï¸ Mengubah tema manual akan mematikan 'Cocokkan Tema Sistem'." 
+                          : "âš ï¸ Selecting a manual theme will turn off 'Match System Theme'."}
                       </span>
                     )}
                   </div>
