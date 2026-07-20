@@ -12,6 +12,7 @@ interface PromptImageViewProps {
   dailyGenCount?: number;
   incrementDailyCount?: (amount?: number) => void;
   setShowLimitModal?: (show: boolean) => void;
+  uiLanguage?: string;
 }
 import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
@@ -28,6 +29,15 @@ interface ImageItem {
   error?: string | null;
 }
 
+const PREMIUM_ONLY_STYLES = [
+  'Embroidery',
+  'Disney Cartoon',
+  'Dark Horror Aesthetic',
+  'Lego Style',
+  'Voxel Art',
+  'Graphic Design'
+];
+
 const STYLE_OPTIONS = (t: any) => [
   { id: 'Photorealistic', label: t.style_photorealistic || 'Photorealistic', icon: '📷', desc: 'Realism' },
   { id: 'Cinematic', label: t.style_cinematic || 'Cinematic', icon: '🎬', desc: 'Movie light' },
@@ -39,9 +49,10 @@ const STYLE_OPTIONS = (t: any) => [
   { id: 'Anime', label: 'Anime', icon: '🌸', desc: 'Japanese' },
   { id: 'Embroidery', label: 'Embroidery', icon: '🧵', desc: 'Needlework' },
   { id: 'Disney Cartoon', label: 'Disney Cartoon', icon: '🏰', desc: 'Animation' },
-  { id: 'Dark Horror Aesthetic', label: 'Dark Horror', icon: '🦇', desc: 'Macabre' },
+  { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic', icon: '🦇', desc: 'Macabre' },
   { id: 'Lego Style', label: 'Lego Style', icon: '🧱', desc: 'Bricks' },
-  { id: 'Voxel Art', label: 'Voxel Art', icon: '🟩', desc: 'Cubes' }
+  { id: 'Voxel Art', label: 'Voxel Art', icon: '🟩', desc: 'Cubes' },
+  { id: 'Graphic Design', label: 'Graphic Design', icon: '📐', desc: 'Commercial Design' }
 ];
 
 export const PromptImageView: React.FC<PromptImageViewProps> = ({ 
@@ -50,7 +61,8 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   isLicensed = false,
   dailyGenCount = 0,
   incrementDailyCount,
-  setShowLimitModal
+  setShowLimitModal,
+  uiLanguage = 'en'
 }) => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -167,6 +179,13 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   const analyzeBatch = async (itemsToAnalyze?: ImageItem[], forceAll = false) => {
     const unanalyzed = itemsToAnalyze || (forceAll ? images : images.filter(img => !img.result && !img.loading));
     if (unanalyzed.length === 0) return;
+
+    if (!isLicensed && PREMIUM_ONLY_STYLES.includes(styleCategory)) {
+      setGlobalError(uiLanguage === 'id' 
+        ? `Gaya "${styleCategory}" hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!` 
+        : `The style "${styleCategory}" is only available for Premium/Subscription users. Please upgrade your account!`);
+      return;
+    }
 
     if (!isLicensed && dailyGenCount + unanalyzed.length > getDailyLimit()) {
       setGlobalError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali generate, tetapi Anda mencoba memproses ${unanalyzed.length} gambar.`);
@@ -370,24 +389,42 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 {t.image_studio_target_label}
               </label>
               <div className="grid grid-cols-2 gap-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                {currentStyleOptions.map((opt: any) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => setStyleCategory(opt.id)}
-                    className={`flex flex-col items-start justify-center p-3 rounded-[1.2rem] text-left transition-all border ${
-                      styleCategory === opt.id
-                        ? 'bg-emerald-500/10 border-emerald-500 shadow-sm shadow-emerald-500/10'
-                        : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-emerald-500/30'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1.5 w-full">
-                      <span className="text-sm">{opt.icon}</span>
-                      <span className={`text-[10px] font-black uppercase truncate flex-1 ${styleCategory === opt.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
-                      {styleCategory === opt.id && <Check size={12} className="text-emerald-500" />}
-                    </div>
-                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium truncate w-full">{opt.desc}</span>
-                  </button>
-                ))}
+                {currentStyleOptions.map((opt: any) => {
+                  const isLocked = PREMIUM_ONLY_STYLES.includes(opt.id) && !isLicensed;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        if (isLocked) {
+                          setGlobalError(uiLanguage === 'id' 
+                            ? `Gaya "${opt.label}" adalah fitur Premium. Silakan upgrade akun Anda!` 
+                            : `The style "${opt.label}" is a Premium feature. Please upgrade your account!`);
+                          return;
+                        }
+                        setStyleCategory(opt.id);
+                        setGlobalError(null);
+                      }}
+                      className={`flex flex-col items-start justify-center p-3 rounded-[1.2rem] text-left transition-all border relative ${
+                        isLocked
+                          ? 'bg-slate-100 dark:bg-black/10 text-slate-400 dark:text-slate-500 border-slate-200/40 dark:border-white/5 opacity-60 cursor-not-allowed'
+                          : styleCategory === opt.id
+                            ? 'bg-emerald-500/10 border-emerald-500 shadow-sm shadow-emerald-500/10'
+                            : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-emerald-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5 w-full">
+                        <span className="text-sm">{opt.icon}</span>
+                        <span className={`text-[10px] font-black uppercase truncate flex-1 ${styleCategory === opt.id && !isLocked ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
+                        {isLocked ? (
+                          <span className="text-[10px] text-amber-500" title="Premium">🔒</span>
+                        ) : styleCategory === opt.id && (
+                          <Check size={12} className="text-emerald-500" />
+                        )}
+                      </div>
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium truncate w-full">{opt.desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
