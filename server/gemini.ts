@@ -1304,6 +1304,64 @@ const processFrameServer = (frame: any) => {
   };
 };
 
+interface ToolTypeDirectives {
+  mediaTypeContext: string;
+  titleRule: string;
+  descriptionRule: string;
+  risetKeywordRule: string;
+  seoBoostRule: string;
+  prohibitedExemptions: string;
+}
+
+export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
+  if (toolType === ToolType.VIDEO) {
+    return {
+      mediaTypeContext: "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.",
+      titleRule: `- Start/prioritize dynamic action, movement, and setting of the video.
+- Front-load descriptive cinematic movement phrases (e.g. "Slow motion footage of...", "Cinematic tracking shot of...", "Drone aerial view of..."). Exceptions to the default Rule 6 (no media types) are fully granted for these video/motion terms in the title!
+- Describe the active setting and camera flow rather than just static scenes.`,
+      descriptionRule: `- Detail the visual timeline, camera work, dynamic lighting, movement speeds, and narrative story across frames.
+- Describe actions and characters naturally and with high density.
+- MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning professional video uses, e.g., "Perfect for film production, commercial video ads, documentary b-roll, or high-definition social media content."`,
+      risetKeywordRule: `- Conduct deep, professional motion-picture research: identify specific camera motions (e.g., panning, tilting, tracking, orbiting, zooming), camera gear (e.g., drone, steadicam, dolly, crane), frame rate pacing (e.g., slow motion, real-time, time-lapse), and environmental dynamics.
+- Map cinematic concepts, lighting transitions, action verbs, and temporal themes.`,
+      seoBoostRule: `- Heavily front-load highly searched video commercial keywords to maximize search CTR on stock video marketplaces.
+- Integrate essential video SEO tags: 'footage', 'b-roll', 'video', 'cinematic', 'motion', 'slow motion', 'camera movement', 'panning', 'tracking shot', 'aerial view', 'drone shot', 'time-lapse', 'real-time', '4k resolution', 'film production', 'stock video'. (Exceptions to the default Rule 6 are granted for these).`,
+      prohibitedExemptions: "However, for VIDEO assets, cinematic terms and motion tags (e.g., 'footage', 'b-roll', 'cinematic', 'slow motion', 'panning shot', 'aerial drone view') are highly encouraged."
+    };
+  } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
+    return {
+      mediaTypeContext: "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.",
+      titleRule: `- Describe the vector asset in terms of graphic style, design layout, icon style, branding emblem, or creative illustration template.
+- Use descriptors like "Flat design icon of...", "Minimalist vector illustration of...", "Isometric 3D graphic of...", or "Modern emblem/logo design of...".
+- Avoid plain or spammy titles like "Vector of..." directly, but frame them as high-quality professional digital graphic assets. Exceptions to the default Rule 6 are granted for vector descriptors.`,
+      descriptionRule: `- Describe digital shapes (geometric, organic), clean outlines, gradient/flat colors, layout complexity, and commercial usability.
+- Explicitly describe any isolated presentation (e.g. "isolated on a white background") or clean graphic margins.
+- MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning graphic design uses, e.g., "Ideal for website graphic designs, branding materials, app UI layouts, infographic templates, or commercial print posters."`,
+      risetKeywordRule: `- Conduct deep graphic design research: identify specific vector styles (e.g., flat design, isometric, low-poly, line art, 3D render, badge, emblem, sticker, pictogram), shape complexity, grid alignments, and file types.
+- Map design metaphors, branding purposes, and commercial layout structures.`,
+      seoBoostRule: `- Heavily front-load highly searched vector and digital asset keywords to maximize search discoverability by web designers and publishers.
+- Integrate essential vector SEO tags: 'vector', 'illustration', 'graphic design', 'flat design', 'minimalist', 'icon', 'isolated', 'clipart', 'svg', 'branding', 'design element', 'isometric', 'infographic', 'shapes', 'logo', 'scalable', 'clipart', 'template'. (Exceptions to the default Rule 6 are granted for these).`,
+      prohibitedExemptions: "However, for VECTOR assets, terms indicating digital formats or design styles (e.g., 'vector', 'illustration', 'graphic design', 'flat design', 'icon', 'isolated', 'isometric', 'svg') are highly encouraged."
+    };
+  } else {
+    // Default to Image/Photo
+    return {
+      mediaTypeContext: "The provided image is a photograph or digital artwork. Generate natural, human-readable descriptions of concepts and visual facts smoothly.",
+      titleRule: `- Describe the real-world scene, main subjects, active posing, and lighting atmosphere beautifully.
+- Avoid any cheap subjective marketing terms or "High quality photo of...".
+- Front-load the most descriptive searchable keywords.`,
+      descriptionRule: `- Detail physical realism, authentic human expressions, real-world textures, lighting qualities, and photographic depth of field.
+- MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning photography uses, e.g., "Ideal for commercial advertising, marketing campaigns, editorial web blogs, or social media banner graphics."`,
+      risetKeywordRule: `- Conduct deep photographic and real-world concept research: identify visual subjects, authentic expressions, clothing textures, environment details, weather conditions, lighting attributes, and depth of field.
+- Map realistic physical synonyms, human-centric emotional adjectives, and situational contexts.`,
+      seoBoostRule: `- Heavily front-load high-converting professional photography keywords to capture exact search patterns of magazine and commercial buyers.
+- Integrate essential photo SEO tags: 'photo', 'photography', 'realistic', 'candid', 'outdoor shot', 'studio shot', 'depth of field', 'professional lighting', 'high-resolution', 'commercial photography', 'real-world', 'lifestyle shot'. (Exceptions to the default Rule 6 are granted for these).`,
+      prohibitedExemptions: "However, for PHOTOGRAPHIC assets, terms indicating photo style (e.g., 'photo', 'photography', 'realistic', 'candid', 'studio shot') are fully allowed."
+    };
+  }
+}
+
 export const generateStockMetadata = async (
   frames: string[],
   keywordCount: number | string,
@@ -1343,15 +1401,18 @@ export const generateStockMetadata = async (
   const targetCount = parseInt(String(keywordCount), 10) || 60;
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
+  const directives = getToolTypeDirectives(toolType);
+
   // Rules for keywords depending on keywordMode
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
+   - ${directives.risetKeywordRule}
    - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
    - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
 3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
    - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
+   - ${directives.seoBoostRule}
    - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
    - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
    - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
@@ -1374,11 +1435,12 @@ export const generateStockMetadata = async (
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
+   - ${directives.risetKeywordRule}
    - Map single-word synonyms, technical terms, and semantic variations.
    - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
 3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
    - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
+   - ${directives.seoBoostRule} Note: Since this is SINGLE-WORD mode, ensure any keyword phrase is split or shortened into a single word.
    - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
@@ -1399,11 +1461,12 @@ export const generateStockMetadata = async (
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
+   - ${directives.risetKeywordRule}
    - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
    - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
 3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
    - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
+   - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
    - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
    - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
    - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
@@ -1428,12 +1491,7 @@ export const generateStockMetadata = async (
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
-  let mediaTypeContext = "The provided image is a photograph or digital artwork. Generate natural, human-readable descriptions of concepts and visual facts smoothly.";
-  if (toolType === ToolType.VIDEO) {
-    mediaTypeContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.";
-  } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-    mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
-  }
+  const mediaTypeContext = directives.mediaTypeContext;
 
   const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
@@ -1580,7 +1638,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO MEDIA TYPE WORDS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+   ${directives.prohibitedExemptions}
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
@@ -1589,19 +1648,22 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
-2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-3. Use easy-to-read phrases, NOT formal sentence structures.
-4. DO NOT treat the title like a list of keywords. No commas separating words.
+2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+   ${directives.titleRule}
+3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+4. Use easy-to-read phrases, NOT formal sentence structures.
+5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself). ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
+   ${directives.descriptionRule}
+3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
+4. Limit to 200 characters.
 
 Rules for Keywords:
 1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
-2. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
-3. Ensure no IP, brands, or names are included.
+2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
 Rules for Categories:
@@ -1721,7 +1783,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO MEDIA TYPE WORDS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+   ${directives.prohibitedExemptions}
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
@@ -1732,6 +1795,8 @@ Rules for Titles:
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
+- SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+  ${directives.titleRule}
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
@@ -1741,8 +1806,9 @@ Rules for Titles:
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
-2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself). ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
-3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
+   ${directives.descriptionRule}
+3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
 
 Rules for Keywords:
@@ -1943,6 +2009,7 @@ export const generateBatchStockMetadata = async (
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
+  const directives = getToolTypeDirectives(toolType);
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
@@ -2049,12 +2116,7 @@ export const generateBatchStockMetadata = async (
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
-      let mediaTypeContext = "The provided image is a photograph or digital artwork. Generate natural, human-readable descriptions of concepts and visual facts smoothly.";
-      if (toolType === ToolType.VIDEO) {
-        mediaTypeContext = "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.";
-      } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
-        mediaTypeContext = "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.";
-      }
+      const mediaTypeContext = directives.mediaTypeContext;
 
       const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
@@ -2186,7 +2248,7 @@ OUTPUT FORMAT:
       ].filter((item: any) => item.importance >= 50).map((item: any) => item.name);
   });
 
-  const mediaContext = toolType === ToolType.VIDEO ? "CRITICAL: Sequential frames from a single VIDEO. Analyze continuous motion and storyline across frames." : (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS ? "VECTOR illustration. Focus on ACTUAL SUBJECT MATTER explicitly visible inside the illustration for categorization." : "Photograph or digital artwork.");
+  const mediaContext = directives.mediaTypeContext;
   
   const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / CONCEPT KEY (ABSOLUTE PRIORITY):
 The user has provided a custom instruction, concept key, or target keywords: "${customPrompt}"
@@ -2208,7 +2270,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO MEDIA TYPE WORDS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+   ${directives.prohibitedExemptions}
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
@@ -2217,19 +2280,22 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
-2. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-3. Use easy-to-read phrases, NOT formal sentence structures.
-4. DO NOT treat the title like a list of keywords. No commas separating words.
+2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+   ${directives.titleRule}
+3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+4. Use easy-to-read phrases, NOT formal sentence structures.
+5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms.
-2. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
-3. Limit to 200 characters.
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
+   ${directives.descriptionRule}
+3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
+4. Limit to 200 characters.
 
 Rules for Keywords:
 1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
-2. CRITICAL: Keywords must be single words only. NEVER use multi-word phrases or compound words with spaces.
-3. Ensure no IP, brands, or names are included.
+2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
 Rules for Categories:
@@ -2354,7 +2420,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
 4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO MEDIA TYPE WORDS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
+   ${directives.prohibitedExemptions}
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
@@ -2365,6 +2432,8 @@ Rules for Titles:
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
+- SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+  ${directives.titleRule}
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
 - Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
@@ -2374,8 +2443,9 @@ Rules for Titles:
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
-2. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language.
-3. ALWAYS conclude the description with a sentence starting with "Ideal for..." or "Perfect for..." that suggests how a customer might use this asset (e.g., "Ideal for tech blogs or app UI presentations").
+2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
+   ${directives.descriptionRule}
+3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
 
 Rules for Keywords:
