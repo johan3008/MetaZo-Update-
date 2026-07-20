@@ -26,7 +26,6 @@ import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
-import { MotionGenView } from './src/components/MotionGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -1010,7 +1009,6 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'epsconverter': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
-    case 'motiongen': return ToolType.MOTION_GEN;
     default: return null;
   }
 };
@@ -1105,7 +1103,7 @@ const App: React.FC = () => {
   const [keywordMode, setKeywordMode] = useState<'mixed' | 'single' | 'multi'>(() => {
     const saved = localStorage.getItem('mz_keyword_mode');
     if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
-      return saved;
+      return saved as any;
     }
     return 'mixed';
   });
@@ -1582,8 +1580,7 @@ const App: React.FC = () => {
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.CALENDAR_GEN,
-      ToolType.MUTE_VIDEO,
-      ToolType.MOTION_GEN
+      ToolType.MUTE_VIDEO
     ];
     return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
   }, [getDailyCount]);
@@ -1603,8 +1600,7 @@ const App: React.FC = () => {
       [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
       [ToolType.VECTOR_EPS]: 0,
       [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN),
-      [ToolType.MUTE_VIDEO]: getDailyCount(ToolType.MUTE_VIDEO),
-      [ToolType.MOTION_GEN]: getDailyCount(ToolType.MOTION_GEN)
+      [ToolType.MUTE_VIDEO]: getDailyCount(ToolType.MUTE_VIDEO)
     });
   }, [getDailyCount]);
 
@@ -1847,8 +1843,7 @@ const App: React.FC = () => {
             ToolType.PROMPT_VIDEO,
             ToolType.PROMPT_IMAGE_CHECK,
             ToolType.CALENDAR_GEN,
-            ToolType.MUTE_VIDEO,
-            ToolType.MOTION_GEN
+            ToolType.MUTE_VIDEO
           ];
           tools.forEach((t) => {
             const val = localStorage.getItem(`mz_daily_gen_${t}_${dateStr}`);
@@ -1876,7 +1871,7 @@ const App: React.FC = () => {
               uiLanguage: localStorage.getItem('mz_ui_language') || 'en',
               keywordMode: (() => {
                  const saved = localStorage.getItem('mz_keyword_mode');
-                 if (saved === 'mixed' || saved === 'single' || saved === 'multi') {
+                 if (saved === 'mixed' || saved === 'single' || saved === 'multi' || saved === 'research' || saved === 'seo_boost') {
                    return saved;
                  }
                  return 'mixed';
@@ -4449,15 +4444,6 @@ const App: React.FC = () => {
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MUTE_VIDEO, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
-            />
-          ) : activeTool === ToolType.MOTION_GEN ? (
-            <MotionGenView 
-              isLicensed={isMzLicensed}
-              dailyGenCount={dailyGenCounts[ToolType.MOTION_GEN] || 0}
-              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MOTION_GEN, amount)}
-              setShowLimitModal={setShowLimitModal}
-              setShowActivationModal={setShowActivationModal}
-              aiOptions={commonAiOptions}
             />
           ) : (
             <>
