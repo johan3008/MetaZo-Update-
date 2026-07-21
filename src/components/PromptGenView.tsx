@@ -34,12 +34,13 @@ interface PromptHistoryItem {
   promptMode?: 'background' | 'png';
   pngBgColor?: 'white' | 'black' | 'transparent';
   flatIconType?: 'sheet' | 'single';
+  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
 }
 
 const BACKGROUND_STYLE_OPTIONS = [
   { id: '3D CGI', label: '3D CGI Style (Gaya 3D CGI)', icon: '🧊' },
   { id: 'Cinematic', label: 'Cinematic (Sinematik)', icon: '🎬' },
-  { id: 'Vector Art', label: 'Vector Art (Seni Vektor - Flat Design)', icon: '🎨' },
+  { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
   { id: 'Photorealistic', label: 'Photorealistic (Foto Realistis)', icon: '📷' },
   { id: 'Fantasy Art', label: 'Fantasy Art (Seni Fantasi)', icon: '🧙' },
   { id: 'Scifi Concept Art', label: 'Scifi Concept Art (Konsep Sains Fiksi)', icon: '🛸' },
@@ -63,7 +64,7 @@ const PNG_STYLE_OPTIONS = [
   { id: '3D Render', label: '3D Render (Animasi 3D)', icon: '🎮' },
   { id: 'Isometric', label: 'Isometric (Isometrik 3D)', icon: '📦' },
   { id: 'Lowpoly', label: 'Lowpoly (Poli Rendah)', icon: '💎' },
-  { id: 'Vector Art', label: 'Vector Art (Seni Vektor - Flat Design)', icon: '🎨' },
+  { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
   { id: 'Flat Icon', label: 'Flat Icon (Desain Flat)', icon: '📱' },
   { id: 'Sticker Illustration', label: 'Sticker Illustration (Stiker Aset)', icon: '🏷️' },
   { id: 'Pixel Art', label: 'Pixel Art (Seni Piksel Retro)', icon: '👾' },
@@ -86,6 +87,33 @@ const PREMIUM_ONLY_STYLES = [
   'Graphic Design',
   'Line Art'
 ];
+
+const VECTOR_SUB_TYPES = {
+  'minimal_flat': {
+    label: 'Minimal Flat Design',
+    desc: 'Desain ultra-sederhana dengan warna solid minimalis tanpa detail rumit.'
+  },
+  'flat_vector': {
+    label: 'Flat Vector Illustration',
+    desc: 'Ilustrasi vektor 2D detail dengan garis bersih dan blok warna solid yang estetis.'
+  },
+  'corporate_flat': {
+    label: 'Corporate Flat Illustration',
+    desc: 'Ilustrasi flat profesional bergaya modern tech/corporate (Alegria) dengan karakter dinamis.'
+  },
+  'gradient_flat': {
+    label: 'Gradient Flat Design',
+    desc: 'Flat design modern yang dipercantik dengan gradasi warna linear/radial lembut.'
+  },
+  'flat_icon': {
+    label: 'Flat Icon Design',
+    desc: 'Ikon atau simbol terfokus dengan desain flat modern beresolusi tinggi.'
+  },
+  'isometric_flat': {
+    label: 'Isometric Flat Design',
+    desc: 'Ilustrasi isometrik 3D semu menggunakan sudut 30 derajat dengan pewarnaan flat yang rapi.'
+  }
+};
 
 export const PromptGenView: React.FC<PromptGenViewProps> = ({ 
   t, 
@@ -121,6 +149,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [pngNegativePrompt, setPngNegativePrompt] = useState('scenery, context backdrop, ground shadow, drop shadow, ambient background, blurry, watermark, text');
   const [flatIconType, setFlatIconType] = useState<'sheet' | 'single'>('single');
   const [showFlatIconModal, setShowFlatIconModal] = useState(false);
+  const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat'>('minimal_flat');
+  const [showVectorModal, setShowVectorModal] = useState(false);
   
   const currentStyleOptions = promptMode === 'background' ? BACKGROUND_STYLE_OPTIONS : PNG_STYLE_OPTIONS;
   
@@ -388,7 +418,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim(),
           model: aiOptions?.model,
           seed,
-          flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined
+          flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
+          vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
         })
       });
 
@@ -427,7 +458,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         styleExplanation: data.styleExplanation || [],
         promptMode,
         pngBgColor,
-        flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined
+        flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
+        vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
       };
       saveToHistory(historyItem);
       
@@ -731,6 +763,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       if (promptMode === 'png' && val === 'Flat Icon') {
                         setShowFlatIconModal(true);
                       }
+                      if (promptMode === 'png' && val === 'Vector Art') {
+                        setShowVectorModal(true);
+                      }
                     }}
                     className="relative w-full rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer appearance-none shadow-sm transition-all z-10"
                   >
@@ -776,6 +811,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                             setStyleCategory(opt.id);
                             if (promptMode === 'png' && opt.id === 'Flat Icon') {
                               setShowFlatIconModal(true);
+                            }
+                            if (promptMode === 'png' && opt.id === 'Vector Art') {
+                              setShowVectorModal(true);
                             }
                           }}
                           className={`px-3 py-2 rounded-[1.5rem] text-[10px] font-extrabold uppercase transition-all duration-200 flex items-center gap-1.5 border cursor-pointer ${
@@ -863,6 +901,40 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                             {flatIconType === 'sheet' 
                               ? 'Koleksi beberapa ikon bertema serupa dalam satu lembar.' 
                               : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {styleCategory === 'Vector Art' && promptMode === 'png' && (
+                    <div className="p-4 bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/20 dark:border-violet-500/30 rounded-[1.5rem] space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                          Format Vector Art
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowVectorModal(true)}
+                          className="text-[10px] px-2.5 py-1 bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-all border border-violet-500/20"
+                        >
+                          <Sliders size={10} />
+                          Ubah
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-950 rounded-xl border border-violet-500/10">
+                        <div className="p-2 bg-violet-500/10 text-violet-500 rounded-lg">
+                          <svg className="w-5 h-5 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            {VECTOR_SUB_TYPES[vectorSubType]?.label || 'Minimal Flat Design'}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                            {VECTOR_SUB_TYPES[vectorSubType]?.desc || ''}
                           </div>
                         </div>
                       </div>
@@ -1361,6 +1433,9 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       if (item.flatIconType) {
                         setFlatIconType(item.flatIconType);
                       }
+                      if (item.vectorSubType) {
+                        setVectorSubType(item.vectorSubType as any);
+                      }
                       setResult({
                         prompts: item.prompts || [],
                         negativePrompt: item.negativePrompt,
@@ -1536,6 +1611,90 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   >
                     Simpan Pilihan
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Vector Art Style Option Modal Selection */}
+      <AnimatePresence>
+        {showVectorModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop with Blur but NO black shadow overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowVectorModal(false)}
+              className="absolute inset-0 bg-slate-500/5 dark:bg-slate-900/5 backdrop-blur-md"
+            />
+            
+            {/* Modal Body Card - No black shadow, just a beautiful clean border */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 border-2 border-violet-500/20 dark:border-violet-500/30 rounded-3xl shadow-none overflow-hidden z-10"
+            >
+              {/* Decorative top colored bar */}
+              <div className="h-2 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
+              
+              {/* Content Container */}
+              <div className="p-6 space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">🎨</span>
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 leading-tight">
+                        Pilih Gaya Vector Art
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+                        Gaya Ilustrasi Vektor PNG Asset
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVectorModal(false)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                {/* Options list */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
+                  {Object.entries(VECTOR_SUB_TYPES).map(([key, item]) => {
+                    const isSelected = vectorSubType === key;
+                    return (
+                      <div
+                        key={key}
+                        onClick={() => {
+                          setVectorSubType(key as any);
+                          setShowVectorModal(false);
+                        }}
+                        className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex flex-col justify-between text-left ${
+                          isSelected
+                            ? 'bg-violet-500/5 border-violet-500 text-violet-600 dark:text-violet-400 scale-[1.01]'
+                            : 'bg-slate-50/50 dark:bg-slate-950/20 border-slate-200/60 dark:border-white/5 hover:border-violet-500/30 text-slate-800 dark:text-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-extrabold flex items-center gap-1.5 mb-1">
+                            <span className="text-sm">🔹</span>
+                            <span>{item.label}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                            {item.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </motion.div>
