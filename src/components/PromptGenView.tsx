@@ -39,7 +39,7 @@ interface PromptHistoryItem {
 const BACKGROUND_STYLE_OPTIONS = [
   { id: '3D CGI', label: '3D CGI Style (Gaya 3D CGI)', icon: '🧊' },
   { id: 'Cinematic', label: 'Cinematic (Sinematik)', icon: '🎬' },
-  { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
+  { id: 'Vector Art', label: 'Vector Art (Seni Vektor - Flat Design)', icon: '🎨' },
   { id: 'Photorealistic', label: 'Photorealistic (Foto Realistis)', icon: '📷' },
   { id: 'Fantasy Art', label: 'Fantasy Art (Seni Fantasi)', icon: '🧙' },
   { id: 'Scifi Concept Art', label: 'Scifi Concept Art (Konsep Sains Fiksi)', icon: '🛸' },
@@ -63,7 +63,7 @@ const PNG_STYLE_OPTIONS = [
   { id: '3D Render', label: '3D Render (Animasi 3D)', icon: '🎮' },
   { id: 'Isometric', label: 'Isometric (Isometrik 3D)', icon: '📦' },
   { id: 'Lowpoly', label: 'Lowpoly (Poli Rendah)', icon: '💎' },
-  { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
+  { id: 'Vector Art', label: 'Vector Art (Seni Vektor - Flat Design)', icon: '🎨' },
   { id: 'Flat Icon', label: 'Flat Icon (Desain Flat)', icon: '📱' },
   { id: 'Sticker Illustration', label: 'Sticker Illustration (Stiker Aset)', icon: '🏷️' },
   { id: 'Pixel Art', label: 'Pixel Art (Seni Piksel Retro)', icon: '👾' },
