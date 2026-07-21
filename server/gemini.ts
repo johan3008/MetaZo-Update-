@@ -1634,9 +1634,12 @@ ${mediaContext}${customPromptCommand}${exifInstruction}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
+2. NO FAMOUS PEOPLE, ARTISTS, OR CHARACTERS (STRICT ADOBE STOCK CONTENT POLICY COMPLIANCE - Based on https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
+   - You must NEVER submit or include names of real, known people (including celebrities, politicians, athletes, public figures, or historical figures) in the Title, Description, or Keywords.
+   - You must NEVER include names of fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Harry Potter, etc.).
+   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol").
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic.
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
@@ -1777,13 +1780,15 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
      * Commercial products with distinctive designs MUST NOT be named or suggested as main subjects, such as toys, fashion items, electronics, or designer furniture.
      * Depictions of ticketed locations or restricted sites without required property releases are STRICTLY FORBIDDEN.
      * Certain landmarks or monuments cannot be accepted or named, even with releases (e.g., Menara Eiffel di malam hari, Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, Hollywood Sign, Istana Neuschwanstein, Kuil Sagrada Família interior).
-     * Modern architecture with a unique or recognizable design must never be referred to by its trademarked/proprietary name when shown as the primary focus without a release.
-     * Copyrighted works, including art, sculptures, street art, illustrations, fonts, or graphic elements created by others, must never be named or referenced. (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE).
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
+      * Modern architecture with a unique or recognizable design must never be referred to by its trademarked/proprietary name when shown as the primary focus without a release.
+      * Copyrighted works, including art, sculptures, street art, illustrations, fonts, or graphic elements created by others, must never be named or referenced. (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE). (NOTE: Public domain historical documents, historical calligraphy, and ancient fonts are EXEMPT and completely SAFE).
+2. NO FAMOUS PEOPLE, ARTISTS, OR CHARACTERS (STRICT ADOBE STOCK CONTENT POLICY COMPLIANCE - Based on https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
+   - You must NEVER submit or include names of real, known people (including celebrities, politicians, athletes, public figures, or historical figures) in the Title, Description, or Keywords.
+   - You must NEVER include names of fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Harry Potter, etc.).
+   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol").
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic.
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
-6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
@@ -2266,9 +2271,12 @@ ${mediaContext}${customPromptCommand}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
+2. NO FAMOUS PEOPLE, ARTISTS, OR CHARACTERS (STRICT ADOBE STOCK CONTENT POLICY COMPLIANCE - Based on https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
+   - You must NEVER submit or include names of real, known people (including celebrities, politicians, athletes, public figures, or historical figures) in the Title, Description, or Keywords.
+   - You must NEVER include names of fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Harry Potter, etc.).
+   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol").
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic.
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
@@ -2416,9 +2424,12 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
      * Certain landmarks or monuments cannot be accepted or named, even with releases (e.g., Menara Eiffel di malam hari, Burj Khalifa, Burj Al Arab, Sydney Opera House, Atomium, Louvre Pyramid, Space Needle, Hollywood Sign, Istana Neuschwanstein, Kuil Sagrada Família interior).
      * Modern architecture with a unique or recognizable design must never be referred to by its trademarked/proprietary name when shown as the primary focus without a release.
      * Copyrighted works, including art, sculptures, street art, illustrations, fonts, or graphic elements created by others, must never be named or referenced.
-2. NO FAMOUS PEOPLE OR CHARACTERS: NEVER include names of artists, celebrities, public figures, or fictional characters.
+2. NO FAMOUS PEOPLE, ARTISTS, OR CHARACTERS (STRICT ADOBE STOCK CONTENT POLICY COMPLIANCE - Based on https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
+   - You must NEVER submit or include names of real, known people (including celebrities, politicians, athletes, public figures, or historical figures) in the Title, Description, or Keywords.
+   - You must NEVER include names of fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Harry Potter, etc.).
+   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol").
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of".
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic.
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
@@ -2789,7 +2800,7 @@ export const generateOptimizedPrompt = async (options: {
   let modeConstraint = "";
 
   const styleSpecificDirectives: Record<string, string> = {
-    "Vector Art": ' - Focus on clean geometric paths, flat colors, minimalist shapes, and sharp digital outlines typical of Adobe Illustrator. NO gradients unless requested.',
+    "Vector Art": ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design), featuring clean geometric paths, flat solid colors, minimalist 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and precise geometric proportions suitable for high-end digital interfaces.',
     "3D Render": ' - Focus on soft studio lighting, Octane render quality, glossy or matte plastic materials, raytraced reflections, and smooth 3D surfaces.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
@@ -2893,7 +2904,11 @@ Rules for the Generated Prompts:
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
 3. WORD COUNT CONSTRAINT: Each generated prompt SHOULD be between ${minWords} and ${maxWords} words long. Adjust the level of detail to strictly match this requested length profile.
-4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property (IP). Under any circumstances, NEVER include any brand names, trademarked names, manufacturer names, or proprietary product lines (e.g., Apple, Nike, Adidas, BMW, Vespa, LEGO, GoPro, iPhone). Use completely generic descriptions instead (e.g., "sleek modern smartphone" instead of "iPhone", "classic retro European scooter" instead of "Vespa", "athletic sports sneakers" instead of "Nike shoes").
+4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property (IP). Under any circumstances, NEVER include any brand names, trademarked names, manufacturer names, or proprietary product lines (e.g., Apple, Nike, Adidas, BMW, Vespa, LEGO, GoPro, iPhone). Use completely generic descriptions instead.
+   Under Adobe Stock Content Policy for Artist Names, Real Known People, and Fictional Characters (https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
+   - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
+   - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
+   - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
 5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
@@ -3110,16 +3125,16 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "high-fidelity 3D CGI render, synthetic material focus, clear digital resolution, perfect lighting balance"
     ],
     "Vector Art": [
-      "sleek flat vector style, bold clean geometric outlines, vibrant color palette, vector graphics",
-      "minimalist vector illustration, smooth curves, flat design aesthetic, Adobe Illustrator style",
-      "sharp vector graphic, solid bold gradients, high fidelity flat shading style, crisp edges",
-      "modern corporate vector illustration, stylized characters and scenery, trending on Dribbble",
-      "creative 2D vector art, clean layout, perfect proportions, beautifully composed vector scene",
-      "retro-wave flat vector art, precise paths, bold pop colors, clean design",
-      "elegant minimalist flat graphic design, balanced colors, sharp clean paths, artistic vector",
-      "2D stylized vector print illustration, high end packaging design concept, clean outline art",
-      "modern editorial flat vector, stylized visual presentation, premium visual look",
-      "flat minimal vector layout, screen printed aesthetic, striking balanced hues, beautiful color blocking"
+      "sleek flat design vector style, bold clean geometric outlines, vibrant flat solid colors, minimalist 2D vector graphics",
+      "minimalist vector illustration, smooth curves, clean 2D flat design aesthetic, Adobe Illustrator style",
+      "sharp flat vector graphic, solid bold flat colors, high fidelity flat shading style, crisp edges, no gradients",
+      "modern corporate flat design vector illustration, stylized minimalist characters, clean shapes",
+      "creative 2D flat vector art, solid color blocking, clean layout, perfect proportions, beautifully composed vector scene",
+      "retro-wave flat design vector art, precise paths, bold pop solid colors, clean geometric shapes",
+      "elegant minimalist flat design graphic, balanced solid color palette, sharp clean paths, artistic vector",
+      "2D stylized flat vector illustration, clean outline art, modern flat aesthetic",
+      "modern editorial flat vector, stylized 2D visual presentation, flat design style, premium visual look",
+      "flat minimal vector layout, screen printed flat design, striking balanced solid hues, beautiful color blocking"
     ],
     "Photorealistic": [
       "sharp raw photograph, ultra photorealistic, shot on 50mm f/1.2 lens, rich natural colors, highly detailed",
@@ -3808,9 +3823,11 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Taipei 101 (Taiwan)
      * Menara Kembar Petronas (Malaysia)
      * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual:
+   - Karya Seni Berhak Cipta & Hak Cipta Visual (TERMASUK ADOBE STOCK GENERATIVE AI CONTENT POLICY - https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
      * Karya cipta ciptaan orang lain (copyrighted works), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
+     * Karakter fiksi berhak cipta: Tokoh fiksi dari buku, film, komik, game, atau acara televisi (seperti Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC, Barbie, LEGO, dsb.) = FAIL secara instan jika terdeteksi.
+     * Nama Artis / Gaya Artis Berhak Cipta: Visual yang meniru gaya khas seniman tertentu yang masih dilindungi hak cipta (misal: "in the style of Van Gogh", "drawn by Picasso", dsb.) = FAIL secara instan jika diindikasikan meniru artis berhak cipta.
+     * Nama Orang Nyata Terkenal (Real Known People): Kemiripan visual dengan selebritas, politisi, atlet, tokoh sejarah terkenal, atau figur publik lainnya = FAIL secara instan.
      * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
    - Dokumen Negara, Uang & Identitas: PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN. PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN.
      * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
@@ -5015,9 +5032,11 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
      * Taipei 101 (Taiwan)
      * Menara Kembar Petronas (Malaysia)
      * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual:
+   - Karya Seni Berhak Cipta & Hak Cipta Visual (TERMASUK ADOBE STOCK GENERATIVE AI CONTENT POLICY - https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
      * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta (seperti karakter Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC).
+     * Karakter fiksi berhak cipta: Tokoh fiksi dari buku, film, komik, game, atau acara televisi (seperti Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC, Barbie, LEGO, dsb.) = FAIL secara instan jika terdeteksi.
+     * Nama Artis / Gaya Artis Berhak Cipta: Visual yang meniru gaya khas seniman tertentu yang masih dilindungi hak cipta (misal: "in the style of Van Gogh", "drawn by Picasso", dsb.) = FAIL secara instan jika diindikasikan meniru artis berhak cipta.
+     * Nama Orang Nyata Terkenal (Real Known People): Kemiripan visual dengan selebritas, politisi, atlet, tokoh sejarah terkenal, atau figur publik lainnya = FAIL secara instan.
      * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
    - Dokumen Negara, Uang & Identitas:
      * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
