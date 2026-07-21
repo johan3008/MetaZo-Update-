@@ -1479,22 +1479,22 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
       <AnimatePresence>
         {showFlatIconModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            {/* Backdrop with Blur */}
+            {/* Backdrop with Blur but NO black shadow overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowFlatIconModal(false)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-500/5 dark:bg-slate-900/5 backdrop-blur-md"
             />
             
-            {/* Modal Body Card */}
+            {/* Modal Body Card - No black shadow, just a beautiful clean border */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ type: 'spring', duration: 0.4 }}
-              className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden z-10"
+              className="relative w-full max-w-md bg-white dark:bg-slate-900 border-2 border-emerald-500/20 dark:border-emerald-500/30 rounded-3xl shadow-none overflow-hidden z-10"
             >
               {/* Decorative top colored bar */}
               <div className="h-2 bg-gradient-to-r from-teal-500 to-emerald-500" />
@@ -1607,7 +1607,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowFlatIconModal(false)}
-                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all cursor-pointer"
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-widest rounded-2xl shadow-none transition-all cursor-pointer"
                   >
                     Simpan Pilihan
                   </button>
