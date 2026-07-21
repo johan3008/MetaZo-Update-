@@ -3781,6 +3781,14 @@ Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri 
 2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh atau lebih dari 5).
 3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
 
+---
+PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
+Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis murni:
+- Depth of Field (DoF) dangkal / Bokeh: Latar belakang buram yang indah (bokeh lembut) adalah kualitas bernilai jual sangat tinggi dan dicari di Adobe Stock, BUKAN cacat. Selama bagian utama subjek tetap fokus tajam sempurna (tack-sharp), tandai status "PASS" pada "blur" dan "out_of_focus".
+- Low-light & Shadow Noise: Foto bernuansa malam hari, lilin, atau siluet dramatis secara wajar memiliki noise halus. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
+- High-Contrast & Shadows: Bayangan yang dalam (crushed shadows) atau sorotan cahaya terang yang dramatis sering kali merupakan unsur seni/pencahayaan yang indah. Jangan langsung menganggapnya cacat eksposur jika itu memperkuat mood estetika foto.
+
+---
 Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
 1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
    - Subjek utama wajib memiliki fokus yang tajam sempurna (pin-sharp atau tack-sharp).
@@ -4031,7 +4039,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
       
-      const criticalKeys = ['blur', 'lighting', 'exposure', 'over_edited', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'watermark', 'logo', 'text', 'ip_risk'];
+      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
@@ -4061,7 +4070,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           }
         }
       } else if (tolerance === 'LOOSE') {
-        if (anyIpFail || hasCriticalFail) {
+        if (anyIpFail) {
           parsedResult.recommendation = "FAIL";
           if (parsedResult.overall_score >= 70) {
             parsedResult.overall_score = 69;
@@ -4937,6 +4946,15 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
 Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap isi video secara utuh (keseluruhan pergerakan, transisi, dan durasi). Analisislah seluruh aspek raw video ini secara mendetail dari awal hingga akhir.${metadataInstruction}${technicalInstruction}
 
 ---
+PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
+1. Bedakan antara PILIHAN ARTISTIK Profesional dan CACAT TEKNIS:
+   - Bokeh / Depth of Field (DoF) dangkal yang indah dengan latar belakang yang buram lembut adalah KUALITAS PREMIUM yang sangat dicari di Adobe Stock, BUKAN cacat. Selama subjek utama yang ditargetkan tetap tajam (sharp), status check "blur" dan "out_of_focus" wajib dianggap "PASS".
+   - Locked-off Camera / Tripod shot: Jika video sengaja diambil menggunakan tripod stabil dan subjeknya tenang (misal: pemandangan alam, timelapse lambat, potret diam), ini adalah video normal yang sangat profesional. JANGAN PERNAH menyatakannya sebagai "frozen_frame" atau "FAIL" hanya karena tidak ada guncangan atau pergerakan masif di latar belakang. Frozen frame hanya di-set "FAIL" jika terjadi galat teknis di mana seluruh video macet/berhenti bergerak (frame duplikat identik karena crash render/kompresi).
+   - Noise Alami Low-Light: Video yang diambil malam hari atau kondisi gelap (misal: langit berbintang, konser malam, api unggun) secara wajar akan memiliki sedikit digital noise. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
+   - Cinematic Motion Blur: Pergerakan dinamis yang cepat secara alami menghasilkan motion blur di tepian subjek demi pergerakan yang mulus (shutter speed 180 derajat). Jika ini disengaja untuk aksi, ini adalah nilai estetik, bukan cacat.
+2. Analisis matematis dari filter FFmpeg (jika dilampirkan) hanyalah alat bantu objektif dasar. Gunakan penilaian manusiawi kuratorial Anda untuk memutuskan kelulusan sesungguhnya. Jika video tampak indah dan layak komersial secara visual, berikan nilai kelulusan yang adil (PASS).
+
+---
 ATURAN ANTI-HALUSINASI & ANTI-SIMULASI (CRITICAL):
 1. JANGAN PERNAH MENEBAK atau membuat asumsi palsu (simulasi). Jika elemen atau subjek tertentu tidak ada dalam video, Anda WAJIB menandai status checkpoint tersebut sebagai "UNKNOWN" dan menjelaskan di bagian note bahwa elemen tersebut tidak tersedia/tidak relevan untuk dievaluasi pada aset ini.
    Contoh:
@@ -5194,12 +5212,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
 
-      // Kunci kritis untuk kualitas video dalam mode MEDIUM
+      // Kunci kritis untuk kualitas video dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
       const criticalKeys = [
-        'blur', 'out_of_focus', 'camera_shake', 'flickering', 'watermark', 'logo', 'text', 
-        'ai_artifact', 'bad_anatomy', 'deformed_object', 'noise', 'compression_artifacts', 
-        'technical_issues', 'banding', 'blocking', 'motion_blur', 'overexposure', 'underexposure', 
-        'low_aesthetic_quality'
+        'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 'empty_frame', 'black_frame'
       ];
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
