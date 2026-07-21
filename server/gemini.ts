@@ -2803,8 +2803,8 @@ export const generateOptimizedPrompt = async (options: {
 
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
-      ? ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design) utilizing smooth linear and radial color gradients instead of pure solid colors. Clean geometric paths, sleek modern gradients, minimalist 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and precise geometric proportions.'
-      : ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design), featuring clean geometric paths, flat solid colors, minimalist 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and precise geometric proportions suitable for high-end digital interfaces.',
+      ? ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design) utilizing smooth linear and radial color gradients instead of pure solid colors. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines.'
+      : ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design), featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions suitable for high-end digital interfaces.',
     "3D Render": ' - Focus on soft studio lighting, Octane render quality, glossy or matte plastic materials, raytraced reflections, and smooth 3D surfaces.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
@@ -2846,17 +2846,17 @@ export const generateOptimizedPrompt = async (options: {
   let vectorSubTypeDirective = '';
   if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
     if (vectorSubType === 'minimal_flat') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean geometric shapes, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
     } else if (vectorSubType === 'flat_vector') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Vector Illustration" aesthetic. Clean vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, smooth curves, and beautiful solid color blocks.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks.';
     } else if (vectorSubType === 'corporate_flat') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Corporate Flat Illustration" aesthetic (Alegria style / tech corporate art). Characterized by oversized limbs, dynamic elegant action poses, clean flat gradients or solid colors, and professional corporate vector design elements.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Corporate Flat Illustration" aesthetic (Alegria style / tech corporate art). Characterized by stylized figures with oversized limbs, fluid sweeping postures, expressive dynamic organic poses, friendly tech character design, clean flat gradients or solid colors, and professional corporate vector elements.';
     } else if (vectorSubType === 'gradient_flat') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Gradient Flat Design" aesthetic. Flat design but with smooth, modern, clean linear or radial color gradients instead of pure solid colors, providing a sleek contemporary 2D premium aesthetic.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Gradient Flat Design" aesthetic. Modern 2D flat illustration but with smooth, modern, clean linear or radial color gradients instead of pure solid colors. Focus on beautiful fluid transitions, sleek organic shapes, and soft blended hues providing a highly contemporary premium aesthetic.';
     } else if (vectorSubType === 'flat_icon') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Icon Design" aesthetic. Centered standalone icon or emblem design, simplified visual metaphor, clean flat vector design with solid coloring, circular/shield base or clean standalone geometry.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Icon Design" aesthetic. Centered standalone icon or emblem design, simplified organic visual metaphor, clean flat vector design with solid coloring, neat lines, and high contrast readable silhouettes.';
     } else if (vectorSubType === 'isometric_flat') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Isometric Flat Design" aesthetic. Flat 2D isometric style using orthographic 30-degree angles, creating a pseudo-3D look but rendered in clean, flat, shadow-free vector graphics with distinct color shades for each plane.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Isometric Flat Design" aesthetic. Flat 2D isometric style using orthographic 30-degree parallel projection, creating a pseudo-3D look but rendered in clean, flat, shadow-free vector graphics with distinct solid color shades for each plane (top, left, right) to represent volume without gradients.';
     }
   }
 
