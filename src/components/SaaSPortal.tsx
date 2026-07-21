@@ -3,7 +3,7 @@ import { getDailyLimit } from '@/constants';
 import { 
   Key, Sparkles, CheckCircle2, AlertTriangle, MessageCircle, 
   CreditCard, ShoppingCart, ShieldCheck, Shield, Save, RotateCcw, Copy, Heart, Check, HelpCircle, Lock,
-  Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift, X
+  Trash2, RefreshCw, Download, Mail, Send, Search, Plus, ListFilter, Gift, X, Clock, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType, doc, getDoc, getDocs, collection, setDoc, deleteDoc, updateDoc, onSnapshot } from '../supabase';
@@ -191,6 +191,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
   const [autoProEmail, setAutoProEmail] = useState('');
   const [autoProDuration, setAutoProDuration] = useState<'unlimited' | '30days'>('unlimited');
   const [isAutoProLoading, setIsAutoProLoading] = useState(false);
+
+  // Renewal states
+  const [activeRenewKey, setActiveRenewKey] = useState<string | null>(null);
+  const [renewDuration, setRenewDuration] = useState<'30days' | 'unlimited'>('30days');
+  const [isRenewing, setIsRenewing] = useState(false);
+
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(() => {
     return localStorage.getItem('last_firestore_quota_error') === new Date().toDateString();
   });
@@ -670,6 +676,78 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       alert(`Key ${keyToReset} berhasil direset secara lokal (Sandbox Mode).`);
     } finally {
       setIsKeysLoading(false);
+    }
+  };
+
+  const handleRenewKey = async (keyToRenew: string) => {
+    if (isRenewing) return;
+    setIsRenewing(true);
+    try {
+      const keyObj = backendKeys.find(k => k.key === keyToRenew);
+      const email = keyObj?.activatedBy || keyObj?.firstActivatedBy;
+
+      const updates: any = {
+        duration: renewDuration,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (renewDuration === '30days') {
+        updates.activatedAt = new Date().toISOString();
+      } else {
+        updates.activatedAt = '';
+      }
+
+      await updateDoc(doc(db, 'keys', keyToRenew), updates);
+
+      // If the key was already active, restore/update the user profile in Firestore
+      if (email && keyObj?.activated) {
+        try {
+          const qSnap = await getDocs(collection(db, 'users'));
+          qSnap.forEach((userDoc) => {
+            const uData = userDoc.data();
+            if (uData && uData.email && uData.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+              updateDoc(doc(db, 'users', userDoc.id), {
+                licenseKey: keyToRenew,
+                cancelledSubscription: false,
+                updatedAt: new Date().toISOString()
+              }).catch(err => console.error("Error restoring user license:", err));
+            }
+          });
+        } catch (e) {
+          console.warn('Could not restore user doc during key renewal:', e);
+        }
+      }
+
+      await fetchBackendKeys();
+      alert(`Key ${keyToRenew} berhasil diperpanjang menjadi ${renewDuration === '30days' ? '30 Hari' : 'Unlimited'}.`);
+      setActiveRenewKey(null);
+    } catch (err) {
+      console.error('Failed to renew key inside Firestore, falling back to local storage:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `keys/${keyToRenew}`);
+      
+      let cached = localStorage.getItem('mz_backend_keys_cache');
+      let currentList: LicenseKeyBackend[] = [];
+      if (cached) {
+        try {
+          currentList = JSON.parse(cached);
+        } catch(e) {}
+      }
+      const updatedList = currentList.map(k => {
+        if (k.key === keyToRenew) {
+          return {
+            ...k,
+            duration: renewDuration,
+            activatedAt: renewDuration === '30days' ? new Date().toISOString() : ''
+          };
+        }
+        return k;
+      });
+      setBackendKeys(updatedList);
+      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
+      alert(`Key ${keyToRenew} berhasil diperpanjang secara lokal (Sandbox Mode).`);
+      setActiveRenewKey(null);
+    } finally {
+      setIsRenewing(false);
     }
   };
 
@@ -2450,6 +2528,25 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                 <RotateCcw size={12} />
                               </button>
                             )}
+                            {kObj.duration === '30days' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeRenewKey === kObj.key) {
+                                    setActiveRenewKey(null);
+                                  } else {
+                                    setActiveRenewKey(kObj.key);
+                                    setActiveEmailKey(null);
+                                    setActiveWhatsAppKey(null);
+                                    setRenewDuration('30days');
+                                  }
+                                }}
+                                className={`p-1 rounded transition-colors ${activeRenewKey === kObj.key ? 'bg-violet-500 text-white' : 'text-violet-500 hover:bg-violet-500/10'}`}
+                                title="Perpanjang Key License (30 Hari / Unlimited)"
+                              >
+                                <Clock size={12} />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleDeleteKey(kObj.key)}
@@ -2531,6 +2628,44 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
                                   <Send size={10} />
                                   <span>Kirim ke WhatsApp</span>
                                 </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Inline Renew Form */}
+                        <AnimatePresence>
+                          {activeRenewKey === kObj.key && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="px-2 pb-2 overflow-hidden"
+                            >
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 mt-1 space-y-2 shadow-inner">
+                                <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                  <Clock size={10} className="text-violet-500" />
+                                  <span>Perpanjangan Key License</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <select 
+                                    value={renewDuration}
+                                    onChange={(e) => setRenewDuration(e.target.value as '30days' | 'unlimited')}
+                                    className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none cursor-pointer"
+                                  >
+                                    <option value="30days">30 Hari</option>
+                                    <option value="unlimited">Unlimited / Selamanya</option>
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRenewKey(kObj.key)}
+                                    disabled={isRenewing}
+                                    className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-[9px] font-black uppercase rounded-xl flex items-center gap-1.5 shadow-lg shadow-violet-500/20 transition-all shrink-0"
+                                  >
+                                    {isRenewing ? <RefreshCw size={10} className="animate-spin" /> : <Check size={10} />}
+                                    <span>{isRenewing ? 'Memproses...' : 'Perpanjang'}</span>
+                                  </button>
+                                </div>
                               </div>
                             </motion.div>
                           )}
