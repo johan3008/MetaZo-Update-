@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass } from './server/gemini.ts';
+import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
@@ -1448,7 +1448,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-prompt', async (req, res) => {
         try {
-            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType } = req.body;
+            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType } = req.body;
             if (!subject) {
                 return res.status(400).json({ error: 'Missing subject field' });
             }
@@ -1463,7 +1463,8 @@ app.get('/api/debug-uploads', (req, res) => {
                 maxWords,
                 model,
                 seed: typeof seed === 'number' ? seed : undefined,
-                flatIconType
+                flatIconType,
+                vectorSubType
             });
             res.json(promptData);
         } catch (e: any) {
@@ -2178,6 +2179,32 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating Hollywood prompts' });
+            }
+        }
+    });
+
+    app.post('/api/generate-motion-code', async (req, res) => {
+        try {
+            const { prompt, currentCode, fps, durationSeconds, width, height, history, model } = req.body;
+            if (!prompt) {
+                return res.status(400).json({ error: 'Missing prompt field' });
+            }
+            const data = await generateMotionCode(prompt, {
+                currentCode,
+                fps: fps ? Number(fps) : undefined,
+                durationSeconds: durationSeconds ? Number(durationSeconds) : undefined,
+                width: width ? Number(width) : undefined,
+                height: height ? Number(height) : undefined,
+                history,
+                model
+            });
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server generate-motion-code error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error generating motion code' });
             }
         }
     });
