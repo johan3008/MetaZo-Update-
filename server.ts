@@ -1587,86 +1587,85 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             let videoFile = null;
-            if (!extractionSuccess && videoPath) {
+            if (videoPath) {
+                // 1. Extract keyframes using FFmpeg if available (extract 6 frames across duration for temporal analysis)
+                if (ffmpeg && (!frames || frames.length === 0)) {
+                    try {
+                        console.log('Server check-video-quality: Extracting keyframes with FFmpeg...');
+                        const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+                        fs.mkdirSync(outDir, { recursive: true });
+
+                        frames = await new Promise<string[]>((resolve, reject) => {
+                            let isDone = false;
+                            const timeout = setTimeout(() => {
+                                if (!isDone) {
+                                    isDone = true;
+                                    reject(new Error("Video extraction timed out."));
+                                }
+                            }, 45000);
+
+                            const extractFast = async () => {
+                                try {
+                                    const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
+                                    const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
+                                    const execPromise = util.promisify(exec);
+
+                                    const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
+                                    const duration = parseFloat(probeOut.trim());
+                                    if (isNaN(duration) || duration <= 0) {
+                                        throw new Error("Could not determine video duration");
+                                    }
+
+                                    // Extract 6 keyframes across duration (10%, 25%, 40%, 55%, 70%, 85%)
+                                    const timestamps = [
+                                        duration * 0.10,
+                                        duration * 0.25,
+                                        duration * 0.40,
+                                        duration * 0.55,
+                                        duration * 0.70,
+                                        duration * 0.85
+                                    ];
+
+                                    const framePaths = [];
+                                    for (let i = 0; i < timestamps.length; i++) {
+                                        const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
+                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
+                                        framePaths.push(fPath);
+                                    }
+
+                                    const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
+                                    fs.rmSync(outDir, { recursive: true, force: true });
+
+                                    if (!isDone) {
+                                        isDone = true;
+                                        clearTimeout(timeout);
+                                        resolve(frameData.map(f => `data:image/jpeg;base64,${f}`));
+                                    }
+                                } catch (e) {
+                                    if (!isDone) {
+                                        isDone = true;
+                                        clearTimeout(timeout);
+                                        reject(e);
+                                    }
+                                }
+                            };
+                            
+                            extractFast();
+                        });
+                        extractionSuccess = true;
+                    } catch (extractionErr: any) {
+                        console.warn('[Video Audit] FFmpeg frame extraction failed:', extractionErr);
+                    }
+                }
+
+                // 2. Upload raw video to Gemini File API as well
                 try {
                     console.log('Server check-video-quality: Uploading raw video to Gemini...');
                     videoFile = await uploadVideoToGemini(videoPath, req.file ? req.file.mimetype : 'video/mp4');
                     extractionSuccess = true;
                 } catch (uploadErr: any) {
-                    console.warn('[Video Audit Fallback] Upload to Gemini File API failed:', uploadErr);
+                    console.warn('[Video Audit] Upload to Gemini File API failed:', uploadErr);
                 }
-            }
-
-            if (!extractionSuccess && ffmpeg) {
-                try {
-                    console.log('Server check-video-quality: Extracting frames...');
-                    const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
-                    fs.mkdirSync(outDir, { recursive: true });
-
-                    frames = await new Promise<string[]>((resolve, reject) => {
-                        let isDone = false;
-                        const timeout = setTimeout(() => {
-                            if (!isDone) {
-                                isDone = true;
-                                reject(new Error("Video extraction timed out. Please try a shorter or lighter video."));
-                            }
-                        }, 45000); // 45 seconds timeout
-
-                        // Fast Native Extraction using ffmpeg path directly
-                        const extractFast = async () => {
-                            try {
-                                const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
-const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
-                                const execPromise = util.promisify(exec);
-
-                                // 1. Get duration
-                                const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
-                                const duration = parseFloat(probeOut.trim());
-                                if (isNaN(duration) || duration <= 0) {
-                                    throw new Error("Could not determine video duration");
-                                }
-
-                                // 2. Calculate timestamps (extract frames from Awal, Tengah, and Akhir)
-                                const numFrames = 3;
-                                const timestamps = [
-                                    duration * 0.1, // Awal
-                                    duration * 0.5, // Tengah
-                                    duration * 0.9  // Akhir
-                                ];
-
-                                // 3. Extract frames with fast seek (-ss BEFORE -i)
-                                const framePaths = [];
-                                for (let i = 0; i < numFrames; i++) {
-                                    const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
-                                    await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
-                                    framePaths.push(fPath);
-                                }
-
-                                const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
-                                fs.rmSync(outDir, { recursive: true, force: true });
-
-                                if (!isDone) {
-                                    isDone = true;
-                                    clearTimeout(timeout);
-                                    resolve(frameData.map(f => `data:image/jpeg;base64,${f}`));
-                                }
-                            } catch (e) {
-                                if (!isDone) {
-                                    isDone = true;
-                                    clearTimeout(timeout);
-                                    reject(e);
-                                }
-                            }
-                        };
-                        
-                        extractFast();
-                    });
-                    extractionSuccess = true;
-                } catch (extractionErr: any) {
-                    console.warn('[Video Audit Fallback] Extraction failed. Using fallback simulation audit:', extractionErr);
-                }
-            } else if (!extractionSuccess) {
-                console.warn('[Video Audit Fallback] FFmpeg not initialized and no frames provided. Using fallback simulation audit.');
             }
 
             if (extractionSuccess && (videoFile || (frames && frames.length > 0))) {
