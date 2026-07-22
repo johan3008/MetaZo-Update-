@@ -4963,7 +4963,7 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     technicalInstruction = `\n\n[DATA ANALISA TEKNIS FISIK (FFMPEG & PENGUKURAN PIKSEL)]\nBerikut adalah data analisa teknis objektif riil dari file Video yang dihitung secara matematis menggunakan FFprobe, filter FFmpeg (kedipan/black_frame/freeze_frame), dan deteksi piksel (ketajaman/blur Laplacian, overexposure/underexposure piksel):\n\`\`\`json\n${JSON.stringify(videoTechnicalReport, null, 2)}\n\`\`\`\nJadikan data analisa teknis objektif di atas sebagai panduan mutlak untuk mengisi quality_checks yang sesuai secara 100% akurat tanpa halusinasi. Jika filter mendeteksi black frame atau frozen frame, sesuaikan status check tersebut ke 'FAIL' secara kesepakatan dan jelaskan sebabnya secara detail.`;
   }
 
-  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal).
+  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal / Quality Issues).
 
 Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap isi video secara utuh (keseluruhan pergerakan, transisi, dan durasi). Analisislah seluruh aspek raw video ini secara mendetail dari awal hingga akhir.${metadataInstruction}${technicalInstruction}
 
@@ -4972,9 +4972,15 @@ PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTEN
 1. Bedakan antara PILIHAN ARTISTIK Profesional dan CACAT TEKNIS:
    - Bokeh / Depth of Field (DoF) dangkal yang indah dengan latar belakang yang buram lembut adalah KUALITAS PREMIUM yang sangat dicari di Adobe Stock, BUKAN cacat. Selama subjek utama yang ditargetkan tetap tajam (sharp), status check "blur" dan "out_of_focus" wajib dianggap "PASS".
    - Locked-off Camera / Tripod shot: Jika video sengaja diambil menggunakan tripod stabil dan subjeknya tenang (misal: pemandangan alam, timelapse lambat, potret diam), ini adalah video normal yang sangat profesional. JANGAN PERNAH menyatakannya sebagai "frozen_frame" atau "FAIL" hanya karena tidak ada guncangan atau pergerakan masif di latar belakang. Frozen frame hanya di-set "FAIL" jika terjadi galat teknis di mana seluruh video macet/berhenti bergerak (frame duplikat identik karena crash render/kompresi).
-   - Noise Alami Low-Light: Video yang diambil malam hari atau kondisi gelap (misal: langit berbintang, konser malam, api unggun) secara wajar akan memiliki sedikit digital noise. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
+   - Noise Alami Low-Light: Video yang diambil malam hari atau kondisi gelap (misal: langit berbintang, konser malam, api unggun) secara wajar akan memiliki sedikit digital noise. Namun jika noise tersebut berupa bintik kasar/artefak kompresi gelap yang merusak estetika, ini WAJIB FAIL.
    - Cinematic Motion Blur: Pergerakan dinamis yang cepat secara alami menghasilkan motion blur di tepian subjek demi pergerakan yang mulus (shutter speed 180 derajat). Jika ini disengaja untuk aksi, ini adalah nilai estetik, bukan cacat.
-2. Analisis matematis dari filter FFmpeg (jika dilampirkan) hanyalah alat bantu objektif dasar. Gunakan penilaian manusiawi kuratorial Anda untuk memutuskan kelulusan sesungguhnya. Jika video tampak indah dan layak komersial secara visual, berikan nilai kelulusan yang adil (PASS).
+
+2. ATURAN PENOLAKAN SANGAT KETAT UNTUK ADOBE STOCK "QUALITY ISSUES" & GENERATIVE AI VIDEO:
+   Adobe Stock secara rutin MENOLAK (REJECT) video Generative AI akibat alasan utama "Quality Issues". Anda DILARANG Loloskan (PASS) video buatan AI jika terdapat salah satu cacat berikut:
+   - Temporal Morphing / Texture Warping: Tekstur background (seperti ladang jagung, awan, pepohonan, rumput, bangunan) atau tekstur subjek (karung goni, pakaian, kulit, struktur) yang meliuk, melelok, atau berubah bentuk/pola secara tidak wajar antar-frame saat kamera bergerak.
+   - Visual / Anatomical Distortions: Bentuk mata, wajah, jari, ekspresi, atau anatomi subjek yang terdistorsi, juling, menonjol abnormal, tampak menyeramkan/uncanny, atau bergaya plastik AI yang cacat.
+   - Flickering / Lighting Glitches / Background Noise: Efek pencahayaan (petir, kilatan, bayangan) yang berkedip kasar (flicker) atau menciptakan blok-blok artefak kompresi (macro-blocking) / noise berlebih pada langit malam, awan, atau area gelap.
+   - Jika ditemukan salah satu dari cacat di atas, Anda WAJIB menetapkan recommendation = 'FAIL', adobe_stock_readiness = 'Reject Risk', overall_score < 70 (misal 45 - 62), dan jelaskan detail cacat secara tajam pada technical_issues dan detailed_feedback!
 
 ---
 ATURAN ANTI-HALUSINASI & ANTI-SIMULASI (CRITICAL):
@@ -4998,8 +5004,8 @@ Untuk memberikan hasil yang paling akurat, Anda WAJIB mensimulasikan proses ZOOM
 PANDUAN TOLERANSI KETAT & REFUSAL REASONS ADOBE STOCK:
 Tingkat Toleransi Saat Ini: ${tolerance}. Anda harus mengevaluasi dengan tingkat keketatan berikut:
 - STRICT: "Zero Tolerance" mutlak terhadap cacat teknis apa pun atau pelanggaran IP sekecil apa pun. Sedikit soft focus, sedikit chromatic aberration, satu titik debu sensor, artefak AI sekecil apa pun, jello effect minor, atau indikasi IP = FAIL secara instan (Skor maksimal 0-59).
-- MEDIUM: Cacat minor di latar belakang non-kritis yang tidak mengganggu estetika komersial bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek utama, out-of-focus pada subjek utama, guncangan kamera yang mengganggu, atau anomali gen-AI yang terlihat jelas = FAIL secara instan (Skor maksimal 0-65).
-- LOOSE: Loloskan selama video memiliki nilai komersial yang tinggi dan komposisinya menarik. Hanya kegagalan teknis yang sangat parah atau pelanggaran IP mencolok yang menyebabkan FAIL (Skor 0-69).
+- MEDIUM: Cacat minor di latar belakang non-kritis yang tidak mengganggu estetika komersial bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek utama, out-of-focus pada subjek utama, guncangan kamera yang mengganggu, atau anomali gen-AI (morphing, face/eye distortion, noise/banding) = FAIL secara instan (Skor maksimal 0-62).
+- LOOSE: Loloskan hanya jika video benar-being terbebas dari cacat teknis utama dan memiliki nilai komersial yang tinggi. Cacat AI morphing atau distorsi fisik tetap menyebabkan FAIL (Skor 0-69).
 
 ---
 DAFTAR ALASAN PENOLAKAN RESMI ADOBE STOCK (REFUSAL CRITERIA):
@@ -5011,42 +5017,30 @@ Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan beri
    - Depth of field (DoF) terlalu dangkal yang menyebabkan area penting subjek meleset dari fokus (misal, hidung fokus tetapi mata buram). Note: Bokeh artistik pada latar belakang adalah estetika premium, BUKAN cacat, selama subjek utamanya tajam sempurna.
    - Efek noise reduction (pembungkaman noise) yang terlalu agresif, menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
 
-2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION:
-   - PENTING (CRITICAL) UNTUK VIDEO: Jika terdapat noise berlebih pada area warna polos atau artifact kompresi yang membuat batas gelembung/objek menjadi bergerigi (pixelated) atau kotor, maka WAJIB DITOLAK (FAIL). Video makro/close-up air atau cairan dengan lighting terang namun kotor oleh noise adalah ciri khas penolakan "Compression Artifacts" atau "Noise" di Adobe Stock.
-   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit biru atau cairan kuning.
-   - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi (seperti ranting pohon di latar belakang langit terang).
-   - Sensor Dust (Bintik Debu): Bintik-bintik abu-abu/hitam buram melingkar akibat debu pada sensor fisik kamera, terutama tampak jelas pada area warna datar (sky, studio background).
-   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi atau pembesaran gambar (interpolation) paksa, sangat fatal pada batas gelembung cairan.
-   - Halos / Oversharpening: Tepi putih menyala di sekitar objek akibat penggunaan filter penajaman (sharpening) yang berlebihan.
-   - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus), sering terjadi pada langit atau background studio.
-   - Excessive Filtering / Over-processed: Gambar terlalu kontras, warna terlalu tersaturasi secara artifisial, atau efek HDR ekstrem yang merusak estetika natural.
+2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION / QUALITY ISSUES:
+   - PENTING (CRITICAL) UNTUK VIDEO: Jika terdapat noise berlebih pada area warna polos atau artifact kompresi yang membuat batas objek menjadi bergerigi (pixelated) atau kotor, maka WAJIB DITOLAK (FAIL).
+   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit malam atau awan.
+   - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi.
+   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi.
+   - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus) pada langit atau background.
 
 3. EXPOSURE & LIGHTING PROBLEMS:
-   - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali (misal, langit putih polos tanpa awan, kulit putih terbakar cahaya).
+   - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali.
    - Underexposure: "Crushed shadows" / bagian gelap yang hitam pekat tanpa detail piksel sama sekali.
-   - Kontras tidak seimbang, pencahayaan datar (flat lighting) yang tidak menarik, atau bayangan yang kasar/tidak sedap dipandang pada subjek (unflattering shadows).
-   - White balance buruk yang menghasilkan color cast tidak alami (terlalu biru, kuning, atau hijau).
+   - Pencahayaan datar atau bayangan yang kasar/tidak sedap dipandang pada subjek.
 
 4. COMPOSITION & CROPPING ISSUES:
-   - Crooked Horizon: Garis cakrawala, dinding, atau bangunan yang miring tanpa ada tujuan artistik yang jelas.
-   - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai (misal, memotong sendi, ujung jari kaki, atau sebagian kepala subjek secara tanggung).
-   - Komposisi berantakan atau subjek utama tenggelam oleh elemen latar belakang.
+   - Crooked Horizon: Garis cakrawala, dinding, atau bangunan yang miring tanpa ada tujuan artistik.
+   - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai.
 
 5. ROLLING SHUTTER, STABILITY & VIDEO SPECIFIC ISSUES:
-   - PENTING (CRITICAL): Sesuai dengan Rules Adobe Stock Maintain video quality: High-quality video content should be stable, clear, and technically consistent. Jika terdapat unintentional shaking (guncangan tak disengaja/kamera tidak stabil tanpa tripod/stabilizer), empty black or white frame, masalah format/color grading, compression artifact, audio issues, skew distortion, jello effects, atau flash banding, maka status technical_issues dan recommendation WAJIB di-set ke FAIL.
-   - Analisis Seluruh Cuplikan (Analyze Entire Video Sequence): Anda wajib mengevaluasi konsistensi kualitas fisik di SELURUH durasi video dari awal hingga akhir. Cek transisi bentuk, pergerakan, dan objek di sepanjang video.
-   - Skew Distortion: Garis tegak lurus tampak miring ketika kamera bergeser secara horizontal (panning) dengan cepat.
-   - Jello Effect: Video bergoyang meliuk-liuk secara artifisial seperti jeli karena getaran frekuensi tinggi pada kamera.
-   - Flash Banding: Kecerahan video tidak merata (terbagi menjadi pita-pita horizontal) karena kecepatan blitz cahaya atau lampu di sekitar tidak sinkron dengan sensor rolling shutter.
-   - Flickering: Kedipan cahaya tidak stabil pada video karena ketidaksamaan frekuensi lampu listrik dengan shutter speed kamera.
-   - Duplicate / Empty Frames: Bagian kosong (fully black/white) atau macet/membeku (frozen frame).
+   - Unintentional shaking (guncangan tak disengaja/kamera tidak stabil), empty black or white frame, masalah format/color grading, compression artifact, audio issues, skew distortion, jello effects, atau flash banding/flickering.
 
-6. GENERATIVE AI QUALITY STANDARDS (SANGAT KRITIS UNTUK AI):
-   - PENTING (CRITICAL): Jika terdapat distorsi fisika yang mustahil (seperti objek padat menembus objek lain / clipping, pisau/alat pemotong yang melebur dengan benda yang dipotong, tekstur yang tiba-tiba meleleh tidak logis, atau interaksi objek padat yang tidak masuk akal), maka status ai_artifact, deformed_object, dan recommendation WAJIB di-set ke FAIL. Periksa keseluruhan durasi video dengan saksama untuk mencari ketidakkonsistenan fisik ini. Cermati area interaksi antar objek (contoh: ujung pisau yang menyentuh coklat) yang bergerak di sepanjang video.
-   - Anatomi Cacat (Deformed Anatomy): Jari tangan berlebih/kurang, tangan/kaki meliuk atau menyatu secara tidak logis, mata asimetris/juling, gigi berlebih, bentuk telinga abnormal.
-   - Teks Kacau (Incoherent/Gibberish Text): Huruf atau tulisan acak, salah ketik, atau karakter aneh yang tampak seperti alien/gibberish text.
-   - Geometri Mustahil (Impossible Physics/Geometry): Objek menyatu secara aneh (contoh: alat memotong seperti pisau/spatula menembus materi coklat/kue tanpa jejak logis atau justru melebur dengan material tersebut), potongan benda padat yang menggulung/meleleh tidak logis seperti karet cair, objek padat saling tembus (clipping/phasing), alat yang gagangnya atau ujungnya berubah bentuk/melengkung/menghilang sebagian saat digunakan. Video AI yang menampilkan interaksi benda padat yang saling menembus, potongan melayang, atau alat yang melebur dengan objek WAJIB DITOLAK (FAIL).
-   - Polusi Visual AI: Artefak sisa rendering, bagian halus dan tajam yang tidak konsisten, serta pola berhalusinasi (hallucinated details) pada tekstur benda (misalnya pola sisa potongan yang tidak masuk akal atau sisa patahan melayang).
+6. GENERATIVE AI QUALITY STANDARDS & QUALITY ISSUES (SANGAT KRITIS UNTUK AI VIDEO):
+   - PENTING (CRITICAL): Adobe Stock menolak video AI yang mengandung "Quality Issues" seperti temporal morphing (perubahan bentuk meliuk antar-frame), tekstur meliuk/meleleh (seperti ladang, pakaian, kayu, awan, atau kulit yang berubah pola saat kamera bergerak), anatomi/mata/wajah AI terdistorsi (creepy/uncanny eyes, mata juling/asimetris), atau flickering petir/pencahayaan yang menciptakan artefak piksel. Jika ditemukan salah satu cacat ini, status ai_artifact, deformed_object, bad_anatomy, flickering, low_aesthetic_quality, dan recommendation WAJIB di-set ke FAIL.
+   - Anatomi Cacat (Deformed Anatomy): Mata asimetris/juling/terdistorsi, jari berlebih/kurang, tangan/kaki meliuk secara tidak logis.
+   - Geometri & Fisika Mustahil: Objek menyatu secara aneh, potongan melayang, tekstur meleleh/meliuk tidak masuk akal saat bergerak.
+   - Polusi Visual AI & Compression Noise: Artefak sisa rendering, noise pada area bayangan/langit gelap, dan flickering kasar pada efek petir/cahaya.
 
 7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
    - PUBLIC DOMAIN EXCEPTION (PENGECUALIAN AMAN): Dokumen sejarah, teks kuno, dan dokumen pemerintah dari domain publik (seperti The Constitution, The Bill of Rights, Declaration of Independence, naskah kuno, peta sejarah) adalah 100% AMAN dan TIDAK MELANGGAR IP. Jangan flag dokumen publik atau sejarah sebagai pelanggaran IP.
@@ -5174,10 +5168,24 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
   };
 
-  const imageParts = videoFile ? [{ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } }] : (frames && frames.length > 0 ? frames.map(f => processFrameServer(f)) : []);
-  const evalText = videoFile 
-    ? `Act as an objective Adobe Stock QA curator. Evaluate this video thoroughly. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found as detailed_feedback. Ensure your entire response is written in ${language}.`
-    : `Act as an objective Adobe Stock QA curator. Evaluate these ${frames ? frames.length : 0} random video frames extracted throughout the video. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. If the video fails, provide a detailed analysis of the visual issues found in the frames as detailed_feedback. Ensure your entire response is written in ${language}.`;
+  const imageParts: any[] = [];
+  if (videoFile) {
+    imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
+  }
+  if (frames && frames.length > 0) {
+    imageParts.push(...frames.map(f => processFrameServer(f)));
+  }
+
+  const frameCount = frames ? frames.length : 0;
+  const evalText = `Act as an objective, highly strict Adobe Stock QA Curator and Technical Inspector.
+Conduct a rigorous audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
+Your primary task is to detect Adobe Stock "Quality Issues", specifically checking for:
+1. Generative AI Temporal Morphing & Texture Warping: Any unphysical shifting, melting, or morphing of background elements (cornfields, sky, trees, structure) or subject textures across frames.
+2. Anatomical & Facial Distortions: Any strange, uncanny, protruding, asymmetrical, or distorted AI eyes, faces, hands, or limbs.
+3. Compression Noise, Banding & Flickering: Macroblocking artifacts or digital noise in dark sky/cloud regions or flashing light/lightning effects.
+4. Overall Commercial Viability & Quality Issues.
+
+IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Do NOT give a PASS to videos with AI morphing or visual artifacts. Ensure your entire response is written in ${language}.`;
 
   
   const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
