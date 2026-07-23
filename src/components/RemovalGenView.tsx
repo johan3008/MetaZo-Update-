@@ -687,8 +687,30 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
             setTimeout(renderFrame, 0);
           };
 
-          // Offset video currentTime slightly from 0 so browser reliably fires 'onseeked' for frame 0
-          video.currentTime = 0.001;
+          // Fallback: if onseeked doesn't fire within 2s, start rendering anyway
+          let seekTimeout: any = null;
+          const startRendering = () => {
+            if (seekTimeout) clearTimeout(seekTimeout);
+            if (currentFrame === 0) {
+              renderFrame();
+            }
+          };
+          seekTimeout = setTimeout(startRendering, 2000);
+
+          // Also listen for timeupdate as backup trigger
+          video.ontimeupdate = () => {
+            if (currentFrame === 0 && video.currentTime >= 0) {
+              startRendering();
+            }
+          };
+
+          // Try to seek to start - if it fails, timeout will kick in
+          try {
+            video.currentTime = 0.001;
+          } catch {
+            // If seeking throws, start rendering immediately
+            startRendering();
+          }
         } catch (err: any) {
           reject(new Error(err.message || 'Gagal memproses video.'));
         }
