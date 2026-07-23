@@ -4000,17 +4000,48 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   let responseText = "";
   let lastError;
 
+  let evalImageText = `Conduct a rigorous, zero-tolerance audit of this image asset against official Adobe Stock contributor standards.
+Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o, Llama, or any other vision model, you MUST apply the EXACT same strict Adobe Stock quality rules without guessing or hallucinating:
+
+1. ABSOLUTE ZERO-HALLUCINATION & FACTUAL AUDIT RULE (DO NOT GUESS OR INVENT DEFECTS):
+   - You MUST NOT guess or invent defects. Only mark "FAIL" if you can point to a real, unambiguous, visible defect in the image pixels.
+   - DILARANG KERAS MENEBAK, BERHALUSINASI, ATAU MEMBUAT ASUMSI (NO GUESSING OR HALLUCINATION). JANGAN melaporkan cacat anatomi, teks rusak, watermark, logo, cacat komposisi, atau masalah pencahayaan/warna jika masalah tersebut TIDAK BENAR-BENAR TERLIHAT dengan jelas di dalam gambar.
+   - If the image is sharp, well-lit, visually clean, well-composed, and completely free of trademark logos or defects, mark it "PASS" with overall_score between 85 and 95.
+
+2. MACRO / LIQUID / CLOSE-UP / BUBBLE / FLUID IMAGES (CRITICAL):
+   - Inspect macro elements (oil droplets, water bubbles, liquid splashes, close-up textures).
+   - Main foreground bubbles/droplets MUST have pin-sharp focal clarity and crisp detail.
+   - Check for severe out-of-focus blur on primary subjects, blown-out white overexposure on liquid speculars (>45%), chromatic fringing, or compression pixelation.
+   - If macro bubbles/subjects lack pin-point focus, suffer from severe specular overexposure, or show digital noise/compression artifacts, set 'out_of_focus', 'blur', 'exposure', or 'ai_artifacts' to "FAIL" and recommendation to "FAIL".
+
+3. STUDIO / PORTRAIT / GREEN SCREEN / LIFESTYLE IMAGES:
+   - Inspect subject sharpness (face, eyes, glasses, suit/clothing), lighting balance, and absence of trademark logos.
+   - If the subject is crisp, sharp, well-lit, and completely clean of logos or defects, set recommendation MUST be "PASS" with overall_score = 85-95.
+
+4. GENERATIVE AI ANATOMY & STRUCTURAL ANOMALIES (CRITICAL):
+   - Inspect hands, fingers, limbs, faces, and eyes of human subjects (e.g., people sitting, holding objects, working, or lounging).
+   - Check for distorted/fused fingers, unnatural hand poses holding devices, morphing objects, uncanny faces, or floating structural elements.
+   - Do NOT be misled by high visual aesthetics! If hands, fingers, or furniture exhibit AI generation distortions or morphing, status for 'ai_artifacts', 'anatomical_errors', and 'structural_defects' MUST be set to "FAIL", overall_score MUST be under 65, and recommendation MUST be "FAIL".
+
+5. INTELLECTUAL PROPERTY & BRAND SAFETY:
+   - Check for trademarked logos, brand names, or copyrighted characters.
+   - If detected, set 'logo', 'ip_risk', or 'watermark' to "FAIL", legal_status to "VIOLATION", and recommendation to "FAIL".
+
+6. CONSISTENT SCORING & RECOMMENDATION OUTPUT:
+   - If ANY check item is "FAIL" or "VIOLATION", recommendation MUST be "FAIL", overall_score = 45-65, adobe_stock_readiness = "Reject Risk".
+   - If ALL check items are clean and "PASS", recommendation MUST be "PASS", overall_score = 80-95, adobe_stock_readiness = "Ready for Submission".
+   - CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+
+  if (imageMetadata) {
+    evalImageText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
+  }
+
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
-      if (imageMetadata) {
-        promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-      }
-      
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: [...imageParts, { text: promptText }],
+        contents: [...imageParts, { text: evalImageText }],
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.0, topP: 0.1 },
@@ -4027,12 +4058,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
-        if (imageMetadata) {
-          promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-        }
-        
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: evalImageText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -5194,19 +5220,26 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 Conduct a rigorous, zero-tolerance audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
 Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o, or any other model, you MUST apply the EXACT same strict Adobe Stock quality rules:
 
-1. GENERATIVE AI ANATOMY & STRUCTURAL ANOMALIES (CRITICAL):
+1. MACRO / LIQUID / BUBBLE / FLUID FOOTAGE (CRITICAL):
+   - Inspect macro elements (oil droplets, water bubbles, liquid splashes, close-up textures).
+   - The main foreground bubbles/droplets MUST have pin-sharp focal clarity and crisp detail.
+   - Check for soft-focus / out-of-focus bubbles, blown-out white overexposure on liquid surfaces, chromatic fringing/noise along bubble rims, or compression pixelation.
+   - If macro bubbles lack crisp pin-point focus, suffer from overexposure on liquid speculars, or show digital noise/compression artifacts, set 'out_of_focus', 'blur', 'overexposure', or 'compression_artifacts' MUST be set to "FAIL", recommendation MUST be "FAIL", and list the exact flaws in technical_issues.
+
+2. STUDIO / PORTRAIT / GREEN SCREEN FOOTAGE:
+   - Inspect subject sharpness (face, eyes, glasses, suit/clothing), lighting balance, and absence of trademark logos.
+   - If the subject is crisp, sharp, well-lit, and completely clean of logos or defects, set recommendation MUST be "PASS" with overall_score = 85-95.
+
+3. GENERATIVE AI ANATOMY & STRUCTURAL ANOMALIES (CRITICAL):
    - Inspect hands, fingers, limbs, faces, and eyes of human subjects (e.g., people sitting in massage chairs, holding tablets, working, or lounging).
    - Check for distorted/fused fingers, unnatural hand poses holding devices, morphing objects (tablets, phones, massage chair footrests, headrests, furniture seams), uncanny faces, or floating structural elements across keyframes.
-   - Do NOT be misled by high visual aesthetics, warm lighting, or cinematic sunset atmosphere! If hands, fingers, or furniture exhibit AI generation distortions or morphing, status for 'ai_artifact', 'bad_anatomy', and 'deformed_object' MUST be set to "FAIL", overall_score MUST be under 65, and recommendation MUST be "FAIL".
+   - Do NOT be misled by high visual aesthetics! If hands, fingers, or furniture exhibit AI generation distortions or morphing, status for 'ai_artifact', 'bad_anatomy', and 'deformed_object' MUST be set to "FAIL", overall_score MUST be under 65, and recommendation MUST be "FAIL".
 
-2. TEMPORAL MORPHING & TEXTURE WARPING:
+4. TEMPORAL MORPHING & TEXTURE WARPING:
    - Check across keyframes for unphysical shifting, melting, or morphing of background elements, glass window reflections, chair seams, or subject textures.
 
-3. COMPRESSION NOISE, BANDING & FLICKERING:
-   - Macroblocking artifacts or digital noise in dark sky/cloud regions or flashing light/lightning effects.
-
-4. OVERALL COMMERCIAL VIABILITY & QUALITY ISSUES:
-   - If any quality check item is defective or if AI defects are detected, set recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Do NOT give a PASS to videos with AI morphing, warped hands, or visual artifacts. Ensure your entire response is written in ${language}.`;
+5. OVERALL COMMERCIAL VIABILITY & QUALITY ISSUES:
+   - If any quality check item is defective or if technical/AI defects are detected, set recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Ensure your entire response is written in ${language}.`;
 
   
   const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
