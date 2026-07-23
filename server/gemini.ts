@@ -4070,7 +4070,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let hasCriticalFail = false;
       
       // 🔒 Kunci kritis DIPERLUAS — mencakup semua masalah AI/upscale/quality yang umum ditolak Adobe Stock
-      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'ai_upscale', 'flickering', 'low_aesthetic', 'noise', 'blocking', 'banding', 'overexposure', 'underexposure', 'out_of_focus'];
+      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'ai_upscale', 'flickering', 'motion_consistency', 'ghosting', 'geometry_consistency', 'visual_quality', 'empty_frame', 'black_frame', 'frozen_frame'];
       
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
@@ -5205,7 +5205,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 🔵 LEGAL: Watermarks, logos, trademarks, copyrighted artwork, restricted landmarks
 
 ⚠️ MANDATORY:
-- ONLY fail if you SEE actual defects. Clean, professional-looking videos = PASS.
+- BE CONSERVATIVE about AI flags. Unsure = PASS. Natural camera movement = NOT morphing.
 - If AI-generated/upscaled with visible morphing or distortion → ai_artifact=FAIL, upscaled_video=FAIL
 - If video looks natural, clean, and professional → PASS even if AI-assisted (Adobe accepts well-made AI content)
 - Minor noise in dark areas, slight banding in sky, natural motion blur do NOT warrant FAIL in MEDIUM
@@ -5277,7 +5277,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         'watermark', 'logo', 'text',
         'ai_artifact', 'bad_anatomy', 'deformed_object', 'flickering',
         'empty_frame', 'black_frame', 'frozen_frame',
-        'upscaled_video'
+        'upscaled_video', 'visual_quality'
       ];
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
