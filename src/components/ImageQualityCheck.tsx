@@ -539,10 +539,13 @@ export const ImageQualityCheck: React.FC<{
                 pathKey: getUrlData?.pathKey,
                 tolerance,
                 language: t.language || 'English',
-                model: aiOptions?.model || 'gemini-3.1-pro-preview'
+                model: aiOptions?.model || 'gemini-3.6-flash'
               })
             });
           } else {
+            if (file.size > 4.5 * 1024 * 1024) {
+               throw new Error('File terlalu besar (> 4.5MB). Silakan konfigurasikan Cloudflare R2 dengan benar (termasuk CORS) untuk file besar.');
+            }
             const formData = new FormData();
             formData.append('video', file);
             formData.append('tolerance', tolerance);
