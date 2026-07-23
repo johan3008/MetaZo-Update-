@@ -4,9 +4,9 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX, Monitor
+  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Eraser
 } from 'lucide-react';
-import { ToolType, GenerationMode, toolToPath } from '@/types';
+import { ToolType, GenerationMode, toolToPath } from '../../types';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-base" }) => {
   const chars = name.split('');
@@ -323,12 +323,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <a href={toolToPath[ToolType.MOTION_GEN]} onClick={(e) => handleNavClick(e, ToolType.MOTION_GEN)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.MOTION_GEN 
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-indigo-500" 
                   : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Monitor size={16} className={activeTool === ToolType.MOTION_GEN ? "text-purple-400" : "text-slate-400"} />
-              {!sidebarCollapsed && <span>Motion Gen (Remotion)</span>}
+              <Video size={16} className={activeTool === ToolType.MOTION_GEN ? "text-indigo-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_motion_gen || "Motion Gen"}</span>}
+            </a>
+
+            <a href={toolToPath[ToolType.REMOVAL_GEN]} onClick={(e) => handleNavClick(e, ToolType.REMOVAL_GEN)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.REMOVAL_GEN 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-fuchsia-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Eraser size={16} className={activeTool === ToolType.REMOVAL_GEN ? "text-fuchsia-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_removal_gen || "Removal Gen"}</span>}
             </a>
           </nav>
         </div>
@@ -699,12 +710,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onClick={() => { setActiveTool(ToolType.MOTION_GEN); setSidebarOpen(false); }}
                       className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                         activeTool === ToolType.MOTION_GEN 
-                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-purple-500" 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-indigo-500" 
                           : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                       }`}
                     >
-                      <Monitor size={14} className={activeTool === ToolType.MOTION_GEN ? "text-purple-400" : "text-slate-400"} />
-                      <span>Motion Gen (Remotion)</span></button>
+                      <Video size={14} className={activeTool === ToolType.MOTION_GEN ? "text-indigo-400" : "text-slate-400"} />
+                      <span>{t.sidebar_motion_gen || "Motion Gen"}</span></button>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.REMOVAL_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.REMOVAL_GEN 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-fuchsia-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Eraser size={14} className={activeTool === ToolType.REMOVAL_GEN ? "text-fuchsia-400" : "text-slate-400"} />
+                      <span>{t.sidebar_removal_gen || "Removal Gen"}</span></button>
                   </nav>
                 </div>
 
