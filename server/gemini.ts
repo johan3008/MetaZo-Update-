@@ -4061,42 +4061,38 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
       
-      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
-      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
+      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (semua standar penolakan Adobe Stock: IP, AI anomaly, serta cacat teknis/fokus/eksposur)
+      const criticalKeys = [
+        'watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts',
+        'blur', 'exposure', 'lighting', 'sensor_issues', 'over_edited', 'proportion_defects', 'stock_acceptance'
+      ];
       
-      // Guardrail tambahan: Pindai teks analisis (visual_scan_analysis, technical_issues, detailed_feedback) untuk indikasi cacat AI / anatomi
+      // Guardrail tambahan: Pindai teks analisis HANYA untuk frase kegagalan eksplisit (menghindari false positive pada kata biasa seperti hand, finger, blur, noise)
       const textAnalysisLower = (
         (parsedResult.visual_scan_analysis || "") + " " +
         (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
         (parsedResult.detailed_feedback || "")
       ).toLowerCase();
 
-      const aiDefectKeywords = [
-        'distort', 'morph', 'warp', 'hand', 'finger', 'jari', 'tangan', 
-        'cacat', 'artefak', 'generat', 'ai artifact', 'bad anatomy', 'melt', 
-        'leleh', 'asimetris', 'tidak wajar', 'bengkok', 'patah', 'uncanny', 'extra finger', 
-        'deformed', 'deform'
+      const explicitDefectPhrases = [
+        'terdapat cacat', 'terdapat defect', 'terdapat artefak', 'terdapat distortion',
+        'bad anatomy detected', 'ai artifact detected', 'watermark terdeteksi', 'logo terdeteksi',
+        'ip risk detected', 'copyright violation', 'severe blur', 'subjek utama out of focus',
+        'deformed fingers', 'extra finger detected', 'morphism detected'
       ];
 
-      const textMentionedAiDefect = aiDefectKeywords.some(kw => textAnalysisLower.includes(kw));
-      if (textMentionedAiDefect) {
+      const textMentionedExplicitDefect = explicitDefectPhrases.some(phrase => textAnalysisLower.includes(phrase));
+      if (textMentionedExplicitDefect) {
         hasCriticalFail = true;
-        if (parsedResult.ai_vision_checks.ai_artifacts) {
+        anyFail = true;
+        if (parsedResult.ai_vision_checks.ai_artifacts && parsedResult.ai_vision_checks.ai_artifacts.status !== 'FAIL') {
           parsedResult.ai_vision_checks.ai_artifacts.status = 'FAIL';
-          if (!parsedResult.ai_vision_checks.ai_artifacts.note || parsedResult.ai_vision_checks.ai_artifacts.note.includes('No issues')) {
-            parsedResult.ai_vision_checks.ai_artifacts.note = 'Generative AI distortion or morphological defect detected.';
-          }
-        }
-        if (parsedResult.ai_vision_checks.anatomical_errors) {
-          parsedResult.ai_vision_checks.anatomical_errors.status = 'FAIL';
-          if (!parsedResult.ai_vision_checks.anatomical_errors.note || parsedResult.ai_vision_checks.anatomical_errors.note.includes('No issues')) {
-            parsedResult.ai_vision_checks.anatomical_errors.note = 'Anatomical distortion (hands/fingers/face) detected.';
-          }
+          parsedResult.ai_vision_checks.ai_artifacts.note = 'Terdeteksi cacat/artefak visual atau anatomi dalam analisis AI.';
         }
       }
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
-        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
+        if (value && typeof value === 'object' && ((value as any).status === 'FAIL' || (value as any).status === 'VIOLATION' || (value as any).status === 'REJECT')) {
           anyFail = true;
           if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
             anyIpFail = true;
@@ -4107,32 +4103,24 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
       
-      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
-      if (tolerance === 'STRICT') {
-        if (anyFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
-          }
-        }
-      } else if (tolerance === 'MEDIUM') {
-        if (hasCriticalFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
-          }
-        }
-      } else if (tolerance === 'LOOSE') {
+      // Terapkan Keputusan Akhir Status: Jika Ada Masalah Quality Issue / IP -> FAIL, Jika Bersih -> PASS
+      if (anyFail || hasCriticalFail || anyIpFail) {
+        parsedResult.recommendation = "FAIL";
+        parsedResult.adobe_stock_readiness = "Reject Risk";
+        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
+        if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
+        if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 55;
         if (anyIpFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
-          }
+          parsedResult.legal_status = "VIOLATION";
         }
-      }
-      
-      if (anyIpFail) {
-        parsedResult.legal_status = "VIOLATION";
+      } else {
+        // Aset Bersih 100% -> Wajib PASS
+        parsedResult.recommendation = "PASS";
+        parsedResult.adobe_stock_readiness = "Ready for Submission";
+        parsedResult.legal_status = "CLEAN";
+        if (!parsedResult.overall_score || parsedResult.overall_score < 75) parsedResult.overall_score = 88;
+        if (!parsedResult.technical_score || parsedResult.technical_score < 75) parsedResult.technical_score = 90;
+        if (!parsedResult.visual_score || parsedResult.visual_score < 75) parsedResult.visual_score = 88;
       }
     }
 
@@ -5282,44 +5270,104 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       let anyIpFail = false;
       let hasCriticalFail = false;
 
-      // Kunci kritis untuk kualitas video dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      // 1. Integrasi Langsung Analisa Teknis Objektif (FFmpeg & Piksel) jika tersedia
+      if (videoTechnicalReport) {
+        if (videoTechnicalReport.filters?.black_frames_detected) {
+          hasCriticalFail = true;
+          parsedResult.quality_checks.black_frame = {
+            status: 'FAIL',
+            note: 'Terdeteksi black frame pada linimasa video oleh filter FFmpeg.'
+          };
+        }
+        if (videoTechnicalReport.filters?.frozen_frames_detected) {
+          hasCriticalFail = true;
+          parsedResult.quality_checks.frozen_frame = {
+            status: 'FAIL',
+            note: 'Terdeteksi frame beku/stuck pada linimasa video oleh filter FFmpeg.'
+          };
+        }
+        if (videoTechnicalReport.stabilityStatus === 'FLICKERING') {
+          hasCriticalFail = true;
+          parsedResult.quality_checks.flickering = {
+            status: 'FAIL',
+            note: 'Fluktuasi kecerahan / kedipan berulang terdeteksi pada rantai frame.'
+          };
+        }
+        if (videoTechnicalReport.stabilityStatus === 'UNSTABLE') {
+          hasCriticalFail = true;
+          parsedResult.quality_checks.camera_shake = {
+            status: 'FAIL',
+            note: 'Guncangan kamera / ketidakstabilan pergerakan terdeteksi pada rantai frame.'
+          };
+        }
+        if (Array.isArray(videoTechnicalReport.frameAnalysis) && videoTechnicalReport.frameAnalysis.length > 0) {
+          const blurredFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.blurStatus === 'BLURRED' || f.sharpness < 20);
+          if (blurredFrames.length > 0) {
+            hasCriticalFail = true;
+            parsedResult.quality_checks.blur = {
+              status: 'FAIL',
+              note: `Pemeriksaan Laplacian piksel mendeteksi ketajaman sangat rendah/buram pada ${blurredFrames.length} keyframe.`
+            };
+            parsedResult.quality_checks.out_of_focus = {
+              status: 'FAIL',
+              note: 'Subjek utama terdeteksi out-of-focus / soft focus secara teknis.'
+            };
+          }
+          const overexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.overexposurePercent > 18);
+          if (overexpFrames.length > 0) {
+            hasCriticalFail = true;
+            parsedResult.quality_checks.overexposure = {
+              status: 'FAIL',
+              note: `Pemeriksaan kecerahan piksel mendeteksi overexposure / blown highlights pada ${overexpFrames.length} keyframe.`
+            };
+          }
+          const underexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.underexposurePercent > 22);
+          if (underexpFrames.length > 0) {
+            hasCriticalFail = true;
+            parsedResult.quality_checks.underexposure = {
+              status: 'FAIL',
+              note: `Pemeriksaan kecerahan piksel mendeteksi underexposure / crushed shadows pada ${underexpFrames.length} keyframe.`
+            };
+          }
+        }
+      }
+
+      // Kunci kritis untuk kualitas video dalam mode MEDIUM (semua standar penolakan resmi Adobe Stock)
       const criticalKeys = [
-        'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 'empty_frame', 'black_frame'
+        'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 
+        'empty_frame', 'black_frame', 'frozen_frame', 'duplicate_frame', 'flickering', 
+        'out_of_focus', 'blur', 'camera_shake', 'motion_blur', 'noise', 'compression_artifacts', 
+        'blocking', 'banding', 'overexposure', 'underexposure', 'cropped_subject', 'cut_off_object', 
+        'wrong_perspective', 'low_aesthetic_quality', 'low_framerate', 'visible_transitions', 
+        'log_profile', 'upscaled_video'
       ];
 
-      // Guardrail tambahan: Pindai teks analisis (visual_scan_analysis, technical_issues, detailed_feedback) untuk indikasi cacat AI / anatomi
+      // Guardrail tambahan: Pindai teks analisis (visual_scan_analysis, technical_issues, detailed_feedback) untuk indikasi cacat AI / anatomi / teknis
       const textAnalysisLower = (
         (parsedResult.visual_scan_analysis || "") + " " +
         (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
         (parsedResult.detailed_feedback || "")
       ).toLowerCase();
 
-      const aiDefectKeywords = [
-        'distort', 'morph', 'warp', 'hand', 'finger', 'jari', 'tangan', 
-        'cacat', 'artefak', 'generat', 'veo', 'sora', 'ai artifact', 'bad anatomy', 'melt', 
-        'leleh', 'asimetris', 'tidak wajar', 'bengkok', 'patah', 'uncanny', 'extra finger', 
-        'deformed', 'deform'
+      const explicitDefectPhrases = [
+        'terdapat cacat', 'terdapat defect', 'terdapat artefak', 'terdapat distortion',
+        'bad anatomy detected', 'ai artifact detected', 'watermark terdeteksi', 'logo terdeteksi',
+        'ip risk detected', 'copyright violation', 'black frame detected', 'frozen frame detected',
+        'temporal morphing detected', 'severe flickering detected', 'subjek utama out of focus'
       ];
 
-      const textMentionedAiDefect = aiDefectKeywords.some(kw => textAnalysisLower.includes(kw));
-      if (textMentionedAiDefect) {
+      const textMentionedExplicitDefect = explicitDefectPhrases.some(phrase => textAnalysisLower.includes(phrase));
+      if (textMentionedExplicitDefect) {
         hasCriticalFail = true;
-        if (parsedResult.quality_checks.ai_artifact) {
+        anyFail = true;
+        if (parsedResult.quality_checks.ai_artifact && parsedResult.quality_checks.ai_artifact.status !== 'FAIL') {
           parsedResult.quality_checks.ai_artifact.status = 'FAIL';
-          if (!parsedResult.quality_checks.ai_artifact.note || parsedResult.quality_checks.ai_artifact.note.includes('No issues')) {
-            parsedResult.quality_checks.ai_artifact.note = 'Generative AI distortion or morphological defect detected in video keyframe.';
-          }
-        }
-        if (parsedResult.quality_checks.bad_anatomy) {
-          parsedResult.quality_checks.bad_anatomy.status = 'FAIL';
-          if (!parsedResult.quality_checks.bad_anatomy.note || parsedResult.quality_checks.bad_anatomy.note.includes('No issues')) {
-            parsedResult.quality_checks.bad_anatomy.note = 'Anatomical distortion (hands/fingers/face) detected in video subject.';
-          }
+          parsedResult.quality_checks.ai_artifact.note = 'Terdeteksi cacat/artefak visual atau morphing pada linimasa video.';
         }
       }
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
-        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
+        if (value && typeof value === 'object' && ((value as any).status === 'FAIL' || (value as any).status === 'VIOLATION' || (value as any).status === 'REJECT')) {
           anyFail = true;
           if (['watermark', 'logo', 'text'].includes(key)) {
             anyIpFail = true;
@@ -5330,35 +5378,24 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
         }
       }
 
-      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
-      if (tolerance === 'STRICT') {
-        if (anyFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
-          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
-          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
-          parsedResult.adobe_stock_readiness = "Reject Risk";
-        }
-      } else if (tolerance === 'MEDIUM') {
-        if (hasCriticalFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
-          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
-          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
-          parsedResult.adobe_stock_readiness = "Reject Risk";
-        }
-      } else if (tolerance === 'LOOSE') {
+      // Terapkan Keputusan Akhir Status Video: Jika Ada Masalah Quality Issue / IP -> FAIL, Jika Bersih -> PASS
+      if (anyFail || hasCriticalFail || anyIpFail) {
+        parsedResult.recommendation = "FAIL";
+        parsedResult.adobe_stock_readiness = "Reject Risk";
+        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
+        if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
+        if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 55;
         if (anyIpFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
-          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
-          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
-          parsedResult.adobe_stock_readiness = "Reject Risk";
+          parsedResult.legal_status = "VIOLATION";
         }
-      }
-
-      if (anyIpFail) {
-        parsedResult.legal_status = "VIOLATION";
+      } else {
+        // Video Bersih 100% -> Wajib PASS
+        parsedResult.recommendation = "PASS";
+        parsedResult.adobe_stock_readiness = "Ready for Submission";
+        parsedResult.legal_status = "CLEAN";
+        if (!parsedResult.overall_score || parsedResult.overall_score < 75) parsedResult.overall_score = 88;
+        if (!parsedResult.technical_score || parsedResult.technical_score < 75) parsedResult.technical_score = 90;
+        if (!parsedResult.visual_score || parsedResult.visual_score < 75) parsedResult.visual_score = 88;
       }
     }
     
