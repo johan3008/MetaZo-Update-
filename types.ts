@@ -12,7 +12,8 @@ export enum ToolType {
   VECTOR_EPS = 'vector_eps',
   CALENDAR_GEN = 'calendar_gen',
   MUTE_VIDEO = 'mute_video',
-  MOTION_GEN = 'motion_gen'
+  MOTION_GEN = 'motion_gen',
+  REMOVAL_GEN = 'removal_gen'
 }
 
 export const toolToPath: Record<ToolType, string> = {
@@ -28,7 +29,8 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.VECTOR_EPS]: '/EpsConverter',
   [ToolType.CALENDAR_GEN]: '/NicheCalendar',
   [ToolType.MUTE_VIDEO]: '/MuteVideoGen',
-  [ToolType.MOTION_GEN]: '/MotionGen'
+  [ToolType.MOTION_GEN]: '/MotionGen',
+  [ToolType.REMOVAL_GEN]: '/RemovalGen'
 };
 
 export enum GenerationMode {
@@ -67,6 +69,7 @@ export interface FileItem {
   isGenerating: boolean;
   isExtracting?: boolean;
   error: string | null;
+  exifMetadata?: any;
 }
 
 export interface ProgressInfo {
