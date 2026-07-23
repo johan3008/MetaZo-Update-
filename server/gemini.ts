@@ -4998,118 +4998,162 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
+  const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
   const imageParts: any[] = [];
-  if (videoFile) {
-    imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
-  }
-  if (frames && frames.length > 0) {
-    imageParts.push(...frames.map(f => processFrameServer(f)));
-  }
-
+  if (videoFile) imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
+  if (frames && frames.length > 0) imageParts.push(...frames.map((f: any) => processFrameServer(f)));
   const frameCount = frames ? frames.length : 0;
 
-  let metadataInstruction = "";
-  if (videoMetadata) {
-    metadataInstruction = `\n\n[DATA EXIFTOOL]\nTechnical metadata:\n\`\`\`json\n${JSON.stringify(videoMetadata, null, 2)}\n\`\`\``;
+  // Parse technical report and build ground truth summary
+  const report = videoTechnicalReport ? (typeof videoTechnicalReport === 'string' ? JSON.parse(videoTechnicalReport) : videoTechnicalReport) : null;
+  
+  // Build deterministic ground truth from pipeline tools
+  const gt: any = {};
+  if (report) {
+    // ffprobe findings
+    if (report.ffprobe?.video) {
+      const v = report.ffprobe.video;
+      gt.resolution = `${v.width}x${v.height}`;
+      gt.fps = v.fps?.toFixed(2);
+      gt.codec = v.codec;
+      gt.bitrate = `${((report.ffprobe.bitrate || 0) / 1000).toFixed(0)}kbps`;
+    }
+    // FFmpeg blackdetect/freezedetect findings
+    if (report.filters) {
+      gt.black_frames = report.filters.black_frames_detected ? `${report.filters.black_frames?.length || 0} detected` : 'none';
+      gt.frozen_frames = report.filters.frozen_frames_detected ? `${report.filters.frozen_frames?.length || 0} detected` : 'none';
+    }
+    // signalstats findings
+    if (report.signalstats) {
+      gt.luminance = `min=${report.signalstats.luminance_min} max=${report.signalstats.luminance_max} avg=${report.signalstats.luminance_avg}`;
+      gt.saturation = `avg=${report.signalstats.saturation_avg}`;
+    }
+    // vmafmotion findings
+    if (report.vmaf_motion) {
+      gt.motion_level = `${report.vmaf_motion.motion_score} (${report.vmaf_motion.motion_interpretation})`;
+    }
+    // OpenCV pixel analysis
+    if (report.frameAnalysis?.length > 0) {
+      const avgSharp = report.frameAnalysis.reduce((s: number, f: any) => s + (f.sharpness || 0), 0) / report.frameAnalysis.length;
+      const worstBlur = report.frameAnalysis.some((f: any) => f.blurStatus === 'BLURRED');
+      const maxOver = Math.max(...report.frameAnalysis.map((f: any) => f.overexposurePercent || 0));
+      const maxUnder = Math.max(...report.frameAnalysis.map((f: any) => f.underexposurePercent || 0));
+      gt.sharpness = `Laplacian avg ${avgSharp.toFixed(1)} — ${worstBlur ? 'BLURRED' : 'OK'}`;
+      gt.overexposure = `${maxOver.toFixed(1)}%`;
+      gt.underexposure = `${maxUnder.toFixed(1)}%`;
+    }
+    if (report.stabilityStatus) {
+      gt.stability = `${report.stabilityStatus} (index ${report.stabilityIndex})`;
+    }
+    if (report.scene_detection?.scene_changes_detected) {
+      gt.scene_changes = `${report.scene_detection.scene_changes?.length || 0} cuts detected`;
+    }
   }
 
-  let technicalInstruction = "";
-  if (videoTechnicalReport) {
-    const report = typeof videoTechnicalReport === 'string' ? JSON.parse(videoTechnicalReport) : videoTechnicalReport;
-    technicalInstruction = `\n\n[DATA TEKNIS - ffprobe + FFmpeg + OpenCV Pixel Analysis]\n${JSON.stringify(report, null, 2)}\n\nGunakan data ini sebagai panduan MUTLAK. Black frame/frozen frame dari FFmpeg = FAIL. Blur dari Laplacian = FAIL jika terdeteksi.`;
-  }
+  // Build AI system instruction with ground truth
+  const systemInstruction = `You are an Adobe Stock Senior QA Curator. Your job is to make the FINAL PASS/FAIL decision for this video.
 
-  const systemInstruction = `Anda adalah Kurator QA Adobe Stock profesional. Audit video ini secara ketat.${metadataInstruction}${technicalInstruction}\n\nToleransi: ${tolerance}. Bahasa: ${targetLanguageName}.\nBerikan respons JSON lengkap dengan quality_checks untuk SEMUA kategori.`;
+======= TECHNICAL GROUND TRUTH (from ffprobe + FFmpeg filters + OpenCV pixel analysis) =======
+${JSON.stringify(gt, null, 1)}
+
+IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolute reference:
+- Black frames detected by FFmpeg = FAIL mandatory
+- Frozen frames detected by FFmpeg = FAIL mandatory  
+- Blur detected by Laplacian variance (<15) = FAIL mandatory
+- Resolution < 1920x1080 = FAIL mandatory
+- FPS < 23.976 = FAIL mandatory
+- Stability FLICKERING = FAIL mandatory
+
+======= YOUR SUBJECTIVE ASSESSMENT =======
+Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
+
+1. TEMPORAL MORPHING: Do textures/objects change shape unnaturally between frames? (warping, melting, liquid-like deformation)
+2. TEXTURE WARPING: Do backgrounds/surfaces distort or ripple when the camera moves?
+3. FLICKERING: Are there rapid brightness/color fluctuations NOT already caught by stability analysis?
+4. GHOSTING: Are there duplicate/semi-transparent trails behind moving objects?
+5. GEOMETRY CONSISTENCY: Do objects maintain logical 3D structure? (collapsing, floating, impossible geometry)
+6. AI ARTIFACTS: Any generative AI defects? (uncanny faces, extra fingers, gibberish text, pattern collapse)
+
+======= FINAL DECISION =======
+Tolerance: ${tolerance}. Language: ${targetLanguageName}.
+Return your PASS/FAIL verdict with COMPLETE JSON. The technical ground truth above should heavily influence scores.
+If ANY mandatory technical failure is detected → recommendation = FAIL, overall_score < 70.`;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-        visual_scan_analysis: { type: Type.STRING },
-        legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
-        technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
-        strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-        overall_score: { type: Type.NUMBER },
-        technical_score: { type: Type.NUMBER },
-        visual_score: { type: Type.NUMBER },
-        recommendation: { type: Type.STRING, enum: ["PASS", "FAIL", "RETOUCH"] },
-        adobe_stock_readiness: { type: Type.STRING, enum: ["Ready", "Needs Improvement", "Reject Risk"] },
-        detailed_feedback: { type: Type.STRING },
-        quality_checks: {
-            type: Type.OBJECT,
-            properties: {
-                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                overexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                underexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                camera_shake: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                out_of_focus: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                flickering: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                duplicate_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                empty_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                black_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                frozen_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                motion_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                ghosting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                geometry_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-                visual_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] }
-            },
-            required: ["blur","noise","compression_artifacts","blocking","banding","overexposure","underexposure","white_balance","motion_blur","camera_shake","out_of_focus","flickering","duplicate_frame","empty_frame","black_frame","frozen_frame","watermark","logo","text","ai_artifact","deformed_object","bad_anatomy","cropped_subject","cut_off_object","wrong_perspective","low_aesthetic_quality","motion_consistency","ghosting","geometry_consistency","visual_quality"]
+      visual_scan_analysis: { type: Type.STRING },
+      legal_status: { type: Type.STRING, enum: ["SAFE","AT_RISK","VIOLATION"] },
+      technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+      strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+      overall_score: { type: Type.NUMBER },
+      technical_score: { type: Type.NUMBER },
+      visual_score: { type: Type.NUMBER },
+      recommendation: { type: Type.STRING, enum: ["PASS","FAIL","RETOUCH"] },
+      adobe_stock_readiness: { type: Type.STRING, enum: ["Ready","Needs Improvement","Reject Risk"] },
+      detailed_feedback: { type: Type.STRING },
+      quality_checks: {
+        type: Type.OBJECT,
+        properties: {
+          blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          overexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          underexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          black_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          frozen_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          flickering: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          camera_shake: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          out_of_focus: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          motion_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          visual_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          // ===== AI VISION CRITERIA =====
+          temporal_morphing: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          texture_warping: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          ghosting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          geometry_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          // ===== SUBJECTIVE (AI) =====
+          watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          duplicate_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          empty_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] }
         },
-        heatmaps: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { type:{type:Type.STRING}, x:{type:Type.NUMBER}, y:{type:Type.NUMBER}, intensity:{type:Type.NUMBER}, raw_value:{type:Type.STRING} }, required:["type","x","y","intensity","raw_value"] } }
+        required: ["blur","noise","overexposure","underexposure","black_frame","frozen_frame","flickering","camera_shake","out_of_focus","motion_consistency","visual_quality","temporal_morphing","texture_warping","ghosting","geometry_consistency","ai_artifact","watermark","logo","text","deformed_object","bad_anatomy","compression_artifacts","blocking","banding","white_balance","motion_blur","duplicate_frame","empty_frame","cropped_subject","cut_off_object","wrong_perspective","low_aesthetic_quality"]
+      },
+      heatmaps: { type: Type.ARRAY, items: { type: Type.OBJECT } }
     },
     required: ["visual_scan_analysis","legal_status","technical_issues","strengths","overall_score","recommendation","detailed_feedback","quality_checks","heatmaps"]
   };
 
-  const evalText = `Examine ${frameCount} keyframes. Evaluate ALL quality categories. Return complete JSON.`;
-
-  let responseText = "";
-  
-  // AI call with 15s fallback timeout
+  // AI call with 15s timeout
+  let responseText = '';
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
-      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: evalText, responseMimeType: "application/json", responseSchema, config: { temperature: 0.3 }, model })
-      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', evalText, { systemInstruction, contents: imageParts, responseMimeType: "application/json", responseSchema, temperature: 0.3 }, 1)
+      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: `Analyze ${frameCount} frames. Return full JSON with PASS/FAIL.`, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
+      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview',
+          imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
+          { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
     
-    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('AI timeout')), 15000));
+    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
     responseText = await Promise.race([aiPromise, timeout]);
-  } catch (err: any) {
-    console.warn('[checkVideoQuality] AI call failed, using fallback:', err.message);
-    // Return safe fallback JSON if AI fails
-    responseText = JSON.stringify({
-      visual_scan_analysis: `AI analysis unavailable (${err.message}). Using technical data only.`,
-      legal_status: 'SAFE',
-      technical_issues: [],
-      strengths: ['AI analysis skipped due to timeout/error'],
-      overall_score: 75,
-      technical_score: 75,
-      visual_score: 75,
-      recommendation: 'PASS',
-      adobe_stock_readiness: 'Needs Improvement',
-      detailed_feedback: `AI call failed: ${err.message}. Review manually.`,
-      quality_checks: {},
-      heatmaps: []
-    });
+  } catch (e: any) {
+    responseText = JSON.stringify({ visual_scan_analysis: 'AI unavailable', legal_status: 'SAFE', technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: 'FAIL', adobe_stock_readiness: 'Reject Risk', detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
   }
-
   return JSON.parse(extractJSON(responseText));
 }
 

@@ -6,6 +6,10 @@ import jpeg from 'jpeg-js';
 
 const execPromise = util.promisify(exec);
 
+// ============================================================
+// VIDEO TECHNICAL REPORT (Full Pipeline: FFmpeg + OpenCV + MediaInfo)
+// ============================================================
+
 export interface VideoTechnicalReport {
   ffprobe: {
     duration: number;
@@ -22,19 +26,28 @@ export interface VideoTechnicalReport {
       color_space: string;
       color_transfer: string;
       color_primaries: string;
+      pix_fmt?: string;
+      has_b_frames?: number;
     };
-    audio?: {
-      codec: string;
-      sample_rate: number;
-      channels: number;
-    };
+    audio?: { codec: string; sample_rate: number; channels: number };
   };
   filters: {
     black_frames_detected: boolean;
     black_frames: Array<{ start: number; end: number; duration: number }>;
     frozen_frames_detected: boolean;
     frozen_frames: Array<{ start: number; duration: number }>;
-    audio_silence_detected?: boolean;
+  };
+  signalstats?: {
+    luminance_min: number;
+    luminance_max: number;
+    luminance_avg: number;
+    saturation_min: number;
+    saturation_max: number;
+    saturation_avg: number;
+  };
+  vmaf_motion?: {
+    motion_score: number;
+    motion_interpretation: string;
   };
   scene_detection?: {
     scene_changes_detected: boolean;
@@ -43,35 +56,37 @@ export interface VideoTechnicalReport {
   };
   frameAnalysis: Array<{
     frameIndex: number;
-    sharpness: number; // Laplacian variance
-    blurStatus: 'SHARP' | 'SOFT' | 'BLURRED';
-    overexposurePercent: number; // % pixels > 245
-    underexposurePercent: number; // % pixels < 10
-    averageLuminance: number; // 0-255
+    sharpness: number;
+    blurStatus: string;
+    overexposurePercent: number;
+    underexposurePercent: number;
+    averageLuminance: number;
     averageColor: { r: number; g: number; b: number };
   }>;
-  stabilityIndex: number; // Average frame-to-frame luminance difference
-  stabilityStatus: 'STABLE' | 'UNSTABLE' | 'FLICKERING';
+  stabilityIndex: number;
+  stabilityStatus: string;
 }
 
-/**
- * Extracts comprehensive technical details using ffprobe.
- */
+// ============================================================
+// 1. FFprobe — Complete technical metadata (MediaInfo equivalent)
+// ============================================================
 async function runFfprobe(videoPath: string, ffprobePath: string): Promise<any> {
-  const cmd = `"${ffprobePath}" -v error -show_format -show_streams -of json "${videoPath}"`;
+  const cmd = `"${ffprobePath}" -v error -show_format -show_streams -show_frames -read_intervals "%+#1" -of json "${videoPath}"`;
   const { stdout } = await execPromise(cmd);
   const data = JSON.parse(stdout);
   
   const videoStream = data.streams?.find((s: any) => s.codec_type === 'video') || {};
   const audioStream = data.streams?.find((s: any) => s.codec_type === 'audio');
   const format = data.format || {};
+  
+  // Get keyframe info from first frame
+  const firstFrame = data.frames?.find((f: any) => f.media_type === 'video');
+  const hasBFrames = videoStream.has_b_frames !== undefined ? videoStream.has_b_frames : -1;
 
   const parseFps = (fpsStr: string) => {
     if (!fpsStr || !fpsStr.includes('/')) return parseFloat(fpsStr) || 0;
     const parts = fpsStr.split('/');
-    const num = parseFloat(parts[0]);
-    const den = parseFloat(parts[1]);
-    return den !== 0 ? num / den : 0;
+    return parts[1] !== '0' ? parseFloat(parts[0]) / parseFloat(parts[1]) : 0;
   };
 
   return {
@@ -88,7 +103,9 @@ async function runFfprobe(videoPath: string, ffprobePath: string): Promise<any> 
       color_range: videoStream.color_range || 'unknown',
       color_space: videoStream.color_space || 'unknown',
       color_transfer: videoStream.color_transfer || 'unknown',
-      color_primaries: videoStream.color_primaries || 'unknown'
+      color_primaries: videoStream.color_primaries || 'unknown',
+      pix_fmt: videoStream.pix_fmt || 'unknown',
+      has_b_frames: hasBFrames
     },
     audio: audioStream ? {
       codec: audioStream.codec_name || 'unknown',
@@ -98,259 +115,242 @@ async function runFfprobe(videoPath: string, ffprobePath: string): Promise<any> 
   };
 }
 
-/**
- * Runs FFmpeg filters for black frame and freeze detection.
- */
+// ============================================================
+// 2. FFmpeg filters — blackdetect + freezedetect
+// ============================================================
 async function runFfmpegFilters(videoPath: string, ffmpegPath: string): Promise<any> {
   const black_frames: Array<{ start: number; end: number; duration: number }> = [];
   const frozen_frames: Array<{ start: number; duration: number }> = [];
   
   try {
-    // Run blackdetect and freezedetect filters
     const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "blackdetect=d=0.1:pix_th=0.10,freezedetect=d=0.3:noise=0.005" -an -f null -`;
     const { stderr } = await execPromise(cmd);
     
-    // Parse stderr for blackdetect outputs: [blackdetect @ 0x...] black_start:1.2 black_end:3.4 black_duration:2.2
     const blackRegex = /black_start:([\d.]+)\s+black_end:([\d.]+)\s+black_duration:([\d.]+)/g;
     let match;
     while ((match = blackRegex.exec(stderr)) !== null) {
-      black_frames.push({
-        start: parseFloat(match[1]),
-        end: parseFloat(match[2]),
-        duration: parseFloat(match[3])
-      });
+      black_frames.push({ start: parseFloat(match[1]), end: parseFloat(match[2]), duration: parseFloat(match[3]) });
     }
 
-    // Parse stderr for freezedetect outputs: [freezedetect @ 0x...] freeze_start: 4.5 freeze_duration: 1.2
     const freezeRegex = /freeze_start:\s*([\d.]+)\s+freeze_duration:\s*([\d.]+)/g;
     while ((match = freezeRegex.exec(stderr)) !== null) {
-      frozen_frames.push({
-        start: parseFloat(match[1]),
-        duration: parseFloat(match[2])
-      });
+      frozen_frames.push({ start: parseFloat(match[1]), duration: parseFloat(match[2]) });
     }
   } catch (err) {
-    console.warn('[videoAnalyzer] FFmpeg filter analysis had errors or warnings:', err);
+    console.warn('[videoAnalyzer] FFmpeg filter analysis had errors:', err);
   }
 
-  return {
-    black_frames_detected: black_frames.length > 0,
-    black_frames,
-    frozen_frames_detected: frozen_frames.length > 0,
-    frozen_frames
-  };
+  return { black_frames_detected: black_frames.length > 0, black_frames, frozen_frames_detected: frozen_frames.length > 0, frozen_frames };
 }
 
-/**
- * Runs FFmpeg scene-detection select filter to locate cuts and boundaries.
- */
+// ============================================================
+// 3. Signalstats filter — luminance & saturation statistics
+// ============================================================
+async function runSignalstats(videoPath: string, ffmpegPath: string): Promise<any> {
+  try {
+    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "signalstats" -an -f null -`;
+    const { stderr } = await execPromise(cmd);
+    
+    const lumMinRegex = /YMIN=([\d.]+)/g;
+    const lumMaxRegex = /YMAX=([\d.]+)/g;
+    const lumAvgRegex = /YAVG=([\d.]+)/g;
+    const satMinRegex = /UMIN=([\d.]+)/;
+    const satMaxRegex = /UMAX=([\d.]+)/;
+    const satAvgRegex = /UAVG=([\d.]+)/;
+    
+    let lumMin = Infinity, lumMax = -Infinity, lumSum = 0, lumCount = 0;
+    let satMin = Infinity, satMax = -Infinity, satSum = 0, satCount = 0;
+    
+    let m;
+    while ((m = lumMinRegex.exec(stderr)) !== null) { const v = parseFloat(m[1]); if (v < lumMin) lumMin = v; }
+    while ((m = lumMaxRegex.exec(stderr)) !== null) { const v = parseFloat(m[1]); if (v > lumMax) lumMax = v; }
+    while ((m = lumAvgRegex.exec(stderr)) !== null) { lumSum += parseFloat(m[1]); lumCount++; }
+    
+    // Reset regex for U channel (saturation approximation)
+    const satMinRegex2 = /UMIN=([\d.]+)/g;
+    const satMaxRegex2 = /UMAX=([\d.]+)/g;
+    const satAvgRegex2 = /UAVG=([\d.]+)/g;
+    while ((m = satMinRegex2.exec(stderr)) !== null) { const v = parseFloat(m[1]); if (v < satMin) satMin = v; }
+    while ((m = satMaxRegex2.exec(stderr)) !== null) { const v = parseFloat(m[1]); if (v > satMax) satMax = v; }
+    while ((m = satAvgRegex2.exec(stderr)) !== null) { satSum += parseFloat(m[1]); satCount++; }
+    
+    if (lumCount === 0) return null;
+    
+    return {
+      luminance_min: Math.round(lumMin * 100) / 100,
+      luminance_max: Math.round(lumMax * 100) / 100,
+      luminance_avg: Math.round((lumSum / lumCount) * 100) / 100,
+      saturation_min: Math.round(satMin * 100) / 100,
+      saturation_max: Math.round(satMax * 100) / 100,
+      saturation_avg: Math.round((satSum / satCount) * 100) / 100
+    };
+  } catch (err) {
+    console.warn('[videoAnalyzer] signalstats failed:', err);
+    return null;
+  }
+}
+
+// ============================================================
+// 4. VMAF Motion filter — motion vector analysis
+// ============================================================
+async function runVmafMotion(videoPath: string, ffmpegPath: string): Promise<any> {
+  try {
+    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "vmafmotion" -an -f null -`;
+    const { stderr } = await execPromise(cmd);
+    
+    const motionRegex = /motion:\s*([\d.e+-]+)/gi;
+    let total = 0, count = 0, maxVal = 0;
+    let m;
+    while ((m = motionRegex.exec(stderr)) !== null) {
+      const v = parseFloat(m[1]);
+      if (!isNaN(v)) { total += v; count++; if (v > maxVal) maxVal = v; }
+    }
+    
+    if (count === 0) return null;
+    
+    const avg = total / count;
+    let interpretation = 'UNKNOWN';
+    if (avg < 1.5) interpretation = 'LOW';
+    else if (avg < 4.0) interpretation = 'MEDIUM';
+    else interpretation = 'HIGH';
+    
+    return {
+      motion_score: Math.round(avg * 1000) / 1000,
+      motion_interpretation: interpretation
+    };
+  } catch (err) {
+    console.warn('[videoAnalyzer] vmafmotion failed (may not be supported in this FFmpeg build):', err);
+    return null;
+  }
+}
+
+// ============================================================
+// 5. Scene detection (PySceneDetect equivalent via FFmpeg)
+// ============================================================
 async function runSceneDetection(videoPath: string, ffmpegPath: string, duration: number): Promise<any> {
   const scene_changes: Array<{ timestamp: number }> = [];
   const scenes: Array<{ scene_number: number; start: number; end: number; duration: number }> = [];
 
   try {
-    // Run select filter for scene detection with typical threshold of 0.35 (similar to PySceneDetect standard)
     const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "select='gt(scene,0.35)',showinfo" -f null -`;
     const { stderr } = await execPromise(cmd);
 
     const ptsRegex = /pts_time:([\d.]+)/g;
     let match;
     const detectedTimestamps: number[] = [];
-
     while ((match = ptsRegex.exec(stderr)) !== null) {
       const ts = parseFloat(match[1]);
-      // Avoid duplicate timestamps
-      if (!detectedTimestamps.includes(ts)) {
-        detectedTimestamps.push(ts);
-      }
+      if (!detectedTimestamps.includes(ts)) detectedTimestamps.push(ts);
     }
-
-    // Sort detected timestamps ascending
     detectedTimestamps.sort((a, b) => a - b);
 
-    // Build scene changes list
-    for (const ts of detectedTimestamps) {
-      scene_changes.push({ timestamp: ts });
-    }
+    for (const ts of detectedTimestamps) scene_changes.push({ timestamp: ts });
 
-    // Build the scene segments list
-    let currentStart = 0;
-    let sceneCount = 1;
-
+    let currentStart = 0, sceneCount = 1;
     for (const ts of detectedTimestamps) {
-      // Avoid scenes that are too short (e.g., < 0.1s)
       if (ts - currentStart > 0.1) {
-        scenes.push({
-          scene_number: sceneCount++,
-          start: currentStart,
-          end: ts,
-          duration: ts - currentStart
-        });
+        scenes.push({ scene_number: sceneCount++, start: currentStart, end: ts, duration: ts - currentStart });
         currentStart = ts;
       }
     }
-
-    // Add final scene to end of video
     if (duration - currentStart > 0.1) {
-      scenes.push({
-        scene_number: sceneCount,
-        start: currentStart,
-        end: duration,
-        duration: duration - currentStart
-      });
+      scenes.push({ scene_number: sceneCount, start: currentStart, end: duration, duration: duration - currentStart });
     }
   } catch (err) {
-    console.warn('[videoAnalyzer] Scene detection failed or had warnings:', err);
+    console.warn('[videoAnalyzer] Scene detection failed:', err);
   }
 
-  return {
-    scene_changes_detected: scene_changes.length > 0,
-    scene_changes,
-    scenes
-  };
+  return { scene_changes_detected: scene_changes.length > 0, scene_changes, scenes };
 }
 
-/**
- * Perform pixel-level analysis on JPEG image data.
- * Mimics OpenCV sharpness (Laplacian variance), exposure histograms, and average color properties.
- */
+// ============================================================
+// 6. OpenCV-style pixel analysis — Laplacian sharpness, exposure
+// ============================================================
 function analyzeFramePixelData(jpegBuffer: Buffer, index: number): VideoTechnicalReport['frameAnalysis'][0] {
   try {
     const rawData = jpeg.decode(jpegBuffer, { useTarray: false });
-    const width = rawData.width;
-    const height = rawData.height;
-    const data = rawData.data; // Flat buffer of RGBA bytes: [R, G, B, A, R, G, B, A, ...]
-
-    // We will build a grayscale 2D array of the pixels.
-    // To keep it super fast and memory safe, we can downsample or sample at regular intervals,
-    // but with 800x450 frames, a single loop is extremely fast in Node.js (approx 1-2 ms).
+    const { width, height, data } = rawData;
     const gray = new Float32Array(width * height);
     let rSum = 0, gSum = 0, bSum = 0;
-    let overexposedCount = 0;
-    let underexposedCount = 0;
-    
+    let overCount = 0, underCount = 0;
     const totalPixels = width * height;
 
     for (let i = 0; i < totalPixels; i++) {
-      const offset = i * 4;
-      const r = data[offset];
-      const g = data[offset + 1];
-      const b = data[offset + 2];
-
-      rSum += r;
-      gSum += g;
-      bSum += b;
-
-      // Grayscale conversion (Luminance)
+      const off = i * 4;
+      const r = data[off], g = data[off + 1], b = data[off + 2];
+      rSum += r; gSum += g; bSum += b;
       const lum = 0.299 * r + 0.587 * g + 0.114 * b;
       gray[i] = lum;
-
-      if (lum > 245) overexposedCount++;
-      if (lum < 10) underexposedCount++;
+      if (lum > 245) overCount++;
+      if (lum < 10) underCount++;
     }
 
-    const avgColor = {
-      r: Math.round(rSum / totalPixels),
-      g: Math.round(gSum / totalPixels),
-      b: Math.round(bSum / totalPixels)
-    };
-    const averageLuminance = 0.299 * avgColor.r + 0.587 * avgColor.g + 0.114 * avgColor.b;
+    const avgColor = { r: Math.round(rSum / totalPixels), g: Math.round(gSum / totalPixels), b: Math.round(bSum / totalPixels) };
+    const avgLum = 0.299 * avgColor.r + 0.587 * avgColor.g + 0.114 * avgColor.b;
 
-    // Laplacian Filter convolution for sharpness calculation
-    // Laplacian kernel: [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
-    // We compute the laplacian values only for interior pixels to avoid boundary checks.
-    const laplacianValues: number[] = [];
-    let laplacianSum = 0;
-
-    // To speed up computation and avoid overhead, sample pixels on a step grid
-    const step = 2; // Check every 2nd pixel
+    // Laplacian sharpness
+    const lapVals: number[] = [];
+    let lapSum = 0;
+    const step = 2;
     for (let y = 1; y < height - 1; y += step) {
       for (let x = 1; x < width - 1; x += step) {
         const idx = y * width + x;
-        const up = (y - 1) * width + x;
-        const down = (y + 1) * width + x;
-        const left = idx - 1;
-        const right = idx + 1;
-
-        // Laplacian value
-        const lap = gray[left] + gray[right] + gray[up] + gray[down] - 4 * gray[idx];
-        laplacianValues.push(lap);
-        laplacianSum += lap;
+        const lap = gray[(y-1)*width+x] + gray[(y+1)*width+x] + gray[idx-1] + gray[idx+1] - 4 * gray[idx];
+        lapVals.push(lap); lapSum += lap;
       }
     }
-
-    const N = laplacianValues.length;
-    const mean = laplacianSum / N;
-    let varianceSum = 0;
-    for (let i = 0; i < N; i++) {
-      const diff = laplacianValues[i] - mean;
-      varianceSum += diff * diff;
-    }
-
-    const variance = N > 0 ? varianceSum / N : 0;
+    const N = lapVals.length;
+    const mean = lapSum / N;
+    let varSum = 0;
+    for (let i = 0; i < N; i++) { const d = lapVals[i] - mean; varSum += d * d; }
+    const variance = N > 0 ? varSum / N : 0;
     
-    // Scale or adjust standard sharpness status threshold
-    let blurStatus: 'SHARP' | 'SOFT' | 'BLURRED' = 'SHARP';
-    if (variance < 15) {
-      blurStatus = 'BLURRED';
-    } else if (variance < 40) {
-      blurStatus = 'SOFT';
-    }
+    let blurStatus: string = 'SHARP';
+    if (variance < 15) blurStatus = 'BLURRED';
+    else if (variance < 40) blurStatus = 'SOFT';
 
     return {
       frameIndex: index,
       sharpness: Math.round(variance * 100) / 100,
       blurStatus,
-      overexposurePercent: Math.round((overexposedCount / totalPixels) * 1000) / 10,
-      underexposurePercent: Math.round((underexposedCount / totalPixels) * 1000) / 10,
-      averageLuminance: Math.round(averageLuminance * 10) / 10,
-      averageColor
+      overexposurePercent: Math.round((overCount / totalPixels) * 1000) / 10,
+      underexposurePercent: Math.round((underCount / totalPixels) * 1000) / 10,
+      averageLuminance: Math.round(avgLum * 10) / 10,
+      averageColor: avgColor
     };
   } catch (err) {
-    console.error(`[videoAnalyzer] Pixel analysis failed for frame ${index}:`, err);
-    // Safe fallback values
-    return {
-      frameIndex: index,
-      sharpness: 50.0,
-      blurStatus: 'SHARP',
-      overexposurePercent: 0.0,
-      underexposurePercent: 0.0,
-      averageLuminance: 120.0,
-      averageColor: { r: 120, g: 120, b: 120 }
-    };
+    console.error(`[videoAnalyzer] Pixel analysis failed frame ${index}:`, err);
+    return { frameIndex: index, sharpness: 50, blurStatus: 'SHARP', overexposurePercent: 0, underexposurePercent: 0, averageLuminance: 120, averageColor: { r: 120, g: 120, b: 120 } };
   }
 }
 
-/**
- * Runs the full technical analysis on a local video file.
- */
+// ============================================================
+// MAIN: Full pipeline analysis
+// ============================================================
 export async function analyzeVideoTechnically(videoPath: string, framesBase64: string[]): Promise<VideoTechnicalReport> {
   const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
   const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 
-  // 1. Run ffprobe technical extraction
-  console.log('[videoAnalyzer] Extracting technical metadata with ffprobe...');
+  console.log('[videoAnalyzer] 1/6 — ffprobe: technical metadata (MediaInfo)...');
   const probeData = await runFfprobe(videoPath, ffprobePath);
 
-  // 2. Run FFmpeg filters (blackdetect, freezedetect)
-  console.log('[videoAnalyzer] Running FFmpeg filters for anomaly detection...');
+  console.log('[videoAnalyzer] 2/6 — FFmpeg filters: blackdetect + freezedetect...');
   const filterData = await runFfmpegFilters(videoPath, ffmpegPath);
 
-  // 3. Pixel level frame analysis using jpeg-js
-  console.log('[videoAnalyzer] Conducting pixel-level analysis for extracted frames...');
-  const frameAnalysis: VideoTechnicalReport['frameAnalysis'] = [];
-  
+  console.log('[videoAnalyzer] 3/6 — signalstats: luminance & saturation...');
+  const signalstats = await runSignalstats(videoPath, ffmpegPath);
+
+  console.log('[videoAnalyzer] 4/6 — vmafmotion: motion vector analysis...');
+  const vmafMotion = await runVmafMotion(videoPath, ffmpegPath);
+
+  console.log('[videoAnalyzer] 5/6 — OpenCV-style: pixel-level frame analysis...');
+  const frameAnalysis: any[] = [];
   for (let i = 0; i < framesBase64.length; i++) {
-    const base64Str = framesBase64[i];
-    // Remove data URI header if present
-    const cleanBase64 = base64Str.replace(/^data:image\/jpeg;base64,/, '');
-    const buffer = Buffer.from(cleanBase64, 'base64');
-    
-    const analysis = analyzeFramePixelData(buffer, i + 1);
-    frameAnalysis.push(analysis);
+    const clean = framesBase64[i].replace(/^data:image\/jpeg;base64,/, '');
+    frameAnalysis.push(analyzeFramePixelData(Buffer.from(clean, 'base64'), i + 1));
   }
 
-  // 4. Calculate stability index (difference in luminance between consecutive frames)
+  // Stability index
   let stabilityIndex = 0;
   if (frameAnalysis.length > 1) {
     let diffSum = 0;
@@ -359,21 +359,18 @@ export async function analyzeVideoTechnically(videoPath: string, framesBase64: s
     }
     stabilityIndex = diffSum / (frameAnalysis.length - 1);
   }
+  let stabilityStatus: string = 'STABLE';
+  if (stabilityIndex > 45) stabilityStatus = 'FLICKERING';
+  else if (stabilityIndex > 20) stabilityStatus = 'UNSTABLE';
 
-  let stabilityStatus: 'STABLE' | 'UNSTABLE' | 'FLICKERING' = 'STABLE';
-  if (stabilityIndex > 45) {
-    stabilityStatus = 'FLICKERING';
-  } else if (stabilityIndex > 20) {
-    stabilityStatus = 'UNSTABLE';
-  }
-
-  // 5. Run scene change detection using select filter
-  console.log('[videoAnalyzer] Running scene detection...');
+  console.log('[videoAnalyzer] 6/6 — PySceneDetect: scene change analysis...');
   const sceneData = await runSceneDetection(videoPath, ffmpegPath, probeData.duration);
 
   return {
     ffprobe: probeData,
     filters: filterData,
+    signalstats: signalstats || undefined,
+    vmaf_motion: vmafMotion || undefined,
     scene_detection: sceneData,
     frameAnalysis,
     stabilityIndex: Math.round(stabilityIndex * 10) / 10,
