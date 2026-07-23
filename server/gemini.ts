@@ -4064,57 +4064,74 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (semua standar penolakan Adobe Stock: IP, AI anomaly, serta cacat teknis/fokus/eksposur)
       const criticalKeys = [
         'watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts',
-        'blur', 'exposure', 'lighting', 'sensor_issues', 'over_edited', 'proportion_defects', 'stock_acceptance'
+        'blur', 'exposure', 'lighting', 'sensor_issues', 'over_edited', 'proportion_defects', 'stock_acceptance',
+        'vector_issues', 'illustration_issues'
       ];
       
-      // Guardrail tambahan: Pindai teks analisis HANYA untuk frase kegagalan eksplisit (menghindari false positive pada kata biasa seperti hand, finger, blur, noise)
+      // 1. Jika ada list technical_issues atau model semula memberikan FAIL / Reject Risk -> WAJIB FAIL
+      if (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0) {
+        anyFail = true;
+        hasCriticalFail = true;
+      }
+      if (parsedResult.recommendation === 'FAIL' || parsedResult.recommendation === 'REJECT' || parsedResult.adobe_stock_readiness === 'Reject Risk' || parsedResult.adobe_stock_readiness === 'Needs Improvement') {
+        anyFail = true;
+        hasCriticalFail = true;
+      }
+
+      // 2. Guardrail Pemindaian Teks Analisis untuk Istilah Cacat Teknis & Quality Issues
       const textAnalysisLower = (
         (parsedResult.visual_scan_analysis || "") + " " +
         (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
         (parsedResult.detailed_feedback || "")
       ).toLowerCase();
 
-      const explicitDefectPhrases = [
-        'terdapat cacat', 'terdapat defect', 'terdapat artefak', 'terdapat distortion',
-        'bad anatomy detected', 'ai artifact detected', 'watermark terdeteksi', 'logo terdeteksi',
-        'ip risk detected', 'copyright violation', 'severe blur', 'subjek utama out of focus',
-        'deformed fingers', 'extra finger detected', 'morphism detected'
+      const qualityDefectKeywords = [
+        'soft focus', 'out of focus', 'lack of sharpness', 'kurang tajam', 'buram', 'blur',
+        'noise', 'derau', 'grain', 'bintik', 'compression', 'artifact', 'artefak',
+        'macroblock', 'blocking', 'banding', 'posterization', 'overexposure', 'underexposure',
+        'morph', 'morphing', 'warp', 'warping', 'leleh', 'melt', 'temporal',
+        'flicker', 'flickering', 'kedip', 'shake', 'guncang', 'unstable', 'distortion', 'distorsi',
+        'watermark', 'logo', 'copyright', 'trademark', 'brand', 'merek', 'quality issue', 'quality issues',
+        'ditolak', 'reject', 'defect', 'cacat', 'bad anatomy', 'ai artifact', 'deformed'
       ];
 
-      const textMentionedExplicitDefect = explicitDefectPhrases.some(phrase => textAnalysisLower.includes(phrase));
-      if (textMentionedExplicitDefect) {
+      const textMentionedQualityDefect = qualityDefectKeywords.some(keyword => textAnalysisLower.includes(keyword));
+      if (textMentionedQualityDefect) {
         hasCriticalFail = true;
         anyFail = true;
         if (parsedResult.ai_vision_checks.ai_artifacts && parsedResult.ai_vision_checks.ai_artifacts.status !== 'FAIL') {
           parsedResult.ai_vision_checks.ai_artifacts.status = 'FAIL';
-          parsedResult.ai_vision_checks.ai_artifacts.note = 'Terdeteksi cacat/artefak visual atau anatomi dalam analisis AI.';
+          parsedResult.ai_vision_checks.ai_artifacts.note = 'Terdeteksi indikasi cacat kualitas teknis atau visual dalam analisis AI.';
         }
       }
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
-        if (value && typeof value === 'object' && ((value as any).status === 'FAIL' || (value as any).status === 'VIOLATION' || (value as any).status === 'REJECT')) {
-          anyFail = true;
-          if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
-            anyIpFail = true;
-          }
-          if (criticalKeys.includes(key)) {
-            hasCriticalFail = true;
+        if (value && typeof value === 'object') {
+          const statusStr = String((value as any).status || '').toUpperCase();
+          if (statusStr === 'FAIL' || statusStr === 'SOFT' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK' || statusStr === 'NEEDS_IMPROVEMENT') {
+            anyFail = true;
+            if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
+              anyIpFail = true;
+            }
+            if (criticalKeys.includes(key)) {
+              hasCriticalFail = true;
+            }
           }
         }
       }
       
-      // Terapkan Keputusan Akhir Status: Jika Ada Masalah Quality Issue / IP -> FAIL, Jika Bersih -> PASS
-      if (anyFail || hasCriticalFail || anyIpFail) {
+      // Terapkan Keputusan Akhir Status: Jika Ada Masalah Quality Issue / IP / Technical Issues -> FAIL, Jika Bersih 100% -> PASS
+      if (anyFail || hasCriticalFail || anyIpFail || (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0)) {
         parsedResult.recommendation = "FAIL";
         parsedResult.adobe_stock_readiness = "Reject Risk";
-        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
-        if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
-        if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 55;
+        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 52;
+        if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 48;
+        if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 50;
         if (anyIpFail) {
           parsedResult.legal_status = "VIOLATION";
         }
       } else {
-        // Aset Bersih 100% -> Wajib PASS
+        // Aset Bersih 100% tanpa isu -> Wajib PASS
         parsedResult.recommendation = "PASS";
         parsedResult.adobe_stock_readiness = "Ready for Submission";
         parsedResult.legal_status = "CLEAN";
@@ -5274,6 +5291,7 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       if (videoTechnicalReport) {
         if (videoTechnicalReport.filters?.black_frames_detected) {
           hasCriticalFail = true;
+          anyFail = true;
           parsedResult.quality_checks.black_frame = {
             status: 'FAIL',
             note: 'Terdeteksi black frame pada linimasa video oleh filter FFmpeg.'
@@ -5281,6 +5299,7 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
         }
         if (videoTechnicalReport.filters?.frozen_frames_detected) {
           hasCriticalFail = true;
+          anyFail = true;
           parsedResult.quality_checks.frozen_frame = {
             status: 'FAIL',
             note: 'Terdeteksi frame beku/stuck pada linimasa video oleh filter FFmpeg.'
@@ -5288,45 +5307,62 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
         }
         if (videoTechnicalReport.stabilityStatus === 'FLICKERING') {
           hasCriticalFail = true;
+          anyFail = true;
           parsedResult.quality_checks.flickering = {
             status: 'FAIL',
             note: 'Fluktuasi kecerahan / kedipan berulang terdeteksi pada rantai frame.'
           };
         }
-        if (videoTechnicalReport.stabilityStatus === 'UNSTABLE') {
+        if (videoTechnicalReport.stabilityStatus === 'UNSTABLE' || videoTechnicalReport.stabilityIndex > 15) {
           hasCriticalFail = true;
+          anyFail = true;
           parsedResult.quality_checks.camera_shake = {
             status: 'FAIL',
             note: 'Guncangan kamera / ketidakstabilan pergerakan terdeteksi pada rantai frame.'
           };
         }
         if (Array.isArray(videoTechnicalReport.frameAnalysis) && videoTechnicalReport.frameAnalysis.length > 0) {
-          const blurredFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.blurStatus === 'BLURRED' || f.sharpness < 20);
-          if (blurredFrames.length > 0) {
+          const softOrBlurredFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.blurStatus === 'BLURRED' || f.blurStatus === 'SOFT' || f.sharpness < 45);
+          if (softOrBlurredFrames.length > 0) {
             hasCriticalFail = true;
+            anyFail = true;
             parsedResult.quality_checks.blur = {
               status: 'FAIL',
-              note: `Pemeriksaan Laplacian piksel mendeteksi ketajaman sangat rendah/buram pada ${blurredFrames.length} keyframe.`
+              note: `Pemeriksaan Laplacian piksel mendeteksi ${softOrBlurredFrames.length} keyframe mengalami soft-focus/kurang tajam (sharpness < 45).`
             };
             parsedResult.quality_checks.out_of_focus = {
               status: 'FAIL',
-              note: 'Subjek utama terdeteksi out-of-focus / soft focus secara teknis.'
+              note: 'Subjek utama terdeteksi soft-focus atau meleset dari ketajaman standar Adobe Stock (Lack of Pin-Sharpness).'
             };
           }
-          const overexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.overexposurePercent > 18);
+          const overexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.overexposurePercent > 12);
           if (overexpFrames.length > 0) {
             hasCriticalFail = true;
+            anyFail = true;
             parsedResult.quality_checks.overexposure = {
               status: 'FAIL',
               note: `Pemeriksaan kecerahan piksel mendeteksi overexposure / blown highlights pada ${overexpFrames.length} keyframe.`
             };
           }
-          const underexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.underexposurePercent > 22);
+          const underexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.underexposurePercent > 18);
           if (underexpFrames.length > 0) {
             hasCriticalFail = true;
+            anyFail = true;
             parsedResult.quality_checks.underexposure = {
               status: 'FAIL',
               note: `Pemeriksaan kecerahan piksel mendeteksi underexposure / crushed shadows pada ${underexpFrames.length} keyframe.`
+            };
+          }
+        }
+        if (videoTechnicalReport.ffprobe) {
+          const bitrateMbps = (videoTechnicalReport.ffprobe.bitrate || 0) / 1000000;
+          const height = videoTechnicalReport.ffprobe.video?.height || 0;
+          if (bitrateMbps > 0 && ((height >= 1080 && bitrateMbps < 12) || (height >= 2160 && bitrateMbps < 30))) {
+            hasCriticalFail = true;
+            anyFail = true;
+            parsedResult.quality_checks.compression_artifacts = {
+              status: 'FAIL',
+              note: `Bitrate video (${bitrateMbps.toFixed(1)} Mbps) terlalu rendah untuk standar komersial Adobe Stock (min 15 Mbps untuk 1080p, 35 Mbps untuk 4K).`
             };
           }
         }
@@ -5342,54 +5378,70 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
         'log_profile', 'upscaled_video'
       ];
 
-      // Guardrail tambahan: Pindai teks analisis (visual_scan_analysis, technical_issues, detailed_feedback) untuk indikasi cacat AI / anatomi / teknis
+      // 2. Jika ada list technical_issues dari AI vision model -> WAJIB FAIL
+      if (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0) {
+        anyFail = true;
+        hasCriticalFail = true;
+      }
+      if (parsedResult.recommendation === 'FAIL' || parsedResult.recommendation === 'REJECT' || parsedResult.adobe_stock_readiness === 'Reject Risk' || parsedResult.adobe_stock_readiness === 'Needs Improvement') {
+        anyFail = true;
+        hasCriticalFail = true;
+      }
+
+      // 3. Guardrail Pindai Teks Analisis untuk Istilah Cacat Kualitas Video
       const textAnalysisLower = (
         (parsedResult.visual_scan_analysis || "") + " " +
         (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
         (parsedResult.detailed_feedback || "")
       ).toLowerCase();
 
-      const explicitDefectPhrases = [
-        'terdapat cacat', 'terdapat defect', 'terdapat artefak', 'terdapat distortion',
-        'bad anatomy detected', 'ai artifact detected', 'watermark terdeteksi', 'logo terdeteksi',
-        'ip risk detected', 'copyright violation', 'black frame detected', 'frozen frame detected',
-        'temporal morphing detected', 'severe flickering detected', 'subjek utama out of focus'
+      const qualityDefectKeywords = [
+        'soft focus', 'out of focus', 'lack of sharpness', 'kurang tajam', 'buram', 'blur',
+        'noise', 'derau', 'grain', 'bintik', 'compression', 'artifact', 'artefak',
+        'macroblock', 'blocking', 'banding', 'posterization', 'overexposure', 'underexposure',
+        'morph', 'morphing', 'warp', 'warping', 'leleh', 'melt', 'temporal',
+        'flicker', 'flickering', 'kedip', 'shake', 'guncang', 'unstable', 'distortion', 'distorsi',
+        'watermark', 'logo', 'copyright', 'trademark', 'brand', 'merek', 'quality issue', 'quality issues',
+        'ditolak', 'reject', 'defect', 'cacat', 'bad anatomy', 'ai artifact', 'deformed'
       ];
 
-      const textMentionedExplicitDefect = explicitDefectPhrases.some(phrase => textAnalysisLower.includes(phrase));
-      if (textMentionedExplicitDefect) {
+      const textMentionedQualityDefect = qualityDefectKeywords.some(keyword => textAnalysisLower.includes(keyword));
+      if (textMentionedQualityDefect) {
         hasCriticalFail = true;
         anyFail = true;
         if (parsedResult.quality_checks.ai_artifact && parsedResult.quality_checks.ai_artifact.status !== 'FAIL') {
           parsedResult.quality_checks.ai_artifact.status = 'FAIL';
-          parsedResult.quality_checks.ai_artifact.note = 'Terdeteksi cacat/artefak visual atau morphing pada linimasa video.';
+          parsedResult.quality_checks.ai_artifact.note = 'Terdeteksi indikasi cacat kualitas teknis/fokus/visual dalam analisis video.';
         }
       }
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
-        if (value && typeof value === 'object' && ((value as any).status === 'FAIL' || (value as any).status === 'VIOLATION' || (value as any).status === 'REJECT')) {
-          anyFail = true;
-          if (['watermark', 'logo', 'text'].includes(key)) {
-            anyIpFail = true;
-          }
-          if (criticalKeys.includes(key)) {
-            hasCriticalFail = true;
+        if (value && typeof value === 'object') {
+          const statusStr = String((value as any).status || '').toUpperCase();
+          if (statusStr === 'FAIL' || statusStr === 'SOFT' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK' || statusStr === 'NEEDS_IMPROVEMENT') {
+            anyFail = true;
+            if (['watermark', 'logo', 'text'].includes(key)) {
+              anyIpFail = true;
+            }
+            if (criticalKeys.includes(key)) {
+              hasCriticalFail = true;
+            }
           }
         }
       }
 
-      // Terapkan Keputusan Akhir Status Video: Jika Ada Masalah Quality Issue / IP -> FAIL, Jika Bersih -> PASS
-      if (anyFail || hasCriticalFail || anyIpFail) {
+      // Terapkan Keputusan Akhir Status Video: Jika Ada Masalah Quality Issue / IP / Technical Issues -> FAIL, Jika Bersih 100% -> PASS
+      if (anyFail || hasCriticalFail || anyIpFail || (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0)) {
         parsedResult.recommendation = "FAIL";
         parsedResult.adobe_stock_readiness = "Reject Risk";
-        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
-        if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
-        if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 55;
+        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 52;
+        if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 48;
+        if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 50;
         if (anyIpFail) {
           parsedResult.legal_status = "VIOLATION";
         }
       } else {
-        // Video Bersih 100% -> Wajib PASS
+        // Video Bersih 100% tanpa isu -> Wajib PASS
         parsedResult.recommendation = "PASS";
         parsedResult.adobe_stock_readiness = "Ready for Submission";
         parsedResult.legal_status = "CLEAN";
