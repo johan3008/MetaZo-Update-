@@ -2990,7 +2990,9 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // 🔒 SINGLE MODEL — gemini-2.5-pro only
+  const SINGLE_FIXED_MODEL = 'gemini-2.5-pro';
+  const modelsToTry = ['gemini-2.5-pro']; // Locked — no fallback
   let lastError: any = null;
 
   const safetySettings = [
@@ -3039,7 +3041,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     }
   } else {
     // If user explicitly provided a Gemini model via `model`, use it as primary, else default fallback chain
-    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    const modelToUse = model && model.startsWith("gemini") ? model : SINGLE_FIXED_MODEL;
     for (const modelName of modelsToTryList) {
       let attempts = 0;
       const maxAttempts = 2;
@@ -3513,13 +3515,15 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // 🔒 SINGLE MODEL — gemini-2.5-pro only
+  const SINGLE_FIXED_MODEL = 'gemini-2.5-pro';
+  const modelsToTry = ['gemini-2.5-pro']; // Locked — no fallback
   let response;
   let lastError;
   let responseText = "";
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  const modelToUse = model && model.startsWith("gemini") ? model : SINGLE_FIXED_MODEL;
   for (const modelName of modelsToTryList) {
     try {
       response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
@@ -3604,12 +3608,14 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // 🔒 SINGLE MODEL — gemini-2.5-pro only
+  const SINGLE_FIXED_MODEL = 'gemini-2.5-pro';
+  const modelsToTry = ['gemini-2.5-pro']; // Locked — no fallback
   let responseText = "";
   let lastError;
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+  const modelToUse = model && model.startsWith("gemini") ? model : SINGLE_FIXED_MODEL;
   for (const modelName of modelsToTryList) {
     try {
       const res = await callGeminiWithRetry(modelName, { parts }, {
@@ -3995,13 +4001,15 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // Normalisasi Model ke Seri Resmi Terupdate
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // 🔒 SINGLE FIXED MODEL — NO FALLBACK (accuracy > availability)
+  // Using gemini-2.5-pro for maximum visual accuracy and AI artifact detection.
+  // Fallback to weaker models causes false PASS on AI-generated/upscaled videos.
+  const SINGLE_FIXED_MODEL = model && model.startsWith('gemini') ? model : 'gemini-2.5-pro';
   let responseText = "";
   let lastError;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
     try {
       let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
@@ -4021,18 +4029,15 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const activeModel = model || 'gemini-3.5-flash';
-
-    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
-    
-    for (const modelName of modelsToTryList) {
+    // 🔒 Single fixed model — retry up to 2 times on the SAME model only, never downgrade
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
         
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+        const res = await callGeminiWithRetry(SINGLE_FIXED_MODEL, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -4044,8 +4049,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         break;
       } catch (err: any) {
         lastError = err;
-        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
+        console.warn(`[checkImageQuality] Attempt ${attempt + 1}/2 failed with ${SINGLE_FIXED_MODEL}:`, err.message || err);
         if (err.message && err.message.includes('API_KEY')) throw err;
+        if (attempt === 0) {
+          console.warn(`[checkImageQuality] Retrying ${SINGLE_FIXED_MODEL} one more time (no model downgrade)...`);
+        }
       }
     }
   }
@@ -4061,8 +4069,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
       
-      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
-      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
+      // 🔒 Kunci kritis DIPERLUAS — mencakup semua masalah AI/upscale/quality yang umum ditolak Adobe Stock
+      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'ai_upscale', 'flickering', 'low_aesthetic', 'noise', 'blocking', 'banding', 'overexposure', 'underexposure', 'out_of_focus'];
       
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
@@ -5178,22 +5186,41 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const frameCount = frames ? frames.length : 0;
   const evalText = `Act as an objective, highly strict Adobe Stock QA Curator and Technical Inspector.
-Conduct a rigorous audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
-Your primary task is to detect Adobe Stock "Quality Issues", specifically checking for:
-1. Generative AI Temporal Morphing & Texture Warping: Any unphysical shifting, melting, or morphing of background elements (cornfields, sky, trees, structure) or subject textures across frames.
-2. Anatomical & Facial Distortions: Any strange, uncanny, protruding, asymmetrical, or distorted AI eyes, faces, hands, or limbs.
-3. Compression Noise, Banding & Flickering: Macroblocking artifacts or digital noise in dark sky/cloud regions or flashing light/lightning effects.
-4. Overall Commercial Viability & Quality Issues.
 
-IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Do NOT give a PASS to videos with AI morphing or visual artifacts. Ensure your entire response is written in ${language}.`;
+⚠️ CRITICAL: This is a HIGH-STAKES inspection. A false PASS on a defective video costs the contributor real rejection. When in doubt, FAIL.
+
+Conduct a rigorous audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
+
+🔴 GENERATIVE AI ARTIFACTS (MOST IMPORTANT — Adobe Stock HEAVILY rejects these):
+- Temporal Morphing & Texture Warping: Unphysical shifting, melting, swirling of background/surface textures
+- AI Upscale Artifacts: Over-sharpened halos, plastic/waxy textures, inconsistent detail levels
+- Anatomical Distortions: Uncanny/asymmetrical eyes, faces, hands, limbs
+- Impossible Physics: Objects merging, floating fragments, melting textures during camera movement
+
+🟠 COMPRESSION & NOISE:
+- Macroblocking, banding, digital noise in shadows/sky
+- Chromatic aberration at high-contrast edges
+- Flickering/pulsing brightness artifacts
+
+🟡 TECHNICAL: Overexposure, underexposure, soft focus, camera shake, empty/frozen frames
+
+🔵 LEGAL: Watermarks, logos, trademarks, copyrighted artwork, restricted landmarks
+
+⚠️ MANDATORY:
+- If AI-generated or AI-upscaled: ai_artifact=FAIL, upscaled_video=FAIL, low_aesthetic_quality=FAIL
+- If temporal morphing detected: FAIL immediately
+- Score AI artifact videos 35-55, NOT 60+
+- Response in ${language}.`;
 
   
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // 🔒 SINGLE FIXED MODEL — NO FALLBACK (accuracy > availability)
+  // Using gemini-2.5-pro for maximum visual accuracy and AI artifact detection.
+  const SINGLE_FIXED_MODEL = model && model.startsWith('gemini') ? model : 'gemini-2.5-pro';
   let responseText = "";
   let lastError;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
     try {
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
@@ -5208,10 +5235,10 @@ IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overa
       console.error(`[checkVideoQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-    for (const modelName of modelsToTryList) {
+    // 🔒 Single fixed model — retry up to 2 times on the SAME model only, never downgrade
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: evalText }] }, {
+        const res = await callGeminiWithRetry(SINGLE_FIXED_MODEL, { parts: [...imageParts, { text: evalText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -5223,8 +5250,11 @@ IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overa
         break;
       } catch (err: any) {
         lastError = err;
-        console.warn(`[checkVideoQuality] Failed with ${modelName}:`, err.message || err);
+        console.warn(`[checkVideoQuality] Attempt ${attempt + 1}/2 failed with ${SINGLE_FIXED_MODEL}:`, err.message || err);
         if (err.message && err.message.includes('API_KEY')) throw err;
+        if (attempt === 0) {
+          console.warn(`[checkVideoQuality] Retrying ${SINGLE_FIXED_MODEL} one more time (no model downgrade)...`);
+        }
       }
     }
   }
@@ -5242,9 +5272,16 @@ IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overa
       let anyIpFail = false;
       let hasCriticalFail = false;
 
-      // Kunci kritis untuk kualitas video dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      // 🔒 Kunci kritis DIPERLUAS — mencakup semua masalah AI/upscale/quality yang umum ditolak Adobe Stock
+      // Video AI upscale sering memiliki: flickering, noise, blocking, banding, low_aesthetic_quality
       const criticalKeys = [
-        'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 'empty_frame', 'black_frame'
+        'watermark', 'logo', 'text',
+        'ai_artifact', 'bad_anatomy', 'deformed_object',
+        'empty_frame', 'black_frame', 'frozen_frame',
+        'flickering', 'low_aesthetic_quality',
+        'noise', 'blocking', 'banding',
+        'compression_artifacts', 'out_of_focus',
+        'upscaled_video', 'visible_transitions'
       ];
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
