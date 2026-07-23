@@ -539,7 +539,7 @@ export const ImageQualityCheck: React.FC<{
                 pathKey: getUrlData?.pathKey,
                 tolerance,
                 language: t.language || 'English',
-                model: aiOptions?.model || 'gemini-3.6-flash'
+                model: aiOptions?.model || 'gemini-3.1-flash-lite'
               })
             });
           } else {
