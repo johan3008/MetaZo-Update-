@@ -27,6 +27,7 @@ import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
+import { RemovalGenView } from './src/components/RemovalGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -1011,6 +1012,7 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
     case 'motiongen': return ToolType.MOTION_GEN;
+    case 'removalgen': return ToolType.REMOVAL_GEN;
     default: return null;
   }
 };
@@ -3386,7 +3388,7 @@ const App: React.FC = () => {
                   modelParam = selectedNvidiaModel;
               } else if (selectedProvider === 'aivene') {
                   if (selectedAiveneModel === 'auto') {
-                      const stableModels = ['gpt-4o-mini', 'gemini-3.5-flash', 'deepseek-v4-flash', 'qwen3.5-flash'];
+                      const stableModels = ['gpt-4o-mini', 'gemini-3.6-flash', 'gemini-3.5-flash', 'deepseek-v4-flash', 'qwen3.5-flash'];
                       modelParam = stableModels[Math.floor(Math.random() * stableModels.length)];
                   } else {
                       modelParam = selectedAiveneModel;
@@ -3563,7 +3565,7 @@ const App: React.FC = () => {
                     modelParam = selectedNvidiaModel;
                 } else if (selectedProvider === 'aivene') {
                     if (selectedAiveneModel === 'auto') {
-                        const stableModels = ['gpt-4o-mini', 'gemini-3.5-flash', 'deepseek-v4-flash', 'qwen3.5-flash'];
+                        const stableModels = ['gpt-4o-mini', 'gemini-3.6-flash', 'gemini-3.5-flash', 'deepseek-v4-flash', 'qwen3.5-flash'];
                         modelParam = stableModels[Math.floor(Math.random() * stableModels.length)];
                     } else {
                         modelParam = selectedAiveneModel;
@@ -4457,6 +4459,16 @@ const App: React.FC = () => {
               isLicensed={isMzLicensed}
               dailyGenCount={dailyGenCounts[ToolType.MOTION_GEN] || 0}
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MOTION_GEN, amount)}
+              setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
+              aiOptions={commonAiOptions}
+            />
+          ) : activeTool === ToolType.REMOVAL_GEN ? (
+            <RemovalGenView 
+              t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.REMOVAL_GEN] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.REMOVAL_GEN, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
               aiOptions={commonAiOptions}
