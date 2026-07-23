@@ -103,7 +103,13 @@ const CHECK_ITEMS = [
   { key: 'low_framerate', label: 'Low framerate', desc: 'Mendeteksi kecepatan bingkai video yang rendah.' },
   { key: 'visible_transitions', label: 'Visible transitions', desc: 'Mendeteksi transisi, efek, atau efek overlay yang terlihat jelas.' },
   { key: 'log_profile', label: 'Log profile / Flat Color', desc: 'Mendeteksi video dengan gamma logaritmik tanpa penyesuaian warna.' },
-  { key: 'upscaled_video', label: 'Upscaled video', desc: 'Mendeteksi peningkatan resolusi paksa (misal dari HD ke 4K).' }
+  { key: 'upscaled_video', label: 'Upscaled video', desc: 'Mendeteksi peningkatan resolusi paksa (misal dari HD ke 4K).' },
+  { key: 'motion_consistency', label: 'Motion consistency', desc: 'Mendeteksi gerakan patah-patah, skipping frame, atau kecepatan tidak natural.' },
+  { key: 'ghosting', label: 'Ghosting', desc: 'Mendeteksi jejak bayangan ganda di belakang objek bergerak.' },
+  { key: 'geometry_consistency', label: 'Geometry consistency', desc: 'Mendeteksi garis lurus melengkung, bangunan bengkok, atau struktur tidak stabil.' },
+  { key: 'visual_quality', label: 'Visual quality', desc: 'Menilai kualitas visual keseluruhan — ketajaman, estetika, nilai komersial.' },
+  { key: 'flickering', label: 'Flickering', desc: 'Mendeteksi kedipan atau perubahan kecerahan yang berulang cepat.' },
+  { key: 'ai_artifact', label: 'AI artifacts', desc: 'Mendeteksi gabungan cacat generative AI — morphing, distorsi, tekstur meleleh.' }
 ];
 
 export const VideoQualityCheck: React.FC<{ 
@@ -327,7 +333,7 @@ export const VideoQualityCheck: React.FC<{
         }
       }
 
-      const activeModel = aiOptions?.model || 'gemini-3.1-flash-lite';
+      const activeModel = aiOptions?.model || 'gemini-3.5-flash';
 
       if (uploadedUrl) {
         response = await fetch('/api/check-video-quality', {
