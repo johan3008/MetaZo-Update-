@@ -5453,14 +5453,12 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       }
     }
 
-    // 4. Analisis Semantik Teks & Catatan AI: Jika AI menyebutkan adanya isu kualitas atau green screen / chroma key / background solid dalam teks feedback/catatan, paksa menjadi FAIL (Quality Issues).
+    // 4. Analisis Semantik Teks & Catatan AI: Jika AI menyebutkan adanya isu kualitas dalam teks feedback/catatan, paksa menjadi FAIL (Quality Issues).
     const combinedFeedbackText = `${parsedResult.detailed_feedback || ''} ${parsedResult.visual_scan_analysis || ''} ${JSON.stringify(parsedResult.quality_checks || {})}`.toLowerCase();
     const qualityIssueKeywords = [
       'noise', 'compression', 'banding', 'artifact', 'morph', 'flicker', 'blur', 'grain', 
-      'quality', 'reject', 'issue', 'cacat', 'kompresi', 'bintik', 'buram', 'kedipan', 
-      'macro-blocking', 'pixelated', 'soft', 'out of focus', 'distortion', 'warping',
-      'green screen', 'chroma key', 'green backdrop', 'blue screen', 'solid background', 
-      'background spill', 'backdrop', 'screen background'
+      'quality reject', 'severe issue', 'cacat', 'kompresi parah', 'bintik berlebih', 'buram', 'kedipan parah', 
+      'macro-blocking', 'pixelated', 'soft focus', 'out of focus', 'severe distortion', 'warping'
     ];
     const foundKeywords = qualityIssueKeywords.filter(kw => combinedFeedbackText.includes(kw));
     if (foundKeywords.length > 0 && !combinedFeedbackText.includes('tidak ada isu') && !combinedFeedbackText.includes('tanpa cacat') && !combinedFeedbackText.includes('no issues')) {
