@@ -4069,16 +4069,16 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       ];
       
       // 1. Cek apakah ada daftar technical_issues eksplisit yang dideklarasikan oleh model Vision
-      if (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0) {
-        // Hanya tandai jika technical_issues tidak sekadar berisi ucapan "None" / "Tidak ada"
-        const realIssues = parsedResult.technical_issues.filter((issue: string) => {
-          const lower = issue.toLowerCase();
-          return !lower.includes('none') && !lower.includes('tidak ada') && !lower.includes('no issues') && !lower.includes('clean');
-        });
-        if (realIssues.length > 0) {
-          anyFail = true;
-          hasCriticalFail = true;
-        }
+      const realTechnicalIssuesImg = Array.isArray(parsedResult.technical_issues) 
+        ? parsedResult.technical_issues.filter((issue: string) => {
+            const lower = String(issue || '').toLowerCase();
+            return !lower.includes('none') && !lower.includes('tidak ada') && !lower.includes('no issue') && !lower.includes('clean') && !lower.includes('n/a');
+          }) 
+        : [];
+
+      if (realTechnicalIssuesImg.length > 0) {
+        anyFail = true;
+        hasCriticalFail = true;
       }
 
       // 2. Evaluasi item pemeriksaan terstruktur (ai_vision_checks)
@@ -4098,7 +4098,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       }
       
       // Terapkan Keputusan Akhir Status: Jika Ada Masalah Quality Issue / IP / Technical Issues -> FAIL, Jika Bersih 100% -> PASS
-      if (anyFail || hasCriticalFail || anyIpFail || (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0)) {
+      if (anyFail || hasCriticalFail || anyIpFail || realTechnicalIssuesImg.length > 0) {
         parsedResult.recommendation = "FAIL";
         parsedResult.adobe_stock_readiness = "Reject Risk";
         if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 52;
@@ -5266,23 +5266,23 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
 
       // 1. Integrasi Langsung Analisa Teknis Objektif (FFmpeg & Piksel) jika tersedia
       if (videoTechnicalReport) {
-        if (videoTechnicalReport.filters?.black_frames_detected) {
+        if (videoTechnicalReport.filters?.black_frames_detected && Array.isArray(videoTechnicalReport.filters.black_frames) && videoTechnicalReport.filters.black_frames.some((bf: any) => bf.duration >= 0.5)) {
           hasCriticalFail = true;
           anyFail = true;
           parsedResult.quality_checks.black_frame = {
             status: 'FAIL',
-            note: 'Terdeteksi black frame pada linimasa video oleh filter FFmpeg.'
+            note: 'Terdeteksi black frame berdurasi > 0.5 detik pada linimasa video.'
           };
         }
-        if (videoTechnicalReport.filters?.frozen_frames_detected) {
+        if (videoTechnicalReport.filters?.frozen_frames_detected && Array.isArray(videoTechnicalReport.filters.frozen_frames) && videoTechnicalReport.filters.frozen_frames.some((ff: any) => ff.duration >= 1.5)) {
           hasCriticalFail = true;
           anyFail = true;
           parsedResult.quality_checks.frozen_frame = {
             status: 'FAIL',
-            note: 'Terdeteksi frame beku/stuck pada linimasa video oleh filter FFmpeg.'
+            note: 'Terdeteksi frame beku/stuck berdurasi > 1.5 detik pada linimasa video.'
           };
         }
-        if (videoTechnicalReport.stabilityStatus === 'FLICKERING') {
+        if (videoTechnicalReport.stabilityStatus === 'FLICKERING' && videoTechnicalReport.stabilityIndex > 50) {
           hasCriticalFail = true;
           anyFail = true;
           parsedResult.quality_checks.flickering = {
@@ -5290,56 +5290,44 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
             note: 'Fluktuasi kecerahan / kedipan berulang terdeteksi pada rantai frame.'
           };
         }
-        if (videoTechnicalReport.stabilityStatus === 'UNSTABLE' || videoTechnicalReport.stabilityIndex > 15) {
-          hasCriticalFail = true;
-          anyFail = true;
-          parsedResult.quality_checks.camera_shake = {
-            status: 'FAIL',
-            note: 'Guncangan kamera / ketidakstabilan pergerakan terdeteksi pada rantai frame.'
-          };
-        }
         if (Array.isArray(videoTechnicalReport.frameAnalysis) && videoTechnicalReport.frameAnalysis.length > 0) {
-          const softOrBlurredFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.blurStatus === 'BLURRED' || f.blurStatus === 'SOFT' || f.sharpness < 45);
-          if (softOrBlurredFrames.length > 0) {
+          // Hanya beri bendera jika ketajaman benar-benar sangat parah (sharpness < 8) dan blurStatus BLURRED
+          const severeBlurFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.blurStatus === 'BLURRED' && f.sharpness < 8);
+          if (severeBlurFrames.length > 0) {
             hasCriticalFail = true;
             anyFail = true;
             parsedResult.quality_checks.blur = {
               status: 'FAIL',
-              note: `Pemeriksaan Laplacian piksel mendeteksi ${softOrBlurredFrames.length} keyframe mengalami soft-focus/kurang tajam (sharpness < 45).`
-            };
-            parsedResult.quality_checks.out_of_focus = {
-              status: 'FAIL',
-              note: 'Subjek utama terdeteksi soft-focus atau meleset dari ketajaman standar Adobe Stock (Lack of Pin-Sharpness).'
+              note: `Pemeriksaan piksel mendeteksi ${severeBlurFrames.length} keyframe mengalami severe blur / out-of-focus.`
             };
           }
-          const overexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.overexposurePercent > 12);
-          if (overexpFrames.length > 0) {
+          const severeOverexp = videoTechnicalReport.frameAnalysis.filter((f: any) => f.overexposurePercent > 45);
+          if (severeOverexp.length > 0) {
             hasCriticalFail = true;
             anyFail = true;
             parsedResult.quality_checks.overexposure = {
               status: 'FAIL',
-              note: `Pemeriksaan kecerahan piksel mendeteksi overexposure / blown highlights pada ${overexpFrames.length} keyframe.`
+              note: `Pemeriksaan kecerahan piksel mendeteksi severe overexposure (>45% blown highlights).`
             };
           }
-          const underexpFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.underexposurePercent > 18);
-          if (underexpFrames.length > 0) {
+          const severeUnderexp = videoTechnicalReport.frameAnalysis.filter((f: any) => f.underexposurePercent > 50);
+          if (severeUnderexp.length > 0) {
             hasCriticalFail = true;
             anyFail = true;
             parsedResult.quality_checks.underexposure = {
               status: 'FAIL',
-              note: `Pemeriksaan kecerahan piksel mendeteksi underexposure / crushed shadows pada ${underexpFrames.length} keyframe.`
+              note: `Pemeriksaan kecerahan piksel mendeteksi severe underexposure (>50% crushed shadows).`
             };
           }
         }
         if (videoTechnicalReport.ffprobe) {
           const bitrateMbps = (videoTechnicalReport.ffprobe.bitrate || 0) / 1000000;
-          const height = videoTechnicalReport.ffprobe.video?.height || 0;
-          if (bitrateMbps > 0 && ((height >= 1080 && bitrateMbps < 12) || (height >= 2160 && bitrateMbps < 30))) {
+          if (bitrateMbps > 0 && bitrateMbps < 1.0) {
             hasCriticalFail = true;
             anyFail = true;
             parsedResult.quality_checks.compression_artifacts = {
               status: 'FAIL',
-              note: `Bitrate video (${bitrateMbps.toFixed(1)} Mbps) terlalu rendah untuk standar komersial Adobe Stock (min 15 Mbps untuk 1080p, 35 Mbps untuk 4K).`
+              note: `Bitrate video (${bitrateMbps.toFixed(2)} Mbps) sangat rendah sehingga mengalami kompresi/makroblok parah.`
             };
           }
         }
