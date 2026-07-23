@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Eraser, Sparkles, Upload, Download, Trash2, Play, Pause, RefreshCw, 
   CheckCircle2, AlertCircle, Eye, Sliders, Zap, Video, ImageIcon, Wand2, 
-  Layers, Film, Check, X, ShieldAlert, ArrowRight, CornerDownRight, Focus
+  Layers, Film, Check, X, ShieldAlert, ArrowRight, CornerDownRight, Focus,
+  Columns, Split, RotateCcw
 } from 'lucide-react';
 import * as ort from 'onnxruntime-web';
 
@@ -55,9 +56,25 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [hasCustomMask, setHasCustomMask] = useState<boolean>(false);
 
-  // Comparison slider state
+  // Comparison slider & side-by-side mode state
   const [comparisonPos, setComparisonPos] = useState<number>(50);
   const [isComparing, setIsComparing] = useState<boolean>(false);
+  const [comparisonMode, setComparisonMode] = useState<'side-by-side' | 'slider'>('side-by-side');
+
+  // Real-time Frame Processing state (HUD)
+  const [processingFrameInfo, setProcessingFrameInfo] = useState<{
+    currentFrame: number;
+    totalFrames: number;
+    currentTime: number;
+    duration: number;
+  } | null>(null);
+
+  // Synchronized Dual Video Player state
+  const origVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cleanVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [isSyncPlaying, setIsSyncPlaying] = useState<boolean>(false);
+  const [syncTime, setSyncTime] = useState<number>(0);
+  const [syncDuration, setSyncDuration] = useState<number>(0);
 
   // Processing state
   const [isBatchProcessing, setIsBatchProcessing] = useState<boolean>(false);
@@ -83,6 +100,34 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
       });
     };
   }, []);
+
+  // Synchronized Dual Video Player Control Functions
+  const toggleSyncPlay = () => {
+    if (origVideoRef.current && cleanVideoRef.current) {
+      if (isSyncPlaying) {
+        origVideoRef.current.pause();
+        cleanVideoRef.current.pause();
+        setIsSyncPlaying(false);
+      } else {
+        origVideoRef.current.play().catch(() => {});
+        cleanVideoRef.current.play().catch(() => {});
+        setIsSyncPlaying(true);
+      }
+    }
+  };
+
+  const handleSyncSeek = (time: number) => {
+    setSyncTime(time);
+    if (origVideoRef.current) origVideoRef.current.currentTime = time;
+    if (cleanVideoRef.current) cleanVideoRef.current.currentTime = time;
+  };
+
+  const formatVideoTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Handle File Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -398,74 +443,105 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
   const processImageItem = async (item: WatermarkItem): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = async () => {
-        const workCanvas = document.createElement('canvas');
-        const maskCanvas = document.createElement('canvas');
-        
-        workCanvas.width = img.naturalWidth || 1280;
-        workCanvas.height = img.naturalHeight || 720;
-        maskCanvas.width = workCanvas.width;
-        maskCanvas.height = workCanvas.height;
+      // Only set crossOrigin for remote HTTP/HTTPS URLs to prevent CORS errors on blob/data URLs
+      if (item.previewUrl.startsWith('http://') || item.previewUrl.startsWith('https://')) {
+        img.crossOrigin = 'anonymous';
+      }
 
-        const workCtx = workCanvas.getContext('2d');
-        const maskCtx = maskCanvas.getContext('2d');
+      const executeInpainting = async () => {
+        try {
+          const workCanvas = document.createElement('canvas');
+          const maskCanvas = document.createElement('canvas');
+          
+          workCanvas.width = img.naturalWidth || img.width || 1280;
+          workCanvas.height = img.naturalHeight || img.height || 720;
+          maskCanvas.width = workCanvas.width;
+          maskCanvas.height = workCanvas.height;
 
-        if (!workCtx || !maskCtx) {
-          reject(new Error('Gagal menginisialisasi konteks kanvas.'));
-          return;
-        }
+          const workCtx = workCanvas.getContext('2d');
+          const maskCtx = maskCanvas.getContext('2d');
 
-        workCtx.drawImage(img, 0, 0);
+          if (!workCtx || !maskCtx) {
+            reject(new Error('Gagal menginisialisasi konteks kanvas.'));
+            return;
+          }
 
-        // Copy active mask canvas if selected item matches, else apply preset
-        if (selectedItemId === item.id && maskCanvasRef.current) {
-          maskCtx.drawImage(maskCanvasRef.current, 0, 0, workCanvas.width, workCanvas.height);
-        } else {
-          applyPresetToMask(maskCanvas, presetMask);
-        }
+          workCtx.drawImage(img, 0, 0);
 
-        if (activeEngine === 'gemini-ai') {
-          // Gemini AI Vision Inpainting Server Call
-          try {
-            const base64Img = workCanvas.toDataURL('image/jpeg', 0.92);
-            const maskBase64 = maskCanvas.toDataURL('image/png');
+          // Copy active mask canvas if selected item matches, else apply preset
+          if (selectedItemId === item.id && maskCanvasRef.current) {
+            maskCtx.drawImage(maskCanvasRef.current, 0, 0, workCanvas.width, workCanvas.height);
+          } else {
+            applyPresetToMask(maskCanvas, presetMask);
+          }
 
-            const res = await fetch('/api/remove-watermark', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                image: base64Img,
-                mask: maskBase64,
-                preset: presetMask
-              })
-            });
+          if (activeEngine === 'gemini-ai') {
+            // Gemini AI Vision Inpainting Server Call
+            try {
+              const base64Img = workCanvas.toDataURL('image/jpeg', 0.92);
+              const maskBase64 = maskCanvas.toDataURL('image/png');
 
-            if (res.ok) {
-              const data = await res.json();
-              if (data.processedImage) {
-                resolve(data.processedImage);
-                return;
+              const res = await fetch('/api/remove-watermark', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  image: base64Img,
+                  mask: maskBase64,
+                  preset: presetMask
+                })
+              });
+
+              if (res.ok) {
+                const data = await res.json();
+                if (data.processedImage && data.processedImage !== base64Img) {
+                  resolve(data.processedImage);
+                  return;
+                }
+              }
+            } catch (e) {
+              console.warn('[Gemini AI Removal Engine Fallback to Local WebCodecs]', e);
+            }
+          }
+
+          // On-Device Fast Telea / ONNX Canvas Inpainting
+          inpaintCanvasRegion(workCtx, maskCtx, workCanvas.width, workCanvas.height);
+
+          workCanvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              resolve(url);
+            } else {
+              // Fallback to dataURL if toBlob returns null
+              const dataUrl = workCanvas.toDataURL('image/png');
+              if (dataUrl) {
+                resolve(dataUrl);
+              } else {
+                reject(new Error('Gagal mengekspor blob gambar.'));
               }
             }
-          } catch (e) {
-            console.warn('[Gemini AI Removal Engine Fallback to Local WebCodecs]', e);
-          }
+          }, 'image/png');
+        } catch (err: any) {
+          reject(new Error(err.message || 'Gagal memproses gambar.'));
         }
-
-        // On-Device Fast Telea / ONNX Canvas Inpainting
-        inpaintCanvasRegion(workCtx, maskCtx, workCanvas.width, workCanvas.height);
-
-        workCanvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            resolve(url);
-          } else {
-            reject(new Error('Gagal mengekspor blob gambar.'));
-          }
-        }, 'image/png');
       };
-      img.onerror = () => reject(new Error('Gagal memuat gambar.'));
+
+      img.onload = () => executeInpainting();
+
+      img.onerror = () => {
+        // Retry loading once without crossOrigin in case CORS headers were missing
+        if (img.crossOrigin) {
+          console.warn('Image load error with crossOrigin, retrying without crossOrigin...');
+          const retryImg = new Image();
+          retryImg.onload = () => {
+            executeInpainting();
+          };
+          retryImg.onerror = () => reject(new Error('Gagal memuat gambar. Periksa format file.'));
+          retryImg.src = item.previewUrl;
+        } else {
+          reject(new Error('Gagal memuat gambar. Periksa format file.'));
+        }
+      };
+
       img.src = item.previewUrl;
     });
   };
@@ -477,94 +553,151 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
   ): Promise<string> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
+      if (item.previewUrl.startsWith('http://') || item.previewUrl.startsWith('https://')) {
+        video.crossOrigin = 'anonymous';
+      }
       video.muted = true;
       video.playsInline = true;
 
       video.onloadedmetadata = async () => {
-        const width = video.videoWidth || 1280;
-        const height = video.videoHeight || 720;
-        const duration = video.duration || 5;
+        try {
+          const width = video.videoWidth || 1280;
+          const height = video.videoHeight || 720;
+          const duration = video.duration || 5;
 
-        const workCanvas = document.createElement('canvas');
-        const maskCanvas = document.createElement('canvas');
-        workCanvas.width = width;
-        workCanvas.height = height;
-        maskCanvas.width = width;
-        maskCanvas.height = height;
+          const workCanvas = document.createElement('canvas');
+          const maskCanvas = document.createElement('canvas');
+          workCanvas.width = width;
+          workCanvas.height = height;
+          maskCanvas.width = width;
+          maskCanvas.height = height;
 
-        const workCtx = workCanvas.getContext('2d');
-        const maskCtx = maskCanvas.getContext('2d');
+          const workCtx = workCanvas.getContext('2d');
+          const maskCtx = maskCanvas.getContext('2d');
 
-        if (!workCtx || !maskCtx) {
-          reject(new Error('Gagal membuat kanvas video.'));
-          return;
-        }
-
-        // Prepare mask
-        if (selectedItemId === item.id && maskCanvasRef.current) {
-          maskCtx.drawImage(maskCanvasRef.current, 0, 0, width, height);
-        } else {
-          applyPresetToMask(maskCanvas, presetMask);
-        }
-
-        // Setup MediaRecorder for WebCodecs Canvas Stream Encoding
-        const stream = workCanvas.captureStream(30);
-        let mimeType = 'video/webm;codecs=vp9';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm';
-        }
-
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType,
-          videoBitsPerSecond: 8000000 // 8 Mbps high quality
-        });
-
-        const chunks: Blob[] = [];
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) chunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/mp4' });
-          const url = URL.createObjectURL(blob);
-          resolve(url);
-        };
-
-        mediaRecorder.start();
-
-        const fps = 30;
-        const totalFrames = Math.max(Math.floor(duration * fps), 30);
-        let currentFrame = 0;
-
-        const processNextFrame = () => {
-          if (currentFrame >= totalFrames) {
-            mediaRecorder.stop();
+          if (!workCtx || !maskCtx) {
+            reject(new Error('Gagal membuat kanvas video.'));
             return;
           }
 
-          const currentTime = (currentFrame / totalFrames) * duration;
-          video.currentTime = currentTime;
-        };
+          // Prepare mask
+          if (selectedItemId === item.id && maskCanvasRef.current) {
+            maskCtx.drawImage(maskCanvasRef.current, 0, 0, width, height);
+          } else {
+            applyPresetToMask(maskCanvas, presetMask);
+          }
 
-        video.onseeked = () => {
-          workCtx.drawImage(video, 0, 0, width, height);
-          inpaintCanvasRegion(workCtx, maskCtx, width, height);
+          const chunks: Blob[] = [];
+          let mediaRecorder: MediaRecorder | null = null;
+          let recordedType = 'video/webm';
 
-          currentFrame++;
-          const progress = Math.min(Math.round((currentFrame / totalFrames) * 100), 100);
-          onProgress(progress);
+          if (typeof workCanvas.captureStream === 'function' && typeof MediaRecorder !== 'undefined') {
+            try {
+              const stream = workCanvas.captureStream(30);
+              const supportedTypes = [
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm',
+                'video/mp4'
+              ];
+              for (const type of supportedTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                  recordedType = type;
+                  break;
+                }
+              }
 
-          // Render next frame asynchronously with microtask yielding for low-end mobile & PC CPUs
-          setTimeout(() => {
-            requestAnimationFrame(processNextFrame);
-          }, 0);
-        };
+              mediaRecorder = new MediaRecorder(stream, {
+                mimeType: recordedType,
+                videoBitsPerSecond: 8000000 // 8 Mbps high quality
+              });
 
-        processNextFrame();
+              mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) chunks.push(e.data);
+              };
+
+              mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: recordedType });
+                const url = URL.createObjectURL(blob);
+                resolve(url);
+              };
+
+              mediaRecorder.onerror = (e: any) => {
+                console.warn('MediaRecorder error:', e);
+              };
+
+              mediaRecorder.start();
+            } catch (recorderErr) {
+              console.warn('MediaRecorder init failed, fallback to canvas export:', recorderErr);
+            }
+          }
+
+          const fps = 30;
+          const totalFrames = Math.max(Math.floor(duration * fps), 15);
+          let currentFrame = 0;
+
+          const renderFrame = () => {
+            workCtx.drawImage(video, 0, 0, width, height);
+            inpaintCanvasRegion(workCtx, maskCtx, width, height);
+
+            // Live Canvas Update: Render inpainted frame to main canvas live so user sees frame-by-frame progress
+            if (canvasRef.current) {
+              const displayCtx = canvasRef.current.getContext('2d');
+              if (displayCtx) {
+                displayCtx.drawImage(workCanvas, 0, 0, canvasRef.current.width, canvasRef.current.height);
+              }
+            }
+
+            currentFrame++;
+            const currentTime = (currentFrame / totalFrames) * duration;
+            setProcessingFrameInfo({
+              currentFrame,
+              totalFrames,
+              currentTime,
+              duration
+            });
+
+            const progress = Math.min(Math.round((currentFrame / totalFrames) * 100), 100);
+            onProgress(progress);
+
+            if (currentFrame >= totalFrames) {
+              if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+              } else {
+                workCanvas.toBlob((blob) => {
+                  if (blob) {
+                    resolve(URL.createObjectURL(blob));
+                  } else {
+                    resolve(workCanvas.toDataURL('image/png'));
+                  }
+                }, 'image/png');
+              }
+              return;
+            }
+
+            const nextTime = (currentFrame / totalFrames) * duration;
+            if (Math.abs(video.currentTime - nextTime) < 0.001) {
+              setTimeout(renderFrame, 16);
+            } else {
+              video.currentTime = nextTime;
+            }
+          };
+
+          video.onseeked = () => {
+            setTimeout(renderFrame, 0);
+          };
+
+          // Offset video currentTime slightly from 0 so browser reliably fires 'onseeked' for frame 0
+          video.currentTime = 0.001;
+        } catch (err: any) {
+          reject(new Error(err.message || 'Gagal memproses video.'));
+        }
       };
 
-      video.onerror = () => reject(new Error('Gagal memuat berkas video.'));
+      video.onerror = () => {
+        reject(new Error('Gagal memuat berkas video. Periksa format video.'));
+      };
+
       video.src = item.previewUrl;
     });
   };
@@ -605,6 +738,8 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
         status: 'error',
         error: err.message || 'Gagal menghapus watermark'
       } : i));
+    } finally {
+      setProcessingFrameInfo(null);
     }
   };
 
@@ -749,63 +884,238 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
                     style={{ pointerEvents: isComparing ? 'none' : 'auto' }}
                   />
 
-                  {/* Before/After Split View Comparison Overlay */}
+                  {/* Before/After View Comparison Overlay */}
                   {isComparing && selectedItem.processedUrl && (
-                    <div className="absolute inset-0 z-30 overflow-hidden flex items-center justify-center p-2">
-                      <div className="relative w-full h-full max-h-[560px] overflow-hidden rounded-xl">
-                        {/* Processed (After) Image */}
-                        <img 
-                          src={selectedItem.processedUrl} 
-                          alt="Processed Result" 
-                          className="absolute inset-0 w-full h-full object-contain"
-                        />
+                    <div className="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md rounded-xl p-3 flex flex-col overflow-hidden">
+                      {/* Header Mode Switcher & Close button */}
+                      <div className="flex items-center justify-between pb-2 border-b border-white/10 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setComparisonMode('side-by-side')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                              comparisonMode === 'side-by-side'
+                                ? 'bg-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/20'
+                                : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                            }`}
+                          >
+                            <Columns className="w-3.5 h-3.5" />
+                            Side-by-Side (Berdampingan)
+                          </button>
 
-                        {/* Original (Before) Clip Container */}
-                        <div 
-                          className="absolute inset-y-0 left-0 overflow-hidden border-r-2 border-fuchsia-500 shadow-2xl"
-                          style={{ width: `${comparisonPos}%` }}
-                        >
-                          <img 
-                            src={selectedItem.previewUrl} 
-                            alt="Original" 
-                            className="absolute top-0 left-0 max-w-none h-full object-contain"
-                            style={{ width: containerRef.current?.clientWidth }}
-                          />
-                          <span className="absolute top-3 left-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-md text-[10px] font-black text-white uppercase tracking-wider">
-                            Original (Watermark)
-                          </span>
+                          <button
+                            onClick={() => setComparisonMode('slider')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                              comparisonMode === 'slider'
+                                ? 'bg-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/20'
+                                : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                            }`}
+                          >
+                            <Split className="w-3.5 h-3.5" />
+                            Split Slider Drag
+                          </button>
                         </div>
 
-                        <span className="absolute top-3 right-3 bg-fuchsia-600/80 backdrop-blur px-2.5 py-1 rounded-md text-[10px] font-black text-white uppercase tracking-wider">
-                          Clean (Removal Gen)
-                        </span>
+                        <button
+                          onClick={() => setIsComparing(false)}
+                          className="p-1.5 px-3 rounded-lg bg-white/10 text-slate-300 hover:bg-white/20 hover:text-white text-xs font-bold flex items-center gap-1"
+                        >
+                          <X className="w-4 h-4" />
+                          Tutup
+                        </button>
+                      </div>
 
-                        {/* Slider Handle */}
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={comparisonPos}
-                          onChange={(e) => setComparisonPos(Number(e.target.value))}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-40"
-                        />
+                      {/* Comparison Body */}
+                      <div className="flex-1 min-h-0 py-2 relative overflow-hidden flex flex-col justify-center">
+                        {comparisonMode === 'side-by-side' ? (
+                          <div className="w-full h-full flex flex-col justify-between space-y-2">
+                            {/* Side-by-Side Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
+                              {/* Left: Original (With Watermark) */}
+                              <div className="bg-slate-900/90 rounded-xl border border-rose-500/30 p-2 flex flex-col relative overflow-hidden">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                    📍 Original (Ada Watermark)
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-h-0 flex items-center justify-center relative bg-black/40 rounded-lg overflow-hidden">
+                                  {selectedItem.type === 'video' ? (
+                                    <video
+                                      ref={origVideoRef}
+                                      src={selectedItem.previewUrl}
+                                      onTimeUpdate={() => {
+                                        if (origVideoRef.current) {
+                                          setSyncTime(origVideoRef.current.currentTime);
+                                          if (origVideoRef.current.duration) setSyncDuration(origVideoRef.current.duration);
+                                        }
+                                      }}
+                                      className="max-w-full max-h-full object-contain rounded-lg"
+                                      playsInline
+                                      muted
+                                    />
+                                  ) : (
+                                    <img
+                                      src={selectedItem.previewUrl}
+                                      alt="Original Watermark"
+                                      className="max-w-full max-h-full object-contain rounded-lg"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right: Clean Result (No Watermark) */}
+                              <div className="bg-slate-900/90 rounded-xl border border-emerald-500/30 p-2 flex flex-col relative overflow-hidden">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                    ✨ Clean Result (Removal Gen)
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-h-0 flex items-center justify-center relative bg-black/40 rounded-lg overflow-hidden">
+                                  {selectedItem.type === 'video' ? (
+                                    <video
+                                      ref={cleanVideoRef}
+                                      src={selectedItem.processedUrl}
+                                      className="max-w-full max-h-full object-contain rounded-lg"
+                                      playsInline
+                                      muted
+                                    />
+                                  ) : (
+                                    <img
+                                      src={selectedItem.processedUrl}
+                                      alt="Clean Result"
+                                      className="max-w-full max-h-full object-contain rounded-lg"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Synchronized Player Bar (For Video Comparison) */}
+                            {selectedItem.type === 'video' && (
+                              <div className="bg-slate-900/90 p-2.5 rounded-xl border border-white/10 flex items-center gap-3 shrink-0">
+                                <button
+                                  onClick={toggleSyncPlay}
+                                  className="p-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold transition-all shrink-0 flex items-center gap-1.5 text-xs"
+                                >
+                                  {isSyncPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+                                  {isSyncPlaying ? 'Pause Sync' : 'Play Both'}
+                                </button>
+
+                                <button
+                                  onClick={() => handleSyncSeek(0)}
+                                  className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-all shrink-0"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </button>
+
+                                {/* Time scrubber */}
+                                <div className="flex-1 flex items-center gap-2">
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max={syncDuration || 100}
+                                    step="0.05"
+                                    value={syncTime}
+                                    onChange={(e) => handleSyncSeek(Number(e.target.value))}
+                                    className="w-full accent-fuchsia-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                                  />
+                                  <span className="text-[11px] font-mono font-bold text-slate-300 shrink-0">
+                                    {formatVideoTime(syncTime)} / {formatVideoTime(syncDuration)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Split Slider Mode */
+                          <div className="relative w-full h-full max-h-[520px] overflow-hidden rounded-xl flex items-center justify-center">
+                            {/* Processed (After) Image */}
+                            <img
+                              src={selectedItem.processedUrl}
+                              alt="Processed Result"
+                              className="absolute inset-0 w-full h-full object-contain"
+                            />
+
+                            {/* Original (Before) Clip Container */}
+                            <div
+                              className="absolute inset-y-0 left-0 overflow-hidden border-r-2 border-fuchsia-500 shadow-2xl"
+                              style={{ width: `${comparisonPos}%` }}
+                            >
+                              <img
+                                src={selectedItem.previewUrl}
+                                alt="Original"
+                                className="absolute top-0 left-0 max-w-none h-full object-contain"
+                                style={{ width: containerRef.current?.clientWidth }}
+                              />
+                              <span className="absolute top-3 left-3 bg-black/70 backdrop-blur border border-rose-500/30 px-2.5 py-1 rounded-md text-[10px] font-black text-rose-400 uppercase tracking-wider">
+                                Original (Watermark)
+                              </span>
+                            </div>
+
+                            <span className="absolute top-3 right-3 bg-fuchsia-600/90 backdrop-blur px-2.5 py-1 rounded-md text-[10px] font-black text-white uppercase tracking-wider">
+                              Clean (Removal Gen)
+                            </span>
+
+                            {/* Slider Handle */}
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={comparisonPos}
+                              onChange={(e) => setComparisonPos(Number(e.target.value))}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-40"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Status Overlay */}
+                  {/* Status Overlay with Real-time Frame HUD */}
                   {selectedItem.status === 'processing' && (
-                    <div className="absolute inset-0 bg-black/75 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 text-center">
-                      <div className="w-16 h-16 rounded-full border-4 border-fuchsia-500/20 border-t-fuchsia-500 animate-spin mb-4" />
-                      <h3 className="text-lg font-black text-white">Memproses Watermark Removal...</h3>
-                      <p className="text-xs text-slate-400 font-mono mt-1 mb-4">
-                        {selectedItem.type === 'video' ? `Memproses frame video (${selectedItem.progress}%)` : 'Menghapus watermark piksel...'}
-                      </p>
-                      <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 transition-all duration-300"
-                          style={{ width: `${selectedItem.progress}%` }}
-                        />
+                    <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] z-50 flex flex-col justify-between p-4 pointer-events-none">
+                      {/* TOP LIVE FRAME HUD */}
+                      <div className="flex items-center justify-between bg-slate-900/90 backdrop-blur-md border border-fuchsia-500/30 p-3 rounded-2xl shadow-2xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-fuchsia-500/20 border border-fuchsia-500/40 flex items-center justify-center shrink-0">
+                            <Film className="w-4 h-4 text-fuchsia-400 animate-pulse" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-white">
+                                ⚡ Real-Time Inpainting Active
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold animate-pulse">
+                                Live Frame
+                              </span>
+                            </div>
+                            {processingFrameInfo ? (
+                              <p className="text-[11px] text-slate-300 font-mono">
+                                Frame <strong className="text-fuchsia-400">{processingFrameInfo.currentFrame}</strong> / {processingFrameInfo.totalFrames} • Durasi: {processingFrameInfo.currentTime.toFixed(1)}s / {processingFrameInfo.duration.toFixed(1)}s
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-slate-400 font-mono">Menyiapkan frame kanvas...</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right font-mono">
+                          <span className="text-lg font-black text-fuchsia-400">{selectedItem.progress}%</span>
+                        </div>
+                      </div>
+
+                      {/* BOTTOM PROGRESS BAR */}
+                      <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-2xl shadow-2xl flex flex-col items-center gap-2">
+                        <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5">
+                          <div
+                            className="h-full bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 rounded-full transition-all duration-150"
+                            style={{ width: `${selectedItem.progress}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-300">
+                          {selectedItem.type === 'video'
+                            ? 'Memproses & mengekstrak watermark tiap frame video secara langsung...'
+                            : 'Menghapus watermark piksel gambar...'}
+                        </p>
                       </div>
                     </div>
                   )}
