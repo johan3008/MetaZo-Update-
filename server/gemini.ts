@@ -5182,20 +5182,36 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   }
 
   const frameCount = frames ? frames.length : 0;
-    const evalText = `You are examining ${frameCount} keyframes extracted at strategic points across this video's duration. Examine EACH frame carefully — zoom into pixel-level detail.
 
-For EVERY quality_checks category in your schema:
-1. LOOK at the frames and video for actual visual evidence.
-2. If you SEE the defect → FAIL with specific, detailed note describing what you see.
-3. If you DON'T see the defect → PASS.
-4. If the category does not apply → UNKNOWN with explanation.
+  // 🔍 PRE-SCREENING: check for AI upscale indicators from technical metadata
+  let aiContextNote = '';
+  if (videoMetadata) {
+    const meta = typeof videoMetadata === 'string' ? JSON.parse(videoMetadata) : videoMetadata;
+    const encoder = meta?.encoder || meta?.Streams?.[0]?.encoder || '';
+    const isLavEncoded = /Lav[cf]/.test(encoder);
+    const highBitrate = meta?.bitrate && meta?.duration && (meta.bitrate / (meta.duration * 1000) > 5000);
+    if (isLavEncoded || highBitrate) {
+      aiContextNote = '\n\n⚠️ TECHNICAL CONTEXT: Video metadata (encoder: ' + encoder + ', high bitrate) suggests this may be AI-generated or AI-upscaled content. Pay EXTRA attention to: (1) over-sharpened edges with white halos, (2) unnaturally smooth/waxy skin textures, (3) inconsistent detail levels (some areas sharp, some blurred), (4) temporal texture warping between frames. These are classic AI upscale defects that Adobe Stock rejects.';
+    }
+  }
+
+    const evalText = `You are examining ${frameCount} keyframes extracted at strategic points across this video's duration.${aiContextNote}
+
+🔍 ANALYSIS METHOD (follow strictly):
+1. Examine EACH individual frame at pixel level — zoom in mentally to 200-400%.
+2. COMPARE adjacent frames (frame 1→2, 2→3, 3→4...) for temporal changes — look for morphing, texture warping, flickering, ghosting between frames.
+3. Check the raw video for motion-related defects that static frames miss.
+
+For EVERY quality_checks category:
+- SEE the defect → FAIL with specific pixel-level description
+- DON'T see the defect → PASS
+- Category doesn't apply → UNKNOWN with reason
 
 ⚠️ MANDATORY:
-- Do NOT skip any category. Verify each one against the visual evidence.
-- Be OBJECTIVE. Base every decision on what you actually see in the frames.
-- If the video has ANY real quality issues that would cause Adobe Stock rejection → FAIL (score 0-69).
-- If the video is TRULY clean across ALL checks → PASS (score 75-95).
-- This applies to ALL videos equally. No exceptions.
+- Do NOT skip any category. Verify each one against actual visual evidence.
+- Any real quality issues that would cause Adobe Stock rejection → FAIL (score 0-69)
+- Truly clean across ALL checks → PASS (score 75-95)
+- This standard applies equally to ALL videos.
 
 Response in ${language}.`;
 
