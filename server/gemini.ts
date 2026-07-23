@@ -4021,7 +4021,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const activeModel = model || 'gemini-3.5-flash';
+    const activeModel = model || 'gemini-3.6-flash';
 
     const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
     
@@ -5208,7 +5208,8 @@ IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overa
       console.error(`[checkVideoQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
+    const activeModel = model || 'gemini-3.6-flash';
+    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       try {
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: evalText }] }, {
