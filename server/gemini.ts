@@ -2990,9 +2990,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  // 🔒 SINGLE MODEL — gemini-2.5-pro only
-  const SINGLE_FIXED_MODEL = 'gemini-2.5-pro';
-  const modelsToTry = ['gemini-2.5-pro']; // Locked — no fallback
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
   const safetySettings = [
@@ -3041,7 +3039,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     }
   } else {
     // If user explicitly provided a Gemini model via `model`, use it as primary, else default fallback chain
-    const modelToUse = model && model.startsWith("gemini") ? model : SINGLE_FIXED_MODEL;
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       let attempts = 0;
       const maxAttempts = 2;
@@ -3515,15 +3513,13 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  // 🔒 SINGLE MODEL — gemini-2.5-pro only
-  const SINGLE_FIXED_MODEL = 'gemini-2.5-pro';
-  const modelsToTry = ['gemini-2.5-pro']; // Locked — no fallback
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
   let responseText = "";
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
-  const modelToUse = model && model.startsWith("gemini") ? model : SINGLE_FIXED_MODEL;
+  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
       response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
@@ -3608,14 +3604,12 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  // 🔒 SINGLE MODEL — gemini-2.5-pro only
-  const SINGLE_FIXED_MODEL = 'gemini-2.5-pro';
-  const modelsToTry = ['gemini-2.5-pro']; // Locked — no fallback
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
-  const modelToUse = model && model.startsWith("gemini") ? model : SINGLE_FIXED_MODEL;
+  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
       const res = await callGeminiWithRetry(modelName, { parts }, {
@@ -4001,15 +3995,13 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // 🔒 SINGLE FIXED MODEL — NO FALLBACK (accuracy > availability)
-  // Using gemini-2.5-pro for maximum visual accuracy and AI artifact detection.
-  // Fallback to weaker models causes false PASS on AI-generated/upscaled videos.
-  const SINGLE_FIXED_MODEL = model && model.startsWith('gemini') ? model : 'gemini-2.5-pro';
+  // Normalisasi Model ke Seri Resmi Terupdate
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
       let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
@@ -4029,15 +4021,18 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    // 🔒 Single fixed model — retry up to 2 times on the SAME model only, never downgrade
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const activeModel = model || 'gemini-3.5-flash';
+
+    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
+    
+    for (const modelName of modelsToTryList) {
       try {
         let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
         
-        const res = await callGeminiWithRetry(SINGLE_FIXED_MODEL, { parts: [...imageParts, { text: promptText }] }, {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -4049,11 +4044,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         break;
       } catch (err: any) {
         lastError = err;
-        console.warn(`[checkImageQuality] Attempt ${attempt + 1}/2 failed with ${SINGLE_FIXED_MODEL}:`, err.message || err);
+        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
         if (err.message && err.message.includes('API_KEY')) throw err;
-        if (attempt === 0) {
-          console.warn(`[checkImageQuality] Retrying ${SINGLE_FIXED_MODEL} one more time (no model downgrade)...`);
-        }
       }
     }
   }
@@ -4069,8 +4061,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
       
-      // 🔒 Kunci kritis DIPERLUAS — mencakup semua masalah AI/upscale/quality yang umum ditolak Adobe Stock
-      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'ai_upscale', 'flickering', 'motion_consistency', 'ghosting', 'geometry_consistency', 'visual_quality', 'empty_frame', 'black_frame', 'frozen_frame'];
+      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
@@ -5147,7 +5139,11 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
+                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                motion_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                ghosting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                geometry_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                visual_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
             },
             required: [
                 "blur", "noise", "compression_artifacts", "blocking", "banding", 
@@ -5155,7 +5151,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 "camera_shake", "out_of_focus", "flickering", "duplicate_frame",
                 "empty_frame", "black_frame", "frozen_frame", "watermark",
                 "logo", "text", "ai_artifact", "deformed_object", "bad_anatomy",
-                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality"
+                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality",
+                "motion_consistency", "ghosting", "geometry_consistency", "visual_quality"
             ]
         },
         heatmaps: {
@@ -5185,240 +5182,22 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   }
 
   const frameCount = frames ? frames.length : 0;
-  const evalText = `Act as an objective, highly strict Adobe Stock QA Curator and Technical Inspector.
+    const evalText = `You are examining ${frameCount} keyframes extracted at strategic points across this video's duration. Examine EACH frame carefully — zoom into pixel-level detail.
 
-⚠️ CRITICAL: Be ACCURATE, not paranoid. Clean professional videos should PASS. Only FAIL videos with REAL defects.
-
-🔴 GENERATIVE AI ARTIFACTS:
-- Temporal Morphing & Texture Warping: Unphysical shifting, melting, swirling of background/surface textures
-- AI Upscale Artifacts: Over-sharpened halos, plastic/waxy textures, inconsistent detail levels
-- Anatomical Distortions: Uncanny/asymmetrical eyes, faces, hands, limbs
-- Impossible Physics: Objects merging, floating fragments, melting textures during camera movement
-
-🟠 COMPRESSION & NOISE:
-- Macroblocking, banding, digital noise in shadows/sky
-- Chromatic aberration at high-contrast edges
-- Flickering/pulsing brightness artifacts
-
-🟡 TECHNICAL: Overexposure, underexposure, soft focus, camera shake, empty/frozen frames
-
-🔵 LEGAL: Watermarks, logos, trademarks, copyrighted artwork, restricted landmarks
+For EVERY quality_checks category in your schema:
+1. LOOK at the frames and video for actual visual evidence.
+2. If you SEE the defect → FAIL with specific, detailed note describing what you see.
+3. If you DON'T see the defect → PASS.
+4. If the category does not apply → UNKNOWN with explanation.
 
 ⚠️ MANDATORY:
-- BE CONSERVATIVE about AI flags. Unsure = PASS. Natural camera movement = NOT morphing.
-- If AI-generated/upscaled with visible morphing or distortion → ai_artifact=FAIL, upscaled_video=FAIL
-- If video looks natural, clean, and professional → PASS even if AI-assisted (Adobe accepts well-made AI content)
-- Minor noise in dark areas, slight banding in sky, natural motion blur do NOT warrant FAIL in MEDIUM
-- Score clean professional videos 75-95. Score AI videos with visible defects 35-55.
-- Response in ${language}.`;
+- Do NOT skip any category. Verify each one against the visual evidence.
+- Be OBJECTIVE. Base every decision on what you actually see in the frames.
+- If the video has ANY real quality issues that would cause Adobe Stock rejection → FAIL (score 0-69).
+- If the video is TRULY clean across ALL checks → PASS (score 75-95).
+- This applies to ALL videos equally. No exceptions.
 
-  
-  // 🔒 SINGLE FIXED MODEL — NO FALLBACK (accuracy > availability)
-  // Using gemini-2.5-pro for maximum visual accuracy and AI artifact detection.
-  const SINGLE_FIXED_MODEL = model && model.startsWith('gemini') ? model : 'gemini-2.5-pro';
-  let responseText = "";
-  let lastError;
-
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
-    try {
-      responseText = await callOpenAICompatibleWithRetry({
-        systemInstruction,
-        contents: [...imageParts, { text: evalText }],
-        responseMimeType: "application/json",
-        responseSchema,
-        config: { temperature: 0.0 },
-        model: activeModel
-      });
-    } catch (err: any) {
-      lastError = err;
-      console.error(`[checkVideoQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
-    }
-  } else {
-    // 🔒 Single fixed model — retry up to 2 times on the SAME model only, never downgrade
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const res = await callGeminiWithRetry(SINGLE_FIXED_MODEL, { parts: [...imageParts, { text: evalText }] }, {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-          temperature: 0.0,
-          topK: 1,
-          topP: 0.1
-        });
-        responseText = res.text || "{}";
-        break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[checkVideoQuality] Attempt ${attempt + 1}/2 failed with ${SINGLE_FIXED_MODEL}:`, err.message || err);
-        if (err.message && err.message.includes('API_KEY')) throw err;
-        if (attempt === 0) {
-          console.warn(`[checkVideoQuality] Retrying ${SINGLE_FIXED_MODEL} one more time (no model downgrade)...`);
-        }
-      }
-    }
-  }
-
-  if (!responseText) throw lastError;
-  
-  try {
-    const text = responseText;
-    console.log('QA raw video response:', text);
-    const parsedResult = JSON.parse(extractJSON(text));
-    
-    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE) untuk Video
-    if (parsedResult.quality_checks) {
-      let anyFail = false;
-      let anyIpFail = false;
-      let hasCriticalFail = false;
-
-      // 🔒 Critical keys BALANCED — AI/IP/severe technical = auto-FAIL, minor quality = AI discretion
-      const criticalKeys = [
-        'watermark', 'logo', 'text',
-        'ai_artifact', 'bad_anatomy', 'deformed_object', 'flickering',
-        'empty_frame', 'black_frame', 'frozen_frame',
-        'upscaled_video', 'visual_quality'
-      ];
-
-      for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
-        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
-          anyFail = true;
-          if (['watermark', 'logo', 'text'].includes(key)) {
-            anyIpFail = true;
-          }
-          if (criticalKeys.includes(key)) {
-            hasCriticalFail = true;
-          }
-        }
-      }
-
-      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
-      if (tolerance === 'STRICT') {
-        if (anyFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
-          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
-          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
-          parsedResult.adobe_stock_readiness = "Reject Risk";
-        }
-      } else if (tolerance === 'MEDIUM') {
-        if (hasCriticalFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
-          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
-          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
-          parsedResult.adobe_stock_readiness = "Reject Risk";
-        }
-      } else if (tolerance === 'LOOSE') {
-        if (anyIpFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
-          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
-          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
-          parsedResult.adobe_stock_readiness = "Reject Risk";
-        }
-      }
-
-      if (anyIpFail) {
-        parsedResult.legal_status = "VIOLATION";
-      }
-    }
-    
-    return parsedResult;
-  } catch(e) {
-    console.warn("Parse Error:", responseText);
-    throw e;
-  }
-}
-
-
-export async function uploadVideoToGemini(localFilePath: string, mimeType: string = 'video/mp4') {
-  const store = apiKeyStorage.getStore();
-  let key = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  if (store) {
-    if (store.gemini && Array.isArray(store.gemini.keys) && store.gemini.keys.length > 0) {
-      key = store.gemini.keys[store.gemini.activeIndex || 0] || key;
-    } else if (typeof store === 'string') {
-      key = store;
-    } else if (Array.isArray(store.keys) && store.keys.length > 0) {
-      key = store.keys[store.activeIndex || 0] || key;
-    }
-  }
-  
-  if (!key) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
-  
-  const { GoogleGenAI } = require('@google/genai');
-  const ai = new GoogleGenAI({ apiKey: key });
-  
-  console.log('[Gemini File API] Uploading video...', localFilePath);
-  const uploadResult = await ai.files.upload({
-    file: localFilePath,
-    mimeType: mimeType
-  });
-  
-  console.log('[Gemini File API] Upload successful. Waiting for processing... File URI:', uploadResult.uri);
-  
-  let fileInfo = await ai.files.get({ name: uploadResult.name });
-  let attempts = 0;
-  while (fileInfo.state === 'PROCESSING' && attempts < 30) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    fileInfo = await ai.files.get({ name: uploadResult.name });
-    attempts++;
-  }
-  
-  if (fileInfo.state === 'FAILED') {
-    throw new Error("Video processing failed in Gemini API");
-  }
-  
-  return { fileUri: fileInfo.uri, mimeType: fileInfo.mimeType, name: fileInfo.name };
-}
-
-// ============================================================================
-// MOTION GEN (REMOTION) - "Vibe Coding" AI Motion Graphics Generator
-// ============================================================================
-export async function generateMotionCode(
-  userPrompt: string,
-  options?: {
-    currentCode?: string;
-    model?: string;
-    fps?: number;
-    durationSeconds?: number;
-    width?: number;
-    height?: number;
-    history?: { role: 'user' | 'assistant'; content: string }[];
-  }
-) {
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
-  const model = options?.model;
-
-  const fps = options?.fps || 30;
-  const durationInFrames = (options?.durationSeconds || 5) * fps;
-  const width = options?.width || 1920;
-  const height = options?.height || 1080;
-
-  const systemInstruction = `You are "MotionGen AI", an elite senior Motion Graphics Engineer specialized in writing Remotion (React video framework) compositions. You do "vibe coding": the user describes a motion graphics/video idea in plain, casual language (often Indonesian), and you turn it directly into working, polished, production-ready Remotion code. No back-and-forth, no clarifying questions — just ship great code.
-
-STRICT TECHNICAL RULES (the code runs inside a sandboxed in-browser Babel transpiler, NOT a real Node/Remotion project, so it has ONLY 'react' and 'remotion' available as importable modules):
-1. Output EXACTLY ONE React functional component named "MotionComposition" and export it with: export const MotionComposition = () => { ... }
-2. You MAY import ONLY from 'react' and 'remotion'. NEVER import images, fonts, audio, video files, external assets, external npm packages (no framer-motion, no gsap, no three.js, no lottie, no icon libraries), and NEVER use require() for anything other than 'react'/'remotion'.
-3. From 'remotion' you may use: useCurrentFrame, useVideoConfig, interpolate, spring, Easing, AbsoluteFill, Sequence, Series, random, Img (only if using a public https image URL is truly necessary; prefer pure CSS/SVG instead).
-4. Always read fps/width/height/durationInFrames from useVideoConfig() inside the component rather than hardcoding, so the animation adapts to the configured canvas.
-5. Build ALL visuals using inline CSS-in-JS (style objects), CSS gradients, SVG shapes/paths drawn inline, and typography. Do not rely on any external image, logo, or font file.
-6. Animate using frame-driven math: interpolate() for tweening, spring() for bouncy/elastic motion, and Sequence for staged/multi-scene timelines. Extrapolate with 'clamp' unless a loop is intended.
-7. Design like a professional motion designer: clear visual hierarchy, tasteful color palettes/gradients, easing curves (not linear unless intentional), staggered entrances, subtle parallax/depth, and a cohesive theme matching the user's request.
-8. The component MUST be self-contained, deterministic (no Math.random(), no Date.now(); use Remotion's random() with a fixed seed if randomness is needed), and must not use browser-only APIs (no window, document, fetch, setTimeout inside render).
-9. Never use TypeScript type annotations (the sandbox transpiles JSX only, not TS) — write plain modern JavaScript (ES2020+) with JSX.
-10. If the user is asking to MODIFY previously generated code (a "currentCode" is provided below), treat it as the base: keep what already works and only change what the user is asking for, still returning the FULL updated component (never a diff/partial snippet).
-
-Respond ONLY with a JSON object with this exact shape (no markdown fences, no extra commentary):
-{
-  "title": "Short catchy title for this motion graphic (max 6 words, match user's language)",
-  "summary": "One short friendly sentence (in the same language the user used) describing what you built or changed",
-  "code": "the full JSX source code string described above"
-}`;
+Response in ${language}.`;
 
   const contextParts: string[] = [];
   contextParts.push(`Video canvas target: ${width}x${height} px, ${fps} fps, ${durationInFrames} frames total (${(durationInFrames / fps).toFixed(1)} seconds).`);
