@@ -1383,8 +1383,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    if (!activeModel || activeModel.includes('preview') || activeModel === 'gemini-3.1-pro-preview') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite' : 'gemini-3.5-flash';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -5273,7 +5273,7 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
    - If any quality check item is defective or if technical/AI defects are detected, set recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Ensure your entire response is written in ${language}.`;
 
   
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -5453,12 +5453,14 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       }
     }
 
-    // 4. Analisis Semantik Teks & Catatan AI: Jika AI menyebutkan adanya isu kualitas (noise, compression, banding, artifact, morph, flicker, blur, quality, reject, issue, cacat, kompresi) dalam teks feedback/catatan, paksa menjadi FAIL (Quality Issues).
+    // 4. Analisis Semantik Teks & Catatan AI: Jika AI menyebutkan adanya isu kualitas atau green screen / chroma key / background solid dalam teks feedback/catatan, paksa menjadi FAIL (Quality Issues).
     const combinedFeedbackText = `${parsedResult.detailed_feedback || ''} ${parsedResult.visual_scan_analysis || ''} ${JSON.stringify(parsedResult.quality_checks || {})}`.toLowerCase();
     const qualityIssueKeywords = [
       'noise', 'compression', 'banding', 'artifact', 'morph', 'flicker', 'blur', 'grain', 
       'quality', 'reject', 'issue', 'cacat', 'kompresi', 'bintik', 'buram', 'kedipan', 
-      'macro-blocking', 'pixelated', 'soft', 'out of focus', 'distortion', 'warping'
+      'macro-blocking', 'pixelated', 'soft', 'out of focus', 'distortion', 'warping',
+      'green screen', 'chroma key', 'green backdrop', 'blue screen', 'solid background', 
+      'background spill', 'backdrop', 'screen background'
     ];
     const foundKeywords = qualityIssueKeywords.filter(kw => combinedFeedbackText.includes(kw));
     if (foundKeywords.length > 0 && !combinedFeedbackText.includes('tidak ada isu') && !combinedFeedbackText.includes('tanpa cacat') && !combinedFeedbackText.includes('no issues')) {
@@ -5491,6 +5493,14 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       if (parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
       if (parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
       if (parsedResult.visual_score >= 70) parsedResult.visual_score = 58;
+      if (!parsedResult.detailed_feedback || parsedResult.detailed_feedback.toLowerCase().includes('memenuhi standar') || parsedResult.detailed_feedback.toLowerCase().includes('direkomendasikan') || parsedResult.detailed_feedback.toLowerCase().includes('ready')) {
+        parsedResult.detailed_feedback = isIndonesian
+          ? "Klip video ini ditolak (Quality Issues) berdasarkan standar kurasi Adobe Stock Contributor. Terdeteksi adanya artefak kompresi, noise piksel, ketidaskonsistenan fokus, background solid/green screen, atau anomali visual yang tidak memenuhi kriteria kelayakan komersial."
+          : "This video clip is rejected (Quality Issues) based on Adobe Stock Contributor standards due to detected compression artifacts, pixel noise, focus inconsistency, solid background/green screen defects, or visual anomalies.";
+      }
+      if (!parsedResult.technical_issues || parsedResult.technical_issues.length === 0 || parsedResult.technical_issues.some((i: string) => i.toLowerCase().includes('none') || i.toLowerCase().includes('tidak ada') || i.toLowerCase().includes('clean'))) {
+        parsedResult.technical_issues = ["Quality Issues / Compression Artifacts / Noise / Visual Defect"];
+      }
     } else {
       if (parsedResult.overall_score < 75) parsedResult.overall_score = 85;
       if (parsedResult.technical_score < 75) parsedResult.technical_score = 88;
