@@ -4068,47 +4068,24 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         'vector_issues', 'illustration_issues'
       ];
       
-      // 1. Jika ada list technical_issues atau model semula memberikan FAIL / Reject Risk -> WAJIB FAIL
+      // 1. Cek apakah ada daftar technical_issues eksplisit yang dideklarasikan oleh model Vision
       if (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0) {
-        anyFail = true;
-        hasCriticalFail = true;
-      }
-      if (parsedResult.recommendation === 'FAIL' || parsedResult.recommendation === 'REJECT' || parsedResult.adobe_stock_readiness === 'Reject Risk' || parsedResult.adobe_stock_readiness === 'Needs Improvement') {
-        anyFail = true;
-        hasCriticalFail = true;
-      }
-
-      // 2. Guardrail Pemindaian Teks Analisis untuk Istilah Cacat Teknis & Quality Issues
-      const textAnalysisLower = (
-        (parsedResult.visual_scan_analysis || "") + " " +
-        (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
-        (parsedResult.detailed_feedback || "")
-      ).toLowerCase();
-
-      const qualityDefectKeywords = [
-        'soft focus', 'out of focus', 'lack of sharpness', 'kurang tajam', 'buram', 'blur',
-        'noise', 'derau', 'grain', 'bintik', 'compression', 'artifact', 'artefak',
-        'macroblock', 'blocking', 'banding', 'posterization', 'overexposure', 'underexposure',
-        'morph', 'morphing', 'warp', 'warping', 'leleh', 'melt', 'temporal',
-        'flicker', 'flickering', 'kedip', 'shake', 'guncang', 'unstable', 'distortion', 'distorsi',
-        'watermark', 'logo', 'copyright', 'trademark', 'brand', 'merek', 'quality issue', 'quality issues',
-        'ditolak', 'reject', 'defect', 'cacat', 'bad anatomy', 'ai artifact', 'deformed'
-      ];
-
-      const textMentionedQualityDefect = qualityDefectKeywords.some(keyword => textAnalysisLower.includes(keyword));
-      if (textMentionedQualityDefect) {
-        hasCriticalFail = true;
-        anyFail = true;
-        if (parsedResult.ai_vision_checks.ai_artifacts && parsedResult.ai_vision_checks.ai_artifacts.status !== 'FAIL') {
-          parsedResult.ai_vision_checks.ai_artifacts.status = 'FAIL';
-          parsedResult.ai_vision_checks.ai_artifacts.note = 'Terdeteksi indikasi cacat kualitas teknis atau visual dalam analisis AI.';
+        // Hanya tandai jika technical_issues tidak sekadar berisi ucapan "None" / "Tidak ada"
+        const realIssues = parsedResult.technical_issues.filter((issue: string) => {
+          const lower = issue.toLowerCase();
+          return !lower.includes('none') && !lower.includes('tidak ada') && !lower.includes('no issues') && !lower.includes('clean');
+        });
+        if (realIssues.length > 0) {
+          anyFail = true;
+          hasCriticalFail = true;
         }
       }
 
+      // 2. Evaluasi item pemeriksaan terstruktur (ai_vision_checks)
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object') {
           const statusStr = String((value as any).status || '').toUpperCase();
-          if (statusStr === 'FAIL' || statusStr === 'SOFT' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK' || statusStr === 'NEEDS_IMPROVEMENT') {
+          if (statusStr === 'FAIL' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK') {
             anyFail = true;
             if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
               anyIpFail = true;
