@@ -5355,47 +5355,23 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
         'log_profile', 'upscaled_video'
       ];
 
-      // 2. Jika ada list technical_issues dari AI vision model -> WAJIB FAIL
+      // 2. Jika ada list technical_issues dari AI vision model -> WAJIB FAIL jika bukan "none"/"clean"
       if (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0) {
-        anyFail = true;
-        hasCriticalFail = true;
-      }
-      if (parsedResult.recommendation === 'FAIL' || parsedResult.recommendation === 'REJECT' || parsedResult.adobe_stock_readiness === 'Reject Risk' || parsedResult.adobe_stock_readiness === 'Needs Improvement') {
-        anyFail = true;
-        hasCriticalFail = true;
-      }
-
-      // 3. Guardrail Pindai Teks Analisis untuk Istilah Cacat Kualitas Video
-      const textAnalysisLower = (
-        (parsedResult.visual_scan_analysis || "") + " " +
-        (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
-        (parsedResult.detailed_feedback || "")
-      ).toLowerCase();
-
-      const qualityDefectKeywords = [
-        'soft focus', 'out of focus', 'lack of sharpness', 'kurang tajam', 'buram', 'blur',
-        'noise', 'derau', 'grain', 'bintik', 'compression', 'artifact', 'artefak',
-        'macroblock', 'blocking', 'banding', 'posterization', 'overexposure', 'underexposure',
-        'morph', 'morphing', 'warp', 'warping', 'leleh', 'melt', 'temporal',
-        'flicker', 'flickering', 'kedip', 'shake', 'guncang', 'unstable', 'distortion', 'distorsi',
-        'watermark', 'logo', 'copyright', 'trademark', 'brand', 'merek', 'quality issue', 'quality issues',
-        'ditolak', 'reject', 'defect', 'cacat', 'bad anatomy', 'ai artifact', 'deformed'
-      ];
-
-      const textMentionedQualityDefect = qualityDefectKeywords.some(keyword => textAnalysisLower.includes(keyword));
-      if (textMentionedQualityDefect) {
-        hasCriticalFail = true;
-        anyFail = true;
-        if (parsedResult.quality_checks.ai_artifact && parsedResult.quality_checks.ai_artifact.status !== 'FAIL') {
-          parsedResult.quality_checks.ai_artifact.status = 'FAIL';
-          parsedResult.quality_checks.ai_artifact.note = 'Terdeteksi indikasi cacat kualitas teknis/fokus/visual dalam analisis video.';
+        const realIssues = parsedResult.technical_issues.filter((issue: string) => {
+          const lower = String(issue || '').toLowerCase();
+          return !lower.includes('none') && !lower.includes('tidak ada') && !lower.includes('no issues') && !lower.includes('clean');
+        });
+        if (realIssues.length > 0) {
+          anyFail = true;
+          hasCriticalFail = true;
         }
       }
 
+      // 3. Evaluasi item pemeriksaan terstruktur (quality_checks)
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
         if (value && typeof value === 'object') {
           const statusStr = String((value as any).status || '').toUpperCase();
-          if (statusStr === 'FAIL' || statusStr === 'SOFT' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK' || statusStr === 'NEEDS_IMPROVEMENT') {
+          if (statusStr === 'FAIL' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK') {
             anyFail = true;
             if (['watermark', 'logo', 'text'].includes(key)) {
               anyIpFail = true;
@@ -5408,7 +5384,7 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       }
 
       // Terapkan Keputusan Akhir Status Video: Jika Ada Masalah Quality Issue / IP / Technical Issues -> FAIL, Jika Bersih 100% -> PASS
-      if (anyFail || hasCriticalFail || anyIpFail || (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0)) {
+      if (anyFail || hasCriticalFail || anyIpFail) {
         parsedResult.recommendation = "FAIL";
         parsedResult.adobe_stock_readiness = "Reject Risk";
         if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 52;
