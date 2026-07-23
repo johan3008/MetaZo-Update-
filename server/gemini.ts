@@ -5187,11 +5187,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const frameCount = frames ? frames.length : 0;
   const evalText = `Act as an objective, highly strict Adobe Stock QA Curator and Technical Inspector.
 
-⚠️ CRITICAL: This is a HIGH-STAKES inspection. A false PASS on a defective video costs the contributor real rejection. When in doubt, FAIL.
+⚠️ CRITICAL: Be ACCURATE, not paranoid. Clean professional videos should PASS. Only FAIL videos with REAL defects.
 
-Conduct a rigorous audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
-
-🔴 GENERATIVE AI ARTIFACTS (MOST IMPORTANT — Adobe Stock HEAVILY rejects these):
+🔴 GENERATIVE AI ARTIFACTS:
 - Temporal Morphing & Texture Warping: Unphysical shifting, melting, swirling of background/surface textures
 - AI Upscale Artifacts: Over-sharpened halos, plastic/waxy textures, inconsistent detail levels
 - Anatomical Distortions: Uncanny/asymmetrical eyes, faces, hands, limbs
@@ -5207,9 +5205,11 @@ Conduct a rigorous audit of this video asset (including the video media and all 
 🔵 LEGAL: Watermarks, logos, trademarks, copyrighted artwork, restricted landmarks
 
 ⚠️ MANDATORY:
-- If AI-generated or AI-upscaled: ai_artifact=FAIL, upscaled_video=FAIL, low_aesthetic_quality=FAIL
-- If temporal morphing detected: FAIL immediately
-- Score AI artifact videos 35-55, NOT 60+
+- ONLY fail if you SEE actual defects. Clean, professional-looking videos = PASS.
+- If AI-generated/upscaled with visible morphing or distortion → ai_artifact=FAIL, upscaled_video=FAIL
+- If video looks natural, clean, and professional → PASS even if AI-assisted (Adobe accepts well-made AI content)
+- Minor noise in dark areas, slight banding in sky, natural motion blur do NOT warrant FAIL in MEDIUM
+- Score clean professional videos 75-95. Score AI videos with visible defects 35-55.
 - Response in ${language}.`;
 
   
@@ -5272,16 +5272,12 @@ Conduct a rigorous audit of this video asset (including the video media and all 
       let anyIpFail = false;
       let hasCriticalFail = false;
 
-      // 🔒 Kunci kritis DIPERLUAS — mencakup semua masalah AI/upscale/quality yang umum ditolak Adobe Stock
-      // Video AI upscale sering memiliki: flickering, noise, blocking, banding, low_aesthetic_quality
+      // 🔒 Critical keys BALANCED — AI/IP/severe technical = auto-FAIL, minor quality = AI discretion
       const criticalKeys = [
         'watermark', 'logo', 'text',
-        'ai_artifact', 'bad_anatomy', 'deformed_object',
+        'ai_artifact', 'bad_anatomy', 'deformed_object', 'flickering',
         'empty_frame', 'black_frame', 'frozen_frame',
-        'flickering', 'low_aesthetic_quality',
-        'noise', 'blocking', 'banding',
-        'compression_artifacts', 'out_of_focus',
-        'upscaled_video', 'visible_transitions'
+        'upscaled_video'
       ];
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
