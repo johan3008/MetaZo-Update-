@@ -4064,6 +4064,37 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
       const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       
+      // Guardrail tambahan: Pindai teks analisis (visual_scan_analysis, technical_issues, detailed_feedback) untuk indikasi cacat AI / anatomi
+      const textAnalysisLower = (
+        (parsedResult.visual_scan_analysis || "") + " " +
+        (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
+        (parsedResult.detailed_feedback || "")
+      ).toLowerCase();
+
+      const aiDefectKeywords = [
+        'distort', 'morph', 'warp', 'hand', 'finger', 'jari', 'tangan', 
+        'cacat', 'artefak', 'generat', 'ai artifact', 'bad anatomy', 'melt', 
+        'leleh', 'asimetris', 'tidak wajar', 'bengkok', 'patah', 'uncanny', 'extra finger', 
+        'deformed', 'deform'
+      ];
+
+      const textMentionedAiDefect = aiDefectKeywords.some(kw => textAnalysisLower.includes(kw));
+      if (textMentionedAiDefect) {
+        hasCriticalFail = true;
+        if (parsedResult.ai_vision_checks.ai_artifacts) {
+          parsedResult.ai_vision_checks.ai_artifacts.status = 'FAIL';
+          if (!parsedResult.ai_vision_checks.ai_artifacts.note || parsedResult.ai_vision_checks.ai_artifacts.note.includes('No issues')) {
+            parsedResult.ai_vision_checks.ai_artifacts.note = 'Generative AI distortion or morphological defect detected.';
+          }
+        }
+        if (parsedResult.ai_vision_checks.anatomical_errors) {
+          parsedResult.ai_vision_checks.anatomical_errors.status = 'FAIL';
+          if (!parsedResult.ai_vision_checks.anatomical_errors.note || parsedResult.ai_vision_checks.anatomical_errors.note.includes('No issues')) {
+            parsedResult.ai_vision_checks.anatomical_errors.note = 'Anatomical distortion (hands/fingers/face) detected.';
+          }
+        }
+      }
+
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
@@ -5178,14 +5209,22 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const frameCount = frames ? frames.length : 0;
   const evalText = `Act as an objective, highly strict Adobe Stock QA Curator and Technical Inspector.
-Conduct a rigorous audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
-Your primary task is to detect Adobe Stock "Quality Issues", specifically checking for:
-1. Generative AI Temporal Morphing & Texture Warping: Any unphysical shifting, melting, or morphing of background elements (cornfields, sky, trees, structure) or subject textures across frames.
-2. Anatomical & Facial Distortions: Any strange, uncanny, protruding, asymmetrical, or distorted AI eyes, faces, hands, or limbs.
-3. Compression Noise, Banding & Flickering: Macroblocking artifacts or digital noise in dark sky/cloud regions or flashing light/lightning effects.
-4. Overall Commercial Viability & Quality Issues.
+Conduct a rigorous, zero-tolerance audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
+Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o, or any other model, you MUST apply the EXACT same strict Adobe Stock quality rules:
 
-IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Do NOT give a PASS to videos with AI morphing or visual artifacts. Ensure your entire response is written in ${language}.`;
+1. GENERATIVE AI ANATOMY & STRUCTURAL ANOMALIES (CRITICAL):
+   - Inspect hands, fingers, limbs, faces, and eyes of human subjects (e.g., people sitting in massage chairs, holding tablets, working, or lounging).
+   - Check for distorted/fused fingers, unnatural hand poses holding devices, morphing objects (tablets, phones, massage chair footrests, headrests, furniture seams), uncanny faces, or floating structural elements across keyframes.
+   - Do NOT be misled by high visual aesthetics, warm lighting, or cinematic sunset atmosphere! If hands, fingers, or furniture exhibit AI generation distortions or morphing, status for 'ai_artifact', 'bad_anatomy', and 'deformed_object' MUST be set to "FAIL", overall_score MUST be under 65, and recommendation MUST be "FAIL".
+
+2. TEMPORAL MORPHING & TEXTURE WARPING:
+   - Check across keyframes for unphysical shifting, melting, or morphing of background elements, glass window reflections, chair seams, or subject textures.
+
+3. COMPRESSION NOISE, BANDING & FLICKERING:
+   - Macroblocking artifacts or digital noise in dark sky/cloud regions or flashing light/lightning effects.
+
+4. OVERALL COMMERCIAL VIABILITY & QUALITY ISSUES:
+   - If any quality check item is defective or if AI defects are detected, set recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Do NOT give a PASS to videos with AI morphing, warped hands, or visual artifacts. Ensure your entire response is written in ${language}.`;
 
   
   const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
@@ -5247,6 +5286,37 @@ IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overa
       const criticalKeys = [
         'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 'empty_frame', 'black_frame'
       ];
+
+      // Guardrail tambahan: Pindai teks analisis (visual_scan_analysis, technical_issues, detailed_feedback) untuk indikasi cacat AI / anatomi
+      const textAnalysisLower = (
+        (parsedResult.visual_scan_analysis || "") + " " +
+        (Array.isArray(parsedResult.technical_issues) ? parsedResult.technical_issues.join(" ") : "") + " " +
+        (parsedResult.detailed_feedback || "")
+      ).toLowerCase();
+
+      const aiDefectKeywords = [
+        'distort', 'morph', 'warp', 'hand', 'finger', 'jari', 'tangan', 
+        'cacat', 'artefak', 'generat', 'veo', 'sora', 'ai artifact', 'bad anatomy', 'melt', 
+        'leleh', 'asimetris', 'tidak wajar', 'bengkok', 'patah', 'uncanny', 'extra finger', 
+        'deformed', 'deform'
+      ];
+
+      const textMentionedAiDefect = aiDefectKeywords.some(kw => textAnalysisLower.includes(kw));
+      if (textMentionedAiDefect) {
+        hasCriticalFail = true;
+        if (parsedResult.quality_checks.ai_artifact) {
+          parsedResult.quality_checks.ai_artifact.status = 'FAIL';
+          if (!parsedResult.quality_checks.ai_artifact.note || parsedResult.quality_checks.ai_artifact.note.includes('No issues')) {
+            parsedResult.quality_checks.ai_artifact.note = 'Generative AI distortion or morphological defect detected in video keyframe.';
+          }
+        }
+        if (parsedResult.quality_checks.bad_anatomy) {
+          parsedResult.quality_checks.bad_anatomy.status = 'FAIL';
+          if (!parsedResult.quality_checks.bad_anatomy.note || parsedResult.quality_checks.bad_anatomy.note.includes('No issues')) {
+            parsedResult.quality_checks.bad_anatomy.note = 'Anatomical distortion (hands/fingers/face) detected in video subject.';
+          }
+        }
+      }
 
       for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
