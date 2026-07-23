@@ -1177,9 +1177,6 @@ const callGeminiWithRetry = async (
 ): Promise<any> => {
   let lastError: any;
   let currentModel = modelName;
-  if (currentModel === 'gemini-3.5-flash-lite' || currentModel === 'gemini-3.5-flash-lite-preview' || currentModel === 'gemini-lite' || currentModel === 'flash-lite') {
-    currentModel = 'gemini-3.1-flash-lite';
-  }
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await getAIClient().models.generateContent({
@@ -1225,7 +1222,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-flash-latest'];
+          const rotationModels = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -1383,8 +1380,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel.includes('preview') || activeModel === 'gemini-3.1-pro-preview') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite' : 'gemini-3.5-flash';
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -2993,7 +2990,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
   const safetySettings = [
@@ -3516,7 +3513,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let response;
   let lastError;
   let responseText = "";
@@ -3607,7 +3604,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -3999,52 +3996,21 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
   // Normalisasi Model ke Seri Resmi Terupdate
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
-
-  let evalImageText = `Conduct a rigorous, zero-tolerance audit of this image asset against official Adobe Stock contributor standards.
-Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o, Llama, or any other vision model, you MUST apply the EXACT same strict Adobe Stock quality rules without guessing or hallucinating:
-
-1. ABSOLUTE ZERO-HALLUCINATION & FACTUAL AUDIT RULE (DO NOT GUESS OR INVENT DEFECTS):
-   - You MUST NOT guess or invent defects. Only mark "FAIL" if you can point to a real, unambiguous, visible defect in the image pixels.
-   - DILARANG KERAS MENEBAK, BERHALUSINASI, ATAU MEMBUAT ASUMSI (NO GUESSING OR HALLUCINATION). JANGAN melaporkan cacat anatomi, teks rusak, watermark, logo, cacat komposisi, atau masalah pencahayaan/warna jika masalah tersebut TIDAK BENAR-BENAR TERLIHAT dengan jelas di dalam gambar.
-   - If the image is sharp, well-lit, visually clean, well-composed, and completely free of trademark logos or defects, mark it "PASS" with overall_score between 85 and 95.
-
-2. MACRO / LIQUID / CLOSE-UP / BUBBLE / FLUID IMAGES (CRITICAL):
-   - Inspect macro elements (oil droplets, water bubbles, liquid splashes, close-up textures).
-   - Main foreground bubbles/droplets MUST have pin-sharp focal clarity and crisp detail.
-   - Check for severe out-of-focus blur on primary subjects, blown-out white overexposure on liquid speculars (>45%), chromatic fringing, or compression pixelation.
-   - If macro bubbles/subjects lack pin-point focus, suffer from severe specular overexposure, or show digital noise/compression artifacts, set 'out_of_focus', 'blur', 'exposure', or 'ai_artifacts' to "FAIL" and recommendation to "FAIL".
-
-3. STUDIO / PORTRAIT / GREEN SCREEN / LIFESTYLE IMAGES:
-   - Inspect subject sharpness (face, eyes, glasses, suit/clothing), lighting balance, and absence of trademark logos.
-   - If the subject is crisp, sharp, well-lit, and completely clean of logos or defects, set recommendation MUST be "PASS" with overall_score = 85-95.
-
-4. GENERATIVE AI ANATOMY & STRUCTURAL ANOMALIES (CRITICAL):
-   - Inspect hands, fingers, limbs, faces, and eyes of human subjects (e.g., people sitting, holding objects, working, or lounging).
-   - Check for distorted/fused fingers, unnatural hand poses holding devices, morphing objects, uncanny faces, or floating structural elements.
-   - Do NOT be misled by high visual aesthetics! If hands, fingers, or furniture exhibit AI generation distortions or morphing, status for 'ai_artifacts', 'anatomical_errors', and 'structural_defects' MUST be set to "FAIL", overall_score MUST be under 65, and recommendation MUST be "FAIL".
-
-5. INTELLECTUAL PROPERTY & BRAND SAFETY:
-   - Check for trademarked logos, brand names, or copyrighted characters.
-   - If detected, set 'logo', 'ip_risk', or 'watermark' to "FAIL", legal_status to "VIOLATION", and recommendation to "FAIL".
-
-6. CONSISTENT SCORING & RECOMMENDATION OUTPUT:
-   - If ANY check item is "FAIL" or "VIOLATION", recommendation MUST be "FAIL", overall_score = 45-65, adobe_stock_readiness = "Reject Risk".
-   - If ALL check items are clean and "PASS", recommendation MUST be "PASS", overall_score = 80-95, adobe_stock_readiness = "Ready for Submission".
-   - CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
-
-  if (imageMetadata) {
-    evalImageText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-  }
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
+      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+      if (imageMetadata) {
+        promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
+      }
+      
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: [...imageParts, { text: evalImageText }],
+        contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.0, topP: 0.1 },
@@ -4055,13 +4021,18 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const activeModel = model || 'gemini-3.1-flash-lite';
+    const activeModel = model || 'gemini-3.5-flash';
 
     const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
     
     for (const modelName of modelsToTryList) {
       try {
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: evalImageText }] }, {
+        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+        if (imageMetadata) {
+          promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
+        }
+        
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -4084,55 +4055,17 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Normalisasi struktur keys untuk berbagai model/provider agar konsisten
-    if (!parsedResult.ai_vision_checks && parsedResult.quality_checks) {
-      parsedResult.ai_vision_checks = parsedResult.quality_checks;
-    } else if (!parsedResult.ai_vision_checks && parsedResult.ai_vision_check) {
-      parsedResult.ai_vision_checks = parsedResult.ai_vision_check;
-    } else if (!parsedResult.ai_vision_checks && parsedResult.quality_check) {
-      parsedResult.ai_vision_checks = parsedResult.quality_check;
-    }
-    if (!parsedResult.ai_vision_checks) {
-      parsedResult.ai_vision_checks = {};
-    }
-
-    // Normalisasi rekomendasi
-    let currentRec = String(parsedResult.recommendation || '').toUpperCase();
-    if (currentRec.includes('PASS') || currentRec.includes('READY') || currentRec.includes('APPROV')) {
-      parsedResult.recommendation = 'PASS';
-    } else {
-      parsedResult.recommendation = 'FAIL';
-    }
-
-    let anyFail = false;
-    let anyIpFail = false;
-    let hasCriticalFail = false;
-    
-    // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (semua standar penolakan Adobe Stock: IP, AI anomaly, serta cacat teknis/fokus/eksposur)
-    const criticalKeys = [
-      'watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts',
-      'blur', 'exposure', 'lighting', 'sensor_issues', 'over_edited', 'proportion_defects', 'stock_acceptance',
-      'vector_issues', 'illustration_issues'
-    ];
-    
-    // 1. Cek apakah ada daftar technical_issues eksplisit yang dideklarasikan oleh model Vision
-    const realTechnicalIssuesImg = Array.isArray(parsedResult.technical_issues) 
-      ? parsedResult.technical_issues.filter((issue: string) => {
-          const lower = String(issue || '').toLowerCase();
-          return !lower.includes('none') && !lower.includes('tidak ada') && !lower.includes('no issue') && !lower.includes('clean') && !lower.includes('n/a');
-        }) 
-      : [];
-
-    if (realTechnicalIssuesImg.length > 0) {
-      anyFail = true;
-      hasCriticalFail = true;
-    }
-
-    // 2. Evaluasi item pemeriksaan terstruktur (ai_vision_checks)
-    for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
-      if (value && typeof value === 'object') {
-        const statusStr = String((value as any).status || '').toUpperCase();
-        if (statusStr === 'FAIL' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK') {
+    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
+    if (parsedResult.ai_vision_checks) {
+      let anyFail = false;
+      let anyIpFail = false;
+      let hasCriticalFail = false;
+      
+      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
+      
+      for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
+        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
           if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
             anyIpFail = true;
@@ -4142,37 +4075,34 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
           }
         }
       }
-    }
-    
-    // Terapkan Keputusan Akhir Status: Jika Ada Masalah Quality Issue / IP / Technical Issues -> FAIL, Jika Bersih 100% -> PASS
-    if (anyFail || hasCriticalFail || anyIpFail || realTechnicalIssuesImg.length > 0) {
-      parsedResult.recommendation = "FAIL";
-      parsedResult.adobe_stock_readiness = "Reject Risk";
-      if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 52;
-      if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 48;
-      if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 50;
+      
+      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
+      if (tolerance === 'STRICT') {
+        if (anyFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) {
+            parsedResult.overall_score = 69;
+          }
+        }
+      } else if (tolerance === 'MEDIUM') {
+        if (hasCriticalFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) {
+            parsedResult.overall_score = 69;
+          }
+        }
+      } else if (tolerance === 'LOOSE') {
+        if (anyIpFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) {
+            parsedResult.overall_score = 69;
+          }
+        }
+      }
+      
       if (anyIpFail) {
         parsedResult.legal_status = "VIOLATION";
       }
-    } else {
-      // Aset Bersih 100% tanpa isu -> Wajib PASS
-      parsedResult.recommendation = "PASS";
-      parsedResult.adobe_stock_readiness = "Ready for Submission";
-      parsedResult.legal_status = "CLEAN";
-      if (!parsedResult.overall_score || parsedResult.overall_score < 75) parsedResult.overall_score = 88;
-      if (!parsedResult.technical_score || parsedResult.technical_score < 75) parsedResult.technical_score = 90;
-      if (!parsedResult.visual_score || parsedResult.visual_score < 75) parsedResult.visual_score = 88;
-    }
-
-    // Garansi Keamanan Tambahan: Menghilangkan Area Abu-abu (70-74) dan Sinkronisasi Rekomendasi vs Skor Secara Mutlak
-    if (parsedResult.recommendation === "FAIL") {
-      if (parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
-      if (parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
-      if (parsedResult.visual_score >= 70) parsedResult.visual_score = 58;
-    } else {
-      if (parsedResult.overall_score < 75) parsedResult.overall_score = 85;
-      if (parsedResult.technical_score < 75) parsedResult.technical_score = 88;
-      if (parsedResult.visual_score < 75) parsedResult.visual_score = 85;
     }
 
     return parsedResult;
@@ -5248,32 +5178,17 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const frameCount = frames ? frames.length : 0;
   const evalText = `Act as an objective, highly strict Adobe Stock QA Curator and Technical Inspector.
-Conduct a rigorous, zero-tolerance audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
-Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o, or any other model, you MUST apply the EXACT same strict Adobe Stock quality rules:
+Conduct a rigorous audit of this video asset (including the video media and all ${frameCount} extracted keyframes).
+Your primary task is to detect Adobe Stock "Quality Issues", specifically checking for:
+1. Generative AI Temporal Morphing & Texture Warping: Any unphysical shifting, melting, or morphing of background elements (cornfields, sky, trees, structure) or subject textures across frames.
+2. Anatomical & Facial Distortions: Any strange, uncanny, protruding, asymmetrical, or distorted AI eyes, faces, hands, or limbs.
+3. Compression Noise, Banding & Flickering: Macroblocking artifacts or digital noise in dark sky/cloud regions or flashing light/lightning effects.
+4. Overall Commercial Viability & Quality Issues.
 
-1. MACRO / LIQUID / BUBBLE / FLUID FOOTAGE (CRITICAL):
-   - Inspect macro elements (oil droplets, water bubbles, liquid splashes, close-up textures).
-   - The main foreground bubbles/droplets MUST have pin-sharp focal clarity and crisp detail.
-   - Check for soft-focus / out-of-focus bubbles, blown-out white overexposure on liquid surfaces, chromatic fringing/noise along bubble rims, or compression pixelation.
-   - If macro bubbles lack crisp pin-point focus, suffer from overexposure on liquid speculars, or show digital noise/compression artifacts, set 'out_of_focus', 'blur', 'overexposure', or 'compression_artifacts' MUST be set to "FAIL", recommendation MUST be "FAIL", and list the exact flaws in technical_issues.
-
-2. STUDIO / PORTRAIT / GREEN SCREEN FOOTAGE:
-   - Inspect subject sharpness (face, eyes, glasses, suit/clothing), lighting balance, and absence of trademark logos.
-   - If the subject is crisp, sharp, well-lit, and completely clean of logos or defects, set recommendation MUST be "PASS" with overall_score = 85-95.
-
-3. GENERATIVE AI ANATOMY & STRUCTURAL ANOMALIES (CRITICAL):
-   - Inspect hands, fingers, limbs, faces, and eyes of human subjects (e.g., people sitting in massage chairs, holding tablets, working, or lounging).
-   - Check for distorted/fused fingers, unnatural hand poses holding devices, morphing objects (tablets, phones, massage chair footrests, headrests, furniture seams), uncanny faces, or floating structural elements across keyframes.
-   - Do NOT be misled by high visual aesthetics! If hands, fingers, or furniture exhibit AI generation distortions or morphing, status for 'ai_artifact', 'bad_anatomy', and 'deformed_object' MUST be set to "FAIL", overall_score MUST be under 65, and recommendation MUST be "FAIL".
-
-4. TEMPORAL MORPHING & TEXTURE WARPING:
-   - Check across keyframes for unphysical shifting, melting, or morphing of background elements, glass window reflections, chair seams, or subject textures.
-
-5. OVERALL COMMERCIAL VIABILITY & QUALITY ISSUES:
-   - If any quality check item is defective or if technical/AI defects are detected, set recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Ensure your entire response is written in ${language}.`;
+IF ANY OF THESE DEFECTS ARE PRESENT, YOU MUST SET recommendation = "FAIL", overall_score = 45-62, adobe_stock_readiness = "Reject Risk", and list the exact flaws in technical_issues. Do NOT give a PASS to videos with AI morphing or visual artifacts. Ensure your entire response is written in ${language}.`;
 
   
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
@@ -5293,8 +5208,7 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
       console.error(`[checkVideoQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const activeModel = model || 'gemini-3.1-flash-lite';
-    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
+    const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       try {
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: evalText }] }, {
@@ -5322,126 +5236,19 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
     console.log('QA raw video response:', text);
     const parsedResult = JSON.parse(extractJSON(text));
     
-    // Normalisasi struktur keys untuk berbagai model/provider agar konsisten
-    if (!parsedResult.quality_checks && parsedResult.ai_vision_checks) {
-      parsedResult.quality_checks = parsedResult.ai_vision_checks;
-    } else if (!parsedResult.quality_checks && parsedResult.quality_check) {
-      parsedResult.quality_checks = parsedResult.quality_check;
-    } else if (!parsedResult.quality_checks && parsedResult.ai_vision_check) {
-      parsedResult.quality_checks = parsedResult.ai_vision_check;
-    }
-    if (!parsedResult.quality_checks) {
-      parsedResult.quality_checks = {};
-    }
+    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE) untuk Video
+    if (parsedResult.quality_checks) {
+      let anyFail = false;
+      let anyIpFail = false;
+      let hasCriticalFail = false;
 
-    // Normalisasi rekomendasi
-    let currentRec = String(parsedResult.recommendation || '').toUpperCase();
-    if (currentRec.includes('PASS') || currentRec.includes('READY') || currentRec.includes('APPROV')) {
-      parsedResult.recommendation = 'PASS';
-    } else {
-      parsedResult.recommendation = 'FAIL';
-    }
+      // Kunci kritis untuk kualitas video dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      const criticalKeys = [
+        'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 'empty_frame', 'black_frame'
+      ];
 
-    let anyFail = false;
-    let anyIpFail = false;
-    let hasCriticalFail = false;
-
-    // 1. Integrasi Langsung Analisa Teknis Objektif (FFmpeg & Piksel) jika tersedia
-    if (videoTechnicalReport) {
-      if (videoTechnicalReport.filters?.black_frames_detected && Array.isArray(videoTechnicalReport.filters.black_frames) && videoTechnicalReport.filters.black_frames.some((bf: any) => bf.duration >= 0.5)) {
-        hasCriticalFail = true;
-        anyFail = true;
-        parsedResult.quality_checks.black_frame = {
-          status: 'FAIL',
-          note: 'Terdeteksi black frame berdurasi > 0.5 detik pada linimasa video.'
-        };
-      }
-      if (videoTechnicalReport.filters?.frozen_frames_detected && Array.isArray(videoTechnicalReport.filters.frozen_frames) && videoTechnicalReport.filters.frozen_frames.some((ff: any) => ff.duration >= 1.5)) {
-        hasCriticalFail = true;
-        anyFail = true;
-        parsedResult.quality_checks.frozen_frame = {
-          status: 'FAIL',
-          note: 'Terdeteksi frame beku/stuck berdurasi > 1.5 detik pada linimasa video.'
-        };
-      }
-      if (videoTechnicalReport.stabilityStatus === 'FLICKERING' && videoTechnicalReport.stabilityIndex > 50) {
-        hasCriticalFail = true;
-        anyFail = true;
-        parsedResult.quality_checks.flickering = {
-          status: 'FAIL',
-          note: 'Fluktuasi kecerahan / kedipan berulang terdeteksi pada rantai frame.'
-        };
-      }
-      if (Array.isArray(videoTechnicalReport.frameAnalysis) && videoTechnicalReport.frameAnalysis.length > 0) {
-        // Hanya beri bendera jika ketajaman benar-benar sangat parah (sharpness < 8) dan blurStatus BLURRED
-        const severeBlurFrames = videoTechnicalReport.frameAnalysis.filter((f: any) => f.blurStatus === 'BLURRED' && f.sharpness < 8);
-        if (severeBlurFrames.length > 0) {
-          hasCriticalFail = true;
-          anyFail = true;
-          parsedResult.quality_checks.blur = {
-            status: 'FAIL',
-            note: `Pemeriksaan piksel mendeteksi ${severeBlurFrames.length} keyframe mengalami severe blur / out-of-focus.`
-          };
-        }
-        const severeOverexp = videoTechnicalReport.frameAnalysis.filter((f: any) => f.overexposurePercent > 45);
-        if (severeOverexp.length > 0) {
-          hasCriticalFail = true;
-          anyFail = true;
-          parsedResult.quality_checks.overexposure = {
-            status: 'FAIL',
-            note: `Pemeriksaan kecerahan piksel mendeteksi severe overexposure (>45% blown highlights).`
-          };
-        }
-        const severeUnderexp = videoTechnicalReport.frameAnalysis.filter((f: any) => f.underexposurePercent > 50);
-        if (severeUnderexp.length > 0) {
-          hasCriticalFail = true;
-          anyFail = true;
-          parsedResult.quality_checks.underexposure = {
-            status: 'FAIL',
-            note: `Pemeriksaan kecerahan piksel mendeteksi severe underexposure (>50% crushed shadows).`
-          };
-        }
-      }
-      if (videoTechnicalReport.ffprobe) {
-        const bitrateMbps = (videoTechnicalReport.ffprobe.bitrate || 0) / 1000000;
-        if (bitrateMbps > 0 && bitrateMbps < 1.0) {
-          hasCriticalFail = true;
-          anyFail = true;
-          parsedResult.quality_checks.compression_artifacts = {
-            status: 'FAIL',
-            note: `Bitrate video (${bitrateMbps.toFixed(2)} Mbps) sangat rendah sehingga mengalami kompresi/makroblok parah.`
-          };
-        }
-      }
-    }
-
-    // Kunci kritis untuk kualitas video dalam mode MEDIUM (semua standar penolakan resmi Adobe Stock)
-    const criticalKeys = [
-      'watermark', 'logo', 'text', 'ai_artifact', 'bad_anatomy', 'deformed_object', 
-      'empty_frame', 'black_frame', 'frozen_frame', 'duplicate_frame', 'flickering', 
-      'out_of_focus', 'blur', 'camera_shake', 'motion_blur', 'noise', 'compression_artifacts', 
-      'blocking', 'banding', 'overexposure', 'underexposure', 'cropped_subject', 'cut_off_object', 
-      'wrong_perspective', 'low_aesthetic_quality', 'low_framerate', 'visible_transitions', 
-      'log_profile', 'upscaled_video'
-    ];
-
-    // 2. Jika ada list technical_issues dari AI vision model -> WAJIB FAIL jika bukan "none"/"clean"
-    if (Array.isArray(parsedResult.technical_issues) && parsedResult.technical_issues.length > 0) {
-      const realIssues = parsedResult.technical_issues.filter((issue: string) => {
-        const lower = String(issue || '').toLowerCase();
-        return !lower.includes('none') && !lower.includes('tidak ada') && !lower.includes('no issues') && !lower.includes('clean');
-      });
-      if (realIssues.length > 0) {
-        anyFail = true;
-        hasCriticalFail = true;
-      }
-    }
-
-    // 3. Evaluasi item pemeriksaan terstruktur (quality_checks)
-    for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
-      if (value && typeof value === 'object') {
-        const statusStr = String((value as any).status || '').toUpperCase();
-        if (statusStr === 'FAIL' || statusStr === 'VIOLATION' || statusStr === 'REJECT' || statusStr === 'AT_RISK') {
+      for (const [key, value] of Object.entries(parsedResult.quality_checks)) {
+        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
           if (['watermark', 'logo', 'text'].includes(key)) {
             anyIpFail = true;
@@ -5451,58 +5258,37 @@ Regardless of whether you are running Gemini 3.6 Flash, Gemini 3.5 Flash, GPT-4o
           }
         }
       }
-    }
 
-    // 4. Analisis Semantik Teks & Catatan AI: Jika AI menyebutkan adanya isu kualitas dalam teks feedback/catatan, paksa menjadi FAIL (Quality Issues).
-    const combinedFeedbackText = `${parsedResult.detailed_feedback || ''} ${parsedResult.visual_scan_analysis || ''} ${JSON.stringify(parsedResult.quality_checks || {})}`.toLowerCase();
-    const qualityIssueKeywords = [
-      'noise', 'compression', 'banding', 'artifact', 'morph', 'flicker', 'blur', 'grain', 
-      'quality reject', 'severe issue', 'cacat', 'kompresi parah', 'bintik berlebih', 'buram', 'kedipan parah', 
-      'macro-blocking', 'pixelated', 'soft focus', 'out of focus', 'severe distortion', 'warping'
-    ];
-    const foundKeywords = qualityIssueKeywords.filter(kw => combinedFeedbackText.includes(kw));
-    if (foundKeywords.length > 0 && !combinedFeedbackText.includes('tidak ada isu') && !combinedFeedbackText.includes('tanpa cacat') && !combinedFeedbackText.includes('no issues')) {
-      anyFail = true;
-      hasCriticalFail = true;
-    }
+      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
+      if (tolerance === 'STRICT') {
+        if (anyFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
+          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
+          parsedResult.adobe_stock_readiness = "Reject Risk";
+        }
+      } else if (tolerance === 'MEDIUM') {
+        if (hasCriticalFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
+          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
+          parsedResult.adobe_stock_readiness = "Reject Risk";
+        }
+      } else if (tolerance === 'LOOSE') {
+        if (anyIpFail) {
+          parsedResult.recommendation = "FAIL";
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+          if (parsedResult.technical_score >= 70) parsedResult.technical_score = 69;
+          if (parsedResult.visual_score >= 70) parsedResult.visual_score = 69;
+          parsedResult.adobe_stock_readiness = "Reject Risk";
+        }
+      }
 
-    // Terapkan Keputusan Akhir Status Video: Jika Ada Masalah Quality Issue / IP / Technical Issues -> FAIL, Jika Bersih 100% -> PASS
-    if (anyFail || hasCriticalFail || anyIpFail) {
-      parsedResult.recommendation = "FAIL";
-      parsedResult.adobe_stock_readiness = "Reject Risk";
-      if (!parsedResult.overall_score || parsedResult.overall_score >= 70) parsedResult.overall_score = 52;
-      if (!parsedResult.technical_score || parsedResult.technical_score >= 70) parsedResult.technical_score = 48;
-      if (!parsedResult.visual_score || parsedResult.visual_score >= 70) parsedResult.visual_score = 50;
       if (anyIpFail) {
         parsedResult.legal_status = "VIOLATION";
       }
-    } else {
-      // Video Bersih 100% tanpa isu -> Wajib PASS
-      parsedResult.recommendation = "PASS";
-      parsedResult.adobe_stock_readiness = "Ready for Submission";
-      parsedResult.legal_status = "CLEAN";
-      if (!parsedResult.overall_score || parsedResult.overall_score < 75) parsedResult.overall_score = 88;
-      if (!parsedResult.technical_score || parsedResult.technical_score < 75) parsedResult.technical_score = 90;
-      if (!parsedResult.visual_score || parsedResult.visual_score < 75) parsedResult.visual_score = 88;
-    }
-
-    // Garansi Keamanan Tambahan: Menghilangkan Area Abu-abu (70-74) dan Sinkronisasi Rekomendasi vs Skor Secara Mutlak
-    if (parsedResult.recommendation === "FAIL") {
-      if (parsedResult.overall_score >= 70) parsedResult.overall_score = 58;
-      if (parsedResult.technical_score >= 70) parsedResult.technical_score = 55;
-      if (parsedResult.visual_score >= 70) parsedResult.visual_score = 58;
-      if (!parsedResult.detailed_feedback || parsedResult.detailed_feedback.toLowerCase().includes('memenuhi standar') || parsedResult.detailed_feedback.toLowerCase().includes('direkomendasikan') || parsedResult.detailed_feedback.toLowerCase().includes('ready')) {
-        parsedResult.detailed_feedback = isIndonesian
-          ? "Klip video ini ditolak (Quality Issues) berdasarkan standar kurasi Adobe Stock Contributor. Terdeteksi adanya artefak kompresi, noise piksel, ketidaskonsistenan fokus, background solid/green screen, atau anomali visual yang tidak memenuhi kriteria kelayakan komersial."
-          : "This video clip is rejected (Quality Issues) based on Adobe Stock Contributor standards due to detected compression artifacts, pixel noise, focus inconsistency, solid background/green screen defects, or visual anomalies.";
-      }
-      if (!parsedResult.technical_issues || parsedResult.technical_issues.length === 0 || parsedResult.technical_issues.some((i: string) => i.toLowerCase().includes('none') || i.toLowerCase().includes('tidak ada') || i.toLowerCase().includes('clean'))) {
-        parsedResult.technical_issues = ["Quality Issues / Compression Artifacts / Noise / Visual Defect"];
-      }
-    } else {
-      if (parsedResult.overall_score < 75) parsedResult.overall_score = 85;
-      if (parsedResult.technical_score < 75) parsedResult.technical_score = 88;
-      if (parsedResult.visual_score < 75) parsedResult.visual_score = 85;
     }
     
     return parsedResult;
