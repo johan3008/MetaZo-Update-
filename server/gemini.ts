@@ -5215,14 +5215,82 @@ For EVERY quality_checks category:
 
 Response in ${language}.`;
 
+  let responseText = "";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const res = await callOpenAICompatibleWithRetry({
+      systemInstruction,
+      contents: evalText,
+      responseMimeType: "application/json",
+      responseSchema,
+      config: { temperature: 0.3 },
+      model
+    });
+    responseText = res;
+  } else {
+    try {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', evalText, {
+        systemInstruction,
+        contents: imageParts,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.3
+      }, 1);
+      responseText = res.text || "{}";
+    } catch (err: any) {
+      const res = await callGeminiWithRetry('gemini-2.5-flash', evalText, {
+        systemInstruction,
+        contents: imageParts,
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.3
+      }, 1);
+      responseText = res.text || "{}";
+    }
+  }
+
+  return JSON.parse(extractJSON(responseText));
+}
+
+export async function generateMotionCode(userPrompt: string, options?: { currentCode?: string; fps?: number; durationSeconds?: number; width?: number; height?: number; history?: Array<{role: string; content: string}>; model?: string }) {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+  const model = options?.model;
+
+  const systemInstruction = `You are an expert Remotion developer.
+Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation.
+The component MUST be a valid Remotion composition that exports a default MotionComposition component.
+
+RULES:
+- Use @remotion packages (react, compositions, etc.) appropriately.
+- The animation should be smooth, professional, and visually impressive.
+- Use React hooks (useState, useEffect, useRef, useCallback, useMemo) as needed.
+- Use the useCurrentFrame() and useVideoConfig() hooks from remotion to control timing.
+- The animation should loop seamlessly or have a clear beginning and end.
+- Add comments explaining key sections of the code.
+- Ensure all imports are from valid packages.
+- Return ONLY valid, runnable JSX/TSX code.
+
+CRITICAL:
+- Export as: export default MotionComposition;
+- The component should accept standard Remotion props.
+- Do NOT use external assets (images, fonts) unless they are system fonts or CSS-generated graphics.
+- Keep the code self-contained and production-ready.`;
+
+  const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
+  const durationInFrames = fps * durationSeconds;
+
   const contextParts: string[] = [];
   contextParts.push(`Video canvas target: ${width}x${height} px, ${fps} fps, ${durationInFrames} frames total (${(durationInFrames / fps).toFixed(1)} seconds).`);
   if (options?.currentCode && options.currentCode.trim().length > 0) {
-    contextParts.push(`CURRENT EXISTING CODE (this is the base you are editing/iterating on):\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+    contextParts.push(`CURRENT EXISTING CODE (this is the base you are editing/iterating on):
+\`\`\`jsx
+${options.currentCode}
+\`\`\``);
   }
   if (options?.history && options.history.length > 0) {
     const trimmedHistory = options.history.slice(-6);
-    contextParts.push(`Recent conversation history for extra context:\n${trimmedHistory.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.content}`).join('\n')}`);
+    contextParts.push(`Recent conversation history for extra context:
+${trimmedHistory.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.content}`).join('\n')}`);
   }
   contextParts.push(`User's new request: "${userPrompt}"`);
 
@@ -5289,5 +5357,23 @@ Response in ${language}.`;
     title: parsed.title || 'Untitled Motion',
     summary: parsed.summary || '',
     code: parsed.code as string
+  };
+}
+
+export async function uploadVideoToGemini(videoPath: string, mimeType: string): Promise<{ fileUri: string; mimeType: string }> {
+  const fs = await import('fs');
+  if (!fs.existsSync(videoPath)) {
+    throw new Error(`Video file not found: ${videoPath}`);
+  }
+  
+  // For Gemini File API upload, we use the Google GenAI client
+  const ai = getAIClient();
+  const fileBuffer = fs.readFileSync(videoPath);
+  const base64Data = fileBuffer.toString('base64');
+  
+  // Upload to Gemini via inline data
+  return {
+    fileUri: `data:${mimeType};base64,${base64Data}`,
+    mimeType
   };
 }
