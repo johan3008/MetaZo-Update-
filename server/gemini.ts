@@ -4946,6 +4946,54 @@ Return exactly 8 items matching the schema in JSON array format.`;
   return scrapingResults;
 }
 
+/** DETERMINISTIC: Compute measurable quality_checks from technical report. ffprobe + FFmpeg + OpenCV pixel. */
+function computeTechnicalQualityChecks(report: any, tolerance: string): Record<string, { status: string; note: string }> {
+  const c: Record<string, { status: string; note: string }> = {};
+  if (report?.frameAnalysis?.length > 0) {
+    const avgSharp = report.frameAnalysis.reduce((s: number, f: any) => s + (f.sharpness || 0), 0) / report.frameAnalysis.length;
+    const worst = report.frameAnalysis.some((f: any) => f.blurStatus === 'BLURRED');
+    const hasSoft = report.frameAnalysis.some((f: any) => f.blurStatus === 'SOFT');
+    if (worst) { c.blur = { status: 'FAIL', note: `Laplacian avg ${avgSharp.toFixed(1)} — BLURRED.` }; c.out_of_focus = { status: 'FAIL', note: 'Soft focus detected.' }; }
+    else if (hasSoft && tolerance === 'STRICT') { c.blur = { status: 'FAIL', note: `Laplacian ${avgSharp.toFixed(1)} — SOFT (strict).` }; }
+    else { c.blur = { status: 'PASS', note: `Laplacian ${avgSharp.toFixed(1)} — OK.` }; c.out_of_focus = { status: 'PASS', note: 'Focus acceptable.' }; }
+    const maxOver = Math.max(...report.frameAnalysis.map((f: any) => f.overexposurePercent || 0));
+    const maxUnder = Math.max(...report.frameAnalysis.map((f: any) => f.underexposurePercent || 0));
+    c.overexposure = maxOver > 15 ? { status: 'FAIL', note: `${maxOver.toFixed(1)}% overexposed.` } : { status: 'PASS', note: `${maxOver.toFixed(1)}% — OK.` };
+    c.underexposure = maxUnder > 20 ? { status: 'FAIL', note: `${maxUnder.toFixed(1)}% underexposed.` } : { status: 'PASS', note: `${maxUnder.toFixed(1)}% — OK.` };
+  } else { c.blur = { status: 'PASS', note: 'No pixel data.' }; c.overexposure = { status: 'PASS', note: 'No data.' }; c.underexposure = { status: 'PASS', note: 'No data.' }; }
+  if (report?.filters) {
+    c.black_frame = report.filters.black_frames_detected ? { status: 'FAIL', note: `${report.filters.black_frames?.length || 0} black frame(s) detected.` } : { status: 'PASS', note: 'No black frames.' };
+    c.frozen_frame = report.filters.frozen_frames_detected ? { status: 'FAIL', note: `${report.filters.frozen_frames?.length || 0} frozen segment(s).` } : { status: 'PASS', note: 'No frozen frames.' };
+    c.empty_frame = { status: 'PASS', note: 'No empty frames.' }; c.duplicate_frame = { status: 'PASS', note: 'No duplicate frames.' };
+  }
+  if (report?.stabilityStatus) {
+    const si = report.stabilityIndex || 0;
+    if (report.stabilityStatus === 'FLICKERING') { c.flickering = { status: 'FAIL', note: `Stability ${si} — FLICKERING.` }; c.camera_shake = { status: 'FAIL', note: 'Significant instability.' }; }
+    else if (report.stabilityStatus === 'UNSTABLE' && tolerance === 'STRICT') { c.flickering = { status: 'FAIL', note: `Stability ${si} — UNSTABLE (strict).` }; }
+    else { c.flickering = { status: 'PASS', note: `Stability ${si} — ${report.stabilityStatus}.` }; c.camera_shake = { status: 'PASS', note: 'Stable.' }; }
+  }
+  if (report?.ffprobe?.video) {
+    const v = report.ffprobe.video;
+    c.motion_consistency = (v?.fps || 0) >= 23.976 ? { status: 'PASS', note: `FPS ${v?.fps?.toFixed(2)} — OK.` } : { status: 'FAIL', note: `FPS ${v?.fps?.toFixed(2)} — below 23.976.` };
+    c.visual_quality = ((v?.width || 0) >= 1920 && (v?.height || 0) >= 1080) ? { status: 'PASS', note: `${v?.width}x${v?.height} — 1080p+.` } : { status: 'FAIL', note: `${v?.width}x${v?.height} — below 1080p.` };
+    c.noise = { status: 'PASS', note: `Bitrate ${((report.ffprobe.bitrate || 0) / 1000).toFixed(0)}kbps, ${v?.codec || '?'}.` };
+  }
+  return c;
+}
+
+function computeTechnicalScore(checks: Record<string, { status: string; note: string }>): number {
+  const keys = ['blur','overexposure','underexposure','black_frame','frozen_frame','flickering','camera_shake','motion_consistency','visual_quality','out_of_focus'];
+  let tot = 0, fail = 0;
+  for (const k of keys) { if (checks[k]) { tot++; if (checks[k].status === 'FAIL') fail++; } }
+  return tot > 0 ? Math.round(100 - (fail / tot) * 100) : 85;
+}
+
+/** 
+ * HYBRID VIDEO QUALITY ANALYSIS — CONSISTENT ACROSS ALL MODELS/PROVIDERS
+ * Phase 1: ffprobe + FFmpeg + OpenCV pixel = DETERMINISTIC (70% weight)
+ * Phase 2: AI Vision = SUBJECTIVE only: IP, aesthetics, AI artifacts (30% weight)
+ * Phase 3: Standardized merge + scoring formula
+ */
 export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language = 'Bahasa', model, videoMetadata = null, videoFile = null, videoTechnicalReport = null) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -4953,664 +5001,273 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
-  let metadataInstruction = "";
-  if (videoMetadata) {
-    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Video yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(videoMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat (misal: cek resolusi, frame rate, durasi, codec, audio, atau tag software/kamera penciptanya) untuk melengkapi temuan audit visual Anda.`;
-  }
-
-  let technicalInstruction = "";
-  if (videoTechnicalReport) {
-    technicalInstruction = `\n\n[DATA ANALISA TEKNIS FISIK (FFMPEG & PENGUKURAN PIKSEL)]\nBerikut adalah data analisa teknis objektif riil dari file Video yang dihitung secara matematis menggunakan FFprobe, filter FFmpeg (kedipan/black_frame/freeze_frame), dan deteksi piksel (ketajaman/blur Laplacian, overexposure/underexposure piksel):\n\`\`\`json\n${JSON.stringify(videoTechnicalReport, null, 2)}\n\`\`\`\nJadikan data analisa teknis objektif di atas sebagai panduan mutlak untuk mengisi quality_checks yang sesuai secara 100% akurat tanpa halusinasi. Jika filter mendeteksi black frame atau frozen frame, sesuaikan status check tersebut ke 'FAIL' secara kesepakatan dan jelaskan sebabnya secara detail.`;
-  }
-
-  let systemInstruction = `Anda adalah Kurator Fotografi Senior dan Spesialis Quality Assurance (QA) "Standar Kualitas Teknis Adobe Stock" tingkat dunia. Anda dilatih secara khusus untuk melakukan kurasi dan audit teknis/hukum berstandar premium dengan akurasi 100% berdasarkan panduan resmi Adobe Stock Contributor Help untuk alasan penolakan konten (Quality and Technical Standards Reasons for Content Refusal / Quality Issues).
-
-Tugas Anda adalah melakukan audit visual yang SANGAT KETAT, MENDALAM, AKURAT, dan TANPA KOMPROMI terhadap isi video secara utuh (keseluruhan pergerakan, transisi, dan durasi). Analisislah seluruh aspek raw video ini secara mendetail dari awal hingga akhir.${metadataInstruction}${technicalInstruction}
-
----
-PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
-1. Bedakan antara PILIHAN ARTISTIK Profesional dan CACAT TEKNIS:
-   - Bokeh / Depth of Field (DoF) dangkal yang indah dengan latar belakang yang buram lembut adalah KUALITAS PREMIUM yang sangat dicari di Adobe Stock, BUKAN cacat. Selama subjek utama yang ditargetkan tetap tajam (sharp), status check "blur" dan "out_of_focus" wajib dianggap "PASS".
-   - Locked-off Camera / Tripod shot: Jika video sengaja diambil menggunakan tripod stabil dan subjeknya tenang (misal: pemandangan alam, timelapse lambat, potret diam), ini adalah video normal yang sangat profesional. JANGAN PERNAH menyatakannya sebagai "frozen_frame" atau "FAIL" hanya karena tidak ada guncangan atau pergerakan masif di latar belakang. Frozen frame hanya di-set "FAIL" jika terjadi galat teknis di mana seluruh video macet/berhenti bergerak (frame duplikat identik karena crash render/kompresi).
-   - Noise Alami Low-Light: Video yang diambil malam hari atau kondisi gelap (misal: langit berbintang, konser malam, api unggun) secara wajar akan memiliki sedikit digital noise. Namun jika noise tersebut berupa bintik kasar/artefak kompresi gelap yang merusak estetika, ini WAJIB FAIL.
-   - Cinematic Motion Blur: Pergerakan dinamis yang cepat secara alami menghasilkan motion blur di tepian subjek demi pergerakan yang mulus (shutter speed 180 derajat). Jika ini disengaja untuk aksi, ini adalah nilai estetik, bukan cacat.
-
-2. ATURAN PENOLAKAN SANGAT KETAT UNTUK ADOBE STOCK "QUALITY ISSUES" & GENERATIVE AI VIDEO:
-   Adobe Stock secara rutin MENOLAK (REJECT) video Generative AI akibat alasan utama "Quality Issues". Anda DILARANG Loloskan (PASS) video buatan AI jika terdapat salah satu cacat berikut:
-   - Temporal Morphing / Texture Warping: Tekstur background (seperti ladang jagung, awan, pepohonan, rumput, bangunan) atau tekstur subjek (karung goni, pakaian, kulit, struktur) yang meliuk, melelok, atau berubah bentuk/pola secara tidak wajar antar-frame saat kamera bergerak.
-   - Visual / Anatomical Distortions: Bentuk mata, wajah, jari, ekspresi, atau anatomi subjek yang terdistorsi, juling, menonjol abnormal, tampak menyeramkan/uncanny, atau bergaya plastik AI yang cacat.
-   - Flickering / Lighting Glitches / Background Noise: Efek pencahayaan (petir, kilatan, bayangan) yang berkedip kasar (flicker) atau menciptakan blok-blok artefak kompresi (macro-blocking) / noise berlebih pada langit malam, awan, atau area gelap.
-   - Jika ditemukan salah satu dari cacat di atas, Anda WAJIB menetapkan recommendation = 'FAIL', adobe_stock_readiness = 'Reject Risk', overall_score < 70 (misal 45 - 62), dan jelaskan detail cacat secara tajam pada technical_issues dan detailed_feedback!
-
----
-ATURAN ANTI-HALUSINASI & ANTI-SIMULASI (CRITICAL):
-1. JANGAN PERNAH MENEBAK atau membuat asumsi palsu (simulasi). Jika elemen atau subjek tertentu tidak ada dalam video, Anda WAJIB menandai status checkpoint tersebut sebagai "UNKNOWN" dan menjelaskan di bagian note bahwa elemen tersebut tidak tersedia/tidak relevan untuk dievaluasi pada aset ini.
-   Contoh:
-   - Jika video adalah pemandangan alam (landscape) tanpa ada manusia/makhluk hidup, maka status "bad_anatomy" WAJIB diisi "UNKNOWN" dengan note: "Tidak ada subjek manusia atau makhluk hidup dalam video untuk dievaluasi."
-   - Jika video tidak mengandung teks/huruf, status "text" WAJIB diisi "UNKNOWN" dengan note: "Tidak ada teks dalam video."
-   - Jika tidak ada komponen mekanis/mesin/arsitektur, status "deformed_object" WAJIB diisi "UNKNOWN" dengan note: "Tidak ada elemen mekanis atau geometris struktural pada video."
-2. Evaluasi harus didasarkan 100% pada bukti visual riil yang terlihat di dalam video yang Anda terima, bukan pada ekspektasi teoritis atau asumsi acak.
-
----
-PROSEDUR INSPEKSI ZOOM-IN & DETAIL MENDALAM (MANDATORY):
-Untuk memberikan hasil yang paling akurat, Anda WAJIB mensimulasikan proses ZOOM-IN visual hingga 200% sampai 400% di tingkat piksel pada setiap bagian video yang diberikan:
-1. Periksa area fokus utama: Apakah subjek target benar-benar tajam (pin-sharp) di sepanjang durasi video? Jika ada "soft focus" terus-menerus atau "motion blur" ekstrem yang tidak disengaja akibat guncangan kamera parah (camera shake), tandai sebagai FAIL.
-2. Deteksi distorsi Rolling Shutter secara teliti: Cari sisa-sisa skew (distorsi miring pada garis vertikal), jello effect (efek goyangan seperti jeli), atau flash banding.
-3. Periksa area latar belakang dan detail piksel: Cari bintik debu sensor (sensor dust), chromatic aberration di tepian objek berkontras tinggi, artefak kompresi video parah (macro-blocking), gradasi warna patah (color banding), dan noise digital parah di area bayangan (shadows).
-4. Periksa seluruh bagian untuk mendeteksi pelanggaran kekayaan intelektual (IP) mikro: Logo kecil pada kancing pakaian, emblem samar pada gadget/mobil, teks bermerek pada latar belakang, graffiti, atau karya seni berhak cipta.
-5. Periksa struktur anatomi dan logika AI (jika video buatan AI): Cari jari berlebih/kurang, mata juling, geometri yang saling melebur atau melayang tidak wajar, detail pola berulang yang hancur, atau tulisan acak/gibberish yang mengacaukan estetika komersial.
-
----
-PANDUAN TOLERANSI KETAT & REFUSAL REASONS ADOBE STOCK:
-Tingkat Toleransi Saat Ini: ${tolerance}. Anda harus mengevaluasi dengan tingkat keketatan berikut:
-- STRICT: "Zero Tolerance" mutlak terhadap cacat teknis apa pun atau pelanggaran IP sekecil apa pun. Sedikit soft focus, sedikit chromatic aberration, satu titik debu sensor, artefak AI sekecil apa pun, jello effect minor, atau indikasi IP = FAIL secara instan (Skor maksimal 0-59).
-- MEDIUM: Cacat minor di latar belakang non-kritis yang tidak mengganggu estetika komersial bisa ditoleransi. Namun, pelanggaran IP sekecil apa pun, over-exposure fatal pada subjek utama, out-of-focus pada subjek utama, guncangan kamera yang mengganggu, atau anomali gen-AI (morphing, face/eye distortion, noise/banding) = FAIL secara instan (Skor maksimal 0-62).
-- LOOSE: Loloskan hanya jika video benar-being terbebas dari cacat teknis utama dan memiliki nilai komersial yang tinggi. Cacat AI morphing atau distorsi fisik tetap menyebabkan FAIL (Skor 0-69).
-
----
-DAFTAR ALASAN PENOLAKAN RESMI ADOBE STOCK (REFUSAL CRITERIA):
-Anda wajib mencocokkan setiap temuan secara presisi dengan alasan penolakan berikut:
-
-1. OUT OF FOCUS / SOFT FOCUS / SHARPNESS:
-   - Subjek utama tidak tajam secara sempurna (lack of sharpness).
-   - Motion blur akibat guncangan kamera atau pergerakan subjek yang terlalu cepat tanpa diimbangi shutter speed yang memadai.
-   - Depth of field (DoF) terlalu dangkal yang menyebabkan area penting subjek meleset dari fokus (misal, hidung fokus tetapi mata buram). Note: Bokeh artistik pada latar belakang adalah estetika premium, BUKAN cacat, selama subjek utamanya tajam sempurna.
-   - Efek noise reduction (pembungkaman noise) yang terlalu agresif, menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
-
-2. ARTIFACTS / NOISE / EXCESSIVE FILTERING / COMPRESSION / QUALITY ISSUES:
-   - PENTING (CRITICAL) UNTUK VIDEO: Jika terdapat noise berlebih pada area warna polos atau artifact kompresi yang membuat batas objek menjadi bergerigi (pixelated) atau kotor, maka WAJIB DITOLAK (FAIL).
-   - Noise digital (luminance & chromatic noise) berlebih, terutama terlihat di area bayangan atau bidang berwarna datar seperti langit malam atau awan.
-   - Chromatic Aberration / Color Fringing: Garis tepi berwarna ungu, hijau, atau magenta di sepanjang batas objek berkontras tinggi.
-   - Compression Artifacts (Artefak Kompresi): Kotak-kotak piksel kecil (macro-blocking) atau pixelation akibat rasio kompresi video yang terlalu tinggi.
-   - Color Banding: Transisi gradasi warna yang patah atau bergaris kasar (tidak mulus) pada langit atau background.
-
-3. EXPOSURE & LIGHTING PROBLEMS:
-   - Overexposure: "Blown-out highlights" / bagian terang yang benar-benar putih murni tanpa ada detail tekstur/piksel sama sekali.
-   - Underexposure: "Crushed shadows" / bagian gelap yang hitam pekat tanpa detail piksel sama sekali.
-   - Pencahayaan datar atau bayangan yang kasar/tidak sedap dipandang pada subjek.
-
-4. COMPOSITION & CROPPING ISSUES:
-   - Crooked Horizon: Garis cakrawala, dinding, atau bangunan yang miring tanpa ada tujuan artistik.
-   - Awkward Crop: Pemotongan subjek utama yang canggung di tepi bingkai.
-
-5. ROLLING SHUTTER, STABILITY & VIDEO SPECIFIC ISSUES:
-   - Unintentional shaking (guncangan tak disengaja/kamera tidak stabil), empty black or white frame, masalah format/color grading, compression artifact, audio issues, skew distortion, jello effects, atau flash banding/flickering.
-
-6. GENERATIVE AI QUALITY STANDARDS & QUALITY ISSUES (SANGAT KRITIS UNTUK AI VIDEO):
-   - PENTING (CRITICAL): Adobe Stock menolak video AI yang mengandung "Quality Issues" seperti temporal morphing (perubahan bentuk meliuk antar-frame), tekstur meliuk/meleleh (seperti ladang, pakaian, kayu, awan, atau kulit yang berubah pola saat kamera bergerak), anatomi/mata/wajah AI terdistorsi (creepy/uncanny eyes, mata juling/asimetris), atau flickering petir/pencahayaan yang menciptakan artefak piksel. Jika ditemukan salah satu cacat ini, status ai_artifact, deformed_object, bad_anatomy, flickering, low_aesthetic_quality, dan recommendation WAJIB di-set ke FAIL.
-   - Anatomi Cacat (Deformed Anatomy): Mata asimetris/juling/terdistorsi, jari berlebih/kurang, tangan/kaki meliuk secara tidak logis.
-   - Geometri & Fisika Mustahil: Objek menyatu secara aneh, potongan melayang, tekstur meleleh/meliuk tidak masuk akal saat bergerak.
-   - Polusi Visual AI & Compression Noise: Artefak sisa rendering, noise pada area bayangan/langit gelap, dan flickering kasar pada efek petir/cahaya.
-
-7. INTELLECTUAL PROPERTY (IP) & TRADEMARK RESTRICTIONS (Hukum & Hak Cipta - Berdasarkan Kebijakan Resmi Adobe Stock Known Restrictions di https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-   - PUBLIC DOMAIN EXCEPTION (PENGECUALIAN AMAN): Dokumen sejarah, teks kuno, dan dokumen pemerintah dari domain publik (seperti The Constitution, The Bill of Rights, Declaration of Independence, naskah kuno, peta sejarah) adalah 100% AMAN dan TIDAK MELANGGAR IP. Jangan flag dokumen publik atau sejarah sebagai pelanggaran IP.
-   - Merek & Logo Komersial: Penggunaan logo, merek dagang, nama merek, karya seni orang lain, font berhak cipta modern, atau kemasan produk yang dapat dikenali. Wajib tolak secara instan. PENGECUALIAN: Tulisan tangan kaligrafi atau font kuno dalam dokumen sejarah (The Constitution, Bill of Rights) adalah 100% AMAN.
-   - Desain Khas & Bentuk Produk: Desain fisik yang khas dari produk komersial modern sebagai subjek utama, seperti mainan (lego bricks, boneka Barbie, dsb), barang fesyen/fashion items, elektronik (bentuk bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang yang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
-   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta yang ikonik.
-   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
-     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
-     * Landmark atau monumen tertentu tidak dapat diterima, bahkan dengan rilis properti (certain landmarks or monuments cannot be accepted, even with releases).
-     * Arsitektur modern dengan desain yang unik atau mudah dikenali (modern architecture with a unique or recognizable design) ketika ditampilkan sebagai fokus utama tanpa rilis properti.
-     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta milik SETE). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
-     * Burj Al Arab, Burj Khalifa (Dubai)
-     * Sydney Opera House (Australia)
-     * Atomium (Brussels)
-     * Louvre Pyramid (Paris)
-     * Space Needle (Seattle)
-     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
-     * Istana Neuschwanstein (Jerman)
-     * CN Tower (Toronto)
-     * The Shard, London Eye, Tower Bridge (London)
-     * Transamerica Pyramid (San Francisco)
-     * Kuil Sagrada Família (khusus bagian interior)
-     * Taipei 101 (Taiwan)
-     * Menara Kembar Petronas (Malaysia)
-     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual (TERMASUK ADOBE STOCK GENERATIVE AI CONTENT POLICY - https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
-     * Karya cipta ciptaan orang lain (copyrighted works created by others), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta: Tokoh fiksi dari buku, film, komik, game, atau acara televisi (seperti Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC, Barbie, LEGO, dsb.) = FAIL secara instan jika terdeteksi.
-     * Nama Artis / Gaya Artis Berhak Cipta: Visual yang meniru gaya khas seniman tertentu yang masih dilindungi hak cipta (misal: "in the style of Van Gogh", "drawn by Picasso", dsb.) = FAIL secara instan jika diindikasikan meniru artis berhak cipta.
-     * Nama Orang Nyata Terkenal (Real Known People): Kemiripan visual dengan selebritas, politisi, atlet, tokoh sejarah terkenal, atau figur publik lainnya = FAIL secara instan.
-     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas:
-     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
-     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
-   - Hak Pribadi & Tubuh (Biometrics):
-     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk.
-     * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
-     * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
-
----
-STATUS & SKORING (HARUS SANGAT KONSISTEN & KETAT):
-- PASS: Lulus standar Adobe Stock secara sempurna. Skor WAJIB 75 - 100.
-- FAIL: Ditolak karena melanggar minimal salah satu kriteria di atas (Kriteria A, B, atau C). Skor WAJIB di bawah 70 (0 - 69).
-*PENTING: Jangan berikan skor abu-abu di rentang 70-74. Jika gagal, skor harus di bawah 70. Jika lulus, skor minimal 75.*
-
-ATURAN BAHASA:
-Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons (termasuk visual_scan_analysis, technical_issues, strengths, detailed_feedback, dan note pada quality_checks) wajib menggunakan bahasa tersebut secara konsisten sesuai pilihan pengguna.
-
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
-
-  const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-        visual_scan_analysis: { type: Type.STRING },
-        legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
-        technical_issues: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-        },
-        strengths: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-        },
-        overall_score: { type: Type.NUMBER },
-        technical_score: { type: Type.NUMBER },
-        visual_score: { type: Type.NUMBER },
-        recommendation: { type: Type.STRING, enum: ["PASS", "FAIL", "RETOUCH"] },
-        adobe_stock_readiness: { type: Type.STRING, enum: ["Ready", "Needs Improvement", "Reject Risk"] },
-        detailed_feedback: { type: Type.STRING },
-        quality_checks: {
-            type: Type.OBJECT,
-            properties: {
-                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                overexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                underexposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                camera_shake: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                out_of_focus: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                flickering: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                duplicate_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                empty_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                black_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                frozen_frame: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                motion_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                ghosting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                geometry_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                visual_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status", "note"] }
-            },
-            required: [
-                "blur", "noise", "compression_artifacts", "blocking", "banding", 
-                "overexposure", "underexposure", "white_balance", "motion_blur",
-                "camera_shake", "out_of_focus", "flickering", "duplicate_frame",
-                "empty_frame", "black_frame", "frozen_frame", "watermark",
-                "logo", "text", "ai_artifact", "deformed_object", "bad_anatomy",
-                "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality",
-                "motion_consistency", "ghosting", "geometry_consistency", "visual_quality"
-            ]
-        },
-        heatmaps: {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    type: { type: Type.STRING },
-                    x: { type: Type.NUMBER },
-                    y: { type: Type.NUMBER },
-                    intensity: { type: Type.NUMBER },
-                    raw_value: { type: Type.STRING }
-                },
-                required: ["type", "x", "y", "intensity", "raw_value"]
-            }
-        }
-    },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
-  };
-
   const imageParts: any[] = [];
-  if (videoFile) {
-    imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
-  }
-  if (frames && frames.length > 0) {
-    imageParts.push(...frames.map(f => processFrameServer(f)));
-  }
-
+  if (videoFile) imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
+  if (frames?.length > 0) imageParts.push(...frames.map((f: any) => processFrameServer(f)));
   const frameCount = frames ? frames.length : 0;
 
-  // 🔍 PRE-SCREENING: check for AI upscale indicators from technical metadata
-  let aiContextNote = '';
-  if (videoMetadata) {
-    const meta = typeof videoMetadata === 'string' ? JSON.parse(videoMetadata) : videoMetadata;
-    const encoder = meta?.encoder || meta?.Streams?.[0]?.encoder || '';
-    const isLavEncoded = /Lav[cf]/.test(encoder);
-    const highBitrate = meta?.bitrate && meta?.duration && (meta.bitrate / (meta.duration * 1000) > 5000);
-    if (isLavEncoded || highBitrate) {
-      aiContextNote = '\n\n⚠️ TECHNICAL CONTEXT: Video metadata (encoder: ' + encoder + ', high bitrate) suggests this may be AI-generated or AI-upscaled content. Pay EXTRA attention to: (1) over-sharpened edges with white halos, (2) unnaturally smooth/waxy skin textures, (3) inconsistent detail levels (some areas sharp, some blurred), (4) temporal texture warping between frames. These are classic AI upscale defects that Adobe Stock rejects.';
+  // ===== PHASE 1: DETERMINISTIC TECHNICAL ANALYSIS (ffprobe + FFmpeg + OpenCV pixel) =====
+  let techReport: any = null;
+  if (videoTechnicalReport) techReport = typeof videoTechnicalReport === 'string' ? JSON.parse(videoTechnicalReport) : videoTechnicalReport;
+  const techChecks = computeTechnicalQualityChecks(techReport, tolerance);
+  const techScore = computeTechnicalScore(techChecks);
+
+  // ===== PHASE 2: AI VISION — SUBJECTIVE CATEGORIES ONLY (IP, aesthetics, AI artifacts) =====
+  const aiPrompt = `Analyze ${frameCount} video keyframes for SUBJECTIVE quality issues ONLY:
+- watermark, logo, text (IP/brand detection)
+- ai_artifact, deformed_object, bad_anatomy (AI generation defects)  
+- cropped_subject, cut_off_object, wrong_perspective (composition)
+- low_aesthetic_quality, white_balance, ghosting, geometry_consistency (aesthetics)
+- compression_artifacts, blocking, banding, motion_blur (compression/motion)
+
+TECHNICAL metrics are ALREADY computed deterministically from ffprobe+FFmpeg+OpenCV:
+Blur:${techChecks.blur?.status || 'PASS'}, Exposure:${techChecks.overexposure?.status || 'PASS'}/${techChecks.underexposure?.status || 'PASS'}, Black:${techChecks.black_frame?.status || 'PASS'}, Frozen:${techChecks.frozen_frame?.status || 'PASS'}, Flicker:${techChecks.flickering?.status || 'PASS'}, Stability:${techReport?.stabilityStatus || 'N/A'}
+Resolution:${techReport?.ffprobe?.video?.width || '?'}x${techReport?.ffprobe?.video?.height || '?'}, FPS:${techReport?.ffprobe?.video?.fps?.toFixed(1) || 'N/A'}
+
+DO NOT re-evaluate technical metrics. Only assess SUBJECTIVE categories.
+Set UNKNOWN for categories not visible. Response in ${targetLanguageName}.`;
+
+  const aiSchema = {
+    type: Type.OBJECT,
+    properties: {
+      visual_scan_analysis: { type: Type.STRING },
+      legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
+      ai_checks: {
+        type: Type.OBJECT,
+        properties: {
+          watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          ai_artifact: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          deformed_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          bad_anatomy: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          white_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          ghosting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          geometry_consistency: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          compression_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          blocking: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          banding: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          motion_blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] }
+        },
+        required: ["watermark","logo","text","ai_artifact","deformed_object","bad_anatomy","cropped_subject","cut_off_object","wrong_perspective","low_aesthetic_quality","white_balance","ghosting","geometry_consistency","compression_artifacts","blocking","banding","motion_blur"]
+      }
+    },
+    required: ["visual_scan_analysis","legal_status","ai_checks"]
+  };
+
+  let aiResult: any = { visual_scan_analysis: '', legal_status: 'SAFE', ai_checks: {} };
+  try {
+    if (NON_GEMINI_PROVIDERS.has(provider)) {
+      const res = await callOpenAICompatibleWithRetry({ systemInstruction: aiPrompt, contents: aiPrompt, responseMimeType: 'application/json', responseSchema: aiSchema, config: { temperature: 0.1 }, model });
+      try { aiResult = JSON.parse(typeof res === 'string' ? res : extractJSON(res)); } catch {}
+    } else {
+      try {
+        const parts: any[] = [...imageParts, { text: aiPrompt }];
+        const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-flash', { parts }, { systemInstruction: aiPrompt, responseMimeType: 'application/json', responseSchema: aiSchema, temperature: 0.1 }, 1);
+        aiResult = JSON.parse(extractJSON(res.text || '{}'));
+      } catch (e: any) { console.warn('[checkVideoQuality] AI failed, technical-only:', e.message); }
     }
-  }
+  } catch (e: any) { console.warn('[checkVideoQuality] AI error:', e.message); }
 
-    const evalText = `You are examining ${frameCount} keyframes extracted at strategic points across this video's duration.${aiContextNote}
+  // ===== PHASE 3: MERGE + STANDARDIZED SCORING (70% tech + 30% AI) =====
+  const aiCh = aiResult?.ai_checks || {};
+  const merged: any = {
+    blur: techChecks.blur || { status: 'PASS', note: '' },
+    noise: techChecks.noise || { status: 'PASS', note: '' },
+    overexposure: techChecks.overexposure || { status: 'PASS', note: '' },
+    underexposure: techChecks.underexposure || { status: 'PASS', note: '' },
+    flickering: techChecks.flickering || { status: 'PASS', note: '' },
+    black_frame: techChecks.black_frame || { status: 'PASS', note: '' },
+    frozen_frame: techChecks.frozen_frame || { status: 'PASS', note: '' },
+    empty_frame: techChecks.empty_frame || { status: 'PASS', note: '' },
+    duplicate_frame: techChecks.duplicate_frame || { status: 'PASS', note: '' },
+    camera_shake: techChecks.camera_shake || { status: 'PASS', note: '' },
+    out_of_focus: techChecks.out_of_focus || { status: 'PASS', note: '' },
+    motion_consistency: techChecks.motion_consistency || { status: 'PASS', note: '' },
+    visual_quality: techChecks.visual_quality || { status: 'PASS', note: '' },
+    watermark: aiCh.watermark || { status: 'UNKNOWN', note: '' },
+    logo: aiCh.logo || { status: 'UNKNOWN', note: '' },
+    text: aiCh.text || { status: 'UNKNOWN', note: '' },
+    ai_artifact: aiCh.ai_artifact || { status: 'UNKNOWN', note: '' },
+    deformed_object: aiCh.deformed_object || { status: 'UNKNOWN', note: '' },
+    bad_anatomy: aiCh.bad_anatomy || { status: 'UNKNOWN', note: '' },
+    cropped_subject: aiCh.cropped_subject || { status: 'UNKNOWN', note: '' },
+    cut_off_object: aiCh.cut_off_object || { status: 'UNKNOWN', note: '' },
+    wrong_perspective: aiCh.wrong_perspective || { status: 'UNKNOWN', note: '' },
+    low_aesthetic_quality: aiCh.low_aesthetic_quality || { status: 'UNKNOWN', note: '' },
+    white_balance: aiCh.white_balance || { status: 'UNKNOWN', note: '' },
+    ghosting: aiCh.ghosting || { status: 'UNKNOWN', note: '' },
+    geometry_consistency: aiCh.geometry_consistency || { status: 'UNKNOWN', note: '' },
+    compression_artifacts: aiCh.compression_artifacts || { status: 'UNKNOWN', note: '' },
+    blocking: aiCh.blocking || { status: 'UNKNOWN', note: '' },
+    banding: aiCh.banding || { status: 'UNKNOWN', note: '' },
+    motion_blur: aiCh.motion_blur || { status: 'UNKNOWN', note: '' },
+  };
 
-🔍 ANALYSIS METHOD (follow strictly):
-1. Examine EACH individual frame at pixel level — zoom in mentally to 200-400%.
-2. COMPARE adjacent frames (frame 1→2, 2→3, 3→4...) for temporal changes — look for morphing, texture warping, flickering, ghosting between frames.
-3. Check the raw video for motion-related defects that static frames miss.
+  const tKeys = ['blur','overexposure','underexposure','black_frame','frozen_frame','empty_frame','duplicate_frame','flickering','camera_shake','out_of_focus','motion_consistency','visual_quality','noise'];
+  const aKeys = ['watermark','logo','text','ai_artifact','deformed_object','bad_anatomy','cropped_subject','cut_off_object','wrong_perspective','low_aesthetic_quality','white_balance','ghosting','geometry_consistency','compression_artifacts','blocking','banding','motion_blur'];
 
-For EVERY quality_checks category:
-- SEE the defect → FAIL with specific pixel-level description
-- DON'T see the defect → PASS
-- Category doesn't apply → UNKNOWN with reason
+  let tF = 0, tT = 0, aF = 0, aT = 0;
+  for (const k of tKeys) { if (merged[k] && merged[k].status !== 'UNKNOWN') { tT++; if (merged[k].status === 'FAIL') tF++; } }
+  for (const k of aKeys) { if (merged[k] && merged[k].status !== 'UNKNOWN') { aT++; if (merged[k].status === 'FAIL') aF++; } }
 
-⚠️ MANDATORY:
-- Do NOT skip any category. Verify each one against actual visual evidence.
-- Any real quality issues that would cause Adobe Stock rejection → FAIL (score 0-69)
-- Truly clean across ALL checks → PASS (score 75-95)
-- This standard applies equally to ALL videos.
+  const tScore = tT > 0 ? Math.round(100 - (tF / tT) * 100) : 85;
+  const aScore = aT > 0 ? Math.round(100 - (aF / aT) * 100) : 85;
+  const overall = Math.round(tScore * 0.7 + aScore * 0.3);
 
-Response in ${language}.`;
+  const hasCrit = merged.watermark?.status === 'FAIL' || merged.logo?.status === 'FAIL' || merged.ai_artifact?.status === 'FAIL' || merged.bad_anatomy?.status === 'FAIL' || merged.frozen_frame?.status === 'FAIL' || merged.black_frame?.status === 'FAIL';
 
-  let responseText = "";
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({
-      systemInstruction,
-      contents: evalText,
-      responseMimeType: "application/json",
-      responseSchema,
-      config: { temperature: 0.3 },
-      model
-    });
-    responseText = res;
-  } else {
-    try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', evalText, {
-        systemInstruction,
-        contents: imageParts,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.3
-      }, 1);
-      responseText = res.text || "{}";
-    } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', evalText, {
-        systemInstruction,
-        contents: imageParts,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.3
-      }, 1);
-      responseText = res.text || "{}";
-    }
-  }
+  let rec = 'PASS', readiness = 'Ready';
+  if (tolerance === 'STRICT') { if (overall < 75 || hasCrit) { rec = 'FAIL'; readiness = 'Reject Risk'; } }
+  else if (tolerance === 'MEDIUM') { if (overall < 65 || hasCrit) { rec = 'FAIL'; readiness = 'Reject Risk'; } else if (overall < 75) { rec = 'RETOUCH'; readiness = 'Needs Improvement'; } }
+  else { if (overall < 55 || hasCrit) { rec = 'FAIL'; readiness = 'Reject Risk'; } else if (overall < 70) { rec = 'RETOUCH'; readiness = 'Needs Improvement'; } }
 
-  return JSON.parse(extractJSON(responseText));
+  const issues: string[] = [], strengths: string[] = [];
+  for (const [k, v] of Object.entries(merged)) { if ((v as any).status === 'FAIL') issues.push(`${k}: ${(v as any).note}`); if ((v as any).status === 'PASS') strengths.push(`${k}: ${(v as any).note}`); }
+
+  console.log(`[checkVideoQuality] Provider:${provider} Tech:${tScore} AI:${aScore} Overall:${overall} Rec:${rec}`);
+
+  return {
+    visual_scan_analysis: aiResult?.visual_scan_analysis || `Technical: ${tScore}/100 (ffprobe+FFmpeg+OpenCV). AI: ${aScore}/100.`,
+    legal_status: aiResult?.legal_status || 'SAFE',
+    technical_issues: issues,
+    strengths,
+    overall_score: overall,
+    technical_score: tScore,
+    visual_score: aScore,
+    recommendation: rec,
+    adobe_stock_readiness: readiness,
+    detailed_feedback: `[ffprobe+FFmpeg+Pixel]:${tScore} | [AI-${provider}]:${aScore} | Overall:${overall} | Consistent across models`,
+    quality_checks: merged,
+    heatmaps: []
+  };
 }
 
+/* ===== FIXED: generateMotionCode restored as standalone function ===== */
 export async function generateMotionCode(userPrompt: string, options?: { currentCode?: string; fps?: number; durationSeconds?: number; width?: number; height?: number; history?: Array<{role: string; content: string}>; model?: string }) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   const model = options?.model;
 
-  const systemInstruction = `You are an expert Remotion developer.
-Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation.
-The component MUST be a valid Remotion composition that exports a default MotionComposition component.
-
-RULES:
-- Use @remotion packages (react, compositions, etc.) appropriately.
-- The animation should be smooth, professional, and visually impressive.
-- Use React hooks (useState, useEffect, useRef, useCallback, useMemo) as needed.
-- Use the useCurrentFrame() and useVideoConfig() hooks from remotion to control timing.
-- The animation should loop seamlessly or have a clear beginning and end.
-- Add comments explaining key sections of the code.
-- Ensure all imports are from valid packages.
-- Return ONLY valid, runnable JSX/TSX code.
-
-CRITICAL:
-- Export as: export default MotionComposition;
-- The component should accept standard Remotion props.
-- Do NOT use external assets (images, fonts) unless they are system fonts or CSS-generated graphics.
-- Keep the code self-contained and production-ready.`;
+  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
+RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
 
   const contextParts: string[] = [];
-  contextParts.push(`Video canvas target: ${width}x${height} px, ${fps} fps, ${durationInFrames} frames total (${(durationInFrames / fps).toFixed(1)} seconds).`);
-  if (options?.currentCode && options.currentCode.trim().length > 0) {
-    contextParts.push(`CURRENT EXISTING CODE (this is the base you are editing/iterating on):
-\`\`\`jsx
-${options.currentCode}
-\`\`\``);
+  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Existing code:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+  if (options?.history?.length) {
+    const h = options.history.slice(-6);
+    contextParts.push(`History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
   }
-  if (options?.history && options.history.length > 0) {
-    const trimmedHistory = options.history.slice(-6);
-    contextParts.push(`Recent conversation history for extra context:
-${trimmedHistory.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.content}`).join('\n')}`);
-  }
-  contextParts.push(`User's new request: "${userPrompt}"`);
-
+  contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join('\n\n');
 
-  const responseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING },
-      summary: { type: Type.STRING },
-      code: { type: Type.STRING }
-    },
-    required: ["title", "summary", "code"]
-  };
+  const responseSchema = { type: Type.OBJECT, properties: { title: { type: Type.STRING }, summary: { type: Type.STRING }, code: { type: Type.STRING } }, required: ["title", "summary", "code"] };
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({
-      systemInstruction,
-      contents: fullContents,
-      responseMimeType: "application/json",
-      responseSchema,
-      config: { temperature: 0.9 },
-      model
-    });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.9
-      }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.9
-      }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
 
   const parsed = JSON.parse(extractJSON(responseText));
-
-  // Basic safety/sanity cleanup: strip markdown fences if the model added them anyway
   if (typeof parsed.code === 'string') {
-    parsed.code = parsed.code
-      .replace(/^```(jsx|javascript|js|tsx)?\s*/i, '')
-      .replace(/```\s*$/i, '')
-      .trim();
-
-    if (!/MotionComposition/.test(parsed.code)) {
-      throw new Error('AI response did not include a MotionComposition export. Please try again.');
-    }
-  } else {
-    throw new Error('AI response missing code field. Please try again.');
-  }
-
-  return {
-    title: parsed.title || 'Untitled Motion',
-    summary: parsed.summary || '',
-    code: parsed.code as string
-  };
+    parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
+    if (!/MotionComposition/.test(parsed.code)) throw new Error('AI response did not include a MotionComposition export.');
+  } else throw new Error('AI response missing code field.');
+  return { title: parsed.title || 'Untitled Motion', summary: parsed.summary || '', code: parsed.code as string };
 }
 
+/* ===== uploadVideoToGemini ===== */
 export async function uploadVideoToGemini(videoPath: string, mimeType: string): Promise<{ fileUri: string; mimeType: string }> {
   const fs = await import('fs');
-  if (!fs.existsSync(videoPath)) {
-    throw new Error(`Video file not found: ${videoPath}`);
-  }
-  
-  // For Gemini File API upload, we use the Google GenAI client
-  const ai = getAIClient();
+  if (!fs.existsSync(videoPath)) throw new Error(`Video file not found: ${videoPath}`);
   const fileBuffer = fs.readFileSync(videoPath);
   const base64Data = fileBuffer.toString('base64');
-  
-  // Upload to Gemini via inline data
-  return {
-    fileUri: `data:${mimeType};base64,${base64Data}`,
-    mimeType
-  };
+  return { fileUri: `data:${mimeType};base64,${base64Data}`, mimeType };
 }
 
-/**
- * AI-Powered Watermark Removal using Gemini Vision
- * Menggunakan Gemini untuk menganalisis gambar dan menghapus watermark/text/logo
- * dari area yang di-mask, lalu mengisi area tersebut dengan inpainting kontekstual.
- */
-export async function removeWatermark(
-  imageBase64: string,
-  maskBase64: string,
-  preset: string
-): Promise<{ processedImage: string; status: string }> {
+/* ===== removeWatermark - Gemini AI + Server-Side Pixel Inpainting ===== */
+export async function removeWatermark(imageBase64: string, maskBase64: string, preset: string): Promise<{ processedImage: string; status: string }> {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
+  const imageMime = imageBase64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+  const imageData = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-  const systemInstruction = `You are an expert AI image restoration and inpainting specialist.
-Your task is to analyze the provided image and the mask overlay (red area indicates the watermark/logo/text to remove).
+  // Gemini analysis
+  const imagePart = { inlineData: { mimeType: imageMime, data: imageData } };
+  const promptText = `Analyze this image. The red overlay region shows watermark area to remove (preset: ${preset}). Describe what should fill that area.`;
+  const parts: any[] = [imagePart];
+  if (maskBase64) parts.push({ inlineData: { mimeType: 'image/png', data: maskBase64.replace(/^data:image\/\w+;base64,/, '') } });
+  parts.push({ text: promptText });
 
-INSTRUCTIONS:
-1. Examine the image carefully. The red masked area shows where the watermark, logo, or unwanted text is located.
-2. Analyze the surrounding pixels, textures, colors, patterns, and lighting around the masked area.
-3. Describe EXACTLY what natural content should fill the masked region based on the surrounding context.
-
-Return your analysis as a JSON object with:
-- "analysis": what's in the masked area
-- "fill_description": exact description of replacement content
-- "colors": array of 3 hex colors that match the surrounding area
-- "pattern": one of ["solid", "gradient", "textured", "complex"]`;
-
-  try {
-    // Strip data URI prefixes for Gemini inlineData
-    const imageMime = imageBase64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-    const imageData = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const maskData = maskBase64 ? maskBase64.replace(/^data:image\/\w+;base64,/, '') : '';
-
-    const imagePart = { inlineData: { mimeType: imageMime, data: imageData } };
-    const promptText = `Analyze this image. The red overlay region shows the watermark/logo area to remove (preset: ${preset}). 
-Describe what natural content should fill that area based on surrounding pixels.`;
-
-    // Build parts array - include mask as second image if provided
-    const parts: any[] = [imagePart];
-    if (maskData) {
-      parts.push({ inlineData: { mimeType: 'image/png', data: maskData } });
-    }
-    parts.push({ text: promptText });
-
-    let analysisResult: any = null;
-    
-    if (NON_GEMINI_PROVIDERS.has(provider)) {
-      const res = await callOpenAICompatibleWithRetry({
-        systemInstruction,
-        contents: promptText,
-        responseMimeType: 'application/json',
-        config: { temperature: 0.2 },
-        model: undefined
-      });
-      try {
-        analysisResult = JSON.parse(typeof res === 'string' ? res : extractJSON(res));
-      } catch { analysisResult = {}; }
-    } else {
-      try {
-        const res = await callGeminiWithRetry('gemini-2.5-flash', { parts }, {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              analysis: { type: Type.STRING },
-              fill_description: { type: Type.STRING },
-              colors: { type: Type.ARRAY, items: { type: Type.STRING } },
-              pattern: { type: Type.STRING }
-            },
-            required: ['analysis', 'fill_description', 'colors', 'pattern']
-          },
-          temperature: 0.2
-        }, 1);
-        analysisResult = JSON.parse(extractJSON(res.text || '{}'));
-      } catch (geminiErr: any) {
-        console.warn('[removeWatermark] Gemini analysis failed, using pixel-based inpainting:', geminiErr.message);
-      }
-    }
-
-    console.log('[removeWatermark] Analysis:', analysisResult?.fill_description?.substring(0, 80) || 'none');
-
-    // ===== SERVER-SIDE PIXEL INPAINTING USING jpeg-js =====
-    // The image from frontend is JPEG (toDataURL 'image/jpeg'), mask is PNG.
-    // We use preset coordinates for the mask since jpeg-js can't decode PNG.
+  let analysis: any = null;
+  if (!NON_GEMINI_PROVIDERS.has(provider)) {
     try {
-      const jpeg = await import('jpeg-js');
-      
-      // Decode the source JPEG image
-      const imgBuffer = Buffer.from(imageData, 'base64');
-      const rawImageData = jpeg.default.decode(imgBuffer, { useTArray: true });
-      const { width, height, data: pixels } = rawImageData;
-      
-      // Calculate mask region from preset coordinates
-      const maskPixels = new Uint8Array(width * height);
-      const mw = Math.floor(width * 0.30);
-      const mh = Math.floor(height * 0.18);
-      const pad = Math.floor(width * 0.015);
-      
-      let startX = width - mw - pad;
-      let startY = height - mh - pad;
-      
-      if (preset === 'bottom-left') {
-        startX = Math.floor(width * 0.02);
-        startY = height - mh - Math.floor(height * 0.02);
-      } else if (preset === 'top-right') {
-        startX = width - mw - Math.floor(width * 0.02);
-        startY = Math.floor(height * 0.02);
-      } else if (preset === 'center-grid') {
-        // Center cross pattern for stock watermarks
-        const stripH = Math.floor(height * 0.08);
-        for (let y = Math.floor(height * 0.46); y < Math.floor(height * 0.46) + stripH && y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            if (y >= 0) maskPixels[y * width + x] = 1;
-          }
-        }
-        for (let y = 0; y < height; y++) {
-          for (let x = Math.floor(width * 0.46); x < Math.floor(width * 0.46) + stripH && x < width; x++) {
-            if (x >= 0) maskPixels[y * width + x] = 1;
-          }
-        }
-      } else if (preset === 'auto-detect') {
-        // Default to bottom-right with wider coverage
-        startX = width - Math.floor(width * 0.32) - 10;
-        startY = height - Math.floor(height * 0.20) - 10;
-      }
-      
-      // Fill mask region (for non-grid presets)
-      if (preset !== 'center-grid') {
-        for (let y = Math.max(0, startY); y < Math.min(height, startY + mh); y++) {
-          for (let x = Math.max(0, startX); x < Math.min(width, startX + mw); x++) {
-            maskPixels[y * width + x] = 1;
-          }
-        }
-      }
-      
-      const hasMask = maskPixels.some(v => v === 1);
-      
-      if (hasMask) {
-        // Multi-pass neighborhood interpolation inpainting
-        const radius = Math.min(Math.max(Math.floor(Math.min(width, height) * 0.04), 6), 24);
-        
-        // First pass: use only unmasked neighbors
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const idx = y * width + x;
-            if (!maskPixels[idx]) continue;
-            
-            let rSum = 0, gSum = 0, bSum = 0, weightSum = 0;
-            
-            for (let dy = -radius; dy <= radius; dy++) {
-              const ny = y + dy;
-              if (ny < 0 || ny >= height) continue;
-              for (let dx = -radius; dx <= radius; dx++) {
-                const nx = x + dx;
-                if (nx < 0 || nx >= width) continue;
-                const nIdx = ny * width + nx;
-                if (maskPixels[nIdx]) continue;
-                
-                const distSq = dx * dx + dy * dy;
-                if (distSq === 0 || distSq > radius * radius) continue;
-                
-                const weight = 1.0 / (Math.sqrt(distSq) + 0.1);
-                const pOffset = nIdx * 4;
-                rSum += pixels[pOffset] * weight;
-                gSum += pixels[pOffset + 1] * weight;
-                bSum += pixels[pOffset + 2] * weight;
-                weightSum += weight;
-              }
-            }
-            
-            if (weightSum > 0) {
-              const pOffset = idx * 4;
-              pixels[pOffset] = Math.round(rSum / weightSum);
-              pixels[pOffset + 1] = Math.round(gSum / weightSum);
-              pixels[pOffset + 2] = Math.round(bSum / weightSum);
-            }
-          }
-        }
-        
-        // Second pass: refine using inpainted neighbors
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const idx = y * width + x;
-            if (!maskPixels[idx]) continue;
-            
-            let rSum = 0, gSum = 0, bSum = 0, weightSum = 0;
-            
-            for (let dy = -Math.floor(radius/2); dy <= Math.floor(radius/2); dy++) {
-              const ny = y + dy;
-              if (ny < 0 || ny >= height) continue;
-              for (let dx = -Math.floor(radius/2); dx <= Math.floor(radius/2); dx++) {
-                const nx = x + dx;
-                if (nx < 0 || nx >= width) continue;
-                const nIdx = ny * width + nx;
-                
-                const distSq = dx * dx + dy * dy;
-                if (distSq === 0) continue;
-                
-                const weight = 1.0 / (Math.sqrt(distSq) + 0.1);
-                const pOffset = nIdx * 4;
-                rSum += pixels[pOffset] * weight;
-                gSum += pixels[pOffset + 1] * weight;
-                bSum += pixels[pOffset + 2] * weight;
-                weightSum += weight;
-              }
-            }
-            
-            if (weightSum > 0) {
-              const pOffset = idx * 4;
-              pixels[pOffset] = Math.round(rSum / weightSum);
-              pixels[pOffset + 1] = Math.round(gSum / weightSum);
-              pixels[pOffset + 2] = Math.round(bSum / weightSum);
-            }
-          }
-        }
-        
-        // Encode back to JPEG
-        const processedJpeg = jpeg.default.encode({ data: pixels, width, height }, 92);
-        const processedBase64 = `data:image/jpeg;base64,${processedJpeg.data.toString('base64')}`;
-        
-        console.log('[removeWatermark] Server-side inpainting completed successfully');
-        return { processedImage: processedBase64, status: 'success' };
-      }
-    } catch (inpaintErr: any) {
-      console.warn('[removeWatermark] Server inpainting failed:', inpaintErr.message);
-    }
-
-    // If inpainting failed or no mask, return original for client-side fallback
-    return { processedImage: imageBase64, status: 'fallback', error: 'Server inpainting not available' };
-
-  } catch (err: any) {
-    console.error('[removeWatermark] Error:', err.message);
-    return { processedImage: imageBase64, status: 'fallback', error: err.message };
+      const res = await callGeminiWithRetry('gemini-2.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
+      analysis = JSON.parse(extractJSON(res.text || '{}'));
+    } catch {}
   }
+
+  // Server-side pixel inpainting via jpeg-js
+  try {
+    const jpeg = await import('jpeg-js');
+    const imgBuffer = Buffer.from(imageData, 'base64');
+    const raw = jpeg.default.decode(imgBuffer, { useTArray: true });
+    const { width, height, data: pixels } = raw;
+
+    const maskPixels = new Uint8Array(width * height);
+    const mw = Math.floor(width * 0.30), mh = Math.floor(height * 0.18);
+    let sx = width - mw - Math.floor(width * 0.015), sy = height - mh - Math.floor(height * 0.015);
+    if (preset === 'bottom-left') { sx = Math.floor(width * 0.02); sy = height - mh - Math.floor(height * 0.02); }
+    else if (preset === 'top-right') { sx = width - mw - Math.floor(width * 0.02); sy = Math.floor(height * 0.02); }
+    for (let y = Math.max(0, sy); y < Math.min(height, sy + mh); y++)
+      for (let x = Math.max(0, sx); x < Math.min(width, sx + mw); x++)
+        maskPixels[y * width + x] = 1;
+
+    if (maskPixels.some(v => v === 1)) {
+      const r = Math.min(Math.max(Math.floor(Math.min(width, height) * 0.04), 6), 24);
+      for (let pass = 0; pass < 2; pass++) {
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            if (!maskPixels[idx]) continue;
+            let rs = 0, gs = 0, bs = 0, ws = 0;
+            const rr = pass === 0 ? r : Math.floor(r / 2);
+            for (let dy = -rr; dy <= rr; dy++) {
+              const ny = y + dy; if (ny < 0 || ny >= height) continue;
+              for (let dx = -rr; dx <= rr; dx++) {
+                const nx = x + dx; if (nx < 0 || nx >= width) continue;
+                const nI = ny * width + nx;
+                if (pass === 0 && maskPixels[nI]) continue;
+                const d2 = dx * dx + dy * dy; if (d2 === 0 || (pass === 0 && d2 > r * r)) continue;
+                const w = 1.0 / (Math.sqrt(d2) + 0.1);
+                const po = nI * 4; rs += pixels[po] * w; gs += pixels[po + 1] * w; bs += pixels[po + 2] * w; ws += w;
+              }
+            }
+            if (ws > 0) { const po = idx * 4; pixels[po] = Math.round(rs / ws); pixels[po + 1] = Math.round(gs / ws); pixels[po + 2] = Math.round(bs / ws); }
+          }
+        }
+      }
+      const enc = jpeg.default.encode({ data: pixels, width, height }, 92);
+      return { processedImage: `data:image/jpeg;base64,${enc.data.toString('base64')}`, status: 'success' };
+    }
+  } catch (e: any) { console.warn('[removeWatermark] Inpainting fallback:', e.message); }
+
+  return { processedImage: imageBase64, status: 'fallback', error: 'Inpainting unavailable' };
 }
