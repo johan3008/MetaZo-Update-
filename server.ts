@@ -1658,34 +1658,53 @@ app.get('/api/debug-uploads', (req, res) => {
                     }
                 }
 
-                // 2. Upload raw video to Gemini File API as well
+                // 2. Get video reference for Gemini — use R2 presigned URL instead of base64
                 try {
-                    console.log('Server check-video-quality: Uploading raw video to Gemini...');
-                    videoFile = await uploadVideoToGemini(videoPath, req.file ? req.file.mimetype : 'video/mp4');
+                    console.log('Server check-video-quality: Getting video reference for Gemini...');
+                    const videoMime = req.file ? req.file.mimetype : 'video/mp4';
+                    
+                    // If video is in R2, generate presigned URL so Gemini fetches directly (no base64, no OOM)
+                    if (req.body.pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
+                        const presignCmd = new GetObjectCommand({
+                            Bucket: process.env.S3_BUCKET_NAME,
+                            Key: req.body.pathKey
+                        });
+                        const presignedUrl = await getSignedUrl(getS3Client(), presignCmd, { expiresIn: 3600 });
+                        videoFile = { fileUri: presignedUrl, mimeType: videoMime };
+                        console.log('[Video Audit] Using R2 presigned URL for Gemini direct fetch');
+                    } else {
+                        // Fallback: use uploadVideoToGemini for local files (skips >25MB)
+                        videoFile = await uploadVideoToGemini(videoPath, videoMime);
+                    }
                     extractionSuccess = true;
                 } catch (uploadErr: any) {
-                    console.warn('[Video Audit] Upload to Gemini File API failed:', uploadErr);
+                    console.warn('[Video Audit] Video reference failed:', uploadErr.message);
                 }
             }
 
             if (extractionSuccess && (videoFile || (frames && frames.length > 0))) {
                 console.log('Server check-video-quality: Analyzing frames with Gemini...');
+                // Timeout helper: wraps any promise with a max execution time
+                const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
+                    Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms/1000}s`)), ms))]);
+
                 let videoMetadata = null;
                 if (videoPath) {
                     try {
                         console.log('Server check-video-quality: Extracting ExifTool metadata...');
                         const { exiftool } = require('exiftool-vendored');
-                        videoMetadata = await exiftool.read(videoPath);
-                        // Clean up noisy or binary metadata to save prompt tokens
-                        delete videoMetadata.Directory;
-                        delete videoMetadata.SourceFile;
-                        delete videoMetadata.FileName;
-                        delete videoMetadata.FileAccessDate;
-                        delete videoMetadata.FileModifyDate;
-                        delete videoMetadata.FileInodeChangeDate;
-                        delete videoMetadata.FilePermissions;
-                    } catch (exifErr) {
-                        console.warn('[Video Audit] ExifTool extraction failed:', exifErr);
+                        videoMetadata = await withTimeout(exiftool.read(videoPath), 15000, 'ExifTool');
+                        if (videoMetadata) {
+                            delete videoMetadata.Directory;
+                            delete videoMetadata.SourceFile;
+                            delete videoMetadata.FileName;
+                            delete videoMetadata.FileAccessDate;
+                            delete videoMetadata.FileModifyDate;
+                            delete videoMetadata.FileInodeChangeDate;
+                            delete videoMetadata.FilePermissions;
+                        }
+                    } catch (exifErr: any) {
+                        console.warn('[Video Audit] ExifTool extraction failed:', exifErr.message);
                     }
                 }
                 let technicalReport = null;
@@ -1693,13 +1712,13 @@ app.get('/api/debug-uploads', (req, res) => {
                     try {
                         console.log('Server check-video-quality: Running videoAnalyzer...');
                         const { analyzeVideoTechnically } = await import('./server/videoAnalyzer.ts');
-                        technicalReport = await analyzeVideoTechnically(videoPath, frames);
+                        technicalReport = await withTimeout(analyzeVideoTechnically(videoPath, frames), 45000, 'videoAnalyzer');
                         console.log('Server check-video-quality: videoAnalyzer completed successfully');
-                    } catch (techErr) {
-                        console.warn('[Video Audit] Technical analysis failed, proceeding without it:', techErr);
+                    } catch (techErr: any) {
+                        console.warn('[Video Audit] Technical analysis failed, proceeding without it:', techErr.message);
                     }
                 }
-                const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport);
+                const data = await withTimeout(checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport), 45000, 'checkVideoQuality');
                 console.log('Server check-video-quality: Analysis successful');
                 cleanupFn();
                 res.json({ ...data, technical_details: technicalReport });
