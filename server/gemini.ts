@@ -5061,7 +5061,7 @@ ${JSON.stringify(gt, null, 1)}
 IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolute reference:
 - Black frames detected by FFmpeg = FAIL mandatory
 - Frozen frames detected by FFmpeg = FAIL mandatory  
-- Blur detected by Laplacian variance (<15) = FAIL mandatory
+- EXTREME BLUR detected by OpenCV (Laplacian variance < 15 or BLURRED) = FAIL mandatory, no exceptions. If technical ground truth says it is blurred, the final recommendation MUST be FAIL.
 - Resolution < 1920x1080 = FAIL mandatory
 - FPS < 23.976 = FAIL mandatory
 - Stability FLICKERING = FAIL mandatory
@@ -5149,7 +5149,7 @@ If ANY mandatory technical failure is detected → recommendation = FAIL, overal
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
     
-    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
+    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 90000));
     responseText = await Promise.race([aiPromise, timeout]);
   } catch (e: any) {
     responseText = JSON.stringify({ visual_scan_analysis: 'AI unavailable', legal_status: 'SAFE', technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: 'FAIL', adobe_stock_readiness: 'Reject Risk', detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
