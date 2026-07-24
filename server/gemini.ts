@@ -5068,13 +5068,14 @@ IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolut
 
 ======= YOUR SUBJECTIVE ASSESSMENT =======
 Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
+(NOTE: The images are provided in pairs: Image 1 is a Full Frame, Image 2 is a 200% Zoom Center Crop of the same frame. Use the 200% Zoom crops specifically to rigorously check for Compression Artifacts, Noise, Banding, and AI texture defects).
 
 1. TEMPORAL MORPHING: Do textures/objects change shape unnaturally between frames? (warping, melting, liquid-like deformation)
-2. TEXTURE WARPING: Do backgrounds/surfaces distort or ripple when the camera moves?
-3. FLICKERING: Are there rapid brightness/color fluctuations NOT already caught by stability analysis?
+2. TEXTURE WARPING & BANDING: Do backgrounds/surfaces distort, ripple, or have ugly color banding (checked via Zoom Crop)?
+3. FLICKERING & COMPRESSION: Are there rapid brightness fluctuations or blocky compression artifacts (checked via Zoom Crop)?
 4. GHOSTING: Are there duplicate/semi-transparent trails behind moving objects?
 5. GEOMETRY CONSISTENCY: Do objects maintain logical 3D structure? (collapsing, floating, impossible geometry)
-6. AI ARTIFACTS: Any generative AI defects? (uncanny faces, extra fingers, gibberish text, pattern collapse)
+6. AI ARTIFACTS & NOISE: Any generative AI defects, extra fingers, gibberish text, or harsh noise grain (checked via Zoom Crop)?
 
 ======= FINAL DECISION =======
 Tolerance: ${tolerance}. Language: ${targetLanguageName}.
