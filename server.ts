@@ -1602,7 +1602,7 @@ app.get('/api/debug-uploads', (req, res) => {
                                     isDone = true;
                                     reject(new Error("Video extraction timed out."));
                                 }
-                            }, 45000);
+                            }, 90000);
 
                             const extractFast = async () => {
                                 try {
@@ -1712,13 +1712,13 @@ app.get('/api/debug-uploads', (req, res) => {
                     try {
                         console.log('Server check-video-quality: Running videoAnalyzer...');
                         const { analyzeVideoTechnically } = await import('./server/videoAnalyzer.ts');
-                        technicalReport = await withTimeout(analyzeVideoTechnically(videoPath, frames), 45000, 'videoAnalyzer');
+                        technicalReport = await withTimeout(analyzeVideoTechnically(videoPath, frames), 90000, 'videoAnalyzer');
                         console.log('Server check-video-quality: videoAnalyzer completed successfully');
                     } catch (techErr: any) {
                         console.warn('[Video Audit] Technical analysis failed, proceeding without it:', techErr.message);
                     }
                 }
-                const data = await withTimeout(checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport), 45000, 'checkVideoQuality');
+                const data = await withTimeout(checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport), 90000, 'checkVideoQuality');
                 console.log('Server check-video-quality: Analysis successful');
                 cleanupFn();
                 res.json({ ...data, technical_details: technicalReport });
