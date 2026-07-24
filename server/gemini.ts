@@ -5053,7 +5053,10 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   }
 
   // Build AI system instruction with ground truth
-  const systemInstruction = `You are an Adobe Stock Senior QA Curator. Your job is to make the FINAL PASS/FAIL decision for this video.
+  const systemInstruction = `You are an EXTREMELY STRICT and UNFORGIVING Adobe Stock Senior QA Curator. 
+Your job is to make the FINAL PASS/FAIL decision for this video. You MUST NOT be lenient. 
+If you spot even the SLIGHTEST micro-artifact, unnatural AI texture, or physics inconsistency, you MUST mercilessly FAIL the video. Assume all AI videos are flawed until proven perfect.
+CRITICAL: DO NOT GUESS OR HALLUCINATE. Base your verdict strictly on the visible evidence in the provided frames and the mathematical ground truth. Do not invent defects that aren't there, but remain absolutely ruthless on the ones that are.
 
 ======= TECHNICAL GROUND TRUTH (from ffprobe + FFmpeg filters + OpenCV pixel analysis) =======
 ${JSON.stringify(gt, null, 1)}
@@ -5081,7 +5084,7 @@ Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
 ======= FINAL DECISION =======
 Tolerance: ${tolerance}. Language: ${targetLanguageName}.
 Return your PASS/FAIL verdict with COMPLETE JSON. The technical ground truth above should heavily influence scores.
-If ANY mandatory technical failure is detected → recommendation = FAIL, overall_score < 70.`;
+ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY of the 7 Subjective AI-Vision criteria (Morphing, Warping, Banding, Artifacts, etc.) is flagged as flawed/problematic, the final recommendation MUST be FAIL and overall_score MUST be < 70. Do NOT pass a video that has even one quality issue.`;
 
   const responseSchema = {
     type: Type.OBJECT,
