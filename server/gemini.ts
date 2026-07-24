@@ -1509,6 +1509,7 @@ VISUAL ACCURACY RULES:
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
 4. Never hallucinate brands, trademarked logos, or copyrighted characters.
 5. If uncertain, provide the closest accurate generic description.
+6. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
@@ -1648,6 +1649,7 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
 - SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
+- SPECIAL ASSET TYPES (FLATLAY & GREEN SCREEN): If the visual facts indicate a "Flatlay" (top-down view) or "Green Screen" (chroma key background), you MUST include "Flatlay" or "Green Screen" (and their variations like "Top-down view", "Chroma Key") prominently in BOTH the Title and Keywords.
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
