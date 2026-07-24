@@ -5145,8 +5145,8 @@ If ANY mandatory technical failure is detected → recommendation = FAIL, overal
   let responseText = '';
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
-      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: `Analyze ${frameCount} frames. Return full JSON with PASS/FAIL.`, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
-      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview',
+      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
+      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-1.5-pro',
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
