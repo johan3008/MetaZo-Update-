@@ -1628,9 +1628,17 @@ app.get('/api/debug-uploads', (req, res) => {
 
                                     const framePaths = [];
                                     for (let i = 0; i < timestamps.length; i++) {
-                                        const fPath = path.join(outDir, `frame-${i + 1}.jpg`);
-                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPath}" -y`);
-                                        framePaths.push(fPath);
+                                        const fPathFull = path.join(outDir, `frame-full-${i + 1}.jpg`);
+                                        const fPathZoom = path.join(outDir, `frame-zoom-${i + 1}.jpg`);
+                                        
+                                        // 1. Full Frame (scaled down to 1280x720 for composition/morphing check)
+                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPathFull}" -y`);
+                                        
+                                        // 2. Zoomed Crop (100-200% zoom crop of the absolute center to detect raw pixel defects)
+                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(800,iw):min(800,ih)" "${fPathZoom}" -y`);
+                                        
+                                        framePaths.push(fPathFull);
+                                        framePaths.push(fPathZoom);
                                     }
 
                                     const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
