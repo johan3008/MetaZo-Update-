@@ -1646,9 +1646,9 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
    ${directives.prohibitedExemptions}
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
+- HUMAN-FRIENDLY SEARCH INTENT (LONG-TAIL SEO): Write metadata that sounds completely natural and conversational. Search engine algorithms and microstock indexers now heavily prioritize human-friendly, long-tail search queries over robotic keyword stuffing (e.g., use natural phrasing like "young business woman working on a laptop in a modern bright cafe" instead of disconnected terms).
+- SEMANTIC & CONTEXTUAL TAXONOMY: Blend high-weight concrete keywords with natural context. Answer the 5Ws (Who, What, Where, When, Why) to ensure the asset ranks across a broad spectrum of semantic search indexes.
+- HIGH-VALUE NICHE FRONT-LOADING: Place the most descriptive, highly specific visual keywords at the very beginning of the Title. Search algorithms weigh the first 3-5 words significantly higher than the rest!
 - SPECIAL ASSET TYPES (FLATLAY & GREEN SCREEN): If the visual facts indicate a "Flatlay" (top-down view) or "Green Screen" (chroma key background), you MUST include "Flatlay" or "Green Screen" (and their variations like "Top-down view", "Chroma Key") prominently in BOTH the Title and Keywords.
 
 Rules for Titles:
