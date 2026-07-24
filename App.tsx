@@ -2086,7 +2086,6 @@ const App: React.FC = () => {
 
   // Login promo modal removed per user request
 
-  // Wrapped activeTool setter to enforce trial constraints and update clean browser URL
   const handleSetActiveTool = (tool: ToolType) => {
     setActiveTool(tool);
     const path = toolToPath[tool] || '/Dashboard';
@@ -2094,6 +2093,15 @@ const App: React.FC = () => {
     if (!isIframe && window.location.pathname !== path) {
       window.history.pushState(null, '', path);
     }
+    
+    // Interactive: Scroll to top smoothly when changing tabs
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    
+    // Also scroll the main scrollable container if it has a generic scrollbar (optional fallback)
+    const mainScrollAreas = document.querySelectorAll('.overflow-y-auto');
+    mainScrollAreas.forEach(area => {
+      area.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    });
   };
 
   // Sync route path state, auth redirection, and listen for back/forward navigation popstate events
