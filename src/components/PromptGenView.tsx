@@ -56,6 +56,13 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
   { id: 'Grimdark Gothic Horror Painterly', label: 'Grimdark Gothic Horror Painterly', icon: '🎨' },
+  { id: 'Grimdark', label: 'Grimdark', icon: '🌑' },
+  { id: 'Gothic Horror', label: 'Gothic Horror', icon: '🕍' },
+  { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', icon: '🔥' },
+  { id: 'Macabre Art', label: 'Macabre Art', icon: '💀' },
+  { id: 'Occult Horror', label: 'Occult Horror', icon: '🔮' },
+  { id: 'Cinematic Horror Concept Art', label: 'Cinematic Horror', icon: '🎞️' },
+  { id: 'Painterly Digital Art', label: 'Painterly Digital Art', icon: '🖌️' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
   { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }

@@ -32,11 +32,17 @@ interface ImageItem {
 const PREMIUM_ONLY_STYLES = [
   'Embroidery',
   'Disney Cartoon',
-  'Dark Horror Aesthetic',
   'Lego Style',
   'Voxel Art',
   'Graphic Design',
-  'Grimdark Gothic Horror Painterly'
+  'Grimdark Gothic Horror Painterly',
+  'Grimdark',
+  'Gothic Horror',
+  'Infernal / Hellscape',
+  'Macabre Art',
+  'Occult Horror',
+  'Cinematic Horror Concept Art',
+  'Painterly Digital Art'
 ];
 
 const STYLE_OPTIONS = (t: any) => [
@@ -52,6 +58,13 @@ const STYLE_OPTIONS = (t: any) => [
   { id: 'Disney Cartoon', label: 'Disney Cartoon', icon: '🏰', desc: 'Animation' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic', icon: '🦇', desc: 'Macabre' },
   { id: 'Grimdark Gothic Horror Painterly', label: 'Grimdark Gothic Painterly', icon: '🎨', desc: 'Gothic Painting' },
+  { id: 'Grimdark', label: 'Grimdark', icon: '🌑', desc: 'Dark Fantasy' },
+  { id: 'Gothic Horror', label: 'Gothic Horror', icon: '🕍', desc: 'Ancient Terror' },
+  { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', icon: '🔥', desc: 'Demonic Realm' },
+  { id: 'Macabre Art', label: 'Macabre Art', icon: '💀', desc: 'Sinister Art' },
+  { id: 'Occult Horror', label: 'Occult Horror', icon: '🔮', desc: 'Dark Magic' },
+  { id: 'Cinematic Horror Concept Art', label: 'Cinematic Horror', icon: '🎞️', desc: 'Movie Fear' },
+  { id: 'Painterly Digital Art', label: 'Painterly Digital Art', icon: '🖌️', desc: 'Impasto Canvas' },
   { id: 'Lego Style', label: 'Lego Style', icon: '🧱', desc: 'Bricks' },
   { id: 'Voxel Art', label: 'Voxel Art', icon: '🟩', desc: 'Cubes' },
   { id: 'Graphic Design', label: 'Graphic Design', icon: '📐', desc: 'Commercial Design' }
