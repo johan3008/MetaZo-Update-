@@ -3200,6 +3200,50 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "macabre painterly style, moody low-key lighting, gothic elements, dramatic and scary atmosphere",
       "ominous dark fantasy digital painting, brutalist grimdark aesthetics, hauntingly beautiful but terrifying"
     ],
+    "Grimdark": [
+      "grimdark, oppressive shadows, terrifying atmosphere, hyper-detailed dark fantasy",
+      "brutalist grimdark aesthetics, bleak world, highly detailed digital painting",
+      "grimdark masterpiece, dark fantasy art, ominous mood, hyper-realistic"
+    ],
+    "Gothic Horror": [
+      "gothic horror, eerie mist, decaying ancient architecture, unsettling lighting",
+      "classic gothic horror, creepy mansion, moonlit shadows, macabre atmosphere",
+      "terrifying gothic horror art, intricate gothic architecture, sinister mood"
+    ],
+    "Infernal / Hellscape": [
+      "infernal hellscape, demonic elements, brimstone and fire, ominous dark fantasy",
+      "fiery infernal landscape, demonic horror, terrifying hellish environment",
+      "infernal abyss, chaotic fire and shadows, dark fantasy masterpiece"
+    ],
+    "Macabre Art": [
+      "macabre art, sinister environment, bone-chilling details, dark surrealism",
+      "creepy macabre painting, unsettling subjects, high-contrast dark art",
+      "macabre masterpiece, grim details, dark and terrifying aesthetics"
+    ],
+    "Occult Horror": [
+      "occult horror, ancient runes, dark magic rituals, creepy and mysterious mood",
+      "terrifying occult ritual scene, eerie lighting, dark mysterious fantasy",
+      "occult horror aesthetics, eerie symbolism, unsettling dark magic art"
+    ],
+    "Cinematic Horror Concept Art": [
+      "cinematic horror concept art, high-contrast chiaroscuro, moody lighting, terrifying and beautiful",
+      "cinematic dark horror, volumetric mist, terrifying movie still, highly detailed",
+      "masterful cinematic horror composition, atmospheric dread, epic dark concept art"
+    ],
+    "Painterly Digital Art": [
+      "painterly digital art, heavy impasto brushstrokes, dark horror aesthetics, masterwork painting",
+      "expressive painterly horror art, thick brushstrokes, eerie mood, beautiful yet terrifying",
+      "digital painterly style, classical horror aesthetic, highly detailed brushwork"
+    ],
+    "Dark Horror Aesthetic": [
+      "grimdark, oppressive shadows, terrifying atmosphere, hyper-detailed dark fantasy",
+      "gothic horror, eerie mist, decaying ancient architecture, unsettling lighting",
+      "infernal / hellscape, demonic elements, brimstone and fire, ominous dark fantasy",
+      "macabre art, sinister environment, bone-chilling details, dark surrealism",
+      "occult horror, ancient runes, dark magic rituals, creepy and mysterious mood",
+      "cinematic horror concept art, high-contrast chiaroscuro, moody lighting, terrifying and beautiful",
+      "painterly digital art, heavy impasto brushstrokes, dark horror aesthetics, masterwork painting"
+    ],
     "Scifi Concept Art": [
       "sci-fi concept art illustration, high-tech spaceship interior, futuristic details, cinematic key visual",
       "space exploration alien-planet scenic, cyberpunk elements, futuristic architecture, sleek structures",
