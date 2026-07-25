@@ -844,6 +844,31 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                 </div>
               </div>
 
+              {/* Sub-style selector for Dark Horror Aesthetic */}
+              {styleCategory === 'Dark Horror Aesthetic' && (
+                <div className="mb-4 bg-red-900/10 border border-red-500/20 p-4 rounded-[1.5rem] animate-in fade-in slide-in-from-top-2 duration-300">
+                  <h3 className="text-[11px] font-black uppercase tracking-wider text-red-500 mb-3 flex items-center gap-2">
+                    <span className="text-lg">🦇</span> Pilih Sub-Gaya Horor
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {DARK_HORROR_SUB_STYLES.map((sub) => (
+                      <div 
+                        key={sub.id}
+                        onClick={() => setDarkHorrorSubStyle(sub.id)}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col gap-1 ${
+                          darkHorrorSubStyle === sub.id 
+                            ? 'bg-red-500/20 border-red-500 text-white shadow-md shadow-red-500/10' 
+                            : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-red-500/30'
+                        }`}
+                      >
+                        <div className="font-bold text-[10px] uppercase text-slate-700 dark:text-slate-300">{sub.label}</div>
+                        <div className="text-[9px] opacity-70 leading-relaxed font-medium">{sub.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* PNG Background Dropdown Option - Only visible when promptMode === 'png' */}
               {promptMode === 'png' && (
                 <div className="space-y-4">
