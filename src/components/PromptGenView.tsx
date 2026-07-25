@@ -55,17 +55,19 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Embroidery', label: 'Embroidery (Seni Bordir)', icon: '🧵' },
   { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
-  { id: 'Grimdark Gothic Horror Painterly', label: 'Grimdark Gothic Horror Painterly', icon: '🎨' },
-  { id: 'Grimdark', label: 'Grimdark', icon: '🌑' },
-  { id: 'Gothic Horror', label: 'Gothic Horror', icon: '🕍' },
-  { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', icon: '🔥' },
-  { id: 'Macabre Art', label: 'Macabre Art', icon: '💀' },
-  { id: 'Occult Horror', label: 'Occult Horror', icon: '🔮' },
-  { id: 'Cinematic Horror Concept Art', label: 'Cinematic Horror', icon: '🎞️' },
-  { id: 'Painterly Digital Art', label: 'Painterly Digital Art', icon: '🖌️' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
   { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
+];
+
+const DARK_HORROR_SUB_STYLES = [
+  { id: 'Grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
+  { id: 'Gothic Horror', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
+  { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
+  { id: 'Macabre Art', label: 'Macabre Art', desc: 'Lingkungan yang menyeramkan dengan detail surealisme gelap.' },
+  { id: 'Occult Horror', label: 'Occult Horror', desc: 'Rune kuno, ritual sihir gelap, dan suasana misterius.' },
+  { id: 'Cinematic Horror Concept Art', label: 'Cinematic Horror Concept Art', desc: 'Pencahayaan chiaroscuro berbayang pekat ala film.' },
+  { id: 'Painterly Digital Art', label: 'Painterly Digital Art', desc: 'Goresan kuas tebal (impasto) ala mahakarya lukisan digital.' }
 ];
 
 const PNG_STYLE_OPTIONS = [
@@ -136,15 +138,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   uiLanguage = 'en'
 }) => {
   const [subject, setSubject] = useState('');
-
-  useEffect(() => {
-    if (prefilledSubject) {
-      setSubject(prefilledSubject);
-      if (onPrefillConsumed) onPrefillConsumed();
-    }
-  }, [prefilledSubject, onPrefillConsumed]);
-
   const [styleCategory, setStyleCategory] = useState('Cinematic');
+  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('Grimdark');
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
   const [minWords, setMinWords] = useState<number>(15);
   const [maxWords, setMaxWords] = useState<number>(60);
@@ -201,6 +196,13 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [history, setHistory] = useState<PromptHistoryItem[]>([]);
 
   // Load history with backward compatibility and cloud sync
+  useEffect(() => {
+    if (prefilledSubject) {
+      setSubject(prefilledSubject);
+      if (onPrefillConsumed) onPrefillConsumed();
+    }
+  }, [prefilledSubject, onPrefillConsumed]);
+
   useEffect(() => {
     // Load deleted prompt history item IDs to prevent resurrection
     let deletedIds: string[] = [];
@@ -417,8 +419,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         headers: getHeaders(aiOptions),
         body: JSON.stringify({
           subject: subject.trim(),
-          styleCategory,
-          variation,
+          styleCategory: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : styleCategory,
+          count: variation,
           promptMode,
           pngBgColor,
           minWords,
