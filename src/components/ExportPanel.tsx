@@ -12,6 +12,14 @@ interface ExportPanelProps {
   setExportCanva: (v: boolean) => void;
   exportFreepik: boolean;
   setExportFreepik: (v: boolean) => void;
+  exportPond5: boolean;
+  setExportPond5: (v: boolean) => void;
+  exportDepositPhotos: boolean;
+  setExportDepositPhotos: (v: boolean) => void;
+  exportMiriCanvas: boolean;
+  setExportMiriCanvas: (v: boolean) => void;
+  export123RF: boolean;
+  setExport123RF: (v: boolean) => void;
   shutterstockDescMode: 'desc' | 'title_desc';
   setShutterstockDescMode: (v: 'desc' | 'title_desc') => void;
   autoDownloadCSV: boolean;
@@ -33,6 +41,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   setExportCanva,
   exportFreepik,
   setExportFreepik,
+  exportPond5,
+  setExportPond5,
+  exportDepositPhotos,
+  setExportDepositPhotos,
+  exportMiriCanvas,
+  setExportMiriCanvas,
+  export123RF,
+  setExport123RF,
   shutterstockDescMode,
   setShutterstockDescMode,
   autoDownloadCSV,
@@ -57,7 +73,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           <label className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500 block mb-3">
             Target Stock Platforms
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {/* Adobe Stock */}
             <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
               exportAdobe ? 'border-slate-800 dark:border-indigo-500 bg-slate-50/50 dark:bg-indigo-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-slate-350 dark:hover:border-slate-800'
@@ -150,6 +166,82 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               <div>
                 <span className="text-xs font-extrabold text-slate-700 dark:text-slate-100 block">Freepik</span>
                 <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Category keywords split</span>
+              </div>
+            </label>
+
+            {/* Pond5 */}
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
+              exportPond5 ? 'border-sky-500 bg-sky-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-sky-300 dark:hover:border-slate-800'
+            }`}>
+              <input type="checkbox" className="hidden" checked={exportPond5} onChange={(e) => setExportPond5(e.target.checked)} />
+              <div className="flex items-center justify-between w-full mb-3">
+                <span className="text-[9px] font-black px-1.5 py-0.5 bg-sky-500 text-white rounded uppercase">P5</span>
+                <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border ${
+                  exportPond5 ? 'bg-sky-500 text-white border-transparent' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-slate-800'
+                }`}>
+                  {exportPond5 && <Check size={10} />}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-100 block">Pond5</span>
+                <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Standard metadata</span>
+              </div>
+            </label>
+
+            {/* Deposit Photos */}
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
+              exportDepositPhotos ? 'border-teal-500 bg-teal-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-teal-300 dark:hover:border-slate-800'
+            }`}>
+              <input type="checkbox" className="hidden" checked={exportDepositPhotos} onChange={(e) => setExportDepositPhotos(e.target.checked)} />
+              <div className="flex items-center justify-between w-full mb-3">
+                <span className="text-[9px] font-black px-1.5 py-0.5 bg-teal-500 text-white rounded uppercase">DP</span>
+                <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border ${
+                  exportDepositPhotos ? 'bg-teal-500 text-white border-transparent' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-slate-800'
+                }`}>
+                  {exportDepositPhotos && <Check size={10} />}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-100 block">DepositPhotos</span>
+                <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Standard metadata</span>
+              </div>
+            </label>
+
+            {/* MiriCanvas */}
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
+              exportMiriCanvas ? 'border-yellow-500 bg-yellow-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-yellow-300 dark:hover:border-slate-800'
+            }`}>
+              <input type="checkbox" className="hidden" checked={exportMiriCanvas} onChange={(e) => setExportMiriCanvas(e.target.checked)} />
+              <div className="flex items-center justify-between w-full mb-3">
+                <span className="text-[9px] font-black px-1.5 py-0.5 bg-yellow-500 text-white rounded uppercase">MC</span>
+                <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border ${
+                  exportMiriCanvas ? 'bg-yellow-500 text-white border-transparent' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-slate-800'
+                }`}>
+                  {exportMiriCanvas && <Check size={10} />}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-100 block">MiriCanvas</span>
+                <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Basic attributes</span>
+              </div>
+            </label>
+
+            {/* 123RF */}
+            <label className={`flex flex-col justify-between p-3.5 rounded-[1.5rem] border-2 cursor-pointer transition-all ${
+              export123RF ? 'border-pink-500 bg-pink-500/5 shadow-inner' : 'border-slate-200 dark:border-white/5 hover:border-pink-300 dark:hover:border-slate-800'
+            }`}>
+              <input type="checkbox" className="hidden" checked={export123RF} onChange={(e) => setExport123RF(e.target.checked)} />
+              <div className="flex items-center justify-between w-full mb-3">
+                <span className="text-[9px] font-black px-1.5 py-0.5 bg-pink-500 text-white rounded uppercase">123RF</span>
+                <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border ${
+                  export123RF ? 'bg-pink-500 text-white border-transparent' : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-slate-800'
+                }`}>
+                  {export123RF && <Check size={10} />}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-100 block">123RF</span>
+                <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Standard metadata</span>
               </div>
             </label>
           </div>
