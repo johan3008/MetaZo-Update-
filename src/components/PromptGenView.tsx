@@ -55,6 +55,7 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Embroidery', label: 'Embroidery (Seni Bordir)', icon: '🧵' },
   { id: 'Disney Cartoon', label: 'Disney Cartoon (Kartun Disney)', icon: '🏰' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
+  { id: 'Grimdark Gothic Horror Painterly', label: 'Grimdark Gothic Horror Painterly', icon: '🎨' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
   { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
