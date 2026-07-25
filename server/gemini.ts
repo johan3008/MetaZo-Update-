@@ -2756,6 +2756,7 @@ export const generateOptimizedPrompt = async (options: {
   model?: string;
   seed?: number;
   flatIconType?: 'sheet' | 'single';
+  iconSheetColumns?: number;
   vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
@@ -2770,6 +2771,7 @@ export const generateOptimizedPrompt = async (options: {
     model = undefined,
     seed = Math.floor(Math.random() * 1000000),
     flatIconType = undefined,
+    iconSheetColumns = undefined,
     vectorSubType = undefined
   } = options;
 
@@ -2810,8 +2812,8 @@ export const generateOptimizedPrompt = async (options: {
 
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
-      ? ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design) utilizing smooth linear and radial color gradients instead of pure solid colors. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines.'
-      : ' - Style Guide: Focus on flat design aesthetic (ciri-ciri flat design), featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO 3D effects, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions suitable for high-end digital interfaces.',
+      ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines.'
+      : ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic, featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO shading, NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions.',
     "3D Render": ' - Focus on soft studio lighting, Octane render quality, glossy or matte plastic materials, raytraced reflections, and smooth 3D surfaces.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
@@ -2844,7 +2846,8 @@ export const generateOptimizedPrompt = async (options: {
   let flatIconDirective = '';
   if (styleCategory === 'Flat Icon' && isPngMode && flatIconType) {
     if (flatIconType === 'sheet') {
-      flatIconDirective = ' - ICON COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a flat design icon collection sheet, showing a clean grid array, set, or organized group of multiple matching, cohesive flat icons or related pictograms on the same plain background, sharing a unified flat visual theme and color palette.';
+      const colStr = iconSheetColumns ? ` Specifically, arrange them strictly in a ${iconSheetColumns}-column grid layout.` : '';
+      flatIconDirective = ` - ICON COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a flat design icon collection sheet, showing a clean grid array, set, or organized group of multiple matching, cohesive flat icons or related pictograms on the same plain background, sharing a unified flat visual theme and color palette.${colStr}`;
     } else {
       flatIconDirective = ' - SINGLE STANDALONE ICON REQUIREMENT: Every prompt variation MUST describe exactly ONE single standalone individual flat design icon or centered pictogram, with absolutely NO other icons, NO multiple items, and NO grid sheet/collections in the composition.';
     }
@@ -2906,12 +2909,12 @@ Make sure your generated prompts do not contain these elements or depict them in
 
   let effectiveStyleCategory = styleCategory;
   if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
-    if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Minimal Flat Design';
-    else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Flat Vector Illustration';
-    else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Corporate Flat Illustration';
-    else if (vectorSubType === 'gradient_flat') effectiveStyleCategory = 'Gradient Flat Design';
-    else if (vectorSubType === 'flat_icon') effectiveStyleCategory = 'Flat Icon Design';
-    else if (vectorSubType === 'isometric_flat') effectiveStyleCategory = 'Isometric Flat Design';
+    if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Vector Art - Minimal Flat Design';
+    else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Vector Art - Flat Vector Illustration';
+    else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Vector Art - Corporate Flat Illustration';
+    else if (vectorSubType === 'gradient_flat') effectiveStyleCategory = 'Vector Art - Gradient Flat Design';
+    else if (vectorSubType === 'flat_icon') effectiveStyleCategory = 'Vector Art - Flat Icon Design';
+    else if (vectorSubType === 'isometric_flat') effectiveStyleCategory = 'Vector Art - Isometric Flat Design';
   }
 
   const systemInstruction = `You are an elite AI Image Prompt Designer specializing in text-to-image generators like Midjourney, DALL-E 3, Adobe Firefly, and Stable Diffusion.
