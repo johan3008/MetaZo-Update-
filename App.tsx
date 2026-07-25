@@ -1274,6 +1274,10 @@ const App: React.FC = () => {
   const [exportVecteezy, setExportVecteezy] = useState(false);
   const [exportCanva, setExportCanva] = useState(false);
   const [exportFreepik, setExportFreepik] = useState(false);
+  const [exportPond5, setExportPond5] = useState(false);
+  const [exportDepositPhotos, setExportDepositPhotos] = useState(false);
+  const [exportMiriCanvas, setExportMiriCanvas] = useState(false);
+  const [export123RF, setExport123RF] = useState(false);
   const [shutterstockDescMode, setShutterstockDescMode] = useState<'desc' | 'title_desc'>('desc');
   const [triggerAutoDownload, setTriggerAutoDownload] = useState(0);
   
@@ -2872,12 +2876,20 @@ const App: React.FC = () => {
           setExportVecteezy(true);
           setExportCanva(true);
           setExportFreepik(true);
+          setExportPond5(true);
+          setExportDepositPhotos(true);
+          setExportMiriCanvas(true);
+          setExport123RF(true);
       } else {
           setExportAdobe(false);
           setExportShutterstock(false);
           setExportVecteezy(false);
           setExportCanva(false);
           setExportFreepik(false);
+          setExportPond5(false);
+          setExportDepositPhotos(false);
+          setExportMiriCanvas(false);
+          setExport123RF(false);
       }
   };
 
@@ -4162,6 +4174,70 @@ const App: React.FC = () => {
       link.download = `MetaZo_Freepik_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
+
+    if (exportPond5) {
+      const headers = ['OriginalFilename', 'Title', 'Description', 'Keywords', 'Price', 'Editorial'];
+      const rows = toolFiles.map(f => [
+          escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
+          escapeCsv(f.title || ''),
+          escapeCsv(f.description || f.title || ''),
+          escapeCsv((f.keywords || []).join(',')),
+          '',
+          'no'
+      ]);
+      const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_Pond5_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (exportDepositPhotos) {
+      const headers = ['Filename', 'Title', 'Description', 'Keywords'];
+      const rows = toolFiles.map(f => [
+          escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
+          escapeCsv(f.title || ''),
+          escapeCsv(f.description || f.title || ''),
+          escapeCsv((f.keywords || []).join(','))
+      ]);
+      const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_DepositPhotos_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (exportMiriCanvas) {
+      const headers = ['Filename', 'Name', 'Keywords'];
+      const rows = toolFiles.map(f => [
+          escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
+          escapeCsv(f.title || ''),
+          escapeCsv((f.keywords || []).join(','))
+      ]);
+      const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_MiriCanvas_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    if (export123RF) {
+      const headers = ['filename', 'description', 'keywords'];
+      const rows = toolFiles.map(f => [
+          escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
+          escapeCsv(f.title || f.description || ''),
+          escapeCsv((f.keywords || []).join(','))
+      ]);
+      const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MetaZo_123RF_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
   };
 
   const handleDeleteFile = (id: string) => {
@@ -4692,6 +4768,14 @@ const App: React.FC = () => {
                     setExportCanva={setExportCanva} 
                     exportFreepik={exportFreepik} 
                     setExportFreepik={setExportFreepik} 
+                    exportPond5={exportPond5}
+                    setExportPond5={setExportPond5}
+                    exportDepositPhotos={exportDepositPhotos}
+                    setExportDepositPhotos={setExportDepositPhotos}
+                    exportMiriCanvas={exportMiriCanvas}
+                    setExportMiriCanvas={setExportMiriCanvas}
+                    export123RF={export123RF}
+                    setExport123RF={setExport123RF}
                     shutterstockDescMode={shutterstockDescMode} 
                     setShutterstockDescMode={setShutterstockDescMode} 
                     autoDownloadCSV={autoDownloadCSV} 
