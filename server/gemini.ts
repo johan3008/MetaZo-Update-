@@ -2925,6 +2925,7 @@ Input parameters:
 - Base Subject/Idea: "${subject}"
 - Selected Style Context: ${effectiveStyleCategory}
 - Theme Context & Salt Variabilitas: ${randomSaltInjection}
+- Dynamic Timestamp Seed: ${Date.now()}
 - Requested Number of Prompt Variations: ${count}
 - Requested Word Count Range: ${minWords} to ${maxWords} words per prompt
 - Focus Mode: ${promptMode.toUpperCase()}${userNegInstruction}
@@ -3076,7 +3077,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.95,
+            temperature: 0.85,
             seed: seed,
             topP: 0.99,
             topK: 100,
