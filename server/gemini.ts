@@ -2904,13 +2904,23 @@ Make sure your generated prompts do not contain these elements or depict them in
 
   const isPhotographic = ['Photorealistic', 'Cinematic', 'Vintage Photography'].includes(styleCategory);
 
+  let effectiveStyleCategory = styleCategory;
+  if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
+    if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Minimal Flat Design';
+    else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Flat Vector Illustration';
+    else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Corporate Flat Illustration';
+    else if (vectorSubType === 'gradient_flat') effectiveStyleCategory = 'Gradient Flat Design';
+    else if (vectorSubType === 'flat_icon') effectiveStyleCategory = 'Flat Icon Design';
+    else if (vectorSubType === 'isometric_flat') effectiveStyleCategory = 'Isometric Flat Design';
+  }
+
   const systemInstruction = `You are an elite AI Image Prompt Designer specializing in text-to-image generators like Midjourney, DALL-E 3, Adobe Firefly, and Stable Diffusion.
 Anda adalah AI Prompt Generator ahli yang bertugas membuat prompt gambar unik dan bervariasi.
 Your job is to translate a raw idea and specific style choices into exactly ${count} highly unique, descriptive, and professional-grade generation prompt variations in English.
 
 Input parameters:
 - Base Subject/Idea: "${subject}"
-- Selected Style Context: ${styleCategory}
+- Selected Style Context: ${effectiveStyleCategory}
 - Theme Context & Salt Variabilitas: ${randomSaltInjection}
 - Requested Number of Prompt Variations: ${count}
 - Requested Word Count Range: ${minWords} to ${maxWords} words per prompt
@@ -2927,7 +2937,7 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. ${isPhotographic ? 'Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).' : 'Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${styleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
+0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
 0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
