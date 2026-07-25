@@ -1486,6 +1486,9 @@ export const generateStockMetadata = async (
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
+  const realisticPhotoRule = `\n12. SPECIAL RULE FOR REALISTIC PHOTOS: Jika mendeteksi gambar tersebut adalah Foto Realistis, Real-World Scene, atau Seperti Pengambilan kamera, WAJIB sertakan keyword "candid", "photography", dll. KECUALI jika gambar adalah Kartun, Vector, Ilustrasi 2D/3D, dan selain foto realistis, maka DILARANG KERAS menggunakan keyword tersebut.`;
+  keywordRulePromptText += realisticPhotoRule;
+
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
   
@@ -2112,6 +2115,8 @@ export const generateBatchStockMetadata = async (
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
+  const realisticPhotoRule = `\n12. SPECIAL RULE FOR REALISTIC PHOTOS: Jika mendeteksi gambar tersebut adalah Foto Realistis, Real-World Scene, atau Seperti Pengambilan kamera, WAJIB sertakan keyword "candid", "photography", dll. KECUALI jika gambar adalah Kartun, Vector, Ilustrasi 2D/3D, dan selain foto realistis, maka DILARANG KERAS menggunakan keyword tersebut.`;
+  keywordRulePromptText += realisticPhotoRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
@@ -2770,12 +2775,12 @@ export const generateOptimizedPrompt = async (options: {
 
   const count = Math.min(Math.max(variation, 10), 150);
 
-  // ELEMEN KEJUTAN (Surprise Element) - Random Salt & Diversity Injection
-  const angles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot"];
-  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light"];
-  const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background"];
-  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky"];
-  const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream"];
+  // ELEMEN KEJUTAN (Surprise Element) - Random Salt & Diversity Injection (Expanded for Adobe Stock Similarity Protection)
+  const angles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot", "extreme close-up", "Dutch angle", "worm's-eye view", "bird's-eye view", "first-person POV"];
+  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "neon cyberpunk glow", "chiaroscuro lighting", "bioluminescent ambient light", "ethereal volumetric rays", "harsh cinematic spotlight", "dramatic backlighting with lens flare"];
+  const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background", "forced perspective", "kaleidoscopic symmetry", "abstract fragmented framing", "dramatic low-angle heroic composition", "ultra-wide architectural framing"];
+  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky", "thunderstorm dramatic sky", "heavy snow blizzard", "post-apocalyptic ash fall", "magical glowing floating embers", "surreal cosmic starscape"];
+  const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream", "vibrant neon cyberpunk palette", "dark moody cinematic tones", "surreal iridiscent colors", "high-contrast duotone", "hyper-saturated pop art colors"];
 
   // Linear Congruential Generator (PRNG) using the seed to ensure deterministic but highly varied selections
   let currentSeed = seed;
@@ -2943,6 +2948,10 @@ Rules for the Generated Prompts:
     - EVERY SINGLE PROMPT in the batch MUST be clearly, visibly, and dramatically differentiated from the others to prevent "Similar content" flag rejections.
     - Do NOT just make minimal variations (e.g., just changing a shirt color or moving a prop slightly). Each prompt must be a visually distinct, unique, and standalone masterpiece.
     - Moderators look for NOTICEABLE DIFFERENCES including variations in composition, color, expression, or scenario. You must be extremely selective and output only your most varied, premium, and distinct concepts.
+11. ADOBE STOCK SIMILARITY PROTECTION ACTIVE (CRITICAL CORE DIRECTIVE):
+    - DO NOT generate prompts that sound like generic, common, or natural stock photos (e.g., "business people shaking hands", "happy family in park", "generic coffee cup on table").
+    - You must forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
+    - Break the standard stock photography molds by using hyper-specific, unusual subject interactions, highly dramatic emotional states, or avant-garde conceptual presentations. Make the prompts incredibly creative, unpredictable, and highly varied.
     - Inject extreme variation across:
       * Composition & Camera Angle: Vary across wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, and overhead drone shots.
       * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
