@@ -35,7 +35,8 @@ const PREMIUM_ONLY_STYLES = [
   'Dark Horror Aesthetic',
   'Lego Style',
   'Voxel Art',
-  'Graphic Design'
+  'Graphic Design',
+  'Grimdark Gothic Horror Painterly'
 ];
 
 const STYLE_OPTIONS = (t: any) => [
@@ -50,6 +51,7 @@ const STYLE_OPTIONS = (t: any) => [
   { id: 'Embroidery', label: 'Embroidery', icon: '🧵', desc: 'Needlework' },
   { id: 'Disney Cartoon', label: 'Disney Cartoon', icon: '🏰', desc: 'Animation' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic', icon: '🦇', desc: 'Macabre' },
+  { id: 'Grimdark Gothic Horror Painterly', label: 'Grimdark Gothic Painterly', icon: '🎨', desc: 'Gothic Painting' },
   { id: 'Lego Style', label: 'Lego Style', icon: '🧱', desc: 'Bricks' },
   { id: 'Voxel Art', label: 'Voxel Art', icon: '🟩', desc: 'Cubes' },
   { id: 'Graphic Design', label: 'Graphic Design', icon: '📐', desc: 'Commercial Design' }
