@@ -3193,6 +3193,13 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "whimsical storybook digital painting, rich saturated warm colors, cozy fantasy vibe",
       "gothic fantasy concept art, dramatic moonlit scenery, beautiful intricate illustrations, epic scale"
     ],
+    "Grimdark Gothic Horror Painterly": [
+      "grimdark gothic horror, macabre atmosphere, oppressive shadows, decaying architecture, unsettling lighting",
+      "heavy impasto painterly brushstrokes, dark fantasy art, eerie mist, ominous mood, highly detailed oil painting style",
+      "gothic horror masterpiece, dark and gritty textures, sinister environment, classic dark fantasy illustration",
+      "macabre painterly style, moody low-key lighting, gothic elements, dramatic and scary atmosphere",
+      "ominous dark fantasy digital painting, brutalist grimdark aesthetics, hauntingly beautiful but terrifying"
+    ],
     "Scifi Concept Art": [
       "sci-fi concept art illustration, high-tech spaceship interior, futuristic details, cinematic key visual",
       "space exploration alien-planet scenic, cyberpunk elements, futuristic architecture, sleek structures",
@@ -3508,6 +3515,7 @@ Adapt the prompt structure according to the chosen style:
 - If 'Editorial': focus on fashion/magazine composition, avant-garde elements, professional retouching styles.
 - If 'Lifestyle': focus on natural motion, candid moments, warm/authentic lighting, everyday settings.
 - If 'Fine Art': focus on brushstrokes, medium textures, artistic theory, museum-quality lighting.
+- If 'Grimdark Gothic Horror Painterly': focus on macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy and gothic horror art.
 
 CRITICAL RULES:
 1. OUTPUT PROMPT MUST BE IN ENGLISH.
@@ -3588,6 +3596,7 @@ Adapt the logic based on style:
 - Photorealistic/Cinematic: High technical detail, optics, and lighting.
 - Adobe Stock/Editorial: Commercial composition and polish.
 - Lifestyle/Fine Art: Emotional resonance and artistic medium.
+- Grimdark Gothic Horror Painterly: Macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy.
 
 CRITICAL BATCH RULES:
 1. You are receiving ${images.length} distinct images.
@@ -5064,6 +5073,13 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     if (report.scene_detection?.scene_changes_detected) {
       gt.scene_changes = `${report.scene_detection.scene_changes?.length || 0} cuts detected`;
     }
+    // Perceptual Metrics from Python Microservice
+    if (report.advancedMetrics) {
+      gt.brisque = report.advancedMetrics.brisque;
+      gt.niqe = report.advancedMetrics.niqe;
+      gt.ssim = report.advancedMetrics.ssim;
+      gt.lpips = report.advancedMetrics.lpips;
+    }
   }
 
   // Build AI system instruction with ground truth
@@ -5088,12 +5104,15 @@ Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
 (NOTE: The images are provided in pairs: Image 1 is a Full Frame, Image 2 is a 200% Zoom Center Crop of the same frame. Use the 200% Zoom crops specifically to rigorously check for Compression Artifacts, Noise, Banding, and AI texture defects).
 
 1. TEMPORAL MORPHING: Do textures/objects change shape unnaturally between frames? (warping, melting, liquid-like deformation)
-2. TEXTURE WARPING, BANDING & MICRO-REFLECTIONS: Do backgrounds/surfaces distort, ripple, or have ugly color banding? PAY STRICT ATTENTION to complex lighting, water reflections, and wet floors. AI often fails here by generating inconsistent, micro-warping light patterns (checked via Zoom Crop).
-3. FLICKERING & COMPRESSION: Are there rapid brightness fluctuations or blocky compression artifacts (checked via Zoom Crop)?
-4. GHOSTING: Are there duplicate/semi-transparent trails behind moving objects?
-5. GEOMETRY CONSISTENCY: Do objects maintain logical 3D structure? (collapsing, floating, impossible geometry)
-6. AI ARTIFACTS & NOISE: Any generative AI defects, extra fingers, gibberish text, or harsh noise grain (checked via Zoom Crop)?
-7. KINEMATICS & PHYSICS (Content Motion): Do objects move with natural momentum, gravity, and physics, or is the movement robotic, stiff, or unnaturally slow/gelatinous (common in AI videos)?
+2. TEXTURE WARPING & MICRO-REFLECTIONS: Do backgrounds/surfaces distort, ripple, or have unnatural micro-warping light patterns?
+3. BANDING (Color Banding): Are there posterization effects or harsh, stepped gradients in the sky, gradients, or flat surfaces instead of smooth transitions?
+4. FLICKERING & COMPRESSION: Are there rapid, strobing brightness fluctuations, macro-blocks, or severe compression artifacts (checked via Zoom Crop)?
+5. OVERSHARPENING (Halos): Are there unnatural bright outlines or halos around the edges of subjects due to excessive digital sharpening?
+6. GHOSTING: Are there duplicate/semi-transparent trails behind moving objects?
+7. GEOMETRY CONSISTENCY: Do objects maintain logical 3D structure? (collapsing, floating, impossible geometry)
+8. AI ARTIFACTS & NOISE: Any generative AI defects, extra fingers, gibberish text, or harsh noise grain (checked via Zoom Crop)?
+9. KINEMATICS & PHYSICS: Do objects move with natural momentum, gravity, and physics, or is the movement robotic, stiff, or unnaturally slow/gelatinous (common in AI videos)?
+10. INTELLECTUAL PROPERTY & BRAND SAFETY (ADOBE STOCK POLICY): Does the video contain any commercial logos, brand names, trademarked designs (e.g., iPhone camera bumps, Adidas stripes), copyrighted artworks, modern museum paintings, or restricted landmarks (e.g., Eiffel Tower at night, Hollywood Sign)? (Note: Public domain historical documents and generic toys are SAFE). If any IP violation is detected, you MUST fail the video.
 
 ======= FINAL DECISION =======
 Tolerance: ${tolerance}. Language: ${targetLanguageName}.
