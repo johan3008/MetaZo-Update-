@@ -8,21 +8,6 @@ import {
 
 import { FeatureGuideButton } from './FeatureGuideModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { useRef } from 'react';
-
-const INSPIRATIONS_DATA = [
-  { text: "Graphic Design template for a Summer Sale, featuring a large empty circular copy space in the center, vibrant neon pink and orange abstract geometric waves, floating 3D spheres, sleek borders, and a minimal frame, perfect for social media advertisement.", label: "Promo Template 📣" },
-  { text: "Graphic Design template for a celebratory event, featuring a vast clean minimalist blue and white background with a clear visual hierarchy, festive floating ribbons, colorful balloons, gold confetti, and elegant borders, ideal for a banner or poster.", label: "Festive Template 🎉" },
-  { text: "Low angle shot of a diverse business team brainstorming around a glass table in a modern sunlit office, skyscrapers visible in the background, candid interaction.", label: "Team Strategy 📈" },
-  { text: "Wide shot of an elderly traveler looking out the window of a scenic train traversing the Swiss Alps, capturing the awe and reflection, soft interior lighting.", label: "Alpine Journey 🏔️" },
-  { text: "Close-up macro shot of a barista meticulously pouring latte art into a ceramic cup, focus on the espresso stream and delicate patterns, warm cafe environment.", label: "Coffee Craft ☕" },
-  { text: "High angle shot of a person practicing yoga on a wooden pier overlooking a calm, misty lake at sunrise, serene mood.", label: "Sunrise Yoga 🧘" },
-  { text: "Side profile shot of a young student focused intently on a vintage microscope in a well-equipped science laboratory, shallow depth of field.", label: "Science Discovery 🔬" },
-  { text: "Medium shot of a traditional Japanese potter carefully molding clay on a rotating wheel, workshop setting with natural light.", label: "Pottery Art 🏺" },
-  { text: "Candid shot of a father teaching his daughter to ride a bicycle in a local park, sunset lighting creating long, warm shadows.", label: "Family Time 🚲" },
-  { text: "Vibrant medium shot of dancers in colorful elaborate traditional attire participating in a cultural parade on a crowded city street.", label: "Cultural Parade 🎭" },
-  { text: "Over-the-shoulder shot of a graphic designer working on a complex digital illustration on a large creative tablet.", label: "Digital Art 🎨" }
-];
 
 interface PromptGenViewProps {
   t: any;
@@ -180,57 +165,20 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   } | null>(null);
 
   const [inspirations, setInspirations] = useState<any[]>([]);
-  
-  // A. & B. Fisher-Yates Pool and Memory Buffering (State Tracking)
-  const inspirationPool = useRef<any[]>([]);
-  const recentInspirations = useRef<Set<string>>(new Set());
 
-  const getNextInspirations = () => {
-    // 1. Refill pool if empty using Fisher-Yates Shuffle
-    if (inspirationPool.current.length < 5) {
-      const available = INSPIRATIONS_DATA.filter(item => !recentInspirations.current.has(item.label));
-      
-      // If we filtered out too many, just shuffle all
-      let poolToUse = available.length >= 5 ? [...available] : [...INSPIRATIONS_DATA];
-      
-      // Fisher-Yates Algorithm
-      for (let i = poolToUse.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [poolToUse[i], poolToUse[j]] = [poolToUse[j], poolToUse[i]];
-      }
-      
-      inspirationPool.current = poolToUse;
+  const fetchInspirations = async () => {
+    try {
+      const response = await fetch('/api/inspirations');
+      const data = await response.json();
+      setInspirations(data);
+    } catch (e) {
+      console.error("Failed to fetch inspirations:", e);
     }
-
-    const selected = [];
-    while (selected.length < 5 && inspirationPool.current.length > 0) {
-      const item = inspirationPool.current.pop();
-      if (item && !recentInspirations.current.has(item.label)) {
-        selected.push(item);
-        recentInspirations.current.add(item.label);
-      }
-    }
-    
-    // Limit memory buffer size to avoid running out of options (Pool Without Replacement)
-    if (recentInspirations.current.size > 8) {
-      const arr = Array.from(recentInspirations.current);
-      recentInspirations.current = new Set(arr.slice(arr.length - 8));
-    }
-
-    // Fallback if needed
-    while (selected.length < 5) {
-      const fallback = INSPIRATIONS_DATA[Math.floor(Math.random() * INSPIRATIONS_DATA.length)];
-      if (!selected.find(s => s.label === fallback.label)) {
-        selected.push(fallback);
-      }
-    }
-
-    setInspirations(selected);
   };
 
   useEffect(() => {
-    getNextInspirations();
-    const interval = setInterval(getNextInspirations, 60000); // Refresh every minute
+    fetchInspirations();
+    const interval = setInterval(fetchInspirations, 60000); // Refresh every minute
     return () => clearInterval(interval);
   }, []);
 
@@ -744,19 +692,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
               {/* Inspiration Presets */}
               <div className="space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Sparkles size={12} className="text-emerald-500" />
-                    {t.prompt_inspiration_label}
-                  </span>
-                  <button 
-                    onClick={getNextInspirations}
-                    className="p-1 hover:bg-emerald-500/10 text-emerald-500 rounded-lg transition-colors"
-                    title={uiLanguage === 'id' ? 'Acak Ulang Inspirasi' : 'Reshuffle Inspirations'}
-                  >
-                    <RefreshCw size={12} className="cursor-pointer hover:rotate-180 transition-transform duration-500" />
-                  </button>
-                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-emerald-500" />
+                  {t.prompt_inspiration_label}
+                </span>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                   {inspirations.map((insp) => (
                     <button
