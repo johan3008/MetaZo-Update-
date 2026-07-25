@@ -61,6 +61,7 @@ const BACKGROUND_STYLE_OPTIONS = [
 ];
 
 const DARK_HORROR_SUB_STYLES = [
+  { id: 'Dark Horror Aesthetic', label: 'Classic / Mixed', desc: 'Campuran estetika horor gelap secara umum.' },
   { id: 'Grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
   { id: 'Gothic Horror', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
   { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
@@ -139,7 +140,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 }) => {
   const [subject, setSubject] = useState('');
   const [styleCategory, setStyleCategory] = useState('Cinematic');
-  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('Grimdark');
+  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('Dark Horror Aesthetic');
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
   const [minWords, setMinWords] = useState<number>(15);
   const [maxWords, setMaxWords] = useState<number>(60);

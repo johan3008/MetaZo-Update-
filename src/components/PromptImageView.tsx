@@ -38,6 +38,7 @@ const PREMIUM_ONLY_STYLES = [
 ];
 
 const DARK_HORROR_SUB_STYLES = [
+  { id: 'Dark Horror Aesthetic', label: 'Classic / Mixed', desc: 'Campuran estetika horor gelap secara umum.' },
   { id: 'Grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
   { id: 'Gothic Horror', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
   { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
@@ -78,7 +79,6 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
   const [styleCategory, setStyleCategory] = useState('Cinematic');
-  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('Grimdark');
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -232,7 +232,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         headers: getHeaders(aiOptions),
         body: JSON.stringify({
           images: pendingImages,
-          styleCategory: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : styleCategory,
+          styleCategory,
           model: aiOptions?.model
         })
       });
@@ -437,31 +437,6 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 })}
               </div>
             </div>
-
-            {/* Sub-style selector for Dark Horror Aesthetic */}
-            {styleCategory === 'Dark Horror Aesthetic' && (
-              <div className="mb-6 bg-red-900/10 border border-red-500/20 p-4 rounded-[1.5rem]">
-                <h3 className="text-[11px] font-black uppercase text-red-500 mb-3 flex items-center gap-2">
-                  <span className="text-lg">🦇</span> Pilih Sub-Gaya Horor
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {DARK_HORROR_SUB_STYLES.map((sub) => (
-                    <div 
-                      key={sub.id}
-                      onClick={() => setDarkHorrorSubStyle(sub.id)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col gap-1 ${
-                        darkHorrorSubStyle === sub.id 
-                          ? 'bg-red-500/20 border-red-500 text-white' 
-                          : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-red-500/30'
-                      }`}
-                    >
-                      <div className="font-bold text-[10px] uppercase text-slate-700 dark:text-slate-300">{sub.label}</div>
-                      <div className="text-[9px] opacity-70 leading-relaxed font-medium">{sub.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {globalError && (
               <div className="flex items-center space-x-2.5 p-3.5 bg-red-500/10 border border-red-500/20 rounded-[1.5rem] text-[10px] font-bold text-red-500">
