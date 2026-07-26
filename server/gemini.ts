@@ -2758,6 +2758,7 @@ export const generateOptimizedPrompt = async (options: {
   flatIconType?: 'sheet' | 'single';
   iconSheetColumns?: number;
   vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
+  darkHorrorSubStyle?: string;
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -2772,7 +2773,8 @@ export const generateOptimizedPrompt = async (options: {
     seed = Math.floor(Math.random() * 1000000),
     flatIconType = undefined,
     iconSheetColumns = undefined,
-    vectorSubType = undefined
+    vectorSubType = undefined,
+    darkHorrorSubStyle = undefined
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
@@ -2839,10 +2841,71 @@ export const generateOptimizedPrompt = async (options: {
     "Lego Style": ' - Focus on compositions entirely constructed from interlocking plastic building bricks (gaya mainan balok plastik). Emphasize sharp geometric brick shapes, visible circular studs on top of bricks, glossy plastic textures with subtle scratches, vibrant primary colors, and macro photography lighting (depth of field, studio lighting) to make it look like a miniature diorama or toy set. Do NOT use the word "Lego" in the prompt if possible, use "interlocking plastic bricks" or "brick toy style".',
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
-    "Graphic Design": ' - Act as an expert human graphic designer. Focus on creating high-quality, professional graphic design background templates, compositions, and layouts perfectly optimized for commercial advertising, marketing, social media banners, posters, flyers, or web backgrounds. IMPORTANT DIRECTIVES: 1) COPY SPACE: Ensure a very large, clean, and spacious negative space / copy space explicitly designed for adding custom titles, marketing text, promo descriptions, or brand logos. 2) VISUAL HIERARCHY: Maintain a clean layout with a clear and distinct visual hierarchy. 3) ABSTRACT GEOMETRIC BACKGROUND: Use abstract geometric backgrounds, containing elegant shapes, modern gradients, waves, or creative frames. 4) GRAPHIC ELEMENTS: Infuse creative graphic elements such as decorative circles, floating ribbons, commercial badges, stylish borders, celebratory confetti, balloons, hearts, stars, or 3D vector elements as accents depending on the subject. 5) MODERN ADVERTISING STYLE: Style with a modern advertising design language, utilizing vibrant, bright, and high-contrast color palettes (e.g., neon accents, pastel duotones, or bold commercial solids). 6) TEMPLATE COMPOSITION: The output must look like an empty template or asset placeholder ready for custom content, NOT a finalized design with pre-baked specific final text, to ensure maximum versatility. 7) MARKETING-READY: Tailor for easy deployment on social media feeds, banners, or print-ready marketing materials. AVOID: Pure photorealism, raw unstylized natural photography, cluttered backgrounds, or pre-written specific text.'
+    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand, commercial-ready background templates, banners, and marketing assets for top microstock platforms (such as Adobe Stock and Freepik).
+
+When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules and characteristics:
+
+1. CORE PURPOSE & FUNCTIONALITY
+   - Act as a professional graphic designer crafting versatile background templates, banners, social media layouts, flyers, and web hero graphics.
+   - Outputs must function as clean, adaptable asset templates (placeholders) rather than finished, locked illustrations.
+
+2. MANDATORY COPY SPACE & COMPOSITION (2/3 RULE)
+   - ALWAYS incorporate a generous, clean, and uncluttered negative space (copy space) specifically designed for users to add headline text, logos, or marketing copy.
+   - Enforce asymmetric balance or Rule of Thirds: Allocate roughly 60–70% of the canvas for clean background/copy space and 30–40% for decorative/subject elements.
+   - Specify clear element positioning (e.g., "clean gradient area on the left with floating 3D elements anchored to the right margin").
+
+3. COMMERCIAL VISUAL TRENDS & AESTHETICS
+   - Select and apply modern design trends appropriate to the topic, such as:
+     * 3D Claymorphism / Soft Matte 3D: Smooth 3D shapes with soft matte textures.
+     * Glassmorphism: Frosted glass panels with subtle blur, glow, and light reflections.
+     * Fluid / Liquid Gradients: Smooth, wavy liquid shapes with vibrant transitions.
+     * Minimalist Neo-Brutalisism: Clean lines, bold shapes, and high contrast.
+
+4. DECORATIVE ELEMENTS & PODIUM INTEGRATION
+   - Enhance the composition with contextual accent graphics: floating ribbons, confetti, abstract geometric shapes, 3D vector icons, decorative borders, or commercial badges.
+   - When contextually relevant (e.g., product displays, cosmetics, tech), include clean geometric pedestals, 3D display stages, or floating isometric platforms in the scene.
+
+5. LIGHTING, SHADOWS & COLOR HARMONY
+   - Lighting: Specify studio lighting conditions such as soft ambient lighting, subtle drop shadows, directional rim light, or soft depth of field to create depth without clutter.
+   - Color Palette: Enforce cohesive color schemes using modern commercial palettes—such as vibrant neon-accented duotones, soft pastel gradients, or high-contrast dark modes.
+
+6. STRICT PROHIBITIONS (STRICTLY AVOID)
+   - DO NOT generate pre-written specific text, fake gibberish words, or static typographies on the image.
+   - DO NOT create raw photorealistic photos or natural landscape scenery.
+   - DO NOT create overly busy, cluttered, or chaotic compositions with no focus area.`
+  };
+    "Dark Horror Aesthetic": ' - Focus on eerie, unsettling, and atmospheric horror themes. Emphasize deep shadows, high-contrast chiaroscuro lighting, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), fog/mist, decaying textures, and a general sense of dread or suspense. AVOID: Bright daylight, cheerful elements, or cartoonish comic-book horror unless specified.'
   };
 
-  const currentDirective = styleSpecificDirectives[styleCategory] || '';
+  let currentDirective = styleSpecificDirectives[styleCategory] || '';
+
+  if (styleCategory === 'Dark Horror Aesthetic') {
+    const DARK_HORROR_BASE_INSTRUCTION = `You are an expert Digital Concept Artist specializing in Dark Horror, Macabre, and Gothic Aesthetic assets for high-end digital media, game concept art, and book covers.
+
+When generating prompts for "Dark Horror Aesthetic", follow these core directives:
+- ATMOSPHERE: Eerie, unsettling psychological tension, dread, deep shadows, chiaroscuro lighting, volumetric fog, floating dust motes, decaying textures.
+- CAMERA & COMPOSITION: Dramatic camera angles (low-angle, tight claustrophobic framing, or subtle dutch angles). Clear eerie focal point.
+- PALETTE & LIGHTING: Muted charcoal/ash tones with stark accents (crimson blood-red, ghostly cyan, toxic emerald glow). Directional rim lighting.
+- TEXTURES: Weathered stone, cracked porcelain, peeling wallpaper, wet asphalt, or viscous reflections.
+- AVOID: Daylight, cheerful elements, cartoonish comic styles, and flat lighting.`;
+
+    const DARK_HORROR_SUB_STYLE_MODIFIERS: Record<string, string> = {
+      classic: "Blend overall dark horror elements with eerie lighting and ambiguous terror.",
+      grimdark: "Focus on oppressive heavy shadows, brutal atmosphere, grime, and hyper-detailed dark fantasy aesthetic.",
+      gothic: "Emphasize eerie mist, decaying Victorian or ancient gothic architecture, ornate dark stone, and melancholic dread.",
+      lovecraftian: "Incorporate cosmic horror, non-Euclidean geometry, unfathomable alien structures, tentacles, and psychological cosmic dread.",
+      infernal: "Focus on demonic entities, glowing magma embers, crackling hellfire, obsidian rock, and a suffocating fiery abyss.",
+      macabre: "Highlight surreal dark art, skeletal motifs, morbid beauty, eerie anatomical elements, and unsettling elegance.",
+      occult: "Integrate ancient glowing runes, dark ritual circles, esoteric symbols, ritualistic candles, and mystical shadow energy.",
+      biomechanical: "Fuse fleshy organic decay with sleek cold machinery, bio-luminescent tubes, and surreal alien cybernetics (HR Giger style).",
+      cinematic: "Emphasize 35mm film grain, deep chiaroscuro rim lighting, wide anamorphic lens framing, and dramatic movie-still composition.",
+      painterly: "Apply visible heavy impasto brushstrokes, rich digital oil paint textures, and fine-art dark masterpiece aesthetics."
+    };
+
+    const subMod = darkHorrorSubStyle ? (DARK_HORROR_SUB_STYLE_MODIFIERS[darkHorrorSubStyle] || DARK_HORROR_SUB_STYLE_MODIFIERS.classic) : DARK_HORROR_SUB_STYLE_MODIFIERS.classic;
+    currentDirective = ` - ${DARK_HORROR_BASE_INSTRUCTION}\n\nSUB-STYLE SPECIFIC INSTRUCTION:\n${subMod}`;
+  }
+
   let flatIconDirective = '';
   if (styleCategory === 'Flat Icon' && isPngMode && flatIconType) {
     if (flatIconType === 'sheet') {
