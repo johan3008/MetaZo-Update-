@@ -1417,7 +1417,7 @@ export const generateStockMetadata = async (
    - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
    - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
 4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing.
+5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -1444,7 +1444,7 @@ export const generateStockMetadata = async (
    - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing.
+5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -1471,7 +1471,7 @@ export const generateStockMetadata = async (
    - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
    - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
 4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing.
+5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -2048,7 +2048,7 @@ export const generateBatchStockMetadata = async (
    - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
    - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
 4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing.
+5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -2074,7 +2074,7 @@ export const generateBatchStockMetadata = async (
    - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing.
+5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -2100,7 +2100,7 @@ export const generateBatchStockMetadata = async (
    - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
    - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
 4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing.
+5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -5592,6 +5592,53 @@ export async function generateAbstractPrompt(topic: string): Promise<string> {
     return result.text?.trim() || '';
   } catch (error) {
     console.error('Error generating Abstract prompt:', error);
+    throw new Error('Failed to generate prompt');
+  }
+}
+
+export const PAINTERLY_DIGITAL_ART_STYLE_INSTRUCTION = `
+You are a Master Digital Painter and Concept Artist specializing in Painterly Digital Art, blending traditional brushwork techniques with modern digital illustration aesthetics.
+
+When generating or refining prompts for the "Painterly Digital Art" style, you MUST strictly follow these rules:
+
+1. CORE CONCEPT & BRUSHWORK
+   - Focus on expressive, visible brushstrokes and a handcrafted artistic feel.
+   - Blend the boundaries between traditional media (like oil, acrylic, or gouache) and high-end digital painting (e.g., ArtStation trending illustrations, Procreate masterworks).
+
+2. VISUAL CHARACTERISTICS & TEXTURES
+   - Incorporate rich, tactile textures: canvas grain, thick impasto strokes, blended gradients, and dynamic painterly splatters.
+   - Emphasize edge control: a mix of lost and found edges, soft transitions, and sharp focal points to guide the viewer's eye.
+
+3. LIGHTING & COLOR PALETTE
+   - Lighting: Utilize dramatic, stylized lighting with vibrant color bounces, rim lights, or ethereal glows. Avoid hyper-realistic or sterile studio lighting.
+   - Color Palette: Use harmonious, rich color palettes with deep shadows and luminous highlights, characteristic of professional digital concept art.
+
+4. MANDATORY PROMPT STRUCTURE
+   - Ensure the prompt explicitly calls for "painterly digital art," "visible brushstrokes," "digital painting," and "expressive artistic style."
+   - Adapt the subject into a cohesive painting rather than a photorealistic scene.
+
+5. STRICT PROHIBITIONS (STRICTLY AVOID)
+   - DO NOT generate photorealistic renders, 3D CGI, or camera-based photography.
+   - DO NOT use vector art, flat shading, or perfectly smooth plastic-like surfaces.
+   - DO NOT include photographic lens effects like chromatic aberration, film grain, or realistic depth-of-field blur.
+`;
+
+export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<string> {
+  const userQuery = \`Generate a highly artistic Painterly Digital Art image prompt for the subject: "\${topic}". \nFocus on expressive brushstrokes, traditional media aesthetics blended with digital painting, rich textures, and stylized lighting. \nOutput ONLY the refined prompt text without intro or explanations.\`;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: userQuery,
+      config: {
+        systemInstruction: PAINTERLY_DIGITAL_ART_STYLE_INSTRUCTION,
+      }
+    });
+
+    return result.text?.trim() || '';
+  } catch (error) {
+    console.error('Error generating Painterly Digital Art prompt:', error);
     throw new Error('Failed to generate prompt');
   }
 }
