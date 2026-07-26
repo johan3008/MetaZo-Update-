@@ -61,14 +61,16 @@ const BACKGROUND_STYLE_OPTIONS = [
 ];
 
 const DARK_HORROR_SUB_STYLES = [
-  { id: 'Dark Horror Aesthetic', label: 'Classic / Mixed', desc: 'Campuran estetika horor gelap secara umum.' },
-  { id: 'Grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
-  { id: 'Gothic Horror', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
-  { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
-  { id: 'Macabre Art', label: 'Macabre Art', desc: 'Lingkungan yang menyeramkan dengan detail surealisme gelap.' },
-  { id: 'Occult Horror', label: 'Occult Horror', desc: 'Rune kuno, ritual sihir gelap, dan suasana misterius.' },
-  { id: 'Cinematic Horror Concept Art', label: 'Cinematic Horror Concept Art', desc: 'Pencahayaan chiaroscuro berbayang pekat ala film.' },
-  { id: 'Painterly Digital Art', label: 'Painterly Digital Art', desc: 'Goresan kuas tebal (impasto) ala mahakarya lukisan digital.' }
+  { id: 'classic', label: 'Classic / Mixed', desc: 'Campuran estetika horor gelap secara umum.' },
+  { id: 'grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
+  { id: 'gothic', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
+  { id: 'lovecraftian', label: 'Lovecraftian / Cosmic', desc: 'Entitas tak terpahami, geometri non-Euclidean, kengerian kosmik.' },
+  { id: 'infernal', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
+  { id: 'macabre', label: 'Macabre Art', desc: 'Lingkungan yang menyeramkan dengan detail surealisme gelap.' },
+  { id: 'occult', label: 'Occult Horror', desc: 'Rune kuno, ritual sihir gelap, dan suasana misterius.' },
+  { id: 'biomechanical', label: 'Biomechanical / Body Horror', desc: 'Daging menyatu dengan mesin, kebusukan organik, fiksi ilmiah surealis.' },
+  { id: 'cinematic', label: 'Cinematic Concept Art', desc: 'Pencahayaan chiaroscuro berbayang pekat ala film.' },
+  { id: 'painterly', label: 'Painterly Digital Art', desc: 'Goresan kuas tebal (impasto) ala mahakarya lukisan digital.' }
 ];
 
 const PNG_STYLE_OPTIONS = [
@@ -140,7 +142,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 }) => {
   const [subject, setSubject] = useState('');
   const [styleCategory, setStyleCategory] = useState('Cinematic');
-  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('Dark Horror Aesthetic');
+  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('classic');
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
   const [minWords, setMinWords] = useState<number>(15);
   const [maxWords, setMaxWords] = useState<number>(60);
@@ -420,7 +422,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         headers: getHeaders(aiOptions),
         body: JSON.stringify({
           subject: subject.trim(),
-          styleCategory: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : styleCategory,
+          styleCategory,
+          darkHorrorSubStyle: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : undefined,
           count: variation,
           promptMode,
           pngBgColor,
