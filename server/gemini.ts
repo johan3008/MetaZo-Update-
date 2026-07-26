@@ -1418,6 +1418,11 @@ export const generateStockMetadata = async (
    - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
 4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
+5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
+   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
+   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
+   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
+   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -1445,6 +1450,11 @@ export const generateStockMetadata = async (
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
+5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
+   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
+   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
+   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
+   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -1472,6 +1482,11 @@ export const generateStockMetadata = async (
    - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
 4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
+5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
+   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
+   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
+   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
+   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -2049,6 +2064,11 @@ export const generateBatchStockMetadata = async (
    - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
 4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
+5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
+   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
+   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
+   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
+   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -2075,6 +2095,11 @@ export const generateBatchStockMetadata = async (
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
+5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
+   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
+   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
+   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
+   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
@@ -2101,6 +2126,11 @@ export const generateBatchStockMetadata = async (
    - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
 4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
+5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
+   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
+   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
+   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
+   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
 7. Every keyword/phrase must be strictly in lowercase.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
