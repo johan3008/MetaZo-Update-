@@ -5654,7 +5654,7 @@ When generating or refining prompts for the "Painterly Digital Art" style, you M
 `;
 
 export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<string> {
-  const userQuery = \`Generate a highly artistic Painterly Digital Art image prompt for the subject: "\${topic}". \nFocus on expressive brushstrokes, traditional media aesthetics blended with digital painting, rich textures, and stylized lighting. \nOutput ONLY the refined prompt text without intro or explanations.\`;
+  const userQuery = `Generate a highly artistic Painterly Digital Art image prompt for the subject: "${topic}". \nFocus on expressive brushstrokes, traditional media aesthetics blended with digital painting, rich textures, and stylized lighting. \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
