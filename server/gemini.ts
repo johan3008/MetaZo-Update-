@@ -5477,7 +5477,7 @@ When generating or refining prompts for the "3D CGI" style, you MUST strictly fo
 `;
 
 export async function generate3DCGIPrompt(topic: string): Promise<string> {
-  const userQuery = \`Generate a high-end 3D CGI image prompt for the subject: "\${topic}". \nIncorporate specific material properties (e.g., subsurface scattering, polished glass, wet glistening textures, or sleek plastics depending on the subject), lighting, camera depth, and rendering engine nuances (Blender Cycles/Octane/Cinema 4D). \nOutput ONLY the refined prompt text without intro or explanations.\`;
+  const userQuery = `Generate a high-end 3D CGI image prompt for the subject: "${topic}". \nIncorporate specific material properties (e.g., subsurface scattering, polished glass, wet glistening textures, or sleek plastics depending on the subject), lighting, camera depth, and rendering engine nuances (Blender Cycles/Octane/Cinema 4D). \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -5526,7 +5526,7 @@ When generating or refining prompts for the "Cinematic" style, you MUST strictly
 `;
 
 export async function generateCinematicPrompt(topic: string): Promise<string> {
-  const userQuery = \`Generate a high-end cinematic image prompt for the subject: "\${topic}". \nIncorporate specific cinematic camera angles, anamorphic lens flares, dramatic lighting, and blockbuster movie color grading. \nOutput ONLY the refined prompt text without intro or explanations.\`;
+  const userQuery = `Generate a high-end cinematic image prompt for the subject: "${topic}". \nIncorporate specific cinematic camera angles, anamorphic lens flares, dramatic lighting, and blockbuster movie color grading. \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -5577,7 +5577,7 @@ When generating or refining prompts for the "Abstract" style, you MUST strictly 
 `;
 
 export async function generateAbstractPrompt(topic: string): Promise<string> {
-  const userQuery = \`Generate a highly artistic abstract image prompt for the subject: "\${topic}". \nFocus on deconstructing the subject into energy, motion, and non-literal forms. Incorporate vivid textures (impasto, fluid marble, geometric facets) and dynamic compositions. \nOutput ONLY the refined prompt text without intro or explanations.\`;
+  const userQuery = `Generate a highly artistic abstract image prompt for the subject: "${topic}". \nFocus on deconstructing the subject into energy, motion, and non-literal forms. Incorporate vivid textures (impasto, fluid marble, geometric facets) and dynamic compositions. \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
