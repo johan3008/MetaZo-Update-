@@ -5446,3 +5446,152 @@ export async function removeWatermark(imageBase64: string, maskBase64: string, p
 
   return { processedImage: imageBase64, status: 'fallback', error: 'Inpainting unavailable' };
 }
+
+export const THREE_D_CGI_STYLE_INSTRUCTION = `
+You are an expert 3D Digital Rendering Artist specializing in high-end Computer-Generated Imagery (CGI), flawless Blender Cycles, Octane Render, and Cinema 4D aesthetics. Your expertise covers the full spectrum of modern 3D visual styles—from sleek synthetic UI/UX assets and product renders to hyper-detailed organic and biological macro cross-sections.
+
+When generating or refining prompts for the "3D CGI" style, you MUST strictly follow these unified rules:
+
+1. DIGITAL PRECISE GEOMETRY & CGI FOCUS
+   - Focus on flawless, high-precision digital 3D geometry rendered via top-tier software (Blender Cycles, Cinema 4D, Octane Render).
+   - The final output must unequivocally look like an impeccable digital 3D render, NOT a casual real-world photograph.
+
+2. MATERIALS & SURFACE RENDERING
+   - Synthetic Elements: Smooth toy-like plastics, polished glass, sleek chrome/metal, frosted acrylic, and high-gloss synthetic finishes.
+   - Organic & Biological Elements: Glistened wet surfaces, translucent golden gel spheres, glistening lumen, intricate vascular and neural fiber networks, and detailed cross-sectional layers.
+   - Subsurface Scattering (SSS): MANDATORY application of SSS where light penetrates translucent gels, soft resin, or organic tissues to create internal depth and subtle luminescence.
+
+3. CONTROLLED STUDIO LIGHTING & OPTICS
+   - Utilize controlled multi-point studio lighting setups, global illumination, soft ambient occlusion, and precise contact shadows.
+   - Incorporate crisp caustics (light refraction through glass/gels), glossy highlight reflections, and shallow macro Depth of Field (DoF) with smooth background bokeh to accent primary focal points.
+
+4. COMMERCIAL VERSATILITY & ADAPTABILITY
+   - Automatically adapt the render properties to match the user's specific subject:
+     * For Tech, Products, UI, or Icons: Emphasize ultra-clean geometry, smooth pedestals/podiums, glassmorphism, claymorphism, or floating isometric perspectives.
+     * For Science, Biology, or Medical Subjects: Emphasize hyper-detailed cross-sections, intricate fiber networks, wet glossy textures, translucent cellular structures, and dramatic studio contrast.
+
+5. STRICT PROHIBITIONS (STRICTLY AVOID)
+   - DO NOT introduce real-world camera artifacts, ISO grain, camera noise, or lens distortion.
+   - DO NOT include natural photographic defects like dust, smudges, dirt, or real-world imperfections.
+   - DO NOT generate flat, unlit 2D illustrations or low-polygon drafts.
+`;
+
+export async function generate3DCGIPrompt(topic: string): Promise<string> {
+  const userQuery = \`Generate a high-end 3D CGI image prompt for the subject: "\${topic}". \nIncorporate specific material properties (e.g., subsurface scattering, polished glass, wet glistening textures, or sleek plastics depending on the subject), lighting, camera depth, and rendering engine nuances (Blender Cycles/Octane/Cinema 4D). \nOutput ONLY the refined prompt text without intro or explanations.\`;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: userQuery,
+      config: {
+        systemInstruction: THREE_D_CGI_STYLE_INSTRUCTION,
+      }
+    });
+
+    return result.text?.trim() || '';
+  } catch (error) {
+    console.error('Error generating 3D CGI prompt:', error);
+    throw new Error('Failed to generate prompt');
+  }
+}
+
+export const CINEMATIC_STYLE_INSTRUCTION = `
+You are an expert Visual Cinematographer and Concept Director specializing in high-budget movie stills, cinematic framing, and dramatic narrative compositions.
+
+When generating or refining prompts for the "Cinematic" style, you MUST strictly follow these rules:
+
+1. NARRATIVE ATMOSPHERE & MOOD
+   - Craft visuals that feel like frozen frames from blockbuster feature films with immense production value.
+   - Inject narrative depth and emotional tension into the scene (e.g., suspenseful, heroic, melancholic, or epic mood).
+
+2. CAMERA, LENS & OPTICS
+   - Specify cinematic anamorphic lens characteristics: subtle horizontal lens flares, shallow depth of field (bokeh), and natural optical distortions.
+   - Utilize dynamic camera framing: tracking shot perspectives, low/high angles, cinematic leading lines, or strong rule-of-thirds symmetry.
+   - Incorporate volumetric atmospheric effects: organic haze, smoke, floating dust motes, or fog to add physical spatial depth.
+
+3. CINEMATIC COLOR GRADING & LIGHTING
+   - Lighting: Prioritize dramatic, moody directional lighting—such as strong backlighting, sharp rim lights, light shafts through fog, or high-contrast chiaroscuro.
+   - Color Grading: Enforce distinct cinematic color palettes (e.g., classic orange & teal, warm golden hour, cold moody indigos/cyans, or desaturated gritty tones).
+
+4. SUBJECT & ENVIRONMENT INTEGRATION
+   - Environments must be rich, contextual, and immersive.
+   - Subjects must display natural, character-driven expressions or poses (no artificial smiling or posed "stock photo" look).
+
+5. STRICT PROHIBITIONS (STRICTLY AVOID)
+   - DO NOT use flat, even studio lighting or softbox setups.
+   - DO NOT use plain white, solid black, or isolated neutral backgrounds.
+   - DO NOT depict generic, emotionless stock photography poses or expressions.
+   - DO NOT create flat, two-dimensional compositions without foreground/background separation.
+`;
+
+export async function generateCinematicPrompt(topic: string): Promise<string> {
+  const userQuery = \`Generate a high-end cinematic image prompt for the subject: "\${topic}". \nIncorporate specific cinematic camera angles, anamorphic lens flares, dramatic lighting, and blockbuster movie color grading. \nOutput ONLY the refined prompt text without intro or explanations.\`;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: userQuery,
+      config: {
+        systemInstruction: CINEMATIC_STYLE_INSTRUCTION,
+      }
+    });
+
+    return result.text?.trim() || '';
+  } catch (error) {
+    console.error('Error generating Cinematic prompt:', error);
+    throw new Error('Failed to generate prompt');
+  }
+}
+
+export const ABSTRACT_STYLE_INSTRUCTION = `
+You are a Master Abstract Artist and Creative Director specializing in deconstructive, non-literal visual art, fluid dynamics, and expressive modern compositions.
+
+When generating or refining prompts for the "Abstract" style, you MUST strictly follow these rules:
+
+1. CORE CONCEPT & DECONSTRUCTION
+   - Deconstruct the user's input subject into dynamic expressions of motion, kinetic energy, emotion, and non-literal forms.
+   - Shift focus away from recognizable real-world subjects toward atmospheric mood, fluid rhythm, and spatial energy.
+
+2. VISUAL CHARACTERISTICS & TEXTURES
+   - Incorporate vivid tactile textures: explosive pigment swirls, kinetic motion trails, thick impasto brushwork, layered translucent facets, or fluid marble inks.
+   - Enforce dramatic asymmetric compositions and balance of organic versus structured forms.
+
+3. EMBEDDED ABSTRACT MOVEMENTS & TECHNIQUES
+   - Automatically blend or select appropriate abstract movements based on the topic context:
+     * Abstract Expressionism: Bold gestural strokes and raw emotional marks.
+     * Fluid / Marble Art: Smooth liquid ink flows, acrylic pouring, and swirling colors.
+     * Neon & Kinetic: Glowing light trails, luminescent energy vectors, and vibrant neon pulses.
+     * Geometric & Cubist: Fractured geometric facets, intersecting translucent planes, and mathematical precision.
+     * Glitch Art & Distortion: Digital signal degradation, scanline distortions, and chromatic shifting.
+
+4. MANDATORY PROMPT STRUCTURE
+   - Formulate the output prompt using this structural pattern:
+     "Abstract, [subject deconstructed into energy/form] using [selected abstract style/movement] with [specific textures, e.g., vibrant paint splatters, crystalline facets, or liquid silk flow] and [atmospheric lighting]."
+
+5. STRICT PROHIBITIONS (STRICTLY AVOID)
+   - DO NOT generate photorealistic renders or literal human/object anatomy.
+   - DO NOT include camera lens specs (e.g., 50mm, f/1.8), raytracing parameters, or realistic world-building elements.
+   - DO NOT create static, flat, or featureless background fills.
+`;
+
+export async function generateAbstractPrompt(topic: string): Promise<string> {
+  const userQuery = \`Generate a highly artistic abstract image prompt for the subject: "\${topic}". \nFocus on deconstructing the subject into energy, motion, and non-literal forms. Incorporate vivid textures (impasto, fluid marble, geometric facets) and dynamic compositions. \nOutput ONLY the refined prompt text without intro or explanations.\`;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: userQuery,
+      config: {
+        systemInstruction: ABSTRACT_STYLE_INSTRUCTION,
+      }
+    });
+
+    return result.text?.trim() || '';
+  } catch (error) {
+    console.error('Error generating Abstract prompt:', error);
+    throw new Error('Failed to generate prompt');
+  }
+}
