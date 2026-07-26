@@ -2874,8 +2874,6 @@ When generating or refining prompts for the "Graphic Design" style, you MUST str
    - DO NOT create raw photorealistic photos or natural landscape scenery.
    - DO NOT create overly busy, cluttered, or chaotic compositions with no focus area.`
   };
-    "Dark Horror Aesthetic": ' - Focus on eerie, unsettling, and atmospheric horror themes. Emphasize deep shadows, high-contrast chiaroscuro lighting, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), fog/mist, decaying textures, and a general sense of dread or suspense. AVOID: Bright daylight, cheerful elements, or cartoonish comic-book horror unless specified.'
-  };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
 
