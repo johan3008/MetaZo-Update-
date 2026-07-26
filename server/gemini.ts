@@ -398,15 +398,15 @@ function ensureDescription(description: string, title: string, keywords: string[
     if (title && title.trim().length > 5) {
       const cleanTitle = title.replace(/write a descriptive/gi, '').replace(/<generate/gi, '').replace(/highly descriptive/gi, '').trim();
       if (cleanTitle.length > 5) {
-        return `A professional stock photo showcasing ${cleanTitle.toLowerCase()}. Ideal for commercial, editorial, and creative design use.`;
+        return `Visual media showcasing ${cleanTitle.toLowerCase()}, designed for commercial, editorial, and creative projects.`;
       }
     }
     
     if (keywords && keywords.length >= 3) {
-      return `Professional visual content featuring ${keywords.slice(0, 5).join(', ')}. Perfect for advertising, marketing, and editorial purposes.`;
+      return `Visual content featuring ${keywords.slice(0, 5).join(', ')}, suitable for advertising, marketing, and editorial purposes.`;
     }
     
-    return "High-quality professional stock asset designed for commercial, editorial, or creative media projects.";
+    return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
   
   return description.trim();
@@ -1676,6 +1676,7 @@ Rules for Titles:
 3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 4. Use easy-to-read phrases, NOT formal sentence structures.
 5. DO NOT treat the title like a list of keywords. No commas separating words.
+6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -1683,6 +1684,7 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
@@ -1818,6 +1820,7 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
+- NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
 - SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
@@ -1835,6 +1838,7 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 ${keywordRulePromptText}
@@ -2330,6 +2334,7 @@ Rules for Titles:
 3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 4. Use easy-to-read phrases, NOT formal sentence structures.
 5. DO NOT treat the title like a list of keywords. No commas separating words.
+6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -2337,6 +2342,7 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
@@ -2478,6 +2484,7 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
+- NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
 - SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
@@ -2495,6 +2502,7 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 ${keywordRulePromptText}
