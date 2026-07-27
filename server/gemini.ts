@@ -2884,53 +2884,51 @@ export const generateOptimizedPrompt = async (options: {
     "Paper Cut": ' - Focus on layered paper textures (lapisan kertas bertumpuk), sharp and clean cut edges (tepi potongan tajam dan rapi), profound 3D depth effects from multiple stacked paper layers, soft drop shadows between layers (bayangan lembut antar lapisan kertas), highly detailed handcrafted papercraft aesthetic, compositions constructed purely from cut paper shapes rather than drawings/paintings, matte paper textures, clean silhouettes, and beautiful solid colors for each stacked layer.',
     "Embroidery": ' - Focus on physical textile art, thick raised thread textures, intricate stitched patterns, woven fabric backgrounds, and realistic needlework craftsmanship. Emphasize the tactile quality of yarn, floss, and fabric grain.',
     "Disney Cartoon": ' - Focus on classic 2D or modern 3D Western animation styles characteristic of major animation studios. Emphasize expressive, large-eyed characters, vibrant magical color palettes, soft appealing shapes, and enchanting environments. CRITICAL: You MUST NOT mention any specific IP, character names, or specific film titles. Keep the concepts generic and copyright-free, but retain the magical and charming artistic style.',
-    "Dark Horror Aesthetic": ' - Focus on eerie, unsettling, and atmospheric horror themes. Emphasize deep shadows, high-contrast chiaroscuro lighting, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), fog/mist, decaying textures, and a general sense of dread or suspense. AVOID: Bright daylight, cheerful elements, or cartoonish comic-book horror unless specified.',
+    "Dark Horror Aesthetic": ' - Focus on extremely dark, eerie, unsettling, and atmospheric horror themes. Emphasize crushing pitch-black shadows, high-contrast chiaroscuro lighting with minimal illumination, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), thick fog/mist, decaying textures, and a profound sense of dread. AVOID: Bright daylight, cheerful elements, well-lit scenes, or cartoonish comic-book horror unless specified.',
     "Lego Style": ' - Focus on compositions entirely constructed from interlocking plastic building bricks (gaya mainan balok plastik). Emphasize sharp geometric brick shapes, visible circular studs on top of bricks, glossy plastic textures with subtle scratches, vibrant primary colors, and macro photography lighting (depth of field, studio lighting) to make it look like a miniature diorama or toy set. Do NOT use the word "Lego" in the prompt if possible, use "interlocking plastic bricks" or "brick toy style".',
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
-    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand, commercial-ready background templates, banners, and marketing assets for top microstock platforms (such as Adobe Stock and Freepik).
+    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising assets: banners, posters, greeting cards, commercial templates, aesthetic frames, and marketing materials for top microstock platforms.
 
-When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules and characteristics to create highly creative, expansive, and dynamic assets:
+When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
 
 1. CORE PURPOSE & VISUAL IDENTITY
-   - Act as a professional graphic designer crafting commercial assets: posters, banners, flyers, social media posts, UI web banners, infographics, and presentation layouts.
-   - The design MUST NOT be a photorealistic image or natural landscape. It must be a purely shape-based, digital graphic design with a clear communication purpose (promotion, branding, info).
-   - Inject unique, highly stylized elements to ENSURE Adobe Stock anti-similarity. Use premium materials like glossy accents, subtle gradients, and clean digital textures.
+   - Focus exclusively on commercial graphic design elements: abstract promotional posters, advertising banners, greeting cards (kartu ucapan), promo banners (banner promo), aesthetic frames (bingkai estetik), creative digital flyers, and rich layout templates.
+   - STRICTLY DO NOT make it photorealistic. It MUST NOT look like a real photo or natural landscape. It must clearly be a digital graphic design, abstract art, vector style, or illustration meant for advertising and commercial use.
+   - Play heavily with abstract design elements, dynamic geometric shapes, creative layouts, ornate borders, and highly expressive aesthetic styles.
+   - STRICTLY AVOID MINIMALISM. The design should be rich, detailed, visually complex, and engaging, avoiding sparse or overly simple minimalist layouts.
 
 2. STRUCTURED LAYOUT & VISUAL HIERARCHY
-   - Emphasize structured, grid-based layouts with perfect visual balance, alignment, and proportional spacing (margins).
-   - Create a strong visual hierarchy so the viewer's eye is guided to the most important focal points (where CTA or main headers would go).
-   - Use engaging compositions: centered radial bursts, asymmetric Rule of Thirds, or diagonal dynamic flows.
+   - Emphasize structured, grid-based layouts or dynamic asymmetrical compositions perfect for commercial use.
+   - Ensure there is a clear visual flow, elaborate framing, and balance, typical of high-end advertising posters and detailed greeting cards.
 
 3. MANDATORY COPY SPACE & NO TEXT POLICY (CRITICAL)
-   - ALWAYS incorporate a generous, clean, and uncluttered negative space (white space) designed for headline text and logos.
-   - ABSOLUTELY NO TEXT. Do not generate readable letters, words, or typography. Use abstract shapes, empty text boxes, or clean empty ribbons/badges as placeholders for text instead. The design must be 100% text-free ("tanpa teks").
+   - ALWAYS incorporate generous, clean negative space (white space) meant for typography, headlines, and logos.
+   - ABSOLUTELY NO TEXT. Do not generate readable letters or words. Use abstract shapes, ornate ribbons, or empty text boxes as placeholders. The design must be 100% text-free.
 
 4. GRAPHIC ELEMENTS & AESTHETICS
-   - Combine various graphic design elements seamlessly: geometric shapes, organic vectors, abstract icons, fluid gradients, seamless patterns, subtle digital textures, and 3D mockup objects.
-   - Lighting & Depth: Use professional drop shadows, crisp highlights, and studio-style lighting to create depth between layered graphic elements (e.g., Glassmorphism, 3D Claymorphism, paper cut layers).
-   - Color Palette: Enforce cohesive, eye-catching color schemes with high contrast and brand-ready palettes (e.g., vibrant neon duotones, corporate minimalist, elegant beige & gold).
+   - Combine elements like abstract waves, fluid gradients, 3D geometric primitives, halftone patterns, aesthetic ornamental frames, and sleek digital materials.
+   - Use vibrant, eye-catching color palettes optimized for commercial advertising (e.g., striking contrasts, vivid gradients, duotones). Ensure the visuals pop and look highly detailed.
 
-5. KEYWORDS TO INJECT IN THE PROMPT
-   - Seamlessly integrate terms such as: "Graphic design, clean layout, modern composition, abstract shapes, advertising design, promotional design, editorial layout, balanced composition, visual hierarchy, grid-based layout, corporate style, marketing materials, colorful, minimal, contemporary, high contrast, print-ready, commercial design."
+5. KEYWORDS TO INJECT
+   - Seamlessly integrate terms such as: "Abstract graphic design, commercial advertising poster, greeting card design, aesthetic frame border, promo banner template, non-realistic, digital art style, highly detailed, ornate geometric shapes, vibrant gradients, clean copy space, purely graphic art, NO MINIMALISM."
 
 6. STRICT PROHIBITIONS
-   - DO NOT generate chaotic or cluttered compositions.
    - DO NOT create raw photorealistic photos, ordinary real-world objects, or natural environments.
-   - NO TEXT, NO LETTERS, NO GIBBERISH. Use empty placeholders instead.`,
+   - STRICTLY AVOID realism and minimalism. This must be an abstract, highly detailed, digital graphic design asset.`,
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
 
   if (styleCategory === 'Dark Horror Aesthetic') {
-    const DARK_HORROR_BASE_INSTRUCTION = `You are an expert Digital Concept Artist specializing in Dark Horror, Macabre, and Gothic Aesthetic assets for high-end digital media, game concept art, and book covers.
+    const DARK_HORROR_BASE_INSTRUCTION = `You are an expert Digital Concept Artist specializing in extremely Dark Horror, Macabre, and Gothic Aesthetic assets for high-end digital media, game concept art, and book covers.
 
 When generating prompts for "Dark Horror Aesthetic", follow these core directives:
-- ATMOSPHERE: Eerie, unsettling psychological tension, dread, deep shadows, chiaroscuro lighting, volumetric fog, floating dust motes, decaying textures.
-- CAMERA & COMPOSITION: Dramatic camera angles (low-angle, tight claustrophobic framing, or subtle dutch angles). Clear eerie focal point.
-- PALETTE & LIGHTING: Muted charcoal/ash tones with stark accents (crimson blood-red, ghostly cyan, toxic emerald glow). Directional rim lighting.
-- TEXTURES: Weathered stone, cracked porcelain, peeling wallpaper, wet asphalt, or viscous reflections.
-- AVOID: Daylight, cheerful elements, cartoonish comic styles, and flat lighting.`;
+- ATMOSPHERE: Extreme darkness, pitch-black voids, eerie, unsettling psychological tension, dread, ultra-deep crushing shadows, chiaroscuro lighting with minimal visibility, thick volumetric fog, floating dust motes, decaying textures.
+- CAMERA & COMPOSITION: Dramatic camera angles (low-angle, tight claustrophobic framing, or subtle dutch angles) emerging from total darkness. Clear eerie focal point barely illuminated.
+- PALETTE & LIGHTING: Pure black backgrounds, muted charcoal/ash tones with stark minimal accents (crimson blood-red, ghostly cyan, toxic emerald glow). Extremely sparse directional rim lighting.
+- TEXTURES: Weathered stone, cracked porcelain, peeling wallpaper, wet asphalt, or viscous reflections emerging from the shadows.
+- AVOID: Daylight, any bright illumination, cheerful elements, cartoonish comic styles, flat lighting, and excessive visibility.`;
 
     const DARK_HORROR_SUB_STYLE_MODIFIERS: Record<string, string> = {
       classic: "Blend overall dark horror elements with eerie lighting and ambiguous terror.",
