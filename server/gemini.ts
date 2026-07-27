@@ -1528,13 +1528,14 @@ VISUAL ACCURACY RULES:
 4. Never hallucinate brands, trademarked logos, or copyrighted characters.
 5. If uncertain, provide the closest accurate generic description.
 6. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
+7. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
 PRIMARY OBJECTIVE:
-Detect every visible subject, action, color, visible text, and composition detail.
+Deeply and exhaustively detect every visible subject, action, color, visible text, material, texture, lighting, and composition detail. You must recognize the contents of assets deeply and in extraordinary detail.
 Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
 Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
@@ -2177,13 +2178,15 @@ VISUAL ACCURACY RULES:
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
 4. Never hallucinate brands, trademarked logos, or copyrighted characters.
 5. If uncertain, provide the closest accurate generic description.
+6. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
+7. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
 PRIMARY OBJECTIVE:
-Detect every visible subject, action, color, visible text, and composition detail.
+Deeply and exhaustively detect every visible subject, action, color, visible text, material, texture, lighting, and composition detail. You must recognize the contents of assets deeply and in extraordinary detail.
 Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
 Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
