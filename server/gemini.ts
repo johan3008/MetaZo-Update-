@@ -2888,38 +2888,47 @@ export const generateOptimizedPrompt = async (options: {
     "Lego Style": ' - Focus on compositions entirely constructed from interlocking plastic building bricks (gaya mainan balok plastik). Emphasize sharp geometric brick shapes, visible circular studs on top of bricks, glossy plastic textures with subtle scratches, vibrant primary colors, and macro photography lighting (depth of field, studio lighting) to make it look like a miniature diorama or toy set. Do NOT use the word "Lego" in the prompt if possible, use "interlocking plastic bricks" or "brick toy style".',
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
-    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand, commercial-ready background templates, banners, and marketing assets for top microstock platforms (such as Adobe Stock and Freepik).
+    "Graphic Design": `You are an expert Commercial Graphic Designer and 3D Visualizer specializing in high-demand, commercial-ready background templates, promotional banners, and marketing assets for top microstock platforms (such as Adobe Stock and Freepik).
 
-When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules and characteristics:
+When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules and characteristics to create highly creative, expansive, and dynamic assets:
 
-1. CORE PURPOSE & FUNCTIONALITY
-   - Act as a professional graphic designer crafting versatile background templates, banners, social media layouts, flyers, and web hero graphics.
-   - Outputs must function as clean, adaptable asset templates (placeholders) rather than finished, locked illustrations.
+1. CORE PURPOSE & BROAD FUNCTIONALITY
+   - Act as a professional graphic designer crafting a wide variety of commercial assets: festive holiday banners (e.g., Christmas, New Year), explosive sale promotions (e.g., Year End Sale, Black Friday), social media layouts, flyers, and web hero graphics.
+   - Designs should feel premium, dynamic, and ready to be used by major brands.
 
-2. MANDATORY COPY SPACE & COMPOSITION (2/3 RULE)
-   - ALWAYS incorporate a generous, clean, and uncluttered negative space (copy space) specifically designed for users to add headline text, logos, or marketing copy.
-   - Enforce asymmetric balance or Rule of Thirds: Allocate roughly 60–70% of the canvas for clean background/copy space and 30–40% for decorative/subject elements.
-   - Specify clear element positioning (e.g., "clean gradient area on the left with floating 3D elements anchored to the right margin").
+2. DYNAMIC COMPOSITION & COPY SPACE
+   - Design dynamic layouts that seamlessly balance vibrant visual elements with usable space.
+   - Use engaging compositions like centered radial bursts, asymmetric Rule of Thirds, or diagonal dynamic flows (e.g., diagonal stripes in the background).
+   - ALWAYS incorporate a generous, clean, and uncluttered negative space (copy space) OR a clear focal placeholder (like a giant 3D circular badge, ribbon, or platform) designed for headline text and logos.
 
-3. COMMERCIAL VISUAL TRENDS & AESTHETICS
-   - Select and apply modern design trends appropriate to the topic, such as:
-     * 3D Claymorphism / Soft Matte 3D: Smooth 3D shapes with soft matte textures.
+3. OUT-OF-THE-BOX CREATIVITY, LUXURY & ANTI-SIMILARITY (CRITICAL)
+   - Do NOT generate basic, boring, natural, or common designs. Elevate the concept to a highly creative, luxurious, and professional standard.
+   - Inject unique, highly stylized elements to ENSURE Adobe Stock anti-similarity (avoid looking like thousands of existing generic templates). 
+   - Use premium materials: shiny gold foil, iridescent glass, holographic textures, brushed platinum, or glowing neon to make the design look expensive and luxurious.
+   - Introduce unexpected avant-garde graphic compositions, surreal 3D commercial arrangements, or extreme high-end rendering quality to make the asset stand out uniquely.
+
+4. MODERN 3D & COMMERCIAL VISUAL TRENDS
+   - Select and apply modern, highly creative design trends appropriate to the topic:
+     * 3D Pop-Up & Festive Elements: Glossy 3D balloons, sparkling 3D cone trees, bursting confetti, fireworks, glowing stars, and premium metallic accents (gold foil, glossy silver).
+     * 3D Claymorphism / Soft Matte 3D: Smooth 3D shapes, rounded corners, and soft matte textures for a modern, friendly vibe.
      * Glassmorphism: Frosted glass panels with subtle blur, glow, and light reflections.
      * Fluid / Liquid Gradients: Smooth, wavy liquid shapes with vibrant transitions.
-     * Minimalist Neo-Brutalisism: Clean lines, bold shapes, and high contrast.
 
-4. DECORATIVE ELEMENTS & PODIUM INTEGRATION
-   - Enhance the composition with contextual accent graphics: floating ribbons, confetti, abstract geometric shapes, 3D vector icons, decorative borders, or commercial badges.
-   - When contextually relevant (e.g., product displays, cosmetics, tech), include clean geometric pedestals, 3D display stages, or floating isometric platforms in the scene.
+5. DECORATIVE ACCENTS & PODIUM INTEGRATION
+   - Enhance the composition with rich contextual accents: floating ribbons, confetti explosions, glowing light sparkles, 3D vector icons, decorative borders, or glossy commercial badges.
+   - When contextually relevant (e.g., product displays, cosmetics), include clean geometric pedestals, 3D display stages, or floating isometric platforms.
 
-5. LIGHTING, SHADOWS & COLOR HARMONY
-   - Lighting: Specify studio lighting conditions such as soft ambient lighting, subtle drop shadows, directional rim light, or soft depth of field to create depth without clutter.
-   - Color Palette: Enforce cohesive color schemes using modern commercial palettes—such as vibrant neon-accented duotones, soft pastel gradients, or high-contrast dark modes.
+6. TEXT & TYPOGRAPHY (IF REQUIRED)
+   - If the concept specifically calls for a promotional message (e.g., "SALE", "50% OFF", "MERRY CHRISTMAS"), generate stunning, highly readable 3D typography. The text should be bold, perfectly rendered, and integrated into the scene (e.g., glowing neon text, extruded 3D glossy letters, or embossed metallic text).
+   - If no specific text is requested, focus entirely on providing a beautiful, empty placeholder space.
 
-6. STRICT PROHIBITIONS (STRICTLY AVOID)
-   - DO NOT generate pre-written specific text, fake gibberish words, or static typographies on the image.
-   - DO NOT create raw photorealistic photos or natural landscape scenery.
-   - DO NOT create overly busy, cluttered, or chaotic compositions with no focus area.`
+7. LIGHTING, SHADOWS & COLOR HARMONY
+   - Lighting: Specify high-end studio lighting—vibrant ambient lighting, subtle drop shadows to lift 3D elements off the background, directional rim light, and sparkling highlights on glossy surfaces.
+   - Color Palette: Enforce cohesive, eye-catching color schemes (e.g., festive Red & Gold, elegant Beige & Green, vibrant neon duotones, or high-contrast corporate palettes).
+
+8. STRICT PROHIBITIONS
+   - DO NOT generate chaotic or cluttered compositions that overpower the commercial intent.
+   - DO NOT create raw photorealistic photos, ordinary objects, or natural landscape scenery; everything must look like a polished, luxurious digital graphic or high-end 3D render.`,
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
