@@ -83,12 +83,12 @@ export const ImageQualityCheck: React.FC<{
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<Record<string, QualityReport>>({});
   const [error, setError] = useState<string | null>(null);
-  const handleFilesSelectedRef = useRef(handleFilesSelected);
-  useEffect(() => {
+  const handleFilesSelectedRef = React.useRef(handleFilesSelected);
+  React.useEffect(() => {
     handleFilesSelectedRef.current = handleFilesSelected;
   }, [handleFilesSelected]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleGlobalDrop = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
@@ -426,7 +426,6 @@ export const ImageQualityCheck: React.FC<{
     
     setReports({});
     setError(null);
-    setIsDragging(false);
 
     // Auto-trigger analysis for selected/dropped files immediately
     if (fileArray.length > 0) {
@@ -811,7 +810,7 @@ export const ImageQualityCheck: React.FC<{
               </div>
               <div className="text-center px-4">
                 <span className="block text-xs font-black text-slate-900 dark:text-slate-200 uppercase tracking-tight">
-                  {isDragging ? t.qc_release_images : t.qc_drop_images_here}
+                  {t.qc_drop_images_here}
                 </span>
                 <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1.5 flex items-center justify-center gap-2">
                   <FileImage size={12} /> {t.qc_multiple_upload}

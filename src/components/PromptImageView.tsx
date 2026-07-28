@@ -75,12 +75,12 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   uiLanguage = 'en'
 }) => {
   const [images, setImages] = useState<ImageItem[]>([]);
-  const handleFilesRef = useRef(handleFiles);
-  useEffect(() => {
+  const handleFilesRef = React.useRef(handleFiles);
+  React.useEffect(() => {
     handleFilesRef.current = handleFiles;
   }, [handleFiles]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleGlobalDrop = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {

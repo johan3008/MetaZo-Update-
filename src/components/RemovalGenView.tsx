@@ -137,12 +137,12 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
     e.target.value = '';
   };
 
-  const addFilesToQueueRef = useRef(addFilesToQueue);
-  useEffect(() => {
+  const addFilesToQueueRef = React.useRef(addFilesToQueue);
+  React.useEffect(() => {
     addFilesToQueueRef.current = addFilesToQueue;
   }, [addFilesToQueue]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleGlobalDrop = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
