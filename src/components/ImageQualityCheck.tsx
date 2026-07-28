@@ -411,7 +411,7 @@ export const ImageQualityCheck: React.FC<{
     });
   };
 
-  const handleFilesSelected = async (selectedFiles: FileList | File[]) => {
+  async function handleFilesSelected(selectedFiles: FileList | File[]) {
     // Revoke old object URLs
     Object.keys(previews).forEach(key => URL.revokeObjectURL(previews[key]));
 

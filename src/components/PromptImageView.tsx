@@ -139,7 +139,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     });
   };
 
-  const handleFiles = async (files: FileList | null) => {
+  async function handleFiles(files: FileList | null) {
     if (!files) return;
     
     setGlobalError(null);

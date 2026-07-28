@@ -152,7 +152,7 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
     window.addEventListener('globalFileDrop', handleGlobalDrop);
     return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
   }, []);
-  const addFilesToQueue = (newFiles: File[]) => {
+  function addFilesToQueue(newFiles: File[]) {
     const validItems: WatermarkItem[] = [];
 
     newFiles.forEach(file => {

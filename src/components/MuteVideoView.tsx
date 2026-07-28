@@ -80,7 +80,7 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
   }, []);
 
 
-  const processIncomingFiles = (incomingFiles: FileList) => {
+  function processIncomingFiles(incomingFiles: FileList) {
     const validFiles: BatchFileItem[] = [];
     const invalidNames: string[] = [];
 
