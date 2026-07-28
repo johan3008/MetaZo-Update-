@@ -31,7 +31,6 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
   const [files, setFiles] = useState<BatchFileItem[]>([]);
   const [activePreviewId, setActivePreviewId] = useState<string | null>(null);
   const [globalIsProcessing, setGlobalIsProcessing] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [autoDownload, setAutoDownload] = useState(true);
@@ -64,15 +63,22 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
     };
   }, [activePreviewFile?.id]);
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
+  const processIncomingFilesRef = React.useRef(processIncomingFiles);
+  React.useEffect(() => {
+    processIncomingFilesRef.current = processIncomingFiles;
+  }, [processIncomingFiles]);
+
+  React.useEffect(() => {
+    const handleGlobalDrop = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
+        processIncomingFilesRef.current(customEvent.detail.files);
+      }
+    };
+    window.addEventListener('globalFileDrop', handleGlobalDrop);
+    return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
+  }, []);
+
 
   const processIncomingFiles = (incomingFiles: FileList) => {
     const validFiles: BatchFileItem[] = [];
@@ -110,14 +116,6 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processIncomingFiles(e.dataTransfer.files);
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -608,15 +606,7 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
         <div className="lg:col-span-2 space-y-6">
           {/* Uploader Box */}
           <div
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
-              dragActive 
-                ? 'border-rose-500 bg-rose-500/10 scale-[1.01]' 
-                : 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:border-rose-500/40 hover:bg-rose-500/5'
-            }`}
+            className="border-2 border-dashed rounded-3xl p-8 text-center transition-all border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:border-rose-500/40 hover:bg-rose-500/5"
           >
             <input
               ref={fileInputRef}

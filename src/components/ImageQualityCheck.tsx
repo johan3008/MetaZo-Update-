@@ -83,7 +83,22 @@ export const ImageQualityCheck: React.FC<{
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<Record<string, QualityReport>>({});
   const [error, setError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const handleFilesSelectedRef = useRef(handleFilesSelected);
+  useEffect(() => {
+    handleFilesSelectedRef.current = handleFilesSelected;
+  }, [handleFilesSelected]);
+
+  useEffect(() => {
+    const handleGlobalDrop = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
+        handleFilesSelectedRef.current(customEvent.detail.files);
+      }
+    };
+    window.addEventListener('globalFileDrop', handleGlobalDrop);
+    return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
+  }, []);
+
   // removed toggleReportExpand helper since it's not used
   const [progress, setProgress] = useState(0);
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
@@ -422,23 +437,6 @@ export const ImageQualityCheck: React.FC<{
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       handleFilesSelected(e.target.files);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files) {
-      handleFilesSelected(e.dataTransfer.files);
     }
   };
 
@@ -806,12 +804,9 @@ export const ImageQualityCheck: React.FC<{
             </div>
             
             <label 
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 ${isDragging ? 'border-emerald-500 bg-emerald-500/5 scale-[0.98]' : 'border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50'}`}
+              className="group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50"
             >
-              <div className={`p-4 rounded-2xl bg-white dark:bg-white/5 shadow-xl transition-transform duration-500 group-hover:scale-110 ${isDragging ? 'rotate-12' : ''}`}>
+              <div className="p-4 rounded-2xl bg-white dark:bg-white/5 shadow-xl transition-transform duration-500 group-hover:scale-110">
                 <Upload className="text-emerald-500" size={32} />
               </div>
               <div className="text-center px-4">

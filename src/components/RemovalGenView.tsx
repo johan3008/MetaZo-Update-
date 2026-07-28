@@ -137,13 +137,21 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
     e.target.value = '';
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      addFilesToQueue(Array.from(e.dataTransfer.files) as File[]);
-    }
-  };
+  const addFilesToQueueRef = useRef(addFilesToQueue);
+  useEffect(() => {
+    addFilesToQueueRef.current = addFilesToQueue;
+  }, [addFilesToQueue]);
 
+  useEffect(() => {
+    const handleGlobalDrop = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
+        addFilesToQueueRef.current(Array.from(customEvent.detail.files) as File[]);
+      }
+    };
+    window.addEventListener('globalFileDrop', handleGlobalDrop);
+    return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
+  }, []);
   const addFilesToQueue = (newFiles: File[]) => {
     const validItems: WatermarkItem[] = [];
 
@@ -871,8 +879,6 @@ export const RemovalGenView: React.FC<RemovalGenViewProps> = ({
             <div 
               ref={containerRef}
               className="w-full min-h-[420px] bg-slate-950 rounded-2xl border border-slate-800 relative overflow-hidden flex items-center justify-center select-none"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
             >
               {selectedItem ? (
                 <div className="relative w-full h-full max-h-[600px] flex items-center justify-center p-2">

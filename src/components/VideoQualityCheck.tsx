@@ -183,7 +183,7 @@ export const VideoQualityCheck: React.FC<{
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+
   const [tolerance, setTolerance] = useState<'STRICT' | 'MEDIUM' | 'LOOSE'>('MEDIUM');
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [activeCategory, setActiveCategory] = useState<'visual' | 'ai' | 'legal' | 'technical'>('visual');
@@ -214,25 +214,21 @@ export const VideoQualityCheck: React.FC<{
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      setReport(null);
-      setError(null);
-    }
-  };
+  useEffect(() => {
+    const handleGlobalDrop = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
+        const file = customEvent.detail.files[0];
+        if (file.type.startsWith('video/')) {
+          setFile(file);
+          setReport(null);
+          setError(null);
+        }
+      }
+    };
+    window.addEventListener('globalFileDrop', handleGlobalDrop);
+    return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
+  }, []);
 
   const extractVideoFrames = (file: File, frameCount: number = 4): Promise<string[]> => {
     return new Promise((resolve, reject) => {
@@ -433,12 +429,7 @@ export const VideoQualityCheck: React.FC<{
 
       {/* Upload Zone */}
       <div 
-        className={`relative group border-2 border-dashed rounded-3xl p-8 sm:p-12 transition-all duration-300 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-900/50 ${
-          isDragging ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        className="relative group border-2 border-dashed rounded-3xl p-8 sm:p-12 transition-all duration-300 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600"
       >
         <input 
           type="file" 

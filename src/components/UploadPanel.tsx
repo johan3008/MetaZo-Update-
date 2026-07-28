@@ -86,9 +86,6 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               : activeTool === ToolType.VIDEO ? 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 hover:border-purple-400/50 hover:shadow-xl'
               : 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-400/50 hover:shadow-xl'
           } rounded-[2rem] p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] relative group overflow-hidden`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-          onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileChange({ target: { files: e.dataTransfer.files } }); }}
           onClick={triggerFileInput}
         >
           {/* Background Ambient Glow */}
