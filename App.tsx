@@ -4394,17 +4394,20 @@ const App: React.FC = () => {
       }}
     >
       {isDragging && (
-        <div className="absolute inset-0 z-[9999] bg-violet-500/20 backdrop-blur-sm border-8 border-violet-500 border-dashed flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl flex flex-col items-center animate-bounce shadow-violet-500/50 border border-violet-500/30">
-            <div className="w-24 h-24 bg-violet-100 dark:bg-violet-900/50 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-12 h-12 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        <div className="absolute inset-0 z-[9999] bg-white/40 dark:bg-[#090d16]/70 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
+          <div className="absolute inset-6 border-4 border-dashed border-indigo-500/50 dark:border-indigo-400/40 rounded-[2.5rem] animate-pulse pointer-events-none" />
+          
+          <div className="bg-white dark:bg-slate-900/90 p-10 rounded-[2.5rem] shadow-2xl flex flex-col items-center animate-bounce shadow-indigo-500/20 dark:shadow-indigo-500/10 border border-slate-200 dark:border-white/10 backdrop-blur-xl">
+            <div className="relative w-28 h-28 bg-gradient-to-br from-indigo-500 via-purple-500 to-rose-500 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-indigo-500/30 overflow-hidden">
+              <div className="absolute inset-0 bg-white/20 dark:bg-black/10 animate-pulse" />
+              <svg className="w-12 h-12 text-white relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <h2 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400 uppercase tracking-widest">
+            <h2 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-rose-600 dark:from-indigo-400 dark:via-purple-400 dark:to-rose-400 uppercase tracking-[0.1em]">
               Drop Files Here
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 font-bold mt-2 text-sm">
+            <p className="text-slate-500 dark:text-slate-400 font-bold mt-3 text-sm uppercase tracking-wider">
               Anywhere in the application area
             </p>
           </div>
