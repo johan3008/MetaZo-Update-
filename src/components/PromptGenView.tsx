@@ -57,7 +57,8 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
-  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
+  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' },
+  { id: 'Corporate Technology Concept', label: 'Corporate Technology Concept (Konsep Teknologi Perusahaan)', icon: '💼' }
 ];
 
 const DARK_HORROR_SUB_STYLES = [
@@ -88,7 +89,8 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' },
   { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
-  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
+  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
+  { id: 'Painterly Digital Art', label: 'Painterly Digital Art (Lukisan Digital)', icon: '🖌️' }
 ];
 
 const PREMIUM_ONLY_STYLES = [
