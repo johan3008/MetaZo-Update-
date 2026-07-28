@@ -75,7 +75,21 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   uiLanguage = 'en'
 }) => {
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const handleFilesRef = useRef(handleFiles);
+  useEffect(() => {
+    handleFilesRef.current = handleFiles;
+  }, [handleFiles]);
+
+  useEffect(() => {
+    const handleGlobalDrop = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
+        handleFilesRef.current(customEvent.detail.files);
+      }
+    };
+    window.addEventListener('globalFileDrop', handleGlobalDrop);
+    return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
+  }, []);
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
   const [styleCategory, setStyleCategory] = useState('Cinematic');
@@ -161,21 +175,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     handleFiles(e.target.files);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    handleFiles(e.dataTransfer.files);
-  };
 
   const removeImage = (id: string) => {
     setImages(prev => prev.filter(img => img.id !== id));
@@ -363,23 +363,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
 
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`group relative cursor-pointer border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center space-y-3 transition-all duration-300 ${
-                  isDragging 
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 scale-[1.02] shadow-xl shadow-emerald-500/10' 
-                    : 'border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-black/20 hover:bg-slate-50 dark:hover:bg-black/30 hover:border-emerald-500/40'
-                }`}
+                className="group relative cursor-pointer border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center space-y-3 transition-all duration-300 border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-black/20 hover:bg-slate-50 dark:hover:bg-black/30 hover:border-emerald-500/40"
               >
-                <div className={`p-4 rounded-full shadow-md flex items-center justify-center transform transition-transform ${
-                  isDragging ? 'bg-emerald-500 scale-110' : 'bg-white dark:bg-slate-800'
-                }`}>
-                  <Upload size={20} className={isDragging ? 'text-white' : 'text-emerald-500'} />
+                <div className="p-4 rounded-full shadow-md flex items-center justify-center transform transition-transform bg-white dark:bg-slate-800">
+                  <Upload size={20} className="text-emerald-500" />
                 </div>
                 <div className="text-center space-y-1">
                   <p className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
-                    {isDragging ? t.image_studio_release : t.image_studio_drag_drop}
+                    {t.image_studio_drag_drop}
                   </p>
                   <p className="text-[10px] text-slate-400 font-medium tracking-tight">{t.image_studio_support_multiple}</p>
                 </div>
