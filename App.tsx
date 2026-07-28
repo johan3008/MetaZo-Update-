@@ -3271,6 +3271,20 @@ const App: React.FC = () => {
     const allowedVideoExts = ['mp4', 'mov', 'webm'];
     const allowedVectorExts = ['svg', 'eps', 'ai'];
 
+    // Auto-detect tool based on first file
+    let targetTool = activeTool;
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        if (allowedImageExts.includes(ext)) { targetTool = ToolType.IMAGE; break; }
+        if (allowedVideoExts.includes(ext)) { targetTool = ToolType.VIDEO; break; }
+        if (allowedVectorExts.includes(ext)) { targetTool = ToolType.VECTOR; break; }
+    }
+    
+    if (targetTool !== activeTool) {
+        handleSetActiveTool(targetTool);
+    }
+
     for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -3279,9 +3293,9 @@ const App: React.FC = () => {
         let errorMsg: string | null = null;
         
         let isValid = false;
-        if (activeTool === ToolType.IMAGE && allowedImageExts.includes(ext)) isValid = true;
-        else if (activeTool === ToolType.VIDEO && allowedVideoExts.includes(ext)) isValid = true;
-        else if (activeTool === ToolType.VECTOR && allowedVectorExts.includes(ext)) isValid = true;
+        if (targetTool === ToolType.IMAGE && allowedImageExts.includes(ext)) isValid = true;
+        else if (targetTool === ToolType.VIDEO && allowedVideoExts.includes(ext)) isValid = true;
+        else if (targetTool === ToolType.VECTOR && allowedVectorExts.includes(ext)) isValid = true;
 
         if (!isValid) continue; // Skip unsupported files silently or handle validation but since it's forced * we skip.
 
@@ -4350,7 +4364,52 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden transition-colors duration-500`}>
+    <div 
+      className={`min-h-[100dvh] flex bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''} relative overflow-hidden transition-colors duration-500`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setIsDragging(false);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const isMainTool = [ToolType.DASHBOARD, ToolType.PROMPT_GEN, ToolType.IMAGE, ToolType.VIDEO, ToolType.VECTOR].includes(activeTool);
+          if (isMainTool) {
+            handleFileChange({ target: { files: e.dataTransfer.files } });
+          } else {
+            const dropEvent = new CustomEvent('globalFileDrop', { detail: { files: e.dataTransfer.files } });
+            window.dispatchEvent(dropEvent);
+          }
+        }
+      }}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-[9999] bg-violet-500/20 backdrop-blur-sm border-8 border-violet-500 border-dashed flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl flex flex-col items-center animate-bounce shadow-violet-500/50 border border-violet-500/30">
+            <div className="w-24 h-24 bg-violet-100 dark:bg-violet-900/50 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <h2 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400 uppercase tracking-widest">
+              Drop Files Here
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 font-bold mt-2 text-sm">
+              Anywhere in the application area
+            </p>
+          </div>
+        </div>
+      )}
       {/* Immersive background decoration: Animated glowing mesh blobs & high-fidelity alignment grid */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
         <div className="absolute top-[8%] left-[4%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 dark:bg-purple-900/15 blur-[120px] animate-blob-1" />
