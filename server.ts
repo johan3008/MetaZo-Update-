@@ -156,9 +156,11 @@ const localGsPath = path.join(process.cwd(), 'bin', 'gs');
 if (fs.existsSync(localGsPath)) {
     try {
         fs.chmodSync(localGsPath, '0755');
-        console.log('[PERMISSIONS] Successfully set executable permission (0755) on local gs binary');
-    } catch (err) {
-        console.warn('[PERMISSIONS] Failed to set executable permission on gs binary:', err);
+    } catch (err: any) {
+        // EROFS = read-only filesystem (e.g. Vercel/Lambda) — binary is already executable, skip silently
+        if (err && err.code !== 'EROFS') {
+            console.warn('[PERMISSIONS] Failed to set executable permission on gs binary:', err.message || err);
+        }
     }
 }
 const gsExecutable = fs.existsSync(localGsPath) ? localGsPath : 'gs';
