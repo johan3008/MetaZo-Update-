@@ -88,6 +88,7 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   nvidia: 'https://integrate.api.nvidia.com/v1/chat/completions',
   bluesminds: getBluesmindsEndpoint(),
   aivene: 'https://api.aivene.com/v1/chat/completions',
+  zai: 'https://api.z.ai/api/paas/v4/chat/completions',
 };
 
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
@@ -99,6 +100,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   nvidia: 'meta/llama-3.3-70b-instruct',
   bluesminds: 'gpt-4o',
   aivene: 'gpt-4o-mini',
+  zai: 'glm-5.2',
 };
 
 const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
@@ -110,10 +112,11 @@ const PROVIDER_FALLBACK_MODELS: Record<string, string> = {
   nvidia: 'meta/llama-3.1-70b-instruct',
   bluesminds: 'gpt-4o',
   aivene: 'gpt-4o-mini',
+  zai: 'glm-5.2',
 };
 
 // Provider yang reliable mendukung response_format: json_object
-const SUPPORTS_JSON_MODE = new Set(['groq', 'openai', 'openrouter', 'nvidia', 'bluesminds', 'aivene']);
+const SUPPORTS_JSON_MODE = new Set(['groq', 'openai', 'openrouter', 'nvidia', 'bluesminds', 'aivene', 'zai']);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
   groq: 'GROQ_API_KEY',
@@ -124,9 +127,10 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   nvidia: 'NVIDIA_API_KEY',
   bluesminds: 'BLUESMINDS_API_KEY',
   aivene: 'AIVENE_API_KEY',
+  zai: 'ZAI_API_KEY',
 };
 
-const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene']);
+const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'zai']);
 
 /**
  * Ekstrak JSON yang valid dari teks response, toleran terhadap:
@@ -803,7 +807,7 @@ async function callOpenAICompatibleWithRetry(params: {
       payload.response_format = { type: "json_object" };
     }
 
-    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene') {
+    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene' || provider === 'zai') {
       payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
     } else if (provider === 'bluesminds') {
       // Do not send max_tokens to avoid pre-check reservation failures on limited balance or custom endpoints
@@ -2876,8 +2880,8 @@ export const generateOptimizedPrompt = async (options: {
     "Line Art": ' - Focus on clean black and white lines, elegant curves, minimalist continuous line work, crisp vector outlines, and zero shading or gradients unless requested. Elegant, simple, and high-contrast ink strokes.',
     "Lowpoly": ' - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.',
     "3D CGI": ' - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.',
-    "Cinematic": ' - Focus on hyper-realistic, high-budget live-action movie cinematography. MUST feel like a genuine, un-retouched motion picture still shot on real 35mm film or digital cinema cameras with real actors. Prioritize: Wide cinematic aspect ratios, cinematic anamorphic lenses with subtle lens flares, organic volumetric haze, beautiful backlight/rim light, high production value, and deep cinematic color grading (e.g., warm gold, cool blue, orange and teal, moody cinematic shadow). Composition must be dynamic with cinematic framing. CRITICAL: Automatically assign and explicitly mention a specific, varied camera lens/shot type depending on the scene (e.g., 14mm ultra-wide, 24mm wide angle, 50mm standard, 85mm portrait, 200mm telephoto, anamorphic 35mm, macro shot) to ensure high variation and avoid identical prompts. AVOID: ANY digital art, AI-generated look, 3D CGI, plastic skin, flat studio lighting, or illustration styles. It must look 100% real.',
-    "Photorealistic": ' - Generate ultra-realistic, authentic, un-retouched real-world photography. MUST look indistinguishable from a real physical photograph captured by a professional camera (e.g., DSLR or mirrorless). Prioritize: Raw, natural realism, pin-sharp clarity, authentic natural skin/surface textures (e.g., visible pores, fine fabrics, wood grain, organic imperfections, peach fuzz), authentic human candid expressions, and completely realistic real-world environments. Use natural sunlight, overcast daylight, or authentic studio strobe lighting with soft realistic shadows. CRITICAL: Automatically assign and explicitly mention a specific, varied camera lens/focal length depending on the subject (e.g., 85mm f/1.4 for portraits, 24mm f/8 for landscapes, 100mm macro for close-ups, 50mm f/2.8 for street photography) to ensure high variation and avoid identical prompts. AVOID: CGI look, digital painting, excessive smoothness, "AI" look, theatrical cinematic color grading, or artificial dramatic staging. It must look like everyday reality.',
+    "Cinematic": ' - Focus on hyper-realistic, high-budget live-action movie cinematography. MUST feel like a genuine, un-retouched motion picture still shot on real 35mm film or digital cinema cameras with real actors. Prioritize: Wide cinematic aspect ratios, cinematic anamorphic lenses with subtle lens flares, organic volumetric haze, beautiful backlight/rim light, high production value, and deep cinematic color grading (e.g., warm gold, cool blue, orange and teal, moody cinematic shadow). Composition must be dynamic with cinematic framing. AVOID: ANY digital art, AI-generated look, 3D CGI, plastic skin, flat studio lighting, or illustration styles. It must look 100% real.',
+    "Photorealistic": ' - Generate ultra-realistic, authentic, un-retouched real-world photography. MUST look indistinguishable from a real physical photograph captured by a professional camera (e.g., DSLR or mirrorless). Prioritize: Raw, natural realism, pin-sharp clarity, authentic natural skin/surface textures (e.g., visible pores, fine fabrics, wood grain, organic imperfections, peach fuzz), authentic human candid expressions, and completely realistic real-world environments. Use natural sunlight, overcast daylight, or authentic studio strobe lighting with soft realistic shadows. Include realistic professional camera settings (e.g., 50mm lens, 85mm portrait lens, f/1.8 aperture). AVOID: CGI look, digital painting, excessive smoothness, "AI" look, theatrical cinematic color grading, or artificial dramatic staging. It must look like everyday reality.',
     "Anime/Manga": ' - Focus on cel-shaded aesthetics, expressive character features, vibrant colors, and classic Japanese hand-drawn illustration styles.',
     "Watercolor Painting": ' - Focus on flowing pigment washes, paper grain textures, organic color bleeds, and delicate artistic strokes.',
     "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.',
@@ -2927,7 +2931,7 @@ When generating or refining prompts for the "Graphic Design" style, you MUST str
 When generating prompts for "Dark Horror Aesthetic", follow these core directives:
 - REALISM: The image MUST be 100% photorealistic and look like a real physical photograph or live-action movie still. Absolutely NO digital paintings, 3D renders, or illustrations.
 - ATMOSPHERE: Extreme darkness, pitch-black voids, eerie, unsettling psychological tension, dread, ultra-deep crushing shadows, chiaroscuro lighting with minimal visibility, thick volumetric fog, floating dust motes, decaying textures.
-- CAMERA & COMPOSITION: Shot on high-end camera gear. Dramatic camera angles (low-angle, tight claustrophobic framing, or subtle dutch angles) emerging from total darkness. Clear eerie focal point barely illuminated. CRITICAL: Automatically assign and explicitly mention a specific, varied camera lens/shot type depending on the scene (e.g., 14mm ultra-wide for claustrophobia, 50mm standard, 85mm portrait, anamorphic 35mm, macro shot) to ensure high variation and avoid identical prompts.
+- CAMERA & COMPOSITION: Shot on high-end camera gear. Dramatic camera angles (low-angle, tight claustrophobic framing, or subtle dutch angles) emerging from total darkness. Clear eerie focal point barely illuminated.
 - PALETTE & LIGHTING: Pure black backgrounds, muted charcoal/ash tones with stark minimal accents (crimson blood-red, ghostly cyan, toxic emerald glow). Extremely sparse directional rim lighting.
 - TEXTURES: Authentic, real-world textures. Weathered stone, cracked porcelain, peeling wallpaper, wet asphalt, or viscous reflections emerging from the shadows.
 - AVOID: Digital art, 3D CGI, illustrations, daylight, any bright illumination, cheerful elements, cartoonish comic styles, flat lighting, and excessive visibility.`;
