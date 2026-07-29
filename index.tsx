@@ -11,6 +11,7 @@ function injectProviderHeaders(init: any, url: any) {
     const geminiKey = localStorage.getItem('gemini_api_key') || '';
     const groqKey = localStorage.getItem('groq_api_key') || '';
     const mistralKey = localStorage.getItem('mistral_api_key') || '';
+    const zaiKey = localStorage.getItem('zai_api_key') || '';
     const provider = localStorage.getItem('ai_provider') || 'gemini';
 
     init = init || {};
@@ -18,6 +19,7 @@ function injectProviderHeaders(init: any, url: any) {
     if (geminiKey) headers.set('x-gemini-key', geminiKey);
     if (groqKey) headers.set('x-groq-key', groqKey);
     if (mistralKey) headers.set('x-mistral-key', mistralKey);
+    if (zaiKey) headers.set('x-zai-key', zaiKey);
     headers.set('x-ai-provider', provider);
     init.headers = headers;
   }

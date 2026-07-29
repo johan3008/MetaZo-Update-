@@ -1336,6 +1336,61 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/test-zai-key', async (req, res) => {
+        try {
+            const { apiKey } = req.body;
+            if (!apiKey) {
+                return res.status(400).json({ error: 'API Key tidak boleh kosong' });
+            }
+            
+            const testUri = 'https://api.z.ai/api/paas/v4/chat/completions';
+            const testResponse = await fetch(testUri, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'glm-5.2',
+                    messages: [{role: 'user', content: 'test'}],
+                    max_tokens: 5,
+                    stream: false
+                })
+            });
+
+            const status = testResponse.status;
+            const text = await testResponse.text();
+            let errorMsg = text;
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed.error && parsed.error.message) {
+                    errorMsg = parsed.error.message;
+                }
+            } catch (_) {}
+
+            if (testResponse.ok) {
+                return res.json({ success: true, message: 'API Key Z.AI valid!' });
+            }
+
+            if (status === 401 || status === 403 || (status === 400 && errorMsg.toLowerCase().includes('invalid')) || errorMsg.toLowerCase().includes('unauthorized')) {
+                return res.status(400).json({ error: 'API Key Z.AI tidak valid atau salah. Silakan periksa kembali.' });
+            }
+            
+            if (status === 429 || errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('rate_limit') || errorMsg.toLowerCase().includes('exceeded')) {
+                return res.json({
+                    success: true,
+                    quotaExceeded: true,
+                    message: 'API Key Z.AI valid! Namun kuota / limit penggunaan Z.AI Anda telah habis.'
+                });
+            }
+            
+            return res.status(status).json({ error: `Terjadi error dari Z.AI (Status: ${status}): ${errorMsg}` });
+        } catch (e: any) {
+            console.warn('Test Z.AI API Key error exception:', e);
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
+        }
+    });
+
     const getProviderName = (): string => {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
@@ -1347,6 +1402,7 @@ app.get('/api/debug-uploads', (req, res) => {
         if (provider === 'nvidia') return 'NVIDIA';
         if (provider === 'bluesminds') return 'Bluesminds';
         if (provider === 'aivene') return 'Aivene';
+        if (provider === 'zai') return 'Z.AI';
         return 'Gemini';
     };
 

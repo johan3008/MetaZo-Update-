@@ -1289,13 +1289,13 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene'>(() => {
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai'>(() => {
     const val = localStorage.getItem('ai_provider') || 'gemini';
-    const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+    const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'zai'];
     if (!validProviders.includes(val)) { localStorage.setItem('ai_provider', 'gemini'); return 'gemini'; }
     return val as any;
   });
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'reseller' | 'faq_billing'>(selectedProvider);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai' | 'reseller' | 'faq_billing'>(selectedProvider);
 
   useEffect(() => {
     if (showSettingsModal) {
@@ -1815,6 +1815,7 @@ const App: React.FC = () => {
           syncKey(data.settings.nvidia_api_key, 'nvidia_api_key', setNvidiaKeysList);
           syncKey(data.settings.bluesminds_api_key, 'bluesminds_api_key', setBluesmindsKeysList);
           syncKey(data.settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
+          syncKey(data.settings.zai_api_key, 'zai_api_key', setZaiKeysList);
 
 
           // Local settings are fully decoupled from Firestore real-time sync
@@ -1829,7 +1830,8 @@ const App: React.FC = () => {
                 (localStorage.getItem('blackbox_api_key') || '').length > 0 ||
                 (localStorage.getItem('nvidia_api_key') || '').length > 0 ||
                 (localStorage.getItem('bluesminds_api_key') || '').length > 0 ||
-                (localStorage.getItem('aivene_api_key') || '').length > 0
+                (localStorage.getItem('aivene_api_key') || '').length > 0 ||
+                (localStorage.getItem('zai_api_key') || '').length > 0
              );
           }
         }
@@ -1874,6 +1876,7 @@ const App: React.FC = () => {
              nvidia_api_key: localStorage.getItem('nvidia_api_key') || '',
              bluesminds_api_key: localStorage.getItem('bluesminds_api_key') || '',
              aivene_api_key: localStorage.getItem('aivene_api_key') || '',
+             zai_api_key: localStorage.getItem('zai_api_key') || '',
              ai_provider: localStorage.getItem('ai_provider') || 'gemini',
              mz_gemini_model: localStorage.getItem('mz_gemini_model') || '',
              mz_groq_model: localStorage.getItem('mz_groq_model') || '',
@@ -2358,8 +2361,12 @@ const App: React.FC = () => {
   const [aiveneKeysList, setAiveneKeysList] = useState<string[]>(() => {
     return (localStorage.getItem('aivene_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
   });
+  const [zaiKeysList, setZaiKeysList] = useState<string[]>(() => {
+    return (localStorage.getItem('zai_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+  });
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedAiveneModel, setSelectedAiveneModel] = useState<string>(localStorage.getItem('mz_aivene_model') || 'auto');
+  const [selectedZaiModel, setSelectedZaiModel] = useState<string>(localStorage.getItem('mz_zai_model') || 'glm-5.2');
   const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.6-flash' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
 
@@ -2372,10 +2379,11 @@ const App: React.FC = () => {
   const [newNvidiaKey, setNewNvidiaKey] = useState('');
   const [newBluesmindsKey, setNewBluesmindsKey] = useState('');
   const [newAiveneKey, setNewAiveneKey] = useState('');
+  const [newZaiKey, setNewZaiKey] = useState('');
 
   const [serverKeysStatus, setServerKeysStatus] = useState<Record<string, boolean>>({});
   const [keyTestingIndex, setKeyTestingIndex] = useState<number | null>(null);
-  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | null>(null);
+  const [keyTestProvider, setKeyTestProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai' | null>(null);
   const [keyTestResults, setKeyTestResults] = useState<Record<string, { type: 'success' | 'error' | 'quota'; message: string }>>({}); // "provider-index"
   const [hasCustomKeySaved, setHasCustomKeySaved] = useState(() => {
     const geminiSaved = (localStorage.getItem('gemini_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
@@ -2387,6 +2395,7 @@ const App: React.FC = () => {
     const nvidiaSaved = (localStorage.getItem('nvidia_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     const bluesmindsSaved = (localStorage.getItem('bluesminds_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     const aiveneSaved = (localStorage.getItem('aivene_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
+    const zaiSaved = (localStorage.getItem('zai_api_key') || '').split(',').map(k => k.trim()).filter(Boolean);
     
     return (
       geminiSaved.length > 0 ||
@@ -2397,7 +2406,8 @@ const App: React.FC = () => {
       blackboxSaved.length > 0 ||
       nvidiaSaved.length > 0 ||
       bluesmindsSaved.length > 0 ||
-      aiveneSaved.length > 0
+      aiveneSaved.length > 0 ||
+      zaiSaved.length > 0
     );
   });
 
@@ -2426,7 +2436,8 @@ const App: React.FC = () => {
       const nSaved = localStorage.getItem('nvidia_api_key') || '';
       const blSaved = localStorage.getItem('bluesminds_api_key') || '';
       const aSaved = localStorage.getItem('aivene_api_key') || '';
-      const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene'];
+      const zSaved = localStorage.getItem('zai_api_key') || '';
+      const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'zai'];
       const rawP = localStorage.getItem('ai_provider') || 'gemini';
       const pSaved = (validProviders.includes(rawP) ? rawP : 'gemini') as any;
 
@@ -2439,6 +2450,7 @@ const App: React.FC = () => {
       const nParsed = nSaved.split(',').map(k => k.trim()).filter(Boolean);
       const blParsed = blSaved.split(',').map(k => k.trim()).filter(Boolean);
       const aParsed = aSaved.split(',').map(k => k.trim()).filter(Boolean);
+      const zParsed = zSaved.split(',').map(k => k.trim()).filter(Boolean);
 
       setGeminiKeysList(gParsed);
       setGroqKeysList(grParsed);
@@ -2449,6 +2461,7 @@ const App: React.FC = () => {
       setNvidiaKeysList(nParsed);
       setBluesmindsKeysList(blParsed);
       setAiveneKeysList(aParsed);
+      setZaiKeysList(zParsed);
       
       setNewGeminiKey('');
       setNewGroqKey('');
@@ -2459,6 +2472,7 @@ const App: React.FC = () => {
       setNewNvidiaKey('');
       setNewBluesmindsKey('');
       setNewAiveneKey('');
+      setNewZaiKey('');
 
       setSelectedProvider(pSaved);
       setHasCustomKeySaved(
@@ -2470,7 +2484,8 @@ const App: React.FC = () => {
         bParsed.length > 0 ||
         nParsed.length > 0 ||
         blParsed.length > 0 ||
-        aParsed.length > 0
+        aParsed.length > 0 ||
+        zParsed.length > 0
       );
       setKeyTestingIndex(null);
       setKeyTestProvider(null);
@@ -2478,7 +2493,7 @@ const App: React.FC = () => {
     }
   }, [showSettingsModal]);
 
-  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene', index: number, keyValue: string) => {
+  const handleTestKeyAtIndex = async (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai', index: number, keyValue: string) => {
     if (!keyValue.trim()) return;
     setKeyTestingIndex(index);
     setKeyTestProvider(provider);
@@ -2499,6 +2514,7 @@ const App: React.FC = () => {
     if (provider === 'nvidia') endpoint = '/api/test-nvidia-key';
     if (provider === 'bluesminds') endpoint = '/api/test-bluesminds-key';
     if (provider === 'aivene') endpoint = '/api/test-aivene-key';
+    if (provider === 'zai') endpoint = '/api/test-zai-key';
 
     try {
       const response = await fetch(endpoint, {
@@ -2536,7 +2552,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene') => {
+  const handleAddApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai') => {
     let key = '';
     let currentList: string[] = [];
     
@@ -2567,6 +2583,9 @@ const App: React.FC = () => {
     } else if (provider === 'aivene') {
       key = newAiveneKey.trim();
       currentList = aiveneKeysList;
+    } else if (provider === 'zai') {
+      key = newZaiKey.trim();
+      currentList = zaiKeysList;
     }
 
     if (!key) return;
@@ -2604,6 +2623,9 @@ const App: React.FC = () => {
     } else if (provider === 'aivene') {
       setAiveneKeysList(updatedList);
       setNewAiveneKey('');
+    } else if (provider === 'zai') {
+      setZaiKeysList(updatedList);
+      setNewZaiKey('');
     }
 
     // Save immediately to localStorage
@@ -2618,7 +2640,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene', index: number) => {
+  const handleDeleteApiKey = (provider: 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai', index: number) => {
     let listSetter: any;
     let list: string[] = [];
 
@@ -2649,6 +2671,9 @@ const App: React.FC = () => {
     } else if (provider === 'aivene') {
       listSetter = setAiveneKeysList;
       list = aiveneKeysList;
+    } else if (provider === 'zai') {
+      listSetter = setZaiKeysList;
+      list = zaiKeysList;
     }
 
     const filtered = list.filter((_, i) => i !== index);
@@ -2696,6 +2721,7 @@ const App: React.FC = () => {
     const cleanNvidia = nvidiaKeysList.map(k => k.trim()).filter(Boolean);
     const cleanBluesminds = bluesmindsKeysList.map(k => k.trim()).filter(Boolean);
     const cleanAivene = aiveneKeysList.map(k => k.trim()).filter(Boolean);
+    const cleanZai = zaiKeysList.map(k => k.trim()).filter(Boolean);
 
     if (cleanGemini.length > 0) {
       localStorage.setItem('gemini_api_key', cleanGemini.join(','));
@@ -2751,6 +2777,12 @@ const App: React.FC = () => {
       localStorage.removeItem('aivene_api_key');
     }
 
+    if (cleanZai.length > 0) {
+      localStorage.setItem('zai_api_key', cleanZai.join(','));
+    } else {
+      localStorage.removeItem('zai_api_key');
+    }
+
     localStorage.setItem('ai_provider', selectedProvider);
     setHasCustomKeySaved(
       cleanGemini.length > 0 || 
@@ -2761,7 +2793,8 @@ const App: React.FC = () => {
       cleanBlackbox.length > 0 || 
       cleanNvidia.length > 0 ||
       cleanBluesminds.length > 0 ||
-      cleanAivene.length > 0
+      cleanAivene.length > 0 ||
+      cleanZai.length > 0
     );
 
     if (auth.currentUser) {
@@ -2775,6 +2808,7 @@ const App: React.FC = () => {
         'settings.nvidia_api_key': cleanNvidia.join(','),
         'settings.bluesminds_api_key': cleanBluesminds.join(','),
         'settings.aivene_api_key': cleanAivene.join(','),
+        'settings.zai_api_key': cleanZai.join(','),
         'settings.ai_provider': selectedProvider,
       }).catch(err => console.info('db_op', err));
     }
@@ -2792,6 +2826,7 @@ const App: React.FC = () => {
     localStorage.removeItem('nvidia_api_key');
     localStorage.removeItem('bluesminds_api_key');
     localStorage.removeItem('aivene_api_key');
+    localStorage.removeItem('zai_api_key');
     localStorage.removeItem('ai_provider');
     
     setGeminiKeysList([]);
@@ -2803,6 +2838,7 @@ const App: React.FC = () => {
     setNvidiaKeysList([]);
     setBluesmindsKeysList([]);
     setAiveneKeysList([]);
+    setZaiKeysList([]);
     setSelectedProvider('gemini');
     setHasCustomKeySaved(false);
     setKeyTestResults({});
@@ -2818,6 +2854,7 @@ const App: React.FC = () => {
         'settings.nvidia_api_key': '',
         'settings.bluesminds_api_key': '',
         'settings.aivene_api_key': '',
+        'settings.zai_api_key': '',
         'settings.ai_provider': 'gemini',
       }).catch(err => console.info('db_op', err));
     }
@@ -3427,6 +3464,8 @@ const App: React.FC = () => {
                   } else {
                       modelParam = selectedAiveneModel;
                   }
+              } else if (selectedProvider === 'zai') {
+                  modelParam = selectedZaiModel;
               }
               const aiOptions = {
                 provider: selectedProvider,
@@ -3438,7 +3477,8 @@ const App: React.FC = () => {
                 nvidiaKeys: nvidiaKeysList,
                 blackboxKeys: blackboxKeysList,
                 bluesmindsKeys: bluesmindsKeysList,
-                aiveneKeys: aiveneKeysList
+                aiveneKeys: aiveneKeysList,
+                zaiKeys: zaiKeysList
               };
               const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
               
@@ -3604,6 +3644,8 @@ const App: React.FC = () => {
                     } else {
                         modelParam = selectedAiveneModel;
                     }
+                } else if (selectedProvider === 'zai') {
+                    modelParam = selectedZaiModel;
                 }
                 const aiOptions = {
                   provider: selectedProvider,
@@ -3615,7 +3657,8 @@ const App: React.FC = () => {
                   nvidiaKeys: nvidiaKeysList,
                   blackboxKeys: blackboxKeysList,
                   bluesmindsKeys: bluesmindsKeysList,
-                  aiveneKeys: aiveneKeysList
+                  aiveneKeys: aiveneKeysList,
+                  zaiKeys: zaiKeysList
                 };
                 const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
 
@@ -4347,7 +4390,8 @@ const App: React.FC = () => {
   const globalModelParam = selectedProvider === 'gemini' ? (selectedGeminiModel === 'auto' ? undefined : selectedGeminiModel) :
                            selectedProvider === 'groq' ? selectedGroqModel :
                            selectedProvider === 'nvidia' ? selectedNvidiaModel :
-                           selectedProvider === 'aivene' ? (selectedAiveneModel === 'auto' ? 'gpt-4o-mini' : selectedAiveneModel) : undefined;
+                           selectedProvider === 'aivene' ? (selectedAiveneModel === 'auto' ? 'gpt-4o-mini' : selectedAiveneModel) :
+                           selectedProvider === 'zai' ? selectedZaiModel : undefined;
   
   const commonAiOptions = {
     provider: selectedProvider,
@@ -4360,6 +4404,7 @@ const App: React.FC = () => {
     blackboxKeys: blackboxKeysList,
     bluesmindsKeys: bluesmindsKeysList,
     aiveneKeys: aiveneKeysList,
+    zaiKeys: zaiKeysList,
     model: globalModelParam
   };
 
@@ -5032,7 +5077,8 @@ const App: React.FC = () => {
                   { id: 'blackbox', name: 'Blackbox AI', desc: 'Code specialized' },
                   { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' },
                   { id: 'bluesminds', name: 'Bluesminds', desc: 'Fast Proxy' },
-                  { id: 'aivene', name: 'Aivene', desc: 'Aivene Endpoints' }
+                  { id: 'aivene', name: 'Aivene', desc: 'Aivene Endpoints' },
+                  { id: 'zai', name: 'Z.AI', desc: 'GLM Series' }
                 ].map(prov => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name} - {prov.desc}
@@ -5049,7 +5095,7 @@ const App: React.FC = () => {
             >
               {(['appearance', selectedProvider, 'faq_billing', ...(isAdminAccount ? ['reseller'] : [])] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ Tampilan & Tema' : 'ï¿½ï¿½ Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ FAQ Tagihan & Langganan' : 'ï¿½ï¿½ Billing & Subscription FAQ') : tab === 'reseller' ? 'ï¿½ï¿½ Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : `${(tab as string).toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ Tampilan & Tema' : 'ï¿½ï¿½ Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ FAQ Tagihan & Langganan' : 'ï¿½ï¿½ Billing & Subscription FAQ') : tab === 'reseller' ? 'ï¿½ï¿½ Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : tab === 'zai' ? 'Z.AI Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
@@ -6010,6 +6056,141 @@ const App: React.FC = () => {
                       <option value="gemma-4-31b-it">gemma-4-31b-it (Aivene Endpoint)</option>
                       <option value="gemma-4-26b-a4b-it">gemma-4-26b-a4b-it (Aivene Endpoint)</option>
                       <option value="qwen3.5-flash">qwen3.5-flash (Aivene Endpoint)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === 'zai' && (
+                <div className="space-y-4 animate-in fade-in duration-100">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
+                    Simpan API Key Z.AI Anda untuk mengakses GLM Series (OpenAI-compatible).
+                  </p>
+
+                  <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
+                    <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
+                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      {uiLanguage === 'id' ? "Dapatkan API Key Z.AI Anda di " : "Get your Z.AI API Key at "}{' '}
+                      <a
+                        href="https://z.ai/manage-apikey/apikey-list"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#7c3aed] hover:underline hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 inline-flex items-center gap-1 font-black"
+                      >
+                        Z.AI Console
+                        <ExternalLink size={10} />
+                      </a>
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">Daftar API Key Z.AI ({zaiKeysList.length})</label>
+                    
+                    {zaiKeysList.length === 0 ? (
+                      <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                        <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
+                        <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">Belum ada API Key Z.AI ditambahkan.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
+                        {zaiKeysList.map((key, index) => {
+                          const keyId = `zai-key-${index}-${key.substring(0, 10)}`;
+                          const testResult = keyTestResults[`zai-${index}`];
+                          const isTesting = keyTestingIndex === index && keyTestProvider === 'zai';
+                          const maskedKey = `${key.slice(0, 8)}...${key.slice(-4)}`;
+                          
+                          return (
+                            <div key={keyId} className="flex items-center justify-between p-2 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <Key size={12} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{maskedKey}</span>
+                                
+                                {testResult && (
+                                  <span 
+                                    title={testResult.message}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 cursor-help ${
+                                    testResult.type === 'success' 
+                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+                                      : 'bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-350'
+                                  }`}>
+                                    {testResult.type === 'success' ? 'AKTIF/OK' : 'ERROR'}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestKeyAtIndex('zai', index, key)}
+                                  disabled={keyTestingIndex !== null}
+                                  className="px-2 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded disabled:opacity-45 transition-colors"
+                                >
+                                  {isTesting ? <Loader2 size={10} className="animate-spin text-slate-500" /> : 'Uji'}
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteApiKey('zai', index)}
+                                  className="p-1 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                  title="Hapus Key"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Z.AI</label>
+                    <div className="flex gap-2">
+                       <input
+                         type="password"
+                         placeholder="API Key Z.AI"
+                         value={newZaiKey}
+                         onChange={(e) => setNewZaiKey(e.target.value)}
+                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
+                       />
+                       <button
+                         type="button"
+                         onClick={() => handleAddApiKey('zai')}
+                         className="px-4 py-2 bg-[#7c3aed] hover:bg-[#3d5abf] text-white rounded-[1.5rem] font-bold uppercase text-[10px] transition-all"
+                       >
+                         Tambah
+                       </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Model Aktif</label>
+                    <select
+                      value={selectedZaiModel}
+                      onChange={(e) => {
+                        setSelectedZaiModel(e.target.value);
+                        localStorage.setItem('mz_zai_model', e.target.value);
+                        if (auth.currentUser) {
+                          updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                            'settings.mz_zai_model': e.target.value
+                          }).catch(() => {});
+                        }
+                      }}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all cursor-pointer"
+                    >
+                      <option value="glm-5.2">GLM-5.2 (Flagship, 1M context)</option>
+                      <option value="glm-5.1">GLM-5.1</option>
+                      <option value="glm-5-turbo">GLM-5 Turbo</option>
+                      <option value="glm-5">GLM-5</option>
+                      <option value="glm-4.7">GLM-4.7</option>
+                      <option value="glm-4.7-flash">GLM-4.7 Flash</option>
+                      <option value="glm-4.7-flashx">GLM-4.7 FlashX</option>
+                      <option value="glm-4.6">GLM-4.6</option>
+                      <option value="glm-4.5">GLM-4.5</option>
+                      <option value="glm-4.5-air">GLM-4.5 Air</option>
+                      <option value="glm-4.5-flash">GLM-4.5 Flash</option>
+                      <option value="glm-4-32b-0414-128k">GLM-4 32B (128K)</option>
                     </select>
                   </div>
                 </div>
