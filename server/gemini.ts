@@ -4213,13 +4213,30 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
+  // Map/Upgrade low-precision/lightweight models to high-capability vision models to guarantee strict rule-following
+  let selectedModel = model || 'gemini-3.5-flash';
+  if (
+    selectedModel === 'auto' ||
+    selectedModel.includes('1.5-flash') ||
+    selectedModel.includes('8b') ||
+    selectedModel.includes('2.0-flash') ||
+    selectedModel.includes('gemma') ||
+    selectedModel.includes('3-flash') ||
+    selectedModel.includes('3.1-flash-lite')
+  ) {
+    // Force a highly robust, intelligence-aligned model for strict technical quality checks
+    selectedModel = 'gemini-3.5-flash';
+  } else if (selectedModel.includes('pro') || selectedModel.includes('3.1-pro')) {
+    selectedModel = 'gemini-3.1-pro-preview';
+  }
+
   // Normalisasi Model ke Seri Resmi Terupdate
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = [selectedModel, 'gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let responseText = "";
   let lastError;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+    const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
       let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
@@ -4239,7 +4256,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const activeModel = model || 'gemini-3.5-flash';
+    const activeModel = selectedModel;
 
     const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
     
