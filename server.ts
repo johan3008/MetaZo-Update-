@@ -1350,13 +1350,15 @@ app.get('/api/debug-uploads', (req, res) => {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${apiKey.trim()}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept-Language': 'en-US,en'
                 },
                 body: JSON.stringify({
                     model: 'glm-5.2',
-                    messages: [{role: 'user', content: 'test'}],
+                    messages: [{role: 'user', content: 'hi'}],
                     max_tokens: 5,
-                    stream: false
+                    stream: false,
+                    do_sample: false
                 })
             });
 
