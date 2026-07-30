@@ -850,6 +850,12 @@ async function callOpenAICompatibleWithRetry(params: {
           headers['X-Title'] = 'JohMeta';
         }
 
+        // Z.AI requires Accept-Language header
+        if (provider === 'zai') {
+          headers['Accept-Language'] = 'en-US,en';
+          payload.do_sample = false;
+        }
+
         if (provider === 'nvidia') {
           const sanPayload = { ...payload, messages: payload.messages.map((m: any) => ({ ...m, content: typeof m.content === 'string' ? m.content : '[REDACTED CONTENT]' })) };
           console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
@@ -2893,34 +2899,41 @@ export const generateOptimizedPrompt = async (options: {
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
-    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising assets: banners, posters, greeting cards, commercial templates, aesthetic frames, and marketing materials for top microstock platforms.
+    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising and branding assets—banners, flyers, posters, social media promos, commercial templates, and marketing materials—crafted using professional design tools like Adobe Illustrator, Adobe Photoshop, and CorelDRAW.
 
 When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
 
-1. CORE PURPOSE & VISUAL IDENTITY
-   - Focus exclusively on commercial graphic design elements: abstract promotional posters, advertising banners, greeting cards (kartu ucapan), promo banners (banner promo), aesthetic frames (bingkai estetik), creative digital flyers, and rich layout templates.
-   - STRICTLY DO NOT make it photorealistic. It MUST NOT look like a real photo or natural landscape. It must clearly be a digital graphic design, abstract art, vector style, or illustration meant for advertising and commercial use.
-   - Play heavily with abstract design elements, dynamic geometric shapes, creative layouts, ornate borders, and highly expressive aesthetic styles.
-   - STRICTLY AVOID MINIMALISM. The design should be rich, detailed, visually complex, and engaging, avoiding sparse or overly simple minimalist layouts.
+1. CORE PURPOSE & VISUAL IDENTITY (CRITICAL)
+   - Focus purely on COMMERCIAL GRAPHIC DESIGN output: promotional banners, advertising flyers, sale posters, event backdrops, social media graphics, branding templates, and marketing collateral.
+   - The output MUST look like it was made in Adobe Illustrator, Photoshop, or CorelDRAW — flat vector composition, geometric shapes, clean bold layouts, creative typography placeholders, and vibrant commercial color palettes.
+   - STRICTLY ZERO REALISM. NO photographs, NO photorealistic rendering, NO real-world textures, NO natural landscapes, NO 3D CGI, NO human faces or realistic skin.
+   - The design must be 100% VECTOR-BASED and SHAPE-BASED: think flat design icons, geometric abstract compositions, isometric shapes, overlapping semi-transparent polygons, bold line art, halftone patterns, and stylized graphic elements.
 
-2. STRUCTURED LAYOUT & VISUAL HIERARCHY
-   - Emphasize structured, grid-based layouts or dynamic asymmetrical compositions perfect for commercial use.
-   - Ensure there is a clear visual flow, elaborate framing, and balance, typical of high-end advertising posters and detailed greeting cards.
+2. DESIGN TOOL AESTHETIC (IMPORTANT)
+   - Emulate professional design software output: clean vector paths, flat solid fills, smooth gradient meshes, precise geometric alignment, drop shadows, blending modes, and layer-style effects.
+   - Style references: Adobe Illustrator vector artwork, Photoshop poster compositions, CorelDRAW banner layouts, Canva template aesthetics, Figma UI design vibes.
 
-3. MANDATORY COPY SPACE & NO TEXT POLICY (CRITICAL)
-   - ALWAYS incorporate generous, clean negative space (white space) meant for typography, headlines, and logos.
-   - ABSOLUTELY NO TEXT. Do not generate readable letters or words. Use abstract shapes, ornate ribbons, or empty text boxes as placeholders. The design must be 100% text-free.
+3. STRUCTURED LAYOUT & VISUAL HIERARCHY
+   - Use bold grid-based compositions, asymmetrical dynamic layouts, or centered poster-style structures.
+   - Include visual flow elements: sweeping curves, diagonal dividers, overlapping shape clusters, ribbon banners, badge frames, and corner ornaments.
+   - The composition must look like a finished commercial design ready for a client presentation—not an art piece.
 
-4. GRAPHIC ELEMENTS & AESTHETICS
-   - Combine elements like abstract waves, fluid gradients, 3D geometric primitives, halftone patterns, aesthetic ornamental frames, and sleek digital materials.
-   - Use vibrant, eye-catching color palettes optimized for commercial advertising (e.g., striking contrasts, vivid gradients, duotones). Ensure the visuals pop and look highly detailed.
+4. MANDATORY COPY SPACE & NO TEXT (CRITICAL)
+   - ALWAYS reserve generous, clean negative space (empty areas) for headlines, taglines, logos, and CTAs.
+   - NEVER generate readable text, letters, or words. Use abstract placeholder bars, geometric text blocks, or curved ribbon shapes instead.
 
-5. KEYWORDS TO INJECT
-   - Seamlessly integrate terms such as: "Abstract graphic design, commercial advertising poster, greeting card design, aesthetic frame border, promo banner template, non-realistic, digital art style, highly detailed, ornate geometric shapes, vibrant gradients, clean copy space, purely graphic art, NO MINIMALISM."
+5. GRAPHIC ELEMENTS & AESTHETICS
+   - Primary visual language: bold geometric shapes (circles, triangles, hexagons, abstract blobs), smooth gradient meshes, isometric cubes, overlapping translucent layers, dynamic diagonal slashes, dotted halftone textures, sleek line art dividers, and ornamental frame borders.
+   - Color palette: vibrant commercial advertising colors — electric blue, hot pink, neon green, golden yellow, deep purple, teal, coral orange, with striking duotone or triadic color schemes.
+   - The design should be RICH and DETAILED but purely artificial — like a premium stock vector template from Freepik or Shutterstock.
 
-6. STRICT PROHIBITIONS
-   - DO NOT create raw photorealistic photos, ordinary real-world objects, or natural environments.
-   - STRICTLY AVOID realism and minimalism. This must be an abstract, highly detailed, digital graphic design asset.`,
+6. KEYWORDS TO INJECT
+   - Integrate terms like: "flat vector graphic design, commercial advertising poster, promotional banner template, geometric abstract composition, bold vibrant colors, clean copy space, Adobe Illustrator style, non-realistic vector art, isometric shapes, halftone pattern, gradient mesh, corporate branding layout, purely digital graphic art, shape-based design, NO PHOTOGRAPHY."
+
+7. STRICT PROHIBITIONS
+   - NO photographs, NO realism, NO 3D CGI renders, NO natural environments, NO human subjects, NO realistic textures.
+   - NO minimalism — the design must be visually rich, bold, and commercially impactful.
+   - This is PURE GRAPHIC DESIGN — flat, vector, shape-based, digital, commercial.`,
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
@@ -3256,6 +3269,18 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
   let resolvedSubject = translatedWords.join(" ");
 
   const styleFallbackMap: Record<string, string[]> = {
+    "Graphic Design": [
+      "flat vector graphic design, Adobe Illustrator style composition, bold geometric shapes, clean commercial layout, vibrant duotone gradient, no realism",
+      "promotional banner template, isometric abstract geometry, halftone dot pattern, dynamic diagonal slashes, smooth gradient mesh, purely digital art",
+      "commercial advertising poster design, overlapping translucent polygons, bold line art elements, ornate frame border, striking color contrast, clean copy space",
+      "CorelDRAW banner style, geometric abstract composition, ribbon badge placeholder, modern flat vector shapes, electric blue and hot pink palette, no photography",
+      "social media promo template, layered geometric shapes, smooth drop shadows, sleek vector paths, golden yellow and deep purple gradient, shape-based design",
+      "Adobe Photoshop poster composition, asymmetrical dynamic layout, gradient mesh background, abstract blob elements, neon green and teal accents, purely digital",
+      "corporate branding layout, isometric cube cluster, sweeping curve dividers, bold triadic color scheme, clean negative space, professional design tool aesthetic",
+      "event backdrop banner design, overlapping circles and triangles, smooth blending modes, halftone texture overlay, coral orange and electric blue duotone",
+      "marketing flyer template, geometric frame border, abstract placeholder text bars, vibrant commercial colors, sleek layer-style effects, zero realism",
+      "stock vector template style, flat art composition, dynamic shape cluster, clean typography placeholder, rich gradient background, purely graphic art"
+    ],
     "Cinematic": [
       "anamorphic lens, volumetric lighting, hyper-realistic cinematic key shot, intense atmospheric depth, cinematic lighting",
       "shot on Arri Alexa LF, moody dramatic scene, photorealistic smoke effects, shallow depth of field",
@@ -4058,6 +4083,9 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
    - Teks Tidak Terbaca & Gibberish (CRITICAL): Periksa apakah terdapat teks yang tidak terbaca, karakter rusak, kata-kata yang berantakan, atau ejaan aneh (gibberish text) pada papan tulis (whiteboard), catatan tempel (sticky notes), poster, buku, kemasan produk, atau bagian mana pun di dalam gambar. Ini adalah cacat visual generatif AI yang sangat umum dan fatal untuk komersial. Jika gambar mengandung teks berantakan (seperti karakter huruf yang hancur, kata yang tidak bermakna/gibberish, atau gabungan huruf acak), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
 
 6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
+   - Efek Cahaya & Lens Flare Merusak (Excessive/Artificial Lens Flare) [KRITIS]: Deteksi efek bias pelangi (rainbow lens flare), kebocoran cahaya (light leaks), atau flare heksagonal buatan AI yang melintasi subjek utama dan menutupi detail asli (seperti jaket, celana, ransel). Jika efek ini tampak tidak alami, mengganggu estetika komersial, atau menutupi detail tekstur penting, status "ai_artifacts" atau "over_edited" WAJIB di-set ke FAIL.
+   - Figur Latar Belakang Cacat (Deformed/Malformed Background Figures) [SANGAT KRITIS]: Orang/subjek di latar belakang koridor/jalan yang memiliki tubuh terdistorsi, wajah meleleh/hancur, kaki/tangan menyatu secara tidak alami, meskipun latar belakang tersebut blur/bokeh. Cacat visual pada karakter sekunder atau figur latar belakang adalah alasan penolakan nomor satu di Adobe Stock. Jika ditemukan, status "ai_artifacts" dan "anatomical_errors" WAJIB di-set ke FAIL.
+   - Perspektif & Geometri Loker/Benda Bengkok (Warped Locker & Physical Geometry) [SANGAT KRITIS]: Garis-garis lurus pada furnitur, loker, kabinet, garis pintu, tangga, celah pintu loker yang tidak konsisten ukurannya, nomor loker (seperti nomor pelat logam "148") yang penyok/asimetris, atau kunci besi yang bentuknya meleleh dan tidak logis secara mekanisme fisik dunia nyata. Jika ditemukan cacat geometris ini, status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL.
    - Wajah Terdistorsi (Distorted/Melted Faces) [SANGAT KRITIS]: Wajah pada subjek utama maupun orang-orang/kerumunan di latar belakang yang meleleh, asimetris parah, mata yang menyatu, atau tampak seperti gumpalan daging tak berbentuk. Sering terjadi pada gambar kerumunan AI. Jika ditemukan, WAJIB set "anatomical_errors" dan "ai_artifacts" ke FAIL.
    - Benda yang Tidak Logis (Nonsensical Objects/Hallucinations): Objek yang bentuknya tidak masuk akal, terpotong secara ajaib, atau percampuran benda yang tidak logis (misal: tangan yang menyatu dengan bunga atau benda asing, benda yang melayang tanpa alasan, atau geometri mustahil). Jika ditemukan, set "ai_artifacts" ke FAIL.
    - Masalah Anatomi (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, tangan/jari yang meleleh dan berbaur secara mustahil dengan objek lain, sendi terkilir aneh, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.

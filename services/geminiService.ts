@@ -26,6 +26,7 @@ export interface ServiceOptions {
   blackboxKeys?: string | string[];
   bluesmindsKeys?: string | string[];
   aiveneKeys?: string | string[];
+  zaiKeys?: string | string[];
 }
 
 export const getHeaders = (options?: ServiceOptions) => {
@@ -64,6 +65,9 @@ export const getHeaders = (options?: ServiceOptions) => {
 
     const aKey = joinKeys(options.aiveneKeys);
     if (aKey) headers['x-aivene-key'] = aKey;
+
+    const zKey = joinKeys(options.zaiKeys);
+    if (zKey) headers['x-zai-key'] = zKey;
   }
   return headers;
 };
