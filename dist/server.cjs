@@ -5240,7 +5240,8 @@ var generateOptimizedPrompt = async (options) => {
   const randomComp = selectRandom(compositions);
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
-  const randomSaltInjection = userCameraAngle ? `[CRITICAL CAMERA ANGLE (User Selected - DO NOT IGNORE): ALL prompt variations MUST strictly use this exact camera angle: "${userCameraAngle}". Do not randomize, substitute, or deviate from this camera perspective. ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]` : `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
+  const cameraAngleDirective = userCameraAngle ? ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.` : "";
+  const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
   const isPngMode = promptMode === "png";
@@ -5410,7 +5411,8 @@ Your job is to translate a raw idea and specific style choices into exactly ${co
 Input parameters:
 - Base Subject/Idea: "${subject}"
 - Selected Style Context: ${effectiveStyleCategory}
-- Theme Context & Salt Variabilitas: ${randomSaltInjection}
+- Theme Context & Salt Variabilitas: ${randomSaltInjection}${userCameraAngle ? `
+- \u{1F3A5} User-Selected Camera Angle: "${userCameraAngle}" (blend this naturally into the prompt without making it sound forced or edited)` : ""}
 - Requested Number of Prompt Variations: ${count}
 - Requested Word Count Range: ${minWords} to ${maxWords} words per prompt
 - Focus Mode: ${promptMode.toUpperCase()}${userNegInstruction}
@@ -5423,7 +5425,7 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities (e.g., stacked paper layers for Paper Cut, hand-molded clay textures for Claymation, canvas grain/pigments for Oil/Watercolor paintings, clean vector geometry for Vector Art).
 4. Environment: Only introduce environmental details if they naturally fit the theme. Do not introduce unrelated environments.
 5. Lighting: Essential details about mood, shadows, and light sources (e.g., soft shadows between layers for Paper Cut, clean solid gradients for Vectors, natural sunlight/fog for photo styles).
-6. ${isPhotographic ? "Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR)." : "Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details."}
+6. ${isPhotographic ? `Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).${cameraAngleDirective}` : "Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details."}
 
 Rules for the Generated Prompts:
 0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? " [Camera Details]" : ""} [Commercial Intent]. Combine these elements into a fluid, professional description.
