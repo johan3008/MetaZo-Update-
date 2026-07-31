@@ -2816,6 +2816,7 @@ export const generateOptimizedPrompt = async (options: {
   iconSheetColumns?: number;
   vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
   darkHorrorSubStyle?: string;
+  referenceImages?: string[];
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -2831,7 +2832,8 @@ export const generateOptimizedPrompt = async (options: {
     flatIconType = undefined,
     iconSheetColumns = undefined,
     vectorSubType = undefined,
-    darkHorrorSubStyle = undefined
+    darkHorrorSubStyle = undefined,
+    referenceImages = undefined
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);

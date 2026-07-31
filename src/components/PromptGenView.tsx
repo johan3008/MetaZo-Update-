@@ -143,6 +143,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   uiLanguage = 'en'
 }) => {
   const [subject, setSubject] = useState('');
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [isAutoGeneratingSubject, setIsAutoGeneratingSubject] = useState(false);
   const [styleCategory, setStyleCategory] = useState('Cinematic');
   const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('classic');
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
@@ -160,6 +162,49 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat'>('minimal_flat');
   const [showVectorModal, setShowVectorModal] = useState(false);
   
+  
+  const handleReferenceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const remainingSlots = 5 - referenceImages.length;
+      const filesToProcess = files.slice(0, remainingSlots);
+      
+      filesToProcess.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setReferenceImages(prev => [...prev, reader.result as string].slice(0, 5));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const removeReferenceImage = (index: number) => {
+    setReferenceImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const triggerAutoSubject = async () => {
+    setIsAutoGeneratingSubject(true);
+    try {
+      const response = await fetch('/api/auto-subject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+        body: JSON.stringify({ styleCategory })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.subject) {
+          setSubject(data.subject);
+          setError(null);
+        }
+      }
+    } catch (err) {
+      console.warn("Auto subject generation failed:", err);
+    } finally {
+      setIsAutoGeneratingSubject(false);
+    }
+  };
+
   const currentStyleOptions = promptMode === 'background' ? BACKGROUND_STYLE_OPTIONS : PNG_STYLE_OPTIONS;
   
   const [result, setResult] = useState<{
@@ -435,7 +480,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           model: aiOptions?.model,
           seed,
           flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
-          vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
+          vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined,
+          referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined
         })
       });
 
