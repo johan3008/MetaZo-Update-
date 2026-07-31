@@ -1541,18 +1541,9 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/auto-subject', async (req, res) => {
         try {
-            const { styleCategory } = req.body;
-            const systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
-            const activeModel = 'gemini-3.5-flash';
-            const response = await callGeminiWithRetry(activeModel, {
-                parts: [{ text: `Generate a creative subject idea for style: ${styleCategory || "General"}` }]
-              }, {
-                systemInstruction,
-                temperature: 0.9,
-                maxOutputTokens: 100
-            });
-            const text = response.text || "";
-            res.json({ subject: text.trim().replace(/^"|"$/g, '') });
+            const { styleCategory, model } = req.body;
+            const text = await generateAutoSubject(styleCategory, model);
+            res.json({ subject: text });
         } catch (e: any) {
             console.warn('Error in auto-subject:', e);
             res.status(500).json({ error: e.message || 'Failed to generate subject idea' });
