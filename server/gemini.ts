@@ -5741,14 +5741,39 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
 
 
 export async function generateAutoSubject(styleCategory: string, model?: string): Promise<string> {
+  // A vast, highly diverse creative seed list to guarantee complete randomness and prevent repetitive ideas on multiple clicks
+  const creativeSeeds = [
+    "cyberpunk coffee shop", "organic biotechnology", "whimsical woodland creatures", "cosmic ocean nebula", 
+    "minimalist brutalist concrete villa", "ancient steampunk mechanical workshop", "vibrant neon desert oasis", 
+    "surreal levitating glass islands", "cozy Scandinavian hygge attic", "retro-futuristic astronaut exploring mossy ruins", 
+    "mythical crystal cavern glow", "zen botanical garden with koi fish", "underwater city ruins populated by bioluminescent jellyfish", 
+    "futuristic alpine research station", "nostalgic 80s arcade neon glow", "surreal origami paper bird swarm", 
+    "ethereal cloud castle with golden gates", "mystical potion brewing room", "abandoned gothic cathedral claimed by blooming roses", 
+    "sleek futuristic electric motorcycle on rain-slicked highway", "rustic clay pottery workshop with sun-dappled shadows", 
+    "extravagant Victorian masquerade ball", "modern smart greenhouse farming robotics", "abstract flowing liquid marble waves", 
+    "enchanted treehouse village inside a giant hollow oak", "cinematic desert caravan at golden hour", 
+    "surreal clockwork solar system globe", "vibrant pop-art stylized fruit display", "cozy winter cabin library with crackling fireplace", 
+    "majestic phoenix rising from colorful smoke", "futuristic luxury yacht sailing on liquid silver", "magical floating lantern festival"
+  ];
+  
+  // Pick a random seed keyword to inject unpredictable creative inspiration into the LLM
+  const randomSeed = creativeSeeds[Math.floor(Math.random() * creativeSeeds.length)];
+  
   const systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
+  
   const activeModel = model || 'gemini-3.5-flash';
+  
   const response = await callGeminiWithRetry(activeModel, {
-    parts: [{ text: `Generate a creative subject idea for style: ${styleCategory || "General"}` }]
+    parts: [{ 
+      text: `Generate a creative subject idea for style: ${styleCategory || "General"}. 
+      To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". 
+      Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.` 
+    }]
   }, {
     systemInstruction,
-    temperature: 0.9,
-    maxOutputTokens: 100
+    temperature: 0.98, // Higher temperature for maximized creative variation
+    maxOutputTokens: 120
   });
+  
   return (response.text || "").trim().replace(/^"|"$/g, '');
 }
