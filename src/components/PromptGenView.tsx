@@ -723,10 +723,21 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* 1. Subject Area */}
               <div className="space-y-2 group">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <AlignLeft size={14} className="text-emerald-500" />
-                    {t.prompt_subject_label}
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlignLeft size={14} className="text-emerald-500" />
+                      {t.prompt_subject_label}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={triggerAutoSubject}
+                      disabled={isAutoGeneratingSubject}
+                      className="p-1.5 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer group"
+                      title="AI Auto Ide Subject"
+                    >
+                      <Wand2 size={13} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'group-hover:rotate-12 transition-transform'}`} />
+                    </button>
+                  </div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">Bilingual Support</span>
                 </div>
                 
@@ -738,6 +749,55 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     placeholder={t.prompt_subject_placeholder}
                     className="relative w-full min-h-[140px] rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all font-medium leading-relaxed resize-y shadow-inner z-10"
                   />
+                </div>
+
+                {/* Reference Images Upload Area (Max 5) */}
+                <div className="space-y-2 mt-3 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-3.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Gambar Referensi ({referenceImages.length}/5)
+                    </span>
+                    {referenceImages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setReferenceImages([])}
+                        className="text-[9px] font-black text-rose-500 uppercase hover:underline"
+                      >
+                        Hapus Semua
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2.5 items-center">
+                    {referenceImages.map((img, idx) => (
+                      <div key={idx} className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 group">
+                        <img src={img} alt="Reference" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeReferenceImage(idx)}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {referenceImages.length < 5 && (
+                      <label className="w-12 h-12 border-2 border-dashed border-slate-300 dark:border-white/10 hover:border-emerald-500/50 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors text-slate-400 hover:text-emerald-500 bg-white/50 dark:bg-black/20">
+                        <span className="text-lg font-bold leading-none">+</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleReferenceImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold leading-normal uppercase">
+                    💡 Unggah hingga 5 gambar referensi untuk memandu AI menciptakan prompt yang jauh lebih kaya, artistik, dan kreatif!
+                  </p>
                 </div>
               </div>
 
