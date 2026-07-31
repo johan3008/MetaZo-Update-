@@ -205,9 +205,10 @@ export const ImageQualityCheck: React.FC<{
           if (!isResolved) {
             isResolved = true;
             cleanup();
-            reject(new Error("Video frame extraction timed out"));
+            // Fallback: Resolve with empty string to prevent browser codec limitations from blocking the pipeline
+            resolve("");
           }
-        }, 30000);
+        }, 15000);
 
         video.onloadedmetadata = () => {
           video.currentTime = Math.min(1, video.duration / 2 || 1);
@@ -251,7 +252,8 @@ export const ImageQualityCheck: React.FC<{
           clearTimeout(timeoutId);
           isResolved = true;
           cleanup();
-          reject(new Error("Failed to load video file"));
+          // Fallback: Resolve with empty string to prevent browser codec limitations from blocking the pipeline
+          resolve("");
         };
         
         video.src = url;
