@@ -5215,10 +5215,12 @@ var generateOptimizedPrompt = async (options) => {
     iconSheetColumns = void 0,
     vectorSubType = void 0,
     darkHorrorSubStyle = void 0,
-    referenceImages = void 0
+    referenceImages = void 0,
+    cameraAngles = void 0
   } = options;
   const count = Math.min(Math.max(variation, 10), 150);
-  const angles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot", "extreme close-up", "Dutch angle", "worm's-eye view", "bird's-eye view", "first-person POV"];
+  const defaultAngles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot", "extreme close-up", "Dutch angle", "worm's-eye view", "bird's-eye view", "first-person POV"];
+  const angles = cameraAngles && cameraAngles.length > 0 ? cameraAngles : defaultAngles;
   const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "neon cyberpunk glow", "chiaroscuro lighting", "bioluminescent ambient light", "ethereal volumetric rays", "harsh cinematic spotlight", "dramatic backlighting with lens flare"];
   const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background", "forced perspective", "kaleidoscopic symmetry", "abstract fragmented framing", "dramatic low-angle heroic composition", "ultra-wide architectural framing"];
   const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky", "thunderstorm dramatic sky", "heavy snow blizzard", "post-apocalyptic ash fall", "magical glowing floating embers", "surreal cosmic starscape"];
@@ -8979,7 +8981,7 @@ app.post("/api/generate-batch-metadata", async (req, res) => {
 });
 app.post("/api/generate-prompt", async (req, res) => {
   try {
-    const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages } = req.body;
+    const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles } = req.body;
     if (!subject) {
       return res.status(400).json({ error: "Missing subject field" });
     }
@@ -8997,7 +8999,8 @@ app.post("/api/generate-prompt", async (req, res) => {
       flatIconType,
       vectorSubType,
       darkHorrorSubStyle,
-      referenceImages
+      referenceImages,
+      cameraAngles
     });
     res.json(promptData);
   } catch (e) {
@@ -9011,8 +9014,55 @@ app.post("/api/generate-prompt", async (req, res) => {
 });
 app.post("/api/auto-subject", async (req, res) => {
   try {
-    const { styleCategory, model } = req.body;
-    const text = await generateAutoSubject(styleCategory, model);
+    const { styleCategory } = req.body;
+    const creativeSeeds = [
+      "cyberpunk coffee shop",
+      "organic biotechnology",
+      "whimsical woodland creatures",
+      "cosmic ocean nebula",
+      "minimalist brutalist concrete villa",
+      "ancient steampunk mechanical workshop",
+      "vibrant neon desert oasis",
+      "surreal levitating glass islands",
+      "cozy Scandinavian hygge attic",
+      "retro-futuristic astronaut exploring mossy ruins",
+      "mythical crystal cavern glow",
+      "zen botanical garden with koi fish",
+      "underwater city ruins populated by bioluminescent jellyfish",
+      "futuristic alpine research station",
+      "nostalgic 80s arcade neon glow",
+      "surreal origami paper bird swarm",
+      "ethereal cloud castle with golden gates",
+      "mystical potion brewing room",
+      "abandoned gothic cathedral claimed by blooming roses",
+      "sleek futuristic electric motorcycle on rain-slicked highway",
+      "rustic clay pottery workshop with sun-dappled shadows",
+      "extravagant Victorian masquerade ball",
+      "modern smart greenhouse farming robotics",
+      "abstract flowing liquid marble waves",
+      "enchanted treehouse village inside a giant hollow oak",
+      "cinematic desert caravan at golden hour",
+      "surreal clockwork solar system globe",
+      "vibrant pop-art stylized fruit display",
+      "cozy winter cabin library with crackling fireplace",
+      "majestic phoenix rising from colorful smoke",
+      "futuristic luxury yacht sailing on liquid silver",
+      "magical floating lantern festival"
+    ];
+    const randomSeed = creativeSeeds[Math.floor(Math.random() * creativeSeeds.length)];
+    const systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
+    const promptText = `Generate a creative subject idea for style: ${styleCategory || "General"}. To ensure absolute randomness and zero repetition, center your concept around this inspiration seed: "${randomSeed}". Make the concept extremely vivid, detailed, and microstock-ready.`;
+    const aiClient = new import_genai2.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+    const result = await aiClient.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: promptText,
+      config: {
+        systemInstruction,
+        temperature: 0.98,
+        maxOutputTokens: 120
+      }
+    });
+    const text = (result.text || "").trim().replace(/^"|"$/g, "");
     res.json({ subject: text });
   } catch (e) {
     console.warn("Error in auto-subject:", e);

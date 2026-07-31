@@ -157,6 +157,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [pngBgColor, setPngBgColor] = useState<'white' | 'black' | 'transparent'>('white');
   const [bgNegativePrompt, setBgNegativePrompt] = useState('blurry, low quality, worst quality, text, watermark, signature, bad proportions, bad anatomy');
   const [pngNegativePrompt, setPngNegativePrompt] = useState('scenery, context backdrop, ground shadow, drop shadow, ambient background, blurry, watermark, text');
+  const [selectedCameraAngles, setSelectedCameraAngles] = useState<string[]>([]);
+  const [customCameraAngle, setCustomCameraAngle] = useState('');
   const [flatIconType, setFlatIconType] = useState<'sheet' | 'single'>('single');
   const [showFlatIconModal, setShowFlatIconModal] = useState(false);
   const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat'>('minimal_flat');
@@ -203,6 +205,21 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     } finally {
       setIsAutoGeneratingSubject(false);
     }
+  };
+
+  
+  const toggleCameraAngle = (angle) => {
+    setSelectedCameraAngles(prev => {
+      if (prev.includes(angle)) return prev.filter(a => a !== angle);
+      if (prev.length >= 2) return [...prev.slice(1), angle];
+      return [...prev, angle];
+    });
+  };
+  const addCustomAngle = () => {
+    const trimmed = customCameraAngle.trim();
+    if (!trimmed || selectedCameraAngles.includes(trimmed)) { setCustomCameraAngle(''); return; }
+    setSelectedCameraAngles(prev => prev.length >= 2 ? [...prev.slice(1), trimmed] : [...prev, trimmed]);
+    setCustomCameraAngle('');
   };
 
   const currentStyleOptions = promptMode === 'background' ? BACKGROUND_STYLE_OPTIONS : PNG_STYLE_OPTIONS;
@@ -481,7 +498,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           seed,
           flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
           vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined,
-          referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined
+          referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined,
+          cameraAngles: selectedCameraAngles.length > 0 ? selectedCameraAngles : undefined
         })
       });
 
@@ -860,6 +878,56 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   {t.prompt_negative_desc}
                 </p>
               </div>
+
+              {/* Camera Angle Selection — only for realistic Background styles, hidden on PNG tab */}
+              {promptMode === 'background' && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                    🎥 Camera Angle ({selectedCameraAngles.length}/2)
+                  </label>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+                  {["Eye Level","High Angle","Low Angle","Bird's Eye View","Worm's Eye View","Dutch Angle","Overhead Shot","POV Shot","Over-the-Shoulder Shot","Front View","Side Profile","Three-Quarter View","Back View","Aerial View","Drone Shot","Close-Up","Medium Shot","Wide Shot","Extreme Close-Up","Extreme Wide Shot"].map(angle => {
+                    const isSelected = selectedCameraAngles.includes(angle);
+                    return (
+                      <button
+                        key={angle}
+                        type="button"
+                        onClick={() => toggleCameraAngle(angle)}
+                        className={`relative text-[9px] font-bold rounded-xl px-2 py-2.5 border transition-all duration-200 flex items-center justify-center text-center leading-tight cursor-pointer ${isSelected ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 shadow-sm shadow-violet-500/10' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-violet-300 dark:hover:border-violet-700 hover:text-violet-600 dark:hover:text-violet-400'}`}
+                      >
+                        {angle}
+                        {isSelected && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-500 rounded-full flex items-center justify-center">
+                            <Check size={10} className="text-white" />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customCameraAngle}
+                    onChange={(e) => setCustomCameraAngle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addCustomAngle()}
+                    placeholder="Custom angle..."
+                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 outline-none text-[10px] font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:border-violet-500 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomAngle}
+                    disabled={!customCameraAngle.trim()}
+                    className="px-3 py-1.5 bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+              )}
             </div>
 
             {/* Right side within the input panel */}
