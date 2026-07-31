@@ -5234,12 +5234,13 @@ var generateOptimizedPrompt = async (options) => {
     const r = prng();
     return arr[Math.floor(r * arr.length)];
   };
-  const randomAngle = selectRandom(angles);
+  const userCameraAngle = cameraAngles && cameraAngles.length > 0 ? cameraAngles.join(", ") : null;
+  const randomAngle = userCameraAngle || selectRandom(defaultAngles);
   const randomLighting = selectRandom(lightings);
   const randomComp = selectRandom(compositions);
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
-  const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
+  const randomSaltInjection = userCameraAngle ? `[CRITICAL CAMERA ANGLE (User Selected - DO NOT IGNORE): ALL prompt variations MUST strictly use this exact camera angle: "${userCameraAngle}". Do not randomize, substitute, or deviate from this camera perspective. ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]` : `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
   const isPngMode = promptMode === "png";
