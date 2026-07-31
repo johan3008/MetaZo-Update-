@@ -5738,3 +5738,17 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
     throw new Error('Failed to generate prompt');
   }
 }
+
+
+export async function generateAutoSubject(styleCategory: string, model?: string): Promise<string> {
+  const systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
+  const activeModel = model || 'gemini-3.5-flash';
+  const response = await callGeminiWithRetry(activeModel, {
+    parts: [{ text: `Generate a creative subject idea for style: ${styleCategory || "General"}` }]
+  }, {
+    systemInstruction,
+    temperature: 0.9,
+    maxOutputTokens: 100
+  });
+  return (response.text || "").trim().replace(/^"|"$/g, '');
+}
