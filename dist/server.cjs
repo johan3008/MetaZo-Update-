@@ -5240,7 +5240,7 @@ var generateOptimizedPrompt = async (options) => {
   const randomComp = selectRandom(compositions);
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
-  const cameraAngleDirective = userCameraAngle ? ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.` : "";
+  const cameraAngleDirective = userCameraAngle ? ` MUST use this specific camera angle: "${userCameraAngle}".${styleCategory === "Photorealistic" ? " Describe it as a natural, candid real-world photo perspective \u2014 NOT a staged cinematic movie shot. Use genuine photographic language like a real camera, not filmmaking jargon." : styleCategory === "Cinematic" ? " Describe it with cinematic framing and movie-like composition befitting high-end cinematography." : ""} Do not randomize or substitute.` : "";
   const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
