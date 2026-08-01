@@ -5458,6 +5458,20 @@ Rules for the Generated Prompts:
       * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
       * Subjects, Expressions & Poses: Vary characters' ages, genders, ethnicities, actions, emotional expressions (e.g., focused, joyful, contemplative, active, serene), and direct interactions with their surroundings.
       * Scenario & Environment: Change environments completely (e.g., indoors vs. outdoors, modern minimalist spaces vs. raw nature, urban landscapes vs. intimate workspaces).
+    - ANTI-CLICH\xC9 & ANTI-FORCED-DRAMA RULE (CRITICAL):
+      * DO NOT default to clich\xE9 dramatic weather tropes such as "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", or "ominous black clouds" unless the subject EXPLICITLY requires it (e.g., a storm-chaser documentary scene).
+      * Creativity does NOT mean forced drama, darkness, or apocalyptic weather. A beautiful Cinematic scene can be a warm golden-hour field, a sleek modern interior, a serene misty forest, a vibrant cityscape at dusk, or an intimate candlelit room \u2014 not just dark skies and lightning.
+      * For Dark Horror Aesthetic: atmosphere comes from lighting, texture, composition, and psychological tension \u2014 NOT from defaulting to thunder and lightning. Use fog, decay, shadow, unsettling framing, eerie stillness, or subtle wrongness.
+      * Each prompt MUST reflect the AUTHENTIC character of its style, not a lazy default dramatic template. Vary environments naturally: sunny, overcast, dawn, dusk, indoor, outdoor, urban, natural, abstract \u2014 whatever fits the subject and style genuinely.
+    - ZERO-GENERIC PROMPT RULE (CRITICAL \u2014 READ CAREFULLY):
+      * DO NOT write prompts that sound like generic stock photo descriptions. Specifically FORBIDDEN patterns:
+        \u2014 "a person standing..." / "a person sitting..." / "a person holding..." without hyper-specific, unusual detail
+        \u2014 "beautiful", "stunning", "amazing", "professional", "high quality" \u2014 these are empty filler words, NEVER use them
+        \u2014 "with copy space" / "isolated on white" used lazily \u2014 these must feel organic, not tacked on
+        \u2014 Vague environments: "in a room", "outdoors", "in nature", "in a studio" \u2014 be hyper-specific (e.g., "in a sun-drenched Parisian attic with exposed wooden beams" not "in a room")
+      * EVERY prompt MUST contain at least ONE hyper-specific, unmistakably unique micro-detail that makes it impossible to confuse with another prompt (e.g., a specific object, texture, color interaction, or action that only appears in this exact variation).
+      * Prefer unusual, memorable actions over static poses: "carefully polishing a vintage brass telescope with a faded velvet cloth" NOT "holding a telescope".
+      * Each prompt variation must feel like it was hand-crafted by a specialist in that style domain, not auto-generated from a template. The reader should feel the specific mood, texture, and atmosphere of that exact moment \u2014 not a generic placeholder.
     - ABSOLUTE STYLE SEPARATION (CINEMATIC VS PHOTOREALISTIC):
       * If the Selected Style is "Cinematic", the output prompts MUST be strictly cinematic, looking like a movie-set still with anamorphic qualities, film color grading, volumetric lighting, and dramatic mood. Do NOT generate standard flat stock photos.
       * If the Selected Style is "Photorealistic", the output prompts MUST be strictly realistic, looking like sharp, candid, organic real-world captures with lifelike skin/surface textures, natural sunlight or soft studio strobes, and genuine human behaviors. Do NOT inject theatrical movie color grading or artificial film flares.
