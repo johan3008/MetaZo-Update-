@@ -488,7 +488,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           subject: subject.trim(),
           styleCategory,
           darkHorrorSubStyle: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : undefined,
-          count: variation,
+          variation: variation,
           promptMode,
           pngBgColor,
           minWords,
@@ -889,24 +889,60 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   </label>
                 </div>
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-                  {["Eye Level","High Angle","Low Angle","Bird's Eye View","Worm's Eye View","Dutch Angle","Overhead Shot","POV Shot","Over-the-Shoulder Shot","Front View","Side Profile","Three-Quarter View","Back View","Aerial View","Drone Shot","Close-Up","Medium Shot","Wide Shot","Extreme Close-Up","Extreme Wide Shot"].map(angle => {
-                    const isSelected = selectedCameraAngles.includes(angle);
-                    return (
-                      <button
-                        key={angle}
-                        type="button"
-                        onClick={() => toggleCameraAngle(angle)}
-                        className={`relative text-[9px] font-bold rounded-xl px-2 py-2.5 border transition-all duration-200 flex items-center justify-center text-center leading-tight cursor-pointer ${isSelected ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 shadow-sm shadow-violet-500/10' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-violet-300 dark:hover:border-violet-700 hover:text-violet-600 dark:hover:text-violet-400'}`}
-                      >
-                        {angle}
-                        {isSelected && (
-                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-500 rounded-full flex items-center justify-center">
-                            <Check size={10} className="text-white" />
-                          </span>
-                        )}
-                      </button>
+                  {(() => {
+                    const presetAngles = ["Eye Level","High Angle","Low Angle","Bird's Eye View","Worm's Eye View","Dutch Angle","Overhead Shot","POV Shot","Over-the-Shoulder Shot","Front View","Side Profile","Three-Quarter View","Back View","Aerial View","Drone Shot","Close-Up","Medium Shot","Wide Shot","Extreme Close-Up","Extreme Wide Shot"];
+                    const angleTransforms = {
+                      "Eye Level": "", "High Angle": "rotateX(-12deg)", "Low Angle": "rotateX(12deg)",
+                      "Bird's Eye View": "rotateX(-55deg)", "Worm's Eye View": "rotateX(55deg)",
+                      "Dutch Angle": "rotateZ(14deg)", "Overhead Shot": "rotateX(-60deg)",
+                      "POV Shot": "scale(1.05)", "Over-the-Shoulder Shot": "rotateY(18deg)",
+                      "Front View": "", "Side Profile": "rotateY(85deg)",
+                      "Three-Quarter View": "rotateY(40deg)", "Back View": "rotateY(175deg)",
+                      "Aerial View": "rotateX(-45deg)", "Drone Shot": "rotateX(-25deg) scale(0.9)",
+                      "Close-Up": "scale(1.3)", "Medium Shot": "scale(1)", "Wide Shot": "scale(0.72)",
+                      "Extreme Close-Up": "scale(1.5)", "Extreme Wide Shot": "scale(0.55)"
+                    };
+                    const allAngles = [...new Set([...presetAngles, ...selectedCameraAngles])];
+                    return allAngles.map(angle => {
+                      const isSelected = selectedCameraAngles.includes(angle);
+                      const isCustom = !presetAngles.includes(angle);
+                      const transform = angleTransforms[angle] || "";
+                      return (
+                      <div key={angle} className="relative group/cam">
+                        <button
+                          type="button"
+                          onClick={() => toggleCameraAngle(angle)}
+                          className={`relative text-[9px] font-bold rounded-xl px-2 py-2.5 border transition-all duration-200 flex items-center justify-center text-center leading-tight cursor-pointer w-full ${isSelected ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 shadow-sm shadow-violet-500/10' : isCustom ? 'bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:border-amber-400' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-violet-300 dark:hover:border-violet-700 hover:text-violet-600 dark:hover:text-violet-400'}`}
+                        >
+                          {isCustom && <span className="text-[8px] mr-0.5">✨</span>}{angle}
+                          {isSelected && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-500 rounded-full flex items-center justify-center">
+                              <Check size={10} className="text-white" />
+                            </span>
+                          )}
+                        </button>
+                        {/* Hover Tooltip - Camera Animation */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none opacity-0 group-hover/cam:opacity-100 transition-opacity duration-300">
+                          <div className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl px-4 py-3 shadow-2xl border border-white/10 dark:border-slate-200/50 flex flex-col items-center gap-2 min-w-[140px]">
+                            <div className="w-12 h-12 flex items-center justify-center" style={{ transform, transition: 'transform 0.3s ease' }}>
+                              <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10 text-violet-400">
+                                <rect x="8" y="14" width="32" height="24" rx="4" stroke="currentColor" strokeWidth="2" fill="none"/>
+                                <circle cx="24" cy="26" r="7" stroke="currentColor" strokeWidth="2" fill="none"/>
+                                <circle cx="24" cy="26" r="3" fill="currentColor" opacity="0.4"/>
+                                <rect x="18" y="8" width="12" height="6" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                                <rect x="32" y="17" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.6"/>
+                                <line x1="24" y1="6" x2="24" y2="2" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/>
+                              </svg>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap">{angle}</span>
+                            <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-violet-500 to-transparent rounded-full animate-pulse" />
+                          </div>
+                          <div className="w-3 h-3 bg-slate-900 dark:bg-white rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2 border-r border-b border-white/10 dark:border-slate-200/50"></div>
+                        </div>
+                      </div>
                     );
-                  })}
+                    });
+                  })()}
                 </div>
                 <div className="flex gap-2">
                   <input
