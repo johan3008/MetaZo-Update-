@@ -2867,11 +2867,24 @@ export const generateOptimizedPrompt = async (options: {
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
 
+  // ═══════════════════════════════════════════════
+  // 🎲 [Backend Helper] — Dynamic Injection Engine
+  // ═══════════════════════════════════════════════
+  // Step 1: Pilih Style/Modifier Acak untuk variasi kreatif maksimal
+  const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
+  const dynamicMood = selectRandom(creativeSurprise);
+  
+  // Step 2: Generate Random Temperature (0.80 - 0.95) — setiap run berbeda
+  const randomTemp = 0.80 + Math.random() * 0.15;
+
   const cameraAngleDirective = userCameraAngle
     ? ` MUST use this specific camera angle: "${userCameraAngle}".${styleCategory === 'Photorealistic' ? ' Describe it as a natural, candid real-world photo perspective — NOT a staged cinematic movie shot. Use genuine photographic language like a real camera, not filmmaking jargon.' : styleCategory === 'Cinematic' ? ' Describe it with cinematic framing and movie-like composition befitting high-end cinematography.' : ''} Do not randomize or substitute.`
     : '';
 
-  const randomSaltInjection = `[Random Composition Base: ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}]`;
+  const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
+
+  // Step 3: Rakit System Instruction / Prompt — see systemInstruction below
+  // ═══════════════════════════════════════════════
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -3075,6 +3088,15 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 Rules for the Generated Prompts:
 0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
 0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
+0.15 STYLE PURITY LOCK — ZERO CROSS-CONTAMINATION (CRITICAL — READ TWICE):
+      Each style has its OWN vocabulary domain. You MUST use ONLY the vocabulary belonging to the selected style. NEVER leak terms from other style domains.
+      ─ STYLE VOCABULARY DOMAINS ─
+      📸 Photographic Domain (Cinematic, Photorealistic, Vintage Photography, Dark Horror, Corporate Tech): camera lenses, apertures, DSLR, film grain, lighting setups, real-world environments, human subjects, candid moments. FORBIDDEN: "vector", "flat design", "outline", "stroke", "fill color", "isometric grid", "voxel", "polygon count", "render engine".
+      🎨 Vector/Illustration Domain (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): vector paths, solid fills, clean outlines, flat colors, geometric shapes, stroke weight, anchor points. FORBIDDEN: camera terms, 3D materials, photorealism, "shot on", "lens", real-world physics.
+      🧱 3D/CGI Domain (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric, Claymation): polygons, materials, textures, global illumination, ray tracing, subsurface scattering, voxel grids. FORBIDDEN: "photograph", "camera", "vector", "flat 2D".
+      🖌️ Traditional Art Domain (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): brushstrokes, pigments, paper grain, canvas, textile, folded paper. FORBIDDEN: digital 3D terms, camera terms, "vector".
+      🎮 Stylized Domain (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style): cel-shading, brick toys, pixel grid, expressive features. FORBIDDEN: photorealism, 3D render jargon, vector flat design.
+      ⚠️ BEFORE WRITING EACH PROMPT: check which domain the selected style belongs to, then filter your vocabulary to ONLY that domain. Cross-domain leakage = FAIL.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
@@ -3183,7 +3205,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
-          config: { temperature: 0.95, seed: seed, topP: 0.99 },
+          config: { temperature: randomTemp, seed: seed, topP: 0.99 },
           model
         });
         
@@ -3223,7 +3245,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.95,
+            temperature: randomTemp,
             seed: seed,
             topP: 0.99,
             topK: 100,
