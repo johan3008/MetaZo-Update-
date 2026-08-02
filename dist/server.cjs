@@ -5243,8 +5243,9 @@ var generateOptimizedPrompt = async (options) => {
   const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
   const dynamicMood = selectRandom(creativeSurprise);
   const randomTemp = 0.8 + Math.random() * 0.15;
-  const cameraAngleDirective = userCameraAngle ? ` MUST use this specific camera angle: "${userCameraAngle}".${styleCategory === "Photorealistic" ? " Describe it as a natural, candid real-world photo perspective \u2014 NOT a staged cinematic movie shot. Use genuine photographic language like a real camera, not filmmaking jargon." : styleCategory === "Cinematic" ? " Describe it with cinematic framing and movie-like composition befitting high-end cinematography." : ""} Do not randomize or substitute.` : "";
-  const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
+  const cameraAngleDirective = userCameraAngle ? styleCategory === "Photorealistic" ? ` Blend the "${userCameraAngle}" perspective naturally as a candid real-world photo angle \u2014 like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.` : styleCategory === "Cinematic" ? ` Use "${userCameraAngle}" with cinematic framing and movie-like composition.` : ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.` : "";
+  const saltAngle = userCameraAngle ? "User-selected angle (see Camera details rule)" : randomAngle;
+  const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
   const isPngMode = promptMode === "png";

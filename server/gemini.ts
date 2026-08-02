@@ -2867,24 +2867,23 @@ export const generateOptimizedPrompt = async (options: {
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
 
-  // ═══════════════════════════════════════════════
   // 🎲 [Backend Helper] — Dynamic Injection Engine
-  // ═══════════════════════════════════════════════
-  // Step 1: Pilih Style/Modifier Acak untuk variasi kreatif maksimal
   const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
   const dynamicMood = selectRandom(creativeSurprise);
-  
-  // Step 2: Generate Random Temperature (0.80 - 0.95) — setiap run berbeda
   const randomTemp = 0.80 + Math.random() * 0.15;
 
+  // Camera angle directive — minimal & natural, especially for Photorealistic
   const cameraAngleDirective = userCameraAngle
-    ? ` MUST use this specific camera angle: "${userCameraAngle}".${styleCategory === 'Photorealistic' ? ' Describe it as a natural, candid real-world photo perspective — NOT a staged cinematic movie shot. Use genuine photographic language like a real camera, not filmmaking jargon.' : styleCategory === 'Cinematic' ? ' Describe it with cinematic framing and movie-like composition befitting high-end cinematography.' : ''} Do not randomize or substitute.`
+    ? (styleCategory === 'Photorealistic'
+        ? ` Blend the "${userCameraAngle}" perspective naturally as a candid real-world photo angle — like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.`
+        : styleCategory === 'Cinematic'
+        ? ` Use "${userCameraAngle}" with cinematic framing and movie-like composition.`
+        : ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.`)
     : '';
 
-  const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${randomAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
-
-  // Step 3: Rakit System Instruction / Prompt — see systemInstruction below
-  // ═══════════════════════════════════════════════
+  // When user selected camera angle, omit angle from randomSaltInjection to prevent over-emphasis
+  const saltAngle = userCameraAngle ? 'User-selected angle (see Camera details rule)' : randomAngle;
+  const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
