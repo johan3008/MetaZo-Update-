@@ -1506,61 +1506,109 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
-    // === EMBED METADATA: Tanamkan metadata ke dalam file gambar ===
+    // ═══════════════════════════════════════════════════════════
+    // EMBED METADATA: Full R2 Pipeline — Upload → AI Generate → Embed → Download
+    // ═══════════════════════════════════════════════════════════
     app.post('/api/embed-metadata', upload.single('file'), async (req, res) => {
-        let tmpInput = '';
-        let tmpOutput = '';
+        let localInputPath = '';
+        let localOutputPath = '';
+        let cleanupLocal = () => {};
         try {
-            if (!req.file) {
-                return res.status(400).json({ error: 'File gambar tidak ditemukan. Silakan unggah file.' });
+            let originalName = '';
+            let contentType = '';
+
+            // Step 1: Receive file — R2 path (preferred) or direct upload (fallback)
+            if (req.body.fileUrl && req.body.pathKey) {
+                const ext = path.extname(req.body.pathKey) || '.jpg';
+                originalName = path.basename(req.body.pathKey);
+                contentType = req.body.contentType || 'image/jpeg';
+                console.log(`[Embed Metadata] Downloading from R2: ${req.body.pathKey}`);
+                const result = await downloadFileFromStorage(req.body.fileUrl, req.body.pathKey, ext);
+                localInputPath = result.localPath;
+                cleanupLocal = result.cleanup;
+            } else if (req.file) {
+                localInputPath = req.file.path;
+                originalName = req.file.originalname || 'image.jpg';
+                contentType = req.file.mimetype || 'image/jpeg';
+                cleanupLocal = () => {
+                    try { if (fs.existsSync(localInputPath)) fs.unlinkSync(localInputPath); } catch(e) {}
+                };
+            } else {
+                return res.status(400).json({ error: 'File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2).' });
             }
-            const { title, description, keywords } = req.body;
-            if (!title && !description && !keywords) {
-                return res.status(400).json({ error: 'Metadata (title/description/keywords) diperlukan untuk menanamkan.' });
-            }
 
-            const parsedKeywords = typeof keywords === 'string' ? JSON.parse(keywords || '[]') : (keywords || []);
-            const keywordStr = Array.isArray(parsedKeywords) ? parsedKeywords.join('; ') : String(keywords || '');
+            // Step 2: AI Generate Metadata from the image
+            console.log(`[Embed Metadata] Generating AI metadata for: ${originalName}`);
+            const imageBase64 = fs.readFileSync(localInputPath, { encoding: 'base64' });
+            const dataUri = `data:image/jpeg;base64,${imageBase64}`;
+            const { keywordCount = 50, model, metadataLanguage, aiModelPerformance } = req.body;
+            const generatedMetadata = await generateStockMetadata(
+                [dataUri],
+                parseInt(String(keywordCount), 10) || 50,
+                '',
+                ToolType.IMAGE,
+                undefined,
+                model,
+                undefined,
+                undefined,
+                metadataLanguage || 'English',
+                aiModelPerformance || 'detail'
+            );
+            const { title = '', description = '', keywords = [] } = generatedMetadata;
+            console.log(`[Embed Metadata] AI generated title, ${keywords.length} keywords`);
 
-            tmpInput = req.file.path;
-            tmpOutput = tmpInput + '_embedded' + path.extname(req.file.originalname || '.jpg');
+            // Step 3: ExifTool / ImageMagick — write metadata into file
+            const keywordStr = Array.isArray(keywords) ? keywords.join('; ') : String(keywords || '');
+            localOutputPath = localInputPath + '_embedded' + path.extname(originalName);
 
-            // Build ImageMagick arguments for IPTC/EXIF/XMP embedding
-            const magickArgs = [tmpInput];
+            const magickArgs = [localInputPath];
             if (title && title.trim()) {
-                magickArgs.push('-set', 'iptc:2:5', title.trim());       // IPTC Object Name / Title
+                magickArgs.push('-set', 'iptc:2:5', title.trim());
                 magickArgs.push('-set', 'exif:ImageDescription', title.trim());
                 magickArgs.push('-set', 'xmp:Title', title.trim());
             }
             if (description && description.trim()) {
-                magickArgs.push('-set', 'iptc:2:120', description.trim()); // IPTC Caption/Description
-                magickArgs.push('-set', 'exif:ImageDescription', description.trim());
+                magickArgs.push('-set', 'iptc:2:120', description.trim());
                 magickArgs.push('-set', 'xmp:Description', description.trim());
             }
             if (keywordStr) {
-                magickArgs.push('-set', 'iptc:2:25', keywordStr);         // IPTC Keywords
+                magickArgs.push('-set', 'iptc:2:25', keywordStr);
                 magickArgs.push('-set', 'xmp:Keywords', keywordStr);
             }
-            magickArgs.push(tmpOutput);
+            magickArgs.push(localOutputPath);
 
-            console.log(`[Embed Metadata] Embedding metadata into: ${req.file.originalname}`);
+            console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
             await spawnAsync('magick', magickArgs, { timeout: 30000 });
 
-            // Send the file back to client
-            const fileName = `embedded_${req.file.originalname || 'image.jpg'}`;
-            res.setHeader('Content-Type', req.file.mimetype || 'image/jpeg');
-            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-            res.sendFile(tmpOutput, { root: '/' }, (err) => {
-                // Cleanup temp files
-                try { if (fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput); } catch(e) {}
-                try { if (fs.existsSync(tmpOutput)) fs.unlinkSync(tmpOutput); } catch(e) {}
+            // Step 4: Upload embedded file to Cloudflare R2 + return download URL
+            const embeddedName = `embedded_${originalName}`;
+            if (isR2Configured()) {
+                console.log(`[Embed Metadata] Uploading embedded file to R2...`);
+                const { fileUrl: r2Url } = await uploadFileToStorage(localOutputPath, embeddedName, contentType);
+                console.log(`[Embed Metadata] R2 upload complete: ${r2Url}`);
+                cleanupLocal();
+                try { if (fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
+                return res.json({
+                    success: true,
+                    downloadUrl: r2Url,
+                    fileName: embeddedName,
+                    metadata: { title, description, keywords }
+                });
+            }
+
+            // Fallback: direct download (no R2 configured)
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(embeddedName)}"`);
+            res.sendFile(localOutputPath, { root: '/' }, (err) => {
+                cleanupLocal();
+                try { if (fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
                 if (err) console.error('[Embed Metadata] Send error:', err);
             });
         } catch (e: any) {
-            console.error('[Embed Metadata] Error:', e);
-            try { if (tmpInput && fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput); } catch(e) {}
-            try { if (tmpOutput && fs.existsSync(tmpOutput)) fs.unlinkSync(tmpOutput); } catch(e) {}
-            res.status(500).json({ error: e.message || 'Gagal menanamkan metadata ke file.' });
+            console.error('[Embed Metadata] Pipeline error:', e);
+            cleanupLocal();
+            try { if (localOutputPath && fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
+            res.status(500).json({ error: e.message || 'Gagal dalam pipeline Embed Metadata.' });
         }
     });
 
