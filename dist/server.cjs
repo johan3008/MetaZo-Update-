@@ -9009,6 +9009,66 @@ app.post("/api/generate-batch-metadata", async (req, res) => {
     }
   }
 });
+app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
+  let tmpInput = "";
+  let tmpOutput = "";
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "File gambar tidak ditemukan. Silakan unggah file." });
+    }
+    const { title, description, keywords } = req.body;
+    if (!title && !description && !keywords) {
+      return res.status(400).json({ error: "Metadata (title/description/keywords) diperlukan untuk menanamkan." });
+    }
+    const parsedKeywords = typeof keywords === "string" ? JSON.parse(keywords || "[]") : keywords || [];
+    const keywordStr = Array.isArray(parsedKeywords) ? parsedKeywords.join("; ") : String(keywords || "");
+    tmpInput = req.file.path;
+    tmpOutput = tmpInput + "_embedded" + import_path.default.extname(req.file.originalname || ".jpg");
+    const magickArgs = [tmpInput];
+    if (title && title.trim()) {
+      magickArgs.push("-set", "iptc:2:5", title.trim());
+      magickArgs.push("-set", "exif:ImageDescription", title.trim());
+      magickArgs.push("-set", "xmp:Title", title.trim());
+    }
+    if (description && description.trim()) {
+      magickArgs.push("-set", "iptc:2:120", description.trim());
+      magickArgs.push("-set", "exif:ImageDescription", description.trim());
+      magickArgs.push("-set", "xmp:Description", description.trim());
+    }
+    if (keywordStr) {
+      magickArgs.push("-set", "iptc:2:25", keywordStr);
+      magickArgs.push("-set", "xmp:Keywords", keywordStr);
+    }
+    magickArgs.push(tmpOutput);
+    console.log(`[Embed Metadata] Embedding metadata into: ${req.file.originalname}`);
+    await spawnAsync("magick", magickArgs, { timeout: 3e4 });
+    const fileName = `embedded_${req.file.originalname || "image.jpg"}`;
+    res.setHeader("Content-Type", req.file.mimetype || "image/jpeg");
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.sendFile(tmpOutput, { root: "/" }, (err) => {
+      try {
+        if (import_fs.default.existsSync(tmpInput)) import_fs.default.unlinkSync(tmpInput);
+      } catch (e) {
+      }
+      try {
+        if (import_fs.default.existsSync(tmpOutput)) import_fs.default.unlinkSync(tmpOutput);
+      } catch (e) {
+      }
+      if (err) console.error("[Embed Metadata] Send error:", err);
+    });
+  } catch (e) {
+    console.error("[Embed Metadata] Error:", e);
+    try {
+      if (tmpInput && import_fs.default.existsSync(tmpInput)) import_fs.default.unlinkSync(tmpInput);
+    } catch (e2) {
+    }
+    try {
+      if (tmpOutput && import_fs.default.existsSync(tmpOutput)) import_fs.default.unlinkSync(tmpOutput);
+    } catch (e2) {
+    }
+    res.status(500).json({ error: e.message || "Gagal menanamkan metadata ke file." });
+  }
+});
 app.post("/api/generate-prompt", async (req, res) => {
   try {
     const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles } = req.body;
