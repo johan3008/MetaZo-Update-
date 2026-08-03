@@ -2903,6 +2903,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [embedDownloading, setEmbedDownloading] = useState(false);
   const autoDownloadCSVRef = useRef(false);
   const setAutoDownloadCSV = (val: boolean) => {
       setAutoDownloadCSVState(val);
@@ -4297,6 +4298,51 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDownloadEmbedded = async () => {
+    const toolFiles = getFilesForTool(files, activeTool);
+    const completedFile = toolFiles.find(f => f.title && f.file);
+    if (!completedFile) return;
+
+    setEmbedDownloading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', completedFile.file);
+      formData.append('title', completedFile.title || '');
+      formData.append('description', completedFile.description || '');
+      formData.append('keywords', JSON.stringify(completedFile.keywords || []));
+      if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
+
+      const resp = await fetch('/api/embed-metadata', {
+        method: 'POST',
+        headers: getHeaders(commonAiOptions),
+        body: formData
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'Gagal menanamkan metadata');
+      }
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await resp.json();
+        if (data.downloadUrl) window.open(data.downloadUrl, '_blank');
+      } else {
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `embedded_${completedFile.file.name}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('[Download Embedded] Error:', e);
+    } finally {
+      setEmbedDownloading(false);
+    }
+  };
+
   const handleDeleteFile = (id: string) => {
     const fileItem = files.find(f => f.id === id);
     if (fileItem && fileItem.analysisFrames) {
@@ -4890,6 +4936,8 @@ const App: React.FC = () => {
                     canDownload={canDownload} 
                     handleExport={handleExport} 
                     handleBackupJSON={handleBackupJSON}
+                    handleDownloadEmbedded={handleDownloadEmbedded}
+                    embedDownloading={embedDownloading}
                     t={t} 
                   />
                 )}

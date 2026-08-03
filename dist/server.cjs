@@ -9010,21 +9010,55 @@ app.post("/api/generate-batch-metadata", async (req, res) => {
   }
 });
 app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
-  let tmpInput = "";
-  let tmpOutput = "";
+  let localInputPath = "";
+  let localOutputPath = "";
+  let cleanupLocal = () => {
+  };
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "File gambar tidak ditemukan. Silakan unggah file." });
+    let originalName = "";
+    let contentType = "";
+    if (req.body.fileUrl && req.body.pathKey) {
+      const ext = import_path.default.extname(req.body.pathKey) || ".jpg";
+      originalName = import_path.default.basename(req.body.pathKey);
+      contentType = req.body.contentType || "image/jpeg";
+      console.log(`[Embed Metadata] Downloading from R2: ${req.body.pathKey}`);
+      const result = await downloadFileFromStorage(req.body.fileUrl, req.body.pathKey, ext);
+      localInputPath = result.localPath;
+      cleanupLocal = result.cleanup;
+    } else if (req.file) {
+      localInputPath = req.file.path;
+      originalName = req.file.originalname || "image.jpg";
+      contentType = req.file.mimetype || "image/jpeg";
+      cleanupLocal = () => {
+        try {
+          if (import_fs.default.existsSync(localInputPath)) import_fs.default.unlinkSync(localInputPath);
+        } catch (e) {
+        }
+      };
+    } else {
+      return res.status(400).json({ error: "File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2)." });
     }
-    const { title, description, keywords } = req.body;
-    if (!title && !description && !keywords) {
-      return res.status(400).json({ error: "Metadata (title/description/keywords) diperlukan untuk menanamkan." });
-    }
-    const parsedKeywords = typeof keywords === "string" ? JSON.parse(keywords || "[]") : keywords || [];
-    const keywordStr = Array.isArray(parsedKeywords) ? parsedKeywords.join("; ") : String(keywords || "");
-    tmpInput = req.file.path;
-    tmpOutput = tmpInput + "_embedded" + import_path.default.extname(req.file.originalname || ".jpg");
-    const magickArgs = [tmpInput];
+    console.log(`[Embed Metadata] Generating AI metadata for: ${originalName}`);
+    const imageBase64 = import_fs.default.readFileSync(localInputPath, { encoding: "base64" });
+    const dataUri = `data:image/jpeg;base64,${imageBase64}`;
+    const { keywordCount = 50, model, metadataLanguage, aiModelPerformance } = req.body;
+    const generatedMetadata = await generateStockMetadata(
+      [dataUri],
+      parseInt(String(keywordCount), 10) || 50,
+      "",
+      ToolType.IMAGE,
+      void 0,
+      model,
+      void 0,
+      void 0,
+      metadataLanguage || "English",
+      aiModelPerformance || "detail"
+    );
+    const { title = "", description = "", keywords = [] } = generatedMetadata;
+    console.log(`[Embed Metadata] AI generated title, ${keywords.length} keywords`);
+    const keywordStr = Array.isArray(keywords) ? keywords.join("; ") : String(keywords || "");
+    localOutputPath = localInputPath + "_embedded" + import_path.default.extname(originalName);
+    const magickArgs = [localInputPath];
     if (title && title.trim()) {
       magickArgs.push("-set", "iptc:2:5", title.trim());
       magickArgs.push("-set", "exif:ImageDescription", title.trim());
@@ -9032,41 +9066,50 @@ app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
     }
     if (description && description.trim()) {
       magickArgs.push("-set", "iptc:2:120", description.trim());
-      magickArgs.push("-set", "exif:ImageDescription", description.trim());
       magickArgs.push("-set", "xmp:Description", description.trim());
     }
     if (keywordStr) {
       magickArgs.push("-set", "iptc:2:25", keywordStr);
       magickArgs.push("-set", "xmp:Keywords", keywordStr);
     }
-    magickArgs.push(tmpOutput);
-    console.log(`[Embed Metadata] Embedding metadata into: ${req.file.originalname}`);
+    magickArgs.push(localOutputPath);
+    console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
     await spawnAsync("magick", magickArgs, { timeout: 3e4 });
-    const fileName = `embedded_${req.file.originalname || "image.jpg"}`;
-    res.setHeader("Content-Type", req.file.mimetype || "image/jpeg");
-    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
-    res.sendFile(tmpOutput, { root: "/" }, (err) => {
+    const embeddedName = `embedded_${originalName}`;
+    if (isR2Configured()) {
+      console.log(`[Embed Metadata] Uploading embedded file to R2...`);
+      const { fileUrl: r2Url } = await uploadFileToStorage(localOutputPath, embeddedName, contentType);
+      console.log(`[Embed Metadata] R2 upload complete: ${r2Url}`);
+      cleanupLocal();
       try {
-        if (import_fs.default.existsSync(tmpInput)) import_fs.default.unlinkSync(tmpInput);
+        if (import_fs.default.existsSync(localOutputPath)) import_fs.default.unlinkSync(localOutputPath);
       } catch (e) {
       }
+      return res.json({
+        success: true,
+        downloadUrl: r2Url,
+        fileName: embeddedName,
+        metadata: { title, description, keywords }
+      });
+    }
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(embeddedName)}"`);
+    res.sendFile(localOutputPath, { root: "/" }, (err) => {
+      cleanupLocal();
       try {
-        if (import_fs.default.existsSync(tmpOutput)) import_fs.default.unlinkSync(tmpOutput);
+        if (import_fs.default.existsSync(localOutputPath)) import_fs.default.unlinkSync(localOutputPath);
       } catch (e) {
       }
       if (err) console.error("[Embed Metadata] Send error:", err);
     });
   } catch (e) {
-    console.error("[Embed Metadata] Error:", e);
+    console.error("[Embed Metadata] Pipeline error:", e);
+    cleanupLocal();
     try {
-      if (tmpInput && import_fs.default.existsSync(tmpInput)) import_fs.default.unlinkSync(tmpInput);
+      if (localOutputPath && import_fs.default.existsSync(localOutputPath)) import_fs.default.unlinkSync(localOutputPath);
     } catch (e2) {
     }
-    try {
-      if (tmpOutput && import_fs.default.existsSync(tmpOutput)) import_fs.default.unlinkSync(tmpOutput);
-    } catch (e2) {
-    }
-    res.status(500).json({ error: e.message || "Gagal menanamkan metadata ke file." });
+    res.status(500).json({ error: e.message || "Gagal dalam pipeline Embed Metadata." });
   }
 });
 app.post("/api/generate-prompt", async (req, res) => {

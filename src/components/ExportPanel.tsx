@@ -27,6 +27,8 @@ interface ExportPanelProps {
   canDownload: boolean;
   handleExport: () => void;
   handleBackupJSON?: () => void;
+  handleDownloadEmbedded?: () => void;
+  embedDownloading?: boolean;
   t: any;
 }
 
@@ -56,6 +58,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   canDownload,
   handleExport,
   handleBackupJSON,
+  handleDownloadEmbedded,
+  embedDownloading,
   t
 }) => {
   return (
@@ -311,6 +315,22 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             >
               <Download size={15} />
               <span>BACKUP AS JSON</span>
+            </button>
+          )}
+          {handleDownloadEmbedded && (
+            <button
+              onClick={handleDownloadEmbedded}
+              disabled={!canDownload || embedDownloading}
+              className={`w-full sm:w-auto px-6 py-3 text-sm font-black rounded-[1.5rem] shadow transition-all flex items-center justify-center space-x-2 active:scale-[0.98] ${
+                canDownload && !embedDownloading ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-emerald-500/10' : 'bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              {embedDownloading ? (
+                <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+              ) : (
+                <Download size={15} />
+              )}
+              <span>{embedDownloading ? 'EMBEDDING...' : 'DOWNLOAD EMBEDDED'}</span>
             </button>
           )}
           <button
