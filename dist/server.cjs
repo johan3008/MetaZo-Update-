@@ -8956,8 +8956,26 @@ app.post("/api/extract-exif", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "No file uploaded or fileUrl provided" });
     }
     console.log(`[ExifTool API] Extracting metadata from: ${filePath}`);
-    const { exiftool } = require("exiftool-vendored");
-    const exifData = await exiftool.read(filePath);
+    const exifData = {};
+    try {
+      const { stdout } = await require("util").promisify(require("child_process").exec)(
+        `magick identify -verbose "${filePath}" 2>/dev/null`,
+        { timeout: 15e3, maxBuffer: 1024 * 1024 }
+      );
+      for (const line of stdout.split("\n")) {
+        const trimmed = line.trim();
+        const colonIdx = trimmed.indexOf(":");
+        if (colonIdx > 0 && colonIdx < 40) {
+          const key = trimmed.substring(0, colonIdx).trim();
+          const value = trimmed.substring(colonIdx + 1).trim();
+          if (key && value && !key.startsWith("  ")) {
+            exifData[key] = value;
+          }
+        }
+      }
+    } catch (magickErr) {
+      console.warn("[ExifTool API] ImageMagick EXIF extraction fallback failed:", magickErr.message);
+    }
     delete exifData.Directory;
     delete exifData.SourceFile;
     delete exifData.FileName;
@@ -9400,20 +9418,14 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
       let videoMetadata = null;
       if (videoPath) {
         try {
-          console.log("Server check-video-quality: Extracting ExifTool metadata...");
-          const { exiftool } = require("exiftool-vendored");
-          videoMetadata = await withTimeout(exiftool.read(videoPath), 15e3, "ExifTool");
-          if (videoMetadata) {
-            delete videoMetadata.Directory;
-            delete videoMetadata.SourceFile;
-            delete videoMetadata.FileName;
-            delete videoMetadata.FileAccessDate;
-            delete videoMetadata.FileModifyDate;
-            delete videoMetadata.FileInodeChangeDate;
-            delete videoMetadata.FilePermissions;
-          }
+          console.log("Server check-video-quality: Extracting video metadata...");
+          const { stdout } = await require("util").promisify(require("child_process").exec)(
+            `magick identify -verbose "${videoPath}" 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
+            { timeout: 15e3, maxBuffer: 1024 * 1024 }
+          );
+          videoMetadata = { raw: stdout.substring(0, 5e3) };
         } catch (exifErr) {
-          console.warn("[Video Audit] ExifTool extraction failed:", exifErr.message);
+          console.warn("[Video Audit] Metadata extraction failed:", exifErr.message);
         }
       }
       let technicalReport = null;
