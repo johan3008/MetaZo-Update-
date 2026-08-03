@@ -1506,6 +1506,64 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    // === EMBED METADATA: Tanamkan metadata ke dalam file gambar ===
+    app.post('/api/embed-metadata', upload.single('file'), async (req, res) => {
+        let tmpInput = '';
+        let tmpOutput = '';
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: 'File gambar tidak ditemukan. Silakan unggah file.' });
+            }
+            const { title, description, keywords } = req.body;
+            if (!title && !description && !keywords) {
+                return res.status(400).json({ error: 'Metadata (title/description/keywords) diperlukan untuk menanamkan.' });
+            }
+
+            const parsedKeywords = typeof keywords === 'string' ? JSON.parse(keywords || '[]') : (keywords || []);
+            const keywordStr = Array.isArray(parsedKeywords) ? parsedKeywords.join('; ') : String(keywords || '');
+
+            tmpInput = req.file.path;
+            tmpOutput = tmpInput + '_embedded' + path.extname(req.file.originalname || '.jpg');
+
+            // Build ImageMagick arguments for IPTC/EXIF/XMP embedding
+            const magickArgs = [tmpInput];
+            if (title && title.trim()) {
+                magickArgs.push('-set', 'iptc:2:5', title.trim());       // IPTC Object Name / Title
+                magickArgs.push('-set', 'exif:ImageDescription', title.trim());
+                magickArgs.push('-set', 'xmp:Title', title.trim());
+            }
+            if (description && description.trim()) {
+                magickArgs.push('-set', 'iptc:2:120', description.trim()); // IPTC Caption/Description
+                magickArgs.push('-set', 'exif:ImageDescription', description.trim());
+                magickArgs.push('-set', 'xmp:Description', description.trim());
+            }
+            if (keywordStr) {
+                magickArgs.push('-set', 'iptc:2:25', keywordStr);         // IPTC Keywords
+                magickArgs.push('-set', 'xmp:Keywords', keywordStr);
+            }
+            magickArgs.push(tmpOutput);
+
+            console.log(`[Embed Metadata] Embedding metadata into: ${req.file.originalname}`);
+            await spawnAsync('magick', magickArgs, { timeout: 30000 });
+
+            // Send the file back to client
+            const fileName = `embedded_${req.file.originalname || 'image.jpg'}`;
+            res.setHeader('Content-Type', req.file.mimetype || 'image/jpeg');
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+            res.sendFile(tmpOutput, { root: '/' }, (err) => {
+                // Cleanup temp files
+                try { if (fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput); } catch(e) {}
+                try { if (fs.existsSync(tmpOutput)) fs.unlinkSync(tmpOutput); } catch(e) {}
+                if (err) console.error('[Embed Metadata] Send error:', err);
+            });
+        } catch (e: any) {
+            console.error('[Embed Metadata] Error:', e);
+            try { if (tmpInput && fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput); } catch(e) {}
+            try { if (tmpOutput && fs.existsSync(tmpOutput)) fs.unlinkSync(tmpOutput); } catch(e) {}
+            res.status(500).json({ error: e.message || 'Gagal menanamkan metadata ke file.' });
+        }
+    });
+
     app.post('/api/generate-prompt', async (req, res) => {
         try {
             const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles } = req.body;
