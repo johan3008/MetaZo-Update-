@@ -1447,8 +1447,27 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             console.log(`[ExifTool API] Extracting metadata from: ${filePath}`);
-            const { exiftool } = require('exiftool-vendored');
-            const exifData = await exiftool.read(filePath);
+            const exifData: any = {};
+            try {
+              const { stdout } = await require('util').promisify(require('child_process').exec)(
+                `magick identify -verbose "${filePath}" 2>/dev/null`,
+                { timeout: 15000, maxBuffer: 1024 * 1024 }
+              );
+              // Parse ImageMagick verbose output for key EXIF fields
+              for (const line of stdout.split('\n')) {
+                const trimmed = line.trim();
+                const colonIdx = trimmed.indexOf(':');
+                if (colonIdx > 0 && colonIdx < 40) {
+                  const key = trimmed.substring(0, colonIdx).trim();
+                  const value = trimmed.substring(colonIdx + 1).trim();
+                  if (key && value && !key.startsWith('  ')) {
+                    exifData[key] = value;
+                  }
+                }
+              }
+            } catch (magickErr: any) {
+              console.warn('[ExifTool API] ImageMagick EXIF extraction fallback failed:', magickErr.message);
+            }
             
             // Clean up noisy tags to save tokens
             delete exifData.Directory;
@@ -1902,23 +1921,17 @@ app.get('/api/debug-uploads', (req, res) => {
                 const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
                     Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms/1000}s`)), ms))]);
 
-                let videoMetadata = null;
+                let videoMetadata: any = null;
                 if (videoPath) {
                     try {
-                        console.log('Server check-video-quality: Extracting ExifTool metadata...');
-                        const { exiftool } = require('exiftool-vendored');
-                        videoMetadata = await withTimeout(exiftool.read(videoPath), 15000, 'ExifTool');
-                        if (videoMetadata) {
-                            delete videoMetadata.Directory;
-                            delete videoMetadata.SourceFile;
-                            delete videoMetadata.FileName;
-                            delete videoMetadata.FileAccessDate;
-                            delete videoMetadata.FileModifyDate;
-                            delete videoMetadata.FileInodeChangeDate;
-                            delete videoMetadata.FilePermissions;
-                        }
+                        console.log('Server check-video-quality: Extracting video metadata...');
+                        const { stdout } = await require('util').promisify(require('child_process').exec)(
+                          `magick identify -verbose "${videoPath}" 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
+                          { timeout: 15000, maxBuffer: 1024 * 1024 }
+                        );
+                        videoMetadata = { raw: stdout.substring(0, 5000) };
                     } catch (exifErr: any) {
-                        console.warn('[Video Audit] ExifTool extraction failed:', exifErr.message);
+                        console.warn('[Video Audit] Metadata extraction failed:', exifErr.message);
                     }
                 }
                 let technicalReport = null;
