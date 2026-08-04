@@ -85,6 +85,7 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Glassmorphism', label: 'Glassmorphism (Efek Kaca)', icon: '🔮' },
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' },
   { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' },
+  { id: 'Silhouette', label: 'Silhouette (Siluet)', icon: '👤' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
 ];
@@ -429,7 +430,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim(),
           model: aiOptions?.model,
           seed,
-          flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
+          flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
           vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
         })
       });
@@ -469,7 +470,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         styleExplanation: data.styleExplanation || [],
         promptMode,
         pngBgColor,
-        flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
+        flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
         vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
       };
       saveToHistory(historyItem);
@@ -901,11 +902,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     </p>
                   </div>
 
-                  {styleCategory === 'Flat Icon' && (
+                  {(styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && (
                     <div className="p-4 bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/20 dark:border-teal-500/30 rounded-[1.5rem] space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-                          Format Flat Icon
+                          Format {styleCategory === 'Line Art' ? 'Line Art' : styleCategory === 'Silhouette' ? 'Silhouette' : 'Flat Icon'}
                         </label>
                         <button
                           type="button"
@@ -931,12 +932,36 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         </div>
                         <div>
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                            {flatIconType === 'sheet' ? 'Icon Sheet (Collection Icon)' : 'Single Icon'}
+                            {flatIconType === 'sheet' ? (styleCategory === 'Line Art' ? 'Sheet / Collection Art' : styleCategory === 'Silhouette' ? 'Sheet / Collection Art' : 'Icon Sheet (Collection Icon)') : (styleCategory === 'Line Art' ? 'Single Icon / Art' : styleCategory === 'Silhouette' ? 'Single Icon / Art' : 'Single Icon')}
                           </div>
                           <div className="text-[10px] text-slate-500 dark:text-slate-400">
                             {flatIconType === 'sheet' 
-                              ? 'Koleksi beberapa ikon bertema serupa dalam satu lembar.' 
-                              : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.'}
+                              ? (styleCategory === 'Line Art' ? 'Koleksi beberapa elemen seni garis bertema serupa dalam satu lembar.' : styleCategory === 'Silhouette' ? 'Koleksi beberapa seni siluet bertema serupa dalam satu lembar.' : 'Koleksi beberapa ikon bertema serupa dalam satu lembar.') 
+                              : (styleCategory === 'Line Art' ? 'Satu elemen seni garis tunggal terfokus yang siap digunakan.' : styleCategory === 'Silhouette' ? 'Satu elemen seni siluet tunggal terfokus yang siap digunakan.' : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                        <div className="p-2 bg-teal-500/10 text-teal-550 rounded-lg">
+                          {flatIconType === 'sheet' ? (
+                            <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            {flatIconType === 'sheet' ? (styleCategory === 'Line Art' ? 'Sheet / Collection Art' : 'Icon Sheet (Collection Icon)') : (styleCategory === 'Line Art' ? 'Single Icon / Art' : 'Single Icon')}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                            {flatIconType === 'sheet' 
+                              ? (styleCategory === 'Line Art' ? 'Koleksi beberapa elemen seni garis bertema serupa dalam satu lembar.' : 'Koleksi beberapa ikon bertema serupa dalam satu lembar.') 
+                              : (styleCategory === 'Line Art' ? 'Satu elemen seni garis tunggal terfokus yang siap digunakan.' : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.')}
                           </div>
                         </div>
                       </div>
