@@ -88,6 +88,7 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Glassmorphism', label: 'Glassmorphism (Efek Kaca)', icon: '🔮' },
   { id: 'Metal Emboss', label: 'Metal Emboss (Embos Logam)', icon: '⚙️' },
   { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' },
+  { id: 'Silhouette', label: 'Silhouette (Siluet)', icon: '👤' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
   { id: 'Painterly Digital Art', label: 'Painterly Digital Art (Lukisan Digital)', icon: '🖌️' }
@@ -496,7 +497,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           userNegativePrompt: promptMode === 'background' ? bgNegativePrompt.trim() : pngNegativePrompt.trim(),
           model: aiOptions?.model,
           seed,
-          flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
+          flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
           vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined,
           referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined,
           cameraAngles: selectedCameraAngles.length > 0 ? selectedCameraAngles : undefined
@@ -538,7 +539,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         styleExplanation: data.styleExplanation || [],
         promptMode,
         pngBgColor,
-        flatIconType: styleCategory === 'Flat Icon' && promptMode === 'png' ? flatIconType : undefined,
+        flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
         vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
       };
       saveToHistory(historyItem);
@@ -1116,11 +1117,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     </p>
                   </div>
 
-                  {styleCategory === 'Flat Icon' && (
+                  {(styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && (
                     <div className="p-4 bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/20 dark:border-teal-500/30 rounded-[1.5rem] space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-                          Format Flat Icon
+                          Format {styleCategory === 'Line Art' ? 'Line Art' : styleCategory === 'Silhouette' ? 'Silhouette' : 'Flat Icon'}
                         </label>
                         <button
                           type="button"
@@ -1146,12 +1147,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         </div>
                         <div>
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                            {flatIconType === 'sheet' ? 'Icon Sheet (Collection Icon)' : 'Single Icon'}
+                            {flatIconType === 'sheet' ? (styleCategory === 'Line Art' ? 'Sheet / Collection Art' : styleCategory === 'Silhouette' ? 'Sheet / Collection Art' : 'Icon Sheet (Collection Icon)') : (styleCategory === 'Line Art' ? 'Single Icon / Art' : styleCategory === 'Silhouette' ? 'Single Icon / Art' : 'Single Icon')}
                           </div>
                           <div className="text-[10px] text-slate-500 dark:text-slate-400">
                             {flatIconType === 'sheet' 
-                              ? 'Koleksi beberapa ikon bertema serupa dalam satu lembar.' 
-                              : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.'}
+                              ? (styleCategory === 'Line Art' ? 'Koleksi beberapa elemen seni garis bertema serupa dalam satu lembar.' : styleCategory === 'Silhouette' ? 'Koleksi beberapa seni siluet bertema serupa dalam satu lembar.' : 'Koleksi beberapa ikon bertema serupa dalam satu lembar.') 
+                              : (styleCategory === 'Line Art' ? 'Satu elemen seni garis tunggal terfokus yang siap digunakan.' : styleCategory === 'Silhouette' ? 'Satu elemen seni siluet tunggal terfokus yang siap digunakan.' : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.')}
                           </div>
                         </div>
                       </div>

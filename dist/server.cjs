@@ -5262,7 +5262,8 @@ var generateOptimizedPrompt = async (options) => {
     "HandDrawn Sketch": " - Focus on pencil or ink strokes, charcoal textures, artistic hatching, and the look of a sketchbook drawing.",
     "Glassmorphism": " - Focus on frosted glass effects, translucent layers, blurred background refraction, and sleek glossy reflections.",
     "Metal Emboss": " - Focus on metallic surfaces, raised 3D textures, engraved details, and realistic metal reflections like silver, gold, or steel.",
-    "Line Art": " - Focus on clean black and white lines, elegant curves, minimalist continuous line work, crisp vector outlines, and zero shading or gradients unless requested. Elegant, simple, and high-contrast ink strokes.",
+    "Line Art": " - Focus on clean, minimalist continuous single-line art, smooth elegant curves, and pure black-and-white ink strokes on a solid white background (or white line on black). Absolutely NO shading, NO colors, NO gradients, NO 3D rendering, and NO textures. CRITICAL: Maintain a pure, clean minimalist aesthetic. Do NOT mix with sketches, pencil coretan, hand-drawn sketch hatching, polygon structures, geometric low-poly/triangulated facets, or any other artistic style. Every path must be a continuous, single, perfectly smooth line with zero clutter.",
+    "Silhouette": " - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.",
     "Lowpoly": " - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.",
     "3D CGI": " - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.",
     "Cinematic": " - Focus on hyper-realistic, high-budget live-action movie cinematography. MUST feel like a genuine, un-retouched motion picture still shot on real 35mm film or digital cinema cameras with real actors. Prioritize: Wide cinematic aspect ratios, cinematic anamorphic lenses with subtle lens flares, organic volumetric haze, beautiful backlight/rim light, high production value, and deep cinematic color grading (e.g., warm gold, cool blue, orange and teal, moody cinematic shadow). Composition must be dynamic with cinematic framing. AVOID: ANY digital art, AI-generated look, 3D CGI, plastic skin, flat studio lighting, or illustration styles. It must look 100% real.",
@@ -5344,12 +5345,24 @@ SUB-STYLE SPECIFIC INSTRUCTION:
 ${subMod}`;
   }
   let flatIconDirective = "";
-  if (styleCategory === "Flat Icon" && isPngMode && flatIconType) {
+  if ((styleCategory === "Flat Icon" || styleCategory === "Line Art" || styleCategory === "Silhouette") && isPngMode && flatIconType) {
     if (flatIconType === "sheet") {
       const colStr = iconSheetColumns ? ` Specifically, arrange them strictly in a ${iconSheetColumns}-column grid layout.` : "";
-      flatIconDirective = ` - ICON COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a flat design icon collection sheet, showing a clean grid array, set, or organized group of multiple matching, cohesive flat icons or related pictograms on the same plain background, sharing a unified flat visual theme and color palette.${colStr}`;
+      if (styleCategory === "Line Art") {
+        flatIconDirective = ` - LINE ART COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a continuous line art collection sheet (lembar koleksi seni garis), showing a clean grid array, set, or organized group of multiple matching, cohesive minimalist line art elements or icons on the same plain white background, sharing a unified visual theme.${colStr}`;
+      } else if (styleCategory === "Silhouette") {
+        flatIconDirective = ` - SILHOUETTE COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a minimalist high-contrast silhouette collection sheet (lembar koleksi siluet), showing a clean grid array, set, or organized group of multiple matching, cohesive solid black silhouette shapes on the same plain solid white background, sharing a unified visual theme.${colStr}`;
+      } else {
+        flatIconDirective = ` - ICON COLLECTION SHEET REQUIREMENT: Every prompt variation MUST describe a flat design icon collection sheet, showing a clean grid array, set, or organized group of multiple matching, cohesive flat icons or related pictograms on the same plain background, sharing a unified flat visual theme and color palette.${colStr}`;
+      }
     } else {
-      flatIconDirective = " - SINGLE STANDALONE ICON REQUIREMENT: Every prompt variation MUST describe exactly ONE single standalone individual flat design icon or centered pictogram, with absolutely NO other icons, NO multiple items, and NO grid sheet/collections in the composition.";
+      if (styleCategory === "Line Art") {
+        flatIconDirective = " - SINGLE STANDALONE LINE ART REQUIREMENT: Every prompt variation MUST describe exactly ONE single standalone individual minimalist line art element or centered icon, with absolutely NO other icons, NO multiple items, and NO grid sheet/collections in the composition.";
+      } else if (styleCategory === "Silhouette") {
+        flatIconDirective = " - SINGLE STANDALONE SILHOUETTE REQUIREMENT: Every prompt variation MUST describe exactly ONE single standalone individual high-contrast solid silhouette shape or icon, with absolutely NO other elements, NO multiple items, and NO grid sheet/collections in the composition.";
+      } else {
+        flatIconDirective = " - SINGLE STANDALONE ICON REQUIREMENT: Every prompt variation MUST describe exactly ONE single standalone individual flat design icon or centered pictogram, with absolutely NO other icons, NO multiple items, and NO grid sheet/collections in the composition.";
+      }
     }
   }
   let vectorSubTypeDirective = "";
@@ -6002,16 +6015,23 @@ CRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma
       "sleek titanium embossed sheet plate graphic, futuristic metal engraving patterns, high-fidelity premium metal"
     ],
     "Line Art": [
-      "minimalist black and white line art vector graphic, clean black outlines on solid white, continuous line drawing, elegant style",
-      "contemporary fine line art asset, crisp black vector contours, minimalist aesthetic, graceful curves",
-      "modern continuous single-line drawing style, sleek black ink lines, high contrast minimalist art design",
-      "elegant line art vector illustration, pristine sharp black paths, creative line work icon, ultra-clean look",
-      "minimalist outline vector illustration, modern clean line strokes, solid styling with high clarity",
-      "beautiful abstract line art design, continuous ink pen line strokes, sophisticated flow and structure",
-      "zen continuous line sketch graphic, balanced minimal black outlines, elegant and pure aesthetic",
-      "sleek line art emblem vector, precise geometric single-line curves, highly readable silhouette design",
-      "artistic minimalist contour illustration, fine line sketch, pristine black ink outline graphic, elegant styling",
-      "trendy line art vector asset, single-stroke flow, perfect curves and sharp line endings, modern design look"
+      "minimalist black and white continuous single-line art vector graphic, clean black outlines on solid white background, elegant minimalist style, no shading, no sketch",
+      "contemporary fine continuous line art asset, crisp black vector contours, minimalist aesthetic, graceful smooth curves, pure continuous line",
+      "modern continuous single-line drawing style, sleek black ink lines, high contrast minimalist art design on solid white, zero shading, zero sketch lines",
+      "elegant minimalist continuous line art vector illustration, pristine sharp black paths, creative single-line work, ultra-clean look",
+      "minimalist continuous line outline vector illustration, modern clean line strokes, smooth styling with high clarity, no polygon, no hatch lines",
+      "beautiful abstract continuous single-line art design, continuous ink pen line strokes, sophisticated flow and structure, solid white background, no texture",
+      "zen continuous single-line graphic, balanced minimal black outlines, elegant and pure continuous line aesthetic, no colors, no shading",
+      "sleek continuous line art emblem vector, precise geometric single-line curves, highly readable silhouette design, minimalist continuous path",
+      "artistic minimalist continuous line contour illustration, pristine black ink outline graphic, elegant single-line styling, pure solid background",
+      "trendy continuous line art vector asset, single-stroke flow, perfect smooth curves and sharp line endings, modern design look, no sketch, no polygon"
+    ],
+    "Silhouette": [
+      "minimalist high-contrast black silhouette vector graphic, clean solid black outline shape on solid white background, elegant look",
+      "contemporary fine silhouette design asset, crisp solid black vector contours, minimalist aesthetic, graceful curves",
+      "modern solid shape profile silhouette illustration, sleek black shapes, high contrast minimalist art on solid white, no details",
+      "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
+      "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
     ]
   };
   const activeModifiers = styleFallbackMap[styleCategory] || styleFallbackMap["Cinematic"];
