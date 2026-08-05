@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode, removeWatermark } from './server/gemini.ts';
+import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode, removeWatermark } from './server/gemini.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
@@ -1667,48 +1667,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/auto-subject', async (req, res) => {
         try {
-            const { styleCategory, currentSubject } = req.body;
-            const store = apiKeyStorage.getStore();
-            let key = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-            if (store && store.gemini && Array.isArray(store.gemini.keys) && store.gemini.keys.length > 0) {
-                key = store.gemini.keys[store.gemini.activeIndex || 0];
-            }
-
-            let systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
-            let promptText = "";
-
-            if (currentSubject && currentSubject.trim()) {
-                systemInstruction = `You are a professional microstock keyword expansion specialist. Take the user's base concept idea: "${currentSubject.trim()}". Expand it into a rich, creative, and highly detailed visual subject description packed with highly relevant derivative keywords, atmospheric details, professional scenery elements, and specific high-demand visual concepts related to "${currentSubject.trim()}". Return ONLY the expanded descriptive visual concept in 1-2 smooth, cohesive, natural language sentences, without lists, quotes, formatting, or prefixes.`;
-                promptText = `Expand the base subject: "${currentSubject.trim()}" into a highly creative, microstock-ready visual scenario with rich relevant keywords and descriptive details suitable for style Category: ${styleCategory || "General"}.`;
-            } else {
-                const creativeSeeds = [
-                    "cyberpunk coffee shop", "organic biotechnology", "whimsical woodland creatures", "cosmic ocean nebula",
-                    "minimalist brutalist concrete villa", "ancient steampunk mechanical workshop", "vibrant neon desert oasis",
-                    "surreal levitating glass islands", "cozy Scandinavian hygge attic", "retro-futuristic astronaut exploring mossy ruins",
-                    "mythical crystal cavern glow", "zen botanical garden with koi fish", "underwater city ruins populated by bioluminescent jellyfish",
-                    "futuristic alpine research station", "nostalgic 80s arcade neon glow", "surreal origami paper bird swarm",
-                    "ethereal cloud castle with golden gates", "mystical potion brewing room", "abandoned gothic cathedral claimed by blooming roses",
-                    "sleek futuristic electric motorcycle on rain-slicked highway", "rustic clay pottery workshop with sun-dappled shadows",
-                    "extravagant Victorian masquerade ball", "modern smart greenhouse farming robotics", "abstract flowing liquid marble waves",
-                    "enchanted treehouse village inside a giant hollow oak", "cinematic desert caravan at golden hour",
-                    "surreal clockwork solar system globe", "vibrant pop-art stylized fruit display", "cozy winter cabin library with crackling fireplace",
-                    "majestic phoenix rising from colorful smoke", "futuristic luxury yacht sailing on liquid silver", "magical floating lantern festival"
-                ];
-                const randomSeed = creativeSeeds[Math.floor(Math.random() * creativeSeeds.length)];
-                promptText = `Generate a creative subject idea for style: ${styleCategory || "General"}. To ensure absolute randomness and zero repetition, center your concept around this inspiration seed: "${randomSeed}". Make the concept extremely vivid, detailed, and microstock-ready.`;
-            }
-
-            const aiClient = new GoogleGenAI({ apiKey: key });
-            const result = await aiClient.models.generateContent({
-                model: 'gemini-3.5-flash',
-                contents: promptText,
-                config: {
-                    systemInstruction,
-                    temperature: 0.98,
-                    maxOutputTokens: 120
-                }
-            });
-            const text = (result.text || "").trim().replace(/^"|\"$/g, '');
+            const { styleCategory, currentSubject, model } = req.body;
+            console.log('[API /api/auto-subject] styleCategory:', styleCategory, 'currentSubject:', currentSubject);
+            
+            // Call generateAutoSubject which wraps callGeminiWithRetry for full key rotation & fallback models
+            const text = await generateAutoSubject(styleCategory, model, currentSubject);
             res.json({ subject: text });
         } catch (e: any) {
             console.warn('Error in auto-subject:', e);
