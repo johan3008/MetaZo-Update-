@@ -192,7 +192,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
       const response = await fetch('/api/auto-subject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-        body: JSON.stringify({ styleCategory })
+        body: JSON.stringify({ styleCategory, currentSubject: subject })
       });
       if (response.ok) {
         const data = await response.json();
