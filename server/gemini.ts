@@ -5861,7 +5861,7 @@ CRITICAL RULES:
     
     promptText = `Create a highly commercial microstock-optimized subject concept based on the theme "${currentSubject.trim()}" for the style Category: ${styleCategory || 'General'}. Incorporate rich, highly-searched 2-4 word long-tail keyword descriptors.`;
   } else {
-    promptText = `Generate a creative subject idea for style: `${styleCategory || "General"}`. To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
+    promptText = `Generate a creative subject idea for style: "${styleCategory || "General"}". To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
   }
   
   const activeModel = model || 'gemini-3.5-flash';
