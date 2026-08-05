@@ -2905,7 +2905,8 @@ export const generateOptimizedPrompt = async (options: {
     "HandDrawn Sketch": ' - Focus on pencil or ink strokes, charcoal textures, artistic hatching, and the look of a sketchbook drawing.',
     "Glassmorphism": ' - Focus on frosted glass effects, translucent layers, blurred background refraction, and sleek glossy reflections.',
     "Metal Emboss": ' - Focus on metallic surfaces, raised 3D textures, engraved details, and realistic metal reflections like silver, gold, or steel.',
-    "Line Art": ' - Focus on clean, minimalist continuous single-line art, smooth elegant curves, and pure black-and-white ink strokes on a solid white background (or white line on black). Absolutely NO shading, NO colors, NO gradients, NO 3D rendering, and NO textures. CRITICAL: Maintain a pure, clean minimalist aesthetic. Do NOT mix with sketches, pencil coretan, hand-drawn sketch hatching, polygon structures, geometric low-poly/triangulated facets, or any other artistic style. Every path must be a continuous, single, perfectly smooth line with zero clutter.',
+        "Line Art": ' - Focus on clean, minimalist continuous single-line art, smooth elegant curves, and pure black-and-white ink strokes on a solid white background (or white line on black). Absolutely NO shading, NO colors, NO gradients, NO 3D rendering, and NO textures. CRITICAL: Maintain a pure, clean minimalist aesthetic. Do NOT mix with sketches, pencil coretan, hand-drawn sketch hatching, polygon structures, geometric low-poly/triangulated facets, or any other artistic style. Every path must be a continuous, single, perfectly smooth line with zero clutter.',
+    "Silhouette": ' - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.',
     "Silhouette": ' - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.',
     "Lowpoly": ' - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.',
     "3D CGI": ' - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.',
@@ -2989,7 +2990,7 @@ When generating prompts for "Dark Horror Aesthetic", follow these core directive
     currentDirective = ` - ${DARK_HORROR_BASE_INSTRUCTION}\n\nSUB-STYLE SPECIFIC INSTRUCTION:\n${subMod}`;
   }
 
-  let flatIconDirective = '';
+    let flatIconDirective = '';
   if ((styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && isPngMode && flatIconType) {
     if (flatIconType === 'sheet') {
       const colStr = iconSheetColumns ? ` Specifically, arrange them strictly in a ${iconSheetColumns}-column grid layout.` : '';
@@ -3251,8 +3252,25 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       for (let attemptIdx = 0; attemptIdx < maxAttempts; attemptIdx++) {
         try {
           console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attemptIdx + 1}/${maxAttempts})...`);
+          const parts = [];
+          if (referenceImages && referenceImages.length > 0) {
+            referenceImages.forEach((img) => {
+              try {
+                parts.push(processFrameServer(img));
+              } catch (e) {
+                console.warn('[generateOptimizedPrompt] Failed processing reference image:', e);
+              }
+            });
+          }
+
+          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+          if (referenceImages && referenceImages.length > 0) {
+            instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
+          }
+          parts.push({ text: instructionText });
+
           const response = await callGeminiWithRetry(modelName, {
-            parts: [{ text: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.` }]
+            parts
           }, {
             systemInstruction,
             responseMimeType: "application/json",
@@ -3680,7 +3698,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "vintage brass metal emboss emblem plates, polished bronze carvings, Victorian brass detailing",
       "sleek titanium embossed sheet plate graphic, futuristic metal engraving patterns, high-fidelity premium metal"
     ],
-    "Line Art": [
+        "Line Art": [
       "minimalist black and white continuous single-line art vector graphic, clean black outlines on solid white background, elegant minimalist style, no shading, no sketch",
       "contemporary fine continuous line art asset, crisp black vector contours, minimalist aesthetic, graceful smooth curves, pure continuous line",
       "modern continuous single-line drawing style, sleek black ink lines, high contrast minimalist art design on solid white, zero shading, zero sketch lines",
@@ -3691,6 +3709,13 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "sleek continuous line art emblem vector, precise geometric single-line curves, highly readable silhouette design, minimalist continuous path",
       "artistic minimalist continuous line contour illustration, pristine black ink outline graphic, elegant single-line styling, pure solid background",
       "trendy continuous line art vector asset, single-stroke flow, perfect smooth curves and sharp line endings, modern design look, no sketch, no polygon"
+    ],
+    "Silhouette": [
+      "minimalist high-contrast black silhouette vector graphic, clean solid black outline shape on solid white background, elegant look",
+      "contemporary fine silhouette design asset, crisp solid black vector contours, minimalist aesthetic, graceful curves",
+      "modern solid shape profile silhouette illustration, sleek black shapes, high contrast minimalist art on solid white, no details",
+      "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
+      "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
     ],
     "Silhouette": [
       "minimalist high-contrast black silhouette vector graphic, clean solid black outline shape on solid white background, elegant look",
@@ -5803,7 +5828,7 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
 }
 
 
-export async function generateAutoSubject(styleCategory: string, model?: string): Promise<string> {
+export async function generateAutoSubject(styleCategory: string, model?: string, currentSubject?: string): Promise<string> {
   // A vast, highly diverse creative seed list to guarantee complete randomness and prevent repetitive ideas on multiple clicks
   const creativeSeeds = [
     "cyberpunk coffee shop", "organic biotechnology", "whimsical woodland creatures", "cosmic ocean nebula", 
@@ -5822,16 +5847,27 @@ export async function generateAutoSubject(styleCategory: string, model?: string)
   // Pick a random seed keyword to inject unpredictable creative inspiration into the LLM
   const randomSeed = creativeSeeds[Math.floor(Math.random() * creativeSeeds.length)];
   
-  const systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
+  let systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
+  let promptText = "";
+
+  if (currentSubject && currentSubject.trim()) {
+    systemInstruction = `You are an elite microstock SEO director and keyword expansion specialist. Take the user's basic input concept: "${currentSubject.trim()}". 
+Your goal is to expand this into a highly commercial, high-demand visual subject title/description packed with powerful 2-to-4 word compound key phrases (long-tail keywords) that stock buyers actually search for in commercial agencies (e.g. instead of simple "pumpkin", use "spooky Halloween jack-o'-lantern element"; instead of "ghost", use "cute watercolor ghost character").
+CRITICAL RULES:
+1. NO SINGLE WORDS: Do NOT use fragmented or single-word terms ("sepenggal kata"). Every visual descriptor must be a rich, compound, high-conversion keyword phrase (long-tail keyword).
+2. HIGH COMMERCIAL VALUE: Use terms that imply high commercial usability (e.g., "seamless watercolor pattern", "flat vector illustration collection", "continuous line art design element", "minimalist outline icon set", "high-contrast solid silhouette vector").
+3. SYNTHESIS: Blend these compound key phrases into 1-2 smooth, natural-sounding, descriptive sentences that present a cohesive visual scene ready for text-to-image AI generators.
+4. Return ONLY the plain text descriptive concept in English, without lists, formatting, quotes, or prefixes.`;
+    
+    promptText = `Create a highly commercial microstock-optimized subject concept based on the theme "${currentSubject.trim()}" for the style Category: ${styleCategory || 'General'}. Incorporate rich, highly-searched 2-4 word long-tail keyword descriptors.`;
+  } else {
+    promptText = `Generate a creative subject idea for style: `${styleCategory || "General"}`. To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
+  }
   
   const activeModel = model || 'gemini-3.5-flash';
   
   const response = await callGeminiWithRetry(activeModel, {
-    parts: [{ 
-      text: `Generate a creative subject idea for style: ${styleCategory || "General"}. 
-      To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". 
-      Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.` 
-    }]
+    parts: [{ text: promptText }]
   }, {
     systemInstruction,
     temperature: 0.98, // Higher temperature for maximized creative variation
