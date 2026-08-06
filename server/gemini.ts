@@ -1372,6 +1372,396 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
   }
 }
 
+// ============================================================================
+// METADATAGEN STRUCTURED PIPELINE
+// Modul terstruktur untuk MetadataGen — mencakup 8 lapisan sesuai spesifikasi:
+//   1. Analisis visual bertingkat (scene → object → attributes → concepts)
+//   2. Formula judul per jenis aset (photo, AI image, illustration, vector, video)
+//   3. Sistem pembobotan keyword (SEO / visual / commercial / trend score)
+//   4. Ekspansi sinonim & long-tail keyword
+//   5. Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
+//   6. Deduplikasi semantik (bukan hanya deduplikasi teks identik)
+//   7. Penentuan kategori yang lebih akurat (cross-validasi AI vision × heuristik)
+//   8. Validasi akhir (title length, keyword count, order, relevansi, kepatuhan)
+// Dipanggil dari dalam generateStockMetadata (TAHAP 7) dan generateBatchStockMetadata.
+// ============================================================================
+
+// ---- LAPISAN 1: ANALISIS VISUAL BERTINGKAT --------------------------------
+
+type AssetSubtype = 'photo' | 'ai_image' | 'illustration' | 'vector' | 'video';
+
+interface TieredVisualAnalysis {
+  scene: string[];
+  objects: { name: string; importance: number; tier: 'primary' | 'secondary' | 'background' }[];
+  attributes: string[];
+  concepts: string[];
+}
+
+/**
+ * Menyusun ulang VISUAL_FACTS mentah (hasil TAHAP 1 Gemini Vision) menjadi
+ * struktur bertingkat: scene → object → attributes → concepts.
+ * Ini menjadi dasar untuk formula judul (Lapisan 2) dan pembobotan keyword (Lapisan 3).
+ */
+function buildTieredVisualAnalysis(visualFacts: any): TieredVisualAnalysis {
+  const objects: TieredVisualAnalysis['objects'] = [];
+  (Array.isArray(visualFacts?.primary_subjects) ? visualFacts.primary_subjects : []).forEach((s: any) => {
+    if (s?.name) objects.push({ name: String(s.name), importance: Number(s.importance) || 80, tier: 'primary' });
+  });
+  (Array.isArray(visualFacts?.secondary_subjects) ? visualFacts.secondary_subjects : []).forEach((s: any) => {
+    if (s?.name) objects.push({ name: String(s.name), importance: Number(s.importance) || 50, tier: 'secondary' });
+  });
+  (Array.isArray(visualFacts?.background_elements) ? visualFacts.background_elements : []).forEach((s: any) => {
+    if (s?.name) objects.push({ name: String(s.name), importance: Number(s.importance) || 20, tier: 'background' });
+  });
+  objects.sort((a, b) => b.importance - a.importance);
+
+  const scene: string[] = [
+    ...(Array.isArray(visualFacts?.composition) ? visualFacts.composition : []),
+    ...(Array.isArray(visualFacts?.background_elements) ? visualFacts.background_elements.map((b: any) => b?.name).filter(Boolean) : [])
+  ].filter((x: any) => typeof x === 'string');
+
+  const attributes: string[] = [
+    ...(Array.isArray(visualFacts?.colors) ? visualFacts.colors : []),
+    ...(Array.isArray(visualFacts?.actions) ? visualFacts.actions : []),
+    ...(Array.isArray(visualFacts?.visible_text) ? visualFacts.visible_text : [])
+  ].filter((x: any) => typeof x === 'string');
+
+  const concepts: string[] = [
+    ...(visualFacts?.deeper_meaning_and_symbolism ? [String(visualFacts.deeper_meaning_and_symbolism)] : []),
+    ...(visualFacts?.understanding_and_context ? [String(visualFacts.understanding_and_context)] : [])
+  ];
+
+  return { scene, objects, attributes, concepts };
+}
+
+/**
+ * Mendeteksi sub-jenis aset (photo / ai_image / illustration / vector / video)
+ * dari ToolType eksplisit ditambah sinyal tekstual dari analisis visual & prompt.
+ */
+function detectAssetSubtype(toolType: ToolType, visualFacts: any, customPrompt?: string): AssetSubtype {
+  if (toolType === ToolType.VIDEO) return 'video';
+  if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) return 'vector';
+
+  const textSignal = `${visualFacts?.understanding_and_context || ''} ${visualFacts?.deeper_meaning_and_symbolism || ''} ${customPrompt || ''}`.toLowerCase();
+  if (/\b(ai[- ]generated|midjourney|synthetic render|generative art|digital synthesis|ai art)\b/.test(textSignal)) return 'ai_image';
+  if (/\b(illustration|digital painting|drawn art|cartoon|hand-drawn|painterly|artwork|sketch)\b/.test(textSignal)) return 'illustration';
+  return 'photo';
+}
+
+// ---- LAPISAN 2: FORMULA JUDUL PER JENIS ASET -------------------------------
+
+const TITLE_TEMPLATE_LEAD: Record<AssetSubtype, string[]> = {
+  photo: ['{subject} in {scene}', '{subject} {action} in {scene}', 'Candid photo of {subject} {action} in {scene}'],
+  ai_image: ['AI-generated {subject} in {scene}', 'Digital render of {subject} {action}', 'Synthetic digital artwork of {subject} in {scene}'],
+  illustration: ['Illustration of {subject} in {scene}', 'Hand-drawn {subject} {action}', 'Digital illustration depicting {subject} in {scene}'],
+  vector: ['Flat design vector of {subject}', 'Minimalist vector illustration of {subject}', 'Isometric vector graphic of {subject} for {scene}'],
+  video: ['Cinematic footage of {subject} {action}', 'Slow motion shot of {subject} in {scene}', 'Aerial drone view of {subject} {action} in {scene}']
+};
+
+/**
+ * Fallback formula judul berbasis template ketika judul dari AI kosong,
+ * placeholder, atau terlalu generik. Dipilih berdasarkan sub-jenis aset & titleLength.
+ */
+function applyTitleTemplate(subtype: AssetSubtype, tiers: TieredVisualAnalysis, titleLength?: string): string {
+  const subject = tiers.objects[0]?.name || 'subject';
+  const scene = tiers.scene[0] || 'a professional setting';
+  const action = tiers.attributes.find(a => typeof a === 'string') || 'featured prominently';
+
+  const templates = TITLE_TEMPLATE_LEAD[subtype] || TITLE_TEMPLATE_LEAD.photo;
+  let templateIndex = 1;
+  if (titleLength === 'short') templateIndex = 0;
+  else if (titleLength === 'long') templateIndex = templates.length - 1;
+
+  let title = templates[templateIndex]
+    .replace('{subject}', subject)
+    .replace('{scene}', scene)
+    .replace('{action}', action);
+
+  if (titleLength === 'long') {
+    const extraSubjects = tiers.objects.slice(1, 3).map(o => o.name).filter(Boolean);
+    if (extraSubjects.length) title += ` with ${extraSubjects.join(' and ')}`;
+  }
+
+  return title;
+}
+
+// ---- LAPISAN 3: SISTEM PEMBOBOTAN KEYWORD ----------------------------------
+
+interface KeywordScore {
+  keyword: string;
+  seoScore: number;
+  visualScore: number;
+  commercialScore: number;
+  trendScore: number;
+  totalScore: number;
+}
+
+const COMMERCIAL_INTENT_TERMS = new Set([
+  'business', 'marketing', 'commercial', 'professional', 'concept', 'success', 'growth', 'branding',
+  'corporate', 'advertising', 'presentation', 'banner', 'template', 'startup', 'finance', 'investment',
+  'strategy', 'leadership', 'teamwork', 'management', 'productivity'
+]);
+
+const TREND_TERMS = new Set([
+  'ai', 'artificial intelligence', 'sustainability', 'eco friendly', 'remote work', 'digital transformation',
+  'wellness', 'minimalist', 'futuristic', 'innovation', 'green energy', 'mental health', 'diversity', 'automation'
+]);
+
+/**
+ * Menghitung 4 skor per keyword: SEO score, visual score (kecocokan dengan
+ * objek/atribut yang benar-benar terdeteksi di gambar), commercial score, trend score.
+ */
+function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: number, total: number): KeywordScore {
+  const lower = keyword.toLowerCase();
+  const wordCount = lower.split(/\s+/).length;
+
+  const objectMatch = tiers.objects.find(o => o.name.toLowerCase().includes(lower) || lower.includes(o.name.toLowerCase()));
+  const attributeMatch = tiers.attributes.some(a => a.toLowerCase().includes(lower) || lower.includes(a.toLowerCase()));
+  const visualScore = objectMatch ? Math.min(100, objectMatch.importance + 10) : (attributeMatch ? 60 : 25);
+
+  const positionFactor = 1 - (position / Math.max(1, total));
+  const seoScore = Math.round((wordCount <= 3 ? 70 : 40) * 0.6 + positionFactor * 40);
+
+  const commercialScore = (COMMERCIAL_INTENT_TERMS.has(lower) || Array.from(COMMERCIAL_INTENT_TERMS).some(t => lower.includes(t))) ? 90 : 35;
+  const trendScore = Array.from(TREND_TERMS).some(t => lower.includes(t)) ? 85 : 30;
+
+  const totalScore = Math.round(visualScore * 0.4 + seoScore * 0.3 + commercialScore * 0.15 + trendScore * 0.15);
+
+  return { keyword, seoScore, visualScore, commercialScore, trendScore, totalScore };
+}
+
+/**
+ * Mengurutkan ulang keyword berdasarkan bobot gabungan, TETAPI hanya di dalam
+ * setiap kuintil struktural (5 tahap: subject → technical → context → commercial → emotional)
+ * agar aturan urutan SEO marketplace (Lapisan 8) tetap terjaga.
+ */
+function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis): string[] {
+  if (keywords.length === 0) return keywords;
+  const scored = keywords.map((k, i) => scoreKeyword(k, tiers, i, keywords.length));
+
+  const quintileSize = Math.max(1, Math.ceil(scored.length / 5));
+  const result: string[] = [];
+  for (let q = 0; q < 5; q++) {
+    const slice = scored.slice(q * quintileSize, (q + 1) * quintileSize);
+    slice.sort((a, b) => b.totalScore - a.totalScore);
+    result.push(...slice.map(s => s.keyword));
+  }
+  return result;
+}
+
+// ---- LAPISAN 4: EKSPANSI SINONIM & LONG-TAIL KEYWORD -----------------------
+
+const SYNONYM_MAP: Record<string, string[]> = {
+  'car': ['automobile', 'vehicle'], 'phone': ['smartphone', 'mobile device'], 'lift': ['elevator'],
+  'sidewalk': ['pavement'], 'doctor': ['physician'], 'shop': ['store', 'retail outlet'],
+  'big': ['large'], 'small': ['compact'], 'old': ['aged', 'vintage'], 'new': ['modern', 'contemporary'],
+  'work': ['job', 'career'], 'home': ['house', 'residence'], 'city': ['urban', 'metropolitan'],
+  'nature': ['natural', 'outdoors'], 'food': ['cuisine', 'meal'], 'money': ['finance', 'currency'],
+  'idea': ['concept', 'notion'], 'fast': ['quick', 'rapid'], 'happy': ['joyful', 'cheerful']
+};
+
+/**
+ * Ekspansi dua arah: (a) sinonim/istilah regional untuk cross-search discoverability,
+ * (b) long-tail phrase dengan menggabungkan subjek utama + modifier atribut/scene.
+ */
+function expandSynonymsAndLongTail(keywords: string[], tiers: TieredVisualAnalysis, maxNew: number): string[] {
+  if (maxNew <= 0) return [];
+  const existing = new Set(keywords.map(k => k.toLowerCase()));
+  const expansions: string[] = [];
+
+  keywords.forEach(k => {
+    const syns = SYNONYM_MAP[k.toLowerCase()];
+    if (syns) {
+      syns.forEach(s => { if (!existing.has(s)) { expansions.push(s); existing.add(s); } });
+    }
+  });
+
+  const primarySubject = tiers.objects[0]?.name;
+  if (primarySubject) {
+    const modifiers = [...tiers.attributes.slice(0, 4), ...tiers.scene.slice(0, 3)];
+    modifiers.forEach(mod => {
+      const phrase = `${primarySubject.toLowerCase()} ${String(mod).toLowerCase()}`.trim();
+      if (!existing.has(phrase) && phrase.split(/\s+/).length <= 4 && phrase.split(/\s+/).length >= 2) {
+        expansions.push(phrase);
+        existing.add(phrase);
+      }
+    });
+  }
+
+  return expansions.slice(0, maxNew);
+}
+
+// ---- LAPISAN 5: FILTER OTOMATIS PEDOMAN ADOBE STOCK & SHUTTERSTOCK --------
+
+const MARKETPLACE_BANNED_TERMS = new Set([
+  // Klaim superlatif/marketing yang tidak dapat diverifikasi (ditolak kedua marketplace)
+  'best', 'no1', 'number one', 'cheapest', 'guaranteed', 'free download', 'miracle',
+  // Klaim medis/kesehatan yang tidak boleh diklaim aset stok
+  'cures', 'cure for', 'anti-aging miracle',
+  // Penanda konten eksplisit/dewasa (ditolak otomatis oleh moderasi Adobe/Shutterstock)
+  'nude', 'nsfw', 'explicit content',
+  // Spam call-to-action yang tidak relevan sebagai keyword visual
+  'download now', 'click here', 'subscribe now', 'like and share'
+]);
+
+/**
+ * Mengecek apakah sebuah keyword melanggar pedoman Adobe Stock / Shutterstock:
+ * brand & IP (via isProhibitedKeyword), klaim superlatif tak terverifikasi,
+ * konten eksplisit, spam CTA, atau bukan berupa frasa pendek (kalimat penuh).
+ */
+function violatesMarketplaceGuidelines(keyword: string): boolean {
+  const lower = keyword.toLowerCase().trim();
+  if (!lower) return true;
+  if (isProhibitedKeyword(lower)) return true;
+  if (MARKETPLACE_BANNED_TERMS.has(lower)) return true;
+  if (Array.from(MARKETPLACE_BANNED_TERMS).some(term => lower.includes(term))) return true;
+  // Pedoman marketplace: keyword harus frasa pendek, bukan kalimat (maks ~4 kata)
+  if (lower.split(/\s+/).length > 4) return true;
+  return false;
+}
+
+function filterBannedKeywords(keywords: string[]): string[] {
+  return keywords.filter(k => !violatesMarketplaceGuidelines(k));
+}
+
+// ---- LAPISAN 6: DEDUPLIKASI SEMANTIK (BUKAN HANYA TEKS SAMA) --------------
+
+function stemWord(word: string): string {
+  const w = word.toLowerCase();
+  if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
+  if (w.endsWith('es') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('ing') && w.length > 5) return w.slice(0, -3);
+  if (w.endsWith('ed') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) return w.slice(0, -1);
+  return w;
+}
+
+/**
+ * Signature semantik: setiap kata di-stem lalu diurutkan alfabetis, sehingga
+ * frasa yang secara makna identik namun berbeda urutan/bentuk kata
+ * (mis. "beach sunset" vs "sunset beaches" vs "sunset at the beach") terdeteksi sebagai duplikat,
+ * bukan hanya deduplikasi string yang persis sama.
+ */
+function semanticKeySignature(phrase: string): string {
+  return phrase
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(w => !['a', 'an', 'the', 'at', 'in', 'on', 'of'].includes(w))
+    .map(stemWord)
+    .sort()
+    .join(' ');
+}
+
+function semanticDeduplicate(keywords: string[]): string[] {
+  const seenSignatures = new Set<string>();
+  const result: string[] = [];
+  for (const kw of keywords) {
+    const sig = semanticKeySignature(kw);
+    if (!sig || seenSignatures.has(sig)) continue;
+    seenSignatures.add(sig);
+    result.push(kw);
+  }
+  return result;
+}
+
+// ---- LAPISAN 7: PENENTUAN KATEGORI YANG LEBIH AKURAT -----------------------
+
+/**
+ * Cross-validasi kategori: membandingkan hasil analisis semantik visual AI (TAHAP 1,
+ * yang benar-benar "melihat" piksel gambar) dengan heuristik pattern-matching berbasis
+ * title+keyword. Jika keduanya sepakat, confidence tinggi. Jika berbeda, diprioritaskan
+ * hasil AI vision (asalkan disertai alasan eksplisit), heuristik hanya jadi fallback.
+ */
+function determineAccurateCategory(
+  title: string,
+  keywords: string[],
+  visualFacts: any,
+  aiSuggestedCategoryId?: number
+): { category_id: number; shutterstock_category_1: string; shutterstock_category_2: string; confidence: number; reason: string } {
+  const heuristic = getHeuristicCategories(title, keywords);
+  const aiSemantic = visualFacts?.semantic_category_analysis;
+  const aiCatId = Number(aiSemantic?.adobe_id) || Number(aiSuggestedCategoryId) || 0;
+
+  let finalCatId = heuristic.category_id;
+  let confidence = 0.6;
+  let reason = "Ditentukan melalui pencocokan pola judul/keyword berbobot (heuristik).";
+
+  if (aiCatId >= 1 && aiCatId <= 21) {
+    if (aiCatId === heuristic.category_id) {
+      finalCatId = aiCatId;
+      confidence = 0.95;
+      reason = "Analisis semantik visual AI dan heuristik keyword/judul sepakat.";
+    } else if (aiSemantic?.reason && String(aiSemantic.reason).trim().length > 10) {
+      finalCatId = aiCatId;
+      confidence = 0.75;
+      reason = String(aiSemantic.reason);
+    } else {
+      confidence = 0.55;
+    }
+  }
+
+  return {
+    category_id: finalCatId,
+    shutterstock_category_1: (aiSemantic?.shutterstock_category_1 && String(aiSemantic.shutterstock_category_1).trim()) || heuristic.shutterstock_category_1,
+    shutterstock_category_2: (aiSemantic?.shutterstock_category_2 && String(aiSemantic.shutterstock_category_2).trim()) || heuristic.shutterstock_category_2,
+    confidence,
+    reason
+  };
+}
+
+// ---- LAPISAN 8: VALIDASI AKHIR ---------------------------------------------
+
+interface MetadataValidationReport {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Pemeriksaan akhir sebelum metadata dikembalikan ke client: panjang judul,
+ * jumlah keyword, indikasi duplikasi tersembunyi, kepatuhan marketplace, dan validitas kategori.
+ * Bersifat non-blocking (log-only) agar tidak menghentikan response, tapi memberi visibilitas QA penuh.
+ */
+function validateFinalMetadata(
+  data: any,
+  targetKeywordCount: number,
+  titleLength: string | undefined,
+  validShutterstockCats: string[]
+): MetadataValidationReport {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const titleLen = (data.title || '').length;
+  const maxLen = titleLength === 'short' ? 65 : 200;
+  if (titleLen === 0) errors.push('Title kosong.');
+  if (titleLen > maxLen) errors.push(`Title melebihi batas ${maxLen} karakter (aktual: ${titleLen}).`);
+  if (titleLength === 'long' && titleLen < 40) warnings.push('Title mode "long" namun cukup pendek (<40 karakter).');
+
+  const kwCount = Array.isArray(data.keywords) ? data.keywords.length : 0;
+  if (kwCount === 0) errors.push('Tidak ada keyword yang dihasilkan.');
+  if (kwCount !== targetKeywordCount) warnings.push(`Jumlah keyword (${kwCount}) tidak persis sama dengan target (${targetKeywordCount}).`);
+
+  if (Array.isArray(data.keywords) && data.keywords.length > 5) {
+    const uniqueRatio = new Set(data.keywords.map((k: string) => k.toLowerCase())).size / data.keywords.length;
+    if (uniqueRatio < 0.9) warnings.push('Terindikasi duplikasi keyword tersembunyi (uniqueRatio rendah).');
+  }
+
+  const bannedFound = (Array.isArray(data.keywords) ? data.keywords : []).filter((k: string) => violatesMarketplaceGuidelines(k));
+  if (bannedFound.length > 0) errors.push(`Keyword melanggar pedoman marketplace: ${bannedFound.join(', ')}`);
+
+  const catId = Number(data.category_id);
+  if (isNaN(catId) || catId < 1 || catId > 21) errors.push('category_id di luar rentang valid (1-21).');
+  if (!validShutterstockCats.includes(data.shutterstock_category_1)) errors.push('shutterstock_category_1 tidak valid untuk platform ini.');
+  if (!validShutterstockCats.includes(data.shutterstock_category_2)) errors.push('shutterstock_category_2 tidak valid untuk platform ini.');
+  if (data.shutterstock_category_1 === data.shutterstock_category_2) warnings.push('shutterstock_category_1 dan shutterstock_category_2 identik.');
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+// ============================================================================
+// END METADATAGEN STRUCTURED PIPELINE
+// ============================================================================
+
 export const generateStockMetadata = async (
   frames: string[],
   keywordCount: number | string,
@@ -1917,7 +2307,7 @@ OUTPUT FORMAT:
     };
   }
 
-  // --- TAHAP 7: FINAL SANITIZATION & RETURN ---
+  // --- TAHAP 7: FINAL SANITIZATION & RETURN (MetadataGen Structured Pipeline) ---
   try {
     let data = (finalMetadataRaw && typeof finalMetadataRaw === 'object' && !Array.isArray(finalMetadataRaw)) ? { ...finalMetadataRaw } : {};
     
@@ -1933,7 +2323,12 @@ OUTPUT FORMAT:
 
     // Ensure description is valid
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
-    
+
+    // [LAPISAN 1] Bangun analisis visual bertingkat (scene → object → attributes → concepts)
+    // dari VISUAL_FACTS TAHAP 1. Menjadi dasar untuk Lapisan 2, 3, dan 4 di bawah.
+    const tieredVisual = buildTieredVisualAnalysis(visualFacts);
+    const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
+
     // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (!data.keywords || !Array.isArray(data.keywords)) {
       data.keywords = [];
@@ -1983,7 +2378,22 @@ OUTPUT FORMAT:
 
        // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
       const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-      const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+      let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+
+      // [LAPISAN 5] Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
+      // (superlatif tak terverifikasi, klaim medis, konten eksplisit, spam CTA, kalimat penuh, brand/IP)
+      finalKeywordList = filterBannedKeywords(finalKeywordList);
+
+      // [LAPISAN 6] Deduplikasi semantik: menghapus frasa yang secara makna identik
+      // walau berbeda bentuk kata/urutan (bukan hanya deduplikasi string yang persis sama)
+      finalKeywordList = semanticDeduplicate(finalKeywordList);
+
+      // [LAPISAN 4] Ekspansi sinonim & long-tail keyword jika masih kurang dari target,
+      // sebelum fallback generik dari ensureKeywordCount, agar kualitas relevansi tetap tinggi
+      if (finalKeywordList.length < targetCount) {
+        const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
+        finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
+      }
 
       data.keywords = ensureKeywordCount(
         finalKeywordList,
@@ -1995,24 +2405,45 @@ OUTPUT FORMAT:
         keywordMode
       );
 
+      // Final safety pass: re-filter/re-dedupe after ensureKeywordCount's fallback padding,
+      // then re-slice to keep the exact target count intact.
+      data.keywords = semanticDeduplicate(filterBannedKeywords(data.keywords)).slice(0, targetCount);
+
+      // [LAPISAN 3] Sistem pembobotan keyword: SEO score, visual score, commercial score, trend score.
+      // Reorder di dalam tiap kuintil struktural (subject → technical → context → commercial → emotional)
+      // supaya urutan SEO tetap terjaga sambil keyword paling relevan/bernilai naik ke atas kuintilnya.
+      data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual);
+
+    // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
+    // illustration/vector/video) sebagai fallback bila judul dari AI kosong/generik/placeholder.
+    let candidateTitle = String(data.title || "").trim();
+    const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
+    if (isGenericTitle) {
+      candidateTitle = applyTitleTemplate(assetSubtype, tieredVisual, titleLength);
+    }
+
     // 1.5. Enforce professional title length strictly
-    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength);
+    data.title = ensureTitleLength(candidateTitle, data.keywords || [], data.description || "", titleLength);
+
+    // [LAPISAN 7] Penentuan kategori yang lebih akurat: cross-validasi hasil analisis
+    // semantik visual AI (TAHAP 1) dengan heuristik pattern-matching title/keyword.
+    const accurateCategory = determineAccurateCategory(data.title, data.keywords || [], visualFacts, data.category_id);
 
     // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
     const parsedCategoryId = parseInt(String(data.category_id), 10);
     if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
-      const heur = getHeuristicCategories(data.title, data.keywords || []);
-      data.category_id = heur.category_id;
+      data.category_id = accurateCategory.category_id;
     } else {
-      data.category_id = parsedCategoryId;
+      // AI-supplied category_id is in-range: still cross-validate via Lapisan 7,
+      // and only override when confidence is high (AI vision + heuristic agree).
+      data.category_id = accurateCategory.confidence >= 0.75 ? accurateCategory.category_id : parsedCategoryId;
     }
 
     // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
     const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
     if (!data.shutterstock_category_1 || !validShutterstockCats.includes(data.shutterstock_category_1)) {
-      const heur = getHeuristicCategories(data.title, data.keywords || []);
-      data.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
+      data.shutterstock_category_1 = validShutterstockCats.includes(accurateCategory.shutterstock_category_1) ? accurateCategory.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
     }
 
     if (
@@ -2020,8 +2451,7 @@ OUTPUT FORMAT:
       !validShutterstockCats.includes(data.shutterstock_category_2) || 
       data.shutterstock_category_2 === data.shutterstock_category_1
     ) {
-      const heur = getHeuristicCategories(data.title, data.keywords || []);
-      let secondFallback = heur.shutterstock_category_2;
+      let secondFallback = accurateCategory.shutterstock_category_2;
       if (secondFallback === data.shutterstock_category_1) {
         const possibleVal = toolType === ToolType.VIDEO ? "Backgrounds/Textures" : "Abstract";
         secondFallback = validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || possibleVal;
@@ -2029,7 +2459,17 @@ OUTPUT FORMAT:
       data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Backgrounds/Textures");
     }
     
-    data.category_reason = data.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+    data.category_reason = data.category_reason || accurateCategory.reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+
+    // [LAPISAN 8] Validasi akhir non-blocking: title length, keyword count, indikasi duplikasi,
+    // kepatuhan marketplace, dan validitas kategori. Hasil dicatat di log untuk visibilitas QA.
+    const qaReport = validateFinalMetadata(data, targetCount, titleLength, validShutterstockCats);
+    if (!qaReport.valid) {
+      console.warn("[MetadataGen Lapisan 8 - Validasi Akhir] Errors:", qaReport.errors);
+    }
+    if (qaReport.warnings.length > 0) {
+      console.log("[MetadataGen Lapisan 8 - Validasi Akhir] Warnings:", qaReport.warnings);
+    }
     
     return data as StockMetadata;
   } catch (error) {
@@ -2641,6 +3081,13 @@ OUTPUT FORMAT:
         // Ensure description is valid
         metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
 
+        const assetVisualFacts = parsedVisualFactsList[index] || {};
+
+        // [LAPISAN 1] Bangun analisis visual bertingkat (scene → object → attributes → concepts)
+        // per item batch, dari VISUAL_FACTS item tersebut.
+        const tieredVisual = buildTieredVisualAnalysis(assetVisualFacts);
+        const assetSubtype = detectAssetSubtype(toolType, assetVisualFacts, customPrompt);
+
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
             metadata.keywords = [];
@@ -2671,7 +3118,6 @@ OUTPUT FORMAT:
             });
             const uniqueKeywords = Array.from(new Set(cleanedKeywords));
             
-            const assetVisualFacts = parsedVisualFactsList[index] || {};
             const allowedTerms = [
               ...(Array.isArray(assetVisualFacts.primary_subjects) ? assetVisualFacts.primary_subjects : []).map((x: any) => x?.name || ""),
               ...(Array.isArray(assetVisualFacts.secondary_subjects) ? assetVisualFacts.secondary_subjects : []).map((x: any) => x?.name || ""),
@@ -2688,7 +3134,19 @@ OUTPUT FORMAT:
             });
 
             const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-            const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+            let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+
+            // [LAPISAN 5] Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
+            finalKeywordList = filterBannedKeywords(finalKeywordList);
+
+            // [LAPISAN 6] Deduplikasi semantik (bukan hanya teks sama)
+            finalKeywordList = semanticDeduplicate(finalKeywordList);
+
+            // [LAPISAN 4] Ekspansi sinonim & long-tail keyword bila masih kurang dari target
+            if (finalKeywordList.length < targetCount) {
+              const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
+              finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
+            }
 
             metadata.keywords = ensureKeywordCount(
               finalKeywordList,
@@ -2700,24 +3158,38 @@ OUTPUT FORMAT:
               keywordMode
             );
 
+            // Final safety pass setelah fallback padding dari ensureKeywordCount
+            metadata.keywords = semanticDeduplicate(filterBannedKeywords(metadata.keywords)).slice(0, targetCount);
+
+            // [LAPISAN 3] Sistem pembobotan keyword: reorder di dalam tiap kuintil struktural
+            metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual);
+
+        // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
+        let candidateTitle = String(metadata.title || "").trim();
+        const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
+        if (isGenericTitle) {
+          candidateTitle = applyTitleTemplate(assetSubtype, tieredVisual, titleLength);
+        }
+
         // 1.5. Enforce professional title length strictly
-        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength);
+        metadata.title = ensureTitleLength(candidateTitle, metadata.keywords || [], metadata.description || "", titleLength);
+
+        // [LAPISAN 7] Penentuan kategori yang lebih akurat: cross-validasi AI vision × heuristik
+        const accurateCategory = determineAccurateCategory(metadata.title, metadata.keywords || [], assetVisualFacts, metadata.category_id);
 
         // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
         const parsedCategoryId = parseInt(String(metadata.category_id), 10);
         if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
-            const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
-            metadata.category_id = heur.category_id;
+            metadata.category_id = accurateCategory.category_id;
         } else {
-            metadata.category_id = parsedCategoryId;
+            metadata.category_id = accurateCategory.confidence >= 0.75 ? accurateCategory.category_id : parsedCategoryId;
         }
 
         // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
         const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
         if (!metadata.shutterstock_category_1 || !validShutterstockCats.includes(metadata.shutterstock_category_1)) {
-            const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
-            metadata.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
+            metadata.shutterstock_category_1 = validShutterstockCats.includes(accurateCategory.shutterstock_category_1) ? accurateCategory.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
         }
 
         if (
@@ -2725,8 +3197,7 @@ OUTPUT FORMAT:
           !validShutterstockCats.includes(metadata.shutterstock_category_2) || 
           metadata.shutterstock_category_2 === metadata.shutterstock_category_1
         ) {
-          const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
-          let secondFallback = heur.shutterstock_category_2;
+          let secondFallback = accurateCategory.shutterstock_category_2;
           if (secondFallback === metadata.shutterstock_category_1) {
               const possibleVal = toolType === ToolType.VIDEO ? "Backgrounds/Textures" : "Abstract";
               secondFallback = validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || possibleVal;
@@ -2734,7 +3205,16 @@ OUTPUT FORMAT:
           metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures");
         }
 
-        metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+        metadata.category_reason = metadata.category_reason || accurateCategory.reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+
+        // [LAPISAN 8] Validasi akhir non-blocking per item batch
+        const qaReport = validateFinalMetadata(metadata, targetCount, titleLength, validShutterstockCats);
+        if (!qaReport.valid) {
+          console.warn(`[MetadataGen Lapisan 8 - Batch item ${index}] Errors:`, qaReport.errors);
+        }
+        if (qaReport.warnings.length > 0) {
+          console.log(`[MetadataGen Lapisan 8 - Batch item ${index}] Warnings:`, qaReport.warnings);
+        }
 
         const targetId = items[index] ? items[index].id : (items[0]?.id || 'unknown');
         return { id: targetId, metadata };
