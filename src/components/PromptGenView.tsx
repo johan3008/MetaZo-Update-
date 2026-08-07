@@ -75,7 +75,8 @@ const DARK_HORROR_SUB_STYLES = [
 ];
 
 const PNG_STYLE_OPTIONS = [
-  { id: '3D Render', label: '3D Render (Animasi 3D)', icon: '🎮' },
+  { id: 'Photorealistic', label: 'Photorealistic (Foto Realistis)', icon: '📷' },
+  { id: '3D Render', label: '3D Render (Unreal Engine)', icon: '🎮' },
   { id: 'Isometric', label: 'Isometric (Isometrik 3D)', icon: '📦' },
   { id: 'Lowpoly', label: 'Lowpoly (Poli Rendah)', icon: '💎' },
   { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
