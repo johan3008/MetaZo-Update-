@@ -3375,7 +3375,7 @@ export const generateOptimizedPrompt = async (options: {
     "Vector Art": vectorSubType === 'gradient_flat'
       ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines.'
       : ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic, featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO shading, NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions.',
-    "3D Render": ' - Focus on soft studio lighting, Octane render quality, glossy or matte plastic materials, raytraced reflections, and smooth 3D surfaces.',
+    "3D Render": ' - MANDATORY RENDER ENGINE LOCK: This style MUST exclusively depict Unreal Engine 5 real-time 3D rendering aesthetics — Lumen dynamic global illumination, Nanite micro-detail geometry, physically-based rendering (PBR) materials, real-time ray-traced reflections, soft volumetric studio lighting, and smooth high-fidelity 3D surfaces (glossy or matte plastic, metal, or ceramic). Every prompt variation MUST explicitly include "Unreal Engine 5" or "Unreal Engine real-time render" phrasing. STRICTLY FORBIDDEN — under no circumstances mention or blend in: isometric/orthographic perspective, glassmorphism/frosted glass/translucent glass effects, voxel art, low-poly faceting, or any other render engine name (Octane, Cinema 4D, Blender Cycles, V-Ray, Redshift, KeyShot). Do NOT cross-contaminate this style with any other PNG style vocabulary. Keep every variation 100% authentic to a pure Unreal Engine 5 CGI render.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
     "Pixel Art": ' - Focus on visible square pixels, limited color palette, 8-bit or 16-bit retro game aesthetics, and sharp pixelated edges.',
@@ -4047,16 +4047,16 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 
     // PNG Categories
     "3D Render": [
-      "pristine 3D model render, Octane Render, smooth clay materials, vibrant raytracing, cute 3D character style",
-      "cute stylized 3D mascot render, smooth plastic surfaces, pastel colors, soft studio lighting setup",
-      "3D digital asset rendering, glossy metal and glass textures, high fidelity rendering, sleek layout",
-      "vibrant 3D vector style render, playful elements, clean shapes, outstanding volumetric depth",
-      "ultra modern glossy 3D key visual element, ray-traced ambient occlusion, glowing neon edges",
-      "stylized 3D porcelain model, highly polished surface, clean pastel gradients, beautiful rendering",
-      "creative 3D render element, whimsical design, soft plastic textures, warm studio light",
-      "cute 3D game asset render, bright colors, friendly round edges, premium game design look",
-      "3D metallic chrome asset, futuristic iridescent surface, glossy reflections, flawless render",
-      "isometric 3D miniature object model render, toy-like details, charming polished material"
+      "pristine 3D model render, Unreal Engine 5 real-time render, Lumen global illumination, smooth PBR clay materials, cute 3D character style",
+      "cute stylized 3D mascot render, Unreal Engine 5 style, smooth plastic surfaces, pastel colors, soft studio lighting setup",
+      "3D digital asset rendering, Unreal Engine 5 real-time rendering, glossy metal and ceramic PBR textures, high fidelity",
+      "vibrant 3D render, Unreal Engine 5 Nanite detail, playful elements, clean shapes, outstanding volumetric depth",
+      "ultra modern glossy 3D key visual element, Unreal Engine 5 ray-traced reflections, ambient occlusion, glowing neon edges",
+      "stylized 3D porcelain model, Unreal Engine 5 real-time render, highly polished surface, clean pastel studio gradients",
+      "creative 3D render element, Unreal Engine 5 cinematic real-time lighting, whimsical design, soft plastic textures",
+      "cute 3D game asset render, Unreal Engine 5 real-time render quality, bright colors, friendly round edges",
+      "3D metallic chrome asset, Unreal Engine 5 real-time reflections, futuristic iridescent surface, flawless render",
+      "high-fidelity 3D product render, Unreal Engine 5 Lumen lighting, sharp PBR material detail, premium studio render"
     ],
     "Flat Icon": [
       "minimalist flat icon graphic, clean modern UI vector icon, bold flat colors, creative simplicity",
