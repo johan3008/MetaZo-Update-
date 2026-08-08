@@ -1328,31 +1328,31 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
     return {
       mediaTypeContext: "CRITICAL: The provided images are sequential frames (Start, Middle, End) from a single VIDEO. You MUST analyze the continuous motion, narrative progression, concepts, and storyline (alur) across the frames. Do not just describe them individually; synthesize the overall action and concept into natural, coherent metadata.",
       titleRule: `- Start/prioritize dynamic action, movement, and setting of the video.
-- Front-load descriptive cinematic movement phrases (e.g. "Slow motion footage of...", "Cinematic tracking shot of...", "Drone aerial view of..."). Exceptions to the default Rule 6 (no media types) are fully granted for these video/motion terms in the title!
-- Describe the active setting and camera flow rather than just static scenes.`,
+- Focus purely on describing the core visual subject, actions, and active setting without mentioning media/cinematic/format terms (e.g., instead of "Drone cinematic footage of skyscrapers", write "Aerial view of high-rise skyscrapers in a city").
+- Describe the active setting and action rather than just static scenes.`,
       descriptionRule: `- Detail the visual timeline, camera work, dynamic lighting, movement speeds, and narrative story across frames.
 - Describe actions and characters naturally and with high density.
 - MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning professional video uses, e.g., "Perfect for film production, commercial video ads, documentary b-roll, or high-definition social media content."`,
       risetKeywordRule: `- Conduct deep, professional motion-picture research: identify specific camera motions (e.g., panning, tilting, tracking, orbiting, zooming), camera gear (e.g., drone, steadicam, dolly, crane), frame rate pacing (e.g., slow motion, real-time, time-lapse), and environmental dynamics.
 - Map cinematic concepts, lighting transitions, action verbs, and temporal themes.`,
-      seoBoostRule: `- Heavily front-load highly searched video commercial keywords to maximize search CTR on stock video marketplaces.
-- Integrate essential video SEO tags: 'footage', 'b-roll', 'video', 'cinematic', 'motion', 'slow motion', 'camera movement', 'panning', 'tracking shot', 'aerial view', 'drone shot', 'time-lapse', 'real-time', '4k resolution', 'film production', 'stock video'. (Exceptions to the default Rule 6 are granted for these).`,
-      prohibitedExemptions: "However, for VIDEO assets, cinematic terms and motion tags (e.g., 'footage', 'b-roll', 'cinematic', 'slow motion', 'panning shot', 'aerial drone view') are highly encouraged."
+      seoBoostRule: `- Heavily front-load highly searched video-content-related keywords to maximize search CTR.
+- Focus keywords on the subjects, environments, activities, actions, and conceptual meanings represented, while strictly avoiding terms like "video", "footage", "b-roll", "cinematic", "slow motion", "panning", "tracking shot", etc.`,
+      prohibitedExemptions: "For VIDEO assets, keep the title and keywords completely free of cinematic/format terms, focusing exclusively on visual subject matter and actions."
     };
   } else if (toolType === ToolType.VECTOR || toolType === ToolType.VECTOR_EPS) {
     return {
       mediaTypeContext: "CRITICAL: The provided image is a VECTOR illustration. You MUST analyze and categorize it based on the ACTUAL SUBJECT MATTER visually present (e.g. if it shows an animal, classify as Animal; if it shows people, classify as People). Do NOT just default to 'Graphic Resources' or 'Abstract' unless it is genuinely a background/texture without clear subjects. Generate natural, smooth descriptions of the subjects.",
       titleRule: `- Describe the vector asset in terms of graphic style, design layout, icon style, branding emblem, or creative illustration template.
-- Use descriptors like "Flat design icon of...", "Minimalist vector illustration of...", "Isometric 3D graphic of...", or "Modern emblem/logo design of...".
-- Avoid plain or spammy titles like "Vector of..." directly, but frame them as high-quality professional digital graphic assets. Exceptions to the default Rule 6 are granted for vector descriptors.`,
+- Focus purely on describing the subject, characters, symbols, or layouts without adding format keywords like "vector" or "illustration" into the title.
+- Describe the active design and theme rather than formatting types.`,
       descriptionRule: `- Describe digital shapes (geometric, organic), clean outlines, gradient/flat colors, layout complexity, and commercial usability.
 - Explicitly describe any isolated presentation (e.g. "isolated on a white background") or clean graphic margins.
 - MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning graphic design uses, e.g., "Ideal for website graphic designs, branding materials, app UI layouts, infographic templates, or commercial print posters."`,
       risetKeywordRule: `- Conduct deep graphic design research: identify specific vector styles (e.g., flat design, isometric, low-poly, line art, 3D render, badge, emblem, sticker, pictogram), shape complexity, grid alignments, and file types.
 - Map design metaphors, branding purposes, and commercial layout structures.`,
-      seoBoostRule: `- Heavily front-load highly searched vector and digital asset keywords to maximize search discoverability by web designers and publishers.
-- Integrate essential vector SEO tags: 'vector', 'illustration', 'graphic design', 'flat design', 'minimalist', 'icon', 'isolated', 'clipart', 'svg', 'branding', 'design element', 'isometric', 'infographic', 'shapes', 'logo', 'scalable', 'clipart', 'template'. (Exceptions to the default Rule 6 are granted for these).`,
-      prohibitedExemptions: "However, for VECTOR assets, terms indicating digital formats or design styles (e.g., 'vector', 'illustration', 'graphic design', 'flat design', 'icon', 'isolated', 'isometric', 'svg') are highly encouraged."
+      seoBoostRule: `- Heavily front-load highly searched design-related keywords to maximize search discoverability by designers.
+- Focus keywords on the visual symbols, subjects, patterns, styles (e.g., minimal, flat, isometric), layouts, and commercial themes, while strictly avoiding terms like "vector", "illustration", "svg", "clipart", dsb.`,
+      prohibitedExemptions: "Keep titles and keywords completely free of format terms like 'vector', 'illustration', or 'svg', focusing exclusively on visual subject matter, styles, and shapes."
     };
   } else {
     // Default to Image/Photo
@@ -1365,9 +1365,9 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
 - MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning photography uses, e.g., "Ideal for commercial advertising, marketing campaigns, editorial web blogs, or social media banner graphics."`,
       risetKeywordRule: `- Conduct deep photographic and real-world concept research: identify visual subjects, authentic expressions, clothing textures, environment details, weather conditions, lighting attributes, and depth of field.
 - Map realistic physical synonyms, human-centric emotional adjectives, and situational contexts.`,
-      seoBoostRule: `- Heavily front-load high-converting professional photography keywords to capture exact search patterns of magazine and commercial buyers.
-- Integrate essential photo SEO tags: 'photo', 'photography', 'realistic', 'candid', 'outdoor shot', 'studio shot', 'depth of field', 'professional lighting', 'high-resolution', 'commercial photography', 'real-world', 'lifestyle shot'. (Exceptions to the default Rule 6 are granted for these).`,
-      prohibitedExemptions: "However, for PHOTOGRAPHIC assets, terms indicating photo style (e.g., 'photo', 'photography', 'realistic', 'candid', 'studio shot') are fully allowed."
+      seoBoostRule: `- Heavily front-load high-converting keywords to capture exact search patterns of commercial buyers.
+- Focus keywords on the actual visual subjects, environments, clothing, emotional expressions, lighting styles (e.g. golden hour, soft studio light), and commercial contexts, while strictly avoiding terms like "photo", "photography", "realistic", "candid", "lifestyle shot", dsb.`,
+      prohibitedExemptions: "Keep titles and keywords completely free of photography terms or camera styles, focusing exclusively on visual subject matter and actions."
     };
   }
 }
@@ -1901,8 +1901,14 @@ export const generateStockMetadata = async (
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
-  const realisticPhotoRule = `\n12. SPECIAL RULE FOR REALISTIC PHOTOS: Jika mendeteksi gambar tersebut adalah Foto Realistis, Real-World Scene, atau Seperti Pengambilan kamera, WAJIB sertakan keyword "candid", "photography", dll. KECUALI jika gambar adalah Kartun, Vector, Ilustrasi 2D/3D, dan selain foto realistis, maka DILARANG KERAS menggunakan keyword tersebut.`;
-  keywordRulePromptText += realisticPhotoRule;
+  const noMediaFormatRule = `
+12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
+The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
+- Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
+- Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
+- Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
+Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
+  keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
@@ -2606,8 +2612,14 @@ export const generateBatchStockMetadata = async (
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   }
 
-  const realisticPhotoRule = `\n12. SPECIAL RULE FOR REALISTIC PHOTOS: Jika mendeteksi gambar tersebut adalah Foto Realistis, Real-World Scene, atau Seperti Pengambilan kamera, WAJIB sertakan keyword "candid", "photography", dll. KECUALI jika gambar adalah Kartun, Vector, Ilustrasi 2D/3D, dan selain foto realistis, maka DILARANG KERAS menggunakan keyword tersebut.`;
-  keywordRulePromptText += realisticPhotoRule;
+  const noMediaFormatRule = `
+12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
+The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
+- Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
+- Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
+- Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
+Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
+  keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
