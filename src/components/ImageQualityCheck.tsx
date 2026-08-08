@@ -220,8 +220,9 @@ export const ImageQualityCheck: React.FC<{
           isResolved = true;
           try {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 1200;
-            const MAX_HEIGHT = 1200;
+            // FIX QC: naikkan resolusi analisis frame video agar detail forensik tidak hilang
+            const MAX_WIDTH = 2048;
+            const MAX_HEIGHT = 2048;
             let width = video.videoWidth || 640;
             let height = video.videoHeight || 480;
 
@@ -236,7 +237,7 @@ export const ImageQualityCheck: React.FC<{
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.drawImage(video, 0, 0, width, height);
-              resolve(canvas.toDataURL('image/jpeg', 0.85));
+              resolve(canvas.toDataURL('image/jpeg', 0.92));
             } else {
               reject(new Error("Canvas context failed"));
             }
@@ -344,8 +345,9 @@ export const ImageQualityCheck: React.FC<{
                       const img = new Image();
                       img.onload = () => {
                          const canvas = document.createElement('canvas');
-                         const MAX_WIDTH = 1200;
-                         const MAX_HEIGHT = 1200;
+                         // FIX QC: naikkan resolusi analisis agar artefak halus tetap terlihat AI
+                         const MAX_WIDTH = 2048;
+                         const MAX_HEIGHT = 2048;
                          let width = img.width;
                          let height = img.height;
                          if (width > height) {
@@ -358,7 +360,7 @@ export const ImageQualityCheck: React.FC<{
                          const ctx = canvas.getContext('2d');
                          if (ctx) {
                            ctx.drawImage(img, 0, 0, width, height);
-                           resolve(canvas.toDataURL('image/jpeg', 0.85));
+                           resolve(canvas.toDataURL('image/jpeg', 0.92));
                          } else {
                            resolve(reader.result as string);
                          }
@@ -383,8 +385,12 @@ export const ImageQualityCheck: React.FC<{
       reader.onloadend = () => {
         const img = new Image();
         img.onload = () => {
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
+          // FIX QC: resolusi analisis dinaikkan dari 1200 -> 2048 px.
+          // Downscale agresif ke 1200px menghilangkan artefak AI halus (jari meleleh,
+          // detail mekanis rusak) sehingga gambar cacat dinyatakan PASS padahal
+          // moderator Adobe Stock memeriksa pada zoom 100-200% resolusi penuh.
+          const MAX_WIDTH = 2048;
+          const MAX_HEIGHT = 2048;
           let width = img.width;
           let height = img.height;
 
@@ -400,7 +406,7 @@ export const ImageQualityCheck: React.FC<{
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
           } else {
             resolve(reader.result as string);
           }
@@ -410,6 +416,62 @@ export const ImageQualityCheck: React.FC<{
       };
       reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  };
+
+  // FIX QC: Buat crop detail RESOLUSI ASLI (100% pixel, tanpa upscale palsu) dari file asli.
+  // Urutan wilayah HARUS sama dengan panduan di prompt server: TENGAH, KIRI, KANAN.
+  // Crop inilah yang membuat AI bisa melihat cacat kecil (tangan, pedal, jari-jari, tepian)
+  // yang sebelumnya hilang karena gambar dikecilkan ke 1200px sebelum dianalisis.
+  const generateDetailCrops = (file: File): Promise<string[]> => {
+    return new Promise((resolve) => {
+      try {
+        if (file.type.startsWith('video/') || file.name.match(/\.(eps|ai|mp4|mov|webm)$/i)) {
+          resolve([]);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              // Gambar terlalu kecil untuk di-crop bermakna -> biarkan server yang menangani
+              if (img.width < 640 || img.height < 640) {
+                resolve([]);
+                return;
+              }
+              const crops: string[] = [];
+              const cw = Math.floor(img.width / 2);
+              const ch = Math.floor(img.height / 2);
+              const regions: Array<[number, number]> = [
+                [Math.floor(img.width / 4), Math.floor(img.height / 4)], // TENGAH
+                [0, Math.floor(img.height / 4)],                          // KIRI
+                [Math.floor(img.width / 2), Math.floor(img.height / 4)]   // KANAN
+              ];
+              const MAX_CROP_DIM = 1600; // batasi payload; tidak pernah upscale (scale <= 1)
+              for (const [sx, sy] of regions) {
+                const canvas = document.createElement('canvas');
+                const scale = Math.min(1, MAX_CROP_DIM / cw);
+                canvas.width = Math.max(1, Math.floor(cw * scale));
+                canvas.height = Math.max(1, Math.floor(ch * scale));
+                const ctx = canvas.getContext('2d');
+                if (!ctx) continue;
+                ctx.drawImage(img, sx, sy, cw, ch, 0, 0, canvas.width, canvas.height);
+                crops.push(canvas.toDataURL('image/jpeg', 0.92));
+              }
+              resolve(crops);
+            } catch {
+              resolve([]);
+            }
+          };
+          img.onerror = () => resolve([]);
+          img.src = reader.result as string;
+        };
+        reader.onerror = () => resolve([]);
+        reader.readAsDataURL(file);
+      } catch {
+        resolve([]);
+      }
     });
   };
 
@@ -473,6 +535,8 @@ export const ImageQualityCheck: React.FC<{
         if (file.name.match(/\.(eps|ai)$/i)) {
           setPreviews(prev => ({ ...prev, [file.name]: base64Image }));
         }
+        // FIX QC: ambil crop detail resolusi asli dari file asli untuk inspeksi forensik AI
+        const detailCrops = await generateDetailCrops(file);
         setProgress(startProgress + 15);
 
         let uploadedUrl = null;
@@ -483,26 +547,10 @@ export const ImageQualityCheck: React.FC<{
         
         if (!file.name.match(/\.(eps|ai)$/i)) {
           try {
+            // FIX QC: SELALU unggah file ASLI resolusi penuh (bukan versi 1200px untuk analisis),
+            // agar server menjalankan analisis piksel & membuat crop forensik dari kualitas maksimal —
+            // persis seperti moderator Adobe Stock yang memeriksa file asli pada zoom 100-200%.
             let uploadBlob: Blob | File = file;
-            
-            if (!isVideo) {
-                try {
-                  const arr = base64Image.split(',');
-                  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-                  const bstr = atob(arr[1]);
-                  let n = bstr.length;
-                  const u8arr = new Uint8Array(n);
-                  while (n--) {
-                    u8arr[n] = bstr.charCodeAt(n);
-                  }
-                  uploadBlob = new Blob([u8arr], { type: mime });
-                } catch (e) {
-                  console.warn("[Image Audit] Failed to convert base64 to blob, using raw file:", e);
-                  uploadBlob = file;
-                }
-            } else {
-                uploadBlob = file; // Direct upload for video
-            }
 
             const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadBlob.type || 'image/jpeg')}`);
             if (getUrlRes.ok) {
@@ -566,7 +614,8 @@ export const ImageQualityCheck: React.FC<{
               tolerance, 
               language: t.language || 'English', 
               model: aiOptions?.model,
-              fileType: file.type || file.name.split('.').pop()
+              fileType: file.type || file.name.split('.').pop(),
+              detailCrops
             }),
           });
         } else {
@@ -578,7 +627,8 @@ export const ImageQualityCheck: React.FC<{
               tolerance, 
               language: t.language || 'English', 
               model: aiOptions?.model,
-              fileType: file.type || file.name.split('.').pop()
+              fileType: file.type || file.name.split('.').pop(),
+              detailCrops
             }),
           });
         }
@@ -1161,16 +1211,36 @@ export const ImageQualityCheck: React.FC<{
                                   {(() => {
                                     const isPass = r.recommendation === "PASS";
                                     const rawChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {};
+                                    // FIX QC: JANGAN pernah memalsukan status PASS dengan catatan positif kalengan
+                                    // saat AI tidak mengembalikan data check (respons parsial/gagal parsing).
+                                    // Fallback sekarang: (1) FAIL jika check ada di daftar failed_checks server,
+                                    // (2) FAIL jika technical_issues menyebut kata kunci terkait, (3) jika laporan
+                                    // akhir FAIL maka check yang hilang mengikuti FAIL agar UI tidak kontradiktif,
+                                    // dan catatan fallback selalu JUJUR bahwa data tidak dikembalikan AI.
+                                    const failedKeys: string[] = (r as any).failed_checks || (r.ai_vision as any)?.failed_checks || [];
+                                    const issueText = ((r.technical_issues || []) as string[]).join(' ').toLowerCase();
+                                    const fallbackCheck = (key: string, issueKeywords: string[] = []): { status: "PASS" | "FAIL"; note: string } => {
+                                      const inferredFail = failedKeys.includes(key) || issueKeywords.some(kw => issueText.includes(kw));
+                                      const status: "PASS" | "FAIL" = (inferredFail || r.recommendation === "FAIL") ? "FAIL" : "PASS";
+                                      const note = t.language === 'Bahasa'
+                                        ? "Data pemeriksaan ini tidak dikembalikan AI — status mengikuti keputusan akhir laporan dan temuan teknis lainnya."
+                                        : "This check was not returned by the AI — status follows the report's final decision and other technical findings.";
+                                      return { status, note };
+                                    };
+                                    const legalFallback = (key: string): { status: "PASS" | "FAIL"; note: string } =>
+                                      (r.legal_status || '').includes('VIOLATION')
+                                        ? { status: "FAIL", note: t.language === 'Bahasa' ? "Terdeteksi pelanggaran legal/IP pada laporan akhir." : "Legal/IP violation detected in the final report." }
+                                        : fallbackCheck(key);
                                     const aiVisionChecks = {
-                                      blur: rawChecks.blur || { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('focus') || i.toLowerCase().includes('blur')) ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Fokus subjek utama tajam secara sempurna." : "Fokus subjek utama tajam secara sempurna." },
-                                      composition: rawChecks.composition || { status: "PASS", note: t.language === 'Bahasa' ? "Komposisi seimbang dengan rule of thirds." : "Komposisi seimbang dengan rule of thirds." },
-                                      lighting: rawChecks.lighting || { status: (r.technical_issues || []).some(i => i.toLowerCase().includes('lighting') || i.toLowerCase().includes('exposure')) ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Pencahayaan terdistribusi merata dengan detail tinggi." : "Pencahayaan terdistribusi merata dengan detail tinggi." },
-                                      watermark: rawChecks.watermark || { status: "PASS", note: t.language === 'Bahasa' ? "Tidak mendeteksi watermark komersial." : "Tidak mendeteksi watermark komersial." },
-                                      logo: rawChecks.logo || { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Bebas dari logo atau hak cipta merek dagang." : "Bebas dari logo atau hak cipta merek dagang." },
-                                      text: rawChecks.text || { status: "PASS", note: t.language === 'Bahasa' ? "Tidak ada teks overlay mengganggu." : "Tidak ada teks overlay mengganggu." },
-                                      anatomical_errors: rawChecks.anatomical_errors || { status: "PASS", note: t.language === 'Bahasa' ? "Struktur anatomi subjek terlihat alami." : "Struktur anatomi subjek terlihat alami." },
-                                      ip_risk: rawChecks.ip_risk || { status: (r.legal_status || '').includes('VIOLATION') ? "FAIL" : "PASS", note: t.language === 'Bahasa' ? "Aman dari potensi resiko paten atau desain khas." : "Aman dari potensi resiko paten atau desain khas." },
-                                      proportion_defects: rawChecks.proportion_defects || { status: "PASS", note: t.language === 'Bahasa' ? "Struktur proporsi dan detail mekanis terlihat logis." : "Struktur proporsi dan detail mekanis terlihat logis." },
+                                      blur: rawChecks.blur || fallbackCheck('blur', ['focus', 'blur', 'tajam', 'sharp']),
+                                      composition: rawChecks.composition || fallbackCheck('composition', ['komposisi', 'composition']),
+                                      lighting: rawChecks.lighting || fallbackCheck('lighting', ['lighting', 'exposure', 'pencahayaan', 'eksposur']),
+                                      watermark: rawChecks.watermark || fallbackCheck('watermark', ['watermark']),
+                                      logo: rawChecks.logo || legalFallback('logo'),
+                                      text: rawChecks.text || fallbackCheck('text', ['teks', 'text', 'gibberish']),
+                                      anatomical_errors: rawChecks.anatomical_errors || fallbackCheck('anatomical_errors', ['anatomi', 'anatomy', 'jari', 'finger', 'tangan', 'hand']),
+                                      ip_risk: rawChecks.ip_risk || legalFallback('ip_risk'),
+                                      proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical', 'struktur']),
                                       stock_acceptance: rawChecks.stock_acceptance || { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
                                       metadata: rawChecks.metadata || { title: (r as any).metadata?.title || "Stock photography showing details", keywords: (r as any).metadata?.keywords || r.strengths || [] }
                                     };

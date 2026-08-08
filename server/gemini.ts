@@ -4591,9 +4591,17 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 - Depth of Field (DoF) dangkal / Bokeh: Latar belakang buram yang indah (bokeh lembut) adalah kualitas bernilai jual sangat tinggi dan dicari di Adobe Stock, BUKAN cacat. Selama bagian utama subjek tetap fokus tajam sempurna (tack-sharp), tandai status "PASS" pada "blur" dan "out_of_focus".
 - Low-light & Shadow Noise: Foto bernuansa malam hari, lilin, atau siluet dramatis secara wajar memiliki noise halus. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
 - High-Contrast & Shadows: Bayangan yang dalam (crushed shadows) atau sorotan cahaya terang yang dramatis sering kali merupakan unsur seni/pencahayaan yang indah. Jangan langsung menganggapnya cacat eksposur jika itu memperkuat mood estetika foto.
+- BATASAN PENGECUALIAN ARTISTIK (CRITICAL): Pengecualian estetika di atas (bokeh, noise halus, bayangan dramatis) HANYA berlaku untuk pilihan artistik murni. Pengecualian ini TIDAK PERNAH berlaku untuk cacat struktural AI, objek yang tidak logis secara mekanis, anatomi cacat, atau teks rusak — temuan tersebut WAJIB FAIL di semua mode toleransi tanpa kecuali.
 
 ---
-Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Jika Anda menerima 2 gambar, gambar KEDUA adalah potongan tengah yang di-ZOOM 200%. Gunakan gambar kedua KHUSUS untuk menginspeksi artefak kompresi, pixel banding, dan noise mikroskopis!):
+PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
+Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil berurutan dari wilayah: TENGAH (center), KIRI (left), lalu KANAN (right) dari gambar yang sama.
+- Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
+- Sebutkan di laporan visual_scan_analysis crop wilayah mana (tengah/kiri/kanan) tempat Anda menemukan cacat.
+- Cacat yang terkonfirmasi pada SALAH SATU crop saja sudah cukup untuk menyatakan FAIL pada check terkait — moderator Adobe Stock memeriksa gambar pada zoom 100-200% di SELURUH area, bukan hanya tampilan penuh.
+
+---
+Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Manfaatkan SEMUA crop detail resolusi asli yang diberikan!):
 1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
    - Subjek utama wajib memiliki fokus yang tajam sempurna (pin-sharp atau tack-sharp).
    - Deteksi motion blur yang tidak disengaja akibat pergerakan kamera lambat (camera shake) atau shutter speed subjek yang tidak memadai.
@@ -4660,6 +4668,8 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
    - Benda yang Tidak Logis (Nonsensical Objects/Hallucinations): Objek yang bentuknya tidak masuk akal, terpotong secara ajaib, atau percampuran benda yang tidak logis (misal: tangan yang menyatu dengan bunga atau benda asing, benda yang melayang tanpa alasan, atau geometri mustahil). Jika ditemukan, set "ai_artifacts" ke FAIL.
    - Masalah Anatomi (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, tangan/jari yang meleleh dan berbaur secara mustahil dengan objek lain, sendi terkilir aneh, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.
    - Detail yang Meleleh (Melted details) & Pola Hancur (Pattern Degradation): Tekstur ornamen, pakaian tradisional, kacamata, perhiasan, paving block/cobblestone, atau tulisan yang meleleh, menyatu, kehilangan keterpisahan spasial, atau menjadi piksel acak tak beraturan saat di-zoom.
+   - Logika Mekanis Objek Buatan Manusia (Mechanical & Structural Coherence) [SANGAT KRITIS]: Periksa SETIAP objek buatan manusia pada crop detail apakah strukturnya masuk akal secara fisik dan bisa berfungsi di dunia nyata. Contoh wajib periksa: SEPEDA (apakah rantai ada dan tersambung ke gear? apakah pedal tersambung ke engkol/crank arm yang logis? apakah jari-jari/spokes tersambung konsisten dari hub ke rim? apakah rem, fork, dan rangka menyambung secara logis? apakah sadel tersambung ke seatpost yang benar?), kendaraan (roda, spion, wiper), furnitur (kaki kursi/meja), alat musik (senar, tuts), pakaian (kancing, resleting, jahitan), dan bangunan (jendela, tangga, railing). Jika ditemukan bagian yang meleleh, hilang, menyatu mustahil, atau tidak bisa berfungsi secara mekanis (contoh: sepeda tanpa rantai, pedal melayang tanpa engkol), status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL meskipun bagian tersebut kecil atau berada di tepi gambar.
+   - Tangan yang Berinteraksi dengan Objek (Hands Gripping Objects) [SANGAT KRITIS]: Saat tangan memegang/menyentuh objek (setang, sadel, gagang, gelas, alat), periksa pada crop detail apakah jari menggenggam secara logis atau malah menyatu/meleleh ke objek. Titik kontak tangan-objek adalah lokasi cacat AI paling umum. Jari yang menyatu dengan objek WAJIB mengeset "anatomical_errors" ke FAIL.
    - Kedalaman Ruang Tidak Natural (Unnatural Depth of Field): Latar belakang yang kabur (blur) namun tidak terlihat seperti bokeh optik, melainkan tampak seperti coretan kasar (smudgy), berbercak, atau terhapus secara artifisial.
    - Teks & Karakter Rusak (Gibberish Text): Karakter huruf yang rusak/cacat/terdistorsi, kata-kata tak terbaca, teks hancur atau tidak bermakna di papan tulis (whiteboards), bagan diagram, catatan dinding, atau sticky notes.
    - Kecacatan Proporsi & Perspektif (Proportion & Perspective Defects) [CRITICAL]: Periksa distorsi proporsi objek fisik, furnitur, ruangan, atau elemen arsitektur. Periksa juga kemiringan garis bangunan, tangga yang tidak menuju ke mana-mana, atau distorsi proporsi tubuh manusia. Jika fatal, status "proportion_defects" dan "structural_defects" WAJIB FAIL.
@@ -4866,43 +4876,71 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
       
-      // Kunci kritis untuk kualitas gambar dalam mode MEDIUM (hanya masalah hukum, hak cipta, atau cacat AI/struktural parah)
+      // Kunci kritis: masalah hukum, hak cipta, atau cacat AI/struktural parah
       const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
-      
+      // Kunci kualitas teknis: persis kategori "quality issues" yang dipakai Adobe Stock untuk menolak konten
+      // (fokus/ketajaman, eksposur, pencahayaan, warna, editing berlebih, sensor/noise, proporsi, komposisi)
+      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues'];
+      const failedCheckKeys: string[] = [];
+      let anyTechnicalFail = false;
+      let acceptanceFail = false;
+
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
+          failedCheckKeys.push(key);
           if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
             anyIpFail = true;
           }
           if (criticalKeys.includes(key)) {
             hasCriticalFail = true;
           }
+          if (technicalKeys.includes(key)) {
+            anyTechnicalFail = true;
+          }
+          if (key === 'stock_acceptance') {
+            acceptanceFail = true;
+          }
         }
       }
-      
-      // Terapkan penolakan atau kelulusan berdasarkan level toleransi
+
+      // Terapkan penolakan atau kelulusan berdasarkan level toleransi.
+      // CATATAN PENTING: moderator Adobe Stock menolak gambar untuk SATU cacat teknis apa pun,
+      // sehingga MEDIUM (standar industri) kini wajib FAIL jika ada check teknis ATAU kritis yang FAIL.
       if (tolerance === 'STRICT') {
         if (anyFail) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
+          if (parsedResult.overall_score >= 60) {
+            parsedResult.overall_score = 59;
           }
         }
       } else if (tolerance === 'MEDIUM') {
-        if (hasCriticalFail) {
+        if (hasCriticalFail || anyTechnicalFail || acceptanceFail) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
+          if (parsedResult.overall_score >= 66) {
+            parsedResult.overall_score = 65;
           }
         }
       } else if (tolerance === 'LOOSE') {
-        if (anyIpFail) {
+        // LOOSE tetap menoleransi cacat teknis minor, tetapi TIDAK menoleransi cacat kritis,
+        // cacat teknis utama pada subjek, atau penolakan penerimaan stok.
+        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail ||
+          failedCheckKeys.some(k => ['blur', 'exposure', 'lighting', 'over_edited', 'proportion_defects'].includes(k));
+        if (looseBlocking) {
           parsedResult.recommendation = "FAIL";
           if (parsedResult.overall_score >= 70) {
             parsedResult.overall_score = 69;
           }
         }
+      }
+
+      // Sinkronkan stock_acceptance dengan keputusan akhir agar UI tidak menampilkan kontradiksi
+      if (parsedResult.recommendation === "FAIL" && parsedResult.ai_vision_checks.stock_acceptance) {
+        parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
+      }
+      // Lampirkan daftar check yang gagal agar frontend/debug mudah membaca alasan penolakan
+      if (failedCheckKeys.length > 0) {
+        (parsedResult as any).failed_checks = failedCheckKeys;
       }
       
       if (anyIpFail) {
