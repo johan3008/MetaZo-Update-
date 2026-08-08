@@ -36,7 +36,15 @@ Sebelumnya mode MEDIUM hanya FAIL jika check KRITIS gagal (`watermark, logo, tex
 - **LOOSE:** tetap menoleransi cacat minor, tetapi cacat kritis, pelanggaran IP, stock_acceptance, dan cacat teknis utama (`blur, exposure, lighting, over_edited, proportion_defects`) → FAIL
 - Laporan kini menyertakan field `failed_checks` (daftar check yang gagal) dan `stock_acceptance` disinkronkan dengan keputusan akhir.
 
-### 6. Analisis piksel Python tidak mempengaruhi keputusan
+### 6. Mapping Model Cek Kualitas Menggunakan Model Vision "PRO" Berkemampuan Tinggi (Penyebab Utama Cacat Tidak Terdeteksi AI)
+**File:** `server/gemini.ts`
+Sebelumnya, kode model-upgrade di backend memetakan model cek kualitas ke nama model non-existent `gemini-3.5-flash` dan `gemini-3.1-pro-preview`. Karena nama model tersebut salah/tidak ada, Google SDK menghasilkan error 404 dan jatuh kembali ke model default **`gemini-2.5-flash`** (atau `gemini-1.5-flash`) yang merupakan model cepat beresolusi rendah dan memiliki **kecerdasan visual/akurasi rendah**. Model flash biasa tidak bisa melihat cacat kecil/mikroskopis (seperti sadel meleleh, pedal tanpa rantai) meskipun sudah diberi crop.
+**Perbaikan:**
+- Pemetaan model cek kualitas kini diarahkan secara paksa ke model vision "PRO" yang sesungguhnya: **`gemini-2.5-pro`** (atau **`gemini-1.5-pro`** sebagai failsafe).
+- `modelsToTry` disinkronkan menggunakan model Pro resmi: `['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash']`.
+- Ini menjamin AI memiliki kepekaan visual maksimal (visual acuity) untuk membaca cacat mekanis dan struktural secara presisi.
+
+### 7. Analisis piksel Python tidak mempengaruhi keputusan
 **File:** `server.ts`
 **Perbaikan:** gerbang teknis deterministik baru — hasil `sharpness/noise/brightness` kini ikut memutuskan. Hanya nilai EKSTREM yang memaksa FAIL (sharpness < 12, noise > 70, brightness > 92 atau < 8) agar tidak ada false-positive; alasan dicatat ke `technical_issues` dan `failed_checks`.
 
