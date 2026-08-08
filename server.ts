@@ -2280,7 +2280,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         let tempFilePath = "";
         let cleanupFn = () => {};
         try {
-            const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
+            const { image, fileUrl, pathKey, tolerance, language, model, fileType, detailCrops } = req.body;
             
             let imageBase64 = "";
             if (fileUrl) {
@@ -2339,35 +2339,104 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
-            
-            // Generate zoom-in center crop 200% as the second image for forensic detail checks
-            const zoomFilePath = tempFilePath + "_zoom.jpg";
+
+            // FORENSIC DETAIL CROPS — kirim crop resolusi asli 100% pixel (TANPA upscale palsu)
+            // dari wilayah TENGAH, KIRI, dan KANAN agar cacat AI di luar pusat ikut terinspeksi.
+            // Prioritas: crop detail yang dikirim frontend (diambil dari file ASLI resolusi penuh).
+            const cropFilePaths: string[] = [];
             let imagesToSend: string | string[] = imageBase64;
             try {
-                const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
-                const execPromise = util.promisify(exec);
-                await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "crop=iw/2:ih/2:iw/4:ih/4,scale=iw*2:ih*2" "${zoomFilePath}"`);
-                if (fs.existsSync(zoomFilePath)) {
-                    const zoomBuffer = fs.readFileSync(zoomFilePath);
-                    const mime = fileType || 'image/jpeg';
-                    const zoomBase64 = `data:${mime};base64,${zoomBuffer.toString('base64')}`;
-                    imagesToSend = [imageBase64, zoomBase64];
-                    console.log('Server check-image-quality: Successfully generated zoom-in center crop 200% via FFmpeg');
+                const validClientCrops = Array.isArray(detailCrops)
+                    ? detailCrops.filter((c: any) => typeof c === 'string' && c.startsWith('data:image/')).slice(0, 4)
+                    : [];
+
+                if (validClientCrops.length > 0) {
+                    imagesToSend = [imageBase64, ...validClientCrops];
+                    console.log(`Server check-image-quality: Using ${validClientCrops.length} native-resolution detail crops from client`);
+                } else {
+                    const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
+                    const execPromise = util.promisify(exec);
+                    // Crop 50%x50% pada resolusi asli (detail 100% pixel, bukan upscale):
+                    // urutan wilayah = TENGAH, KIRI, KANAN (harus sama dengan panduan di systemInstruction)
+                    const cropRegions = [
+                        { name: 'center', filter: 'crop=iw/2:ih/2:iw/4:ih/4' },
+                        { name: 'left',   filter: 'crop=iw/2:ih/2:0:ih/4' },
+                        { name: 'right',  filter: 'crop=iw/2:ih/2:iw/2:ih/4' }
+                    ];
+                    const cropBase64s: string[] = [];
+                    for (const region of cropRegions) {
+                        try {
+                            const cropPath = `${tempFilePath}_crop_${region.name}.jpg`;
+                            await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${region.filter}" -q:v 2 "${cropPath}"`);
+                            if (fs.existsSync(cropPath)) {
+                                cropFilePaths.push(cropPath);
+                                const cropBuffer = fs.readFileSync(cropPath);
+                                cropBase64s.push(`data:image/jpeg;base64,${cropBuffer.toString('base64')}`);
+                            }
+                        } catch (oneCropErr: any) {
+                            console.warn(`Server check-image-quality: Failed to generate ${region.name} crop:`, oneCropErr);
+                        }
+                    }
+                    if (cropBase64s.length > 0) {
+                        imagesToSend = [imageBase64, ...cropBase64s];
+                        console.log(`Server check-image-quality: Successfully generated ${cropBase64s.length} native-resolution detail crops via FFmpeg`);
+                    }
                 }
             } catch (zoomErr: any) {
-                console.warn('Server check-image-quality: Failed to generate zoom center crop:', zoomErr);
+                console.warn('Server check-image-quality: Failed to prepare detail crops:', zoomErr);
             }
 
             const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType);
-            
+
+            // GERBANG TEKNIS DETERMINISTIK: hasil analisis piksel (Python/FFmpeg) ikut memutuskan,
+            // bukan sekadar ditampilkan. Hanya nilai EKSTREM yang memaksa FAIL agar tidak ada false-positive.
+            try {
+                const techGateReasons: string[] = [];
+                const sharpVal = ffmpegStats?.sharpness?.value;
+                const noiseVal = ffmpegStats?.noise?.value;
+                const brightVal = ffmpegStats?.brightness?.value;
+                if (typeof sharpVal === 'number' && sharpVal < 12) {
+                    techGateReasons.push(`Ketajaman sangat rendah (sharpness ${sharpVal}/100) — indikasi kuat soft focus / motion blur parah di seluruh gambar`);
+                }
+                if (typeof noiseVal === 'number' && noiseVal > 70) {
+                    techGateReasons.push(`Noise sangat tinggi (noise ${noiseVal}/100) — melebihi batas wajar Adobe Stock`);
+                }
+                if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) {
+                    techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) — indikasi over/under exposure parah`);
+                }
+                if (techGateReasons.length > 0) {
+                    console.warn('Server check-image-quality: Deterministic technical gate triggered:', techGateReasons);
+                    aiVisionStats.technical_issues = [...(aiVisionStats.technical_issues || []), ...techGateReasons];
+                    (aiVisionStats as any).failed_checks = Array.from(new Set([...((aiVisionStats as any).failed_checks || []), 'sensor_issues']));
+                    if (aiVisionStats.recommendation !== 'FAIL') {
+                        aiVisionStats.recommendation = 'FAIL';
+                        if (typeof aiVisionStats.overall_score !== 'number' || aiVisionStats.overall_score >= 66) {
+                            aiVisionStats.overall_score = 65;
+                        }
+                        if (aiVisionStats.ai_vision_checks?.stock_acceptance) {
+                            aiVisionStats.ai_vision_checks.stock_acceptance.status = 'FAIL';
+                            aiVisionStats.ai_vision_checks.stock_acceptance.note =
+                                (aiVisionStats.ai_vision_checks.stock_acceptance.note || '') + ' [Sistem] Ditolak otomatis oleh gerbang teknis: ' + techGateReasons.join('; ');
+                        }
+                    }
+                }
+            } catch (gateErr: any) {
+                console.warn('Server check-image-quality: Technical gate evaluation failed (non-blocking):', gateErr);
+            }
+
             console.log('Server check-image-quality: Integration successful');
-            
+
             // Combine results while ensuring backward compatibility
             const combinedReport = {
                 ...aiVisionStats,
                 ffmpeg: ffmpegStats,
                 ai_vision: aiVisionStats
             };
+
+            // Bersihkan file crop sementara
+            for (const cp of cropFilePaths) {
+                try { if (fs.existsSync(cp)) fs.unlinkSync(cp); } catch (e) {}
+            }
             
             res.json(combinedReport);
         } catch (e: any) {
