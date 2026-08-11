@@ -5863,10 +5863,22 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
+  // PERBAIKAN TIMEOUT: Batasi frame yang dikirim ke AI (max 6 frame untuk performa)
+  // Kirim hanya 3 full frame + 3 zoom crop, bukan semua 8-12 frame
   const imageParts: any[] = [];
   if (videoFile) imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
-  if (frames && frames.length > 0) imageParts.push(...frames.map((f: any) => processFrameServer(f)));
-  const frameCount = frames ? frames.length : 0;
+  
+  let frameCount = 0;
+  if (frames && frames.length > 0) {
+    // Ambil maksimal 3 pasang (full+zoom) = 6 frame, atau kurang jika frame lebih sedikit
+    // AKURASI: Naikkan max frame ke 8 (4 full + 4 zoom dari 5 keyframe)
+    const maxFrames = Math.min(frames.length, 8);
+    const step = Math.max(1, Math.floor(frames.length / maxFrames));
+    for (let i = 0; i < frames.length && imageParts.length - (videoFile ? 1 : 0) < 8; i += step) {
+      imageParts.push(processFrameServer(frames[i]));
+      frameCount++;
+    }
+  }
 
   // Parse technical report and build ground truth summary
   const report = videoTechnicalReport ? (typeof videoTechnicalReport === 'string' ? JSON.parse(videoTechnicalReport) : videoTechnicalReport) : null;
@@ -5912,6 +5924,18 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     if (report.scene_detection?.scene_changes_detected) {
       gt.scene_changes = `${report.scene_detection.scene_changes?.length || 0} cuts detected`;
     }
+    // AKURASI: Audio analysis ground truth
+    if (report.audio?.has_audio) {
+      gt.audio_codec = report.audio.codec;
+      gt.audio_sample_rate = `${report.audio.sample_rate}Hz`;
+      gt.audio_channels = report.audio.channels;
+      if (report.audio.volume) {
+        gt.audio_mean_volume = `${report.audio.volume.mean_volume_db}dB`;
+        gt.audio_max_volume = `${report.audio.volume.max_volume_db}dB`;
+      }
+    } else {
+      gt.audio = 'NO AUDIO TRACK';
+    }
     // Perceptual Metrics from Python Microservice
     if (report.advancedMetrics) {
       gt.brisque = report.advancedMetrics.brisque;
@@ -5922,10 +5946,18 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   }
 
   // Build AI system instruction with ground truth
-  const systemInstruction = `You are an EXTREMELY STRICT and UNFORGIVING Adobe Stock Senior QA Curator. 
-Your job is to make the FINAL PASS/FAIL decision for this video. You MUST NOT be lenient. 
-If you spot even the SLIGHTEST micro-artifact, unnatural AI texture, or physics inconsistency, you MUST mercilessly FAIL the video. Assume all AI videos are flawed until proven perfect.
-CRITICAL: DO NOT GUESS OR HALLUCINATE. Base your verdict strictly on the visible evidence in the provided frames and the mathematical ground truth. Do not invent defects that aren't there, but remain absolutely ruthless on the ones that are.
+  // PERBAIKAN TIMEOUT: Prompt lebih ringkas untuk respons AI lebih cepat
+  const systemInstruction = `You are a strict Adobe Stock Senior QA Curator. Make the FINAL PASS/FAIL decision for this video. FAIL ruthlessly for any micro-artifact, AI texture defect, or physics inconsistency. Base verdict strictly on visible evidence. Do NOT hallucinate defects.
+
+MANDATORY FAIL conditions from technical ground truth:
+- Black frames detected = FAIL
+- Frozen frames detected = FAIL
+- EXTREME BLUR (Laplacian < 15 or BLURRED) = FAIL
+- Resolution < 1920x1080 = FAIL
+- FPS < 23.976 = FAIL
+- Stability FLICKERING = FAIL
+- Audio clipping or extreme distortion = FAIL
+- No audio track at all = ACCEPTABLE (silent videos are preferred by stock platforms)
 
 ======= TECHNICAL GROUND TRUTH (from ffprobe + FFmpeg filters + OpenCV pixel analysis) =======
 ${JSON.stringify(gt, null, 1)}
@@ -5940,7 +5972,7 @@ IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolut
 
 ======= YOUR SUBJECTIVE ASSESSMENT =======
 Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
-(NOTE: The images are provided in pairs: Image 1 is a Full Frame, Image 2 is a 200% Zoom Center Crop of the same frame. Use the 200% Zoom crops specifically to rigorously check for Compression Artifacts, Noise, Banding, and AI texture defects).
+(NOTE: Images come in pairs: Full Frame at 1024x576 + 1200px Zoom Center Crop at higher quality. Use the 1200px Zoom crops to rigorously inspect pixel-level defects: Compression Artifacts, Noise, Banding, and AI texture defects).
 
 1. TEMPORAL MORPHING: Do textures/objects change shape unnaturally between frames? (warping, melting, liquid-like deformation)
 2. TEXTURE WARPING & MICRO-REFLECTIONS: Do backgrounds/surfaces distort, ripple, or have unnatural micro-warping light patterns?
@@ -5952,6 +5984,10 @@ Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
 8. AI ARTIFACTS & NOISE: Any generative AI defects, extra fingers, gibberish text, or harsh noise grain (checked via Zoom Crop)?
 9. KINEMATICS & PHYSICS: Do objects move with natural momentum, gravity, and physics, or is the movement robotic, stiff, or unnaturally slow/gelatinous (common in AI videos)?
 10. INTELLECTUAL PROPERTY & BRAND SAFETY (ADOBE STOCK POLICY): Does the video contain any commercial logos, brand names, trademarked designs (e.g., iPhone camera bumps, Adidas stripes), copyrighted artworks, modern museum paintings, or restricted landmarks (e.g., Eiffel Tower at night, Hollywood Sign)? (Note: Public domain historical documents and generic toys are SAFE). If any IP violation is detected, you MUST fail the video.
+11. LOG PROFILE / FLAT COLOR: Does the video have ungraded, washed-out logarithmic gamma (e.g., S-Log, V-Log, C-Log) without proper color correction? Stock platforms require finished, color-graded footage.
+12. UPSCALED VIDEO: Has the video been artificially/forced upscaled from a lower resolution (e.g., HD→4K)? Look for soft details, smeared textures, and lack of true 4K sharpness.
+13. VISIBLE TRANSITIONS / EFFECTS: Are there visible transitions, wipes, dissolves, glitch effects, or overlay effects baked into the footage? Stock footage should be clean raw clips without editor-applied effects.
+14. AUDIO QUALITY: If the video has audio, check for clipping/distortion, excessive noise floor, inconsistent levels, or audio that doesn't match the visual content. Stock platforms prefer clean or no audio.
 
 ======= FINAL DECISION =======
 Tolerance: ${tolerance}. Language: ${targetLanguageName}.
@@ -6007,9 +6043,13 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
           cropped_subject: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
           cut_off_object: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
           wrong_perspective: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
-          low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] }
+          low_aesthetic_quality: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          // ===== PERBAIKAN: 3 field yang sebelumnya hilang =====
+          log_profile: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          upscaled_video: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] },
+          visible_transitions: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS","FAIL","UNKNOWN"] }, note: { type: Type.STRING } }, required: ["status","note"] }
         },
-        required: ["blur","noise","overexposure","underexposure","black_frame","frozen_frame","flickering","camera_shake","out_of_focus","motion_consistency","visual_quality","temporal_morphing","texture_warping","ghosting","geometry_consistency","ai_artifact","watermark","logo","text","deformed_object","bad_anatomy","compression_artifacts","blocking","banding","white_balance","motion_blur","duplicate_frame","empty_frame","cropped_subject","cut_off_object","wrong_perspective","low_aesthetic_quality"]
+        required: ["blur","noise","overexposure","underexposure","black_frame","frozen_frame","flickering","camera_shake","out_of_focus","motion_consistency","visual_quality","temporal_morphing","texture_warping","ghosting","geometry_consistency","ai_artifact","watermark","logo","text","deformed_object","bad_anatomy","compression_artifacts","blocking","banding","white_balance","motion_blur","duplicate_frame","empty_frame","cropped_subject","cut_off_object","wrong_perspective","low_aesthetic_quality","log_profile","upscaled_video","visible_transitions"]
       },
       heatmaps: { type: Type.ARRAY, items: { type: Type.OBJECT } }
     },
@@ -6026,7 +6066,8 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
     
-    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 90000));
+    // PERBAIKAN TIMEOUT: 60s timeout untuk AI call (dari 90s)
+    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 60000));
     responseText = await Promise.race([aiPromise, timeout]);
   } catch (e: any) {
     responseText = JSON.stringify({ visual_scan_analysis: 'AI unavailable', legal_status: 'SAFE', technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: 'FAIL', adobe_stock_readiness: 'Reject Risk', detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
