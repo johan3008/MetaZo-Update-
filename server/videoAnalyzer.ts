@@ -393,7 +393,7 @@ export async function analyzeVideoTechnicallyLightweight(videoPath: string, fram
   console.log('[videoAnalyzer:LW] 3/4 — Pixel analysis...');
   const frameAnalysis: any[] = [];
   for (let i = 0; i < framesBase64.length; i++) {
-    const clean = framesBase64[i].replace(/^data:image/jpeg;base64,/, '').replace(/^data:image/png;base64,/, '');
+    const clean = framesBase64[i].replace(/^data:image\/jpeg;base64,/, '').replace(/^data:image\/png;base64,/, '');
     frameAnalysis.push(analyzeFramePixelData(Buffer.from(clean, 'base64'), i + 1));
   }
 
