@@ -9751,70 +9751,9 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
     }
     let videoFile = null;
     if (videoPath) {
-      if (ffmpeg && (!frames || frames.length === 0)) {
-        try {
-          console.log("Server check-video-quality: Extracting keyframes with FFmpeg...");
-          const outDir = import_path.default.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
-          import_fs.default.mkdirSync(outDir, { recursive: true });
-          frames = await new Promise((resolve, reject) => {
-            let isDone = false;
-            const timeout = setTimeout(() => {
-              if (!isDone) {
-                isDone = true;
-                reject(new Error("Video extraction timed out."));
-              }
-            }, 9e4);
-            const extractFast = async () => {
-              try {
-                const ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
-                const ffprobePath = _require("@ffprobe-installer/ffprobe").path;
-                const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
-                const { stdout: probeOut } = await execPromise2(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
-                const duration = parseFloat(probeOut.trim());
-                if (isNaN(duration) || duration <= 0) {
-                  throw new Error("Could not determine video duration");
-                }
-                const timestamps = [
-                  duration * 0.1,
-                  duration * 0.25,
-                  duration * 0.4,
-                  duration * 0.55,
-                  duration * 0.7,
-                  duration * 0.85
-                ];
-                const framePaths = [];
-                for (let i = 0; i < timestamps.length; i++) {
-                  const fPathFull = import_path.default.join(outDir, `frame-full-${i + 1}.jpg`);
-                  const fPathZoom = import_path.default.join(outDir, `frame-zoom-${i + 1}.jpg`);
-                  await execPromise2(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPathFull}" -y`);
-                  await execPromise2(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(800,iw):min(800,ih)" "${fPathZoom}" -y`);
-                  framePaths.push(fPathFull);
-                  framePaths.push(fPathZoom);
-                }
-                const frameData = framePaths.map((fPath) => import_fs.default.readFileSync(fPath, "base64"));
-                import_fs.default.rmSync(outDir, { recursive: true, force: true });
-                if (!isDone) {
-                  isDone = true;
-                  clearTimeout(timeout);
-                  resolve(frameData.map((f) => `data:image/jpeg;base64,${f}`));
-                }
-              } catch (e) {
-                if (!isDone) {
-                  isDone = true;
-                  clearTimeout(timeout);
-                  reject(e);
-                }
-              }
-            };
-            extractFast();
-          });
-          extractionSuccess = true;
-        } catch (extractionErr) {
-          console.warn("[Video Audit] FFmpeg frame extraction failed:", extractionErr);
-        }
-      }
+      // PERBAIKAN: Skip FFmpeg entirely — upload video langsung ke Gemini
+      console.log("Server check-video-quality: Uploading video to Gemini (no FFmpeg)...");
       try {
-        console.log("Server check-video-quality: Getting video reference for Gemini...");
         const videoMime = req.file ? req.file.mimetype : "video/mp4";
         if (req.body.pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
           const presignCmd = new import_client_s3.GetObjectCommand({
@@ -9827,12 +9766,12 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
         } else {
           videoFile = await uploadVideoToGemini(videoPath, videoMime);
         }
-        extractionSuccess = true;
+        if (videoFile) extractionSuccess = true;
       } catch (uploadErr) {
-        console.warn("[Video Audit] Video reference failed:", uploadErr.message);
+        console.warn("[Video Audit] Video upload to Gemini failed:", uploadErr.message);
       }
     }
-    if (frames && frames.length > 0) {
+    if ((frames && frames.length > 0) || videoFile) {
       console.log("Server check-video-quality: " + frames.length + " frames from client, AI-only mode (no FFmpeg)...");
       const withTimeout = (promise, ms, label) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms / 1e3}s`)), ms))]);
       const data = await withTimeout(checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, null, null, null), 35e3, "checkVideoQuality");
@@ -9841,7 +9780,7 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
       res.json({ ...data, technical_details: null });
     } else {
       cleanupFn();
-      return res.status(500).json({ error: "Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi)." });
+      return res.status(500).json({ error: "Tidak dapat membaca video. Coba rebuild frontend: npm run build. Atau gunakan file berukuran < 25MB untuk upload langsung ke Gemini." });
     }
   } catch (e) {
     console.warn("Server check-video-quality error:", e);
