@@ -1788,95 +1788,12 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
 
-            let videoFile = null;
+                        let videoFile = null;
             if (videoPath) {
-                // 1. Extract keyframes using FFmpeg if available (extract 6 frames across duration for temporal analysis)
-                if (ffmpeg && (!frames || frames.length === 0)) {
-                    try {
-                        console.log('Server check-video-quality: Extracting keyframes with FFmpeg...');
-                        const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
-                        fs.mkdirSync(outDir, { recursive: true });
-
-                        frames = await new Promise<string[]>((resolve, reject) => {
-                            let isDone = false;
-                            // PERBAIKAN TIMEOUT: Turunkan timeout dari 90s ke 30s untuk Vercel serverless
-                            const timeout = setTimeout(() => {
-                                if (!isDone) {
-                                    isDone = true;
-                                    reject(new Error("Video extraction timed out after 30s."));
-                                }
-                            }, 30000);
-
-                            const extractFast = async () => {
-                                try {
-                                    const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
-                                    const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
-                                    const execPromise = util.promisify(exec);
-
-                                    const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
-                                    const duration = parseFloat(probeOut.trim());
-                                    if (isNaN(duration) || duration <= 0) {
-                                        throw new Error("Could not determine video duration");
-                                    }
-
-                                    // AKURASI: 5 keyframes untuk coverage lebih baik (15%, 30%, 50%, 70%, 85%)
-                                    const timestamps = [
-                                        duration * 0.15,
-                                        duration * 0.30,
-                                        duration * 0.50,
-                                        duration * 0.70,
-                                        duration * 0.85
-                                    ];
-
-                                    const framePaths: string[] = [];
-                                    // Jalankan semua ekstraksi frame secara paralel dengan Promise.all
-                                    const extractionPromises = timestamps.map(async (ts, i) => {
-                                        const fPathFull = path.join(outDir, `frame-full-${i + 1}.jpg`);
-                                        const fPathZoom = path.join(outDir, `frame-zoom-${i + 1}.jpg`);
-                                        
-                                        // PERBAIKAN: -ss sebelum -i untuk fast seek, -noaccurate_seek untuk kecepatan
-                                        // Full Frame (720p, quality 2 untuk akurasi AI)
-                                        await execPromise(`"${ffmpegPath}" -noaccurate_seek -ss ${ts} -i "${videoPath}" -vframes 1 -q:v 2 -s 1024x576 "${fPathFull}" -y`);
-                                        // AKURASI: Zoom Crop center 1200px untuk deteksi cacat mikroskopis
-                                        await execPromise(`"${ffmpegPath}" -noaccurate_seek -ss ${ts} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(1200,iw):min(1200,ih)" "${fPathZoom}" -y`);
-                                        
-                                        return [fPathFull, fPathZoom];
-                                    });
-                                    
-                                    const allPaths = await Promise.all(extractionPromises);
-                                    allPaths.forEach(paths => framePaths.push(...paths));
-
-                                    const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
-                                    fs.rmSync(outDir, { recursive: true, force: true });
-
-                                    if (!isDone) {
-                                        isDone = true;
-                                        clearTimeout(timeout);
-                                        resolve(frameData.map(f => `data:image/jpeg;base64,${f}`));
-                                    }
-                                } catch (e) {
-                                    if (!isDone) {
-                                        isDone = true;
-                                        clearTimeout(timeout);
-                                        reject(e);
-                                    }
-                                }
-                            };
-                            
-                            extractFast();
-                        });
-                        extractionSuccess = true;
-                    } catch (extractionErr: any) {
-                        console.warn('[Video Audit] FFmpeg frame extraction failed:', extractionErr);
-                    }
-                }
-
-                // 2. Get video reference for Gemini — use R2 presigned URL instead of base64
+                // ⚡ SKIP FFmpeg — langsung upload ke Gemini atau R2
+                console.log('Server check-video-quality: Uploading video to Gemini...');
                 try {
-                    console.log('Server check-video-quality: Getting video reference for Gemini...');
                     const videoMime = req.file ? req.file.mimetype : 'video/mp4';
-                    
-                    // If video is in R2, generate presigned URL so Gemini fetches directly (no base64, no OOM)
                     if (req.body.pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
                         const presignCmd = new GetObjectCommand({
                             Bucket: process.env.S3_BUCKET_NAME,
@@ -1884,18 +1801,16 @@ app.get('/api/debug-uploads', (req, res) => {
                         });
                         const presignedUrl = await getSignedUrl(getS3Client(), presignCmd, { expiresIn: 3600 });
                         videoFile = { fileUri: presignedUrl, mimeType: videoMime };
-                        console.log('[Video Audit] Using R2 presigned URL for Gemini direct fetch');
                     } else {
-                        // Fallback: use uploadVideoToGemini for local files (skips >25MB)
                         videoFile = await uploadVideoToGemini(videoPath, videoMime);
                     }
-                    extractionSuccess = true;
+                    if (videoFile) console.log('[Video Audit] Video uploaded to Gemini successfully');
                 } catch (uploadErr: any) {
-                    console.warn('[Video Audit] Video reference failed:', uploadErr.message);
+                    console.warn('[Video Audit] Video upload failed:', uploadErr.message);
                 }
             }
 
-            if (frames && frames.length > 0) {
+            if ((frames && frames.length > 0) || videoFile) {
                 console.log('Server check-video-quality: ' + frames.length + ' frames from client, AI-only mode...');
 
                 // ⚡ PERBAIKAN TIMEOUT: Server hanya AI call — tanpa FFmpeg, tanpa ffprobe, tanpa videoAnalyzer
@@ -1904,7 +1819,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms/1000}s`)), ms))]);
 
                 const data = await withTimeout(
-                    checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, null, null, null),
+                    checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, null, videoFile || null, null),
                     35000,
                     'checkVideoQuality'
                 );
@@ -1915,7 +1830,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
             } else {
                 cleanupFn();
-                return res.status(500).json({ error: 'Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi).' });
+                return res.status(500).json({ error: 'Upload video gagal. Pastikan: 1) File < 25MB, atau 2) Cloudflare R2 sudah dikonfigurasi, atau 3) Rebuild frontend dengan npm run build.' });
             }
         } catch (e: any) {
             console.warn('Server check-video-quality error:', e);
