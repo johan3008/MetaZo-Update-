@@ -9832,37 +9832,13 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
         console.warn("[Video Audit] Video reference failed:", uploadErr.message);
       }
     }
-    if (extractionSuccess && (videoFile || frames && frames.length > 0)) {
-      console.log("Server check-video-quality: Analyzing frames with Gemini...");
+    if (frames && frames.length > 0) {
+      console.log("Server check-video-quality: " + frames.length + " frames from client, AI-only mode (no FFmpeg)...");
       const withTimeout = (promise, ms, label) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms / 1e3}s`)), ms))]);
-      let videoMetadata = null;
-      if (videoPath) {
-        try {
-          console.log("Server check-video-quality: Extracting video metadata...");
-          const { stdout } = await require("util").promisify(require("child_process").exec)(
-            `magick identify -verbose "${videoPath}" 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
-            { timeout: 15e3, maxBuffer: 1024 * 1024 }
-          );
-          videoMetadata = { raw: stdout.substring(0, 5e3) };
-        } catch (exifErr) {
-          console.warn("[Video Audit] Metadata extraction failed:", exifErr.message);
-        }
-      }
-      let technicalReport = null;
-      if (videoPath && frames && frames.length > 0) {
-        try {
-          console.log("Server check-video-quality: Running videoAnalyzer...");
-          const { analyzeVideoTechnically: analyzeVideoTechnically2 } = await Promise.resolve().then(() => (init_videoAnalyzer(), videoAnalyzer_exports));
-          technicalReport = await withTimeout(analyzeVideoTechnically2(videoPath, frames), 9e4, "videoAnalyzer");
-          console.log("Server check-video-quality: videoAnalyzer completed successfully");
-        } catch (techErr) {
-          console.warn("[Video Audit] Technical analysis failed, proceeding without it:", techErr.message);
-        }
-      }
-      const data = await withTimeout(checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, videoMetadata, videoFile, technicalReport), 9e4, "checkVideoQuality");
+      const data = await withTimeout(checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, null, null, null), 35e3, "checkVideoQuality");
       console.log("Server check-video-quality: Analysis successful");
       cleanupFn();
-      res.json({ ...data, technical_details: technicalReport });
+      res.json({ ...data, technical_details: null });
     } else {
       cleanupFn();
       return res.status(500).json({ error: "Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi)." });

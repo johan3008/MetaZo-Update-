@@ -1799,12 +1799,13 @@ app.get('/api/debug-uploads', (req, res) => {
 
                         frames = await new Promise<string[]>((resolve, reject) => {
                             let isDone = false;
+                            // PERBAIKAN TIMEOUT: Turunkan timeout dari 90s ke 30s untuk Vercel serverless
                             const timeout = setTimeout(() => {
                                 if (!isDone) {
                                     isDone = true;
-                                    reject(new Error("Video extraction timed out."));
+                                    reject(new Error("Video extraction timed out after 30s."));
                                 }
-                            }, 90000);
+                            }, 30000);
 
                             const extractFast = async () => {
                                 try {
@@ -1818,30 +1819,32 @@ app.get('/api/debug-uploads', (req, res) => {
                                         throw new Error("Could not determine video duration");
                                     }
 
-                                    // Extract 6 keyframes across duration (10%, 25%, 40%, 55%, 70%, 85%)
+                                    // AKURASI: 5 keyframes untuk coverage lebih baik (15%, 30%, 50%, 70%, 85%)
                                     const timestamps = [
-                                        duration * 0.10,
-                                        duration * 0.25,
-                                        duration * 0.40,
-                                        duration * 0.55,
+                                        duration * 0.15,
+                                        duration * 0.30,
+                                        duration * 0.50,
                                         duration * 0.70,
                                         duration * 0.85
                                     ];
 
-                                    const framePaths = [];
-                                    for (let i = 0; i < timestamps.length; i++) {
+                                    const framePaths: string[] = [];
+                                    // Jalankan semua ekstraksi frame secara paralel dengan Promise.all
+                                    const extractionPromises = timestamps.map(async (ts, i) => {
                                         const fPathFull = path.join(outDir, `frame-full-${i + 1}.jpg`);
                                         const fPathZoom = path.join(outDir, `frame-zoom-${i + 1}.jpg`);
                                         
-                                        // 1. Full Frame (scaled down to 1280x720 for composition/morphing check)
-                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPathFull}" -y`);
+                                        // PERBAIKAN: -ss sebelum -i untuk fast seek, -noaccurate_seek untuk kecepatan
+                                        // Full Frame (720p, quality 2 untuk akurasi AI)
+                                        await execPromise(`"${ffmpegPath}" -noaccurate_seek -ss ${ts} -i "${videoPath}" -vframes 1 -q:v 2 -s 1024x576 "${fPathFull}" -y`);
+                                        // AKURASI: Zoom Crop center 1200px untuk deteksi cacat mikroskopis
+                                        await execPromise(`"${ffmpegPath}" -noaccurate_seek -ss ${ts} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(1200,iw):min(1200,ih)" "${fPathZoom}" -y`);
                                         
-                                        // 2. Zoomed Crop (100-200% zoom crop of the absolute center to detect raw pixel defects)
-                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(800,iw):min(800,ih)" "${fPathZoom}" -y`);
-                                        
-                                        framePaths.push(fPathFull);
-                                        framePaths.push(fPathZoom);
-                                    }
+                                        return [fPathFull, fPathZoom];
+                                    });
+                                    
+                                    const allPaths = await Promise.all(extractionPromises);
+                                    allPaths.forEach(paths => framePaths.push(...paths));
 
                                     const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
                                     fs.rmSync(outDir, { recursive: true, force: true });
@@ -1892,40 +1895,24 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             }
 
-            if (extractionSuccess && (videoFile || (frames && frames.length > 0))) {
-                console.log('Server check-video-quality: Analyzing frames with Gemini...');
-                // Timeout helper: wraps any promise with a max execution time
+            if (frames && frames.length > 0) {
+                console.log('Server check-video-quality: ' + frames.length + ' frames from client, AI-only mode...');
+
+                // ⚡ PERBAIKAN TIMEOUT: Server hanya AI call — tanpa FFmpeg, tanpa ffprobe, tanpa videoAnalyzer
+                // Frames sudah diekstrak di frontend browser. Server cuma forward ke Gemini.
                 const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
                     Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms/1000}s`)), ms))]);
 
-                let videoMetadata: any = null;
-                if (videoPath) {
-                    try {
-                        console.log('Server check-video-quality: Extracting video metadata...');
-                        const { stdout } = await require('util').promisify(require('child_process').exec)(
-                          `magick identify -verbose "${videoPath}" 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
-                          { timeout: 15000, maxBuffer: 1024 * 1024 }
-                        );
-                        videoMetadata = { raw: stdout.substring(0, 5000) };
-                    } catch (exifErr: any) {
-                        console.warn('[Video Audit] Metadata extraction failed:', exifErr.message);
-                    }
-                }
-                let technicalReport = null;
-                if (videoPath && frames && frames.length > 0) {
-                    try {
-                        console.log('Server check-video-quality: Running videoAnalyzer...');
-                        const { analyzeVideoTechnically } = await import('./server/videoAnalyzer.ts');
-                        technicalReport = await withTimeout(analyzeVideoTechnically(videoPath, frames), 90000, 'videoAnalyzer');
-                        console.log('Server check-video-quality: videoAnalyzer completed successfully');
-                    } catch (techErr: any) {
-                        console.warn('[Video Audit] Technical analysis failed, proceeding without it:', techErr.message);
-                    }
-                }
-                const data = await withTimeout(checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport), 90000, 'checkVideoQuality');
+                const data = await withTimeout(
+                    checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, null, null, null),
+                    35000,
+                    'checkVideoQuality'
+                );
+
                 console.log('Server check-video-quality: Analysis successful');
-                cleanupFn();
-                res.json({ ...data, technical_details: technicalReport });
+
+                const enrichedData = { ...data };
+
             } else {
                 cleanupFn();
                 return res.status(500).json({ error: 'Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi).' });

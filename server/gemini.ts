@@ -5872,9 +5872,9 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   if (frames && frames.length > 0) {
     // Ambil maksimal 3 pasang (full+zoom) = 6 frame, atau kurang jika frame lebih sedikit
     // AKURASI: Naikkan max frame ke 8 (4 full + 4 zoom dari 5 keyframe)
-    const maxFrames = Math.min(frames.length, 8);
+    const maxFrames = Math.min(frames.length, 5);
     const step = Math.max(1, Math.floor(frames.length / maxFrames));
-    for (let i = 0; i < frames.length && imageParts.length - (videoFile ? 1 : 0) < 8; i += step) {
+    for (let i = 0; i < frames.length && imageParts.length - (videoFile ? 1 : 0) < 5; i += step) {
       imageParts.push(processFrameServer(frames[i]));
       frameCount++;
     }
@@ -5947,7 +5947,7 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
 
   // Build AI system instruction with ground truth
   // PERBAIKAN TIMEOUT: Prompt lebih ringkas untuk respons AI lebih cepat
-  const systemInstruction = `You are a strict Adobe Stock Senior QA Curator. Make the FINAL PASS/FAIL decision for this video. FAIL ruthlessly for any micro-artifact, AI texture defect, or physics inconsistency. Base verdict strictly on visible evidence. Do NOT hallucinate defects.
+  const systemInstruction = `You are a strict Adobe Stock QA Curator. Make PASS/FAIL decision. FAIL for any artifact, defect, or inconsistency. Be concise.
 
 MANDATORY FAIL conditions from technical ground truth:
 - Black frames detected = FAIL
@@ -6061,13 +6061,13 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
       ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
-      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-1.5-pro',
+      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.0-flash',
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
     
     // PERBAIKAN TIMEOUT: 60s timeout untuk AI call (dari 90s)
-    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 60000));
+    const timeout = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
     responseText = await Promise.race([aiPromise, timeout]);
   } catch (e: any) {
     responseText = JSON.stringify({ visual_scan_analysis: 'AI unavailable', legal_status: 'SAFE', technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: 'FAIL', adobe_stock_readiness: 'Reject Risk', detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
