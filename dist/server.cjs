@@ -3684,139 +3684,353 @@ function applyTitleTemplate(subtype, tiers, titleLength) {
   }
   return title;
 }
-var COMMERCIAL_INTENT_TERMS = /* @__PURE__ */ new Set([
-  "business",
-  "concept",
-  "technology",
-  "background",
-  "growth",
-  "success",
-  "strategy",
-  "innovation",
-  "sustainability",
-  "health",
-  "finance",
-  "education",
-  "marketing",
-  "vector",
-  "illustration",
-  "design",
-  "modern",
-  "banner",
-  "template",
-  "corporate",
-  "isolated",
-  "copy space",
-  "copyspace",
-  "flatlay",
-  "landing page",
-  "top view",
-  "minimalist",
-  "abstract",
-  "pattern",
-  "element",
-  "symbol",
-  "sign",
-  "icon",
-  "graphic",
-  "presentation",
-  "advertisement",
-  "promo",
-  "ecommerce",
-  "e-commerce",
-  "fintech",
-  "ai technology",
-  "artificial intelligence",
-  "digital marketing",
-  "green energy",
-  "clean energy",
-  "teamwork",
-  "partnership",
-  "leadership",
-  "financial growth",
-  "data analysis",
-  "cybersecurity",
-  "workflow",
-  "wellbeing",
-  "wellness",
-  "lifestyle",
-  "healthcare",
-  "medical",
-  "real estate"
-]);
-var TREND_TERMS = /* @__PURE__ */ new Set([
-  "ai",
-  "artificial intelligence",
-  "sustainability",
-  "eco friendly",
-  "remote work",
-  "digital transformation",
-  "wellness",
-  "minimalist",
-  "futuristic",
-  "innovation",
-  "green energy",
-  "mental health",
-  "diversity",
-  "automation"
-]);
-function scoreKeyword(keyword, tiers, position, total, title) {
-  const lower = keyword.toLowerCase().trim();
-  const wordCount = lower.split(/\s+/).length;
-  const objectMatch = tiers.objects.find((o) => o.name.toLowerCase().includes(lower) || lower.includes(o.name.toLowerCase()));
-  const attributeMatch = tiers.attributes.some((a) => a.toLowerCase().includes(lower) || lower.includes(a.toLowerCase()));
-  const visualScore = objectMatch ? Math.min(100, objectMatch.importance + 20) : attributeMatch ? 70 : 30;
-  const positionFactor = 1 - position / Math.max(1, total);
-  const seoScore = Math.round((wordCount >= 1 && wordCount <= 3 ? 85 : 40) * 0.6 + positionFactor * 40);
-  const commercialScore = COMMERCIAL_INTENT_TERMS.has(lower) || Array.from(COMMERCIAL_INTENT_TERMS).some((t) => lower.includes(t)) ? 95 : 35;
-  const trendScore = Array.from(TREND_TERMS).some((t) => lower.includes(t)) ? 90 : 30;
-  let titleBonus = 0;
-  if (title) {
-    const titleLower = title.toLowerCase();
-    if (titleLower.includes(lower)) {
-      titleBonus = 40;
-    } else {
-      const kwWords = lower.split(/\s+/);
-      const matchingWords = kwWords.filter((w) => w.length > 2 && titleLower.includes(w));
-      if (matchingWords.length > 0) {
-        titleBonus = matchingWords.length * 15;
-      }
-    }
-  }
-  const totalScore = Math.round(visualScore * 0.35 + seoScore * 0.25 + commercialScore * 0.25 + trendScore * 0.15 + titleBonus);
-  return { keyword, seoScore, visualScore, commercialScore, trendScore, totalScore };
-}
 function rankAndWeightKeywords(keywords, tiers, title) {
   if (keywords.length === 0) return keywords;
-  const scored = keywords.map((k, i) => scoreKeyword(k, tiers, i, keywords.length, title));
-  const sorted = [...scored].sort((a, b) => b.totalScore - a.totalScore);
-  const uniqueResult = [];
+  const lower = (s) => s.toLowerCase().trim();
+  const primarySubjects = tiers.objects.filter((o) => o.tier === "primary").map((o) => lower(o.name));
+  const allSubjects = tiers.objects.map((o) => lower(o.name));
+  const attributes = tiers.attributes.map((a) => lower(String(a)));
+  const scene = tiers.scene.map((s) => lower(String(s)));
+  const concepts = tiers.concepts.map((c) => lower(String(c)));
+  const matchesSubject = (kw) => allSubjects.some((s) => s.includes(kw) || kw.includes(s));
+  const matchesAttribute = (kw) => attributes.some((a) => kw.includes(a) || a.includes(kw));
+  const matchesScene = (kw) => scene.some((s) => kw.includes(s) || s.includes(kw));
+  const matchesConcept = (kw) => concepts.some((c) => kw.includes(c) || c.includes(kw));
+  const ACTION_TERMS = /* @__PURE__ */ new Set([
+    "running",
+    "walking",
+    "jumping",
+    "sitting",
+    "standing",
+    "flying",
+    "swimming",
+    "dancing",
+    "holding",
+    "reaching",
+    "lifting",
+    "working",
+    "typing",
+    "driving",
+    "reading",
+    "writing",
+    "cooking",
+    "eating",
+    "drinking",
+    "sleeping",
+    "talking",
+    "laughing",
+    "smiling",
+    "looking",
+    "watching",
+    "listening",
+    "thinking",
+    "playing",
+    "climbing",
+    "falling",
+    "floating",
+    "rising",
+    "flowing",
+    "moving",
+    "growing",
+    "blooming",
+    "shining",
+    "glowing",
+    "reflecting",
+    "spinning",
+    "exercise",
+    "workout",
+    "yoga",
+    "meditation",
+    "training",
+    "practice",
+    "traveling",
+    "exploring",
+    "hiking",
+    "surfing",
+    "cycling",
+    "commuting"
+  ]);
+  const isAction = (kw) => {
+    const w = lower(kw);
+    if (ACTION_TERMS.has(w)) return true;
+    return Array.from(ACTION_TERMS).some((a) => w.includes(a) || a.includes(w));
+  };
+  const TECHNIQUE_TERMS = /* @__PURE__ */ new Set([
+    "watercolor",
+    "oil painting",
+    "sketch",
+    "line art",
+    "vector",
+    "flat design",
+    "3d render",
+    "cinematic",
+    "macro",
+    "close-up",
+    "wide shot",
+    "aerial view",
+    "drone shot",
+    "long exposure",
+    "bokeh",
+    "depth of field",
+    "grainy",
+    "vintage",
+    "retro",
+    "minimalist",
+    "abstract",
+    "geometric",
+    "isometric",
+    "gradient",
+    "monochrome",
+    "black and white",
+    "sepia",
+    "duotone",
+    "vibrant",
+    "pastel",
+    "high contrast",
+    "soft focus",
+    "flat lay",
+    "top view",
+    "panoramic",
+    "portrait orientation",
+    "landscape orientation",
+    "square format",
+    "high key",
+    "low key",
+    "rim lighting",
+    "backlit",
+    "silhouette",
+    "shadow play",
+    "golden hour",
+    "blue hour",
+    "night",
+    "daylight",
+    "natural light",
+    "studio light"
+  ]);
+  const isTechnique = (kw) => {
+    const w = lower(kw);
+    if (TECHNIQUE_TERMS.has(w)) return true;
+    return Array.from(TECHNIQUE_TERMS).some((t) => w.includes(t) || t.includes(w));
+  };
+  const INDUSTRY_TERMS = /* @__PURE__ */ new Set([
+    "healthcare",
+    "medical",
+    "technology",
+    "fintech",
+    "finance",
+    "education",
+    "marketing",
+    "advertising",
+    "real estate",
+    "hospitality",
+    "food industry",
+    "fashion",
+    "beauty",
+    "fitness",
+    "wellness",
+    "automotive",
+    "construction",
+    "agriculture",
+    "manufacturing",
+    "retail",
+    "e-commerce",
+    "entertainment",
+    "media",
+    "publishing",
+    "legal",
+    "insurance",
+    "travel",
+    "tourism",
+    "sustainability",
+    "green energy",
+    "renewable",
+    "corporate",
+    "startup",
+    "nonprofit",
+    "government",
+    "transportation",
+    "logistics",
+    "science",
+    "research"
+  ]);
+  const isIndustry = (kw) => {
+    const w = lower(kw);
+    if (INDUSTRY_TERMS.has(w)) return true;
+    return Array.from(INDUSTRY_TERMS).some((ind) => w.includes(ind) || ind.includes(w));
+  };
+  const USECASE_TERMS = /* @__PURE__ */ new Set([
+    "banner",
+    "landing page",
+    "presentation",
+    "brochure",
+    "flyer",
+    "poster",
+    "social media",
+    "instagram",
+    "facebook",
+    "website",
+    "blog",
+    "magazine",
+    "newsletter",
+    "annual report",
+    "billboard",
+    "packaging",
+    "product label",
+    "app design",
+    "ui design",
+    "wallpaper",
+    "background",
+    "cover photo",
+    "header",
+    "thumbnail",
+    "icon",
+    "logo",
+    "infographic",
+    "editorial",
+    "commercial",
+    "advertisement",
+    "promo",
+    "catalog",
+    "menu",
+    "invitation",
+    "greeting card",
+    "calendar",
+    "textbook",
+    "wall art",
+    "canvas print",
+    "copy space",
+    "text space",
+    "isolated",
+    "template",
+    "mockup"
+  ]);
+  const isUseCase = (kw) => {
+    const w = lower(kw);
+    if (USECASE_TERMS.has(w)) return true;
+    return Array.from(USECASE_TERMS).some((u) => w.includes(u) || u.includes(w));
+  };
+  const COMPOSITION_TERMS = /* @__PURE__ */ new Set([
+    "rule of thirds",
+    "symmetry",
+    "asymmetry",
+    "leading lines",
+    "diagonal",
+    "framing",
+    "negative space",
+    "positive space",
+    "foreground",
+    "background",
+    "midground",
+    "layered",
+    "depth",
+    "perspective",
+    "vanishing point",
+    "balanced",
+    "unbalanced",
+    "centered",
+    "off-center",
+    "isolated subject",
+    "group composition",
+    "single object",
+    "pattern",
+    "texture",
+    "repetition",
+    "contrast",
+    "harmony",
+    "minimal",
+    "clean",
+    "uncluttered",
+    "cluttered",
+    "spacious",
+    "tight crop",
+    "full frame",
+    "environmental portrait"
+  ]);
+  const isComposition = (kw) => {
+    const w = lower(kw);
+    if (COMPOSITION_TERMS.has(w)) return true;
+    return Array.from(COMPOSITION_TERMS).some((c) => w.includes(c) || c.includes(w));
+  };
+  const stages = [
+    { stage: 1, label: "Exact Main Subject", items: [] },
+    { stage: 2, label: "Specific Attributes", items: [] },
+    { stage: 3, label: "Action", items: [] },
+    { stage: 4, label: "Concept", items: [] },
+    { stage: 5, label: "Context", items: [] },
+    { stage: 6, label: "Technique", items: [] },
+    { stage: 7, label: "Industry", items: [] },
+    { stage: 8, label: "Use Case", items: [] },
+    { stage: 9, label: "Composition", items: [] }
+  ];
   const seen = /* @__PURE__ */ new Set();
-  sorted.forEach((item2) => {
-    const norm = item2.keyword.toLowerCase().trim();
-    if (!seen.has(norm)) {
-      seen.add(norm);
-      uniqueResult.push(item2.keyword);
+  for (const kw of keywords) {
+    const k = lower(kw);
+    if (!k || k.length < 2 || seen.has(k)) continue;
+    seen.add(k);
+    if (primarySubjects.some((s) => s === k || k === s)) {
+      stages[0].items.push(kw);
+      continue;
     }
-  });
-  const primarySubjectObj = tiers.objects.find((o) => o.tier === "primary" || o.importance >= 70);
-  const primarySubjectName = primarySubjectObj?.name?.toLowerCase().trim();
-  if (primarySubjectName && uniqueResult.length > 0) {
-    let mainSubjectIdx = uniqueResult.findIndex((k) => k.toLowerCase().trim() === primarySubjectName);
-    if (mainSubjectIdx === -1) {
-      mainSubjectIdx = uniqueResult.findIndex((k) => k.toLowerCase().includes(primarySubjectName) || primarySubjectName.includes(k.toLowerCase()));
+    if (matchesSubject(k) && allSubjects.length > 0) {
+      stages[0].items.push(kw);
+      continue;
     }
-    if (mainSubjectIdx > 0) {
-      const [mainKw] = uniqueResult.splice(mainSubjectIdx, 1);
-      uniqueResult.unshift(mainKw);
-    } else if (mainSubjectIdx === -1 && primarySubjectName.length > 1) {
-      uniqueResult.unshift(primarySubjectName);
-      if (uniqueResult.length > keywords.length) {
-        uniqueResult.pop();
-      }
+    if (matchesAttribute(k)) {
+      stages[1].items.push(kw);
+      continue;
+    }
+    if (isAction(k)) {
+      stages[2].items.push(kw);
+      continue;
+    }
+    if (matchesConcept(k)) {
+      stages[3].items.push(kw);
+      continue;
+    }
+    if (matchesScene(k)) {
+      stages[4].items.push(kw);
+      continue;
+    }
+    if (isTechnique(k)) {
+      stages[5].items.push(kw);
+      continue;
+    }
+    if (isIndustry(k)) {
+      stages[6].items.push(kw);
+      continue;
+    }
+    if (isUseCase(k)) {
+      stages[7].items.push(kw);
+      continue;
+    }
+    if (isComposition(k)) {
+      stages[8].items.push(kw);
+      continue;
+    }
+    const words = k.split(/\s+/).length;
+    if (words === 1) {
+      stages[1].items.push(kw);
+    } else if (words === 2) {
+      stages[3].items.push(kw);
+    } else {
+      stages[4].items.push(kw);
     }
   }
-  return uniqueResult;
+  const result = [];
+  for (const stage of stages) {
+    result.push(...stage.items);
+  }
+  if (primarySubjects.length > 0 && result.length > 0) {
+    const mainSubj = primarySubjects[0];
+    const idx = result.findIndex((k) => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
+    if (idx > 0) {
+      const [main] = result.splice(idx, 1);
+      result.unshift(main);
+    } else if (idx === -1 && mainSubj.length > 1) {
+      result.unshift(mainSubj);
+    }
+  }
+  return result;
 }
 var SYNONYM_MAP = {
   "car": ["automobile", "vehicle", "automotive"],
@@ -4021,6 +4235,7 @@ Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit v
   const directives = getToolTypeDirectives(toolType);
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
 KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA OF THE ASSET) \u2014 Keyword #1 MUST explicitly name the primary subject noun or compound phrase (e.g. 'cat', 'vintage car', 'borobudur temple', 'laptop', 'coffee cup'). NEVER put background elements, lighting, or generic terms as Keyword #1.
 MUST-1. Directly describe the visible subject \u2014 DO NOT generalize.
 MUST-2. Describe the main action \u2014 capture what the subject(s) are actively doing.
@@ -4056,16 +4271,52 @@ MUST-10. Never prioritize a keyword merely because it sounds popular \u2014 rele
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
+11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
+    Every keyword MUST be placed in this EXACT structural order. The pattern is:
+    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+
+    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
+    The core visual subject noun(s). What is the buyer actually searching for?
+    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
+    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+
+    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
+    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
+    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
+
+    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
+    What is the subject actively doing OR what action is happening in the scene?
+    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
+
+    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
+    Abstract ideas, emotions, metaphors, or themes represented in the asset.
+    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
+
+    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
+    Environment, setting, atmosphere, season, time of day, location, or weather.
+    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
+
+    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
+    Artistic style, visual technique, camera setup, lighting, or rendering method.
+    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
+
+    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
+    Target industry, professional sector, or market where this asset is most usable.
+    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
+
+    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
+    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
+    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
+
+    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
+    Visual layout, framing, spatial arrangement, and design principles used in the image.
+    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
+
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
   if (keywordMode === "single") {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
 MUST-1. Directly describe the visible subject.
 MUST-2. Describe the main action.
 MUST-3. Include specific objects.
@@ -4099,16 +4350,52 @@ MUST-10. Never prioritize popularity over relevance.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
+11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
+    Every keyword MUST be placed in this EXACT structural order. The pattern is:
+    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+
+    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
+    The core visual subject noun(s). What is the buyer actually searching for?
+    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
+    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+
+    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
+    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
+    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
+
+    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
+    What is the subject actively doing OR what action is happening in the scene?
+    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
+
+    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
+    Abstract ideas, emotions, metaphors, or themes represented in the asset.
+    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
+
+    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
+    Environment, setting, atmosphere, season, time of day, location, or weather.
+    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
+
+    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
+    Artistic style, visual technique, camera setup, lighting, or rendering method.
+    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
+
+    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
+    Target industry, professional sector, or market where this asset is most usable.
+    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
+
+    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
+    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
+    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
+
+    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
+    Visual layout, framing, spatial arrangement, and design principles used in the image.
+    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
+
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
   } else if (keywordMode === "multi") {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
 MUST-1. Directly describe the visible subject.
 MUST-2. Describe the main action.
 MUST-3. Include specific objects.
@@ -4143,13 +4430,48 @@ MUST-10. Never prioritize popularity over relevance.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
+11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
+    Every keyword MUST be placed in this EXACT structural order. The pattern is:
+    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+
+    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
+    The core visual subject noun(s). What is the buyer actually searching for?
+    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
+    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+
+    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
+    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
+    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
+
+    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
+    What is the subject actively doing OR what action is happening in the scene?
+    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
+
+    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
+    Abstract ideas, emotions, metaphors, or themes represented in the asset.
+    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
+
+    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
+    Environment, setting, atmosphere, season, time of day, location, or weather.
+    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
+
+    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
+    Artistic style, visual technique, camera setup, lighting, or rendering method.
+    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
+
+    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
+    Target industry, professional sector, or market where this asset is most usable.
+    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
+
+    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
+    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
+    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
+
+    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
+    Visual layout, framing, spatial arrangement, and design principles used in the image.
+    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
+
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
   }
   const noMediaFormatRule = `
 12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
@@ -4693,13 +5015,48 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
+11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
+    Every keyword MUST be placed in this EXACT structural order. The pattern is:
+    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+
+    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
+    The core visual subject noun(s). What is the buyer actually searching for?
+    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
+    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+
+    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
+    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
+    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
+
+    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
+    What is the subject actively doing OR what action is happening in the scene?
+    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
+
+    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
+    Abstract ideas, emotions, metaphors, or themes represented in the asset.
+    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
+
+    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
+    Environment, setting, atmosphere, season, time of day, location, or weather.
+    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
+
+    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
+    Artistic style, visual technique, camera setup, lighting, or rendering method.
+    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
+
+    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
+    Target industry, professional sector, or market where this asset is most usable.
+    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
+
+    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
+    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
+    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
+
+    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
+    Visual layout, framing, spatial arrangement, and design principles used in the image.
+    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
+
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
   if (keywordMode === "single") {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
@@ -4723,13 +5080,48 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
+11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
+    Every keyword MUST be placed in this EXACT structural order. The pattern is:
+    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+
+    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
+    The core visual subject noun(s). What is the buyer actually searching for?
+    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
+    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+
+    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
+    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
+    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
+
+    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
+    What is the subject actively doing OR what action is happening in the scene?
+    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
+
+    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
+    Abstract ideas, emotions, metaphors, or themes represented in the asset.
+    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
+
+    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
+    Environment, setting, atmosphere, season, time of day, location, or weather.
+    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
+
+    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
+    Artistic style, visual technique, camera setup, lighting, or rendering method.
+    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
+
+    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
+    Target industry, professional sector, or market where this asset is most usable.
+    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
+
+    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
+    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
+    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
+
+    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
+    Visual layout, framing, spatial arrangement, and design principles used in the image.
+    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
+
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
   } else if (keywordMode === "multi") {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
@@ -4754,13 +5146,48 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
+11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
+    Every keyword MUST be placed in this EXACT structural order. The pattern is:
+    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+
+    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
+    The core visual subject noun(s). What is the buyer actually searching for?
+    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
+    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+
+    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
+    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
+    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
+
+    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
+    What is the subject actively doing OR what action is happening in the scene?
+    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
+
+    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
+    Abstract ideas, emotions, metaphors, or themes represented in the asset.
+    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
+
+    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
+    Environment, setting, atmosphere, season, time of day, location, or weather.
+    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
+
+    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
+    Artistic style, visual technique, camera setup, lighting, or rendering method.
+    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
+
+    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
+    Target industry, professional sector, or market where this asset is most usable.
+    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
+
+    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
+    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
+    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
+
+    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
+    Visual layout, framing, spatial arrangement, and design principles used in the image.
+    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
+
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
   }
   const noMediaFormatRule = `
 12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
