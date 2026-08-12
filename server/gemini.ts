@@ -467,7 +467,7 @@ function ensureKeywordCount(
   if (Array.isArray(keywords)) {
     keywords.forEach(k => {
       if (typeof k === 'string') {
-        const clean = k.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
+        const clean = sanitizeForIndexing(k);
         if (clean.length > 1 && !isProhibitedKeyword(clean)) {
           if (keywordMode === 'single' && clean.includes(' ')) {
             // Split multi-words into individual single words
@@ -1577,6 +1577,33 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     }
   });
 
+  // STRICT RULE: KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA)
+  // Extract primary subject term from visual tiers
+  const primarySubjectObj = tiers.objects.find(o => o.tier === 'primary' || o.importance >= 70);
+  const primarySubjectName = primarySubjectObj?.name?.toLowerCase().trim();
+
+  if (primarySubjectName && uniqueResult.length > 0) {
+    // Check if primarySubjectName or an exact match exists in uniqueResult
+    let mainSubjectIdx = uniqueResult.findIndex(k => k.toLowerCase().trim() === primarySubjectName);
+    
+    if (mainSubjectIdx === -1) {
+      // Find keyword containing primarySubjectName
+      mainSubjectIdx = uniqueResult.findIndex(k => k.toLowerCase().includes(primarySubjectName) || primarySubjectName.includes(k.toLowerCase()));
+    }
+
+    if (mainSubjectIdx > 0) {
+      // Move main subject keyword to position 0 (Keyword #1)
+      const [mainKw] = uniqueResult.splice(mainSubjectIdx, 1);
+      uniqueResult.unshift(mainKw);
+    } else if (mainSubjectIdx === -1 && primarySubjectName.length > 1) {
+      // Prepend the primary subject as Keyword #1
+      uniqueResult.unshift(primarySubjectName);
+      if (uniqueResult.length > keywords.length) {
+        uniqueResult.pop();
+      }
+    }
+  }
+
   return uniqueResult;
 }
 
@@ -1693,6 +1720,27 @@ function stemWord(word: string): string {
  * (mis. "beach sunset" vs "sunset beaches" vs "sunset at the beach") terdeteksi sebagai duplikat,
  * bukan hanya deduplikasi string yang persis sama.
  */
+
+/**
+ * Sanitasi mendalam khusus untuk memastikan kata kunci 100% ramah indeksasi (Indexable)
+ * pada algoritma mesin pencari microstock (Adobe Stock, Shutterstock, Freepik, Getty).
+ */
+function sanitizeForIndexing(kw: string): string {
+  if (!kw) return '';
+  let clean = kw
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
+    .replace(/\s+/g, ' ')          // Normalisasi spasi
+    .trim();
+
+  // Filter stop-words/noise tunggal yang mengganggu indeksasi
+  const stopWords = new Set(['a', 'an', 'the', 'at', 'in', 'on', 'of', 'to', 'by', 'is', 'it', 'or', 'and', 'as', 'for', 'with']);
+  const words = clean.split(' ').filter(w => w.length >= 2 && !stopWords.has(w));
+  
+  return words.join(' ');
+}
+
 function semanticKeySignature(phrase: string): string {
   return phrase
     .toLowerCase()
@@ -1857,6 +1905,7 @@ export const generateStockMetadata = async (
   // Rules for keywords depending on keywordMode
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA OF THE ASSET) — Keyword #1 MUST explicitly name the primary subject noun or compound phrase (e.g. 'cat', 'vintage car', 'borobudur temple', 'laptop', 'coffee cup'). NEVER put background elements, lighting, or generic terms as Keyword #1.
 MUST-1. Directly describe the visible subject — DO NOT generalize.
 MUST-2. Describe the main action — capture what the subject(s) are actively doing.
 MUST-3. Include specific objects — name every distinct, identifiable object visible.
@@ -2160,6 +2209,14 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
+
+
+MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
+1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
+2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
+3. HIGH-CONVERSION COMPOUND PHRASES: Generate 1-to-3 word compound terms (e.g. 'copy space', 'landing page', 'digital marketing', 'green energy', 'isolated background') which Adobe Stock indexes both as exact compound phrases and individual token words, doubling search visibility.
+4. FULL INDEX CAPACITY: Maximize unique search term coverage across all keyword slots up to the target count, blending core subject nouns, action verbs, environmental setting, commercial intent, regional synonyms, and target industry use-cases.
+5. KEYWORD #1 STRICT MAIN SUBJECT: Keyword #1 MUST strictly be the main visual subject (Subjek Utama).
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION (CRITICAL): If the visual analysis or EXIF technical metadata detects any geographical location, city, country, or specific landmark (such as Borobudur, Paris, Jakarta, Mt. Fuji, Bali, etc.), you MUST integrate this location and landmark details naturally and detailedly into BOTH the Title and the Description. For example, instead of "Old temple in a forest", write "Borobudur temple surrounded by lush tropical forest in Magelang, Indonesia".
@@ -2883,6 +2940,14 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
+
+
+MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
+1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
+2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
+3. HIGH-CONVERSION COMPOUND PHRASES: Generate 1-to-3 word compound terms (e.g. 'copy space', 'landing page', 'digital marketing', 'green energy', 'isolated background') which Adobe Stock indexes both as exact compound phrases and individual token words, doubling search visibility.
+4. FULL INDEX CAPACITY: Maximize unique search term coverage across all keyword slots up to the target count, blending core subject nouns, action verbs, environmental setting, commercial intent, regional synonyms, and target industry use-cases.
+5. KEYWORD #1 STRICT MAIN SUBJECT: Keyword #1 MUST strictly be the main visual subject (Subjek Utama).
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION (CRITICAL): If the visual analysis or EXIF technical metadata detects any geographical location, city, country, or specific landmark (such as Borobudur, Paris, Jakarta, Mt. Fuji, Bali, etc.), you MUST integrate this location and landmark details naturally and detailedly into BOTH the Title and the Description. For example, instead of "Old temple in a forest", write "Borobudur temple surrounded by lush tropical forest in Magelang, Indonesia".
