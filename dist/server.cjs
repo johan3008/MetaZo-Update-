@@ -4,9 +4,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -29,292 +26,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// server/videoAnalyzer.ts
-var videoAnalyzer_exports = {};
-__export(videoAnalyzer_exports, {
-  analyzeVideoTechnically: () => analyzeVideoTechnically
-});
-async function runFfprobe(videoPath, ffprobePath) {
-  const cmd = `"${ffprobePath}" -v error -show_format -show_streams -show_frames -read_intervals "%+#1" -of json "${videoPath}"`;
-  const { stdout } = await execPromise(cmd);
-  const data = JSON.parse(stdout);
-  const videoStream = data.streams?.find((s) => s.codec_type === "video") || {};
-  const audioStream = data.streams?.find((s) => s.codec_type === "audio");
-  const format = data.format || {};
-  const firstFrame = data.frames?.find((f) => f.media_type === "video");
-  const hasBFrames = videoStream.has_b_frames !== void 0 ? videoStream.has_b_frames : -1;
-  const parseFps = (fpsStr) => {
-    if (!fpsStr || !fpsStr.includes("/")) return parseFloat(fpsStr) || 0;
-    const parts = fpsStr.split("/");
-    return parts[1] !== "0" ? parseFloat(parts[0]) / parseFloat(parts[1]) : 0;
-  };
-  return {
-    duration: parseFloat(format.duration) || parseFloat(videoStream.duration) || 0,
-    size: parseInt(format.size, 10) || 0,
-    bitrate: parseInt(format.bit_rate, 10) || parseInt(videoStream.bit_rate, 10) || 0,
-    video: {
-      codec: videoStream.codec_name || "unknown",
-      profile: videoStream.profile || "unknown",
-      width: parseInt(videoStream.width, 10) || 0,
-      height: parseInt(videoStream.height, 10) || 0,
-      fps: parseFps(videoStream.r_frame_rate),
-      avg_fps: parseFps(videoStream.avg_frame_rate),
-      color_range: videoStream.color_range || "unknown",
-      color_space: videoStream.color_space || "unknown",
-      color_transfer: videoStream.color_transfer || "unknown",
-      color_primaries: videoStream.color_primaries || "unknown",
-      pix_fmt: videoStream.pix_fmt || "unknown",
-      has_b_frames: hasBFrames
-    },
-    audio: audioStream ? {
-      codec: audioStream.codec_name || "unknown",
-      sample_rate: parseInt(audioStream.sample_rate, 10) || 0,
-      channels: parseInt(audioStream.channels, 10) || 0
-    } : void 0
-  };
-}
-async function runFfmpegFilters(videoPath, ffmpegPath) {
-  const black_frames = [];
-  const frozen_frames = [];
-  try {
-    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "blackdetect=d=0.1:pix_th=0.10,freezedetect=d=0.3:noise=0.005" -an -f null -`;
-    const { stderr } = await execPromise(cmd);
-    const blackRegex = /black_start:([\d.]+)\s+black_end:([\d.]+)\s+black_duration:([\d.]+)/g;
-    let match;
-    while ((match = blackRegex.exec(stderr)) !== null) {
-      black_frames.push({ start: parseFloat(match[1]), end: parseFloat(match[2]), duration: parseFloat(match[3]) });
-    }
-    const freezeRegex = /freeze_start:\s*([\d.]+)\s+freeze_duration:\s*([\d.]+)/g;
-    while ((match = freezeRegex.exec(stderr)) !== null) {
-      frozen_frames.push({ start: parseFloat(match[1]), duration: parseFloat(match[2]) });
-    }
-  } catch (err) {
-    console.warn("[videoAnalyzer] FFmpeg filter analysis had errors:", err);
-  }
-  return { black_frames_detected: black_frames.length > 0, black_frames, frozen_frames_detected: frozen_frames.length > 0, frozen_frames };
-}
-async function runSignalstats(videoPath, ffmpegPath) {
-  try {
-    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "signalstats" -an -f null -`;
-    const { stderr } = await execPromise(cmd);
-    const lumMinRegex = /YMIN=([\d.]+)/g;
-    const lumMaxRegex = /YMAX=([\d.]+)/g;
-    const lumAvgRegex = /YAVG=([\d.]+)/g;
-    const satMinRegex = /UMIN=([\d.]+)/;
-    const satMaxRegex = /UMAX=([\d.]+)/;
-    const satAvgRegex = /UAVG=([\d.]+)/;
-    let lumMin = Infinity, lumMax = -Infinity, lumSum = 0, lumCount = 0;
-    let satMin = Infinity, satMax = -Infinity, satSum = 0, satCount = 0;
-    let m;
-    while ((m = lumMinRegex.exec(stderr)) !== null) {
-      const v = parseFloat(m[1]);
-      if (v < lumMin) lumMin = v;
-    }
-    while ((m = lumMaxRegex.exec(stderr)) !== null) {
-      const v = parseFloat(m[1]);
-      if (v > lumMax) lumMax = v;
-    }
-    while ((m = lumAvgRegex.exec(stderr)) !== null) {
-      lumSum += parseFloat(m[1]);
-      lumCount++;
-    }
-    const satMinRegex2 = /UMIN=([\d.]+)/g;
-    const satMaxRegex2 = /UMAX=([\d.]+)/g;
-    const satAvgRegex2 = /UAVG=([\d.]+)/g;
-    while ((m = satMinRegex2.exec(stderr)) !== null) {
-      const v = parseFloat(m[1]);
-      if (v < satMin) satMin = v;
-    }
-    while ((m = satMaxRegex2.exec(stderr)) !== null) {
-      const v = parseFloat(m[1]);
-      if (v > satMax) satMax = v;
-    }
-    while ((m = satAvgRegex2.exec(stderr)) !== null) {
-      satSum += parseFloat(m[1]);
-      satCount++;
-    }
-    if (lumCount === 0) return null;
-    return {
-      luminance_min: Math.round(lumMin * 100) / 100,
-      luminance_max: Math.round(lumMax * 100) / 100,
-      luminance_avg: Math.round(lumSum / lumCount * 100) / 100,
-      saturation_min: Math.round(satMin * 100) / 100,
-      saturation_max: Math.round(satMax * 100) / 100,
-      saturation_avg: Math.round(satSum / satCount * 100) / 100
-    };
-  } catch (err) {
-    console.warn("[videoAnalyzer] signalstats failed:", err);
-    return null;
-  }
-}
-async function runVmafMotion(videoPath, ffmpegPath) {
-  try {
-    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "vmafmotion" -an -f null -`;
-    const { stderr } = await execPromise(cmd);
-    const motionRegex = /motion:\s*([\d.e+-]+)/gi;
-    let total = 0, count = 0, maxVal = 0;
-    let m;
-    while ((m = motionRegex.exec(stderr)) !== null) {
-      const v = parseFloat(m[1]);
-      if (!isNaN(v)) {
-        total += v;
-        count++;
-        if (v > maxVal) maxVal = v;
-      }
-    }
-    if (count === 0) return null;
-    const avg = total / count;
-    let interpretation = "UNKNOWN";
-    if (avg < 1.5) interpretation = "LOW";
-    else if (avg < 4) interpretation = "MEDIUM";
-    else interpretation = "HIGH";
-    return {
-      motion_score: Math.round(avg * 1e3) / 1e3,
-      motion_interpretation: interpretation
-    };
-  } catch (err) {
-    console.warn("[videoAnalyzer] vmafmotion failed (may not be supported in this FFmpeg build):", err);
-    return null;
-  }
-}
-async function runSceneDetection(videoPath, ffmpegPath, duration) {
-  const scene_changes = [];
-  const scenes = [];
-  try {
-    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "select='gt(scene,0.35)',showinfo" -f null -`;
-    const { stderr } = await execPromise(cmd);
-    const ptsRegex = /pts_time:([\d.]+)/g;
-    let match;
-    const detectedTimestamps = [];
-    while ((match = ptsRegex.exec(stderr)) !== null) {
-      const ts = parseFloat(match[1]);
-      if (!detectedTimestamps.includes(ts)) detectedTimestamps.push(ts);
-    }
-    detectedTimestamps.sort((a, b) => a - b);
-    for (const ts of detectedTimestamps) scene_changes.push({ timestamp: ts });
-    let currentStart = 0, sceneCount = 1;
-    for (const ts of detectedTimestamps) {
-      if (ts - currentStart > 0.1) {
-        scenes.push({ scene_number: sceneCount++, start: currentStart, end: ts, duration: ts - currentStart });
-        currentStart = ts;
-      }
-    }
-    if (duration - currentStart > 0.1) {
-      scenes.push({ scene_number: sceneCount, start: currentStart, end: duration, duration: duration - currentStart });
-    }
-  } catch (err) {
-    console.warn("[videoAnalyzer] Scene detection failed:", err);
-  }
-  return { scene_changes_detected: scene_changes.length > 0, scene_changes, scenes };
-}
-function analyzeFramePixelData(jpegBuffer, index) {
-  try {
-    const rawData = import_jpeg_js.default.decode(jpegBuffer, { useTarray: false });
-    const { width, height, data } = rawData;
-    const gray = new Float32Array(width * height);
-    let rSum = 0, gSum = 0, bSum = 0;
-    let overCount = 0, underCount = 0;
-    const totalPixels = width * height;
-    for (let i = 0; i < totalPixels; i++) {
-      const off = i * 4;
-      const r = data[off], g = data[off + 1], b = data[off + 2];
-      rSum += r;
-      gSum += g;
-      bSum += b;
-      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-      gray[i] = lum;
-      if (lum > 245) overCount++;
-      if (lum < 10) underCount++;
-    }
-    const avgColor = { r: Math.round(rSum / totalPixels), g: Math.round(gSum / totalPixels), b: Math.round(bSum / totalPixels) };
-    const avgLum = 0.299 * avgColor.r + 0.587 * avgColor.g + 0.114 * avgColor.b;
-    const lapVals = [];
-    let lapSum = 0;
-    const step = 2;
-    for (let y = 1; y < height - 1; y += step) {
-      for (let x = 1; x < width - 1; x += step) {
-        const idx = y * width + x;
-        const lap = gray[(y - 1) * width + x] + gray[(y + 1) * width + x] + gray[idx - 1] + gray[idx + 1] - 4 * gray[idx];
-        lapVals.push(lap);
-        lapSum += lap;
-      }
-    }
-    const N = lapVals.length;
-    const mean = lapSum / N;
-    let varSum = 0;
-    for (let i = 0; i < N; i++) {
-      const d = lapVals[i] - mean;
-      varSum += d * d;
-    }
-    const variance = N > 0 ? varSum / N : 0;
-    let blurStatus = "SHARP";
-    if (variance < 15) blurStatus = "BLURRED";
-    else if (variance < 40) blurStatus = "SOFT";
-    return {
-      frameIndex: index,
-      sharpness: Math.round(variance * 100) / 100,
-      blurStatus,
-      overexposurePercent: Math.round(overCount / totalPixels * 1e3) / 10,
-      underexposurePercent: Math.round(underCount / totalPixels * 1e3) / 10,
-      averageLuminance: Math.round(avgLum * 10) / 10,
-      averageColor: avgColor
-    };
-  } catch (err) {
-    console.error(`[videoAnalyzer] Pixel analysis failed frame ${index}:`, err);
-    return { frameIndex: index, sharpness: 50, blurStatus: "SHARP", overexposurePercent: 0, underexposurePercent: 0, averageLuminance: 120, averageColor: { r: 120, g: 120, b: 120 } };
-  }
-}
-async function analyzeVideoTechnically(videoPath, framesBase64) {
-  const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
-  const ffprobePath = require("@ffprobe-installer/ffprobe").path;
-  console.log("[videoAnalyzer] 1/6 \u2014 ffprobe: technical metadata (MediaInfo)...");
-  const probeData = await runFfprobe(videoPath, ffprobePath);
-  console.log("[videoAnalyzer] 2/6 \u2014 FFmpeg filters: blackdetect + freezedetect...");
-  const filterData = await runFfmpegFilters(videoPath, ffmpegPath);
-  console.log("[videoAnalyzer] 3/6 \u2014 signalstats: luminance & saturation...");
-  const signalstats = await runSignalstats(videoPath, ffmpegPath);
-  console.log("[videoAnalyzer] 4/6 \u2014 vmafmotion: motion vector analysis...");
-  const vmafMotion = await runVmafMotion(videoPath, ffmpegPath);
-  console.log("[videoAnalyzer] 5/6 \u2014 OpenCV-style: pixel-level frame analysis...");
-  const frameAnalysis = [];
-  for (let i = 0; i < framesBase64.length; i++) {
-    const clean = framesBase64[i].replace(/^data:image\/jpeg;base64,/, "");
-    frameAnalysis.push(analyzeFramePixelData(Buffer.from(clean, "base64"), i + 1));
-  }
-  let stabilityIndex = 0;
-  if (frameAnalysis.length > 1) {
-    let diffSum = 0;
-    for (let i = 1; i < frameAnalysis.length; i++) {
-      diffSum += Math.abs(frameAnalysis[i].averageLuminance - frameAnalysis[i - 1].averageLuminance);
-    }
-    stabilityIndex = diffSum / (frameAnalysis.length - 1);
-  }
-  let stabilityStatus = "STABLE";
-  if (stabilityIndex > 45) stabilityStatus = "FLICKERING";
-  else if (stabilityIndex > 20) stabilityStatus = "UNSTABLE";
-  console.log("[videoAnalyzer] 6/6 \u2014 PySceneDetect: scene change analysis...");
-  const sceneData = await runSceneDetection(videoPath, ffmpegPath, probeData.duration);
-  return {
-    ffprobe: probeData,
-    filters: filterData,
-    signalstats: signalstats || void 0,
-    vmaf_motion: vmafMotion || void 0,
-    scene_detection: sceneData,
-    frameAnalysis,
-    stabilityIndex: Math.round(stabilityIndex * 10) / 10,
-    stabilityStatus
-  };
-}
-var import_child_process, import_util, import_jpeg_js, execPromise;
-var init_videoAnalyzer = __esm({
-  "server/videoAnalyzer.ts"() {
-    import_child_process = require("child_process");
-    import_util = __toESM(require("util"), 1);
-    import_jpeg_js = __toESM(require("jpeg-js"), 1);
-    execPromise = import_util.default.promisify(import_child_process.exec);
-  }
-});
-
 // server.ts
 var server_exports = {};
 __export(server_exports, {
@@ -329,8 +40,8 @@ var import_package2 = require("@ffprobe-installer/linux-x64/package.json");
 var import_express = __toESM(require("express"), 1);
 var import_genai2 = require("@google/genai");
 var import_multer = __toESM(require("multer"), 1);
-var import_child_process2 = require("child_process");
-var import_util2 = __toESM(require("util"), 1);
+var import_child_process = require("child_process");
+var import_util = __toESM(require("util"), 1);
 var import_fs = __toESM(require("fs"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_client_s3 = require("@aws-sdk/client-s3");
@@ -3975,26 +3686,63 @@ function applyTitleTemplate(subtype, tiers, titleLength) {
 }
 var COMMERCIAL_INTENT_TERMS = /* @__PURE__ */ new Set([
   "business",
-  "marketing",
-  "commercial",
-  "professional",
   "concept",
-  "success",
+  "technology",
+  "background",
   "growth",
-  "branding",
-  "corporate",
-  "advertising",
-  "presentation",
+  "success",
+  "strategy",
+  "innovation",
+  "sustainability",
+  "health",
+  "finance",
+  "education",
+  "marketing",
+  "vector",
+  "illustration",
+  "design",
+  "modern",
   "banner",
   "template",
-  "startup",
-  "finance",
-  "investment",
-  "strategy",
-  "leadership",
+  "corporate",
+  "isolated",
+  "copy space",
+  "copyspace",
+  "flatlay",
+  "landing page",
+  "top view",
+  "minimalist",
+  "abstract",
+  "pattern",
+  "element",
+  "symbol",
+  "sign",
+  "icon",
+  "graphic",
+  "presentation",
+  "advertisement",
+  "promo",
+  "ecommerce",
+  "e-commerce",
+  "fintech",
+  "ai technology",
+  "artificial intelligence",
+  "digital marketing",
+  "green energy",
+  "clean energy",
   "teamwork",
-  "management",
-  "productivity"
+  "partnership",
+  "leadership",
+  "financial growth",
+  "data analysis",
+  "cybersecurity",
+  "workflow",
+  "wellbeing",
+  "wellness",
+  "lifestyle",
+  "healthcare",
+  "medical",
+  "real estate"
 ]);
 var TREND_TERMS = /* @__PURE__ */ new Set([
   "ai",
@@ -4012,51 +3760,74 @@ var TREND_TERMS = /* @__PURE__ */ new Set([
   "diversity",
   "automation"
 ]);
-function scoreKeyword(keyword, tiers, position, total) {
-  const lower = keyword.toLowerCase();
+function scoreKeyword(keyword, tiers, position, total, title) {
+  const lower = keyword.toLowerCase().trim();
   const wordCount = lower.split(/\s+/).length;
   const objectMatch = tiers.objects.find((o) => o.name.toLowerCase().includes(lower) || lower.includes(o.name.toLowerCase()));
   const attributeMatch = tiers.attributes.some((a) => a.toLowerCase().includes(lower) || lower.includes(a.toLowerCase()));
-  const visualScore = objectMatch ? Math.min(100, objectMatch.importance + 10) : attributeMatch ? 60 : 25;
+  const visualScore = objectMatch ? Math.min(100, objectMatch.importance + 20) : attributeMatch ? 70 : 30;
   const positionFactor = 1 - position / Math.max(1, total);
-  const seoScore = Math.round((wordCount <= 3 ? 70 : 40) * 0.6 + positionFactor * 40);
-  const commercialScore = COMMERCIAL_INTENT_TERMS.has(lower) || Array.from(COMMERCIAL_INTENT_TERMS).some((t) => lower.includes(t)) ? 90 : 35;
-  const trendScore = Array.from(TREND_TERMS).some((t) => lower.includes(t)) ? 85 : 30;
-  const totalScore = Math.round(visualScore * 0.4 + seoScore * 0.3 + commercialScore * 0.15 + trendScore * 0.15);
+  const seoScore = Math.round((wordCount >= 1 && wordCount <= 3 ? 85 : 40) * 0.6 + positionFactor * 40);
+  const commercialScore = COMMERCIAL_INTENT_TERMS.has(lower) || Array.from(COMMERCIAL_INTENT_TERMS).some((t) => lower.includes(t)) ? 95 : 35;
+  const trendScore = Array.from(TREND_TERMS).some((t) => lower.includes(t)) ? 90 : 30;
+  let titleBonus = 0;
+  if (title) {
+    const titleLower = title.toLowerCase();
+    if (titleLower.includes(lower)) {
+      titleBonus = 40;
+    } else {
+      const kwWords = lower.split(/\s+/);
+      const matchingWords = kwWords.filter((w) => w.length > 2 && titleLower.includes(w));
+      if (matchingWords.length > 0) {
+        titleBonus = matchingWords.length * 15;
+      }
+    }
+  }
+  const totalScore = Math.round(visualScore * 0.35 + seoScore * 0.25 + commercialScore * 0.25 + trendScore * 0.15 + titleBonus);
   return { keyword, seoScore, visualScore, commercialScore, trendScore, totalScore };
 }
-function rankAndWeightKeywords(keywords, tiers) {
+function rankAndWeightKeywords(keywords, tiers, title) {
   if (keywords.length === 0) return keywords;
-  const scored = keywords.map((k, i) => scoreKeyword(k, tiers, i, keywords.length));
-  const quintileSize = Math.max(1, Math.ceil(scored.length / 5));
-  const result = [];
-  for (let q = 0; q < 5; q++) {
-    const slice = scored.slice(q * quintileSize, (q + 1) * quintileSize);
-    slice.sort((a, b) => b.totalScore - a.totalScore);
-    result.push(...slice.map((s) => s.keyword));
-  }
-  return result;
+  const scored = keywords.map((k, i) => scoreKeyword(k, tiers, i, keywords.length, title));
+  const sorted = [...scored].sort((a, b) => b.totalScore - a.totalScore);
+  const uniqueResult = [];
+  const seen = /* @__PURE__ */ new Set();
+  sorted.forEach((item2) => {
+    const norm = item2.keyword.toLowerCase().trim();
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      uniqueResult.push(item2.keyword);
+    }
+  });
+  return uniqueResult;
 }
 var SYNONYM_MAP = {
-  "car": ["automobile", "vehicle"],
-  "phone": ["smartphone", "mobile device"],
+  "car": ["automobile", "vehicle", "automotive"],
+  "phone": ["smartphone", "mobile phone", "cellular phone", "mobile device"],
   "lift": ["elevator"],
-  "sidewalk": ["pavement"],
-  "doctor": ["physician"],
-  "shop": ["store", "retail outlet"],
-  "big": ["large"],
-  "small": ["compact"],
-  "old": ["aged", "vintage"],
-  "new": ["modern", "contemporary"],
-  "work": ["job", "career"],
-  "home": ["house", "residence"],
-  "city": ["urban", "metropolitan"],
-  "nature": ["natural", "outdoors"],
-  "food": ["cuisine", "meal"],
-  "money": ["finance", "currency"],
-  "idea": ["concept", "notion"],
-  "fast": ["quick", "rapid"],
-  "happy": ["joyful", "cheerful"]
+  "sidewalk": ["pavement", "walkway"],
+  "doctor": ["physician", "healthcare worker", "medical professional"],
+  "shop": ["store", "retail outlet", "boutique"],
+  "computer": ["laptop", "pc", "workstation", "digital device"],
+  "big": ["large", "huge", "massive"],
+  "small": ["compact", "miniature", "tiny"],
+  "old": ["aged", "vintage", "retro", "antique"],
+  "new": ["modern", "contemporary", "futuristic"],
+  "work": ["job", "career", "employment", "business"],
+  "home": ["house", "residence", "residential"],
+  "city": ["urban", "metropolitan", "downtown"],
+  "nature": ["natural", "outdoors", "environment", "eco"],
+  "food": ["cuisine", "meal", "dish", "refreshment"],
+  "money": ["finance", "currency", "capital", "wealth", "cash"],
+  "idea": ["concept", "notion", "thought", "solution"],
+  "fast": ["quick", "rapid", "speedy", "express"],
+  "happy": ["joyful", "cheerful", "delighted", "smiling"],
+  "autumn": ["fall", "autumnal"],
+  "fall": ["autumn", "autumnal"],
+  "trolley": ["shopping cart", "cart"],
+  "subway": ["underground", "metro", "transit"],
+  "trash": ["garbage", "rubbish", "waste"],
+  "copyspace": ["copy space", "text space", "blank space"]
 };
 function expandSynonymsAndLongTail(keywords, tiers, maxNew) {
   if (maxNew <= 0) return [];
@@ -4225,7 +3996,19 @@ Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit v
   const aiRequestCount = targetCount + 10;
   const directives = getToolTypeDirectives(toolType);
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
+  let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-1. Directly describe the visible subject \u2014 DO NOT generalize.
+MUST-2. Describe the main action \u2014 capture what the subject(s) are actively doing.
+MUST-3. Include specific objects \u2014 name every distinct, identifiable object visible.
+MUST-4. Include the strongest visual context \u2014 environment, setting, background, lighting.
+MUST-5. Represent the primary commercial concept \u2014 what would a buyer realistically search?
+MUST-6. Be 100% highly relevant to the actual asset \u2014 every keyword MUST have a direct visual connection.
+MUST-7. Avoid generic filler words \u2014 NEVER use vague terms like "object", "item", "thing" unless genuinely descriptive.
+MUST-8. Avoid duplicates and near-duplicates \u2014 NEVER repeat root concepts ("person" AND "people", "run" AND "running").
+MUST-9. Never invent unseen attributes \u2014 if it is NOT visible in the asset, DO NOT include it.
+MUST-10. Never prioritize a keyword merely because it sounds popular \u2014 relevance to actual visual content ALWAYS beats search volume.
+
+1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
@@ -4257,7 +4040,19 @@ Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit v
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   if (keywordMode === "single") {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
+    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-1. Directly describe the visible subject.
+MUST-2. Describe the main action.
+MUST-3. Include specific objects.
+MUST-4. Include the strongest visual context (environment, setting, lighting).
+MUST-5. Represent the primary commercial concept.
+MUST-6. Be 100% relevant to the actual asset.
+MUST-7. Avoid generic filler words.
+MUST-8. Avoid duplicates and near-duplicates.
+MUST-9. Never invent unseen attributes.
+MUST-10. Never prioritize popularity over relevance.
+
+1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map single-word synonyms, technical terms, and semantic variations.
@@ -4288,7 +4083,19 @@ Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit v
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   } else if (keywordMode === "multi") {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
+    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-1. Directly describe the visible subject.
+MUST-2. Describe the main action.
+MUST-3. Include specific objects.
+MUST-4. Include the strongest visual context (environment, setting, lighting).
+MUST-5. Represent the primary commercial concept.
+MUST-6. Be 100% relevant to the actual asset.
+MUST-7. Avoid generic filler words.
+MUST-8. Avoid duplicates and near-duplicates.
+MUST-9. Never invent unseen attributes.
+MUST-10. Never prioritize popularity over relevance.
+
+1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
@@ -4774,7 +4581,7 @@ OUTPUT FORMAT:
       keywordMode
     );
     data.keywords = semanticDeduplicate(filterBannedKeywords(data.keywords)).slice(0, targetCount);
-    data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual);
+    data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual, data.title);
     let candidateTitle = String(data.title || "").trim();
     const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
     if (isGenericTitle) {
@@ -5446,7 +5253,7 @@ OUTPUT FORMAT:
         keywordMode
       );
       metadata.keywords = semanticDeduplicate(filterBannedKeywords(metadata.keywords)).slice(0, targetCount);
-      metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual);
+      metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, metadata.title);
       let candidateTitle = String(metadata.title || "").trim();
       const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
       if (isGenericTitle) {
@@ -7830,8 +7637,15 @@ async function checkVideoQuality(frames, tolerance = "MEDIUM", language = "Bahas
   const targetLanguageName = isIndonesian ? "Indonesian (Bahasa Indonesia)" : "English";
   const imageParts = [];
   if (videoFile) imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
-  if (frames && frames.length > 0) imageParts.push(...frames.map((f) => processFrameServer(f)));
-  const frameCount = frames ? frames.length : 0;
+  let frameCount = 0;
+  if (frames && frames.length > 0) {
+    const maxFrames = Math.min(frames.length, 5);
+    const step = Math.max(1, Math.floor(frames.length / maxFrames));
+    for (let i = 0; i < frames.length && imageParts.length - (videoFile ? 1 : 0) < 5; i += step) {
+      imageParts.push(processFrameServer(frames[i]));
+      frameCount++;
+    }
+  }
   const report = videoTechnicalReport ? typeof videoTechnicalReport === "string" ? JSON.parse(videoTechnicalReport) : videoTechnicalReport : null;
   const gt = {};
   if (report) {
@@ -7868,6 +7682,17 @@ async function checkVideoQuality(frames, tolerance = "MEDIUM", language = "Bahas
     if (report.scene_detection?.scene_changes_detected) {
       gt.scene_changes = `${report.scene_detection.scene_changes?.length || 0} cuts detected`;
     }
+    if (report.audio?.has_audio) {
+      gt.audio_codec = report.audio.codec;
+      gt.audio_sample_rate = `${report.audio.sample_rate}Hz`;
+      gt.audio_channels = report.audio.channels;
+      if (report.audio.volume) {
+        gt.audio_mean_volume = `${report.audio.volume.mean_volume_db}dB`;
+        gt.audio_max_volume = `${report.audio.volume.max_volume_db}dB`;
+      }
+    } else {
+      gt.audio = "NO AUDIO TRACK";
+    }
     if (report.advancedMetrics) {
       gt.brisque = report.advancedMetrics.brisque;
       gt.niqe = report.advancedMetrics.niqe;
@@ -7875,10 +7700,17 @@ async function checkVideoQuality(frames, tolerance = "MEDIUM", language = "Bahas
       gt.lpips = report.advancedMetrics.lpips;
     }
   }
-  const systemInstruction = `You are an EXTREMELY STRICT and UNFORGIVING Adobe Stock Senior QA Curator. 
-Your job is to make the FINAL PASS/FAIL decision for this video. You MUST NOT be lenient. 
-If you spot even the SLIGHTEST micro-artifact, unnatural AI texture, or physics inconsistency, you MUST mercilessly FAIL the video. Assume all AI videos are flawed until proven perfect.
-CRITICAL: DO NOT GUESS OR HALLUCINATE. Base your verdict strictly on the visible evidence in the provided frames and the mathematical ground truth. Do not invent defects that aren't there, but remain absolutely ruthless on the ones that are.
+  const systemInstruction = `You are a strict Adobe Stock QA Curator. Make PASS/FAIL decision. FAIL for any artifact, defect, or inconsistency. Be concise.
+
+MANDATORY FAIL conditions from technical ground truth:
+- Black frames detected = FAIL
+- Frozen frames detected = FAIL
+- EXTREME BLUR (Laplacian < 15 or BLURRED) = FAIL
+- Resolution < 1920x1080 = FAIL
+- FPS < 23.976 = FAIL
+- Stability FLICKERING = FAIL
+- Audio clipping or extreme distortion = FAIL
+- No audio track at all = ACCEPTABLE (silent videos are preferred by stock platforms)
 
 ======= TECHNICAL GROUND TRUTH (from ffprobe + FFmpeg filters + OpenCV pixel analysis) =======
 ${JSON.stringify(gt, null, 1)}
@@ -7893,7 +7725,7 @@ IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolut
 
 ======= YOUR SUBJECTIVE ASSESSMENT =======
 Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
-(NOTE: The images are provided in pairs: Image 1 is a Full Frame, Image 2 is a 200% Zoom Center Crop of the same frame. Use the 200% Zoom crops specifically to rigorously check for Compression Artifacts, Noise, Banding, and AI texture defects).
+(NOTE: Images come in pairs: Full Frame at 1024x576 + 1200px Zoom Center Crop at higher quality. Use the 1200px Zoom crops to rigorously inspect pixel-level defects: Compression Artifacts, Noise, Banding, and AI texture defects).
 
 1. TEMPORAL MORPHING: Do textures/objects change shape unnaturally between frames? (warping, melting, liquid-like deformation)
 2. TEXTURE WARPING & MICRO-REFLECTIONS: Do backgrounds/surfaces distort, ripple, or have unnatural micro-warping light patterns?
@@ -7905,6 +7737,10 @@ Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
 8. AI ARTIFACTS & NOISE: Any generative AI defects, extra fingers, gibberish text, or harsh noise grain (checked via Zoom Crop)?
 9. KINEMATICS & PHYSICS: Do objects move with natural momentum, gravity, and physics, or is the movement robotic, stiff, or unnaturally slow/gelatinous (common in AI videos)?
 10. INTELLECTUAL PROPERTY & BRAND SAFETY (ADOBE STOCK POLICY): Does the video contain any commercial logos, brand names, trademarked designs (e.g., iPhone camera bumps, Adidas stripes), copyrighted artworks, modern museum paintings, or restricted landmarks (e.g., Eiffel Tower at night, Hollywood Sign)? (Note: Public domain historical documents and generic toys are SAFE). If any IP violation is detected, you MUST fail the video.
+11. LOG PROFILE / FLAT COLOR: Does the video have ungraded, washed-out logarithmic gamma (e.g., S-Log, V-Log, C-Log) without proper color correction? Stock platforms require finished, color-graded footage.
+12. UPSCALED VIDEO: Has the video been artificially/forced upscaled from a lower resolution (e.g., HD\u21924K)? Look for soft details, smeared textures, and lack of true 4K sharpness.
+13. VISIBLE TRANSITIONS / EFFECTS: Are there visible transitions, wipes, dissolves, glitch effects, or overlay effects baked into the footage? Stock footage should be clean raw clips without editor-applied effects.
+14. AUDIO QUALITY: If the video has audio, check for clipping/distortion, excessive noise floor, inconsistent levels, or audio that doesn't match the visual content. Stock platforms prefer clean or no audio.
 
 ======= FINAL DECISION =======
 Tolerance: ${tolerance}. Language: ${targetLanguageName}.
@@ -7959,9 +7795,13 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
           cropped_subject: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] },
           cut_off_object: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] },
           wrong_perspective: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] },
-          low_aesthetic_quality: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] }
+          low_aesthetic_quality: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] },
+          // ===== PERBAIKAN: 3 field yang sebelumnya hilang =====
+          log_profile: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] },
+          upscaled_video: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] },
+          visible_transitions: { type: import_genai.Type.OBJECT, properties: { status: { type: import_genai.Type.STRING, enum: ["PASS", "FAIL", "UNKNOWN"] }, note: { type: import_genai.Type.STRING } }, required: ["status", "note"] }
         },
-        required: ["blur", "noise", "overexposure", "underexposure", "black_frame", "frozen_frame", "flickering", "camera_shake", "out_of_focus", "motion_consistency", "visual_quality", "temporal_morphing", "texture_warping", "ghosting", "geometry_consistency", "ai_artifact", "watermark", "logo", "text", "deformed_object", "bad_anatomy", "compression_artifacts", "blocking", "banding", "white_balance", "motion_blur", "duplicate_frame", "empty_frame", "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality"]
+        required: ["blur", "noise", "overexposure", "underexposure", "black_frame", "frozen_frame", "flickering", "camera_shake", "out_of_focus", "motion_consistency", "visual_quality", "temporal_morphing", "texture_warping", "ghosting", "geometry_consistency", "ai_artifact", "watermark", "logo", "text", "deformed_object", "bad_anatomy", "compression_artifacts", "blocking", "banding", "white_balance", "motion_blur", "duplicate_frame", "empty_frame", "cropped_subject", "cut_off_object", "wrong_perspective", "low_aesthetic_quality", "log_profile", "upscaled_video", "visible_transitions"]
       },
       heatmaps: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.OBJECT } }
     },
@@ -7970,12 +7810,12 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
   let responseText = "";
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider) ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: "application/json", responseSchema, config: { temperature: 0.2 }, model }) : callGeminiWithRetry(
-      model && model.startsWith("gemini") ? model : "gemini-1.5-pro",
+      model && model.startsWith("gemini") ? model : "gemini-2.0-flash",
       imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
       { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.2 },
       1
     ).then((r) => r.text || "{}");
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 9e4));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3e4));
     responseText = await Promise.race([aiPromise, timeout]);
   } catch (e) {
     responseText = JSON.stringify({ visual_scan_analysis: "AI unavailable", legal_status: "SAFE", technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: "FAIL", adobe_stock_readiness: "Reject Risk", detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
@@ -8056,9 +7896,9 @@ async function removeWatermark(imageBase64, maskBase64, preset) {
     }
   }
   try {
-    const jpeg2 = await import("jpeg-js");
+    const jpeg = await import("jpeg-js");
     const imgBuffer = Buffer.from(imageData, "base64");
-    const raw = jpeg2.default.decode(imgBuffer, { useTArray: true });
+    const raw = jpeg.default.decode(imgBuffer, { useTArray: true });
     const { width, height, data: pixels } = raw;
     const maskPixels = new Uint8Array(width * height);
     const mw = Math.floor(width * 0.3), mh = Math.floor(height * 0.18);
@@ -8109,7 +7949,7 @@ async function removeWatermark(imageBase64, maskBase64, preset) {
           }
         }
       }
-      const enc = jpeg2.default.encode({ data: pixels, width, height }, 92);
+      const enc = jpeg.default.encode({ data: pixels, width, height }, 92);
       return { processedImage: `data:image/jpeg;base64,${enc.data.toString("base64")}`, status: "success" };
     }
   } catch (e) {
@@ -8234,7 +8074,7 @@ var __dirname_safe = typeof __dirname !== "undefined" ? __dirname : __filename_s
 var spawnAsync = (command, args, options) => {
   return new Promise((resolve, reject) => {
     let isDone = false;
-    const child = (0, import_child_process2.spawn)(command, args, { ...options, stdio: "ignore" });
+    const child = (0, import_child_process.spawn)(command, args, { ...options, stdio: "ignore" });
     let timeoutId;
     if (options.timeout) {
       timeoutId = setTimeout(() => {
@@ -9751,8 +9591,7 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
     }
     let videoFile = null;
     if (videoPath) {
-      // PERBAIKAN: Skip FFmpeg entirely — upload video langsung ke Gemini
-      console.log("Server check-video-quality: Uploading video to Gemini (no FFmpeg)...");
+      console.log("Server check-video-quality: Uploading video to Gemini...");
       try {
         const videoMime = req.file ? req.file.mimetype : "video/mp4";
         if (req.body.pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
@@ -9762,25 +9601,27 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
           });
           const presignedUrl = await (0, import_s3_request_presigner.getSignedUrl)(getS3Client(), presignCmd, { expiresIn: 3600 });
           videoFile = { fileUri: presignedUrl, mimeType: videoMime };
-          console.log("[Video Audit] Using R2 presigned URL for Gemini direct fetch");
         } else {
           videoFile = await uploadVideoToGemini(videoPath, videoMime);
         }
-        if (videoFile) extractionSuccess = true;
+        if (videoFile) console.log("[Video Audit] Video uploaded to Gemini successfully");
       } catch (uploadErr) {
-        console.warn("[Video Audit] Video upload to Gemini failed:", uploadErr.message);
+        console.warn("[Video Audit] Video upload failed:", uploadErr.message);
       }
     }
-    if ((frames && frames.length > 0) || videoFile) {
-      console.log("Server check-video-quality: " + frames.length + " frames from client, AI-only mode (no FFmpeg)...");
+    if (frames && frames.length > 0 || videoFile) {
+      console.log("Server check-video-quality: " + frames.length + " frames from client, AI-only mode...");
       const withTimeout = (promise, ms, label) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms / 1e3}s`)), ms))]);
-      const data = await withTimeout(checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, null, null, null), 35e3, "checkVideoQuality");
+      const data = await withTimeout(
+        checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, null, videoFile || null, null),
+        35e3,
+        "checkVideoQuality"
+      );
       console.log("Server check-video-quality: Analysis successful");
-      cleanupFn();
-      res.json({ ...data, technical_details: null });
+      const enrichedData = { ...data };
     } else {
       cleanupFn();
-      return res.status(500).json({ error: "Tidak dapat membaca video. Coba rebuild frontend: npm run build. Atau gunakan file berukuran < 25MB untuk upload langsung ke Gemini." });
+      return res.status(500).json({ error: "Upload video gagal. Pastikan: 1) File < 25MB, atau 2) Cloudflare R2 sudah dikonfigurasi, atau 3) Rebuild frontend dengan npm run build." });
     }
   } catch (e) {
     console.warn("Server check-video-quality error:", e);
@@ -9910,7 +9751,7 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
 function analyzeImageWithPython(tempFilePath) {
   return new Promise((resolve, reject) => {
     const pythonScriptPath = import_path.default.join(__dirname_safe, "server/image_analyzer.py");
-    const pythonProcess = (0, import_child_process2.spawn)("python3", [pythonScriptPath, tempFilePath]);
+    const pythonProcess = (0, import_child_process.spawn)("python3", [pythonScriptPath, tempFilePath]);
     let stdoutData = "";
     let stderrData = "";
     pythonProcess.on("error", (err) => {
@@ -9959,12 +9800,12 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   } catch (e) {
     throw new Error("FFmpeg/FFprobe binaries not found on the server.");
   }
-  const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
+  const execPromise = import_util.default.promisify(import_child_process.exec);
   let resolution = "Unknown";
   let color_space = "sRGB (Standard)";
   let fileSizeKb = 0;
   try {
-    const { stdout: probeOut } = await execPromise2(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
+    const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
     const probeData = JSON.parse(probeOut);
     const stream = probeData.streams?.[0] || {};
     const width = stream.width || 0;
@@ -9996,7 +9837,7 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   const histogram = new Array(32).fill(0);
   let fileValidation = "Valid (Passed FFmpeg Integrity Check)";
   try {
-    await execPromise2(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
+    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
     if (import_fs.default.existsSync(rawOutputPath)) {
       const bytes = import_fs.default.readFileSync(rawOutputPath);
       let sum = 0;
@@ -10150,7 +9991,7 @@ app.post("/api/check-image-quality", async (req, res) => {
         console.log(`Server check-image-quality: Using ${validClientCrops.length} native-resolution detail crops from client`);
       } else {
         const ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
-        const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
+        const execPromise = import_util.default.promisify(import_child_process.exec);
         const cropRegions = [
           { name: "center", filter: "crop=iw/2:ih/2:iw/4:ih/4" },
           { name: "left", filter: "crop=iw/2:ih/2:0:ih/4" },
@@ -10160,7 +10001,7 @@ app.post("/api/check-image-quality", async (req, res) => {
         for (const region of cropRegions) {
           try {
             const cropPath = `${tempFilePath}_crop_${region.name}.jpg`;
-            await execPromise2(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${region.filter}" -q:v 2 "${cropPath}"`);
+            await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${region.filter}" -q:v 2 "${cropPath}"`);
             if (import_fs.default.existsSync(cropPath)) {
               cropFilePaths.push(cropPath);
               const cropBuffer = import_fs.default.readFileSync(cropPath);
