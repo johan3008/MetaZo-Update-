@@ -1805,7 +1805,19 @@ export const generateStockMetadata = async (
 
   // Rules for keywords depending on keywordMode
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
+  let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-1. Directly describe the visible subject — DO NOT generalize.
+MUST-2. Describe the main action — capture what the subject(s) are actively doing.
+MUST-3. Include specific objects — name every distinct, identifiable object visible.
+MUST-4. Include the strongest visual context — environment, setting, background, lighting.
+MUST-5. Represent the primary commercial concept — what would a buyer realistically search?
+MUST-6. Be 100% highly relevant to the actual asset — every keyword MUST have a direct visual connection.
+MUST-7. Avoid generic filler words — NEVER use vague terms like "object", "item", "thing" unless genuinely descriptive.
+MUST-8. Avoid duplicates and near-duplicates — NEVER repeat root concepts ("person" AND "people", "run" AND "running").
+MUST-9. Never invent unseen attributes — if it is NOT visible in the asset, DO NOT include it.
+MUST-10. Never prioritize a keyword merely because it sounds popular — relevance to actual visual content ALWAYS beats search volume.
+
+1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
@@ -1838,7 +1850,19 @@ export const generateStockMetadata = async (
 
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
+    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-1. Directly describe the visible subject.
+MUST-2. Describe the main action.
+MUST-3. Include specific objects.
+MUST-4. Include the strongest visual context (environment, setting, lighting).
+MUST-5. Represent the primary commercial concept.
+MUST-6. Be 100% relevant to the actual asset.
+MUST-7. Avoid generic filler words.
+MUST-8. Avoid duplicates and near-duplicates.
+MUST-9. Never invent unseen attributes.
+MUST-10. Never prioritize popularity over relevance.
+
+1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map single-word synonyms, technical terms, and semantic variations.
@@ -1869,7 +1893,19 @@ export const generateStockMetadata = async (
     NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
+    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
+MUST-1. Directly describe the visible subject.
+MUST-2. Describe the main action.
+MUST-3. Include specific objects.
+MUST-4. Include the strongest visual context (environment, setting, lighting).
+MUST-5. Represent the primary commercial concept.
+MUST-6. Be 100% relevant to the actual asset.
+MUST-7. Avoid generic filler words.
+MUST-8. Avoid duplicates and near-duplicates.
+MUST-9. Never invent unseen attributes.
+MUST-10. Never prioritize popularity over relevance.
+
+1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
