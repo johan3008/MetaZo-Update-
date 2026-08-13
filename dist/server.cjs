@@ -3684,353 +3684,156 @@ function applyTitleTemplate(subtype, tiers, titleLength) {
   }
   return title;
 }
-function rankAndWeightKeywords(keywords, tiers, title) {
-  if (keywords.length === 0) return keywords;
-  const lower = (s) => s.toLowerCase().trim();
-  const primarySubjects = tiers.objects.filter((o) => o.tier === "primary").map((o) => lower(o.name));
-  const allSubjects = tiers.objects.map((o) => lower(o.name));
-  const attributes = tiers.attributes.map((a) => lower(String(a)));
-  const scene = tiers.scene.map((s) => lower(String(s)));
-  const concepts = tiers.concepts.map((c) => lower(String(c)));
-  const matchesSubject = (kw) => allSubjects.some((s) => s.includes(kw) || kw.includes(s));
-  const matchesAttribute = (kw) => attributes.some((a) => kw.includes(a) || a.includes(kw));
-  const matchesScene = (kw) => scene.some((s) => kw.includes(s) || s.includes(kw));
-  const matchesConcept = (kw) => concepts.some((c) => kw.includes(c) || c.includes(kw));
-  const ACTION_TERMS = /* @__PURE__ */ new Set([
-    "running",
-    "walking",
-    "jumping",
-    "sitting",
-    "standing",
-    "flying",
-    "swimming",
-    "dancing",
-    "holding",
-    "reaching",
-    "lifting",
-    "working",
-    "typing",
-    "driving",
-    "reading",
-    "writing",
-    "cooking",
-    "eating",
-    "drinking",
-    "sleeping",
-    "talking",
-    "laughing",
-    "smiling",
-    "looking",
-    "watching",
-    "listening",
-    "thinking",
-    "playing",
-    "climbing",
-    "falling",
-    "floating",
-    "rising",
-    "flowing",
-    "moving",
-    "growing",
-    "blooming",
-    "shining",
-    "glowing",
-    "reflecting",
-    "spinning",
-    "exercise",
-    "workout",
-    "yoga",
-    "meditation",
-    "training",
-    "practice",
-    "traveling",
-    "exploring",
-    "hiking",
-    "surfing",
-    "cycling",
-    "commuting"
-  ]);
-  const isAction = (kw) => {
-    const w = lower(kw);
-    if (ACTION_TERMS.has(w)) return true;
-    return Array.from(ACTION_TERMS).some((a) => w.includes(a) || a.includes(w));
-  };
-  const TECHNIQUE_TERMS = /* @__PURE__ */ new Set([
-    "watercolor",
-    "oil painting",
-    "sketch",
-    "line art",
-    "vector",
-    "flat design",
-    "3d render",
-    "cinematic",
-    "macro",
-    "close-up",
-    "wide shot",
-    "aerial view",
-    "drone shot",
-    "long exposure",
-    "bokeh",
-    "depth of field",
-    "grainy",
-    "vintage",
-    "retro",
-    "minimalist",
-    "abstract",
-    "geometric",
-    "isometric",
-    "gradient",
-    "monochrome",
-    "black and white",
-    "sepia",
-    "duotone",
-    "vibrant",
-    "pastel",
-    "high contrast",
-    "soft focus",
-    "flat lay",
-    "top view",
-    "panoramic",
-    "portrait orientation",
-    "landscape orientation",
-    "square format",
-    "high key",
-    "low key",
-    "rim lighting",
-    "backlit",
-    "silhouette",
-    "shadow play",
-    "golden hour",
-    "blue hour",
-    "night",
-    "daylight",
-    "natural light",
-    "studio light"
-  ]);
-  const isTechnique = (kw) => {
-    const w = lower(kw);
-    if (TECHNIQUE_TERMS.has(w)) return true;
-    return Array.from(TECHNIQUE_TERMS).some((t) => w.includes(t) || t.includes(w));
-  };
-  const INDUSTRY_TERMS = /* @__PURE__ */ new Set([
-    "healthcare",
-    "medical",
-    "technology",
-    "fintech",
-    "finance",
-    "education",
-    "marketing",
-    "advertising",
-    "real estate",
-    "hospitality",
-    "food industry",
-    "fashion",
-    "beauty",
-    "fitness",
-    "wellness",
-    "automotive",
-    "construction",
-    "agriculture",
-    "manufacturing",
-    "retail",
-    "e-commerce",
-    "entertainment",
-    "media",
-    "publishing",
-    "legal",
-    "insurance",
-    "travel",
-    "tourism",
-    "sustainability",
-    "green energy",
-    "renewable",
-    "corporate",
-    "startup",
-    "nonprofit",
-    "government",
-    "transportation",
-    "logistics",
-    "science",
-    "research"
-  ]);
-  const isIndustry = (kw) => {
-    const w = lower(kw);
-    if (INDUSTRY_TERMS.has(w)) return true;
-    return Array.from(INDUSTRY_TERMS).some((ind) => w.includes(ind) || ind.includes(w));
-  };
-  const USECASE_TERMS = /* @__PURE__ */ new Set([
-    "banner",
-    "landing page",
-    "presentation",
-    "brochure",
-    "flyer",
-    "poster",
-    "social media",
-    "instagram",
-    "facebook",
-    "website",
-    "blog",
-    "magazine",
-    "newsletter",
-    "annual report",
-    "billboard",
-    "packaging",
-    "product label",
-    "app design",
-    "ui design",
+var VALID_SEARCH_INTENT_PATTERNS = [
+  // Core subject nouns (weight tertinggi — buyer mencari ini langsung)
+  { pattern: /^(animal|bird|fish|insect|flower|tree|fruit|vegetable|food|drink|person|man|woman|child|baby|dog|cat|horse|car|motorcycle|bicycle|boat|plane|house|building|bridge|road|mountain|river|lake|ocean|beach|forest|sky|sun|moon|star|cloud|rain|snow|wind|fire|water|earth|stone|wood|metal|glass|paper|fabric|leather|plastic|rubber|gold|silver|bronze|iron|steel|copper|diamond|crystal|pearl|coral|shell|feather|fur|scale|leaf|petal|seed|root|branch|trunk|vine|grass|moss|fungus|mushroom|coral|algae|bacteria|virus|cell|dna|atom|molecule|crystal|liquid|gas|plasma|energy|light|shadow|color|pattern|texture|shape|form|line|curve|angle|edge|surface|volume|space|time|motion|force|gravity|magnetism|electricity|sound|music|voice|noise|silence|smell|taste|touch|temperature|pressure|pain|pleasure|emotion|thought|memory|dream|idea|concept|theory|fact|truth|lie|story|myth|legend|history|future|past|present|reality|fantasy|fiction|science|art|philosophy|religion|politics|economics|culture|society|family|friend|enemy|stranger|lover|partner|team|group|crowd|audience|market|customer|client|user|player|student|teacher|doctor|nurse|engineer|artist|musician|writer|actor|director|producer|manager|leader|boss|worker|employee|volunteer|citizen|immigrant|tourist|traveler|explorer|adventurer|hero|villain|victim|survivor|witness|suspect|criminal|police|soldier|firefighter|pilot|driver|captain|chef|waiter|barista|baker|butcher|farmer|gardener|fisher|hunter|miner|builder|carpenter|plumber|electrician|painter|sculptor|potter|weaver|tailor|designer|architect|programmer|developer|analyst|consultant|coach|trainer|mentor|advisor|expert|specialist|professional|amateur|beginner|novice|master|veteran|senior|junior|adult|teenager|child|infant|elder|ancestor|descendant|relative|neighbor|colleague|competitor|ally|opponent|rival|partner|spouse|parent|sibling|cousin|uncle|aunt|nephew|niece|grandparent|grandchild)$/, weight: 100, label: "core-subject" },
+  // High-volume commercial compound phrases (buyer search queries)
+  { pattern: /^(business|office|corporate|workplace|meeting|conference|presentation|seminar|workshop|training|classroom|lecture|exam|graduation|ceremony|celebration|festival|holiday|vacation|travel|trip|journey|tour|excursion|adventure|expedition|campaign|mission|project|task|assignment|goal|target|objective|strategy|plan|schedule|timeline|deadline|budget|report|analysis|research|study|survey|experiment|test|trial|evaluation|review|audit|inspection|check|quality|performance|efficiency|productivity|innovation|creativity|solution|improvement|optimization|transformation|revolution|evolution|growth|development|progress|advancement|achievement|success|victory|triumph|breakthrough|discovery|invention|creation|design|engineering|technology|science|medicine|health|wellness|fitness|nutrition|diet|exercise|sport|game|competition|championship|tournament|race|match|contest|challenge|achievement|record|medal|trophy|award|prize|recognition|honor|respect|trust|loyalty|commitment|dedication|passion|enthusiasm|motivation|inspiration|aspiration|ambition|vision|mission|purpose|meaning|value|principle|ethic|moral|standard|quality|excellence|perfection|mastery|skill|talent|ability|capability|potential|opportunity|possibility|future|trend|change|shift|transition|adaptation|transformation|disruption|revolution|evolution|innovation|breakthrough|milestone|landmark|benchmark|indicator|metric|measurement|assessment|evaluation|analysis|review|feedback|insight|wisdom|knowledge|understanding|awareness|consciousness|mindfulness|focus|concentration|attention|perception|cognition|intelligence|wisdom|learning|education|training|development|growth|progress|improvement|advancement|evolution|maturity|experience|expertise|specialization|professionalism|leadership|management|administration|coordination|organization|planning|execution|implementation|operation|maintenance|support|service|assistance|guidance|counseling|coaching|mentoring|teaching|instruction|direction|supervision|oversight|control|regulation|compliance|governance|policy|procedure|protocol|standard|guideline|framework|structure|system|process|workflow|pipeline|infrastructure|architecture|platform|ecosystem|network|community|society|culture|civilization|humanity|world|planet|earth|nature|environment|ecology|climate|weather|season|atmosphere|universe|cosmos|galaxy|star|planet|moon|asteroid|comet|meteor|nebula|black hole|wormhole|dimension|reality|existence|life|death|birth|creation|destruction|transformation|cycle|balance|harmony|chaos|order|entropy|energy|matter|force|field|wave|particle|quantum|relativity|gravity|electromagnetism|radiation|light|sound|heat|cold|temperature|pressure|density|volume|mass|weight|speed|velocity|acceleration|momentum|inertia|resistance|friction|tension|compression|expansion|contraction|vibration|oscillation|resonance|frequency|amplitude|wavelength|phase|polarization|diffraction|refraction|reflection|absorption|emission|transmission|conduction|convection|radiation|insulation|isolation|integration|connection|relation|interaction|communication|collaboration|cooperation|coordination|synchronization|alignment|integration|unification|consolidation|merger|acquisition|partnership|alliance|coalition|federation|union|association|organization|institution|corporation|company|enterprise|business|startup|venture|investment|finance|banking|insurance|accounting|auditing|taxation|regulation|compliance|legal|law|justice|rights|freedom|liberty|equality|diversity|inclusion|accessibility|sustainability|conservation|preservation|protection|safety|security|privacy|confidentiality|integrity|authenticity|transparency|accountability|responsibility|ethics|morality|values|principles|standards|norms|rules|regulations|laws|policies|procedures|protocols|guidelines|frameworks|structures|systems|processes|workflows|pipelines|operations|functions|services|products|solutions|applications|platforms|tools|technologies|innovations|inventions|discoveries|breakthroughs|advancements|improvements|enhancements|upgrades|updates|patches|fixes|releases|versions|editions|iterations|generations|cycles|phases|stages|steps|levels|layers|dimensions|aspects|facets|elements|components|parts|pieces|units|modules|segments|sections|divisions|departments|branches|subsidiaries|affiliates|partners|associates|members|stakeholders|shareholders|investors|owners|founders|entrepreneurs|leaders|managers|directors|executives|officers|administrators|coordinators|supervisors|overseers|controllers|regulators|auditors|inspectors|reviewers|evaluators|assessors|analysts|researchers|scientists|engineers|designers|developers|programmers|coders|testers|debuggers|optimizers|integrators|implementers|operators|maintainers|supporters|helpers|assistants|aides|advisors|consultants|counselors|coaches|mentors|trainers|teachers|instructors|educators|professors|lecturers|tutors|guides|facilitators|moderators|mediators|arbitrators|judges|referees|umpires|officials|authorities|experts|specialists|professionals|practitioners|technicians|artisans|craftsmen|tradesmen|workers|laborers|employees|staff|personnel|crew|team|squad|unit|force|corps|brigade|division|regiment|battalion|company|platoon|squadron|fleet|flotilla|armada|navy|army|air force|marine corps|coast guard|national guard|reserve|militia|volunteer|recruit|trainee|cadet|apprentice|intern|fellow|scholar|student|pupil|learner|beginner|novice|rookie|newcomer|freshman|sophomore|junior|senior|graduate|postgraduate|doctorate|candidate|applicant|nominee|finalist|winner|champion|victor|conqueror|master|expert|authority|specialist|professional|veteran|legend|icon|star|celebrity|hero|idol|role model|mentor|coach|teacher|guide|leader|pioneer|trailblazer|innovator|inventor|creator|founder|builder|maker|producer|director|manager|executive|administrator|organizer|planner|strategist|tactician|analyst|advisor|consultant|expert|specialist)$/, weight: 90, label: "commercial-phrase" },
+  // High-value compound phrases 2-3 words (long-tail buyer queries)
+  { pattern: /(copy space|copyspace|text space|blank space|white space|negative space|empty space|clean background|plain background|solid background|isolated background|white background|black background|transparent background|studio background|minimal background|simple background|neutral background|gradient background|blurred background|soft background|dark background|bright background|colorful background|abstract background|geometric background|pattern background|texture background|vintage background|retro background|modern background|contemporary background|futuristic background|natural background|organic background|artificial background|digital background|analog background|urban background|rural background|indoor background|outdoor background|office background|home background|kitchen background|bathroom background|bedroom background|living room|dining room|meeting room|conference room|classroom|laboratory|workshop|studio|gallery|museum|library|hospital|clinic|pharmacy|laboratory|factory|warehouse|store|shop|boutique|market|mall|supermarket|restaurant|cafe|bar|hotel|resort|spa|gym|pool|beach|park|garden|forest|mountain|lake|river|ocean|sea|coast|island|desert|jungle|savanna|tundra|arctic|antarctic|tropical|temperate|subtropical|mediterranean|continental|maritime|alpine|coastal|inland|urban|suburban|rural|remote|isolated|crowded|busy|quiet|peaceful|serene|tranquil|calm|relaxing|stressful|chaotic|messy|organized|structured|systematic|methodical|disciplined|focused|distracted|engaged|bored|interested|curious|fascinated|captivated|enchanted|mesmerized|hypnotized|entranced|spellbound|riveted|absorbed|immersed|involved|participating|contributing|collaborating|cooperating|coordinating|communicating|interacting|connecting|relating|bonding|sharing|giving|receiving|exchanging|trading|buying|selling|marketing|advertising|promoting|branding|positioning|targeting|segmenting|analyzing|researching|studying|investigating|exploring|discovering|uncovering|revealing|exposing|highlighting|showcasing|displaying|exhibiting|presenting|demonstrating|illustrating|exemplifying|representing|symbolizing|signifying|indicating|suggesting|implying|inferring|concluding|deciding|choosing|selecting|picking|opting|preferring|favoring|recommending|suggesting|proposing|offering|providing|supplying|delivering|distributing|allocating|assigning|delegating|outsourcing|contracting|partnering|collaborating|cooperating|coordinating|synchronizing|aligning|integrating|unifying|consolidating|merging|acquiring|investing|funding|financing|budgeting|planning|scheduling|organizing|managing|leading|directing|guiding|coaching|mentoring|teaching|training|educating|informing|updating|notifying|alerting|warning|cautioning|advising|counseling|consulting|recommending|suggesting|proposing|presenting|pitching|selling|negotiating|closing|finalizing|completing|finishing|accomplishing|achieving|succeeding|winning|triumphing|prevailing|overcoming|conquering|mastering|dominating|excelling|outperforming|surpassing|exceeding|transcending|going beyond|breaking through|pushing forward|moving ahead|advancing|progressing|developing|growing|expanding|scaling|multiplying|increasing|rising|climbing|soaring|skyrocketing|booming|flourishing|thriving|prospering|blooming|blossoming|flowering|fruiting|harvesting|reaping|gathering|collecting|accumulating|amassing|hoarding|stockpiling|reserving|saving|conserving|preserving|protecting|guarding|defending|securing|shielding|sheltering|housing|accommodating|hosting|entertaining|welcoming|greeting|receiving|accepting|embracing|including|involving|engaging|participating|contributing|sharing|giving|donating|volunteering|helping|assisting|supporting|aiding|serving|caring|nurturing|nourishing|feeding|sustaining|maintaining|keeping|holding|retaining|preserving|protecting|conserving|saving|rescuing|recovering|restoring|repairing|fixing|mending|healing|curing|treating|medicating|vaccinating|immunizing|preventing|avoiding|escaping|evading|dodging|ducking|weaving|zigzagging|maneuvering|navigating|steering|piloting|driving|riding|flying|sailing|cruising|traveling|journeying|voyaging|exploring|adventuring|expeditioning|trekking|hiking|climbing|mountaineering|skiing|snowboarding|surfing|swimming|diving|snorkeling|scuba diving|free diving|deep sea|shallow water|fresh water|salt water|brackish water|mineral water|spring water|tap water|bottled water|filtered water|purified water|distilled water|carbonated water|sparkling water|still water|flat water|ice water|cold water|hot water|warm water|lukewarm water|boiling water|freezing water|icy water|frosty water|chilly water|cool water|refreshing water|invigorating water|energizing water|revitalizing water|rejuvenating water|restoring water|healing water|therapeutic water|medicinal water|curative water|remedial water|restorative water|recuperative water|convalescent water|palliative water|soothing water|calming water|relaxing water|tranquil water|peaceful water|serene water|quiet water|still water|motionless water|stagnant water|flowing water|running water|streaming water|cascading water|waterfall|rapids|whitewater|torrent|flood|deluge|downpour|rainfall|precipitation|drizzle|mist|fog|haze|smog|pollution|contamination|purification|filtration|distillation|evaporation|condensation|precipitation|collection|storage|distribution|consumption|usage|utilization|application|implementation|execution|operation|function|performance|efficiency|effectiveness|productivity|output|throughput|capacity|capability|potential|possibility|probability|likelihood|chance|opportunity|risk|threat|danger|hazard|peril|jeopardy|vulnerability|weakness|strength|advantage|benefit|gain|profit|return|yield|dividend|interest|revenue|income|earnings|salary|wage|compensation|remuneration|payment|fee|charge|cost|expense|price|value|worth|wealth|fortune|treasure|riches|abundance|plenty|prosperity|affluence|opulence|luxury|comfort|convenience|ease|simplicity|efficiency|effectiveness|productivity|performance|quality|excellence|superiority|supremacy|dominance|leadership|authority|power|control|influence|impact|effect|result|outcome|consequence|implication|significance|importance|relevance|meaning|purpose|intention|goal|objective|target|aim|mission|vision|dream|aspiration|ambition|desire|wish|hope|expectation|anticipation|prediction|forecast|projection|estimation|calculation|computation|measurement|assessment|evaluation|analysis|review|inspection|examination|investigation|exploration|discovery|uncovering|revelation|disclosure|exposure|publication|dissemination|distribution|circulation|propagation|spread|diffusion|dispersion|scattering|broadcasting|transmission|communication|notification|announcement|declaration|statement|report|account|description|explanation|interpretation|translation|adaptation|transformation|conversion|modification|alteration|change|adjustment|correction|improvement|enhancement|upgrade|update|revision|edition|version|release|publication|issue|volume|number|copy|duplicate|replica|reproduction|imitation|simulation|emulation|representation|depiction|portrayal|illustration|demonstration|exhibition|display|showcase|presentation|performance|execution|implementation|operation|function|activity|action|behavior|conduct|practice|habit|routine|custom|tradition|convention|norm|standard|rule|regulation|law|policy|procedure|protocol|guideline|framework|structure|system|process|method|technique|approach|strategy|tactic|plan|scheme|design|model|pattern|template|format|layout|arrangement|organization|composition|configuration|setup|installation|deployment|distribution|allocation|assignment|designation|appointment|nomination|selection|election|choice|option|alternative|substitute|replacement|standby|backup|reserve|spare|extra|additional|supplementary|complementary|auxiliary|supporting|assisting|helping|aiding|serving|facilitating|enabling|empowering|strengthening|reinforcing|bolstering|boosting|enhancing|improving|upgrading|advancing|promoting|furthering|developing|cultivating|nurturing|fostering|encouraging|stimulating|motivating|inspiring|driving|pushing|propelling|moving|advancing|progressing|developing|growing|expanding|extending|broadening|widening|deepening|enriching|enhancing|augmenting|amplifying|magnifying|intensifying|strengthening|fortifying|reinforcing|consolidating|solidifying|stabilizing|securing|protecting|defending|guarding|shielding|safeguarding|preserving|conserving|maintaining|sustaining|supporting|upholding|endorsing|backing|sponsoring|funding|financing|investing|contributing|donating|giving|providing|supplying|delivering|distributing|allocating|assigning|designating|appointing|nominating|selecting|choosing|electing|voting|deciding|determining|resolving|settling|concluding|finalizing|completing|finishing|accomplishing|achieving|attaining|reaching|gaining|acquiring|obtaining|securing|winning|earning|deserving|meriting|warranting|justifying|validating|confirming|verifying|authenticating|certifying|attesting|witnessing|testifying|declaring|stating|asserting|claiming|professing|avowing|acknowledging|admitting|confessing|disclosing|revealing|exposing|uncovering|discovering|finding|locating|identifying|recognizing|detecting|noticing|observing|seeing|watching|viewing|looking|gazing|staring|glancing|peeking|peering|inspecting|examining|scrutinizing|analyzing|studying|investigating|researching|exploring|probing|searching|seeking|hunting|pursuing|chasing|following|tracking|tracing|monitoring|surveying|scanning|screening|checking|testing|trying|experimenting|trialing|piloting|sampling|measuring|weighing|calculating|computing|estimating|approximating|guessing|predicting|forecasting|projecting|planning|preparing|arranging|organizing|coordinating|managing|administering|directing|leading|guiding|steering|navigating|piloting|driving|riding|flying|sailing|traveling|journeying|moving|going|coming|arriving|departing|leaving|entering|exiting|approaching|receding|advancing|retreating|withdrawing|pulling back|falling back|giving up|surrendering|yielding|submitting|complying|obeying|following|adhering|conforming|abiding|observing|respecting|honoring|upholding|maintaining|preserving|protecting|defending|guarding|securing|ensuring|guaranteeing|promising|committing|pledging|vowing|swearing|oathing|declaring|announcing|proclaiming|pronouncing|stating|asserting|claiming|maintaining|insisting|contending|arguing|debating|discussing|negotiating|bargaining|haggling|trading|dealing|transacting|conducting|performing|executing|implementing|carrying out|putting into effect|bringing about|effecting|causing|producing|generating|creating|making|building|constructing|assembling|manufacturing|fabricating|producing|developing|designing|engineering|planning|organizing|arranging|setting up|establishing|instituting|founding|launching|starting|beginning|initiating|commencing|opening|unveiling|revealing|disclosing|announcing|introducing|presenting|showcasing|exhibiting|displaying|demonstrating|illustrating|exemplifying|representing|depicting|portraying|describing|explaining|clarifying|elucidating|illuminating|enlightening|informing|educating|teaching|training|coaching|mentoring|guiding|advising|counseling|consulting|recommending|suggesting|proposing|offering|providing|supplying|delivering|giving|donating|contributing|sharing|distributing|allocating|assigning|delegating|transferring|conveying|transmitting|sending|forwarding|relaying|passing|handing|delivering|bringing|carrying|transporting|shipping|mailing|posting|couriering|dispatching|routing|directing|channeling|funneling|filtering|screening|sorting|classifying|categorizing|grouping|organizing|arranging|ordering|ranking|rating|scoring|grading|evaluating|assessing|judging|appraising|valuing|estimating|calculating|measuring|weighing|quantifying|qualifying|characterizing|defining|describing|identifying|naming|labeling|tagging|marking|branding|stamping|sealing|signing|endorsing|approving|authorizing|permitting|allowing|granting|giving|bestowing|conferring|awarding|presenting|offering|providing|supplying|furnishing|equipping|outfitting|arming|preparing|readying|priming|conditioning|training|coaching|teaching|instructing|educating|informing|briefing|debriefing|updating|notifying|alerting|warning|advising|cautioning|counseling|guiding|directing|leading|steering|navigating|piloting)|$/i, weight: 80, label: "compound-phrase" },
+  // Action verbs with visual + commercial significance
+  { pattern: /^(running|walking|jumping|sitting|standing|lying|sleeping|eating|drinking|cooking|cleaning|washing|reading|writing|typing|drawing|painting|singing|dancing|playing|working|studying|learning|teaching|speaking|talking|listening|watching|looking|searching|finding|building|creating|designing|developing|programming|coding|testing|debugging|fixing|repairing|maintaining|operating|driving|flying|swimming|diving|climbing|hiking|camping|traveling|exploring|discovering|researching|analyzing|evaluating|planning|organizing|managing|leading|directing|guiding|coaching|mentoring|training|exercising|practicing|performing|competing|winning|losing|fighting|defending|protecting|helping|supporting|caring|nurturing|loving|kissing|hugging|holding|carrying|lifting|pushing|pulling|throwing|catching|kicking|hitting|striking|cutting|chopping|slicing|dicing|mixing|stirring|pouring|filling|emptying|opening|closing|connecting|disconnecting|plugging|unplugging|charging|discharging|loading|unloading|packing|unpacking|shipping|receiving|sending|delivering|buying|selling|trading|exchanging|investing|saving|spending|earning|paying|borrowing|lending|giving|taking|sharing|donating|volunteering|contributing|participating|engaging|involving|attending|joining|leaving|entering|exiting|arriving|departing|moving|staying|living|residing|visiting|vacationing|relaxing|resting|meditating|praying|worshipping|celebrating|partying|enjoying|suffering|struggling|surviving|thriving|flourishing|growing|developing|evolving|changing|adapting|transforming|transitioning|converting|modifying|updating|upgrading|improving|enhancing|optimizing|maximizing|minimizing|reducing|increasing|expanding|extending|broadening|deepening|strengthening|weakening|intensifying|softening|hardening|solidifying|liquefying|gasifying|vaporizing|condensing|freezing|melting|boiling|evaporating|dissolving|mixing|separating|combining|uniting|dividing|splitting|breaking|shattering|crushing|grinding|pulverizing|powdering|dusting|sweeping|mopping|scrubbing|polishing|shining|buffing|waxing|oiling|greasing|lubricating|rusting|corroding|decaying|rotting|molding|spoiling|aging|maturing|ripening|blooming|flowering|fruiting|seeding|germinating|sprouting|growing|developing|evolving|maturing|ripening|harvesting|reaping|gathering|collecting|picking|plucking|pruning|trimming|cutting|mowing|watering|fertilizing|feeding|nourishing|sustaining|maintaining|caring|protecting|guarding|defending|shielding|sheltering|housing|accommodating|hosting|entertaining|welcoming|greeting|receiving|accepting|rejecting|refusing|denying|declining|dismissing|ignoring|neglecting|abandoning|leaving|forsaking|deserting|betraying|cheating|lying|deceiving|tricking|fooling|misleading|manipulating|controlling|dominating|oppressing|suppressing|repressing|depressing|saddening|angering|enraging|infuriating|maddening|crazing|insaning|driving crazy|making mad|provoking|instigating|inciting|stirring|arousing|awakening|waking|rising|lifting|elevating|raising|increasing|boosting|amplifying|magnifying|enhancing|enriching|improving|bettering|perfecting|refining|polishing|finishing|completing|accomplishing|achieving|succeeding|winning|triumphing|prevailing|overcoming|conquering|mastering|dominating|excelling|outperforming|surpassing|exceeding|transcending|going beyond|breaking through|pushing forward|moving ahead|advancing|progressing)$/i, weight: 70, label: "action-verb" },
+  // Emotional/conceptual terms with commercial search volume
+  { pattern: /^(love|hate|fear|anger|joy|sadness|happiness|pleasure|pain|hope|despair|faith|doubt|trust|mistrust|confidence|anxiety|peace|conflict|harmony|discord|unity|division|togetherness|loneliness|connection|isolation|belonging|alienation|acceptance|rejection|inclusion|exclusion|diversity|uniformity|freedom|captivity|liberty|oppression|justice|injustice|equality|inequality|fairness|unfairness|honesty|dishonesty|integrity|corruption|authenticity|fakeness|reality|illusion|truth|lie|fact|fiction|certainty|uncertainty|clarity|confusion|order|chaos|stability|instability|security|insecurity|safety|danger|comfort|discomfort|ease|difficulty|simplicity|complexity|beauty|ugliness|elegance|crudeness|refinement|roughness|sophistication|primitiveness|modernity|tradition|innovation|conservation|progress|regression|growth|decline|development|stagnation|evolution|devolution|creation|destruction|construction|deconstruction|building|breaking|making|unmaking|forming|deforming|shaping|misshaping|organizing|disorganizing|structuring|destructuring|systematizing|chaotizing|ordering|disordering|arranging|disarranging|tidying|messying|cleaning|dirtying|purifying|polluting|healing|hurting|curing|harming|helping|hindering|supporting|undermining|strengthening|weakening|empowering|disempowering|enabling|disabling|facilitating|obstructing|promoting|demoting|advancing|retarding|accelerating|decelerating|speeding|slowing|quickening|delaying|hastening|prolonging|shortening|extending|reducing|expanding|contracting|inflating|deflating|rising|falling|ascending|descending|climbing|diving|soaring|plummeting|surging|crashing|booming|busting|thriving|declining|flourishing|withering|blooming|wilting|growing|shrinking|multiplying|dividing|uniting|separating|merging|splitting|combining|isolating|integrating|disintegrating|coalescing|dispersing|gathering|scattering|collecting|distributing|centralizing|decentralizing|concentrating|diffusing|focusing|blurring|sharpening|dulling|brightening|darkening|lightening|deepening|flattening|illuminating|shadowing|revealing|hiding|exposing|concealing|discovering|covering|uncovering|masking|unmasking|showing|hiding|displaying|withholding|presenting|removing|giving|taking|offering|refusing|accepting|rejecting|welcoming|excluding|including|embracing|pushing away|pulling close|attracting|repelling|drawing in|pushing out|engaging|disengaging|connecting|disconnecting|linking|unlinking|tying|untying|binding|unbinding|fastening|unfastening|locking|unlocking|opening|closing|starting|stopping|beginning|ending|initiating|terminating|launching|landing|taking off|touching down|departing|arriving|leaving|staying|going|coming)$/i, weight: 60, label: "conceptual" },
+  // Industry/professional terms with buyer intent
+  { pattern: /(healthcare|medical|hospital|clinic|pharmacy|doctor|nurse|patient|treatment|therapy|surgery|medicine|drug|prescription|diagnosis|symptom|disease|illness|condition|disorder|syndrome|infection|injury|wound|fracture|burn|cut|bruise|swelling|inflammation|pain|ache|discomfort|relief|recovery|rehabilitation|physical therapy|occupational therapy|speech therapy|mental health|psychology|psychiatry|counseling|therapy|wellness|fitness|nutrition|diet|exercise|workout|training|gym|yoga|meditation|mindfulness|relaxation|stress management|sleep|rest|recovery|regeneration|rejuvenation|revitalization|detox|cleanse|fast|juice|smoothie|supplement|vitamin|mineral|herb|spice|superfood|organic|natural|holistic|alternative|complementary|integrative|functional|preventive|curative|palliative|rehabilitative|restorative|regenerative|therapeutic|medicinal|pharmaceutical|biotechnology|genetics|genomics|proteomics|metabolomics|bioinformatics|computational biology|systems biology|synthetic biology|molecular biology|cell biology|developmental biology|evolutionary biology|ecology|environmental science|climate science|earth science|geology|oceanography|meteorology|astronomy|astrophysics|cosmology|physics|chemistry|mathematics|statistics|data science|computer science|information technology|artificial intelligence|machine learning|deep learning|neural networks|natural language processing|computer vision|robotics|automation|internet of things|blockchain|cryptocurrency|fintech|financial technology|banking|insurance|investment|wealth management|asset management|portfolio management|risk management|compliance|regulation|governance|policy|law|legal|justice|courts|litigation|arbitration|mediation|negotiation|contract|agreement|partnership|corporation|llc|nonprofit|ngo|charity|foundation|social enterprise|startup|venture capital|private equity|hedge fund|mutual fund|etf|index fund|bond|stock|share|equity|debt|credit|loan|mortgage|lease|rent|buy|sell|trade|exchange|market|exchange|platform|broker|dealer|trader|investor|lender|borrower|saver|spender|consumer|producer|manufacturer|distributor|wholesaler|retailer|merchant|vendor|supplier|buyer|seller|customer|client|user|subscriber|member|patron|donor|sponsor|benefactor|philanthropist|volunteer|activist|advocate|campaigner|organizer|leader|follower|supporter|opponent|critic|analyst|commentator|journalist|reporter|editor|publisher|broadcaster|anchor|host|guest|speaker|presenter|performer|entertainer|artist|musician|actor|actress|director|producer|writer|author|poet|playwright|screenwriter|novelist|essayist|journalist|columnist|blogger|vlogger|influencer|creator|maker|builder|designer|architect|engineer|developer|programmer|coder|hacker|technologist|scientist|researcher|scholar|academic|professor|teacher|instructor|educator|trainer|coach|mentor|advisor|consultant|expert|specialist|professional|practitioner|technician|artisan|craftsman|tradesman|worker|laborer|employee|staff|executive|manager|director|officer|president|ceo|cfo|coo|cto|cio|cmo|chro|vp|svp|evp|md|gm|head|chief|lead|senior|junior|associate|assistant|aide|clerk|secretary|receptionist|administrator|coordinator|planner|scheduler|organizer|analyst|strategist|planner|architect|designer|developer|engineer|technician|specialist|expert|consultant|advisor|counselor|coach|mentor|trainer|teacher|instructor|educator|professor|lecturer|tutor|facilitator|moderator|mediator|arbitrator|negotiator|diplomat|ambassador|representative|delegate|envoy|emissary|agent|broker|intermediary|middleman|liaison|coordinator|connector|networker|relationship manager|account manager|project manager|product manager|program manager|portfolio manager|operations manager|general manager|regional manager|district manager|branch manager|store manager|team leader|team lead|supervisor|foreman|overseer|inspector|auditor|reviewer|evaluator|assessor|appraiser|valuer|estimator|surveyor|examiner|investigator|detective|inspector|agent|officer|patrol|guard|watchman|sentinel|sentry|lookout|scout|ranger|warden|keeper|custodian|janitor|cleaner|maid|housekeeper|butler|servant|attendant|assistant|aide|helper|supporter|carer|caregiver|nurse|doctor|physician|surgeon|specialist|consultant|therapist|counselor|psychologist|psychiatrist|social worker|case worker|probation officer|parole officer|correctional officer|police officer|detective|investigator|agent|fbi|cia|nsa|secret service|military|army|navy|air force|marine corps|coast guard|national guard|reserve|veteran|soldier|sailor|airman|marine|guardsman|reservist|militia|volunteer|recruit|cadet|officer candidate|trainee|student|pupil|learner|apprentice|intern|fellow|resident|attending|physician|surgeon|nurse|practitioner|clinician|therapist|technician|technologist|scientist|researcher|investigator|scholar|academic|professor|teacher|instructor|educator|faculty|staff|administration|management|leadership|governance|board|committee|council|panel|task force|working group|team|squad|unit|division|department|branch|office|bureau|agency|authority|commission|board|council|committee|panel|task force|working group|advisory board|steering committee|executive committee|management committee|operations committee|finance committee|audit committee|risk committee|compliance committee|ethics committee|governance committee|nomination committee|remuneration committee|compensation committee|benefits committee|pension committee|retirement committee|investment committee|strategy committee|planning committee|budget committee|project committee|program committee|portfolio committee|product committee|service committee|quality committee|safety committee|security committee|environmental committee|sustainability committee|diversity committee|inclusion committee|accessibility committee|wellness committee|health committee|safety committee|security committee|emergency committee|crisis committee|disaster committee|recovery committee|continuity committee|resilience committee)$/i, weight: 55, label: "industry" }
+];
+function hasValidSearchIntent(keyword) {
+  const k = keyword.toLowerCase().trim();
+  if (k.length < 3) return false;
+  const NOISE_TERMS = /* @__PURE__ */ new Set([
+    "image",
+    "picture",
+    "photo",
+    "photograph",
+    "stock",
+    "asset",
+    "file",
+    "download",
+    "free",
+    "royalty",
+    "royalty free",
+    "high quality",
+    "premium",
+    "best",
+    "beautiful",
+    "stunning",
+    "amazing",
+    "awesome",
+    "great",
+    "nice",
+    "good",
+    "excellent",
+    "perfect",
+    "wonderful",
+    "fantastic",
+    "incredible",
+    "thing",
+    "object",
+    "item",
+    "stuff",
+    "something",
+    "anything",
+    "nothing",
+    "view",
+    "scene",
+    "scenery",
+    "landscape",
+    "background",
     "wallpaper",
-    "background",
-    "cover photo",
-    "header",
-    "thumbnail",
-    "icon",
-    "logo",
-    "infographic",
-    "editorial",
-    "commercial",
-    "advertisement",
-    "promo",
-    "catalog",
-    "menu",
-    "invitation",
-    "greeting card",
-    "calendar",
-    "textbook",
-    "wall art",
-    "canvas print",
-    "copy space",
-    "text space",
-    "isolated",
-    "template",
-    "mockup"
+    "hd",
+    "4k",
+    "8k",
+    "ultra hd",
+    "full hd",
+    "high resolution",
+    "high res",
+    "no person",
+    "nobody",
+    "empty",
+    "blank"
   ]);
-  const isUseCase = (kw) => {
-    const w = lower(kw);
-    if (USECASE_TERMS.has(w)) return true;
-    return Array.from(USECASE_TERMS).some((u) => w.includes(u) || u.includes(w));
-  };
-  const COMPOSITION_TERMS = /* @__PURE__ */ new Set([
-    "rule of thirds",
-    "symmetry",
-    "asymmetry",
-    "leading lines",
-    "diagonal",
-    "framing",
-    "negative space",
-    "positive space",
-    "foreground",
-    "background",
-    "midground",
-    "layered",
-    "depth",
-    "perspective",
-    "vanishing point",
-    "balanced",
-    "unbalanced",
-    "centered",
-    "off-center",
-    "isolated subject",
-    "group composition",
-    "single object",
-    "pattern",
-    "texture",
-    "repetition",
-    "contrast",
-    "harmony",
-    "minimal",
-    "clean",
-    "uncluttered",
-    "cluttered",
-    "spacious",
-    "tight crop",
-    "full frame",
-    "environmental portrait"
-  ]);
-  const isComposition = (kw) => {
-    const w = lower(kw);
-    if (COMPOSITION_TERMS.has(w)) return true;
-    return Array.from(COMPOSITION_TERMS).some((c) => w.includes(c) || c.includes(w));
-  };
-  const stages = [
-    { stage: 1, label: "Exact Main Subject", items: [] },
-    { stage: 2, label: "Specific Attributes", items: [] },
-    { stage: 3, label: "Action", items: [] },
-    { stage: 4, label: "Concept", items: [] },
-    { stage: 5, label: "Context", items: [] },
-    { stage: 6, label: "Technique", items: [] },
-    { stage: 7, label: "Industry", items: [] },
-    { stage: 8, label: "Use Case", items: [] },
-    { stage: 9, label: "Composition", items: [] }
-  ];
+  if (NOISE_TERMS.has(k)) return false;
+  for (const { pattern } of VALID_SEARCH_INTENT_PATTERNS) {
+    if (pattern.test(k)) return true;
+  }
+  if (k.split(/\s+/).length >= 2) return true;
+  return false;
+}
+function computeCommercialScore(keyword, tiers) {
+  const k = keyword.toLowerCase().trim();
+  let score = 0;
+  for (const { pattern, weight } of VALID_SEARCH_INTENT_PATTERNS) {
+    if (pattern.test(k)) {
+      score = weight;
+      break;
+    }
+  }
+  if (tiers) {
+    const allObjects = tiers.objects.map((o) => o.name.toLowerCase());
+    const allAttributes = tiers.attributes.map((a) => String(a).toLowerCase());
+    const allScene = tiers.scene.map((s) => String(s).toLowerCase());
+    const allConcepts = tiers.concepts.map((c) => String(c).toLowerCase());
+    const allVisual = [...allObjects, ...allAttributes, ...allScene, ...allConcepts];
+    const hasVisualGrounding = allVisual.some((v) => k.includes(v) || v.includes(k));
+    if (hasVisualGrounding) score += 25;
+    else score = Math.max(0, score - 30);
+  }
+  const wordCount = k.split(/\s+/).length;
+  if (wordCount >= 2 && wordCount <= 4) score += 15;
+  if (k.length < 4) score -= 10;
+  if (k.length > 30) score -= 10;
+  return Math.max(0, Math.min(150, score));
+}
+function validateStrictly(keywords, tiers, title) {
+  const validated = [];
   const seen = /* @__PURE__ */ new Set();
+  const allObjects = tiers.objects.map((o) => o.name.toLowerCase());
+  const allAttributes = tiers.attributes.map((a) => String(a).toLowerCase());
+  const allScene = tiers.scene.map((s) => String(s).toLowerCase());
+  const allConcepts = tiers.concepts.map((c) => String(c).toLowerCase());
+  const visualRef = [...allObjects, ...allAttributes, ...allScene, ...allConcepts];
   for (const kw of keywords) {
-    const k = lower(kw);
-    if (!k || k.length < 2 || seen.has(k)) continue;
+    const k = sanitizeForIndexing(kw);
+    if (!k || k.length < 3 || seen.has(k)) continue;
+    if (isProhibitedKeyword(k)) continue;
+    const hasVisualGrounding = visualRef.length === 0 || visualRef.some((v) => k.includes(v) || v.includes(k)) || k.split(/\s+/).some((word) => word.length > 3 && visualRef.some((v) => v.includes(word)));
+    if (!hasVisualGrounding) continue;
+    if (!hasValidSearchIntent(k)) continue;
     seen.add(k);
-    if (primarySubjects.some((s) => s === k || k === s)) {
-      stages[0].items.push(kw);
-      continue;
-    }
-    if (matchesSubject(k) && allSubjects.length > 0) {
-      stages[0].items.push(kw);
-      continue;
-    }
-    if (matchesAttribute(k)) {
-      stages[1].items.push(kw);
-      continue;
-    }
-    if (isAction(k)) {
-      stages[2].items.push(kw);
-      continue;
-    }
-    if (matchesConcept(k)) {
-      stages[3].items.push(kw);
-      continue;
-    }
-    if (matchesScene(k)) {
-      stages[4].items.push(kw);
-      continue;
-    }
-    if (isTechnique(k)) {
-      stages[5].items.push(kw);
-      continue;
-    }
-    if (isIndustry(k)) {
-      stages[6].items.push(kw);
-      continue;
-    }
-    if (isUseCase(k)) {
-      stages[7].items.push(kw);
-      continue;
-    }
-    if (isComposition(k)) {
-      stages[8].items.push(kw);
-      continue;
-    }
-    const words = k.split(/\s+/).length;
-    if (words === 1) {
-      stages[1].items.push(kw);
-    } else if (words === 2) {
-      stages[3].items.push(kw);
-    } else {
-      stages[4].items.push(kw);
+    validated.push(k);
+  }
+  return validated;
+}
+function rankCommercially(keywords, tiers, title) {
+  if (keywords.length === 0) return keywords;
+  const primarySubject = tiers.objects.find((o) => o.tier === "primary" || o.importance >= 70)?.name?.toLowerCase();
+  const scored = keywords.map((k) => ({
+    keyword: k,
+    score: computeCommercialScore(k, tiers),
+    isSubject: primarySubject ? k.toLowerCase().includes(primarySubject) || primarySubject.includes(k.toLowerCase()) : false
+  }));
+  scored.sort((a, b) => {
+    if (a.isSubject && !b.isSubject) return -1;
+    if (!a.isSubject && b.isSubject) return 1;
+    return b.score - a.score;
+  });
+  return scored.map((s) => s.keyword);
+}
+function rankAndWeightKeywords(keywords, tiers, title) {
+  const validated = validateStrictly(keywords, tiers, title);
+  const ranked = rankCommercially(validated, tiers, title);
+  const primarySubject = tiers.objects.find((o) => o.tier === "primary" || o.importance >= 70)?.name?.toLowerCase().trim();
+  if (primarySubject && primarySubject.length > 1 && ranked.length > 0) {
+    let pos = ranked.findIndex((k) => k.toLowerCase().includes(primarySubject) || primarySubject.includes(k.toLowerCase()));
+    if (pos > 0) {
+      const [main] = ranked.splice(pos, 1);
+      ranked.unshift(main);
+    } else if (pos === -1) {
+      ranked.unshift(primarySubject);
     }
   }
-  const result = [];
-  for (const stage of stages) {
-    result.push(...stage.items);
-  }
-  if (primarySubjects.length > 0 && result.length > 0) {
-    const mainSubj = primarySubjects[0];
-    const idx = result.findIndex((k) => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
-    if (idx > 0) {
-      const [main] = result.splice(idx, 1);
-      result.unshift(main);
-    } else if (idx === -1 && mainSubj.length > 1) {
-      result.unshift(mainSubj);
-    }
-  }
-  return result;
+  return ranked;
 }
 var SYNONYM_MAP = {
   "car": ["automobile", "vehicle", "automotive"],
@@ -4231,9 +4034,9 @@ ${JSON.stringify(exifMetadata, null, 2)}
 Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
   }
   const targetCount = parseInt(String(keywordCount), 10) || 60;
-  const aiRequestCount = targetCount + 10;
+  const aiRequestCount = Math.round(targetCount * 1.5);
   const directives = getToolTypeDirectives(toolType);
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `Generate BROADLY: List of UP TO ${aiRequestCount} keyword candidates (high-volume, diverse, covering all visual aspects of the asset). Quality will be validated strictly afterwards \u2014 focus on maximum relevant coverage now. (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
 KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA OF THE ASSET) \u2014 Keyword #1 MUST explicitly name the primary subject noun or compound phrase (e.g. 'cat', 'vintage car', 'borobudur temple', 'laptop', 'coffee cup'). NEVER put background elements, lighting, or generic terms as Keyword #1.
@@ -4271,210 +4074,12 @@ MUST-10. Never prioritize a keyword merely because it sounds popular \u2014 rele
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
-
-    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
-
-    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  if (keywordMode === "single") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-1. Directly describe the visible subject.
-MUST-2. Describe the main action.
-MUST-3. Include specific objects.
-MUST-4. Include the strongest visual context (environment, setting, lighting).
-MUST-5. Represent the primary commercial concept.
-MUST-6. Be 100% relevant to the actual asset.
-MUST-7. Avoid generic filler words.
-MUST-8. Avoid duplicates and near-duplicates.
-MUST-9. Never invent unseen attributes.
-MUST-10. Never prioritize popularity over relevance.
-
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is SINGLE-WORD mode, ensure any keyword phrase is split or shortened into a single word.
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
-
-    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
-
-    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  } else if (keywordMode === "multi") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-1. Directly describe the visible subject.
-MUST-2. Describe the main action.
-MUST-3. Include specific objects.
-MUST-4. Include the strongest visual context (environment, setting, lighting).
-MUST-5. Represent the primary commercial concept.
-MUST-6. Be 100% relevant to the actual asset.
-MUST-7. Avoid generic filler words.
-MUST-8. Avoid duplicates and near-duplicates.
-MUST-9. Never invent unseen attributes.
-MUST-10. Never prioritize popularity over relevance.
-
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
-
-    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
-
-    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  }
-  const noMediaFormatRule = `
-12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
+11. SEO-FRIENDLY KEYWORD ORDER (Adobe Stock Search Algorithm):
+    - Urutkan keyword dari yang paling deskriptif & relevan ke yang paling umum.
+    - Keyword #1 WAJIB subjek visual utama.
+    - Setelah itu, urutkan secara alami: deskripsi spesifik -> aksi -> konteks -> konsep -> industri -> use case.
+    - Jangan paksakan pola kaku. Biarkan relevansi dan maksud pencarian buyer yang memandu urutan.
+    - Setiap keyword HARUS 100% relevan dengan konten visual aset.12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
 The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
 - Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
 - Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
@@ -4663,7 +4268,7 @@ Rules for Descriptions:
 5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
+1. GENERATE BROADLY \u2014 include ALL potentially relevant terms. Do NOT self-censor. The system will validate and rank them afterwards. Focus on maximum visual coverage and buyer search vocabulary.
 2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
@@ -4912,14 +4517,12 @@ OUTPUT FORMAT:
       ...Array.isArray(visualFacts.actions) ? visualFacts.actions : [],
       ...Array.isArray(visualFacts.colors) ? visualFacts.colors : []
     ].join(" ").toLowerCase();
-    const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword) => {
-      if (!allowedTerms || allowedTerms.length < 5) return true;
-      const words = keyword.split(/\s+/);
-      const hasMatchingWord = words.some((w) => allowedTerms.includes(w));
-      return hasMatchingWord && !isProhibitedKeyword(keyword);
-    });
-    const remainingKeywords = uniqueKeywords.filter((k) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-    let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+    const validatedKeywords = validateStrictly(
+      uniqueKeywords.filter((k) => !isProhibitedKeyword(k)),
+      tieredVisual,
+      data.title
+    );
+    let finalKeywordList = validatedKeywords;
     finalKeywordList = filterBannedKeywords(finalKeywordList);
     finalKeywordList = semanticDeduplicate(finalKeywordList);
     if (finalKeywordList.length < targetCount) {
@@ -4991,8 +4594,8 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
   const categoriesText = ADOBE_CATEGORIES.map((c) => `${c.id}: ${c.name}`).join(", ");
   const shutterstockCategoriesText = (toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(", ");
   const targetCount = parseInt(String(keywordCount), 10) || 60;
-  const aiRequestCount = targetCount;
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  const aiRequestCount = Math.round(targetCount * 1.5);
+  let keywordRuleSchemaDesc = `Generate BROADLY: List of UP TO ${aiRequestCount} keyword candidates (high-volume, diverse, covering all visual aspects of the asset). Quality will be validated strictly afterwards \u2014 focus on maximum relevant coverage now. (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
@@ -5015,182 +4618,12 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
-
-    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
-
-    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  if (keywordMode === "single") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
-
-    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
-
-    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  } else if (keywordMode === "multi") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER \u2014 Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
-
-    STAGE 1 \u2014 EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
-
-    STAGE 2 \u2014 SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 \u2014 ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 \u2014 CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 \u2014 CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 \u2014 TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 \u2014 INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 \u2014 USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset \u2014 commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 \u2014 COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  }
-  const noMediaFormatRule = `
-12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
+11. SEO-FRIENDLY KEYWORD ORDER (Adobe Stock Search Algorithm):
+    - Urutkan keyword dari yang paling deskriptif & relevan ke yang paling umum.
+    - Keyword #1 WAJIB subjek visual utama.
+    - Setelah itu, urutkan secara alami: deskripsi spesifik -> aksi -> konteks -> konsep -> industri -> use case.
+    - Jangan paksakan pola kaku. Biarkan relevansi dan maksud pencarian buyer yang memandu urutan.
+    - Setiap keyword HARUS 100% relevan dengan konten visual aset.12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
 The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
 - Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
 - Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
@@ -5403,7 +4836,7 @@ Rules for Descriptions:
 5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
+1. GENERATE BROADLY \u2014 include ALL potentially relevant terms. Do NOT self-censor. The system will validate and rank them afterwards. Focus on maximum visual coverage and buyer search vocabulary.
 2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
