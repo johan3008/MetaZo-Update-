@@ -5331,6 +5331,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 proportion_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 illustration_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 vector_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 ai_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 stock_acceptance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 metadata: {
@@ -5344,7 +5346,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             },
             required: [
                 "blur", "composition", "lighting", "exposure", "color_balance", "over_edited", "sensor_issues", "watermark", "logo", "text",
-                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "ai_artifacts", "stock_acceptance", "metadata"
+                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "noise", "artifacts", "ai_artifacts", "stock_acceptance", "metadata"
             ]
         },
         heatmaps: {
@@ -5455,7 +5457,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       // Kunci kualitas teknis: persis kategori "quality issues" yang dipakai Adobe Stock untuk menolak konten
       // (fokus/ketajaman, eksposur, pencahayaan, warna, editing berlebih, sensor/noise, proporsi, komposisi)
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues'];
+      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues', 'noise', 'artifacts'];
       const failedCheckKeys: string[] = [];
       let anyTechnicalFail = false;
       let acceptanceFail = false;
@@ -6666,8 +6668,7 @@ export async function generateMotionCode(userPrompt: string, options?: { current
   const model = options?.model;
 
   const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
-RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.
-Additionally, you should generate a 'propsSchema' array describing configurable properties for the component (like text, colors, sizes, speed) so the UI can build a dynamic configuration panel. The component MUST accept these props as its arguments.`;
+RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
@@ -6682,28 +6683,7 @@ Additionally, you should generate a 'propsSchema' array describing configurable 
   contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join('\n\n');
 
-  const responseSchema = { 
-    type: Type.OBJECT, 
-    properties: { 
-      title: { type: Type.STRING }, 
-      summary: { type: Type.STRING }, 
-      code: { type: Type.STRING },
-      propsSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING },
-            type: { type: Type.STRING, enum: ["string", "number", "color", "boolean"] },
-            label: { type: Type.STRING },
-            defaultValue: { type: Type.STRING }
-          },
-          required: ["name", "type", "label", "defaultValue"]
-        }
-      }
-    }, 
-    required: ["title", "summary", "code"] 
-  };
+  const responseSchema = { type: Type.OBJECT, properties: { title: { type: Type.STRING }, summary: { type: Type.STRING }, code: { type: Type.STRING } }, required: ["title", "summary", "code"] };
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -6724,22 +6704,7 @@ Additionally, you should generate a 'propsSchema' array describing configurable 
     parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
     if (!/MotionComposition/.test(parsed.code)) throw new Error('AI response did not include a MotionComposition export.');
   } else throw new Error('AI response missing code field.');
-  
-  let formattedPropsSchema = parsed.propsSchema;
-  if (formattedPropsSchema && Array.isArray(formattedPropsSchema)) {
-    formattedPropsSchema = formattedPropsSchema.map((p: any) => {
-       if (p.type === 'number') return { ...p, defaultValue: Number(p.defaultValue) || 0 };
-       if (p.type === 'boolean') return { ...p, defaultValue: p.defaultValue === 'true' || p.defaultValue === true };
-       return p;
-    });
-  }
-
-  return { 
-    title: parsed.title || 'Untitled Motion', 
-    summary: parsed.summary || '', 
-    code: parsed.code as string,
-    propsSchema: formattedPropsSchema
-  };
+  return { title: parsed.title || 'Untitled Motion', summary: parsed.summary || '', code: parsed.code as string };
 }
 
 /* ===== uploadVideoToGemini ===== */

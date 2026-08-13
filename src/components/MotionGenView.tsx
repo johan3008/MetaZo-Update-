@@ -64,10 +64,6 @@ export function MotionGenView({
     const [genError, setGenError] = useState<string | null>(null);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const chatEndRef = useRef<HTMLDivElement>(null);
-    
-    // Dynamic Props
-    const [dynamicPropsSchema, setDynamicPropsSchema] = useState<Array<any>>([]);
-    const [dynamicProps, setDynamicProps] = useState<Record<string, any>>({});
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,14 +130,6 @@ export function MotionGenView({
             );
 
             setCode(result.code);
-            if (result.propsSchema && result.propsSchema.length > 0) {
-                setDynamicPropsSchema(result.propsSchema);
-                const initialProps: Record<string, any> = {};
-                result.propsSchema.forEach(p => {
-                    initialProps[p.name] = p.defaultValue;
-                });
-                setDynamicProps(initialProps);
-            }
             setChatHistory(prev => [...prev, {
                 id: `a_${Date.now()}`,
                 role: 'assistant',
@@ -164,73 +152,6 @@ export function MotionGenView({
         }
     };
 
-    const handleAutoFix = async (compilationError: string) => {
-        if (isGenerating || isAtLimit) return;
-        
-        const errorPrompt = `Kompilasi kode sebelumnya gagal dengan pesan error berikut:\n${compilationError}\n\nTolong perbaiki kode agar bisa berjalan dengan baik.`;
-        
-        const userMsg: ChatMessage = { id: `u_${Date.now()}_err`, role: 'user', content: errorPrompt };
-        setChatHistory(prev => [...prev, userMsg]);
-        setIsGenerating(true);
-        setGenError(null);
-
-        try {
-            const historyForApi: MotionGenHistoryItem[] = [...chatHistory, userMsg]
-                .slice(-8)
-                .map(m => ({ role: m.role, content: m.content }));
-
-            const result = await generateMotionCode(
-                errorPrompt,
-                {
-                    currentCode: code,
-                    fps,
-                    durationSeconds,
-                    width,
-                    height,
-                    history: historyForApi
-                },
-                aiOptions
-            );
-
-            setCode(result.code);
-            if (result.propsSchema && result.propsSchema.length > 0) {
-                setDynamicPropsSchema(result.propsSchema);
-                const initialProps: Record<string, any> = {};
-                result.propsSchema.forEach(p => {
-                    initialProps[p.name] = p.defaultValue;
-                });
-                setDynamicProps(initialProps);
-            }
-            setChatHistory(prev => [...prev, {
-                id: `a_${Date.now()}_fix`,
-                role: 'assistant',
-                content: `Error berhasil dianalisis. Ini perbaikan kodenya.`,
-                codeSnapshot: result.code
-            }]);
-            
-            if (incrementDailyCount) incrementDailyCount(1);
-        } catch (err: any) {
-            const errorMessage = err?.message || 'Gagal memperbaiki animasi. Coba lagi.';
-            setGenError(errorMessage);
-            setChatHistory(prev => [...prev, {
-                id: `e_${Date.now()}_fix`,
-                role: 'assistant',
-                content: errorMessage,
-                isError: true
-            }]);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const handleLiveRunnerError = (err: string | null) => {
-        if (err && !isGenerating) {
-            setGenError(err);
-        } else if (!err) {
-            setGenError(null);
-        }
-    };
-
     const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -242,8 +163,6 @@ export function MotionGenView({
         setCode(DEFAULT_CODE);
         setChatHistory([]);
         setGenError(null);
-        setDynamicPropsSchema([]);
-        setDynamicProps({});
     };
 
     const revertToSnapshot = (snapshot?: string) => {
@@ -478,61 +397,6 @@ export function MotionGenView({
                     </div>
                 </div>
 
-                {dynamicPropsSchema.length > 0 && (
-                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] border border-purple-200/80 dark:border-purple-500/20 shadow-xl shadow-purple-500/10">
-                        <label className="text-xs font-bold text-purple-700 dark:text-purple-300 mb-4 block flex items-center gap-2">
-                            <Sparkles className="w-4 h-4" /> AI Generated Props
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {dynamicPropsSchema.map((prop, idx) => (
-                                <div key={idx}>
-                                    <label className="text-[10px] text-slate-500 dark:text-gray-400 block mb-1">{prop.label || prop.name}</label>
-                                    {prop.type === 'color' ? (
-                                        <div className="flex gap-2 items-center">
-                                            <input 
-                                                type="color"
-                                                value={dynamicProps[prop.name] || '#000000'}
-                                                onChange={(e) => setDynamicProps(prev => ({...prev, [prop.name]: e.target.value}))}
-                                                className="w-10 h-10 rounded overflow-hidden cursor-pointer"
-                                            />
-                                            <input 
-                                                type="text"
-                                                value={dynamicProps[prop.name] || ''}
-                                                onChange={(e) => setDynamicProps(prev => ({...prev, [prop.name]: e.target.value}))}
-                                                className="w-full flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                            />
-                                        </div>
-                                    ) : prop.type === 'boolean' ? (
-                                        <label className="flex items-center gap-2 cursor-pointer mt-2">
-                                            <input 
-                                                type="checkbox"
-                                                checked={!!dynamicProps[prop.name]}
-                                                onChange={(e) => setDynamicProps(prev => ({...prev, [prop.name]: e.target.checked}))}
-                                                className="w-5 h-5 accent-purple-600 rounded"
-                                            />
-                                            <span className="text-sm text-slate-700 dark:text-white">{prop.label}</span>
-                                        </label>
-                                    ) : prop.type === 'number' ? (
-                                        <input 
-                                            type="number"
-                                            value={dynamicProps[prop.name] ?? 0}
-                                            onChange={(e) => setDynamicProps(prev => ({...prev, [prop.name]: Number(e.target.value)}))}
-                                            className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                        />
-                                    ) : (
-                                        <input 
-                                            type="text"
-                                            value={dynamicProps[prop.name] || ''}
-                                            onChange={(e) => setDynamicProps(prev => ({...prev, [prop.name]: e.target.value}))}
-                                            className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-2 text-slate-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {/* Render Mode */}
                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 shadow-xl shadow-black/5">
                     <label className="text-xs font-bold text-slate-600 dark:text-gray-400 mb-4 block flex items-center gap-2">
@@ -594,11 +458,8 @@ export function MotionGenView({
                     <span className="text-[10px] bg-slate-200 dark:bg-[#222] text-slate-600 dark:text-gray-400 px-2 py-0.5 rounded-md ml-1">{width}x{height}</span>
                 </div>
 
-                <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
-                    {/* Mengatur rasio kontainer */}
-                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden relative">
-                        <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} onError={handleLiveRunnerError} inputProps={dynamicProps} />
-                    </div>
+                <div id="motion-gen-player" className="w-full h-full min-h-[400px] max-h-[80vh] flex items-center justify-center relative bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden">
+                    <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} onError={handleLiveRunnerError} inputProps={dynamicProps} />
                     {genError && (
                         <div className="absolute bottom-4 left-4 right-4 bg-red-100 dark:bg-red-900/80 border border-red-300 dark:border-red-500/50 rounded-xl p-4 shadow-xl flex items-center justify-between z-20 backdrop-blur-md">
                             <div className="flex items-center gap-3">
