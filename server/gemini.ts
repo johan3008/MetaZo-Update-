@@ -1014,7 +1014,7 @@ function getAIClient(): any {
         }
 
         const runGeminiDirectFetch = async (keyToUse: string, params: any) => {
-          const model = params.model || 'gemini-2.5-flash';
+          const model = params.model || 'gemini-3.5-flash';
           const cleanModel = model.startsWith('models/') ? model : `models/${model}`;
           const url = `https://generativelanguage.googleapis.com/v1beta/${cleanModel}:generateContent?key=${keyToUse}`;
 
@@ -1204,7 +1204,7 @@ const callGeminiWithRetry = async (
       // Handle invalid model names or hallucinated models
       if (statusCode === 400 || statusCode === 404) {
           if (errorMsg.includes("model") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("support")) {
-              const fallback = 'gemini-2.5-pro';
+              const fallback = 'gemini-3.1-pro-preview';
               if (currentModel !== fallback) {
                   console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Falling back to ${fallback}.`);
                   currentModel = fallback;
@@ -1234,7 +1234,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
+          const rotationModels = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite-preview'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -4248,7 +4248,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -4858,7 +4858,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
   let lastError;
   let responseText = "";
 
@@ -4949,7 +4949,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
   let lastError;
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
@@ -5360,7 +5360,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
   // Map/Upgrade low-precision/lightweight models to high-capability vision models to guarantee strict rule-following
-  let selectedModel = model || 'gemini-2.5-pro';
+  let selectedModel = model || 'gemini-3.1-pro-preview';
   if (
     selectedModel === 'auto' ||
     selectedModel.includes('1.5-flash') ||
@@ -5372,13 +5372,13 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     selectedModel.includes('3.5-flash')
   ) {
     // Force a highly robust, intelligence-aligned model for strict technical quality checks
-    selectedModel = 'gemini-2.5-pro';
+    selectedModel = 'gemini-3.1-pro-preview';
   } else if (selectedModel.includes('pro') || selectedModel.includes('3.1-pro')) {
-    selectedModel = 'gemini-2.5-pro';
+    selectedModel = 'gemini-3.1-pro-preview';
   }
 
   // Normalisasi Model ke Seri Resmi Terupdate (Menggunakan Model Pro Resmi untuk menjamin kepekaan visual yang sangat tinggi)
-  const modelsToTry = ['gemini-2.5-pro', 'gemini-1.5-pro'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
   let responseText = "";
   let lastError;
 
@@ -6637,7 +6637,7 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
       ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
-      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.0-flash',
+      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-flash-lite',
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
@@ -6684,7 +6684,7 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
       const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-3.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -6732,7 +6732,7 @@ export async function removeWatermark(imageBase64: string, maskBase64: string, p
   let analysis: any = null;
   if (!NON_GEMINI_PROVIDERS.has(provider)) {
     try {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
+      const res = await callGeminiWithRetry('gemini-3.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
       analysis = JSON.parse(extractJSON(res.text || '{}'));
     } catch {}
   }
@@ -6820,7 +6820,7 @@ export async function generate3DCGIPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: THREE_D_CGI_STYLE_INSTRUCTION,
@@ -6869,7 +6869,7 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: CINEMATIC_STYLE_INSTRUCTION,
@@ -6920,7 +6920,7 @@ export async function generateAbstractPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: ABSTRACT_STYLE_INSTRUCTION,
@@ -6967,7 +6967,7 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: PAINTERLY_DIGITAL_ART_STYLE_INSTRUCTION,
@@ -7018,7 +7018,7 @@ CRITICAL RULES:
     promptText = `Generate a creative subject idea for style: "${styleCategory || "General"}". To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
   }
   
-  const activeModel = model || 'gemini-2.5-flash';
+  const activeModel = model || 'gemini-3.5-flash';
   
   const response = await callGeminiWithRetry(activeModel, {
     parts: [{ text: promptText }]
