@@ -6089,7 +6089,35 @@ Rules:
     }
   }
 
-  return JSON.parse(extractJSON(responseText));
+  let parsedData = JSON.parse(extractJSON(responseText));
+  
+  // POST-PROCESSING ENFORCEMENT: Jika ada parameter kritis yang FAIL, paksa rekomendasi keseluruhan menjadi FAIL
+  if (parsedData && parsedData.ai_vision_checks) {
+    const checks = parsedData.ai_vision_checks;
+    const criticalFails = ['ai_artifacts', 'structural_defects', 'anatomical_errors', 'text', 'ip_risk', 'over_edited', 'proportion_defects'];
+    
+    let hasCriticalFail = false;
+    for (const key of criticalFails) {
+      if (checks[key] && checks[key].status === 'FAIL') {
+        hasCriticalFail = true;
+        break;
+      }
+    }
+    
+    if (hasCriticalFail) {
+      parsedData.recommendation = 'FAIL';
+      if (parsedData.overall_score >= 70) {
+        parsedData.overall_score = Math.floor(Math.random() * (68 - 55 + 1)) + 55; // Force score between 55-68
+      }
+      
+      // Pastikan ada penjelasan di feedback
+      if (!parsedData.detailed_feedback.includes('Sistem keamanan pasca-pemrosesan')) {
+          parsedData.detailed_feedback += ' (Penolakan Otomatis: Sistem mendeteksi kegagalan kritis pada artefak AI, struktur, atau teks yang memicu penolakan wajib untuk Adobe Stock).';
+      }
+    }
+  }
+  
+  return parsedData;
 }
 
 export async function suggestKeywords(
