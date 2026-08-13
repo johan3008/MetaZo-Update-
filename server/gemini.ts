@@ -5331,6 +5331,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 proportion_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 illustration_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 vector_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 ai_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 stock_acceptance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 metadata: {
@@ -5344,7 +5346,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             },
             required: [
                 "blur", "composition", "lighting", "exposure", "color_balance", "over_edited", "sensor_issues", "watermark", "logo", "text",
-                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "ai_artifacts", "stock_acceptance", "metadata"
+                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "noise", "artifacts", "ai_artifacts", "stock_acceptance", "metadata"
             ]
         },
         heatmaps: {
@@ -5455,7 +5457,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       // Kunci kualitas teknis: persis kategori "quality issues" yang dipakai Adobe Stock untuk menolak konten
       // (fokus/ketajaman, eksposur, pencahayaan, warna, editing berlebih, sensor/noise, proporsi, komposisi)
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues'];
+      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues', 'noise', 'artifacts'];
       const failedCheckKeys: string[] = [];
       let anyTechnicalFail = false;
       let acceptanceFail = false;
