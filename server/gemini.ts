@@ -1204,7 +1204,7 @@ const callGeminiWithRetry = async (
       // Handle invalid model names or hallucinated models
       if (statusCode === 400 || statusCode === 404) {
           if (errorMsg.includes("model") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("support")) {
-              const fallback = 'gemini-3.1-pro-preview';
+              const fallback = 'gemini-3.6-flash';
               if (currentModel !== fallback) {
                   console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Falling back to ${fallback}.`);
                   currentModel = fallback;
@@ -1234,7 +1234,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite-preview'];
+          const rotationModels = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -5360,25 +5360,24 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
   // Map/Upgrade low-precision/lightweight models to high-capability vision models to guarantee strict rule-following
-  let selectedModel = model || 'gemini-3.1-pro-preview';
-  if (
+  let selectedModel = model || 'gemini-3.6-flash';
+  if (selectedModel !== 'gemini-3.6-flash' && (
     selectedModel === 'auto' ||
     selectedModel.includes('1.5-flash') ||
     selectedModel.includes('8b') ||
     selectedModel.includes('2.0-flash') ||
     selectedModel.includes('gemma') ||
-    selectedModel.includes('3-flash') ||
     selectedModel.includes('3.1-flash-lite') ||
-    selectedModel.includes('3.5-flash')
-  ) {
-    // Force a highly robust, intelligence-aligned model for strict technical quality checks
-    selectedModel = 'gemini-3.1-pro-preview';
-  } else if (selectedModel.includes('pro') || selectedModel.includes('3.1-pro')) {
-    selectedModel = 'gemini-3.1-pro-preview';
+    selectedModel.includes('3.5-flash') ||
+    selectedModel.includes('pro') ||
+    selectedModel.includes('3.1-pro') ||
+    selectedModel.includes('3-flash')
+  )) {
+    selectedModel = 'gemini-3.6-flash';
   }
 
   // Normalisasi Model ke Seri Resmi Terupdate (Menggunakan Model Pro Resmi untuk menjamin kepekaan visual yang sangat tinggi)
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
+  const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
   let responseText = "";
   let lastError;
 
