@@ -2101,6 +2101,8 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 - Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
 - Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
 Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
+
+  const noMediaFormatRule = ""; // Content already embedded inline in keywordRulePromptText
   keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -2749,6 +2751,8 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 - Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
 - Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
 Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
+
+  const noMediaFormatRule = ""; // Content already embedded inline in keywordRulePromptText
   keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
