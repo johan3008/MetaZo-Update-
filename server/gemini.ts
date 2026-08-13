@@ -1204,7 +1204,7 @@ const callGeminiWithRetry = async (
       // Handle invalid model names or hallucinated models
       if (statusCode === 400 || statusCode === 404) {
           if (errorMsg.includes("model") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("support")) {
-              const fallback = 'gemini-2.5-flash';
+              const fallback = 'gemini-2.5-pro';
               if (currentModel !== fallback) {
                   console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Falling back to ${fallback}.`);
                   currentModel = fallback;
@@ -1234,7 +1234,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
+          const rotationModels = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -4248,16 +4248,8 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
   let lastError: any = null;
-
-  const safetySettings = [
-    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-  ];
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     let attempts = 0;
@@ -4866,8 +4858,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
-  let response;
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
   let lastError;
   let responseText = "";
 
@@ -4958,8 +4949,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
-  let responseText = "";
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
   let lastError;
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
@@ -5388,7 +5378,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   }
 
   // Normalisasi Model ke Seri Resmi Terupdate (Menggunakan Model Pro Resmi untuk menjamin kepekaan visual yang sangat tinggi)
-  const modelsToTry = [selectedModel, 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-2.5-pro', 'gemini-1.5-pro'];
   let responseText = "";
   let lastError;
 
@@ -7028,7 +7018,7 @@ CRITICAL RULES:
     promptText = `Generate a creative subject idea for style: "${styleCategory || "General"}". To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
   }
   
-  const activeModel = model || 'gemini-3.5-flash';
+  const activeModel = model || 'gemini-2.5-flash';
   
   const response = await callGeminiWithRetry(activeModel, {
     parts: [{ text: promptText }]
