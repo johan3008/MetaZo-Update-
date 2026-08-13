@@ -4,8 +4,19 @@ import base64
 from io import BytesIO
 from PIL import Image
 import numpy as np
-from skimage.filters import laplace
-from skimage.restoration import estimate_sigma
+import cv2
+
+def estimate_noise_cv2(image_array):
+    # Standard fast noise estimation using convolution
+    H, W = image_array.shape
+    M = [[1, -2, 1],
+         [-2, 4, -2],
+         [1, -2, 1]]
+    sigma = np.sum(np.abs(cv2.filter2D(image_array, cv2.CV_64F, np.array(M))))
+    # Check to avoid division by zero
+    if W <= 2 or H <= 2: return 0.5
+    sigma = sigma * np.sqrt(0.5 * np.pi) / (6 * (W - 2) * (H - 2))
+    return sigma
 
 def main():
     try:
@@ -25,7 +36,7 @@ def main():
                 print(json.dumps({"error": "No input received via stdin or arguments"}))
                 return
 
-            # Strip data URL prefix if present (e.g. "data:image/jpeg;base64,")
+            # Strip data URL prefix if present
             if ',' in input_data:
                 input_data = input_data.split(',', 1)[1]
 
@@ -69,30 +80,36 @@ def main():
         max_bin = float(np.max(hist)) if np.max(hist) > 0 else 1.0
         histogram = [int(round((val / max_bin) * 100)) for val in hist]
 
-        # 4. Sharpness using Laplacian variance via skimage.filters.laplace
-        gray_normalized = gray_arr.astype(float) / 255.0
-        lap_img = laplace(gray_normalized)
-        lap_var = float(np.var(lap_img))
+        # 4. Sharpness using Laplacian variance via cv2
+        lap_var = cv2.Laplacian(gray_arr, cv2.CV_64F).var()
         
-        # Mapping lap_var smoothly to 0-100 scale using np.sqrt(lap_var) * 800
-        sharpness_val = min(100, int(round(np.sqrt(lap_var) * 800)))
-        if sharpness_val > 60:
+        # Mapping lap_var smoothly to 0-100 scale using np.sqrt(lap_var)
+        # We need it to be strict for Adobe Stock AI generated images
+        sharpness_score = np.sqrt(lap_var)
+        # Typical values: very blurry < 10, sharp > 30-50
+        
+        sharpness_val = min(100, int(round(sharpness_score * 2.5)))
+        
+        # Stricter thresholds for sharpness
+        if sharpness_val > 65:
             sharpness_status = "Sharp"
-        elif sharpness_val < 20:
-            sharpness_status = "Soft Focus"
+        elif sharpness_val < 45:
+            sharpness_status = "Soft Focus / Blurry"
         else:
             sharpness_status = "Normal"
 
-        # 5. Noise estimation using skimage.restoration.estimate_sigma
-        sigma = estimate_sigma(gray_arr, channel_axis=None)
+        # 5. Noise estimation
+        sigma = estimate_noise_cv2(gray_arr)
         if sigma is None:
             sigma = 0.5
         else:
             sigma = float(sigma)
             
-        noise_val = min(100, int(round((sigma / 20.0) * 100)))
-        if noise_val > 40:
-            noise_status = "High Noise"
+        noise_val = min(100, int(round((sigma / 5.0) * 100)))
+        
+        # Stricter thresholds for noise
+        if noise_val > 35:
+            noise_status = "High Noise / Artifacts"
         elif noise_val > 15:
             noise_status = "Medium Noise"
         else:
@@ -104,8 +121,8 @@ def main():
             "histogram": histogram,
             "brightness": { "value": brightness_val, "status": brightness_status },
             "contrast": { "value": contrast_val, "status": contrast_status },
-            "sharpness": { "value": sharpness_val, "status": sharpness_status },
-            "noise": { "value": noise_val, "status": noise_status },
+            "sharpness": { "value": sharpness_val, "status": sharpness_status, "raw_score": sharpness_score },
+            "noise": { "value": noise_val, "status": noise_status, "raw_sigma": sigma },
             "file_validation": "Valid (Passed In-Memory Science Check)",
             "file_size_kb": file_size_kb
         }
