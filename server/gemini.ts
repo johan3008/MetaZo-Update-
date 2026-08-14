@@ -5259,25 +5259,16 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // Map/Upgrade low-precision/lightweight models to high-capability vision models to guarantee strict rule-following
-  let selectedModel = model || 'gemini-3.6-flash';
-  if (selectedModel !== 'gemini-3.6-flash' && (
-    selectedModel === 'auto' ||
-    selectedModel.includes('1.5-flash') ||
-    selectedModel.includes('8b') ||
-    selectedModel.includes('2.0-flash') ||
-    selectedModel.includes('gemma') ||
-    selectedModel.includes('3.1-flash-lite') ||
-    selectedModel.includes('3.5-flash') ||
-    selectedModel.includes('pro') ||
-    selectedModel.includes('3.1-pro') ||
-    selectedModel.includes('3-flash')
-  )) {
-    selectedModel = 'gemini-3.6-flash';
+  // QC routing: do NOT silently downgrade a requested Pro model to Flash.
+  // The current Gemini API exposes Gemini 3.1 Pro Preview for advanced reasoning and
+  // Gemini 3.6 Flash for faster multimodal fallback.
+  let selectedModel = model || 'gemini-3.1-pro-preview';
+  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
+    selectedModel = 'gemini-3.1-pro-preview';
   }
 
-  // Normalisasi Model ke Seri Resmi Terupdate (Menggunakan Model Pro Resmi untuk menjamin kepekaan visual yang sangat tinggi)
-  const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+  // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
   let responseText = "";
   let lastError;
 
@@ -5313,13 +5304,13 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
         
+        // Gemini 3.6 Flash / 3.5 Flash-Lite deprecate temperature/topP/topK.
+        // Keep the QC request deterministic through the system prompt + structured output
+        // instead of deprecated sampling controls. This also prevents fallback 400s.
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
-          responseSchema,
-          temperature: 0.0,
-          topK: 1,
-          topP: 0.1
+          responseSchema
         });
         responseText = res.text || "{}";
         break;
