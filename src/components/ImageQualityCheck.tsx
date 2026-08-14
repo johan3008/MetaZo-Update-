@@ -17,10 +17,10 @@ interface QualityReport {
     resolution: string;
     color_space: string;
     histogram: number[];
-    brightness: { value: number; status: string };
-    contrast: { value: number; status: string };
-    sharpness: { value: number; status: string };
-    noise: { value: number; status: string };
+    brightness: { value: number | null; status: string };
+    contrast: { value: number | null; status: string };
+    sharpness: { value: number | null; status: string };
+    noise: { value: number | null; status: string };
     file_validation: string;
     file_size_kb: number;
   };
@@ -1260,15 +1260,15 @@ export const ImageQualityCheck: React.FC<{
                                     };
 
                                     const ffmpegData = r.ffmpeg || {
-                                      resolution: "3840 x 2160 (8.29 MP)",
-                                      color_space: "yuvj420p (sRGB)",
-                                      histogram: Array.from({ length: 32 }, (_, i) => Math.round(Math.sin(i / 5) * 50 + 50)),
-                                      brightness: { value: 65, status: "Optimal" },
-                                      contrast: { value: 72, status: "Normal" },
-                                      sharpness: { value: 80, status: "Sharp" },
-                                      noise: { value: 12, status: "Low Noise" },
-                                      file_validation: "Valid (Passed FFmpeg Integrity Check)",
-                                      file_size_kb: 2048
+                                      resolution: "Unknown",
+                                      color_space: "Unknown",
+                                      histogram: [],
+                                      brightness: { value: null, status: "UNKNOWN — technical data unavailable" },
+                                      contrast: { value: null, status: "UNKNOWN — technical data unavailable" },
+                                      sharpness: { value: null, status: "UNKNOWN — technical data unavailable" },
+                                      noise: { value: null, status: "UNKNOWN — technical data unavailable" },
+                                      file_validation: "UNKNOWN — server technical analysis unavailable",
+                                      file_size_kb: 0
                                     };
 
                                     const technicalMetrics = [
@@ -1386,10 +1386,10 @@ export const ImageQualityCheck: React.FC<{
                                                     <div key={m.label} className="space-y-1">
                                                       <div className="flex justify-between text-[10px] font-bold">
                                                         <span className="text-slate-500 uppercase tracking-tight">{m.label}</span>
-                                                        <span className="text-slate-800 dark:text-slate-200 font-black">{m.value}% ({m.status})</span>
+                                                        <span className="text-slate-800 dark:text-slate-200 font-black">{m.value == null ? '—' : `${m.value}%`} ({m.status})</span>
                                                       </div>
                                                       <div className="h-1.5 w-full bg-slate-200/60 dark:bg-slate-800/80 rounded-full overflow-hidden">
-                                                        <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${m.value}%` }} />
+                                                        {m.value != null && <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${Math.max(0, Math.min(100, m.value))}%` }} />}
                                                       </div>
                                                     </div>
                                                   ))}
