@@ -441,12 +441,21 @@ export const ImageQualityCheck: React.FC<{
                 return;
               }
               const crops: string[] = [];
-              const cw = Math.floor(img.width / 2);
-              const ch = Math.floor(img.height / 2);
+              // FIX QC (full-frame coverage): crop lama hanya mengambil PITA TENGAH vertikal
+              // (y: 25%-75%), sehingga 25% area ATAS dan 25% area BAWAH gambar TIDAK PERNAH
+              // diperiksa dalam resolusi asli. Ini adalah blind-spot kritis: pada foto
+              // half-body/full-body (mis. orang memegang objek di depan dada/pinggang),
+              // titik kontak tangan-objek yang paling rawan cacat AI justru sering berada
+              // di paruh BAWAH frame — persis di zona yang terlewat oleh crop lama.
+              // Solusi: gunakan 4 crop KUADRAN dengan overlap 20% agar SELURUH permukaan
+              // gambar (termasuk sudut & tepi bawah) tercakup minimal sekali dalam resolusi asli.
+              const cw = Math.floor(img.width * 0.6);
+              const ch = Math.floor(img.height * 0.6);
               const regions: Array<[number, number]> = [
-                [Math.floor(img.width / 4), Math.floor(img.height / 4)], // TENGAH
-                [0, Math.floor(img.height / 4)],                          // KIRI
-                [Math.floor(img.width / 2), Math.floor(img.height / 4)]   // KANAN
+                [0, 0],                                                          // ATAS-KIRI
+                [Math.floor(img.width * 0.4), 0],                                // ATAS-KANAN
+                [0, Math.floor(img.height * 0.4)],                               // BAWAH-KIRI
+                [Math.floor(img.width * 0.4), Math.floor(img.height * 0.4)]      // BAWAH-KANAN
               ];
               const MAX_CROP_DIM = 1600; // batasi payload; tidak pernah upscale (scale <= 1)
               for (const [sx, sy] of regions) {
