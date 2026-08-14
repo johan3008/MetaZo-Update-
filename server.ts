@@ -2313,10 +2313,33 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) {
                     techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) — indikasi over/under exposure parah`);
                 }
+                // PNG/RGBA transparency must never be treated as black pixels. The
+                // Python analyzer reports visible-pixel metrics only and exposes alpha
+                // diagnostics separately. Transparency itself is valid for isolated assets.
+                if (ffmpegStats?.transparency?.has_alpha) {
+                    const partialAlpha = Number(ffmpegStats.transparency.partial_alpha_percent || 0);
+                    const haloRisk = Number(ffmpegStats.transparency.edge_halo_risk_percent || 0);
+                    if (haloRisk > 35 && partialAlpha > 0.1) {
+                        techGateReasons.push(`Risiko matte/halo pada alpha edge (${haloRisk.toFixed(1)}%) — periksa rambut/kain/tepi objek pada background kontras`);
+                    }
+                }
+                if (Number(ffmpegStats?.banding?.score || 0) > 85) {
+                    techGateReasons.push(`Sinyal banding/posterization tinggi (${ffmpegStats.banding.score}/100) — periksa area gradasi halus pada 100%`);
+                }
+                if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 85) {
+                    techGateReasons.push(`Sinyal JPEG blocking tinggi (${ffmpegStats.jpeg_blocking.score}/100) — periksa kompresi pada 100%`);
+                }
                 if (techGateReasons.length > 0) {
                     console.warn('Server check-image-quality: Deterministic technical gate triggered:', techGateReasons);
                     aiVisionStats.technical_issues = [...(aiVisionStats.technical_issues || []), ...techGateReasons];
-                    (aiVisionStats as any).failed_checks = Array.from(new Set([...((aiVisionStats as any).failed_checks || []), 'sensor_issues']));
+                    const deterministicKeys: string[] = [];
+                    if (typeof sharpVal === 'number' && sharpVal < 12) deterministicKeys.push('blur');
+                    if (typeof noiseVal === 'number' && noiseVal > 70) deterministicKeys.push('noise');
+                    if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) deterministicKeys.push('exposure');
+                    if (Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0) > 35) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.banding?.score || 0) > 85) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 85) deterministicKeys.push('artifacts');
+                    (aiVisionStats as any).failed_checks = Array.from(new Set([...(aiVisionStats as any).failed_checks || [], ...deterministicKeys]));
                     if (aiVisionStats.recommendation !== 'FAIL') {
                         aiVisionStats.recommendation = 'FAIL';
                         if (typeof aiVisionStats.overall_score !== 'number' || aiVisionStats.overall_score >= 66) {
