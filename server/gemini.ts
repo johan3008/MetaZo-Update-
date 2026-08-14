@@ -4768,7 +4768,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 
   for (let i = 0; i < count; i++) {
     const modifier = activeModifiers[i % activeModifiers.length];
-    generatedPrompts.push(`${resolvedSubject}, direct style of ${styleCategory}, ${modifier}${bgSuffix} (variation #${i + 1})`);
+    generatedPrompts.push(`${resolvedSubject} depicted in a ${styleCategory} style. ${modifier}${bgSuffix}.`);
   }
 
   const finalNegative = userNegativePrompt && userNegativePrompt.trim().length > 0
@@ -4776,11 +4776,13 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     : "";
 
   const promptsWithNegative = generatedPrompts.map(p => {
+    // Bersihkan: ubah comma-list jadi kalimat natural
+    let cleaned = p.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
     if (finalNegative) {
-      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
-      return `${p.trim()}${separator}${finalNegative}`;
+      const separator = cleaned.endsWith('.') ? " " : ". ";
+      return `${cleaned}${separator}${finalNegative}`;
     }
-    return p;
+    return cleaned;
   });
 
   return {
