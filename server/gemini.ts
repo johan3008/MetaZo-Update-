@@ -3800,47 +3800,46 @@ OUTPUT FORMAT:
 function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
   let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
   
-  // DETEKSI keyword dump: terlalu banyak koma vs kata, atau tanpa titik & kalimat
-  const isKeywordDump = (p: string): boolean => {
-    const commas = (p.match(/,/g) || []).length;
-    const words = p.split(/\s+/).length;
-    const sentences = (p.match(/\./g) || []).length;
-    return (commas > words * 0.25) || (sentences === 0 && commas > 2) || (words < 10 && commas > 2);
-  };
-  
-  // KONVERSI: keyword dump → kalimat natural jika memungkinkan
-  validatedPrompts = validatedPrompts.map((p: string) => {
-    if (isKeywordDump(p)) {
-      // Hapus koma, jadikan satu kalimat natural
-      return p.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
-    }
-    return p.trim();
-  });
-  
-  // Bersihkan artifact "(variation #N)" dan spasi berlebih
-  validatedPrompts = validatedPrompts.map(p =>
-    p.replace(/\s*\(variation #?\d+\)\s*/gi, '').replace(/\s+/g, ' ').trim()
-  ).filter(p => p.length > 0);
-
   if (validatedPrompts.length === 0) {
-    validatedPrompts = [`${subject} professional stock photography`];
+    // If absolutely no prompts, at least returning something to avoid crash, but ideally shouldn't happen
+    validatedPrompts = [`${subject} professional stock photography`].map(p => p);
   }
 
-  if (validatedPrompts.length > count) {
+  const originalLength = validatedPrompts.length;
+  if (validatedPrompts.length < count) {
+    const modifiers = [
+      "cinematic macro photography, highly detailed",
+      "isometric 3D render, octane render, stylized lighting",
+      "vibrant watercolor ink illustration, splash art",
+      "futuristic cyberpunk city night life background, neon glow",
+      "classical oil painting, textured brush strokes, masterwork",
+      "minimalist flat graphic design icon",
+      "dramatic backlight, rim lighting, atmospheric depth",
+      "wide angle landscape composition, beautiful morning light",
+      "studio lighting portrait, bokeh depth of field",
+      "vintage retro concept art, detailed illustration"
+    ];
+    let modIdx = 0;
+    while (validatedPrompts.length < count) {
+      const base = validatedPrompts[validatedPrompts.length % originalLength];
+      const mod = modifiers[modIdx % modifiers.length];
+      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
+      modIdx++;
+    }
+  } else if (validatedPrompts.length > count) {
     validatedPrompts = validatedPrompts.slice(0, count);
   }
   
   const appendNeg = userNegativePrompt && userNegativePrompt.trim().length > 0 
-    ? ` Avoid: ${userNegativePrompt.trim()}` 
+    ? `Avoid: ${userNegativePrompt.trim()}` 
     : "";
   
   const processedPrompts = validatedPrompts.map((p: string) => {
-    let cleaned = p.trim();
     if (appendNeg) {
-      const separator = cleaned.endsWith('.') ? " " : ". ";
-      return `${cleaned}${separator}${appendNeg}`;
+      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
+      return `${p.trim()}${separator}${appendNeg}`;
     }
-    return cleaned;
+    return p.trim();
   });
 
   return {
@@ -4152,12 +4151,7 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. ${isPhotographic ? `Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).${cameraAngleDirective}` : 'Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: EVERY PROMPT MUST FOLLOW THIS EXACT PATTERN:
-   - START with the style category name: "${effectiveStyleCategory}"
-   - Then write a fluid, natural paragraph: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]
-   - GOOD example: "Photorealistic close-up of a female tightrope walker's chalk-dusted hands gripping a balancing pole. A thick braided steel cable glistens under soft warm gold sunlight. In the background, a sprawling sun-drenched canyon stretches into a soft-focus summer mist, creating organic copy space for editorial placement, captured on 85mm f/1.8 lens."
-   - BAD example (REJECTED): "subject, action, lighting style, anamorphic lens, volumetric lighting, hyper-realistic, cinematic, 8k" — this is a keyword dump, not a prompt.
-   - Each prompt MUST be 2-4 complete sentences with verbs, articles, and natural flow. No comma-separated tags.
+0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
 0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
 0.15 STYLE PURITY LOCK — ZERO CROSS-CONTAMINATION (CRITICAL — READ TWICE):
       Each style has its OWN vocabulary domain. You MUST use ONLY the vocabulary belonging to the selected style. NEVER leak terms from other style domains.
@@ -4177,16 +4171,10 @@ Rules for the Generated Prompts:
    - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
    - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
    - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
-5. CRITICAL — OUTPUT FORMAT (READ CAREFULLY):
-   - EVERY prompt MUST start with "${effectiveStyleCategory}" followed immediately by a natural descriptive sentence.
-   - FORMAT: "${effectiveStyleCategory} [natural descriptive paragraph with complete sentences]"
-   - This is a FLUID PARAGRAPH of natural English prose, NOT a list of comma-separated keywords.
-   - Example of CORRECT output: "Photorealistic wide shot of a lone surfer paddling out at dawn. Golden morning light filters through gentle ocean mist, illuminating the textured surface of the longboard. The deep blue Pacific stretches endlessly toward a soft pastel horizon, creating natural negative space above the composition, shot on 24mm lens at f/4."
-   - Example of WRONG output (will be REJECTED): "a solitary, surfer, photorealistic style, wide shot, dawn lighting, ocean mist, 24mm lens" — THIS IS A COMMA DUMP, NOT A PROMPT.
-   - Write complete descriptive sentences with verbs, articles, and natural flow. Like a magazine photo caption, not a database of tags.
+5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
-8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney, DALL-E, Firefly). Each prompt variation must read like a gorgeous, professional image description — starting with the style name "${effectiveStyleCategory}" followed by a complete descriptive paragraph of 2-4 flowing sentences. Never output a comma-separated keyword dump.
+8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney). Each prompt variation must read like a gorgeous, professional image description, not a database search query.
 9. CRITICAL: Conform exactly to the requested JSON schema.
 10. STRICT ADOBE NO SIMILAR CONTENT RULE (CRITICAL FOR ADOBE STOCK COMPLIANCE):
     You MUST adhere exactly to Adobe Stock's "Similar vs. Spamming" guidelines. Adobe Stock rejects content with the reason: "During our review, we found that your submission closely resembles content already available on Adobe Stock... we refuse content that is too repetitive so customers can easily find distinct and relevant content."
@@ -4245,7 +4233,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       prompts: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: `An array containing exactly ${count} unique generated prompt variations. EACH prompt MUST be a complete, fluid descriptive paragraph in natural English prose — NOT a comma-separated keyword list.`
+        description: `An array containing exactly ${count} unique generated prompt variations based on the visual idea, strictly in English.`
       },
       negativePrompt: {
         type: Type.STRING,
@@ -4260,8 +4248,16 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
+
+  const safetySettings = [
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+  ];
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     let attempts = 0;
@@ -4271,7 +4267,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. EVERY prompt MUST begin with the exact style name "${styleCategory}" followed by fluid sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`,
+          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
           config: { temperature: randomTemp, seed: seed, topP: 0.99 },
@@ -4319,7 +4315,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             });
           }
 
-          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. EVERY prompt MUST begin with the exact style name \"\${styleCategory}\" followed by fluid sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
           if (referenceImages && referenceImages.length > 0) {
             instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
           }
@@ -4790,7 +4786,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 
   for (let i = 0; i < count; i++) {
     const modifier = activeModifiers[i % activeModifiers.length];
-    generatedPrompts.push(`${resolvedSubject} depicted in a ${styleCategory} style. ${modifier}${bgSuffix}.`);
+    generatedPrompts.push(`${resolvedSubject}, direct style of ${styleCategory}, ${modifier}${bgSuffix} (variation #${i + 1})`);
   }
 
   const finalNegative = userNegativePrompt && userNegativePrompt.trim().length > 0
@@ -4798,13 +4794,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     : "";
 
   const promptsWithNegative = generatedPrompts.map(p => {
-    // Bersihkan: ubah comma-list jadi kalimat natural
-    let cleaned = p.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
     if (finalNegative) {
-      const separator = cleaned.endsWith('.') ? " " : ". ";
-      return `${cleaned}${separator}${finalNegative}`;
+      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
+      return `${p.trim()}${separator}${finalNegative}`;
     }
-    return cleaned;
+    return p;
   });
 
   return {
