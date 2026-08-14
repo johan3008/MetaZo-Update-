@@ -616,9 +616,7 @@ function ensureKeywordCount(
     }
   }
 
-  // 7. Generic high density stock keywords (SEO padding to reach target count)
-  const genericFallback = ['commercial', 'concept', 'modern', 'scene', 'design', 'art', 'graphic', 'simple', 'minimal', 'clean', 'detail', 'element', 'context', 'asset', 'lifestyle', 'organic', 'pattern', 'texture', 'background', 'composition', 'subject', 'focus', 'creative', 'fresh', 'bright', 'vibrant', 'backdrop', 'object', 'view', 'horizontal', 'outdoor', 'indoor', 'surface', 'material', 'style', 'trending', 'popular', 'industry', 'space', 'natural', 'lighting', 'atmosphere', 'inspiration'];
-  sources.push(genericFallback);
+  // 7. Generic fallback removed to maintain purely natural keywords.
 
   // Pad the uniqueKeywords checking each source
   for (const source of sources) {
@@ -1684,15 +1682,14 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
 
   // --- Classify each keyword into stage buckets ---
   const stages: { stage: number; label: string; items: string[] }[] = [
-    { stage: 1, label: 'Exact Main Subject', items: [] },
-    { stage: 2, label: 'Specific Attributes', items: [] },
-    { stage: 3, label: 'Action', items: [] },
-    { stage: 4, label: 'Concept', items: [] },
-    { stage: 5, label: 'Context', items: [] },
-    { stage: 6, label: 'Technique', items: [] },
-    { stage: 7, label: 'Industry', items: [] },
-    { stage: 8, label: 'Use Case', items: [] },
-    { stage: 9, label: 'Composition', items: [] },
+    { stage: 1, label: 'SUBJECT', items: [] },
+    { stage: 2, label: 'ACTION', items: [] },
+    { stage: 3, label: 'ATTRIBUTE', items: [] },
+    { stage: 4, label: 'LOCATION/ENVIRONMENT', items: [] },
+    { stage: 5, label: 'CONCEPT', items: [] },
+    { stage: 6, label: 'EMOTION', items: [] },
+    { stage: 7, label: 'COMMERCIAL USE', items: [] },
+    { stage: 8, label: 'SEMANTIC/LONG-TAIL', items: [] }
   ];
 
   const seen = new Set<string>();
@@ -1702,74 +1699,65 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     if (!k || k.length < 2 || seen.has(k)) continue;
     seen.add(k);
 
-    // STAGE 1: Exact Main Subject
-    if (primarySubjects.some(s => s === k || k === s)) {
-      stages[0].items.push(kw);
-      continue;
-    }
-    if (matchesSubject(k) && allSubjects.length > 0) {
-      stages[0].items.push(kw);
-      continue;
-    }
+    const wordsCount = k.split(/\s+/).length;
 
-    // STAGE 2: Specific Attributes (warna, ukuran, material, sifat fisik)
-    if (matchesAttribute(k)) {
-      stages[1].items.push(kw);
-      continue;
-    }
-
-    // STAGE 3: Action
-    if (isAction(k)) {
-      stages[2].items.push(kw);
-      continue;
-    }
-
-    // STAGE 4: Concept (emosi, ide, metafora, tema abstrak)
-    if (matchesConcept(k)) {
-      stages[3].items.push(kw);
-      continue;
-    }
-
-    // STAGE 5: Context (lingkungan, setting, suasana, lokasi)
-    if (matchesScene(k)) {
-      stages[4].items.push(kw);
-      continue;
-    }
-
-    // STAGE 6: Technique
-    if (isTechnique(k)) {
-      stages[5].items.push(kw);
-      continue;
-    }
-
-    // STAGE 7: Industry
-    if (isIndustry(k)) {
-      stages[6].items.push(kw);
-      continue;
-    }
-
-    // STAGE 8: Use Case
-    if (isUseCase(k)) {
+    // STAGE 8: SEMANTIC/LONG-TAIL (multi-word phrases that aren't exact main subjects)
+    if (wordsCount >= 2 && !primarySubjects.some(s => s === k || k === s) && !matchesSubject(k)) {
       stages[7].items.push(kw);
       continue;
     }
 
-    // STAGE 9: Composition
-    if (isComposition(k)) {
-      stages[8].items.push(kw);
+    // STAGE 1: SUBJECT
+    if (primarySubjects.some(s => s === k || k === s) || (matchesSubject(k) && allSubjects.length > 0)) {
+      stages[0].items.push(kw);
       continue;
     }
 
-    // Fallback: assign to most semantically relevant stage
-    // Shorter / noun-like -> Stage 1 or 2; longer phrases -> stage 4 or 5
-    const words = k.split(/\s+/).length;
-    if (words === 1) {
-      // Single word: likely an attribute or subject synonym
+    // STAGE 2: ACTION
+    if (isAction(k)) {
       stages[1].items.push(kw);
-    } else if (words === 2) {
+      continue;
+    }
+
+    // STAGE 3: ATTRIBUTE
+    if (matchesAttribute(k) || isTechnique(k) || isComposition(k)) {
+      stages[2].items.push(kw);
+      continue;
+    }
+
+    // STAGE 4: LOCATION/ENVIRONMENT
+    if (matchesScene(k)) {
       stages[3].items.push(kw);
-    } else {
+      continue;
+    }
+
+    // EMOTION vs CONCEPT logic
+    const EMOTION_TERMS = new Set(['happy', 'sad', 'angry', 'joy', 'fear', 'excited', 'stress', 'love', 'cry', 'smile', 'laugh', 'depressed', 'anxious', 'peaceful', 'calm', 'romantic']);
+    const isEmotion = Array.from(EMOTION_TERMS).some(e => k.includes(e));
+
+    // STAGE 6: EMOTION
+    if (isEmotion) {
+      stages[5].items.push(kw);
+      continue;
+    }
+
+    // STAGE 5: CONCEPT
+    if (matchesConcept(k)) {
       stages[4].items.push(kw);
+      continue;
+    }
+
+    // STAGE 7: COMMERCIAL USE
+    if (isIndustry(k) || isUseCase(k)) {
+      stages[6].items.push(kw);
+      continue;
+    }
+
+    // Fallback based on length if somehow it wasn't caught
+    if (wordsCount === 1) {
+      stages[2].items.push(kw); // Default to ATTRIBUTE
+    } else {
+      stages[7].items.push(kw); // Default to LONG-TAIL
     }
   }
 
@@ -2855,7 +2843,8 @@ OUTPUT FORMAT:
 
       // Final safety pass: re-filter/re-dedupe after ensureKeywordCount's fallback padding,
       // then re-slice to keep the exact target count intact.
-      data.keywords = semanticDeduplicate(filterBannedKeywords(data.keywords)).slice(0, targetCount);
+      let safeKw1 = semanticDeduplicate(filterBannedKeywords(data.keywords));
+      data.keywords = safeKw1.slice(0, targetCount);
 
       // [LAPISAN 3] Sistem pembobotan keyword: SEO score, visual score, commercial score, trend score.
       // Reorder di dalam tiap kuintil struktural (subject → technical → context → commercial → emotional)
@@ -3729,7 +3718,8 @@ OUTPUT FORMAT:
             );
 
             // Final safety pass setelah fallback padding dari ensureKeywordCount
-            metadata.keywords = semanticDeduplicate(filterBannedKeywords(metadata.keywords)).slice(0, targetCount);
+            let safeKw2 = semanticDeduplicate(filterBannedKeywords(metadata.keywords));
+            metadata.keywords = safeKw2.slice(0, targetCount);
 
             // [LAPISAN 3] Sistem pembobotan keyword: reorder di dalam tiap kuintil struktural
             metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, metadata.title);
