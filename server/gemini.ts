@@ -1234,7 +1234,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite-preview'];
+          const rotationModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -3800,46 +3800,36 @@ OUTPUT FORMAT:
 function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
   let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
   
+  // DETEKSI & TOLAK output keyword-list (comma-separated, bukan kalimat natural)
+  const isKeywordList = (p: string): boolean => {
+    const commas = (p.match(/,/g) || []).length;
+    const words = p.split(/\s+/).length;
+    // Keyword list: banyak koma relatif terhadap jumlah kata, atau tidak ada kata kerja/titik
+    return commas > words * 0.3 || (!p.includes('.') && commas > 3 && words < 25);
+  };
+  
+  validatedPrompts = validatedPrompts.filter((p: string) => !isKeywordList(p));
+  
   if (validatedPrompts.length === 0) {
-    // If absolutely no prompts, at least returning something to avoid crash, but ideally shouldn't happen
-    validatedPrompts = [`${subject} professional stock photography`].map(p => p);
+    validatedPrompts = [`${subject} professional stock photography`];
   }
 
-  const originalLength = validatedPrompts.length;
-  if (validatedPrompts.length < count) {
-    const modifiers = [
-      "cinematic macro photography, highly detailed",
-      "isometric 3D render, octane render, stylized lighting",
-      "vibrant watercolor ink illustration, splash art",
-      "futuristic cyberpunk city night life background, neon glow",
-      "classical oil painting, textured brush strokes, masterwork",
-      "minimalist flat graphic design icon",
-      "dramatic backlight, rim lighting, atmospheric depth",
-      "wide angle landscape composition, beautiful morning light",
-      "studio lighting portrait, bokeh depth of field",
-      "vintage retro concept art, detailed illustration"
-    ];
-    let modIdx = 0;
-    while (validatedPrompts.length < count) {
-      const base = validatedPrompts[validatedPrompts.length % originalLength];
-      const mod = modifiers[modIdx % modifiers.length];
-      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
-      modIdx++;
-    }
-  } else if (validatedPrompts.length > count) {
+  // Hanya pakai prompt dari model, jangan padding dengan modifier acak
+  if (validatedPrompts.length > count) {
     validatedPrompts = validatedPrompts.slice(0, count);
   }
   
   const appendNeg = userNegativePrompt && userNegativePrompt.trim().length > 0 
-    ? `Avoid: ${userNegativePrompt.trim()}` 
+    ? ` Avoid: ${userNegativePrompt.trim()}` 
     : "";
   
   const processedPrompts = validatedPrompts.map((p: string) => {
+    let cleaned = p.trim().replace(/\s*\(variation #?\d+\)\s*/gi, '').trim();
     if (appendNeg) {
-      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
-      return `${p.trim()}${separator}${appendNeg}`;
+      const separator = cleaned.endsWith('.') ? " " : ". ";
+      return `${cleaned}${separator}${appendNeg}`;
     }
-    return p.trim();
+    return cleaned;
   });
 
   return {
@@ -4171,7 +4161,7 @@ Rules for the Generated Prompts:
    - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
    - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
    - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
-5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
+5. CRITICAL — NO KEYWORD SPAM / NO COMMA LISTS: You are FORBIDDEN from outputting comma-separated keyword lists, SEO tags, or tag dumps. Each prompt MUST be a single fluid paragraph of natural English prose — like a magazine photo caption, not a database of tags. A prompt that is just "subject, adjective, lighting, camera, style" with commas is INVALID and will be REJECTED. Write complete descriptive sentences with verbs, articles, and natural flow.
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
 8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney). Each prompt variation must read like a gorgeous, professional image description, not a database search query.
@@ -4233,7 +4223,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       prompts: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: `An array containing exactly ${count} unique generated prompt variations based on the visual idea, strictly in English.`
+        description: `An array containing exactly ${count} unique generated prompt variations. EACH prompt MUST be a complete, fluid descriptive paragraph in natural English prose — NOT a comma-separated keyword list.`
       },
       negativePrompt: {
         type: Type.STRING,
@@ -4248,7 +4238,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
