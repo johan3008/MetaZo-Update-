@@ -2258,12 +2258,19 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 } else {
                     const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
                     const execPromise = util.promisify(exec);
-                    // Crop 50%x50% pada resolusi asli (detail 100% pixel, bukan upscale):
-                    // urutan wilayah = TENGAH, KIRI, KANAN (harus sama dengan panduan di systemInstruction)
+                    // FIX QC (full-frame coverage): crop lama (center/left/right) hanya mengambil
+                    // pita TENGAH secara vertikal (25%-75% tinggi gambar), sehingga 25% area PALING
+                    // ATAS dan 25% area PALING BAWAH tidak pernah diperiksa dalam resolusi piksel asli.
+                    // Pada foto orang memegang objek (produk, model arsitektur, botol, dll.), titik
+                    // kontak tangan-jari-objek yang paling rawan cacat AI generatif umumnya berada di
+                    // paruh BAWAH frame — tepat di zona buta crop lama. Diganti dengan 4 crop KUADRAN
+                    // ber-overlap 20% agar seluruh permukaan gambar (termasuk sudut & tepi bawah)
+                    // tercakup minimal sekali dalam resolusi asli, sejajar dengan logika client-side.
                     const cropRegions = [
-                        { name: 'center', filter: 'crop=iw/2:ih/2:iw/4:ih/4' },
-                        { name: 'left',   filter: 'crop=iw/2:ih/2:0:ih/4' },
-                        { name: 'right',  filter: 'crop=iw/2:ih/2:iw/2:ih/4' }
+                        { name: 'top-left',     filter: 'crop=iw*0.6:ih*0.6:0:0' },
+                        { name: 'top-right',    filter: 'crop=iw*0.6:ih*0.6:iw*0.4:0' },
+                        { name: 'bottom-left',  filter: 'crop=iw*0.6:ih*0.6:0:ih*0.4' },
+                        { name: 'bottom-right', filter: 'crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4' }
                     ];
                     const cropBase64s: string[] = [];
                     for (const region of cropRegions) {
