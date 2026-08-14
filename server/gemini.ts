@@ -1014,7 +1014,7 @@ function getAIClient(): any {
         }
 
         const runGeminiDirectFetch = async (keyToUse: string, params: any) => {
-          const model = params.model || 'gemini-3.5-flash';
+          const model = params.model || 'gemini-2.5-flash';
           const cleanModel = model.startsWith('models/') ? model : `models/${model}`;
           const url = `https://generativelanguage.googleapis.com/v1beta/${cleanModel}:generateContent?key=${keyToUse}`;
 
@@ -1204,7 +1204,7 @@ const callGeminiWithRetry = async (
       // Handle invalid model names or hallucinated models
       if (statusCode === 400 || statusCode === 404) {
           if (errorMsg.includes("model") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("support")) {
-              const fallback = 'gemini-3.5-flash';
+              const fallback = 'gemini-2.5-pro';
               if (currentModel !== fallback) {
                   console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Falling back to ${fallback}.`);
                   currentModel = fallback;
@@ -1234,7 +1234,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
+          const rotationModels = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -3800,36 +3800,46 @@ OUTPUT FORMAT:
 function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
   let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
   
-  // DETEKSI & TOLAK output keyword-list (comma-separated, bukan kalimat natural)
-  const isKeywordList = (p: string): boolean => {
-    const commas = (p.match(/,/g) || []).length;
-    const words = p.split(/\s+/).length;
-    // Keyword list: banyak koma relatif terhadap jumlah kata, atau tidak ada kata kerja/titik
-    return commas > words * 0.3 || (!p.includes('.') && commas > 3 && words < 25);
-  };
-  
-  validatedPrompts = validatedPrompts.filter((p: string) => !isKeywordList(p));
-  
   if (validatedPrompts.length === 0) {
-    validatedPrompts = [`${subject} professional stock photography`];
+    // If absolutely no prompts, at least returning something to avoid crash, but ideally shouldn't happen
+    validatedPrompts = [`${subject} professional stock photography`].map(p => p);
   }
 
-  // Hanya pakai prompt dari model, jangan padding dengan modifier acak
-  if (validatedPrompts.length > count) {
+  const originalLength = validatedPrompts.length;
+  if (validatedPrompts.length < count) {
+    const modifiers = [
+      "cinematic macro photography, highly detailed",
+      "isometric 3D render, octane render, stylized lighting",
+      "vibrant watercolor ink illustration, splash art",
+      "futuristic cyberpunk city night life background, neon glow",
+      "classical oil painting, textured brush strokes, masterwork",
+      "minimalist flat graphic design icon",
+      "dramatic backlight, rim lighting, atmospheric depth",
+      "wide angle landscape composition, beautiful morning light",
+      "studio lighting portrait, bokeh depth of field",
+      "vintage retro concept art, detailed illustration"
+    ];
+    let modIdx = 0;
+    while (validatedPrompts.length < count) {
+      const base = validatedPrompts[validatedPrompts.length % originalLength];
+      const mod = modifiers[modIdx % modifiers.length];
+      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
+      modIdx++;
+    }
+  } else if (validatedPrompts.length > count) {
     validatedPrompts = validatedPrompts.slice(0, count);
   }
   
   const appendNeg = userNegativePrompt && userNegativePrompt.trim().length > 0 
-    ? ` Avoid: ${userNegativePrompt.trim()}` 
+    ? `Avoid: ${userNegativePrompt.trim()}` 
     : "";
   
   const processedPrompts = validatedPrompts.map((p: string) => {
-    let cleaned = p.trim().replace(/\s*\(variation #?\d+\)\s*/gi, '').trim();
     if (appendNeg) {
-      const separator = cleaned.endsWith('.') ? " " : ". ";
-      return `${cleaned}${separator}${appendNeg}`;
+      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
+      return `${p.trim()}${separator}${appendNeg}`;
     }
-    return cleaned;
+    return p.trim();
   });
 
   return {
@@ -4161,7 +4171,7 @@ Rules for the Generated Prompts:
    - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
    - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
    - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
-5. CRITICAL — NO KEYWORD SPAM / NO COMMA LISTS: You are FORBIDDEN from outputting comma-separated keyword lists, SEO tags, or tag dumps. Each prompt MUST be a single fluid paragraph of natural English prose — like a magazine photo caption, not a database of tags. A prompt that is just "subject, adjective, lighting, camera, style" with commas is INVALID and will be REJECTED. Write complete descriptive sentences with verbs, articles, and natural flow.
+5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
 8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney). Each prompt variation must read like a gorgeous, professional image description, not a database search query.
@@ -4223,7 +4233,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       prompts: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: `An array containing exactly ${count} unique generated prompt variations. EACH prompt MUST be a complete, fluid descriptive paragraph in natural English prose — NOT a comma-separated keyword list.`
+        description: `An array containing exactly ${count} unique generated prompt variations based on the visual idea, strictly in English.`
       },
       negativePrompt: {
         type: Type.STRING,
@@ -4238,7 +4248,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
   let lastError: any = null;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
@@ -4768,7 +4778,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 
   for (let i = 0; i < count; i++) {
     const modifier = activeModifiers[i % activeModifiers.length];
-    generatedPrompts.push(`${resolvedSubject} depicted in a ${styleCategory} style. ${modifier}${bgSuffix}.`);
+    generatedPrompts.push(`${resolvedSubject}, direct style of ${styleCategory}, ${modifier}${bgSuffix} (variation #${i + 1})`);
   }
 
   const finalNegative = userNegativePrompt && userNegativePrompt.trim().length > 0
@@ -4776,13 +4786,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     : "";
 
   const promptsWithNegative = generatedPrompts.map(p => {
-    // Bersihkan: ubah comma-list jadi kalimat natural
-    let cleaned = p.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
     if (finalNegative) {
-      const separator = cleaned.endsWith('.') ? " " : ". ";
-      return `${cleaned}${separator}${finalNegative}`;
+      const separator = p.trim().endsWith('.') || p.trim().endsWith(',') ? " " : ", ";
+      return `${p.trim()}${separator}${finalNegative}`;
     }
-    return cleaned;
+    return p;
   });
 
   return {
@@ -4850,7 +4858,7 @@ CRITICAL RULES:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
   let lastError;
   let responseText = "";
 
@@ -4941,7 +4949,7 @@ Return a JSON array of objects, each with "prompt" and "description".`;
   }
   parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
   let lastError;
 
   // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
@@ -5352,24 +5360,25 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
   // Map/Upgrade low-precision/lightweight models to high-capability vision models to guarantee strict rule-following
-  let selectedModel = model || 'gemini-3.6-flash';
-  if (selectedModel !== 'gemini-3.6-flash' && (
+  let selectedModel = model || 'gemini-2.5-pro';
+  if (
     selectedModel === 'auto' ||
     selectedModel.includes('1.5-flash') ||
     selectedModel.includes('8b') ||
     selectedModel.includes('2.0-flash') ||
     selectedModel.includes('gemma') ||
+    selectedModel.includes('3-flash') ||
     selectedModel.includes('3.1-flash-lite') ||
-    selectedModel.includes('3.5-flash') ||
-    selectedModel.includes('pro') ||
-    selectedModel.includes('3.1-pro') ||
-    selectedModel.includes('3-flash')
-  )) {
-    selectedModel = 'gemini-3.6-flash';
+    selectedModel.includes('3.5-flash')
+  ) {
+    // Force a highly robust, intelligence-aligned model for strict technical quality checks
+    selectedModel = 'gemini-2.5-pro';
+  } else if (selectedModel.includes('pro') || selectedModel.includes('3.1-pro')) {
+    selectedModel = 'gemini-2.5-pro';
   }
 
   // Normalisasi Model ke Seri Resmi Terupdate (Menggunakan Model Pro Resmi untuk menjamin kepekaan visual yang sangat tinggi)
-  const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+  const modelsToTry = ['gemini-2.5-pro', 'gemini-1.5-pro'];
   let responseText = "";
   let lastError;
 
@@ -6628,7 +6637,7 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
       ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
-      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-flash-lite',
+      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.0-flash',
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
@@ -6675,7 +6684,7 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
       const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-3.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -6723,7 +6732,7 @@ export async function removeWatermark(imageBase64: string, maskBase64: string, p
   let analysis: any = null;
   if (!NON_GEMINI_PROVIDERS.has(provider)) {
     try {
-      const res = await callGeminiWithRetry('gemini-3.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
       analysis = JSON.parse(extractJSON(res.text || '{}'));
     } catch {}
   }
@@ -6811,7 +6820,7 @@ export async function generate3DCGIPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: THREE_D_CGI_STYLE_INSTRUCTION,
@@ -6860,7 +6869,7 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: CINEMATIC_STYLE_INSTRUCTION,
@@ -6911,7 +6920,7 @@ export async function generateAbstractPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: ABSTRACT_STYLE_INSTRUCTION,
@@ -6958,7 +6967,7 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: PAINTERLY_DIGITAL_ART_STYLE_INSTRUCTION,
@@ -7009,7 +7018,7 @@ CRITICAL RULES:
     promptText = `Generate a creative subject idea for style: "${styleCategory || "General"}". To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
   }
   
-  const activeModel = model || 'gemini-3.5-flash';
+  const activeModel = model || 'gemini-2.5-flash';
   
   const response = await callGeminiWithRetry(activeModel, {
     parts: [{ text: promptText }]
