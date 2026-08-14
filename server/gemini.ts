@@ -5230,9 +5230,10 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 
 ---
 PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
-Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil berurutan dari wilayah: TENGAH (center), KIRI (left), lalu KANAN (right) dari gambar yang sama.
+Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil dari 4 wilayah KUADRAN ber-overlap 20% yang bersama-sama mencakup SELURUH permukaan gambar, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, lalu BAWAH-KANAN.
 - Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
-- Sebutkan di laporan visual_scan_analysis crop wilayah mana (tengah/kiri/kanan) tempat Anda menemukan cacat.
+- ZONA RAWAN KRITIS (WAJIB DIPERIKSA EKSTRA TELITI): Pada foto orang memegang/menyentuh objek (produk, model, botol, alat, dsb.), titik kontak tangan-jari-objek PALING SERING berada di paruh BAWAH frame (kuadran BAWAH-KIRI/BAWAH-KANAN) — dekat dada, perut, atau pinggang subjek. Zona inilah yang paling sering mengandung cacat AI generatif (jari menyatu/meleleh ke objek, objek yang menembus pakaian, genggaman yang mustahil secara fisik) namun paling mudah terlewat jika hanya melihat gambar penuh yang telah diperkecil. Periksa kuadran bawah dengan tingkat kecurigaan setara atau lebih tinggi daripada kuadran atas.
+- Sebutkan di laporan visual_scan_analysis crop wilayah mana (atas-kiri/atas-kanan/bawah-kiri/bawah-kanan) tempat Anda menemukan cacat.
 - Cacat yang terkonfirmasi pada SALAH SATU crop saja sudah cukup untuk menyatakan FAIL pada check terkait — moderator Adobe Stock memeriksa gambar pada zoom 100-200% di SELURUH area, bukan hanya tampilan penuh.
 
 ---
