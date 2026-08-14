@@ -1564,7 +1564,7 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * kedekatan semantik dengan setiap kategori. Urutan ini dirancang untuk
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
-function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, title?: string): string[] {
+function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number): string[] {
   if (keywords.length === 0) return keywords;
 
   const lower = (s: string) => s.toLowerCase().trim();
@@ -1761,27 +1761,104 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     }
   }
 
-  // --- Build final ordered keyword list ---
-  const result: string[] = [];
-  for (const stage of stages) {
-    result.push(...stage.items);
+  // --- Dynamic Proportional Allocation ---
+  const proportions = [
+    0.20, // SUBJECT
+    0.15, // ACTION
+    0.15, // ATTRIBUTE
+    0.10, // LOCATION
+    0.10, // CONCEPT
+    0.10, // EMOTION
+    0.10, // COMMERCIAL
+    0.10  // LONG-TAIL
+  ];
+
+  let allocations = proportions.map(p => Math.floor(p * targetCount));
+  
+  // Distribute remaining slots to ensure EXACTLY targetCount
+  let currentTotal = allocations.reduce((a, b) => a + b, 0);
+  let remainder = targetCount - currentTotal;
+  
+  // Assign remainders top-down starting from SUBJECT
+  for (let i = 0; i < remainder; i++) {
+    allocations[i % allocations.length]++;
   }
 
-  // Ensure Keyword #1 is EXACT MAIN SUBJECT
-  if (primarySubjects.length > 0 && result.length > 0) {
-    const mainSubj = primarySubjects[0];
-    const idx = result.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
-    if (idx > 0) {
-      const [main] = result.splice(idx, 1);
-      result.unshift(main);
-    } else if (idx === -1 && mainSubj.length > 1) {
-      result.unshift(mainSubj);
+  const finalResult: string[] = [];
+  const excess: string[] = [];
+
+  // Phase 1: Try to meet allocations
+  for (let i = 0; i < stages.length; i++) {
+    const bucket = stages[i].items;
+    const alloc = allocations[i];
+    
+    if (bucket.length <= alloc) {
+      finalResult.push(...bucket);
+      allocations[i] -= bucket.length; // Remaining quota not met
+    } else {
+      finalResult.push(...bucket.slice(0, alloc));
+      excess.push(...bucket.slice(alloc));
+      allocations[i] = 0; // Met exactly
     }
   }
 
-  return result;
-}
+  // Phase 2: If we didn't meet the targetCount, fill the shortfall from the excess pool
+  let shortfall = targetCount - finalResult.length;
+  if (shortfall > 0 && excess.length > 0) {
+    const extraToTake = Math.min(shortfall, excess.length);
+    finalResult.push(...excess.slice(0, extraToTake));
+  }
 
+  // Phase 3: If STILL short, create dynamic long-tail combinations naturally
+  shortfall = targetCount - finalResult.length;
+  if (shortfall > 0) {
+     const generatedPool = new Set(finalResult.map(k=>k.toLowerCase()));
+     const baseSubject = stages[0].items[0] || 'element';
+     
+     // Mix subject with attributes/actions
+     for(let i=0; i<stages[2].items.length && shortfall > 0; i++) {
+         const combo = baseSubject + ' ' + stages[2].items[i];
+         if(!generatedPool.has(combo)) {
+            finalResult.push(combo);
+            generatedPool.add(combo);
+            shortfall--;
+         }
+     }
+     for(let i=0; i<stages[1].items.length && shortfall > 0; i++) {
+         const combo = stages[1].items[i] + ' ' + baseSubject;
+         if(!generatedPool.has(combo)) {
+            finalResult.push(combo);
+            generatedPool.add(combo);
+            shortfall--;
+         }
+     }
+     
+     // If truly desperate, use single words from generic concepts that are somewhat natural
+     const desperateFallback = ['digital', 'visual', 'composition', 'image', 'picture', 'color', 'detail', 'focus', 'format', 'style'];
+     for(let i=0; i<desperateFallback.length && shortfall > 0; i++) {
+         if(!generatedPool.has(desperateFallback[i])) {
+            finalResult.push(desperateFallback[i]);
+            generatedPool.add(desperateFallback[i]);
+            shortfall--;
+         }
+     }
+  }
+
+  // Ensure main subject is first
+  if (primarySubjects.length > 0 && finalResult.length > 0) {
+    const mainSubj = primarySubjects[0];
+    const idx = finalResult.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
+    if (idx > 0) {
+      const [main] = finalResult.splice(idx, 1);
+      finalResult.unshift(main);
+    } else if (idx === -1 && mainSubj.length > 1) {
+      finalResult.pop(); // Keep exact count
+      finalResult.unshift(mainSubj);
+    }
+  }
+
+  return finalResult;
+}
 // ---- LAPISAN 4: EKSPANSI SINONIM & LONG-TAIL KEYWORD -----------------------
 
 const SYNONYM_MAP: Record<string, string[]> = {
@@ -2072,7 +2149,7 @@ export const generateStockMetadata = async (
   }
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 60;
+  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
   const directives = getToolTypeDirectives(toolType);
@@ -2844,12 +2921,12 @@ OUTPUT FORMAT:
       // Final safety pass: re-filter/re-dedupe after ensureKeywordCount's fallback padding,
       // then re-slice to keep the exact target count intact.
       let safeKw1 = semanticDeduplicate(filterBannedKeywords(data.keywords));
-      data.keywords = safeKw1.slice(0, targetCount);
+      data.keywords = safeKw1;
 
       // [LAPISAN 3] Sistem pembobotan keyword: SEO score, visual score, commercial score, trend score.
       // Reorder di dalam tiap kuintil struktural (subject → technical → context → commercial → emotional)
       // supaya urutan SEO tetap terjaga sambil keyword paling relevan/bernilai naik ke atas kuintilnya.
-      data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual, data.title);
+      data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual, targetCount);
 
     // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
     // illustration/vector/video) sebagai fallback bila judul dari AI kosong/generik/placeholder.
@@ -2944,7 +3021,7 @@ export const generateBatchStockMetadata = async (
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 60;
+  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
   const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
@@ -3719,10 +3796,10 @@ OUTPUT FORMAT:
 
             // Final safety pass setelah fallback padding dari ensureKeywordCount
             let safeKw2 = semanticDeduplicate(filterBannedKeywords(metadata.keywords));
-            metadata.keywords = safeKw2.slice(0, targetCount);
+            metadata.keywords = safeKw2;
 
             // [LAPISAN 3] Sistem pembobotan keyword: reorder di dalam tiap kuintil struktural
-            metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, metadata.title);
+            metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, targetCount);
 
         // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
         let candidateTitle = String(metadata.title || "").trim();
