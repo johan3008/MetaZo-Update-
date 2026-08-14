@@ -2193,49 +2193,18 @@ MUST-10. Never prioritize a keyword merely because it sounds popular — relevan
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER — Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
+    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
+    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
+    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
+    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
+    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
+    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
 
-    STAGE 1 — EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
 
-    STAGE 2 — SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 — ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 — CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 — CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 — TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 — INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 — USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset — commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 — COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-
+    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
+    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
@@ -2273,49 +2242,18 @@ MUST-10. Never prioritize popularity over relevance.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER — Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
+    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
+    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
+    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
+    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
+    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
+    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
 
-    STAGE 1 — EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
 
-    STAGE 2 — SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 — ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 — CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 — CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 — TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 — INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 — USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset — commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 — COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  } else if (keywordMode === 'multi') {
+    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
+    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.`;  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
@@ -2353,49 +2291,18 @@ MUST-10. Never prioritize popularity over relevance.
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER — Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
+    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
+    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
+    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
+    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
+    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
+    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
 
-    STAGE 1 — EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
 
-    STAGE 2 — SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 — ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 — CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 — CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 — TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 — INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 — USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset — commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 — COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  }
+    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
+    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.`;  }
 
   const noMediaFormatRule = `
 12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
@@ -3046,49 +2953,18 @@ export const generateBatchStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER — Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
+    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
+    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
+    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
+    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
+    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
+    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
 
-    STAGE 1 — EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
 
-    STAGE 2 — SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 — ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 — CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 — CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 — TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 — INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 — USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset — commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 — COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-
+    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
+    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
@@ -3112,49 +2988,18 @@ export const generateBatchStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER — Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
+    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
+    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
+    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
+    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
+    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
+    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
 
-    STAGE 1 — EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
 
-    STAGE 2 — SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 — ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 — CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 — CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 — TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 — INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 — USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset — commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 — COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  } else if (keywordMode === 'multi') {
+    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
+    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.`;  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
@@ -3178,49 +3023,18 @@ export const generateBatchStockMetadata = async (
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL 9-STAGE STRUCTURED KEYWORD PATTERN (STRICT SEO ORDER — Adobe Stock Indexing Algorithm):
-    Every keyword MUST be placed in this EXACT structural order. The pattern is:
-    [Exact Main Subject] -> [Specific Attributes] -> [Action] -> [Concept] -> [Context] -> [Technique] -> [Industry] -> [Use Case] -> [Composition]
+11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
+    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
+    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
+    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
+    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
+    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
+    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
 
-    STAGE 1 — EXACT MAIN SUBJECT (Keywords ~1 to ~5):
-    The core visual subject noun(s). What is the buyer actually searching for?
-    Examples: 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop', 'rose flower', 'office building', 'guitar', 'sunset beach', 'puppy'.
-    These MUST be the first keywords a buyer types into the Adobe Stock search bar.
+    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
 
-    STAGE 2 — SPECIFIC ATTRIBUTES (Keywords ~6 to ~10):
-    Distinct physical traits of the main subject: material, texture, color family, size, shape, condition, distinctive features.
-    Examples: 'wooden', 'metallic', 'glossy', 'matte', 'rough texture', 'smooth', 'curved', 'rectangular', 'round', 'transparent', 'opaque', 'worn', 'polished', 'rustic', 'modern design'.
-
-    STAGE 3 — ACTION (Keywords ~11 to ~15):
-    What is the subject actively doing OR what action is happening in the scene?
-    Examples: 'running', 'jumping', 'sitting', 'flying', 'swimming', 'working', 'typing', 'cooking', 'dancing', 'reading', 'driving', 'holding', 'reaching', 'talking', 'laughing'.
-
-    STAGE 4 — CONCEPT (Keywords ~16 to ~20):
-    Abstract ideas, emotions, metaphors, or themes represented in the asset.
-    Examples: 'freedom', 'success', 'innovation', 'growth', 'peace', 'love', 'teamwork', 'leadership', 'happiness', 'focus', 'creativity', 'sustainability', 'strength', 'balance', 'transformation'.
-
-    STAGE 5 — CONTEXT (Keywords ~21 to ~25):
-    Environment, setting, atmosphere, season, time of day, location, or weather.
-    Examples: 'office', 'home', 'outdoors', 'urban', 'nature', 'beach', 'forest', 'mountain', 'studio', 'cafe', 'morning', 'sunset', 'golden hour', 'night scene', 'autumn season', 'rainy day'.
-
-    STAGE 6 — TECHNIQUE (Keywords ~26 to ~30):
-    Artistic style, visual technique, camera setup, lighting, or rendering method.
-    Examples: 'macro', 'close-up', 'aerial view', 'flat lay', 'top view', 'watercolor', 'line art', '3d render', 'cinematic', 'bokeh', 'depth of field', 'natural light', 'studio lighting', 'golden hour light', 'minimalist style'.
-
-    STAGE 7 — INDUSTRY (Keywords ~31 to ~35):
-    Target industry, professional sector, or market where this asset is most usable.
-    Examples: 'healthcare', 'technology', 'finance', 'education', 'marketing', 'real estate', 'hospitality', 'fashion', 'fitness', 'wellness', 'travel', 'food industry', 'corporate', 'startup', 'e-commerce'.
-
-    STAGE 8 — USE CASE (Keywords ~36 to ~40):
-    Where and how the buyer will use the asset — commercial applications, media formats, or design contexts.
-    Examples: 'banner', 'landing page', 'presentation', 'social media', 'website', 'brochure', 'poster', 'magazine', 'blog', 'newsletter', 'advertisement', 'packaging', 'cover photo', 'header', 'copy space'.
-
-    STAGE 9 — COMPOSITION (Keywords ~41 to ~49):
-    Visual layout, framing, spatial arrangement, and design principles used in the image.
-    Examples: 'rule of thirds', 'symmetry', 'negative space', 'isolated subject', 'centered', 'off-center', 'layered', 'depth', 'perspective', 'minimal', 'clean', 'uncluttered', 'spacious', 'framing', 'leading lines'.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to fill a stage. If a stage has genuinely zero relevant terms, skip it. Quality over quantity ALWAYS.`;
-  }
+    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
+    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.`;  }
 
   const noMediaFormatRule = `
 12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
