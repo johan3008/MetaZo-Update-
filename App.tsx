@@ -1310,6 +1310,10 @@ const App: React.FC = () => {
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
+  // Guards against the "subscription expired" alert firing repeatedly (e.g. from
+  // the Firestore snapshot listener re-triggering the license check effect).
+  const hasShownExpiryAlertRef = useRef(false);
+  const lastExpiredKeyRef = useRef<string>('');
   const [isMzLicensedState, setIsMzLicensed] = useState(() => { const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase(); return !!k; });
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
   const isMzLicensed = isMzLicensedState;
@@ -2306,7 +2310,23 @@ const App: React.FC = () => {
               const remainingDays = 30 - elapsedDays;
 
               if (remainingDays <= 0) {
-                clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
+                // Deactivate the key itself in Firestore so it can no longer be
+                // rediscovered by findActiveKeyForEmail() on the next profile
+                // sync tick. Without this, the snapshot listener kept re-assigning
+                // the same expired key back to the user, which re-triggered this
+                // effect and made the alert pop up repeatedly every few seconds.
+                updateDoc(doc(db, 'keys', k), {
+                  activated: false,
+                  deactivatedReason: 'expired_30days',
+                  deactivatedAt: new Date().toISOString()
+                }).catch(e => console.info('db_op', e));
+
+                // Only show the alert once per expired key, per session.
+                const alreadyShown = hasShownExpiryAlertRef.current && lastExpiredKeyRef.current === k;
+                lastExpiredKeyRef.current = k;
+                hasShownExpiryAlertRef.current = true;
+
+                clearLicenseKey(alreadyShown ? undefined : 'Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
                 return;
               }
               setSubDaysLeft(Math.max(0, remainingDays));
