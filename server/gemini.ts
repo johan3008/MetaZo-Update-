@@ -561,7 +561,7 @@ function ensureKeywordCount(
       .filter(w => w.length > 1 && !STOP_WORDS.has(w) && !isProhibitedKeyword(w));
   };
 
-  // Build candidate sources in order of priority:
+  // Build candidate sources in order of priority (only from actual visually-detected facts):
   const sources: string[][] = [];
 
   // 1. From visual facts primary subjects
@@ -600,12 +600,10 @@ function ensureKeywordCount(
     }));
   }
 
-  // 4. From Title
+  // 4. From Title and Description (already generated based on visual facts)
   if (title && typeof title === 'string') {
     sources.push(extractWords(title));
   }
-
-  // 5. From Description
   if (description && typeof description === 'string') {
     sources.push(extractWords(description));
   }
@@ -618,7 +616,7 @@ function ensureKeywordCount(
     }
   }
 
-  // 7. Generic high density stock keywords
+  // 7. Generic high density stock keywords (SEO padding to reach target count)
   const genericFallback = ['commercial', 'concept', 'modern', 'scene', 'design', 'art', 'graphic', 'simple', 'minimal', 'clean', 'detail', 'element', 'context', 'asset', 'lifestyle', 'organic', 'pattern', 'texture', 'background', 'composition', 'subject', 'focus', 'creative', 'fresh', 'bright', 'vibrant', 'backdrop', 'object', 'view', 'horizontal', 'outdoor', 'indoor', 'surface', 'material', 'style', 'trending', 'popular', 'industry', 'space', 'natural', 'lighting', 'atmosphere', 'inspiration'];
   sources.push(genericFallback);
 
