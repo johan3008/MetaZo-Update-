@@ -4152,7 +4152,12 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. ${isPhotographic ? `Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).${cameraAngleDirective}` : 'Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
+0. PROMPT STRUCTURE FORMULA: EVERY PROMPT MUST FOLLOW THIS EXACT PATTERN:
+   - START with the style category name: "${effectiveStyleCategory}"
+   - Then write a fluid, natural paragraph: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]
+   - GOOD example: "Photorealistic close-up of a female tightrope walker's chalk-dusted hands gripping a balancing pole. A thick braided steel cable glistens under soft warm gold sunlight. In the background, a sprawling sun-drenched canyon stretches into a soft-focus summer mist, creating organic copy space for editorial placement, captured on 85mm f/1.8 lens."
+   - BAD example (REJECTED): "subject, action, lighting style, anamorphic lens, volumetric lighting, hyper-realistic, cinematic, 8k" — this is a keyword dump, not a prompt.
+   - Each prompt MUST be 2-4 complete sentences with verbs, articles, and natural flow. No comma-separated tags.
 0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
 0.15 STYLE PURITY LOCK — ZERO CROSS-CONTAMINATION (CRITICAL — READ TWICE):
       Each style has its OWN vocabulary domain. You MUST use ONLY the vocabulary belonging to the selected style. NEVER leak terms from other style domains.
@@ -4172,10 +4177,16 @@ Rules for the Generated Prompts:
    - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
    - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
    - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
-5. CRITICAL — NO KEYWORD SPAM / NO COMMA LISTS: You are FORBIDDEN from outputting comma-separated keyword lists, SEO tags, or tag dumps. Each prompt MUST be a single fluid paragraph of natural English prose — like a magazine photo caption, not a database of tags. A prompt that is just "subject, adjective, lighting, camera, style" with commas is INVALID and will be REJECTED. Write complete descriptive sentences with verbs, articles, and natural flow.
+5. CRITICAL — OUTPUT FORMAT (READ CAREFULLY):
+   - EVERY prompt MUST start with "${effectiveStyleCategory}" followed immediately by a natural descriptive sentence.
+   - FORMAT: "${effectiveStyleCategory} [natural descriptive paragraph with complete sentences]"
+   - This is a FLUID PARAGRAPH of natural English prose, NOT a list of comma-separated keywords.
+   - Example of CORRECT output: "Photorealistic wide shot of a lone surfer paddling out at dawn. Golden morning light filters through gentle ocean mist, illuminating the textured surface of the longboard. The deep blue Pacific stretches endlessly toward a soft pastel horizon, creating natural negative space above the composition, shot on 24mm lens at f/4."
+   - Example of WRONG output (will be REJECTED): "a solitary, surfer, photorealistic style, wide shot, dawn lighting, ocean mist, 24mm lens" — THIS IS A COMMA DUMP, NOT A PROMPT.
+   - Write complete descriptive sentences with verbs, articles, and natural flow. Like a magazine photo caption, not a database of tags.
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
-8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney). Each prompt variation must read like a gorgeous, professional image description, not a database search query.
+8. CRITICAL QUALITY DIRECTIVE: This is for high-fidelity text-to-image generator prompts (e.g. Midjourney, DALL-E, Firefly). Each prompt variation must read like a gorgeous, professional image description — starting with the style name "${effectiveStyleCategory}" followed by a complete descriptive paragraph of 2-4 flowing sentences. Never output a comma-separated keyword dump.
 9. CRITICAL: Conform exactly to the requested JSON schema.
 10. STRICT ADOBE NO SIMILAR CONTENT RULE (CRITICAL FOR ADOBE STOCK COMPLIANCE):
     You MUST adhere exactly to Adobe Stock's "Similar vs. Spamming" guidelines. Adobe Stock rejects content with the reason: "During our review, we found that your submission closely resembles content already available on Adobe Stock... we refuse content that is too repetitive so customers can easily find distinct and relevant content."
@@ -4260,7 +4271,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
+          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. EVERY prompt MUST begin with the exact style name "${styleCategory}" followed by fluid sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`,
           responseMimeType: "application/json",
           responseSchema,
           config: { temperature: randomTemp, seed: seed, topP: 0.99 },
@@ -4308,7 +4319,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             });
           }
 
-          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. EVERY prompt MUST begin with the exact style name \"\${styleCategory}\" followed by fluid sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
           if (referenceImages && referenceImages.length > 0) {
             instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
           }
