@@ -12,51 +12,15 @@ import crypto from "node:crypto";
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
 const CACHE_FILE_PATH = path.join(process.cwd(), "qa_reports_cache.json");
-const QA_CACHE_MAX_ENTRIES = 1000;
 let qaCacheMap: Map<string, any> = new Map();
 
 function loadQACache() {
-  try {
-    if (fs.existsSync(CACHE_FILE_PATH)) {
-      const raw = fs.readFileSync(CACHE_FILE_PATH, "utf8");
-      const obj = JSON.parse(raw);
-      qaCacheMap = new Map(Object.entries(obj));
-      console.log(`[QA Cache] Loaded ${qaCacheMap.size} cached QA report(s) from disk.`);
-    }
-  } catch (e: any) {
-    console.warn("[QA Cache] Failed to load cache file, starting fresh:", e.message || e);
-    qaCacheMap = new Map();
-  }
+  // Caching is disabled to ensure pure, real-time 100% real AI vision analysis
+  console.log("[QA Cache] Caching disabled to ensure pure real-time 100% real AI vision analysis.");
 }
 
 function saveQACache() {
-  try {
-    // Simple bound to avoid unbounded growth: drop oldest entries (Map preserves insertion order).
-    while (qaCacheMap.size > QA_CACHE_MAX_ENTRIES) {
-      const oldestKey = qaCacheMap.keys().next().value;
-      if (oldestKey === undefined) break;
-      qaCacheMap.delete(oldestKey);
-    }
-    const obj = Object.fromEntries(qaCacheMap);
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj), "utf8");
-  } catch (e: any) {
-    console.warn("[QA Cache] Failed to persist cache file:", e.message || e);
-  }
-}
-
-/**
- * Builds a stable content hash for a QA request so that re-running the check on the
- * SAME file with the SAME settings (tolerance/language/model) always returns the
- * EXACT SAME cached report, instead of re-querying the AI (which can vary between
- * calls / model rotation even with temperature pinned to 0).
- */
-function computeQAContentHash(parts: any[], meta: Record<string, any>): string {
-  const hash = crypto.createHash("sha256");
-  for (const p of parts) {
-    hash.update(typeof p === "string" ? p : JSON.stringify(p) || "");
-  }
-  hash.update(JSON.stringify(meta));
-  return hash.digest("hex");
+  // Caching is disabled to ensure pure, real-time 100% real AI vision analysis
 }
 
 // Initialize cache load
@@ -5295,38 +5259,18 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC routing: Resolve model properly per provider
-  let selectedModel = model;
-  if (provider === 'gemini') {
-    if (!selectedModel || selectedModel === 'auto') {
-      selectedModel = 'gemini-3.1-pro-preview';
-    }
-  } else {
-    // For non-Gemini providers, do NOT force gemini model names
-    if (!selectedModel || selectedModel === 'auto' || selectedModel.startsWith('gemini-') || selectedModel.startsWith('gemma-')) {
-      selectedModel = PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
-    }
+  // QC routing: do NOT silently downgrade a requested Pro model to Flash.
+  // The current Gemini API exposes Gemini 3.1 Pro Preview for advanced reasoning and
+  // Gemini 3.6 Flash for faster multimodal fallback.
+  let selectedModel = model || 'gemini-3.1-pro-preview';
+  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
+    selectedModel = 'gemini-3.1-pro-preview';
   }
 
-  // Fallback chain for Gemini
-  const geminiFallbackChain = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
-  const modelsToTry = selectedModel && selectedModel.startsWith('gemini')
-    ? Array.from(new Set([selectedModel, ...geminiFallbackChain]))
-    : geminiFallbackChain;
+  // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
   let responseText = "";
   let lastError;
-
-  // === DETERMINISTIC RESULT CACHE ===
-  // Same file + same tolerance/language/model MUST always give the same report,
-  // regardless of which model in the fallback chain actually ends up answering,
-  // or of any residual sampling noise the provider still has at temperature 0.
-  const qaCacheKey = computeQAContentHash(imageParts, {
-    tolerance, language: targetLanguageName, model: selectedModel, provider, fileType, imageMetadata
-  });
-  if (qaCacheMap.has(qaCacheKey)) {
-    console.log('[checkImageQuality] Cache hit - returning previously computed report for identical input.');
-    return JSON.parse(JSON.stringify(qaCacheMap.get(qaCacheKey)));
-  }
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
@@ -5360,21 +5304,13 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
         
-        // IMPORTANT: temperature/topP/topK ARE supported by the Gemini API for every
-        // model (including 3.6 Flash / 3.5 Flash-Lite) and are NOT deprecated.
-        // Leaving them unset makes generateContent fall back to the API's default
-        // sampling temperature (~1.0), which is why the same image could come back
-        // with different technical_issues / PASS-FAIL verdicts on every re-run.
-        // Pin sampling to near-zero (with a fixed seed) so re-running the QC on an
-        // unchanged image reliably reproduces the same report.
+        // Gemini 3.6 Flash / 3.5 Flash-Lite deprecate temperature/topP/topK.
+        // Keep the QC request deterministic through the system prompt + structured output
+        // instead of deprecated sampling controls. This also prevents fallback 400s.
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
-          responseSchema,
-          temperature: 0.0,
-          topK: 1,
-          topP: 0.1,
-          seed: 42
+          responseSchema
         });
         responseText = res.text || "{}";
         break;
@@ -5391,28 +5327,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Standard list of all expected check keys for robust cross-model / cross-provider consistency
-    const allExpectedCheckKeys = [
-      'blur', 'composition', 'lighting', 'exposure', 'color_balance', 'over_edited', 'sensor_issues',
-      'watermark', 'logo', 'text', 'anatomical_errors', 'structural_defects', 'ip_risk', 'proportion_defects',
-      'illustration_issues', 'vector_issues', 'noise', 'artifacts', 'ai_artifacts', 'stock_acceptance'
-    ];
-
-    if (!parsedResult.ai_vision_checks || typeof parsedResult.ai_vision_checks !== 'object') {
-      parsedResult.ai_vision_checks = {};
-    }
-
-    // Ensure all expected keys exist and normalize status to uppercase 'PASS' or 'FAIL'
-    for (const key of allExpectedCheckKeys) {
-      const item = parsedResult.ai_vision_checks[key];
-      if (!item || typeof item !== 'object') {
-        parsedResult.ai_vision_checks[key] = { status: 'PASS', note: 'No issues detected.' };
-      } else {
-        const rawStatus = String(item.status || '').trim().toUpperCase();
-        item.status = (rawStatus === 'FAIL' || item.status === false) ? 'FAIL' : 'PASS';
-      }
-    }
-
     // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
       let anyFail = false;
@@ -5429,9 +5343,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let acceptanceFail = false;
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
-        const rawStatus = typeof value === 'object' && value ? String((value as any).status || '').trim().toUpperCase() : '';
-        const isFail = rawStatus === 'FAIL' || (value as any)?.status === false;
-        if (isFail) {
+        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
           failedCheckKeys.push(key);
           if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
@@ -5492,11 +5404,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         parsedResult.legal_status = "VIOLATION";
       }
     }
-
-    // Persist so any future re-check of this exact file (same tolerance/language/model)
-    // returns this exact same report instead of calling the AI again.
-    qaCacheMap.set(qaCacheKey, parsedResult);
-    saveQACache();
 
     return parsedResult;
   } catch(e) {
@@ -6615,25 +6522,14 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
     required: ["visual_scan_analysis","legal_status","technical_issues","strengths","overall_score","recommendation","detailed_feedback","quality_checks","heatmaps"]
   };
 
-  // === DETERMINISTIC RESULT CACHE ===
-  // Same video (frames + technical report) + same tolerance/language/model MUST
-  // always give the same report on re-check.
-  const vqCacheKey = computeQAContentHash(imageParts, { tolerance, language: targetLanguageName, model, provider, gt });
-  if (qaCacheMap.has(vqCacheKey)) {
-    console.log('[checkVideoQuality] Cache hit - returning previously computed report for identical input.');
-    return JSON.parse(JSON.stringify(qaCacheMap.get(vqCacheKey)));
-  }
-
   // AI call with 15s timeout
   let responseText = '';
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
-      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.0, topP: 0.1 }, model })
-      // Pin sampling to near-zero + a fixed seed so re-checking the same video
-      // reproduces the same technical_issues / PASS-FAIL verdict every time.
+      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
       : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-flash-lite',
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
-          { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.0, topK: 1, topP: 0.1, seed: 42 }, 1)
+          { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
     
     // PERBAIKAN TIMEOUT: 60s timeout untuk AI call (dari 90s)
@@ -6642,16 +6538,7 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
   } catch (e: any) {
     responseText = JSON.stringify({ visual_scan_analysis: 'AI unavailable', legal_status: 'SAFE', technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: 'FAIL', adobe_stock_readiness: 'Reject Risk', detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
   }
-  const vqResult = JSON.parse(extractJSON(responseText));
-
-  // Don't cache the local "AI unavailable"/timeout fallback - only cache genuine AI results,
-  // so a transient network hiccup doesn't get "stuck" as the permanent answer for this video.
-  if (vqResult && vqResult.visual_scan_analysis !== 'AI unavailable') {
-    qaCacheMap.set(vqCacheKey, vqResult);
-    saveQACache();
-  }
-
-  return vqResult;
+  return JSON.parse(extractJSON(responseText));
 }
 
 /* ===== FIXED: generateMotionCode restored as standalone function ===== */
