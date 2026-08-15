@@ -2178,126 +2178,8 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         };
     }
 
-    // =========================================================================================
-    // DETERMINISTIC SCORING ENGINE
-    // -----------------------------------------------------------------------------------------
-    // Architecture: CV = deterministic, Rules = deterministic, Gemini = evidence detector only.
-    // Gemini's own free-floating `overall_score` / `recommendation` numbers are NEVER trusted
-    // directly — they can vary between calls even at temperature 0 because they are the model's
-    // own subjective "vibe" of the whole image. Instead:
-    //   1. Technical categories (blur/noise/exposure/artifacts) are scored purely from the
-    //      Python/scikit-image + FFmpeg pixel measurements (100% deterministic, no LLM involved).
-    //   2. Non-technical categories that CV cannot measure (legal/IP, AI structural anomalies,
-    //      anatomy, composition, etc.) use Gemini ONLY as a PASS/FAIL "evidence" signal per
-    //      category — Gemini is never asked "how many points should this lose".
-    //   3. WE decide, with a fixed lookup table, how many points each category is worth and
-    //      how much a FAIL costs. Given the same CV numbers + the same evidence flags, this
-    //      function always returns the exact same score and recommendation.
-    // =========================================================================================
-
-    // Fixed point value per evidence category. Critical categories don't just lose points —
-    // a FAIL on any of them forces the whole image to FAIL, no matter the score.
-    const CRITICAL_EVIDENCE_KEYS = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
-    const NON_CRITICAL_EVIDENCE_PENALTY: Record<string, number> = {
-        color_balance: 8,
-        over_edited: 10,
-        sensor_issues: 8,
-        proportion_defects: 12,
-        composition: 6,
-        illustration_issues: 8,
-        vector_issues: 8,
-        // These four overlap with CV-measured categories below; kept as a secondary
-        // penalty in case Gemini spots something the pixel stats missed (e.g. localized
-        // blur/noise inside a small region CV's global average doesn't flag).
-        blur: 10,
-        noise: 8,
-        exposure: 8,
-        lighting: 6,
-        artifacts: 8
-    };
-
-    /**
-     * Pure function: (CV metrics, Gemini evidence, tolerance) -> { overall_score, recommendation, failed_checks, technical_score, evidence_score }
-     * No randomness, no AI calls. Same inputs -> same output, forever.
-     */
-    function computeDeterministicQAResult(ffmpegStats: any, aiVisionChecks: Record<string, any>, tolerance: string) {
-        // ---- 1. Technical subscore: 100% from CV pixel measurements ----
-        const sharpVal = typeof ffmpegStats?.sharpness?.value === 'number' ? ffmpegStats.sharpness.value : 75;
-        const noiseVal = typeof ffmpegStats?.noise?.value === 'number' ? ffmpegStats.noise.value : 10;
-        const brightVal = typeof ffmpegStats?.brightness?.value === 'number' ? ffmpegStats.brightness.value : 50;
-        const bandingVal = Number(ffmpegStats?.banding?.score || 0);
-        const jpegVal = Number(ffmpegStats?.jpeg_blocking?.score || 0);
-
-        let sharpScore = Math.max(0, Math.min(100, sharpVal));
-        if (ffmpegStats?.sharpness?.has_local_blur_anomaly) sharpScore = Math.min(sharpScore, 40);
-
-        let noiseScore = Math.max(0, Math.min(100, 100 - noiseVal));
-        if (Number(ffmpegStats?.local_analysis?.max_local_noise || 0) > 45) noiseScore = Math.min(noiseScore, 40);
-
-        const brightnessScore = Math.max(0, Math.min(100, 100 - Math.abs(brightVal - 50) * 2));
-        const bandingScore = Math.max(0, Math.min(100, 100 - bandingVal));
-        const jpegScore = Math.max(0, Math.min(100, 100 - jpegVal));
-
-        const technicalScore = Math.round(
-            (sharpScore * 0.30) + (noiseScore * 0.25) + (brightnessScore * 0.20) + (bandingScore * 0.125) + (jpegScore * 0.125)
-        );
-
-        // Extreme CV values are hard technical failures regardless of tolerance.
-        const cvFailedKeys: string[] = [];
-        if (sharpVal < 15 || ffmpegStats?.sharpness?.has_local_blur_anomaly) cvFailedKeys.push('blur');
-        if (noiseVal > 60 || Number(ffmpegStats?.local_analysis?.max_local_noise || 0) > 45) cvFailedKeys.push('noise');
-        if (brightVal > 92 || brightVal < 8) cvFailedKeys.push('exposure');
-        if (bandingVal > 65 || jpegVal > 65) cvFailedKeys.push('artifacts');
-        const haloRisk = Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0);
-        const partialAlpha = Number(ffmpegStats?.transparency?.partial_alpha_percent || 0);
-        if (ffmpegStats?.transparency?.has_alpha && haloRisk > 30 && partialAlpha > 0.05) cvFailedKeys.push('artifacts');
-
-        // ---- 2. Evidence subscore: 100% from OUR fixed penalty table, Gemini only supplies PASS/FAIL ----
-        let evidenceScore = 100;
-        let hasCriticalFail = false;
-        const evidenceFailedKeys: string[] = [];
-        for (const [key, val] of Object.entries(aiVisionChecks || {})) {
-            const rawStatus = typeof val === 'object' && val ? String((val as any).status || '').trim().toUpperCase() : '';
-            const isFail = rawStatus === 'FAIL' || (val as any)?.status === false;
-            if (!isFail) continue;
-            evidenceFailedKeys.push(key);
-            if (CRITICAL_EVIDENCE_KEYS.includes(key)) {
-                hasCriticalFail = true;
-            } else if (NON_CRITICAL_EVIDENCE_PENALTY[key] !== undefined) {
-                evidenceScore -= NON_CRITICAL_EVIDENCE_PENALTY[key];
-            } else {
-                evidenceScore -= 8; // unknown/new category default penalty
-            }
-        }
-        evidenceScore = Math.max(0, Math.min(100, evidenceScore));
-
-        // ---- 3. Combine into one deterministic overall score ----
-        let overallScore = Math.round((technicalScore * 0.45) + (evidenceScore * 0.55));
-        const failedCheckKeys = Array.from(new Set([...cvFailedKeys, ...evidenceFailedKeys]));
-        const hasTechnicalFail = cvFailedKeys.length > 0;
-
-        if (hasCriticalFail) overallScore = Math.min(overallScore, 40);
-        overallScore = Math.max(0, Math.min(100, overallScore));
-
-        // ---- 4. Recommendation: same tolerance rules as before, but now the ONLY source of truth ----
-        let recommendation: 'PASS' | 'FAIL' = 'PASS';
-        if (tolerance === 'STRICT') {
-            if (failedCheckKeys.length > 0) recommendation = 'FAIL';
-        } else if (tolerance === 'LOOSE') {
-            const looseBlocking = hasCriticalFail ||
-                failedCheckKeys.some(k => ['blur', 'exposure', 'lighting', 'over_edited', 'proportion_defects'].includes(k));
-            if (looseBlocking) recommendation = 'FAIL';
-        } else { // MEDIUM (default/industry standard)
-            if (hasCriticalFail || hasTechnicalFail || evidenceFailedKeys.length > 0) recommendation = 'FAIL';
-        }
-        if (recommendation === 'FAIL' && overallScore >= 60) overallScore = 59;
-
-        return { overall_score: overallScore, technical_score: technicalScore, evidence_score: evidenceScore, recommendation, failed_checks: failedCheckKeys, has_critical_fail: hasCriticalFail };
-    }
-
     app.post('/api/check-image-quality', async (req, res) => {
         let tempFilePath = "";
-
         let cleanupFn = () => {};
         try {
             const { image, fileUrl, pathKey, tolerance, language, model, fileType, detailCrops } = req.body;
@@ -2415,55 +2297,71 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
             const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType);
 
-            // ============================================================================
-            // DETERMINISTIC FINAL VERDICT
-            // Gemini's own overall_score/recommendation above are informational only (its
-            // "vibe check") — they are NOT what the user sees. The number and PASS/FAIL the
-            // user sees are computed 100% by computeDeterministicQAResult() from:
-            //   - ffmpegStats  = deterministic pixel measurements (Python/scikit-image/FFmpeg)
-            //   - ai_vision_checks = Gemini acting only as a PASS/FAIL evidence detector per
-            //     category (legal/IP, AI anomalies, anatomy, composition, etc. — things pixel
-            //     stats alone can't see)
-            // Same file + same evidence -> always the exact same score & verdict.
-            // ============================================================================
+            // GERBANG TEKNIS DETERMINISTIK: hasil analisis piksel (Python/FFmpeg) ikut memutuskan,
+            // bukan sekadar ditampilkan. Hanya nilai EKSTREM yang memaksa FAIL agar tidak ada false-positive.
             try {
-                (aiVisionStats as any).gemini_raw_score = aiVisionStats.overall_score;
-                (aiVisionStats as any).gemini_raw_recommendation = aiVisionStats.recommendation;
-
-                const verdict = computeDeterministicQAResult(ffmpegStats, aiVisionStats.ai_vision_checks || {}, tolerance);
-
-                aiVisionStats.overall_score = verdict.overall_score;
-                aiVisionStats.recommendation = verdict.recommendation;
-                (aiVisionStats as any).technical_score = verdict.technical_score;
-                (aiVisionStats as any).evidence_score = verdict.evidence_score;
-                (aiVisionStats as any).failed_checks = verdict.failed_checks;
-
-                if (aiVisionStats.ai_vision_checks?.stock_acceptance) {
-                    aiVisionStats.ai_vision_checks.stock_acceptance.status = verdict.recommendation;
-                }
-                if (verdict.has_critical_fail) {
-                    aiVisionStats.legal_status = aiVisionStats.legal_status === 'SAFE' ? 'AT_RISK' : aiVisionStats.legal_status;
-                }
-
-                // Human-readable reasons for any CV-triggered technical failures, appended to the report.
                 const techGateReasons: string[] = [];
                 const sharpVal = ffmpegStats?.sharpness?.value;
                 const noiseVal = ffmpegStats?.noise?.value;
                 const brightVal = ffmpegStats?.brightness?.value;
-                if (typeof sharpVal === 'number' && sharpVal < 15) techGateReasons.push(`Ketajaman sangat rendah (sharpness ${sharpVal}/100) — indikasi kuat soft focus / motion blur parah di seluruh gambar`);
-                if (ffmpegStats?.sharpness?.has_local_blur_anomaly) techGateReasons.push(`Ketajaman lokal tidak seragam — terdeteksi area soft focus/blur lokal (sharpness regional minimum: ${ffmpegStats?.local_analysis?.min_local_sharpness})`);
-                if (typeof noiseVal === 'number' && noiseVal > 60) techGateReasons.push(`Noise sangat tinggi (noise ${noiseVal}/100) — melebihi batas wajar Adobe Stock`);
-                if (ffmpegStats?.local_analysis?.max_local_noise > 45) techGateReasons.push(`Noise lokal sangat tinggi (max_local_noise ${ffmpegStats?.local_analysis?.max_local_noise}/100) di area bayangan tertentu`);
-                if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) — indikasi over/under exposure parah`);
-                if (Number(ffmpegStats?.banding?.score || 0) > 65) techGateReasons.push(`Sinyal banding/posterization tinggi (${ffmpegStats.banding.score}/100)`);
-                if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) techGateReasons.push(`Sinyal JPEG blocking tinggi (${ffmpegStats.jpeg_blocking.score}/100)`);
-                if (techGateReasons.length > 0) {
-                    aiVisionStats.technical_issues = [...(aiVisionStats.technical_issues || []), ...techGateReasons];
+                if (typeof sharpVal === 'number' && sharpVal < 15) {
+                    techGateReasons.push(`Ketajaman sangat rendah (sharpness ${sharpVal}/100) — indikasi kuat soft focus / motion blur parah di seluruh gambar`);
                 }
-
-                console.log(`Server check-image-quality: Deterministic verdict = ${verdict.recommendation} (score ${verdict.overall_score}, tech ${verdict.technical_score}, evidence ${verdict.evidence_score}) [Gemini raw was: ${aiVisionStats.gemini_raw_recommendation}/${aiVisionStats.gemini_raw_score}]`);
+                if (ffmpegStats?.sharpness?.has_local_blur_anomaly) {
+                    techGateReasons.push(`Ketajaman lokal tidak seragam (has_local_blur_anomaly) — terdeteksi area soft focus atau blur lokal yang parah (sharpness regional minimum: ${ffmpegStats?.local_analysis?.min_local_sharpness})`);
+                }
+                if (typeof noiseVal === 'number' && noiseVal > 60) {
+                    techGateReasons.push(`Noise sangat tinggi (noise ${noiseVal}/100) — melebihi batas wajar Adobe Stock`);
+                }
+                if (ffmpegStats?.local_analysis?.max_local_noise > 45) {
+                    techGateReasons.push(`Noise lokal sangat tinggi (max_local_noise ${ffmpegStats?.local_analysis?.max_local_noise}/100) di area bayangan tertentu`);
+                }
+                if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) {
+                    techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) — indikasi over/under exposure parah`);
+                }
+                // PNG/RGBA transparency must never be treated as black pixels. The
+                // Python analyzer reports visible-pixel metrics only and exposes alpha
+                // diagnostics separately. Transparency itself is valid for isolated assets.
+                if (ffmpegStats?.transparency?.has_alpha) {
+                    const partialAlpha = Number(ffmpegStats.transparency.partial_alpha_percent || 0);
+                    const haloRisk = Number(ffmpegStats.transparency.edge_halo_risk_percent || 0);
+                    if (haloRisk > 30 && partialAlpha > 0.05) {
+                        techGateReasons.push(`Risiko matte/halo pada alpha edge tinggi (${haloRisk.toFixed(1)}%) — periksa rambut/kain/tepi objek pada background kontras`);
+                    }
+                }
+                if (Number(ffmpegStats?.banding?.score || 0) > 65) {
+                    techGateReasons.push(`Sinyal banding/posterization tinggi (${ffmpegStats.banding.score}/100) — periksa area gradasi halus pada 100%`);
+                }
+                if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) {
+                    techGateReasons.push(`Sinyal JPEG blocking tinggi (${ffmpegStats.jpeg_blocking.score}/100) — periksa kompresi pada 100%`);
+                }
+                if (techGateReasons.length > 0) {
+                    console.warn('Server check-image-quality: Deterministic technical gate triggered:', techGateReasons);
+                    aiVisionStats.technical_issues = [...(aiVisionStats.technical_issues || []), ...techGateReasons];
+                    const deterministicKeys: string[] = [];
+                    if (typeof sharpVal === 'number' && sharpVal < 15) deterministicKeys.push('blur');
+                    if (ffmpegStats?.sharpness?.has_local_blur_anomaly) deterministicKeys.push('blur');
+                    if (typeof noiseVal === 'number' && noiseVal > 60) deterministicKeys.push('noise');
+                    if (ffmpegStats?.local_analysis?.max_local_noise > 45) deterministicKeys.push('noise');
+                    if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) deterministicKeys.push('exposure');
+                    if (Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0) > 30) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.banding?.score || 0) > 65) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) deterministicKeys.push('artifacts');
+                    (aiVisionStats as any).failed_checks = Array.from(new Set([...(aiVisionStats as any).failed_checks || [], ...deterministicKeys]));
+                    if (aiVisionStats.recommendation !== 'FAIL') {
+                        aiVisionStats.recommendation = 'FAIL';
+                        if (typeof aiVisionStats.overall_score !== 'number' || aiVisionStats.overall_score >= 66) {
+                            aiVisionStats.overall_score = 65;
+                        }
+                        if (aiVisionStats.ai_vision_checks?.stock_acceptance) {
+                            aiVisionStats.ai_vision_checks.stock_acceptance.status = 'FAIL';
+                            aiVisionStats.ai_vision_checks.stock_acceptance.note =
+                                (aiVisionStats.ai_vision_checks.stock_acceptance.note || '') + ' [Sistem] Ditolak otomatis oleh gerbang teknis: ' + techGateReasons.join('; ');
+                        }
+                    }
+                }
             } catch (gateErr: any) {
-                console.warn('Server check-image-quality: Deterministic scoring failed (non-blocking, keeping Gemini raw verdict):', gateErr);
+                console.warn('Server check-image-quality: Technical gate evaluation failed (non-blocking):', gateErr);
             }
 
             console.log('Server check-image-quality: Integration successful');
