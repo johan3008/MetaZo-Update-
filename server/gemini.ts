@@ -2328,7 +2328,7 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
   keywordRulePromptText += noMediaFormatRule;
 
-  // --- TAHAP 1: PROVIDER 1 ����� GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: PROVIDER 1 ������� GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
@@ -4094,7 +4094,7 @@ Rules for the Generated Prompts:
       * DO NOT default to cliché dramatic weather tropes such as "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", or "ominous black clouds" unless the subject EXPLICITLY requires it (e.g., a storm-chaser documentary scene).
       * Creativity does NOT mean forced drama, darkness, or apocalyptic weather. A beautiful Cinematic scene can be a warm golden-hour field, a sleek modern interior, a serene misty forest, a vibrant cityscape at dusk, or an intimate candlelit room — not just dark skies and lightning.
       * For Dark Horror Aesthetic: atmosphere comes from lighting, texture, composition, and psychological tension — NOT from defaulting to thunder and lightning. Use fog, decay, shadow, unsettling framing, eerie stillness, or subtle wrongness.
-      * Each prompt MUST reflect the AUTHENTIC character of its style, not a lazy default dramatic template. Vary environments naturally: sunny, overcast, dawn, dusk, indoor, outdoor, urban, natural, abstract — whatever fits the subject and style genuinely.
+      * Each prompt MUST reflect the AUTHENTIC character of its style, not a lazy default dramatic template. Vary environments naturally: sunny, overcast, dawn, dusk, indoor, outdoor, urban, natural, abstract ��� whatever fits the subject and style genuinely.
     - ZERO-GENERIC PROMPT RULE (CRITICAL — READ CAREFULLY):
       * DO NOT write prompts that sound like generic stock photo descriptions. Specifically FORBIDDEN patterns:
         — "a person standing..." / "a person sitting..." / "a person holding..." without hyper-specific, unusual detail
