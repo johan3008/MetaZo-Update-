@@ -87,10 +87,42 @@ Sebelumnya jika AI tidak mengembalikan suatu check (respons parsial), UI menampi
 
 **Catatan penting:** perbaikan ini memperkuat kemungkinan model MENDETEKSI dan MELAPORKAN cacat kategori ini secara eksplisit — tetapi keputusan akhir tetap bergantung pada kemampuan visual model AI itu sendiri untuk gambar tertentu. Tidak ada perbaikan prompt yang bisa menjamin 100% akurasi; jika suatu gambar masih lolos padahal Anda melihat cacat, gunakan tombol re-check/mode STRICT, atau laporkan contoh kasusnya agar prompt terus disempurnakan.
 
-## Cara Deploy
+## Update — 15 Agustus 2026 (lanjutan): Title & Keyword metadata harus bahasa natural, formal, mudah dipahami buyer
+
+**Masalah:** Instruksi lama untuk Title secara eksplisit berbunyi *"Use easy-to-read phrases, NOT formal sentence structures"* — bertolak belakang dengan kebutuhan bisnis (title terkesan seperti tumpukan kata kunci, bukan judul katalog formal yang dibaca manusia). Sementara instruksi Keyword tidak punya penegasan bahwa setiap kata/frasa harus berupa bahasa natural formal yang benar-benar diketik oleh buyer sungguhan — sehingga berisiko menghasilkan istilah kaku, terjemahan literal janggal, atau kata sambungan buatan yang tidak natural.
+
+**File:** `server/gemini.ts` — berlaku di KEDUA fungsi metadata (`generateStockMetadata` untuk single-asset dan `generateBatchStockMetadata` untuk batch), pada cabang Bahasa Inggris maupun cabang bahasa lain (${metadataLanguage}), serta ketiga mode keyword (`mixed`/default, `single`, `multi`).
+
+**Perbaikan:**
+- **Title:** Instruksi "NOT formal sentence structures" dihapus, diganti menjadi wajib menulis judul dengan bahasa manusia formal, natural, dan langsung dipahami buyer — seperti editor katalog stok profesional menulis judul produk, bukan menyusun daftar kata kunci.
+- **Keyword:** Ditambahkan aturan wajib baru **MUST-0.5** di ketiga varian `keywordRulePromptText` (default, single-word, multi-word): setiap keyword/frasa wajib berupa kata/frasa nyata, ejaan benar, tata bahasa valid, dan register formal — persis seperti yang benar-benar diketik buyer profesional (desainer, tim marketing, editor foto) di kolom pencarian. Fragmen kaku, terjemahan literal janggal, kata sambungan buatan, slang, atau bahasa gaul/singkatan chat WAJIB dihindari.
+
+**Cakupan:** total 7 titik di file yang diperbarui secara konsisten (3× blok keyword, 4× blok title/description) agar tidak ada mode (single/batch × EN/non-EN) yang terlewat.
+
+
 1. `npm install` (jika belum)
 2. `npm run build` — membangun ulang frontend + `dist/server.cjs`
 3. Deploy seperti biasa. Folder `dist/` di zip ini masih build LAMA — wajib build ulang agar perbaikan aktif.
+
+## Update — 15 Agustus 2026 (lanjutan 2): Kenapa hasil QC berbeda-beda per model?
+
+**Pertanyaan pengguna:** Kenapa hasil cek kualitas bisa beda antar model?
+
+**3 penyebab yang ditemukan di kode (`server/gemini.ts`):**
+
+1. **Kemampuan visual antar tier model memang berbeda (bukan bug, tapi wajar/inheren).** Model "Pro" bernalar lebih dalam dan lebih teliti melihat cacat halus (mekanis, hologram/UI, teks mikro) dibanding model "Flash"/"Flash-Lite" yang dioptimalkan untuk kecepatan, bukan ketelitian visual. Gambar yang sama bisa FAIL di Pro tapi PASS di Flash — ini realistis, bukan sesuatu yang bisa "diseragamkan" sepenuhnya lewat prompt.
+
+2. **BUG TRANSPARANSI (diperbaiki):** `callGeminiWithRetry` memiliki 3 mekanisme fallback OTOMATIS DAN DIAM-DIAM yang bisa mengganti model yang diminta pengguna tanpa pemberitahuan apa pun:
+   - Error 400/404 "model not found/invalid" → paksa ganti ke `gemini-3.5-flash`.
+   - Error 429/503 (quota/kepadatan tinggi) → rotasi antara `gemini-3.5-flash` dan `gemini-3.1-flash-lite-preview`.
+   - Loop luar di `checkImageQuality` → jika model utama gagal total, coba `gemini-3.1-pro-preview` → `gemini-3.6-flash` → `gemini-3.5-flash` berurutan.
+   Sebelumnya laporan JSON TIDAK PERNAH mencatat model mana yang benar-benar menjawab — jadi pengguna bisa memilih "Pro" tapi diam-diam dianalisis oleh "Flash" (karena kuota/limit) tanpa tahu sama sekali, membuat hasil terasa "acak" padahal sebenarnya konsisten dengan model yang benar-benar dipakai.
+   **Perbaikan:** `callGeminiWithRetry` sekarang menempelkan `_usedModel` pada setiap respons sukses. `checkImageQuality` meneruskannya sebagai field baru di laporan: `model_used`, `model_requested`, `model_fallback_occurred`. Frontend (`ImageQualityCheck.tsx`) sekarang menampilkan badge kecil di tab "AI" yang jujur memberi tahu model apa yang benar-benar menganalisis gambar, dan tanda peringatan kuning jika terjadi fallback otomatis.
+
+3. **BUG NON-DETERMINISME (diperbaiki):** Perbaikan sebelumnya menghapus TOTAL parameter sampling (`temperature`/`topP`) dari SEMUA model dengan alasan "Gemini 3.6 Flash / 3.5 Flash-Lite deprecate parameter ini" — padahal ini membuat SEMUA model termasuk Pro (yang justru mendukung parameter ini) berjalan pada temperature default (tidak nol/acak), sehingga gambar yang SAMA dicek ULANG dengan model yang SAMA pun bisa memberi verdict berbeda di setiap percobaan.
+   **Perbaikan:** `temperature: 0` dan `topP: 0.1` kini dipasang kembali secara kondisional — hanya di-skip untuk model yang namanya cocok pola `3.6-flash` atau `flash-lite` (yang memang menolak parameter ini), model lain (termasuk `gemini-3.1-pro-preview`) tetap deterministik.
+
+**Catatan:** Perbaikan #2 dan #3 membuat hasil jauh lebih konsisten dan transparan, tapi TIDAK menghilangkan perbedaan inheren #1 — memang wajar dan diharapkan model Pro lebih ketat daripada Flash. Untuk hasil paling akurat & konsisten, gunakan model Pro dan mode STRICT/MEDIUM.
 
 ## Catatan
 - File `ImageQualityCheck.tsx` di ROOT proyek adalah duplikat lama yang **tidak diimpor** oleh aplikasi (aplikasi memakai `src/components/ImageQualityCheck.tsx` via `ImageCheckView`). Perbaikan diterapkan pada file yang aktif dipakai.
