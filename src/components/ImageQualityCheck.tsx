@@ -12,6 +12,9 @@ interface QualityReport {
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
+  model_used?: string;
+  model_requested?: string;
+  model_fallback_occurred?: boolean;
   heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
   ffmpeg?: {
     resolution: string;
@@ -32,6 +35,9 @@ interface QualityReport {
     technical_issues: string[];
     strengths: string[];
     detailed_feedback: string;
+    model_used?: string;
+    model_requested?: string;
+    model_fallback_occurred?: boolean;
     ai_vision_checks?: {
       blur?: { status: "PASS" | "FAIL"; note: string };
       composition?: { status: "PASS" | "FAIL"; note: string };
@@ -1229,6 +1235,9 @@ export const ImageQualityCheck: React.FC<{
                                   {(() => {
                                     const isPass = r.recommendation === "PASS";
                                     const rawChecks = r.ai_vision?.ai_vision_checks || (r as any).ai_vision_checks || {};
+                                    const modelUsed: string = (r as any).model_used || (r.ai_vision as any)?.model_used || "";
+                                    const modelRequested: string = (r as any).model_requested || (r.ai_vision as any)?.model_requested || "";
+                                    const modelFallbackOccurred: boolean = !!((r as any).model_fallback_occurred || (r.ai_vision as any)?.model_fallback_occurred);
                                     // FIX QC: JANGAN pernah memalsukan status PASS dengan catatan positif kalengan
                                     // saat AI tidak mengembalikan data check (respons parsial/gagal parsing).
                                     // Fallback sekarang: (1) FAIL jika check ada di daftar failed_checks server,
@@ -1538,6 +1547,25 @@ export const ImageQualityCheck: React.FC<{
 
                                           {currentTab === 'ai' && (
                                             <div className="space-y-4 animate-fadeIn">
+                                              {/* Model Transparency Badge: which model actually produced this verdict */}
+                                              {modelUsed && (
+                                                <div className={`flex items-center gap-2 p-3 rounded-2xl border text-[9px] font-bold uppercase tracking-wider ${
+                                                  modelFallbackOccurred
+                                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                                                    : 'bg-slate-100/50 dark:bg-white/[0.02] border-slate-200/50 dark:border-white/5 text-slate-500 dark:text-slate-400'
+                                                }`}>
+                                                  {modelFallbackOccurred ? <AlertCircle size={13} /> : <Info size={13} />}
+                                                  <span>
+                                                    {modelFallbackOccurred
+                                                      ? (t.language === 'Bahasa'
+                                                          ? `Model diminta "${modelRequested}" tidak tersedia — hasil ini dianalisis oleh "${modelUsed}" (fallback otomatis)`
+                                                          : `Requested model "${modelRequested}" was unavailable — this result was analyzed by "${modelUsed}" (automatic fallback)`)
+                                                      : (t.language === 'Bahasa'
+                                                          ? `Dianalisis oleh model: ${modelUsed}`
+                                                          : `Analyzed by model: ${modelUsed}`)}
+                                                  </span>
+                                                </div>
+                                              )}
                                               {/* AI Vision Scan Analysis Terminal Card */}
                                               {r.visual_scan_analysis && (
                                                 <div className="bg-slate-950 p-4 rounded-2xl border border-white/10 font-mono text-xs text-slate-300 space-y-2">

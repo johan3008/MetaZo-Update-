@@ -1187,11 +1187,17 @@ const callGeminiWithRetry = async (
   let currentModel = modelName;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      return await getAIClient().models.generateContent({
+      const res = await getAIClient().models.generateContent({
         model: currentModel,
         contents,
         config
       });
+      // Transparency: record which model actually produced this response, since
+      // internal retry/rotation logic below may silently swap to a different model
+      // than the one originally requested (invalid model 400/404, quota 429, 503).
+      // Additive, non-breaking property — every existing call site is unaffected.
+      try { if (res && typeof res === 'object') (res as any)._usedModel = currentModel; } catch {}
+      return res;
     } catch (err: any) {
       lastError = err;
       const statusCode = err.status || err.code;
@@ -2158,6 +2164,7 @@ export const generateStockMetadata = async (
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
+MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
 KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA OF THE ASSET) — Keyword #1 MUST explicitly name the primary subject noun or compound phrase (e.g. 'cat', 'vintage car', 'borobudur temple', 'laptop', 'coffee cup'). NEVER put background elements, lighting, or generic terms as Keyword #1.
 MUST-1. Directly describe the visible subject — DO NOT generalize.
 MUST-2. Describe the main action — capture what the subject(s) are actively doing.
@@ -2211,6 +2218,7 @@ MUST-10. Never prioritize a keyword merely because it sounds popular — relevan
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
+MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
 MUST-1. Directly describe the visible subject.
 MUST-2. Describe the main action.
 MUST-3. Include specific objects.
@@ -2261,6 +2269,7 @@ MUST-10. Never prioritize popularity over relevance.
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
+MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
 MUST-1. Directly describe the visible subject.
 MUST-2. Describe the main action.
 MUST-3. Include specific objects.
@@ -2504,8 +2513,8 @@ Rules for Titles:
 2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
 3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-4. Use easy-to-read phrases, NOT formal sentence structures.
-5. DO NOT treat the title like a list of keywords. No commas separating words.
+4. Use clear, formal, natural human language — the way a professional stock curator would write a real catalog title. It must read as a genuine, grammatically correct phrase a buyer instantly understands, NOT a stitched-together list of keywords. Avoid casual slang, awkward literal translations, or robotic phrasing.
+5. DO NOT treat the title like a list of keywords. No commas separating words. The title must be understandable to a human buyer at a glance, exactly as a formal product/catalog title would read.
 6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Descriptions:
@@ -2645,7 +2654,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural language.
+- Use clear, formal, natural human language — write like a professional stock catalog editor, not a keyword generator. The title must read as a real, grammatically correct phrase that a buyer instantly understands.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
@@ -3253,8 +3262,8 @@ Rules for Titles:
 2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
 3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-4. Use easy-to-read phrases, NOT formal sentence structures.
-5. DO NOT treat the title like a list of keywords. No commas separating words.
+4. Use clear, formal, natural human language — the way a professional stock curator would write a real catalog title. It must read as a genuine, grammatically correct phrase a buyer instantly understands, NOT a stitched-together list of keywords. Avoid casual slang, awkward literal translations, or robotic phrasing.
+5. DO NOT treat the title like a list of keywords. No commas separating words. The title must be understandable to a human buyer at a glance, exactly as a formal product/catalog title would read.
 6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Descriptions:
@@ -3400,7 +3409,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear natural language.
+- Use clear, formal, natural human language — write like a professional stock catalog editor, not a keyword generator. The title must read as a real, grammatically correct phrase that a buyer instantly understands.
 - Describe only visible elements in the image.
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
@@ -5303,23 +5312,33 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     const activeModel = selectedModel;
 
     const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
-    
+    let usedModel = "";
+
     for (const modelName of modelsToTryList) {
       try {
         let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
-        
-        // Gemini 3.6 Flash / 3.5 Flash-Lite deprecate temperature/topP/topK.
-        // Keep the QC request deterministic through the system prompt + structured output
-        // instead of deprecated sampling controls. This also prevents fallback 400s.
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+
+        // Pin deterministic sampling (temperature 0 / low topP) so the SAME model checking
+        // the SAME image twice gives a consistent verdict. Only gemini-3.6-flash and the
+        // 3.x flash-lite line reject explicit sampling params — skip it for those specifically
+        // instead of removing it globally (which made every model, including Pro, non-deterministic).
+        const supportsSamplingControls = !/3\.6-flash|flash-lite/i.test(modelName);
+        const callConfig: any = {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema
-        });
+        };
+        if (supportsSamplingControls) {
+          callConfig.temperature = 0;
+          callConfig.topP = 0.1;
+        }
+
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, callConfig);
         responseText = res.text || "{}";
+        usedModel = (res as any)?._usedModel || modelName;
         break;
       } catch (err: any) {
         lastError = err;
@@ -5411,6 +5430,18 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         parsedResult.legal_status = "VIOLATION";
       }
     }
+
+    // TRANSPARENCY: tell the caller which model actually produced this verdict, and
+    // whether it silently differs from what the user selected. Different model tiers
+    // (Pro vs Flash vs Flash-Lite) have very different visual scrutiny — Pro reliably
+    // catches subtle AI artifacts / mechanical coherence issues that Flash-tier models
+    // often miss, and the retry/rotation logic above CAN swap models silently on
+    // 429/503/invalid-model errors. Surfacing this is the honest fix: it doesn't force
+    // every model to agree (that isn't possible with different underlying capability),
+    // it just stops the report from hiding which model actually looked at the image.
+    (parsedResult as any).model_used = usedModel || selectedModel;
+    (parsedResult as any).model_requested = selectedModel;
+    (parsedResult as any).model_fallback_occurred = !!usedModel && usedModel !== selectedModel;
 
     return parsedResult;
   } catch(e) {
