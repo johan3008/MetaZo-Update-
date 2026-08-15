@@ -2304,11 +2304,17 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 const sharpVal = ffmpegStats?.sharpness?.value;
                 const noiseVal = ffmpegStats?.noise?.value;
                 const brightVal = ffmpegStats?.brightness?.value;
-                if (typeof sharpVal === 'number' && sharpVal < 12) {
+                if (typeof sharpVal === 'number' && sharpVal < 15) {
                     techGateReasons.push(`Ketajaman sangat rendah (sharpness ${sharpVal}/100) — indikasi kuat soft focus / motion blur parah di seluruh gambar`);
                 }
-                if (typeof noiseVal === 'number' && noiseVal > 70) {
+                if (ffmpegStats?.sharpness?.has_local_blur_anomaly) {
+                    techGateReasons.push(`Ketajaman lokal tidak seragam (has_local_blur_anomaly) — terdeteksi area soft focus atau blur lokal yang parah (sharpness regional minimum: ${ffmpegStats?.local_analysis?.min_local_sharpness})`);
+                }
+                if (typeof noiseVal === 'number' && noiseVal > 60) {
                     techGateReasons.push(`Noise sangat tinggi (noise ${noiseVal}/100) — melebihi batas wajar Adobe Stock`);
+                }
+                if (ffmpegStats?.local_analysis?.max_local_noise > 45) {
+                    techGateReasons.push(`Noise lokal sangat tinggi (max_local_noise ${ffmpegStats?.local_analysis?.max_local_noise}/100) di area bayangan tertentu`);
                 }
                 if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) {
                     techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) — indikasi over/under exposure parah`);
@@ -2319,26 +2325,28 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 if (ffmpegStats?.transparency?.has_alpha) {
                     const partialAlpha = Number(ffmpegStats.transparency.partial_alpha_percent || 0);
                     const haloRisk = Number(ffmpegStats.transparency.edge_halo_risk_percent || 0);
-                    if (haloRisk > 35 && partialAlpha > 0.1) {
-                        techGateReasons.push(`Risiko matte/halo pada alpha edge (${haloRisk.toFixed(1)}%) — periksa rambut/kain/tepi objek pada background kontras`);
+                    if (haloRisk > 30 && partialAlpha > 0.05) {
+                        techGateReasons.push(`Risiko matte/halo pada alpha edge tinggi (${haloRisk.toFixed(1)}%) — periksa rambut/kain/tepi objek pada background kontras`);
                     }
                 }
-                if (Number(ffmpegStats?.banding?.score || 0) > 85) {
+                if (Number(ffmpegStats?.banding?.score || 0) > 65) {
                     techGateReasons.push(`Sinyal banding/posterization tinggi (${ffmpegStats.banding.score}/100) — periksa area gradasi halus pada 100%`);
                 }
-                if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 85) {
+                if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) {
                     techGateReasons.push(`Sinyal JPEG blocking tinggi (${ffmpegStats.jpeg_blocking.score}/100) — periksa kompresi pada 100%`);
                 }
                 if (techGateReasons.length > 0) {
                     console.warn('Server check-image-quality: Deterministic technical gate triggered:', techGateReasons);
                     aiVisionStats.technical_issues = [...(aiVisionStats.technical_issues || []), ...techGateReasons];
                     const deterministicKeys: string[] = [];
-                    if (typeof sharpVal === 'number' && sharpVal < 12) deterministicKeys.push('blur');
-                    if (typeof noiseVal === 'number' && noiseVal > 70) deterministicKeys.push('noise');
+                    if (typeof sharpVal === 'number' && sharpVal < 15) deterministicKeys.push('blur');
+                    if (ffmpegStats?.sharpness?.has_local_blur_anomaly) deterministicKeys.push('blur');
+                    if (typeof noiseVal === 'number' && noiseVal > 60) deterministicKeys.push('noise');
+                    if (ffmpegStats?.local_analysis?.max_local_noise > 45) deterministicKeys.push('noise');
                     if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) deterministicKeys.push('exposure');
-                    if (Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0) > 35) deterministicKeys.push('artifacts');
-                    if (Number(ffmpegStats?.banding?.score || 0) > 85) deterministicKeys.push('artifacts');
-                    if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 85) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0) > 30) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.banding?.score || 0) > 65) deterministicKeys.push('artifacts');
+                    if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) deterministicKeys.push('artifacts');
                     (aiVisionStats as any).failed_checks = Array.from(new Set([...(aiVisionStats as any).failed_checks || [], ...deterministicKeys]));
                     if (aiVisionStats.recommendation !== 'FAIL') {
                         aiVisionStats.recommendation = 'FAIL';
