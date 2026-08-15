@@ -2328,7 +2328,7 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
   keywordRulePromptText += noMediaFormatRule;
 
-  // --- TAHAP 1: PROVIDER 1 ��� GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: PROVIDER 1 ����� GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
@@ -5275,16 +5275,15 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC routing: do NOT silently downgrade a requested Pro model to Flash.
-  // The current Gemini API exposes Gemini 3.1 Pro Preview for advanced reasoning and
-  // Gemini 3.6 Flash for faster multimodal fallback.
-  let selectedModel = model || 'gemini-3.1-pro-preview';
-  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
-    selectedModel = 'gemini-3.1-pro-preview';
-  }
+  // QC MUST use a Pro-tier model for consistent, high-accuracy visual analysis.
+  // Flash/Flash-Lite models have inherently lower visual scrutiny and produce
+  // inconsistent verdicts on the same image — they're fine for content generation
+  // but NOT for quality decisions that gate Adobe Stock acceptance.
+  // User model selection is for generation only; QC always uses a Pro model.
+  let selectedModel = 'gemini-3.1-pro-preview';
 
   // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash'];
   let responseText = "";
   let lastError;
   let usedModel = "";
@@ -5323,10 +5322,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
 
         // Pin deterministic sampling (temperature 0 / low topP) so the SAME model checking
-        // the SAME image twice gives a consistent verdict. Only gemini-3.6-flash and the
-        // 3.x flash-lite line reject explicit sampling params — skip it for those specifically
-        // instead of removing it globally (which made every model, including Pro, non-deterministic).
-        const supportsSamplingControls = !/3\.6-flash|flash-lite/i.test(modelName);
+        // the SAME image twice gives a consistent verdict. ALL Flash and Flash-Lite models
+        // reject explicit sampling params — skip it for all flash-tier models.
+        const supportsSamplingControls = !/flash/i.test(modelName);
         const callConfig: any = {
           systemInstruction,
           responseMimeType: "application/json",
