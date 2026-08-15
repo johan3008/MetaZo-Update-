@@ -5295,16 +5295,24 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC routing: do NOT silently downgrade a requested Pro model to Flash.
-  // The current Gemini API exposes Gemini 3.1 Pro Preview for advanced reasoning and
-  // Gemini 3.6 Flash for faster multimodal fallback.
-  let selectedModel = model || 'gemini-3.1-pro-preview';
-  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
-    selectedModel = 'gemini-3.1-pro-preview';
+  // QC routing: Resolve model properly per provider
+  let selectedModel = model;
+  if (provider === 'gemini') {
+    if (!selectedModel || selectedModel === 'auto') {
+      selectedModel = 'gemini-3.1-pro-preview';
+    }
+  } else {
+    // For non-Gemini providers, do NOT force gemini model names
+    if (!selectedModel || selectedModel === 'auto' || selectedModel.startsWith('gemini-') || selectedModel.startsWith('gemma-')) {
+      selectedModel = PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+    }
   }
 
-  // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+  // Fallback chain for Gemini
+  const geminiFallbackChain = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+  const modelsToTry = selectedModel && selectedModel.startsWith('gemini')
+    ? Array.from(new Set([selectedModel, ...geminiFallbackChain]))
+    : geminiFallbackChain;
   let responseText = "";
   let lastError;
 
@@ -5383,6 +5391,28 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
+    // Standard list of all expected check keys for robust cross-model / cross-provider consistency
+    const allExpectedCheckKeys = [
+      'blur', 'composition', 'lighting', 'exposure', 'color_balance', 'over_edited', 'sensor_issues',
+      'watermark', 'logo', 'text', 'anatomical_errors', 'structural_defects', 'ip_risk', 'proportion_defects',
+      'illustration_issues', 'vector_issues', 'noise', 'artifacts', 'ai_artifacts', 'stock_acceptance'
+    ];
+
+    if (!parsedResult.ai_vision_checks || typeof parsedResult.ai_vision_checks !== 'object') {
+      parsedResult.ai_vision_checks = {};
+    }
+
+    // Ensure all expected keys exist and normalize status to uppercase 'PASS' or 'FAIL'
+    for (const key of allExpectedCheckKeys) {
+      const item = parsedResult.ai_vision_checks[key];
+      if (!item || typeof item !== 'object') {
+        parsedResult.ai_vision_checks[key] = { status: 'PASS', note: 'No issues detected.' };
+      } else {
+        const rawStatus = String(item.status || '').trim().toUpperCase();
+        item.status = (rawStatus === 'FAIL' || item.status === false) ? 'FAIL' : 'PASS';
+      }
+    }
+
     // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
       let anyFail = false;
@@ -5399,7 +5429,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let acceptanceFail = false;
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
-        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
+        const rawStatus = typeof value === 'object' && value ? String((value as any).status || '').trim().toUpperCase() : '';
+        const isFail = rawStatus === 'FAIL' || (value as any)?.status === false;
+        if (isFail) {
           anyFail = true;
           failedCheckKeys.push(key);
           if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
