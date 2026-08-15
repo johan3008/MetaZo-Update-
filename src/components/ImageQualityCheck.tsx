@@ -40,6 +40,15 @@ interface QualityReport {
       logo?: { status: "PASS" | "FAIL"; note: string };
       text?: { status: "PASS" | "FAIL"; note: string };
       anatomical_errors?: { status: "PASS" | "FAIL"; note: string };
+      structural_defects?: { status: "PASS" | "FAIL"; note: string };
+      synthetic_ui_coherence?: { status: "PASS" | "FAIL"; note: string };
+      ai_artifacts?: { status: "PASS" | "FAIL"; note: string };
+      exposure?: { status: "PASS" | "FAIL"; note: string };
+      color_balance?: { status: "PASS" | "FAIL"; note: string };
+      over_edited?: { status: "PASS" | "FAIL"; note: string };
+      sensor_issues?: { status: "PASS" | "FAIL"; note: string };
+      noise?: { status: "PASS" | "FAIL"; note: string };
+      artifacts?: { status: "PASS" | "FAIL"; note: string };
       ip_risk?: { status: "PASS" | "FAIL"; note: string };
       proportion_defects?: { status: "PASS" | "FAIL"; note: string };
       stock_acceptance?: { status: "PASS" | "FAIL"; note: string };
@@ -1244,10 +1253,19 @@ export const ImageQualityCheck: React.FC<{
                                       blur: rawChecks.blur || fallbackCheck('blur', ['focus', 'blur', 'tajam', 'sharp']),
                                       composition: rawChecks.composition || fallbackCheck('composition', ['komposisi', 'composition']),
                                       lighting: rawChecks.lighting || fallbackCheck('lighting', ['lighting', 'exposure', 'pencahayaan', 'eksposur']),
+                                      exposure: rawChecks.exposure || fallbackCheck('exposure', ['exposure', 'eksposur', 'overexpos', 'underexpos', 'highlight', 'shadow']),
+                                      color_balance: rawChecks.color_balance || fallbackCheck('color_balance', ['warna', 'color', 'white balance', 'tone']),
+                                      over_edited: rawChecks.over_edited || fallbackCheck('over_edited', ['over-edited', 'over edited', 'lilin', 'waxy', 'plastic', 'sharpening']),
+                                      sensor_issues: rawChecks.sensor_issues || fallbackCheck('sensor_issues', ['sensor', 'dust spot', 'noda sensor']),
                                       watermark: rawChecks.watermark || fallbackCheck('watermark', ['watermark']),
                                       logo: rawChecks.logo || legalFallback('logo'),
                                       text: rawChecks.text || fallbackCheck('text', ['teks', 'text', 'gibberish']),
                                       anatomical_errors: rawChecks.anatomical_errors || fallbackCheck('anatomical_errors', ['anatomi', 'anatomy', 'jari', 'finger', 'tangan', 'hand']),
+                                      structural_defects: rawChecks.structural_defects || fallbackCheck('structural_defects', ['struktur', 'structural', 'mekanis', 'mechanical', 'meleleh', 'melted']),
+                                      synthetic_ui_coherence: rawChecks.synthetic_ui_coherence || fallbackCheck('synthetic_ui_coherence', ['hologram', 'shield', 'perisai', 'ui', 'dashboard', 'circuit', 'sirkuit', 'biner', 'binary', 'chip']),
+                                      ai_artifacts: rawChecks.ai_artifacts || fallbackCheck('ai_artifacts', ['ai artifact', 'artefak ai', 'hallucination', 'halusinasi', 'nonsensical']),
+                                      noise: rawChecks.noise || fallbackCheck('noise', ['noise', 'derau', 'grain']),
+                                      artifacts: rawChecks.artifacts || fallbackCheck('artifacts', ['artifact', 'artefak', 'banding', 'blocking', 'kompresi']),
                                       ip_risk: rawChecks.ip_risk || legalFallback('ip_risk'),
                                       proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical', 'struktur']),
                                       stock_acceptance: rawChecks.stock_acceptance || { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
@@ -1538,6 +1556,9 @@ export const ImageQualityCheck: React.FC<{
                                                 {[
                                                   { label: t.language === 'Bahasa' ? 'Integritas Anatomi' : 'Anatomical Integrity', val: aiVisionChecks.anatomical_errors },
                                                   { label: t.language === 'Bahasa' ? 'Proporsi & Mekanis' : 'Proportion & Mechanical', val: aiVisionChecks.proportion_defects },
+                                                  { label: t.language === 'Bahasa' ? 'Cacat Struktural AI' : 'AI Structural Defects', val: aiVisionChecks.structural_defects },
+                                                  { label: t.language === 'Bahasa' ? 'Artefak AI Generatif' : 'AI Generative Artifacts', val: aiVisionChecks.ai_artifacts },
+                                                  { label: t.language === 'Bahasa' ? 'Koherensi UI/Hologram Sintetis' : 'Synthetic UI/Hologram Coherence', val: aiVisionChecks.synthetic_ui_coherence },
                                                   { label: t.language === 'Bahasa' ? 'Teks Overlay / Typo' : 'Text Overlay Check', val: aiVisionChecks.text },
                                                   { label: t.language === 'Bahasa' ? 'Standar Penerimaan' : 'Stock Acceptance', val: aiVisionChecks.stock_acceptance }
                                                 ].map((c, i) => {
