@@ -2257,8 +2257,9 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         let hasCriticalFail = false;
         const evidenceFailedKeys: string[] = [];
         for (const [key, val] of Object.entries(aiVisionChecks || {})) {
-            const status = (val as any)?.status;
-            if (status !== 'FAIL') continue;
+            const rawStatus = typeof val === 'object' && val ? String((val as any).status || '').trim().toUpperCase() : '';
+            const isFail = rawStatus === 'FAIL' || (val as any)?.status === false;
+            if (!isFail) continue;
             evidenceFailedKeys.push(key);
             if (CRITICAL_EVIDENCE_KEYS.includes(key)) {
                 hasCriticalFail = true;
