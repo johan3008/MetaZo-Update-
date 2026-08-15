@@ -73,6 +73,20 @@ Sebelumnya jika AI tidak mengembalikan suatu check (respons parsial), UI menampi
 | Gambar bersih (MEDIUM) | PASS | PASS |
 | Pelanggaran IP/logo (MEDIUM) | FAIL | FAIL |
 
+---
+
+## Update — 15 Agustus 2026: Kasus "AI chip + shield hologram" tetap PASS di app, DITOLAK Adobe Stock
+
+**Diagnosis:** Kode QC di zip ini (`-QC-Fixed`) sebenarnya SUDAH memuat hampir semua perbaikan di atas (resolusi 2048px, 4 crop kuadran native-resolution, model diarahkan ke `gemini-3.1-pro-preview`, gerbang keputusan MEDIUM yang mewajibkan FAIL untuk cacat teknis, bahkan aturan prompt eksplisit soal "Fake UI/Tech Interfaces, Cyber Shields, Holograms & Binary Streams"). Root cause pada kasus ini BUKAN kode yang hilang, melainkan dua hal:
+
+1. **Model vision melewatkan kategori ini secara diam-diam.** Sebelumnya, cacat pada elemen dekoratif sintetis (teks semu di hologram shield, pola sirkuit PCB yang tidak logis, digit biner melayang yang cacat) hanya disebut dalam SATU paragraf panjang dan dipetakan secara implisit ke field `ai_artifacts`/`structural_defects` yang sama dipakai untuk puluhan kategori cacat lain. Model cenderung "PASS" secara default pada field generik jika tidak ada instruksi yang memaksa ia mendeskripsikan literal isi elemen tersebut lebih dulu.
+   **Perbaikan:** Ditambahkan field JSON baru dan WAJIB (`required`): **`synthetic_ui_coherence`**. Prompt kini secara eksplisit memaksa model membaca ulang (OCR paksa) setiap elemen hologram/shield/dashboard/biner/sirkuit SEBELUM memutuskan status, dan menegaskan elemen dekoratif sci-fi TIDAK mendapat pengecualian artistik seperti bokeh. Field ini dimasukkan ke `criticalKeys` di `server/gemini.ts` sehingga FAIL pada field ini otomatis menggagalkan laporan di SEMUA mode toleransi (STRICT/MEDIUM/LOOSE), sama seperti `ai_artifacts`.
+
+2. **UI laporan menyembunyikan hasil check yang sebenarnya sudah FAIL di server.** Di `src/components/ImageQualityCheck.tsx`, kartu "AI Sanity Checkpoints" hanya me-render 4 field tetap (`anatomical_errors`, `proportion_defects`, `text`, `stock_acceptance`). Field `ai_artifacts`, `structural_defects`, dan kategori teknis lain (`exposure`, `color_balance`, `over_edited`, `sensor_issues`, `noise`, `artifacts`) TIDAK PERNAH ditampilkan ke pengguna — walau ikut dihitung dalam keputusan PASS/FAIL server. Ini murni bug tampilan, tapi berbahaya karena pengguna tidak bisa memverifikasi alasan sebenarnya.
+   **Perbaikan:** Ditambahkan kartu untuk "Cacat Struktural AI" (`structural_defects`), "Artefak AI Generatif" (`ai_artifacts`), dan "Koherensi UI/Hologram Sintetis" (`synthetic_ui_coherence`) ke grid checkpoint, plus fallback keyword yang sesuai dan tipe TypeScript untuk field-field yang sebelumnya tidak dideklarasikan.
+
+**Catatan penting:** perbaikan ini memperkuat kemungkinan model MENDETEKSI dan MELAPORKAN cacat kategori ini secara eksplisit — tetapi keputusan akhir tetap bergantung pada kemampuan visual model AI itu sendiri untuk gambar tertentu. Tidak ada perbaikan prompt yang bisa menjamin 100% akurasi; jika suatu gambar masih lolos padahal Anda melihat cacat, gunakan tombol re-check/mode STRICT, atau laporkan contoh kasusnya agar prompt terus disempurnakan.
+
 ## Cara Deploy
 1. `npm install` (jika belum)
 2. `npm run build` — membangun ulang frontend + `dist/server.cjs`
