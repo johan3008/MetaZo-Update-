@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film } from 'lucide-react';
 import { ToolType, FileItem, ProgressInfo } from '../../types';
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from '../../constants';
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, MIRICANVAS_CATEGORIES, DREAMSTIME_MAIN_CATEGORIES, DREAMSTIME_SUB_CATEGORIES } from '../../constants';
 import { copyToClipboard } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { getHeaders } from '../../services/geminiService';
@@ -984,6 +984,45 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                           </div>
                         </div>
                       )}
+
+                      {/* MiriCanvas Category */}
+                      <div className="space-y-1 px-0.5">
+                        <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest">{t.category_miricanvas_label}</label>
+                        <select 
+                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-yellow-500 transition-all appearance-none" 
+                          value={file.miriCanvasCategoryId} 
+                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, miriCanvasCategoryId: e.target.value === '' ? '' : parseInt(e.target.value)} : f))}
+                        >
+                          <option value="">{t.select_category}</option>
+                          {MIRICANVAS_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Dreamstime Main Category */}
+                      <div className="space-y-1 px-0.5">
+                        <label className="text-[9px] font-black text-green-500 uppercase tracking-widest">{t.category_dreamstime_main_label}</label>
+                        <select 
+                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-green-500 transition-all appearance-none" 
+                          value={file.dreamstimeMainCategoryId} 
+                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeMainCategoryId: e.target.value === '' ? '' : parseInt(e.target.value), dreamstimeSubCategoryId: ''} : f))}
+                        >
+                          <option value="">{t.select_category}</option>
+                          {DREAMSTIME_MAIN_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Dreamstime SubCategory */}
+                      <div className="space-y-1 px-0.5">
+                        <label className="text-[9px] font-black text-green-500 uppercase tracking-widest">{t.category_dreamstime_sub_label}</label>
+                        <select 
+                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-green-500 transition-all appearance-none" 
+                          value={file.dreamstimeSubCategoryId} 
+                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeSubCategoryId: e.target.value === '' ? '' : parseInt(e.target.value)} : f))}
+                        >
+                          <option value="">{t.select_category}</option>
+                          {DREAMSTIME_SUB_CATEGORIES.filter(sc => sc.parentId === (file.dreamstimeMainCategoryId || 0)).map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                        </select>
+                      </div>
 
                       {/* REGENERATE METADATA BUTTON */}
                       {handleRegenerateFile && (

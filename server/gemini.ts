@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { HOLIDAYS_DATA } from "./holidaysData.ts";
 import { EXTRA_HOLIDAYS_DATA } from "./extraHolidaysData.ts";
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, MIRICANVAS_CATEGORIES, DREAMSTIME_MAIN_CATEGORIES, DREAMSTIME_SUB_CATEGORIES } from "../constants";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -307,7 +307,8 @@ function getHeuristicCategories(title: string, keywords: string[]): {
   return {
     category_id: bestCatId,
     shutterstock_category_1: choice.cat1,
-    shutterstock_category_2: choice.cat2
+    shutterstock_category_2: choice.cat2,
+    miriCanvas_category_id: bestCatId
   };
 }
 
@@ -2146,6 +2147,8 @@ export const generateStockMetadata = async (
 
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
+  const miricanvasCategoriesText = MIRICANVAS_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
+  const dreamstimeCategoriesText = DREAMSTIME_MAIN_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   
   const imageParts = frames.map(frame => processFrameServer(frame));
 
@@ -2328,7 +2331,7 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
   keywordRulePromptText += noMediaFormatRule;
 
-  // --- TAHAP 1: PROVIDER 1 ������� GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: PROVIDER 1 ��������� GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
@@ -2373,6 +2376,7 @@ Asset Context: ${mediaTypeContext}
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
 - Shutterstock Categories: ${shutterstockCategoriesText}
+- MiriCanvas Categories: ${miricanvasCategoriesText}
 
 OUTPUT FORMAT:
 {
@@ -2540,6 +2544,12 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
+MiriCanvas Categories:
+${miricanvasCategoriesText}
+
+Dreamstime Main Categories:
+${dreamstimeCategoriesText}
+
 VISUAL_FACTS:
 ${JSON.stringify(visualFacts, null, 2)}
 
@@ -2691,6 +2701,12 @@ ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
+
+MiriCanvas Categories:
+${miricanvasCategoriesText}
+
+Dreamstime Main Categories:
+${dreamstimeCategoriesText}
 
 VISUAL_FACTS:
 ${JSON.stringify(visualFacts, null, 2)}
@@ -2941,6 +2957,8 @@ export const generateBatchStockMetadata = async (
 
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
+  const miricanvasCategoriesText = MIRICANVAS_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
+  const dreamstimeCategoriesText = DREAMSTIME_MAIN_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
@@ -3113,6 +3131,7 @@ Asset Context: ${mediaTypeContext}
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
 - Shutterstock Categories: ${shutterstockCategoriesText}
+- MiriCanvas Categories: ${miricanvasCategoriesText}
 
 OUTPUT FORMAT:
 {
@@ -3289,6 +3308,12 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
+MiriCanvas Categories:
+${miricanvasCategoriesText}
+
+Dreamstime Main Categories:
+${dreamstimeCategoriesText}
+
 STRICT DEFINING RULES:
 - Return a JSON OBJECT containing a "results" array of exactly ${items.length} objects.
 - Order MUST match input items exactly.
@@ -3446,6 +3471,12 @@ ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
+
+MiriCanvas Categories:
+${miricanvasCategoriesText}
+
+Dreamstime Main Categories:
+${dreamstimeCategoriesText}
 
 SOURCE VISUAL_FACTS:
 ${visualDescriptions.join('\n\n')}
