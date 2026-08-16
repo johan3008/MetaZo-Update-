@@ -935,18 +935,33 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         t={t}
                       />
 
-                      <div className="space-y-1 px-0.5">
-                        <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.category_adobe_label}</label>
-                        <select 
-                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
-                          value={file.adobeCategoryId} 
-                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, adobeCategoryId: parseInt(e.target.value)} : f))}
-                        >
-                          <option value="">{t.select_category}</option>
-                          {ADOBE_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
-                        </select>
+                      {/* Adobe Stock + MiriCanvas — side by side */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 px-0.5">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.category_adobe_label}</label>
+                          <select 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
+                            value={file.adobeCategoryId} 
+                            onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, adobeCategoryId: parseInt(e.target.value)} : f))}
+                          >
+                            <option value="">{t.select_category}</option>
+                            {ADOBE_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest">{t.category_miricanvas_label}</label>
+                          <select 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-yellow-500 transition-all appearance-none" 
+                            value={file.miriCanvasCategoryId} 
+                            onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, miriCanvasCategoryId: e.target.value === '' ? '' : parseInt(e.target.value)} : f))}
+                          >
+                            <option value="">{t.select_category}</option>
+                            {MIRICANVAS_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                          </select>
+                        </div>
                       </div>
 
+                      {/* Shutterstock — side by side */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 px-0.5">
                         <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.category_shutterstock_1_label}</label>
@@ -976,52 +991,30 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         </div>
                       </div>
 
-                      {file.categoryReason && (
-                        <div className="mt-2.5 p-3 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/25 border border-indigo-100/40 dark:border-indigo-900/30 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium leading-relaxed flex items-start gap-2">
-                          <Sparkles size={14} className="mt-0.5 text-indigo-500 dark:text-indigo-400 shrink-0 animate-pulse" />
-                          <div>
-                            <span className="font-extrabold text-indigo-800 dark:text-indigo-200">Visual Semantic Reason:</span> {file.categoryReason}
-                          </div>
+                      {/* Dreamstime — Main + SubCategory side by side */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 px-0.5">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-green-500 uppercase tracking-widest">{t.category_dreamstime_main_label}</label>
+                          <select 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-green-500 transition-all appearance-none" 
+                            value={file.dreamstimeMainCategoryId} 
+                            onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeMainCategoryId: e.target.value === '' ? '' : parseInt(e.target.value), dreamstimeSubCategoryId: ''} : f))}
+                          >
+                            <option value="">{t.select_category}</option>
+                            {DREAMSTIME_MAIN_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                          </select>
                         </div>
-                      )}
-
-                      {/* MiriCanvas Category */}
-                      <div className="space-y-1 px-0.5">
-                        <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest">{t.category_miricanvas_label}</label>
-                        <select 
-                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-yellow-500 transition-all appearance-none" 
-                          value={file.miriCanvasCategoryId} 
-                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, miriCanvasCategoryId: e.target.value === '' ? '' : parseInt(e.target.value)} : f))}
-                        >
-                          <option value="">{t.select_category}</option>
-                          {MIRICANVAS_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
-                        </select>
-                      </div>
-
-                      {/* Dreamstime Main Category */}
-                      <div className="space-y-1 px-0.5">
-                        <label className="text-[9px] font-black text-green-500 uppercase tracking-widest">{t.category_dreamstime_main_label}</label>
-                        <select 
-                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-green-500 transition-all appearance-none" 
-                          value={file.dreamstimeMainCategoryId} 
-                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeMainCategoryId: e.target.value === '' ? '' : parseInt(e.target.value), dreamstimeSubCategoryId: ''} : f))}
-                        >
-                          <option value="">{t.select_category}</option>
-                          {DREAMSTIME_MAIN_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
-                        </select>
-                      </div>
-
-                      {/* Dreamstime SubCategory */}
-                      <div className="space-y-1 px-0.5">
-                        <label className="text-[9px] font-black text-green-500 uppercase tracking-widest">{t.category_dreamstime_sub_label}</label>
-                        <select 
-                          className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-green-500 transition-all appearance-none" 
-                          value={file.dreamstimeSubCategoryId} 
-                          onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeSubCategoryId: e.target.value === '' ? '' : parseInt(e.target.value)} : f))}
-                        >
-                          <option value="">{t.select_category}</option>
-                          {DREAMSTIME_SUB_CATEGORIES.filter(sc => sc.parentId === (file.dreamstimeMainCategoryId || 0)).map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
-                        </select>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-green-500 uppercase tracking-widest">{t.category_dreamstime_sub_label}</label>
+                          <select 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-green-500 transition-all appearance-none" 
+                            value={file.dreamstimeSubCategoryId} 
+                            onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeSubCategoryId: e.target.value === '' ? '' : parseInt(e.target.value)} : f))}
+                          >
+                            <option value="">{t.select_category}</option>
+                            {DREAMSTIME_SUB_CATEGORIES.filter(sc => sc.parentId === (file.dreamstimeMainCategoryId || 0)).map(cat => <option key={cat.id} value={cat.id}>{cat.id}: {cat.name}</option>)}
+                          </select>
+                        </div>
                       </div>
 
                       {/* REGENERATE METADATA BUTTON */}

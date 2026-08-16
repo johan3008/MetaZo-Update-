@@ -304,11 +304,47 @@ function getHeuristicCategories(title: string, keywords: string[]): {
 
   const choice = mapping[bestCatId] || { cat1: "Abstract", cat2: "Backgrounds/Textures" };
 
+  // Map Adobe category to MiriCanvas category (content type based)
+  const miriCanvasMapping: Record<number, number> = {
+    1: 4, 2: 4, 3: 4, 4: 4, 5: 3, 6: 1, 7: 4,
+    8: 2, 9: 4, 10: 4, 11: 3, 12: 4, 13: 4,
+    14: 4, 15: 4, 16: 4, 17: 4, 18: 4, 19: 4, 20: 4, 21: 4
+  };
+  // Default MiriCanvas: Photo (4), Graphic/Abstract → PNG Element (2), Backgrounds → Background (3)
+
+  // Map Adobe category to Dreamstime Main + SubCategory
+  const dreamstimeMapping: Record<number, { main: number; sub: number }> = {
+    1: { main: 2, sub: 11 },   // Animals → Wildlife
+    2: { main: 3, sub: 12 },   // Buildings → Modern Buildings
+    3: { main: 5, sub: 23 },   // Business → Office
+    4: { main: 7, sub: 34 },   // Drinks → Beverages
+    5: { main: 11, sub: 51 },  // Environment → Landscapes
+    6: { main: 1, sub: 1 },    // States of Mind → Backgrounds
+    7: { main: 7, sub: 33 },   // Food → Meals
+    8: { main: 1, sub: 3 },    // Graphic Resources → Patterns
+    9: { main: 14, sub: 70 },  // Hobbies → Fitness
+    10: { main: 10, sub: 48 }, // Industry → Construction
+    11: { main: 11, sub: 51 }, // Landscapes → Landscapes
+    12: { main: 13, sub: 62 }, // Lifestyle → Lifestyle
+    13: { main: 13, sub: 63 }, // People → Portraits
+    14: { main: 11, sub: 56 }, // Plants → Flowers & Plants
+    15: { main: 4, sub: 22 },  // Culture → Visual Arts
+    16: { main: 6, sub: 29 },  // Science → Science
+    17: { main: 13, sub: 65 }, // Social Issues → Emotions
+    18: { main: 14, sub: 70 }, // Sports → Fitness
+    19: { main: 12, sub: 57 }, // Technology → Electronics
+    20: { main: 15, sub: 73 }, // Transport → Transportation
+    21: { main: 15, sub: 72 }  // Travel → Destinations
+  };
+  const dreamstimeChoice = dreamstimeMapping[bestCatId] || { main: 1, sub: 1 };
+
   return {
     category_id: bestCatId,
     shutterstock_category_1: choice.cat1,
     shutterstock_category_2: choice.cat2,
-    miriCanvas_category_id: bestCatId
+    miriCanvas_category_id: miriCanvasMapping[bestCatId] || 4,
+    dreamstime_main_category_id: dreamstimeChoice.main,
+    dreamstime_sub_category_id: dreamstimeChoice.sub
   };
 }
 
