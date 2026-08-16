@@ -794,7 +794,7 @@ async function callOpenAICompatibleWithRetry(params: {
     if (!apiKey && provider === 'nvidia') {
       console.warn('NVIDIA key missing. Fallback to Gemini.');
       const fallbackResult = await getAIClient().models.generateContent({
-        model: 'gemini-3.1-pro-preview',
+        model: 'gemini-3.6-pro-preview',
         contents: params.contents,
         config: params.config
       });
@@ -1345,7 +1345,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
+          const rotationModels = ['gemini-3.5-flash', 'gemini-3.5-flash'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -2332,8 +2332,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -2532,7 +2532,7 @@ Ensure your title and keywords focus 100% on the core visual subject matter, act
   
   const mediaTypeContext = directives.mediaTypeContext;
 
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   
   const visionSystemInstruction = `ROLE:
@@ -2612,12 +2612,41 @@ OUTPUT FORMAT:
     ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
     : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
+  // Enforced responseSchema for clean, structured Vision output
+  const visionResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      VISUAL_FACTS: {
+        type: Type.OBJECT,
+        properties: {
+          primary_subjects: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
+          secondary_subjects: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
+          background_elements: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
+          visible_text: { type: Type.ARRAY, items: { type: Type.STRING } },
+          colors: { type: Type.ARRAY, items: { type: Type.STRING } },
+          actions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          composition: { type: Type.ARRAY, items: { type: Type.STRING } },
+          deeper_meaning_and_symbolism: { type: Type.STRING },
+          understanding_and_context: { type: Type.STRING },
+          semantic_category_analysis: {
+            type: Type.OBJECT,
+            properties: { adobe_id: { type: Type.NUMBER }, shutterstock_category_1: { type: Type.STRING }, shutterstock_category_2: { type: Type.STRING }, reason: { type: Type.STRING } },
+            required: ["adobe_id", "shutterstock_category_1", "shutterstock_category_2", "reason"]
+          }
+        },
+        required: ["primary_subjects", "secondary_subjects", "background_elements", "visible_text", "colors", "actions", "composition", "deeper_meaning_and_symbolism", "understanding_and_context", "semantic_category_analysis"]
+      }
+    },
+    required: ["VISUAL_FACTS"]
+  };
+
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
       parts: [...imageParts, { text: promptText }] 
     }, {
       systemInstruction: visionSystemInstruction,
       responseMimeType: "application/json",
+      responseSchema: visionResponseSchema,
       temperature: 0.0,
       topP: 0.8 });
     
@@ -2763,12 +2792,28 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   let draftMetadata: any = {};
   try {
     let genResponse: any;
+    // Enforced responseSchema for structured, clean Metadata output
+    const metadataGenResponseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING, description: "A highly descriptive natural language title representing the core subject" },
+        description: { type: Type.STRING, description: "A detailed visual description focusing on subjects, setting, and mood" },
+        keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Array of relevant keywords in natural, formal language" },
+        category_id: { type: Type.NUMBER, description: "Adobe Stock numeric category ID" },
+        shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
+        shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
+        category_reason: { type: Type.STRING, description: "Brief visual semantic reason for category selection" }
+      },
+      required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason"]
+    };
+
     if (NON_GEMINI_PROVIDERS.has(provider)) {
         try {
             genResponse = await callOpenAICompatibleWithRetry({
                 systemInstruction: genSystemInstruction,
                 contents: `Generate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
                 responseMimeType: "application/json",
+                responseSchema: metadataGenResponseSchema,
                 config: { temperature: temperature ?? 0.3, topP: 0.9 },
                 model: activeModel
             });
@@ -2780,6 +2825,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
                 }, {
                   systemInstruction: genSystemInstruction,
                   responseMimeType: "application/json",
+                  responseSchema: metadataGenResponseSchema,
                   temperature: temperature ?? 0.3,
                   topP: 0.9 
                 });
@@ -2790,6 +2836,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
           }, {
             systemInstruction: genSystemInstruction,
             responseMimeType: "application/json",
+            responseSchema: metadataGenResponseSchema,
             temperature: temperature ?? 0.3,
             topP: 0.9 
           });
@@ -2923,11 +2970,28 @@ OUTPUT FORMAT:
 
   let finalMetadataRaw: any = {};
   try {
+    // Enforced responseSchema for clean, validated Metadata output
+    const validatorResponseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING, description: "Validated, natural language title" },
+        description: { type: Type.STRING, description: "Validated visual description" },
+        keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Validated keyword array" },
+        category_id: { type: Type.NUMBER, description: "Adobe Stock category ID" },
+        shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
+        shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
+        category_reason: { type: Type.STRING, description: "Visual semantic reason" },
+        confidence_score: { type: Type.NUMBER, description: "Confidence score 0-1" }
+      },
+      required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason", "confidence_score"]
+    };
+
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
           systemInstruction: validatorSystemInstruction,
           contents: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
+          responseSchema: validatorResponseSchema,
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
@@ -2936,6 +3000,7 @@ OUTPUT FORMAT:
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
+          responseSchema: validatorResponseSchema,
           temperature: temperature ?? 0.1,
           topP: 0.8 })
     );
@@ -3147,8 +3212,8 @@ export const generateBatchStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -3286,7 +3351,7 @@ Ensure your title and keywords focus 100% on the core visual subject matter, act
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -3539,6 +3604,24 @@ OUTPUT FORMAT:
 
   let draftMetadataArray: any = [];
   try {
+    // Enforced responseSchema for clean, structured batch Metadata output
+    const batchMetadataGenSchema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "A highly descriptive natural language title" },
+          description: { type: Type.STRING, description: "A detailed visual description" },
+          keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Array of relevant keywords in natural, formal language" },
+          category_id: { type: Type.NUMBER, description: "Adobe Stock numeric category ID" },
+          shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
+          shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
+          category_reason: { type: Type.STRING, description: "Brief visual semantic reason for category selection" }
+        },
+        required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason"]
+      }
+    };
+
     let genResponse;
     if (NON_GEMINI_PROVIDERS.has(provider)) {
       try {
@@ -3546,6 +3629,7 @@ OUTPUT FORMAT:
           systemInstruction: genSystemInstruction,
           contents: `Generate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
+          responseSchema: batchMetadataGenSchema,
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         });
@@ -3557,6 +3641,7 @@ OUTPUT FORMAT:
           }, {
             systemInstruction: genSystemInstruction,
             responseMimeType: "application/json",
+            responseSchema: batchMetadataGenSchema,
             temperature: temperature ?? 0.1,
             topP: 0.8 });
       }
@@ -3566,6 +3651,7 @@ OUTPUT FORMAT:
         }, {
           systemInstruction: genSystemInstruction,
           responseMimeType: "application/json",
+          responseSchema: batchMetadataGenSchema,
           temperature: temperature ?? 0.1,
           topP: 0.8 });
     }
@@ -3702,11 +3788,31 @@ OUTPUT FORMAT:
 
   let finalMetadataArray: any = [];
   try {
+    // Enforced responseSchema for clean, validated batch Metadata output
+    const batchValidatorSchema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "Validated natural language title" },
+          description: { type: Type.STRING, description: "Validated visual description" },
+          keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Validated keyword array" },
+          category_id: { type: Type.NUMBER, description: "Adobe Stock category ID" },
+          shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
+          shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
+          category_reason: { type: Type.STRING, description: "Visual semantic reason" },
+          confidence_score: { type: Type.NUMBER, description: "Confidence score 0-1" }
+        },
+        required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason", "confidence_score"]
+      }
+    };
+
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
           systemInstruction: validatorSystemInstruction,
           contents: `Audit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
+          responseSchema: batchValidatorSchema,
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
@@ -3715,6 +3821,7 @@ OUTPUT FORMAT:
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
+          responseSchema: batchValidatorSchema,
           temperature: temperature ?? 0.1,
           topP: 0.8 })
     );
@@ -4383,7 +4490,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-pro-preview', 'gemini-3.5-flash', 'gemini-flash-latest'];
   let lastError: any = null;
 
   const safetySettings = [
@@ -5183,7 +5290,7 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
 
   let responseText = "";
   // Forcing Gemini for Video Analysis to ensure consistency and prevent variations across providers
-  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', prompt, {
     responseMimeType: "application/json",
     responseSchema,
     temperature: 0.0,
@@ -5242,7 +5349,7 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
       model
     });
   } else {
-    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', prompt, {
       responseMimeType: "application/json",
       responseSchema
     });
@@ -5515,10 +5622,10 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   // inconsistent verdicts on the same image — they're fine for content generation
   // but NOT for quality decisions that gate Adobe Stock acceptance.
   // User model selection is for generation only; QC always uses a Pro model.
-  let selectedModel = 'gemini-3.1-pro-preview';
+  let selectedModel = 'gemini-3.6-pro-preview';
 
   // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-3.6-pro-preview', 'gemini-3.6-flash'];
   let responseText = "";
   let lastError;
   let usedModel = "";
@@ -6048,7 +6155,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6058,7 +6165,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err: any) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -6224,7 +6331,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6233,7 +6340,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -6321,7 +6428,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`;
       model
     });
   } else {
-    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', promptContents, {
+    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', promptContents, {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
@@ -6452,7 +6559,7 @@ Strictly return your answer as a JSON array matching the schema.`;
         }
       };
 
-      const response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
+      const response = await callGeminiWithRetry('gemini-3.6-pro-preview', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6495,7 +6602,7 @@ Return exactly 8 items matching the schema in JSON array format.`;
           }
         };
 
-        const responseNoGrounding = await callGeminiWithRetry('gemini-3.1-pro-preview', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
+        const responseNoGrounding = await callGeminiWithRetry('gemini-3.6-pro-preview', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
           systemInstruction: systemInstructionNoGrounding,
           responseMimeType: "application/json",
           responseSchema,
@@ -6799,7 +6906,7 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
       ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
-      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-flash-lite',
+      : callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.5-flash',
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.` }] } : `Technical data: ${JSON.stringify(gt)}. Return PASS/FAIL verdict.`,
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 1)
           .then((r: any) => r.text || '{}');
@@ -6843,7 +6950,7 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
       const res = await callGeminiWithRetry('gemini-3.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
