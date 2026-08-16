@@ -1449,10 +1449,22 @@ app.get('/api/debug-uploads', (req, res) => {
             console.log(`[ExifTool API] Extracting metadata from: ${filePath}`);
             const exifData: any = {};
             try {
-              const { stdout } = await require('util').promisify(require('child_process').exec)(
-                `magick identify -verbose "${filePath}" 2>/dev/null`,
-                { timeout: 15000, maxBuffer: 1024 * 1024 }
-              );
+              // Verify file exists before attempting extraction
+              if (!fs.existsSync(filePath)) {
+                throw new Error(`File not found at path: ${filePath}`);
+              }
+
+              const execAsync = util.promisify(exec);
+              let stdout = '';
+
+              // Try magick (ImageMagick v7+) first, then fallback to identify (v6)
+              try {
+                ({ stdout } = await execAsync(`magick identify -verbose "${filePath}"`, { timeout: 15000, maxBuffer: 1024 * 1024 }));
+              } catch {
+                // Fallback to legacy identify command (ImageMagick v6)
+                ({ stdout } = await execAsync(`identify -verbose "${filePath}"`, { timeout: 15000, maxBuffer: 1024 * 1024 }));
+              }
+
               // Parse ImageMagick verbose output for key EXIF fields
               for (const line of stdout.split('\n')) {
                 const trimmed = line.trim();
@@ -1466,7 +1478,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
               }
             } catch (magickErr: any) {
-              console.warn('[ExifTool API] ImageMagick EXIF extraction fallback failed:', magickErr.message);
+              console.warn('[ExifTool API] ImageMagick EXIF extraction fallback failed:', magickErr.message || magickErr);
             }
             
             // Clean up noisy tags to save tokens
@@ -1597,7 +1609,20 @@ app.get('/api/debug-uploads', (req, res) => {
             magickArgs.push(localOutputPath);
 
             console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
-            await spawnAsync('magick', magickArgs, { timeout: 30000 });
+            
+            // Try ImageMagick v7 (magick) first, then fallback to v6 (convert)
+            try {
+              await spawnAsync('magick', magickArgs, { timeout: 30000 });
+            } catch (magickErr) {
+              console.warn(`[Embed Metadata] magick (v7) failed, trying convert (v6)...`);
+              // For ImageMagick v6, 'convert' replaces 'magick' directly in the args
+              await spawnAsync('convert', magickArgs, { timeout: 30000 });
+            }
+
+            // Verify output file was created
+            if (!fs.existsSync(localOutputPath)) {
+              throw new Error('ImageMagick gagal menulis file output — pastikan ImageMagick terinstall di server.');
+            }
 
             // Step 4: Upload embedded file to Cloudflare R2 + return download URL
             const embeddedName = `embedded_${originalName}`;

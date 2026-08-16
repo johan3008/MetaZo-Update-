@@ -43,6 +43,22 @@ export interface AdobeCategory {
   name: string;
 }
 
+export interface MiriCanvasCategory {
+  id: number;
+  name: string;
+}
+
+export interface DreamstimeCategory {
+  id: number;
+  name: string;
+}
+
+export interface DreamstimeSubCategory {
+  id: number;
+  name: string;
+  parentId: number;
+}
+
 export interface StockMetadata {
   title: string;
   description: string;
@@ -50,6 +66,9 @@ export interface StockMetadata {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
+  miriCanvas_category_id?: number;
+  dreamstime_main_category_id?: number;
+  dreamstime_sub_category_id?: number;
   category_reason?: string;
 }
 
@@ -65,6 +84,9 @@ export interface FileItem {
   adobeCategoryId: number | '';
   shutterstockCategory1: string;
   shutterstockCategory2: string;
+  miriCanvasCategoryId: number | '';
+  dreamstimeMainCategoryId: number | '';
+  dreamstimeSubCategoryId: number | '';
   categoryReason?: string;
   isGenerating: boolean;
   isExtracting?: boolean;
