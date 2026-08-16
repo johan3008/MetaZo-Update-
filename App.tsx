@@ -30,7 +30,7 @@ import { MotionGenView } from './src/components/MotionGenView';
 import { RemovalGenView } from './src/components/RemovalGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
-import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
+import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, MIRICANVAS_CATEGORIES, DREAMSTIME_MAIN_CATEGORIES, DREAMSTIME_SUB_CATEGORIES } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
@@ -3381,6 +3381,7 @@ const App: React.FC = () => {
             adobeCategoryId: '',
             shutterstockCategory1: '',
             shutterstockCategory2: '',
+            miriCanvasCategoryId: '',
             isGenerating: false,
             isExtracting: false,
             error: errorMsg,
@@ -3695,6 +3696,9 @@ const App: React.FC = () => {
                             adobeCategoryId: result.metadata.category_id,
                             shutterstockCategory1: result.metadata.shutterstock_category_1,
                             shutterstockCategory2: result.metadata.shutterstock_category_2,
+                            miriCanvasCategoryId: (result.metadata as any).miriCanvas_category_id || '',
+                            dreamstimeMainCategoryId: (result.metadata as any).dreamstime_main_category_id || '',
+                            dreamstimeSubCategoryId: (result.metadata as any).dreamstime_sub_category_id || '',
                             categoryReason: result.metadata.category_reason,
                             isGenerating: false,
                             error: null
@@ -3900,6 +3904,9 @@ const App: React.FC = () => {
       adobeCategoryId: f.adobeCategoryId,
       shutterstockCategory1: f.shutterstockCategory1,
       shutterstockCategory2: f.shutterstockCategory2,
+      miriCanvasCategoryId: f.miriCanvasCategoryId,
+      dreamstimeMainCategoryId: f.dreamstimeMainCategoryId,
+      dreamstimeSubCategoryId: f.dreamstimeSubCategoryId,
       categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
@@ -3952,6 +3959,9 @@ const App: React.FC = () => {
             adobeCategoryId: backupItem.adobeCategoryId || newFiles[existingIdx].adobeCategoryId,
             shutterstockCategory1: backupItem.shutterstockCategory1 || newFiles[existingIdx].shutterstockCategory1,
             shutterstockCategory2: backupItem.shutterstockCategory2 || newFiles[existingIdx].shutterstockCategory2,
+            miriCanvasCategoryId: backupItem.miriCanvasCategoryId || newFiles[existingIdx].miriCanvasCategoryId,
+            dreamstimeMainCategoryId: backupItem.dreamstimeMainCategoryId || newFiles[existingIdx].dreamstimeMainCategoryId,
+            dreamstimeSubCategoryId: backupItem.dreamstimeSubCategoryId || newFiles[existingIdx].dreamstimeSubCategoryId,
             categoryReason: backupItem.categoryReason || newFiles[existingIdx].categoryReason,
             isGenerating: false,
             error: null
@@ -3974,6 +3984,9 @@ const App: React.FC = () => {
             adobeCategoryId: backupItem.adobeCategoryId || '',
             shutterstockCategory1: backupItem.shutterstockCategory1 || '',
             shutterstockCategory2: backupItem.shutterstockCategory2 || '',
+            miriCanvasCategoryId: backupItem.miriCanvasCategoryId || '',
+            dreamstimeMainCategoryId: backupItem.dreamstimeMainCategoryId || '',
+            dreamstimeSubCategoryId: backupItem.dreamstimeSubCategoryId || '',
             categoryReason: backupItem.categoryReason || '',
             isGenerating: false,
             error: null
@@ -3999,6 +4012,9 @@ const App: React.FC = () => {
       adobeCategoryId: f.adobeCategoryId,
       shutterstockCategory1: f.shutterstockCategory1,
       shutterstockCategory2: f.shutterstockCategory2,
+      miriCanvasCategoryId: f.miriCanvasCategoryId,
+      dreamstimeMainCategoryId: f.dreamstimeMainCategoryId,
+      dreamstimeSubCategoryId: f.dreamstimeSubCategoryId,
       categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
@@ -4288,11 +4304,12 @@ const App: React.FC = () => {
     }
 
     if (exportMiriCanvas) {
-      const headers = ['Filename', 'Name', 'Keywords'];
+      const headers = ['Filename', 'Name', 'Keywords', 'Category'];
       const rows = toolFiles.map(f => [
           escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
           escapeCsv(f.title || ''),
-          escapeCsv((f.keywords || []).join(','))
+          escapeCsv((f.keywords || []).join(',')),
+          escapeCsv(f.miriCanvasCategoryId ? MIRICANVAS_CATEGORIES.find(c => c.id === f.miriCanvasCategoryId)?.name || String(f.miriCanvasCategoryId) : '')
       ]);
       const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
