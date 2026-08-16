@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AdobeCategory, MiriCanvasCategory, DreamstimeCategory, DreamstimeSubCategory } from './types';
+import type { AdobeCategory, MiriCanvasCategory, DreamstimeCategory, DreamstimeSubCategory } from './types';
 
 export const ADOBE_CATEGORIES: AdobeCategory[] = [
   { id: 1, name: 'Animals' }, { id: 2, name: 'Buildings and Architecture' }, { id: 3, name: 'Business' },
