@@ -482,6 +482,73 @@ const getLanguageName = (code?: string) => {
   return map[code || 'en'] || 'ENGLISH';
 };
 
+/**
+ * [ENFORCEMENT TERPUSAT] Menjamin keyword akhir 100% konsisten dengan keywordMode
+ * yang dipilih user — dijalankan sebagai langkah TERAKHIR sebelum keyword dipakai,
+ * terlepas dari sumbernya (AI, padding visualFacts, sinonim, long-tail). Hanya mode
+ * 'mixed' (atau tidak diset) yang boleh berisi campuran satu-kata & multi-kata;
+ * mode 'single' dan 'multi' selalu dipaksa murni sesuai definisinya.
+ */
+function enforceStrictKeywordMode(
+  keywords: string[],
+  keywordMode: 'mixed' | 'single' | 'multi' | undefined,
+  targetCount: number,
+  visualFacts: any
+): string[] {
+  if (keywordMode !== 'single' && keywordMode !== 'multi') {
+    // Mode 'mixed' (default): tidak ada pemaksaan format, campuran diperbolehkan.
+    return keywords.slice(0, targetCount);
+  }
+
+  const hashString = (str: string): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return hash;
+  };
+  const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
+
+  const result: string[] = [];
+  const addWord = (w: string) => {
+    const v = w.trim().toLowerCase();
+    if (v.length > 1 && !isProhibitedKeyword(v) && !result.includes(v)) {
+      result.push(v);
+    }
+  };
+
+  const processOne = (kwRaw: string) => {
+    const clean = sanitizeForIndexing(kwRaw);
+    if (!clean || clean.length <= 1 || isProhibitedKeyword(clean)) return;
+    if (keywordMode === 'single') {
+      clean.split(/\s+/).forEach(p => {
+        if (p.length > 1 && !isProhibitedKeyword(p)) addWord(p);
+      });
+    } else {
+      // keywordMode === 'multi'
+      let val = clean;
+      if (!clean.includes(' ')) {
+        const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
+        val = `${clean} ${mod}`;
+      }
+      addWord(val);
+    }
+  };
+
+  keywords.forEach(processOne);
+
+  // Jika setelah pemaksaan format jumlahnya berkurang di bawah target (wajar terjadi pada
+  // mode 'single' karena beberapa frasa panjang melebur jadi kata yang sama), tambal dari
+  // ekspansi sinonim/long-tail berbasis visualFacts asli — bukan kategori generik — lalu
+  // format ulang setiap kandidat baru supaya tetap murni sesuai mode.
+  if (result.length < targetCount) {
+    const extra = expandFromVisualFacts(result, visualFacts, (targetCount - result.length) * 3);
+    extra.forEach(processOne);
+  }
+
+  return result.slice(0, targetCount);
+}
+
 function ensureKeywordCount(
   keywords: string[],
   targetCount: number,
@@ -559,31 +626,6 @@ function ensureKeywordCount(
     return uniqueKeywords.slice(0, targetCount);
   }
 
-  // Define lookup of category-based keywords
-  const categoryFallbackKeywords: Record<number, string[]> = {
-    1: ['animal', 'nature', 'wildlife', 'fauna', 'creature', 'outdoor', 'mammal', 'species', 'wilderness', 'natural', 'habitat', 'furry', 'adorable', 'portrait', 'close-up', 'environment', 'beast', 'pet', 'wild', 'zoology'],
-    2: ['architecture', 'building', 'structure', 'construction', 'city', 'urban', 'exterior', 'interior', 'design', 'modern', 'concrete', 'glass', 'steel', 'landmark', 'monument', 'facade', 'metropolis', 'tower', 'estate', 'house', 'contemporary'],
-    3: ['business', 'office', 'corporate', 'work', 'workplace', 'finance', 'company', 'management', 'team', 'meeting', 'strategy', 'success', 'professional', 'marketing', 'leadership', 'organization', 'colleague', 'career', 'investment', 'growth', 'concept'],
-    4: ['drink', 'beverage', 'glass', 'liquid', 'refreshing', 'cold', 'hot', 'cup', 'bottle', 'mug', 'bar', 'cafe', 'cocktail', 'juice', 'water', 'coffee', 'tea', 'alcohol', 'brew', 'ice'],
-    5: ['environment', 'nature', 'landscape', 'green', 'eco', 'ecology', 'sustainability', 'recycle', 'conservation', 'earth', 'planet', 'wild', 'scenery', 'outdoor', 'forest', 'climate', 'natural', 'environmental', 'organic'],
-    6: ['concept', 'mood', 'feeling', 'emotion', 'mental', 'mind', 'thought', 'isolated', 'abstract', 'idea', 'expression', 'psychology', 'imagination', 'sensation', 'attitude', 'behavior'],
-    7: ['food', 'delicious', 'tasty', 'dish', 'meal', 'gourmet', 'culinary', 'plate', 'eating', 'ingredient', 'fresh', 'vegetable', 'fruit', 'cooking', 'kitchen', 'recipe', 'diet', 'lunch', 'dinner', 'breakfast', 'cuisine'],
-    8: ['graphic', 'design', 'resource', 'vector', 'illustration', 'element', 'abstract', 'background', 'template', 'pattern', 'asset', 'layout', 'creative', 'art', 'flat', 'logo', 'icon', 'backdrop', 'seamless'],
-    9: ['hobby', 'leisure', 'recreation', 'activity', 'fun', 'game', 'play', 'relaxation', 'lifestyle', 'entertainment', 'pastime', 'craft', 'indoor', 'outdoor', 'enjoyment'],
-    10: ['industry', 'industrial', 'factory', 'manufacture', 'production', 'technology', 'engineering', 'machinery', 'worker', 'equipment', 'facility', 'metal', 'power', 'warehouse', 'technical', 'automated', 'construction'],
-    11: ['landscape', 'scenery', 'scenic', 'nature', 'view', 'outdoor', 'mountain', 'hill', 'valley', 'field', 'panorama', 'horizon', 'wilderness', 'beautiful', 'vista', 'natural', 'sky'],
-    12: ['lifestyle', 'life', 'daily', 'routine', 'modern', 'human', 'person', 'people', 'home', 'domestic', 'activity', 'casual', 'habits', 'style', 'comfort', 'leisure'],
-    13: ['people', 'person', 'human', 'individual', 'portrait', 'man', 'woman', 'adult', 'young', 'lifestyle', 'group', 'crowd', 'interaction', 'relationship', 'face', 'expressive', 'posing'],
-    14: ['plant', 'flower', 'flora', 'botany', 'botanical', 'leaf', 'nature', 'garden', 'green', 'blossom', 'petal', 'growth', 'stem', 'outdoor', 'natural', 'organic', 'vegetation', 'spring', 'summer'],
-    15: ['culture', 'religion', 'religious', 'spiritual', 'belief', 'faith', 'tradition', 'custom', 'heritage', 'sacred', 'ceremony', 'ritual', 'symbol', 'history', 'traditional', 'temple', 'church', 'holiday', 'celebration'],
-    16: ['science', 'scientific', 'research', 'laboratory', 'lab', 'technology', 'analysis', 'experiment', 'discovery', 'study', 'chemistry', 'biology', 'physics', 'tech', 'equipment', 'microscope', 'test', 'data', 'concept'],
-    17: ['social', 'issue', 'community', 'society', 'problem', 'awareness', 'support', 'help', 'advocacy', 'global', 'campaign', 'concept', 'message', 'public', 'humanity', 'care'],
-    18: ['sports', 'sport', 'athletic', 'athlete', 'exercise', 'fitness', 'training', 'game', 'competition', 'player', 'workout', 'active', 'healthy', 'stadium', 'court', 'field', 'gym', 'recreation', 'action'],
-    19: ['technology', 'tech', 'digital', 'device', 'modern', 'electronic', 'innovation', 'computer', 'network', 'connection', 'internet', 'future', 'futuristic', 'concept', 'data', 'communication', 'virtual', 'smart'],
-    20: ['transport', 'transportation', 'vehicle', 'car', 'automobile', 'traffic', 'road', 'street', 'travel', 'highway', 'drive', 'engine', 'movement', 'logistics', 'delivery', 'auto', 'transit'],
-    21: ['travel', 'tourism', 'destination', 'vacation', 'holiday', 'trip', 'journey', 'adventure', 'explore', 'tourist', 'sightseeing', 'scenic', 'landmark', 'outdoor', 'recreation', 'passport', 'luggage']
-  };
-
   const STOP_WORDS = new Set([
     'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'in', 'with', 'by', 'of', 'to', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'us', 'our', 'you', 'your', 'he', 'him', 'his', 'she', 'her', 'isolated', 'stock', 'photo', 'image', 'picture', 'vector', 'illustration', 'captured', 'professional', 'high', 'quality', 'resolution', 'super', 'ultra', 'beautiful', 'stunning', 'amazing', 'perfect', 'ideal'
   ]);
@@ -645,17 +687,7 @@ function ensureKeywordCount(
     sources.push(extractWords(description));
   }
 
-  // 6. From specific category keywords
-  if (categoryId) {
-    const catIdNum = Number(categoryId);
-    if (categoryFallbackKeywords[catIdNum]) {
-      sources.push(categoryFallbackKeywords[catIdNum]);
-    }
-  }
-
-  // 7. Generic fallback removed to maintain purely natural keywords.
-
-  // Pad the uniqueKeywords checking each source
+  // Pad the uniqueKeywords checking each source (semuanya berasal dari fakta visual asli)
   for (const source of sources) {
     if (uniqueKeywords.length >= targetCount) break;
     if (Array.isArray(source)) {
@@ -679,6 +711,46 @@ function ensureKeywordCount(
     }
   }
 
+  // 6. [PENGGANTI FALLBACK KATEGORI GENERIK] Bila masih kurang dari target, ekspansi
+  // lebih lanjut dari sinonim & long-tail keyword yang dibangun murni dari visualFacts
+  // (subjek, warna, aksi yang benar-benar terdeteksi di gambar) — bukan daftar generik
+  // per kategori Adobe Stock yang tidak berhubungan langsung dengan isi gambar.
+  // PENTING: hasil ekspansi ini juga HARUS mematuhi keywordMode secara ketat
+  // (single = semua satu kata, multi = semua dua+ kata), kecuali mode 'mixed'.
+  if (uniqueKeywords.length < targetCount) {
+    const synonymExpansion = expandFromVisualFacts(uniqueKeywords, visualFacts, (targetCount - uniqueKeywords.length) * 2);
+    for (const rawWord of synonymExpansion) {
+      if (uniqueKeywords.length >= targetCount) break;
+      const clean = sanitizeForIndexing(rawWord);
+      if (clean.length <= 1 || isProhibitedKeyword(clean)) continue;
+
+      if (keywordMode === 'single' && clean.includes(' ')) {
+        // Pecah frasa jadi kata tunggal agar konsisten dengan mode 'single'
+        const pieces = clean.split(/\s+/);
+        for (const p of pieces) {
+          if (uniqueKeywords.length >= targetCount) break;
+          if (p.length > 1 && !isProhibitedKeyword(p) && !uniqueKeywords.includes(p)) {
+            uniqueKeywords.push(p);
+          }
+        }
+      } else {
+        let cleanVal = clean;
+        if (keywordMode === 'multi' && !clean.includes(' ')) {
+          const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
+          const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
+          cleanVal = `${clean} ${mod}`;
+        }
+        if (!uniqueKeywords.includes(cleanVal)) {
+          uniqueKeywords.push(cleanVal);
+        }
+      }
+    }
+  }
+
+  // Catatan: fallback generik per kategori sudah dihapus. Jika keyword yang benar-benar
+  // relevan (hasil AI + sinonim + long-tail) masih belum mencapai targetCount, fungsi ini
+  // akan mengembalikan LEBIH SEDIKIT keyword daripada target, alih-alih memaksakan kata
+  // generik yang tidak nyambung dengan gambar.
   return uniqueKeywords.slice(0, targetCount);
 }
 
@@ -1933,35 +2005,121 @@ const SYNONYM_MAP: Record<string, string[]> = {
   'copyspace': ['copy space', 'text space', 'blank space']
 };
 
+// Reverse lookup index dibangun sekali dari SYNONYM_MAP agar pencarian sinonim bekerja
+// dua arah (mis. mencari "car" harus juga menemukan entri di mana "car" adalah nilai
+// dari kunci "automobile", bukan hanya saat "car" adalah kunci).
+const REVERSE_SYNONYM_MAP: Record<string, string[]> = {};
+Object.entries(SYNONYM_MAP).forEach(([key, values]) => {
+  values.forEach(v => {
+    const lv = v.toLowerCase();
+    if (!REVERSE_SYNONYM_MAP[lv]) REVERSE_SYNONYM_MAP[lv] = [];
+    REVERSE_SYNONYM_MAP[lv].push(key);
+    // Juga hubungkan sesama nilai dalam grup sinonim yang sama (mis. "automobile" <-> "vehicle")
+    values.forEach(v2 => {
+      if (v2.toLowerCase() !== lv) {
+        if (!REVERSE_SYNONYM_MAP[lv]) REVERSE_SYNONYM_MAP[lv] = [];
+        REVERSE_SYNONYM_MAP[lv].push(v2.toLowerCase());
+      }
+    });
+  });
+});
+
+function getSynonymsFor(word: string): string[] {
+  const lower = word.toLowerCase();
+  const out = new Set<string>();
+  (SYNONYM_MAP[lower] || []).forEach(s => out.add(s.toLowerCase()));
+  (REVERSE_SYNONYM_MAP[lower] || []).forEach(s => out.add(s.toLowerCase()));
+  return Array.from(out);
+}
+
 /**
- * Ekspansi dua arah: (a) sinonim/istilah regional untuk cross-search discoverability,
- * (b) long-tail phrase dengan menggabungkan subjek utama + modifier atribut/scene.
+ * Menghasilkan varian tunggal/jamak sederhana dari sebuah kata (bukan kamus generik,
+ * murni transformasi morfologis dari keyword yang SUDAH relevan/terdeteksi).
+ */
+function pluralSingularVariant(word: string): string | null {
+  const w = word.toLowerCase();
+  if (w.length < 3) return null;
+  if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
+  if (w.endsWith('y') && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + 'ies';
+  if (w.endsWith('es') && (w.endsWith('ses') || w.endsWith('xes') || w.endsWith('ches') || w.endsWith('shes'))) return w.slice(0, -2);
+  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  if (!w.endsWith('s')) return w + 's';
+  return null;
+}
+
+/**
+ * Ekspansi murni berbasis keyword yang SUDAH relevan (bukan daftar kategori generik):
+ * (a) sinonim/istilah regional dua arah untuk cross-search discoverability,
+ * (b) long-tail phrase dengan menggabungkan SETIAP subjek (primary + secondary) dengan
+ *     modifier atribut/scene yang benar-benar terdeteksi di gambar,
+ * (c) kombinasi subjek x warna dan subjek x aksi yang terdeteksi,
+ * (d) varian tunggal/jamak dari keyword yang sudah ada,
+ * (e) pemecahan frasa multi-kata yang sudah relevan menjadi kata tunggal yang bermakna.
  */
 function expandSynonymsAndLongTail(keywords: string[], tiers: TieredVisualAnalysis, maxNew: number): string[] {
   if (maxNew <= 0) return [];
   const existing = new Set(keywords.map(k => k.toLowerCase()));
   const expansions: string[] = [];
+  const pushIfNew = (val: string) => {
+    const v = val.trim().toLowerCase();
+    if (v.length > 1 && !existing.has(v) && !isProhibitedKeyword(v)) {
+      expansions.push(v);
+      existing.add(v);
+    }
+  };
 
+  // (a) Sinonim dua arah dari setiap keyword yang sudah relevan
   keywords.forEach(k => {
-    const syns = SYNONYM_MAP[k.toLowerCase()];
-    if (syns) {
-      syns.forEach(s => { if (!existing.has(s)) { expansions.push(s); existing.add(s); } });
+    getSynonymsFor(k).forEach(pushIfNew);
+  });
+
+  // (d) Varian tunggal/jamak dari keyword yang sudah relevan
+  keywords.forEach(k => {
+    if (!k.includes(' ')) {
+      const variant = pluralSingularVariant(k);
+      if (variant) pushIfNew(variant);
     }
   });
 
-  const primarySubject = tiers.objects[0]?.name;
-  if (primarySubject) {
-    const modifiers = [...tiers.attributes.slice(0, 4), ...tiers.scene.slice(0, 3)];
+  // (e) Pecah frasa multi-kata relevan menjadi kata tunggal yang bermakna
+  const genericConnectors = new Set(['a', 'an', 'the', 'and', 'or', 'of', 'in', 'on', 'at', 'with', 'for']);
+  keywords.forEach(k => {
+    if (k.includes(' ')) {
+      k.split(/\s+/).forEach(part => {
+        if (part.length > 2 && !genericConnectors.has(part)) pushIfNew(part);
+      });
+    }
+  });
+
+  // (b) Long-tail: SETIAP subjek (primary + secondary + background) x modifier
+  // (atribut warna/aksi/teks + scene) — seluruhnya berasal dari fakta visual terdeteksi,
+  // bukan daftar kategori generik.
+  const allSubjects = [...(tiers.objects || [])].map(o => o?.name).filter(Boolean) as string[];
+  const modifiers = [...(tiers.attributes || []).slice(0, 6), ...(tiers.scene || []).slice(0, 4)];
+  allSubjects.slice(0, 6).forEach(subject => {
     modifiers.forEach(mod => {
-      const phrase = `${primarySubject.toLowerCase()} ${String(mod).toLowerCase()}`.trim();
-      if (!existing.has(phrase) && phrase.split(/\s+/).length <= 4 && phrase.split(/\s+/).length >= 2) {
-        expansions.push(phrase);
-        existing.add(phrase);
-      }
+      const modLower = String(mod).toLowerCase();
+      // subjek + modifier
+      const phraseA = `${subject.toLowerCase()} ${modLower}`.trim();
+      if (phraseA.split(/\s+/).length >= 2 && phraseA.split(/\s+/).length <= 4) pushIfNew(phraseA);
+      // modifier + subjek (urutan alternatif untuk cakupan pencarian yang lebih luas)
+      const phraseB = `${modLower} ${subject.toLowerCase()}`.trim();
+      if (phraseB.split(/\s+/).length >= 2 && phraseB.split(/\s+/).length <= 4) pushIfNew(phraseB);
     });
-  }
+  });
 
   return expansions.slice(0, maxNew);
+}
+
+/**
+ * Versi expandSynonymsAndLongTail yang bekerja langsung dari visualFacts mentah
+ * (dipakai sebagai pengganti fallback kategori generik di dalam ensureKeywordCount,
+ * di mana objek TieredVisualAnalysis penuh belum tentu tersedia).
+ */
+function expandFromVisualFacts(existingKeywords: string[], visualFacts: any, maxNew: number): string[] {
+  if (maxNew <= 0) return [];
+  const pseudoTiers: TieredVisualAnalysis = buildTieredVisualAnalysis(visualFacts);
+  return expandSynonymsAndLongTail(existingKeywords, pseudoTiers, maxNew);
 }
 
 // ---- LAPISAN 5: FILTER OTOMATIS PEDOMAN ADOBE STOCK & SHUTTERSTOCK --------
@@ -2897,6 +3055,11 @@ OUTPUT FORMAT:
       let safeKw1 = semanticDeduplicate(filterBannedKeywords(data.keywords));
       data.keywords = safeKw1;
 
+      // [ENFORCEMENT KEYWORD MODE] Pastikan keyword akhir 100% konsisten dengan pilihan
+      // user (single = murni satu kata, multi = murni dua+ kata) — tidak ada campuran
+      // kecuali mode 'mixed' yang memang mengizinkannya.
+      data.keywords = enforceStrictKeywordMode(data.keywords, keywordMode, targetCount, visualFacts);
+
       // [LAPISAN 3] Sistem pembobotan keyword: SEO score, visual score, commercial score, trend score.
       // Reorder di dalam tiap kuintil struktural (subject → technical → context → commercial → emotional)
       // supaya urutan SEO tetap terjaga sambil keyword paling relevan/bernilai naik ke atas kuintilnya.
@@ -3699,6 +3862,11 @@ OUTPUT FORMAT:
             // Final safety pass setelah fallback padding dari ensureKeywordCount
             let safeKw2 = semanticDeduplicate(filterBannedKeywords(metadata.keywords));
             metadata.keywords = safeKw2;
+
+            // [ENFORCEMENT KEYWORD MODE] Pastikan keyword akhir 100% konsisten dengan
+            // pilihan user (single = murni satu kata, multi = murni dua+ kata) — tidak ada
+            // campuran kecuali mode 'mixed' yang memang mengizinkannya.
+            metadata.keywords = enforceStrictKeywordMode(metadata.keywords, keywordMode, targetCount, assetVisualFacts);
 
             // [LAPISAN 3] Sistem pembobotan keyword: reorder di dalam tiap kuintil struktural
             metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, targetCount);
