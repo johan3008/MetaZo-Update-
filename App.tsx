@@ -917,7 +917,9 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
                 const duration = video.duration;
                 if (!duration || duration === Infinity) throw new Error("Invalid duration");
                 
-                const frameWidth = 320;
+                // Match the FFmpeg fallback resolution (1280px) so AI Vision accuracy
+                // doesn't silently degrade when the faster native path succeeds.
+                const frameWidth = 1280;
                 const frameHeight = Math.floor(frameWidth * (video.videoHeight / video.videoWidth));
 
                 const seekTimes = [
@@ -949,7 +951,7 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
                         ctx.drawImage(video, 0, 0, frameWidth, frameHeight);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                         extractedFrames.push(dataUrl);
                     }
                 }
@@ -3064,8 +3066,8 @@ const App: React.FC = () => {
                   const img = new Image();
                   img.onload = () => {
                       const canvas = document.createElement('canvas');
-                      // Reduce MAX_SIZE to 768px. AI doesn't need high res, and this makes base64 7x smaller!
-                      const MAX_SIZE = 768;
+                      // Higher res + quality so AI Vision can pick up fine detail/small text accurately.
+                      const MAX_SIZE = 1536;
                       let width = img.width;
                       let height = img.height;
                       
@@ -3082,8 +3084,7 @@ const App: React.FC = () => {
                           ctx.fillStyle = '#FFFFFF';
                           ctx.fillRect(0, 0, width, height);
                           ctx.drawImage(img, 0, 0, width, height);
-                          // Lower quality to 0.6 for massive speedup in network transfer
-                          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                           canvas.width = 0;
                           canvas.height = 0;
                           resolve([dataUrl]);
@@ -3118,8 +3119,8 @@ const App: React.FC = () => {
                       const originalWidth = img.width || 1024;
                       const originalHeight = img.height || 1024;
                       
-                      // Scale down to max 768px
-                      const scale = Math.min(768 / originalWidth, 768 / originalHeight);
+                      // Scale down to max 1536px
+                      const scale = Math.min(1536 / originalWidth, 1536 / originalHeight);
                       canvas.width = originalWidth * scale;
                       canvas.height = originalHeight * scale;
                       
@@ -3128,7 +3129,7 @@ const App: React.FC = () => {
                           ctx.fillStyle = '#FFFFFF';
                           ctx.fillRect(0, 0, canvas.width, canvas.height);
                           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                           canvas.width = 0;
                           canvas.height = 0;
                           resolve([dataUrl]);

@@ -202,13 +202,6 @@ function isProhibitedKeyword(word: string): boolean {
   if (!word) return true;
   const lower = word.toLowerCase().trim();
   if (PROHIBITED_KEYWORDS_SET.has(lower)) return true;
-  
-  // Exclude keywords containing color names
-  const parts = lower.split(/[\s-_]+/);
-  if (parts.some(part => COLOR_KEYWORDS.has(part))) {
-    return true;
-  }
-  
   return false;
 }
 
@@ -489,6 +482,120 @@ const getLanguageName = (code?: string) => {
  * 'mixed' (atau tidak diset) yang boleh berisi campuran satu-kata & multi-kata;
  * mode 'single' dan 'multi' selalu dipaksa murni sesuai definisinya.
  */
+/**
+ * METAZO 7-STAGE SEO KEYWORD ARCHITECTURE:
+ * 
+ * OBJECT ──> PRIMARY KEYWORD ──> SYNONYM CHECK ──> RELEVANCE CHECK ──> DUPLICATE CHECK ──> SEO RANKING ──> FINAL KEYWORDS
+ * 
+ * Tahap 1: OBJECT — Ekstraksi subjek visual & elemen konkret dari VISUAL_FACTS.
+ * Tahap 2: PRIMARY KEYWORD — Penetapan kata kunci utama objek inti (Keyword #1).
+ * Tahap 3: SYNONYM CHECK — Ekspansi sinonim profesional lintas-wilayah (tanpa pengulangan sufiks -ing/-er/-s).
+ * Tahap 4: RELEVANCE CHECK — Validasi grounding visual literal & search intent pembeli.
+ * Tahap 5: DUPLICATE CHECK — Deduplikasi eksak & varian morfologi/stemming (anti root redundancy).
+ * Tahap 6: SEO RANKING — Penataan hierarki 3-Tier (1-10: Objek Utama, 11-20: Detail/Aksi, 21-30+: Konsep/Intent).
+ * Tahap 7: FINAL KEYWORDS — Penguncian presisi sesuai jumlah target keyword yang diminta.
+ */
+function processKeywordsWith7StagePipeline(
+  rawAiKeywords: string[],
+  targetCount: number,
+  visualFacts: any,
+  toolType?: ToolType,
+  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed'
+): string[] {
+  // --- TAHAP 1: OBJECT (Visual Detection Extraction) ---
+  const tieredVisual = buildTieredVisualAnalysis(visualFacts);
+  const primarySubjects = (tieredVisual.objects || [])
+    .filter(o => o.tier === 'primary' || o.importance >= 70)
+    .map(o => o.name.toLowerCase().trim());
+  const allVisualObjects = (tieredVisual.objects || []).map(o => o.name.toLowerCase().trim());
+  const visualAttributes = (tieredVisual.attributes || []).map(a => String(a).toLowerCase().trim());
+  const visualActions = (visualFacts?.actions || []).map((a: any) => String(a).toLowerCase().trim());
+  const visualConcepts = (tieredVisual.concepts || []).map(c => String(c).toLowerCase().trim());
+
+  // Grounding corpus untuk validasi relevansi visual
+  const visualGroundingText = [
+    ...allVisualObjects,
+    ...visualAttributes,
+    ...visualActions,
+    ...visualConcepts,
+    ...(Array.isArray(visualFacts?.colors) ? visualFacts.colors : [])
+  ].join(' ').toLowerCase();
+
+  // --- TAHAP 2: PRIMARY KEYWORD (Keyword #1 Establishment) ---
+  const primarySubjectKeyword = primarySubjects.length > 0 ? primarySubjects[0] : (allVisualObjects[0] || '');
+
+  // --- TAHAP 3: SYNONYM CHECK (High-Quality Natural Synonyms & Suffix-Free Expansion) ---
+  const candidatePool: string[] = [];
+  
+  // 3a. Masukkan raw AI keywords yang sudah dibersihkan
+  (rawAiKeywords || []).forEach(k => {
+    if (typeof k === 'string') {
+      const sanitized = sanitizeForIndexing(k);
+      if (sanitized.length > 1 && !isProhibitedKeyword(sanitized)) {
+        if (keywordMode === 'single' && sanitized.includes(' ')) {
+          sanitized.split(/\s+/).forEach(part => {
+            if (part.length > 1 && !isProhibitedKeyword(part)) candidatePool.push(part);
+          });
+        } else {
+          candidatePool.push(sanitized);
+        }
+      }
+    }
+  });
+
+  // 3b. Tambahkan sinonim alami dari visual objects terdeteksi (tanpa membuat varian -ing/-er/-s)
+  allVisualObjects.forEach(obj => {
+    const synonyms = getSynonymsFor(obj);
+    synonyms.forEach(syn => {
+      const cleanSyn = sanitizeForIndexing(syn);
+      if (cleanSyn.length > 1 && !isProhibitedKeyword(cleanSyn)) {
+        if (keywordMode === 'single' && cleanSyn.includes(' ')) {
+          // split
+          cleanSyn.split(/\s+/).forEach(p => { if (p.length > 1) candidatePool.push(p); });
+        } else {
+          candidatePool.push(cleanSyn);
+        }
+      }
+    });
+  });
+
+  // --- TAHAP 4: RELEVANCE CHECK (Visual Grounding & Search Intent) ---
+  const relevantCandidates = candidatePool.filter(kw => {
+    if (!kw || kw.length < 2 || isProhibitedKeyword(kw)) return false;
+    if (violatesMarketplaceGuidelines(kw)) return false;
+
+    // Jika visual grounding corpus tersedia, pastikan ada relevansi kata atau kecocokan konsep
+    if (visualGroundingText.length > 5) {
+      const words = kw.split(/\s+/);
+      const isGrounded = words.some(w => visualGroundingText.includes(w) || w.length >= 4);
+      return isGrounded;
+    }
+    return true;
+  });
+
+  // --- TAHAP 5: DUPLICATE CHECK (Exact & Stem Deduplication — Anti Suffix Spam) ---
+  const deduplicatedList = deduplicateStemVariants(relevantCandidates);
+
+  // --- TAHAP 6: SEO RANKING (3-Tier Buyer Intent Hierarchy) ---
+  const rankedKeywords = rankAndWeightKeywords(deduplicatedList, tieredVisual, targetCount);
+
+  // Pastikan Keyword #1 adalah Primary Subject
+  if (primarySubjectKeyword && primarySubjectKeyword.length > 1 && rankedKeywords.length > 0) {
+    const pSubjClean = sanitizeForIndexing(primarySubjectKeyword);
+    const existingIdx = rankedKeywords.findIndex(k => k === pSubjClean || k.includes(pSubjClean) || pSubjClean.includes(k));
+    if (existingIdx > 0) {
+      const [mainKw] = rankedKeywords.splice(existingIdx, 1);
+      rankedKeywords.unshift(mainKw);
+    } else if (existingIdx === -1) {
+      rankedKeywords.unshift(pSubjClean);
+    }
+  }
+
+  // --- TAHAP 7: FINAL KEYWORDS (Precision Count Locking) ---
+  const finalKeywords = enforceStrictKeywordMode(rankedKeywords, keywordMode, targetCount, visualFacts);
+  return finalKeywords.slice(0, targetCount);
+}
+
 function enforceStrictKeywordMode(
   keywords: string[],
   keywordMode: 'mixed' | 'single' | 'multi' | undefined,
@@ -1679,34 +1786,41 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * kedekatan semantik dengan setiap kategori. Urutan ini dirancang untuk
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
-function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number): string[] {
+/**
+ * METAZO BUYER-CENTRIC 3-TIER KEYWORD RANKING ENGINE
+ * 
+ * Struktur Ideal:
+ * - Slot 1–10:  Objek Utama Paling Relevan (Core Subject Nouns - Apa yang orang cari di search box)
+ * - Slot 11–20: Detail Visual & Aktivitas (Physical Attributes, Colors, Materials & Active Verbs)
+ * - Slot 21–30+: Konsep & Search Intent (Commercial Use Case, Emotions, Industry & Context)
+ * 
+ * Prinsip:
+ * - Akurasi > Jumlah Keyword
+ * - Relevansi > Keyword Viral
+ * - Buyer Intent > Kata Keren
+ * - Urutan Keyword Sangat Penting (Top 10 paling menentukan peringkat)
+ */
+function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number, title?: string): string[] {
   if (keywords.length === 0) return keywords;
 
   const lower = (s: string) => s.toLowerCase().trim();
 
   // Ekstrak elemen visual dari tiers
   const primarySubjects = tiers.objects
-    .filter(o => o.tier === 'primary')
+    .filter(o => o.tier === 'primary' || o.importance >= 70)
     .map(o => lower(o.name));
   const allSubjects = tiers.objects.map(o => lower(o.name));
   const attributes = tiers.attributes.map(a => lower(String(a)));
   const scene = tiers.scene.map(s => lower(String(s)));
   const concepts = tiers.concepts.map(c => lower(String(c)));
 
-  // --- Stage classification helpers ---
-  const matchesSubject = (kw: string): boolean =>
-    allSubjects.some(s => s.includes(kw) || kw.includes(s));
+  // Bucket 1 (Slots 1–10): Objek Utama Paling Relevan
+  const tier1_Subjects: string[] = [];
+  // Bucket 2 (Slots 11–20): Detail Visual & Aktivitas
+  const tier2_DetailsAndActions: string[] = [];
+  // Bucket 3 (Slots 21–30+): Konsep, Konteks & Search Intent
+  const tier3_ConceptsAndIntent: string[] = [];
 
-  const matchesAttribute = (kw: string): boolean =>
-    attributes.some(a => kw.includes(a) || a.includes(kw));
-
-  const matchesScene = (kw: string): boolean =>
-    scene.some(s => kw.includes(s) || s.includes(kw));
-
-  const matchesConcept = (kw: string): boolean =>
-    concepts.some(c => kw.includes(c) || c.includes(kw));
-
-  // Action verbs (gerakan / aksi)
   const ACTION_TERMS = new Set([
     'running', 'walking', 'jumping', 'sitting', 'standing', 'flying', 'swimming',
     'dancing', 'holding', 'reaching', 'lifting', 'working', 'typing', 'driving',
@@ -1718,94 +1832,19 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     'traveling', 'exploring', 'hiking', 'surfing', 'cycling', 'commuting'
   ]);
 
-  const isAction = (kw: string): boolean => {
+  const isActionWord = (kw: string): boolean => {
     const w = lower(kw);
     if (ACTION_TERMS.has(w)) return true;
-    return Array.from(ACTION_TERMS).some(a => w.includes(a) || a.includes(w));
+    return Array.from(ACTION_TERMS).some(a => w.includes(a));
   };
 
-  // Technique / style terms
-  const TECHNIQUE_TERMS = new Set([
-    'watercolor', 'oil painting', 'sketch', 'line art', 'vector', 'flat design',
-    '3d render', 'cinematic', 'macro', 'close-up', 'wide shot', 'aerial view',
-    'drone shot', 'long exposure', 'bokeh', 'depth of field', 'grainy', 'vintage',
-    'retro', 'minimalist', 'abstract', 'geometric', 'isometric', 'gradient',
-    'monochrome', 'black and white', 'sepia', 'duotone', 'vibrant', 'pastel',
-    'high contrast', 'soft focus', 'flat lay', 'top view', 'panoramic',
-    'portrait orientation', 'landscape orientation', 'square format',
-    'high key', 'low key', 'rim lighting', 'backlit', 'silhouette', 'shadow play',
-    'golden hour', 'blue hour', 'night', 'daylight', 'natural light', 'studio light'
-  ]);
-
-  const isTechnique = (kw: string): boolean => {
-    const w = lower(kw);
-    if (TECHNIQUE_TERMS.has(w)) return true;
-    return Array.from(TECHNIQUE_TERMS).some(t => w.includes(t) || t.includes(w));
+  const matchesAnySubject = (kw: string): boolean => {
+    return allSubjects.some(s => s.includes(kw) || kw.includes(s));
   };
 
-  // Industry terms
-  const INDUSTRY_TERMS = new Set([
-    'healthcare', 'medical', 'technology', 'fintech', 'finance', 'education',
-    'marketing', 'advertising', 'real estate', 'hospitality', 'food industry',
-    'fashion', 'beauty', 'fitness', 'wellness', 'automotive', 'construction',
-    'agriculture', 'manufacturing', 'retail', 'e-commerce', 'entertainment',
-    'media', 'publishing', 'legal', 'insurance', 'travel', 'tourism',
-    'sustainability', 'green energy', 'renewable', 'corporate', 'startup',
-    'nonprofit', 'government', 'transportation', 'logistics', 'science', 'research'
-  ]);
-
-  const isIndustry = (kw: string): boolean => {
-    const w = lower(kw);
-    if (INDUSTRY_TERMS.has(w)) return true;
-    return Array.from(INDUSTRY_TERMS).some(ind => w.includes(ind) || ind.includes(w));
+  const matchesAnyAttribute = (kw: string): boolean => {
+    return attributes.some(a => kw.includes(a) || a.includes(kw));
   };
-
-  // Use Case terms
-  const USECASE_TERMS = new Set([
-    'banner', 'landing page', 'presentation', 'brochure', 'flyer', 'poster',
-    'social media', 'instagram', 'facebook', 'website', 'blog', 'magazine',
-    'newsletter', 'annual report', 'billboard', 'packaging', 'product label',
-    'app design', 'ui design', 'wallpaper', 'background', 'cover photo',
-    'header', 'thumbnail', 'icon', 'logo', 'infographic', 'editorial',
-    'commercial', 'advertisement', 'promo', 'catalog', 'menu', 'invitation',
-    'greeting card', 'calendar', 'textbook', 'wall art', 'canvas print',
-    'copy space', 'text space', 'isolated', 'template', 'mockup'
-  ]);
-
-  const isUseCase = (kw: string): boolean => {
-    const w = lower(kw);
-    if (USECASE_TERMS.has(w)) return true;
-    return Array.from(USECASE_TERMS).some(u => w.includes(u) || u.includes(w));
-  };
-
-  // Composition terms
-  const COMPOSITION_TERMS = new Set([
-    'rule of thirds', 'symmetry', 'asymmetry', 'leading lines', 'diagonal',
-    'framing', 'negative space', 'positive space', 'foreground', 'background',
-    'midground', 'layered', 'depth', 'perspective', 'vanishing point',
-    'balanced', 'unbalanced', 'centered', 'off-center', 'isolated subject',
-    'group composition', 'single object', 'pattern', 'texture', 'repetition',
-    'contrast', 'harmony', 'minimal', 'clean', 'uncluttered', 'cluttered',
-    'spacious', 'tight crop', 'full frame', 'environmental portrait'
-  ]);
-
-  const isComposition = (kw: string): boolean => {
-    const w = lower(kw);
-    if (COMPOSITION_TERMS.has(w)) return true;
-    return Array.from(COMPOSITION_TERMS).some(c => w.includes(c) || c.includes(w));
-  };
-
-  // --- Classify each keyword into stage buckets ---
-  const stages: { stage: number; label: string; items: string[] }[] = [
-    { stage: 1, label: 'SUBJECT', items: [] },
-    { stage: 2, label: 'ACTION', items: [] },
-    { stage: 3, label: 'ATTRIBUTE', items: [] },
-    { stage: 4, label: 'LOCATION/ENVIRONMENT', items: [] },
-    { stage: 5, label: 'CONCEPT', items: [] },
-    { stage: 6, label: 'EMOTION', items: [] },
-    { stage: 7, label: 'COMMERCIAL USE', items: [] },
-    { stage: 8, label: 'SEMANTIC/LONG-TAIL', items: [] }
-  ];
 
   const seen = new Set<string>();
 
@@ -1814,195 +1853,95 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     if (!k || k.length < 2 || seen.has(k)) continue;
     seen.add(k);
 
-    const wordsCount = k.split(/\s+/).length;
+    // 1. TIER 1 Check: Main Visual Subjects & Core Nouns (Slots 1-10)
+    const isPrimarySubj = primarySubjects.some(s => s === k || k === s || k.includes(s) || s.includes(k));
+    const isSubjectMatch = matchesAnySubject(k);
 
-    // STAGE 8: SEMANTIC/LONG-TAIL (multi-word phrases that aren't exact main subjects)
-    if (wordsCount >= 2 && !primarySubjects.some(s => s === k || k === s) && !matchesSubject(k)) {
-      stages[7].items.push(kw);
+    if (isPrimarySubj || (isSubjectMatch && tier1_Subjects.length < 10)) {
+      tier1_Subjects.push(kw);
       continue;
     }
 
-    // STAGE 1: SUBJECT
-    if (primarySubjects.some(s => s === k || k === s) || (matchesSubject(k) && allSubjects.length > 0)) {
-      stages[0].items.push(kw);
+    // 2. TIER 2 Check: Visual Details, Physical Attributes, Actions/Verbs (Slots 11-20)
+    const isAction = isActionWord(k);
+    const isAttr = matchesAnyAttribute(k);
+
+    if ((isAction || isAttr) && tier2_DetailsAndActions.length < 10) {
+      tier2_DetailsAndActions.push(kw);
       continue;
     }
 
-    // STAGE 2: ACTION
-    if (isAction(k)) {
-      stages[1].items.push(kw);
-      continue;
-    }
+    // 3. TIER 3 Check: Concepts, Search Intent, Environment Context, Commercial Uses (Slots 21-30+)
+    tier3_ConceptsAndIntent.push(kw);
+  }
 
-    // STAGE 3: ATTRIBUTE
-    if (matchesAttribute(k) || isTechnique(k) || isComposition(k)) {
-      stages[2].items.push(kw);
-      continue;
-    }
-
-    // STAGE 4: LOCATION/ENVIRONMENT
-    if (matchesScene(k)) {
-      stages[3].items.push(kw);
-      continue;
-    }
-
-    // EMOTION vs CONCEPT logic
-    const EMOTION_TERMS = new Set(['happy', 'sad', 'angry', 'joy', 'fear', 'excited', 'stress', 'love', 'cry', 'smile', 'laugh', 'depressed', 'anxious', 'peaceful', 'calm', 'romantic']);
-    const isEmotion = Array.from(EMOTION_TERMS).some(e => k.includes(e));
-
-    // STAGE 6: EMOTION
-    if (isEmotion) {
-      stages[5].items.push(kw);
-      continue;
-    }
-
-    // STAGE 5: CONCEPT
-    if (matchesConcept(k)) {
-      stages[4].items.push(kw);
-      continue;
-    }
-
-    // STAGE 7: COMMERCIAL USE
-    if (isIndustry(k) || isUseCase(k)) {
-      stages[6].items.push(kw);
-      continue;
-    }
-
-    // Fallback based on length if somehow it wasn't caught
-    if (wordsCount === 1) {
-      stages[2].items.push(kw); // Default to ATTRIBUTE
-    } else {
-      stages[7].items.push(kw); // Default to LONG-TAIL
+  // Ensure Keyword #1 is the EXACT primary subject
+  if (primarySubjects.length > 0) {
+    const mainSubj = primarySubjects[0];
+    const idxInTier1 = tier1_Subjects.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj));
+    if (idxInTier1 > 0) {
+      const [main] = tier1_Subjects.splice(idxInTier1, 1);
+      tier1_Subjects.unshift(main);
+    } else if (idxInTier1 === -1 && mainSubj.length > 1) {
+      tier1_Subjects.unshift(mainSubj);
     }
   }
 
-  // --- Dynamic Proportional Allocation ---
-  const proportions = [
-    0.20, // SUBJECT
-    0.15, // ACTION
-    0.15, // ATTRIBUTE
-    0.10, // LOCATION
-    0.10, // CONCEPT
-    0.10, // EMOTION
-    0.10, // COMMERCIAL
-    0.10  // LONG-TAIL
+  // Combine tiers in exact structured order:
+  // 1-10: Objek Utama -> 11-20: Detail Visual & Aktivitas -> 21-30+: Konsep & Search Intent
+  const combined = [
+    ...tier1_Subjects,
+    ...tier2_DetailsAndActions,
+    ...tier3_ConceptsAndIntent
   ];
 
-  let allocations = proportions.map(p => Math.floor(p * targetCount));
-  
-  // Distribute remaining slots to ensure EXACTLY targetCount
-  let currentTotal = allocations.reduce((a, b) => a + b, 0);
-  let remainder = targetCount - currentTotal;
-  
-  // Assign remainders top-down starting from SUBJECT
-  for (let i = 0; i < remainder; i++) {
-    allocations[i % allocations.length]++;
-  }
-
-  const finalResult: string[] = [];
-  const excess: string[] = [];
-
-  // Phase 1: Try to meet allocations
-  for (let i = 0; i < stages.length; i++) {
-    const bucket = stages[i].items;
-    const alloc = allocations[i];
-    
-    if (bucket.length <= alloc) {
-      finalResult.push(...bucket);
-      allocations[i] -= bucket.length; // Remaining quota not met
-    } else {
-      finalResult.push(...bucket.slice(0, alloc));
-      excess.push(...bucket.slice(alloc));
-      allocations[i] = 0; // Met exactly
-    }
-  }
-
-  // Phase 2: If we didn't meet the targetCount, fill the shortfall from the excess pool
-  let shortfall = targetCount - finalResult.length;
-  if (shortfall > 0 && excess.length > 0) {
-    const extraToTake = Math.min(shortfall, excess.length);
-    finalResult.push(...excess.slice(0, extraToTake));
-  }
-
-  // Phase 3: If STILL short, create dynamic long-tail combinations naturally
-  shortfall = targetCount - finalResult.length;
-  if (shortfall > 0) {
-     const generatedPool = new Set(finalResult.map(k=>k.toLowerCase()));
-     const baseSubject = stages[0].items[0] || 'element';
-     
-     // Mix subject with attributes/actions
-     for(let i=0; i<stages[2].items.length && shortfall > 0; i++) {
-         const combo = baseSubject + ' ' + stages[2].items[i];
-         if(!generatedPool.has(combo)) {
-            finalResult.push(combo);
-            generatedPool.add(combo);
-            shortfall--;
-         }
-     }
-     for(let i=0; i<stages[1].items.length && shortfall > 0; i++) {
-         const combo = stages[1].items[i] + ' ' + baseSubject;
-         if(!generatedPool.has(combo)) {
-            finalResult.push(combo);
-            generatedPool.add(combo);
-            shortfall--;
-         }
-     }
-     
-     // If truly desperate, use single words from generic concepts that are somewhat natural
-     const desperateFallback = ['digital', 'visual', 'composition', 'image', 'picture', 'color', 'detail', 'focus', 'format', 'style'];
-     for(let i=0; i<desperateFallback.length && shortfall > 0; i++) {
-         if(!generatedPool.has(desperateFallback[i])) {
-            finalResult.push(desperateFallback[i]);
-            generatedPool.add(desperateFallback[i]);
-            shortfall--;
-         }
-     }
-  }
-
-  // Ensure main subject is first
-  if (primarySubjects.length > 0 && finalResult.length > 0) {
-    const mainSubj = primarySubjects[0];
-    const idx = finalResult.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
-    if (idx > 0) {
-      const [main] = finalResult.splice(idx, 1);
-      finalResult.unshift(main);
-    } else if (idx === -1 && mainSubj.length > 1) {
-      finalResult.pop(); // Keep exact count
-      finalResult.unshift(mainSubj);
-    }
-  }
-
-  return finalResult;
+  return combined.slice(0, targetCount);
 }
+
 // ---- LAPISAN 4: EKSPANSI SINONIM & LONG-TAIL KEYWORD -----------------------
 
 const SYNONYM_MAP: Record<string, string[]> = {
+  // Objects / Subjects
   'car': ['automobile', 'vehicle', 'automotive'],
   'phone': ['smartphone', 'mobile phone', 'cellular phone', 'mobile device'],
   'lift': ['elevator'],
   'sidewalk': ['pavement', 'walkway'],
   'doctor': ['physician', 'healthcare worker', 'medical professional'],
-  'shop': ['store', 'retail outlet', 'boutique'],
+  'nurse': ['healthcare worker', 'medical staff', 'caregiver'],
+  'shop': ['store', 'retail outlet', 'boutique', 'market'],
   'computer': ['laptop', 'pc', 'workstation', 'digital device'],
-  'big': ['large', 'huge', 'massive'],
-  'small': ['compact', 'miniature', 'tiny'],
-  'old': ['aged', 'vintage', 'retro', 'antique'],
-  'new': ['modern', 'contemporary', 'futuristic'],
-  'work': ['job', 'career', 'employment', 'business'],
-  'home': ['house', 'residence', 'residential'],
-  'city': ['urban', 'metropolitan', 'downtown'],
-  'nature': ['natural', 'outdoors', 'environment', 'eco'],
+  'house': ['home', 'residence', 'residential building'],
+  'building': ['architecture', 'structure', 'edifice'],
+  'road': ['street', 'highway', 'avenue', 'pathway'],
+  'city': ['urban area', 'metropolis', 'downtown'],
+  'beach': ['seashore', 'coastline', 'shore'],
+  'sea': ['ocean', 'marine water'],
+  'forest': ['woodland', 'jungle', 'nature reserve'],
+  'money': ['finance', 'currency', 'capital', 'funds'],
   'food': ['cuisine', 'meal', 'dish', 'refreshment'],
-  'money': ['finance', 'currency', 'capital', 'wealth', 'cash'],
-  'idea': ['concept', 'notion', 'thought', 'solution'],
-  'fast': ['quick', 'rapid', 'speedy', 'express'],
-  'happy': ['joyful', 'cheerful', 'delighted', 'smiling'],
+  'drink': ['beverage', 'refreshment'],
+  'dog': ['canine', 'puppy', 'pet'],
+  'cat': ['feline', 'kitten', 'pet'],
+  'plant': ['flora', 'botanical', 'vegetation'],
+  'flower': ['blossom', 'petal', 'bloom'],
   'autumn': ['fall', 'autumnal'],
   'fall': ['autumn', 'autumnal'],
   'trolley': ['shopping cart', 'cart'],
   'subway': ['underground', 'metro', 'transit'],
   'trash': ['garbage', 'rubbish', 'waste'],
-  'copyspace': ['copy space', 'text space', 'blank space']
+  'copyspace': ['copy space', 'text space', 'blank space'],
+  'isolated': ['white background', 'cutout', 'standalone'],
+  'sunset': ['dusk', 'sundown', 'golden hour'],
+  'sunrise': ['dawn', 'morning light', 'daybreak'],
+
+  // Actions
+  'work': ['employment', 'job', 'business'],
+  'walk': ['stroll', 'stride'],
+  'run': ['sprint', 'jog'],
+  'eat': ['dine', 'consume'],
+  'talk': ['converse', 'discuss'],
+  'happy': ['joyful', 'cheerful', 'delighted'],
+  'idea': ['concept', 'notion', 'thought']
 };
 
 // Reverse lookup index dibangun sekali dari SYNONYM_MAP agar pencarian sinonim bekerja
@@ -2073,13 +2012,7 @@ function expandSynonymsAndLongTail(keywords: string[], tiers: TieredVisualAnalys
     getSynonymsFor(k).forEach(pushIfNew);
   });
 
-  // (d) Varian tunggal/jamak dari keyword yang sudah relevan
-  keywords.forEach(k => {
-    if (!k.includes(' ')) {
-      const variant = pluralSingularVariant(k);
-      if (variant) pushIfNew(variant);
-    }
-  });
+  // (d) Varian tunggal/jamak ditiadakan agar sesuai algoritma microstock (mencegah duplikasi akar kata -ing/-er/-s)
 
   // (e) Pecah frasa multi-kata relevan menjadi kata tunggal yang bermakna
   const genericConnectors = new Set(['a', 'an', 'the', 'and', 'or', 'of', 'in', 'on', 'at', 'with', 'for']);
@@ -2158,40 +2091,73 @@ function filterBannedKeywords(keywords: string[]): string[] {
 // ---- LAPISAN 6: DEDUPLIKASI SEMANTIK (BUKAN HANYA TEKS SAMA) --------------
 
 function stemWord(word: string): string {
-  const w = word.toLowerCase();
+  const w = word.toLowerCase().trim();
+  if (w.length <= 3) return w;
+  
+  // Plural / inflectional endings
   if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
   if (w.endsWith('es') && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('ing') && w.length > 5) return w.slice(0, -3);
-  if (w.endsWith('ed') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('ing') && w.length > 5) {
+    let base = w.slice(0, -3);
+    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) base = base.slice(0, -1); // running -> run
+    return base;
+  }
+  if (w.endsWith('ed') && w.length > 4) {
+    let base = w.slice(0, -2);
+    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) base = base.slice(0, -1); // stopped -> stop
+    return base;
+  }
+  if (w.endsWith('er') && w.length > 4) {
+    let base = w.slice(0, -2);
+    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) base = base.slice(0, -1); // runner -> run
+    return base;
+  }
+  if (w.endsWith('or') && w.length > 4) return w.slice(0, -2); // creator -> creat
+  if (w.endsWith('tion') && w.length > 5) return w.slice(0, -4); // creation -> crea
+  if (w.endsWith('ment') && w.length > 5) return w.slice(0, -4);
+  if (w.endsWith('ness') && w.length > 5) return w.slice(0, -4);
+  if (w.endsWith('able') && w.length > 5) return w.slice(0, -4);
+  if (w.endsWith('ly') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('ist') && w.length > 4) return w.slice(0, -3);
   if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) return w.slice(0, -1);
   return w;
 }
 
 /**
- * Signature semantik: setiap kata di-stem lalu diurutkan alfabetis, sehingga
- * frasa yang secara makna identik namun berbeda urutan/bentuk kata
- * (mis. "beach sunset" vs "sunset beaches" vs "sunset at the beach") terdeteksi sebagai duplikat,
- * bukan hanya deduplikasi string yang persis sama.
+ * Filter anti-spam akhiran / duplikasi akar kata (Root Word / Suffix Deduplication)
+ * Sesuai algoritma mesin pencari Microstock (Adobe Stock & Shutterstock).
+ * Melarang pengulangan akar kata dengan akhiran -ing, -er, -ed, -s, dsb.
+ * Hanya menyimpan bentuk pertama yang paling relevan dan natural.
  */
+function deduplicateStemVariants(keywords: string[]): string[] {
+  const seenSingleWordStems = new Set<string>();
+  const seenSignatures = new Set<string>();
+  const result: string[] = [];
 
-/**
- * Sanitasi mendalam khusus untuk memastikan kata kunci 100% ramah indeksasi (Indexable)
- * pada algoritma mesin pencari microstock (Adobe Stock, Shutterstock, Freepik, Getty).
- */
-function sanitizeForIndexing(kw: string): string {
-  if (!kw) return '';
-  let clean = kw
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
-    .replace(/\s+/g, ' ')          // Normalisasi spasi
-    .trim();
+  for (const kw of keywords) {
+    const clean = kw.toLowerCase().trim();
+    if (!clean || clean.length < 2) continue;
 
-  // Filter stop-words/noise tunggal yang mengganggu indeksasi
-  const stopWords = new Set(['a', 'an', 'the', 'at', 'in', 'on', 'of', 'to', 'by', 'is', 'it', 'or', 'and', 'as', 'for', 'with']);
-  const words = clean.split(' ').filter(w => w.length >= 2 && !stopWords.has(w));
-  
-  return words.join(' ');
+    const words = clean.split(/\s+/);
+    
+    // Untuk single-word keyword, pastikan akar kata belum pernah muncul
+    if (words.length === 1) {
+      const stem = stemWord(clean);
+      if (seenSingleWordStems.has(stem)) {
+        continue; // Tolak varian kata yang hanya beda akhiran (-ing, -er, -ed, -s)
+      }
+      seenSingleWordStems.add(stem);
+    }
+
+    // Cek semantic signature untuk multi-word maupun single-word
+    const sig = semanticKeySignature(clean);
+    if (seenSignatures.has(sig)) continue;
+    seenSignatures.add(sig);
+
+    result.push(kw);
+  }
+
+  return result;
 }
 
 function semanticKeySignature(phrase: string): string {
@@ -2205,15 +2171,7 @@ function semanticKeySignature(phrase: string): string {
 }
 
 function semanticDeduplicate(keywords: string[]): string[] {
-  const seenSignatures = new Set<string>();
-  const result: string[] = [];
-  for (const kw of keywords) {
-    const sig = semanticKeySignature(kw);
-    if (!sig || seenSignatures.has(sig)) continue;
-    seenSignatures.add(sig);
-    result.push(kw);
-  }
-  return result;
+  return deduplicateStemVariants(keywords);
 }
 
 // ---- LAPISAN 7: PENENTUAN KATEGORI YANG LEBIH AKURAT -----------------------
@@ -2359,58 +2317,49 @@ export const generateStockMetadata = async (
 
   // Rules for keywords depending on keywordMode
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
-KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA OF THE ASSET) — Keyword #1 MUST explicitly name the primary subject noun or compound phrase (e.g. 'cat', 'vintage car', 'borobudur temple', 'laptop', 'coffee cup'). NEVER put background elements, lighting, or generic terms as Keyword #1.
-MUST-1. Directly describe the visible subject — DO NOT generalize.
-MUST-2. Describe the main action — capture what the subject(s) are actively doing.
-MUST-3. Include specific objects — name every distinct, identifiable object visible.
-MUST-4. Include the strongest visual context — environment, setting, background, lighting.
-MUST-5. Represent the primary commercial concept — what would a buyer realistically search?
-MUST-6. Be 100% highly relevant to the actual asset — every keyword MUST have a direct visual connection.
-MUST-7. Avoid generic filler words AND avoid overloading the list with broad buzzwords ("object", "item", "thing", "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative") unless genuinely one of the strongest descriptors of THIS asset — keep such broad terms to a small minority; prioritize concrete, specific, literally-visible terms.
-MUST-8. Avoid duplicates and near-duplicates — NEVER repeat root concepts ("person" AND "people", "run" AND "running").
-MUST-9. Never invent unseen attributes — if it is NOT visible in the asset, DO NOT include it.
-MUST-10. Never prioritize a keyword merely because it sounds popular — relevance to actual visual content ALWAYS beats search volume.
+  let keywordRulePromptText = `TOP BUYER-INTENT KEYWORD RULES (PRIORITY OVER ALL OTHER RULES):
+CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue search apa?"
+- 10 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
+- SEO microstock itu:
+  * Akurasi > Jumlah keyword
+  * Relevansi > Keyword viral
+  * Buyer intent > Kata keren
+  * Urutan keyword sangat penting (10 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
+  * Keyword harus LITERAL dari apa yang ada di aset, bukan imajinasi/halusinasi AI.
+- Jangan over-niche (nanti gak muncul di pencarian).
+- DILARANG SUFFIX / STEM DUPLICATION (Algoritma Microstock Indexing):
+  * Dilarang mengulang kata yang sama dengan tambahan akhiran seperti -ing, -er, -ed, -s, -es, -ment, -tion (misal: JANGAN masukkan 'paint' DAN 'painter' DAN 'painting', atau 'run' DAN 'runner' DAN 'running').
+  * Mesin pencari stok otomatis melakukan stemming pada satu akar kata. Pengulangan sufiks hanya membuang kuota keyword dan terdeteksi sebagai spam.
+  * Hanya gunakan kata yang berbeda, mandiri, bermakna unik, dan natural.
+- Jangan terlalu generic (tenggelam di antara jutaan aset lain).
+- Keyword mempermudah buyer menemukan aset di halaman pertama Microstock.
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
+1. SLOT 1–10: OBJEK UTAMA PALING RELEVAN (Core Subject Nouns)
+   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop').
+   - Kata benda konkret dan objek utama yang paling pertama kali diketik buyer di kolom search.
+2. SLOT 11–20: DETAIL VISUAL & AKTIVITAS (Visual Details & Actions)
+   - Detail fisik nyata yang terlihat: warna, tekstur, material, bentuk, dan pencahayaan.
+   - Aksi dan aktivitas yang sedang dilakukan subjek secara nyata (e.g., 'working', 'cooking', 'running', 'smiling').
+3. SLOT 21–30+: KONSEP & SEARCH INTENT (Concepts, Industry & Commercial Use Cases)
+   - Konsep komersial, tema emosi, dan suasana (e.g., 'success', 'growth', 'wellness', 'sustainable').
+   - Target industri & use-case (e.g., 'marketing', 'fintech', 'landing page', 'banner', 'presentation', 'copy space').
+
+1. RISET KEYWORD (Microstock Search Researcher):
    - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
-   - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
+   - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
+2. SEO BOOST (Microstock SEO Expert):
    - ${directives.seoBoostRule}
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+   - Optimalkan keterlihatan halaman pertama di Adobe Stock dan Shutterstock.
+3. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
+4. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY (e.g., avoid listing both 'tree' and 'trees').
+5. CROSS-SEARCH DISCOVERABILITY (Search Intent):
+   - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone).
+7. Every keyword must be strictly in lowercase, clean without punctuation.
+8. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
+10. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
@@ -2427,7 +2376,6 @@ MUST-8. Avoid duplicates and near-duplicates.
 MUST-9. Never invent unseen attributes.
 MUST-10. Never prioritize popularity over relevance.
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map single-word synonyms, technical terms, and semantic variations.
@@ -2478,7 +2426,6 @@ MUST-8. Avoid duplicates and near-duplicates.
 MUST-9. Never invent unseen attributes.
 MUST-10. Never prioritize popularity over relevance.
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
@@ -2736,13 +2683,24 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SPECIAL ASSET TYPES (FLATLAY & GREEN SCREEN): If the visual facts indicate a "Flatlay" (top-down view) or "Green Screen" (chroma key background), you MUST include "Flatlay" or "Green Screen" (and their variations like "Top-down view", "Chroma Key") prominently in BOTH the Title and Keywords.
 
 Rules for Titles:
-1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
-2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
+   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
+   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
+   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
+   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
+2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
+   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
+   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
+   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
+3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
+   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
+   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
+4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
-3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-4. Use clear, formal, natural human language — the way a professional stock curator would write a real catalog title. It must read as a genuine, grammatically correct phrase a buyer instantly understands, NOT a stitched-together list of keywords. Avoid casual slang, awkward literal translations, or robotic phrasing.
-5. DO NOT treat the title like a list of keywords. No commas separating words. The title must be understandable to a human buyer at a glance, exactly as a formal product/catalog title would read.
-6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
+5. FORMAT & KEPATUHAN:
+   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
+   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
+   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -2905,22 +2863,24 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear, formal, natural human language — write like a professional stock catalog editor, not a keyword generator. The title must read as a real, grammatically correct phrase that a buyer instantly understands.
-- Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
-- Include important commercial keywords naturally.
-- Do not use keyword stuffing.
-- NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
-- Do not use brand names, trademarks, company names, or copyrighted terms.
-- Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
-- SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
-  ${directives.titleRule}
-- Do not use articles unless necessary (a, an, the).
-- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
-- Use sentence case.
-- Output only one title.
-- Do not include explanations, labels, quotation marks, or numbering.
+1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
+   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
+   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
+   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
+   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
+2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
+   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
+   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
+   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
+3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
+   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
+   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
+4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+   ${directives.titleRule}
+5. FORMAT & KEPATUHAN:
+   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
+   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
+   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -3039,96 +2999,14 @@ OUTPUT FORMAT:
     const tieredVisual = buildTieredVisualAnalysis(visualFacts);
     const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
 
-    // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
-    if (!data.keywords || !Array.isArray(data.keywords)) {
-      data.keywords = [];
-    }
-      let cleanedKeywords: string[] = [];
-      
-      data.keywords.forEach((k: any) => {
-        if (typeof k === 'string') {
-          const cleanPhrase = k.toLowerCase()
-                               .trim()
-                               .replace(/[^a-z0-9\s-]/g, '')
-                               .replace(/\s+/g, ' ');
-          if (cleanPhrase.length > 1) {
-            if (keywordMode === 'single') {
-              // Split any phrase into individual single words
-              const pieces = cleanPhrase.split(/\s+/);
-              pieces.forEach(word => {
-                if (word.length > 1 && !isProhibitedKeyword(word)) {
-                  cleanedKeywords.push(word);
-                }
-              });
-            } else {
-              if (!isProhibitedKeyword(cleanPhrase)) {
-                cleanedKeywords.push(cleanPhrase);
-              }
-            }
-          }
-        }
-      });
-      
-      const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-      
-      const allowedTerms = [
-        ...(Array.isArray(visualFacts.primary_subjects) ? visualFacts.primary_subjects : []).map((x: any) => x?.name || ""),
-        ...(Array.isArray(visualFacts.secondary_subjects) ? visualFacts.secondary_subjects : []).map((x: any) => x?.name || ""),
-        ...(Array.isArray(visualFacts.actions) ? visualFacts.actions : []),
-        ...(Array.isArray(visualFacts.colors) ? visualFacts.colors : [])
-      ].join(" ").toLowerCase();
-
-      // Rule 5: Tambahkan Keyword Validator (Hanya lolos jika keyword memiliki kecocokan kata)
-      const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) => {
-        if (!allowedTerms || allowedTerms.length < 5) return true;
-        const words = keyword.split(/\s+/);
-        const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-        return hasMatchingWord && !isProhibitedKeyword(keyword);
-      });
-
-       // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
-      const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-      let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-
-      // [LAPISAN 5] Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
-      // (superlatif tak terverifikasi, klaim medis, konten eksplisit, spam CTA, kalimat penuh, brand/IP)
-      finalKeywordList = filterBannedKeywords(finalKeywordList);
-
-      // [LAPISAN 6] Deduplikasi semantik: menghapus frasa yang secara makna identik
-      // walau berbeda bentuk kata/urutan (bukan hanya deduplikasi string yang persis sama)
-      finalKeywordList = semanticDeduplicate(finalKeywordList);
-
-      // [LAPISAN 4] Ekspansi sinonim & long-tail keyword jika masih kurang dari target,
-      // sebelum fallback generik dari ensureKeywordCount, agar kualitas relevansi tetap tinggi
-      if (finalKeywordList.length < targetCount) {
-        const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
-        finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
-      }
-
-      data.keywords = ensureKeywordCount(
-        finalKeywordList,
-        targetCount,
-        visualFacts,
-        data.title,
-        data.description,
-        data.category_id,
-        keywordMode
-      );
-
-      // Final safety pass: re-filter/re-dedupe after ensureKeywordCount's fallback padding,
-      // then re-slice to keep the exact target count intact.
-      let safeKw1 = semanticDeduplicate(filterBannedKeywords(data.keywords));
-      data.keywords = safeKw1;
-
-      // [ENFORCEMENT KEYWORD MODE] Pastikan keyword akhir 100% konsisten dengan pilihan
-      // user (single = murni satu kata, multi = murni dua+ kata) — tidak ada campuran
-      // kecuali mode 'mixed' yang memang mengizinkannya.
-      data.keywords = enforceStrictKeywordMode(data.keywords, keywordMode, targetCount, visualFacts);
-
-      // [LAPISAN 3] Sistem pembobotan keyword: SEO score, visual score, commercial score, trend score.
-      // Reorder di dalam tiap kuintil struktural (subject → technical → context → commercial → emotional)
-      // supaya urutan SEO tetap terjaga sambil keyword paling relevan/bernilai naik ke atas kuintilnya.
-      data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual, targetCount);
+        // 1. Pemrosesan Keyword via 7-Stage Pipeline (OBJECT -> PRIMARY KW -> SYNONYM -> RELEVANCE -> DEDUP -> SEO RANK -> FINAL)
+    data.keywords = processKeywordsWith7StagePipeline(
+      Array.isArray(data.keywords) ? data.keywords : [],
+      targetCount,
+      visualFacts,
+      toolType,
+      keywordMode
+    );
 
     // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
     // illustration/vector/video) sebagai fallback bila judul dari AI kosong/generik/placeholder.
@@ -3228,46 +3106,52 @@ export const generateBatchStockMetadata = async (
   const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
   const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
-   - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
-   - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
+  let keywordRulePromptText = `TOP BUYER-INTENT KEYWORD RULES (PRIORITY OVER ALL OTHER RULES):
+CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue search apa?"
+- 10 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
+- SEO microstock itu:
+  * Akurasi > Jumlah keyword
+  * Relevansi > Keyword viral
+  * Buyer intent > Kata keren
+  * Urutan keyword sangat penting (10 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
+  * Keyword harus LITERAL dari apa yang ada di aset, bukan imajinasi/halusinasi AI.
+- Jangan over-niche (nanti gak muncul di pencarian).
+- DILARANG SUFFIX / STEM DUPLICATION (Algoritma Microstock Indexing):
+  * Dilarang mengulang kata yang sama dengan tambahan akhiran seperti -ing, -er, -ed, -s, -es, -ment, -tion (misal: JANGAN masukkan 'paint' DAN 'painter' DAN 'painting', atau 'run' DAN 'runner' DAN 'running').
+  * Mesin pencari stok otomatis melakukan stemming pada satu akar kata. Pengulangan sufiks hanya membuang kuota keyword dan terdeteksi sebagai spam.
+  * Hanya gunakan kata yang berbeda, mandiri, bermakna unik, dan natural.
+- Jangan terlalu generic (tenggelam di antara jutaan aset lain).
+- Keyword mempermudah buyer menemukan aset di halaman pertama Microstock.
 
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
+STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
+1. SLOT 1–10: OBJEK UTAMA PALING RELEVAN (Core Subject Nouns)
+   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop').
+   - Kata benda konkret dan objek utama yang paling pertama kali diketik buyer di kolom search.
+2. SLOT 11–20: DETAIL VISUAL & AKTIVITAS (Visual Details & Actions)
+   - Detail fisik nyata yang terlihat: warna, tekstur, material, bentuk, dan pencahayaan.
+   - Aksi dan aktivitas yang sedang dilakukan subjek secara nyata (e.g., 'working', 'cooking', 'running', 'smiling').
+3. SLOT 21–30+: KONSEP & SEARCH INTENT (Concepts, Industry & Commercial Use Cases)
+   - Konsep komersial, tema emosi, dan suasana (e.g., 'success', 'growth', 'wellness', 'sustainable').
+   - Target industri & use-case (e.g., 'marketing', 'fintech', 'landing page', 'banner', 'presentation', 'copy space').
 
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+1. RISET KEYWORD (Microstock Search Researcher):
+   - ${directives.risetKeywordRule}
+   - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
+2. SEO BOOST (Microstock SEO Expert):
+   - ${directives.seoBoostRule}
+   - Optimalkan keterlihatan halaman pertama di Adobe Stock dan Shutterstock.
+3. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
+4. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY (e.g., avoid listing both 'tree' and 'trees').
+5. CROSS-SEARCH DISCOVERABILITY (Search Intent):
+   - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone).
+7. Every keyword must be strictly in lowercase, clean without punctuation.
+8. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
+9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
+10. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+    keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
    - Map single-word synonyms, technical terms, and semantic variations.
    - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
@@ -3302,8 +3186,7 @@ export const generateBatchStockMetadata = async (
 
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+    keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
    - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
    - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
@@ -3541,13 +3424,24 @@ MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
-1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
-2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
+   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
+   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
+   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
+   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
+2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
+   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
+   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
+   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
+3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
+   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
+   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
+4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
-3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-4. Use clear, formal, natural human language — the way a professional stock curator would write a real catalog title. It must read as a genuine, grammatically correct phrase a buyer instantly understands, NOT a stitched-together list of keywords. Avoid casual slang, awkward literal translations, or robotic phrasing.
-5. DO NOT treat the title like a list of keywords. No commas separating words. The title must be understandable to a human buyer at a glance, exactly as a formal product/catalog title would read.
-6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
+5. FORMAT & KEPATUHAN:
+   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
+   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
+   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -3719,22 +3613,24 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-- Use clear, formal, natural human language — write like a professional stock catalog editor, not a keyword generator. The title must read as a real, grammatically correct phrase that a buyer instantly understands.
-- Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
-- Include important commercial keywords naturally.
-- Do not use keyword stuffing.
-- NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
-- Do not use brand names, trademarks, company names, or copyrighted terms.
-- Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
-- SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
-  ${directives.titleRule}
-- Do not use articles unless necessary (a, an, the).
-- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
-- Use sentence case.
-- Output only one title.
-- Do not include explanations, labels, quotation marks, or numbering.
+1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
+   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
+   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
+   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
+   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
+2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
+   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
+   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
+   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
+3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
+   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
+   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
+4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+   ${directives.titleRule}
+5. FORMAT & KEPATUHAN:
+   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
+   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
+   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -3897,86 +3793,14 @@ OUTPUT FORMAT:
         const assetSubtype = detectAssetSubtype(toolType, assetVisualFacts, customPrompt);
 
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
-        if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
-            metadata.keywords = [];
-        }
-            let cleanedKeywords: string[] = [];
-            metadata.keywords.forEach((k: any) => {
-                if (typeof k === 'string') {
-                    const cleanPhrase = k.toLowerCase()
-                                         .trim()
-                                         .replace(/[^a-z0-9\s-]/g, '')
-                                         .replace(/\s+/g, ' ');
-                    if (cleanPhrase.length > 1) {
-                        if (keywordMode === 'single') {
-                            // Split any phrase into individual single words
-                            const pieces = cleanPhrase.split(/\s+/);
-                            pieces.forEach(word => {
-                                if (word.length > 1 && !isProhibitedKeyword(word)) {
-                                    cleanedKeywords.push(word);
-                                }
-                            });
-                        } else {
-                            if (!isProhibitedKeyword(cleanPhrase)) {
-                                cleanedKeywords.push(cleanPhrase);
-                            }
-                        }
-                    }
-                }
-            });
-            const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-            
-            const allowedTerms = [
-              ...(Array.isArray(assetVisualFacts.primary_subjects) ? assetVisualFacts.primary_subjects : []).map((x: any) => x?.name || ""),
-              ...(Array.isArray(assetVisualFacts.secondary_subjects) ? assetVisualFacts.secondary_subjects : []).map((x: any) => x?.name || ""),
-              ...(Array.isArray(assetVisualFacts.actions) ? assetVisualFacts.actions : []),
-              ...(Array.isArray(assetVisualFacts.colors) ? assetVisualFacts.colors : [])
-            ].join(" ").toLowerCase();
-
-            // Rule 5: Tambahkan Keyword Validator (Hanya lolos jika keyword memiliki kecocokan kata)
-            const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) => {
-              if (!allowedTerms || allowedTerms.length < 5) return true;
-              const words = keyword.split(/\s+/);
-              const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-              return hasMatchingWord && !isProhibitedKeyword(keyword);
-            });
-
-            const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-            let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-
-            // [LAPISAN 5] Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
-            finalKeywordList = filterBannedKeywords(finalKeywordList);
-
-            // [LAPISAN 6] Deduplikasi semantik (bukan hanya teks sama)
-            finalKeywordList = semanticDeduplicate(finalKeywordList);
-
-            // [LAPISAN 4] Ekspansi sinonim & long-tail keyword bila masih kurang dari target
-            if (finalKeywordList.length < targetCount) {
-              const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
-              finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
-            }
-
-            metadata.keywords = ensureKeywordCount(
-              finalKeywordList,
+        // 1. Pemrosesan Keyword Batch via 7-Stage Pipeline
+            metadata.keywords = processKeywordsWith7StagePipeline(
+              Array.isArray(metadata.keywords) ? metadata.keywords : [],
               targetCount,
               assetVisualFacts,
-              metadata.title,
-              metadata.description,
-              metadata.category_id,
+              toolType,
               keywordMode
             );
-
-            // Final safety pass setelah fallback padding dari ensureKeywordCount
-            let safeKw2 = semanticDeduplicate(filterBannedKeywords(metadata.keywords));
-            metadata.keywords = safeKw2;
-
-            // [ENFORCEMENT KEYWORD MODE] Pastikan keyword akhir 100% konsisten dengan
-            // pilihan user (single = murni satu kata, multi = murni dua+ kata) — tidak ada
-            // campuran kecuali mode 'mixed' yang memang mengizinkannya.
-            metadata.keywords = enforceStrictKeywordMode(metadata.keywords, keywordMode, targetCount, assetVisualFacts);
-
-            // [LAPISAN 3] Sistem pembobotan keyword: reorder di dalam tiap kuintil struktural
-            metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, targetCount);
 
         // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
         let candidateTitle = String(metadata.title || "").trim();
@@ -4200,7 +4024,6 @@ export const generateOptimizedPrompt = async (options: {
     "Glassmorphism": ' - Focus on frosted glass effects, translucent layers, blurred background refraction, and sleek glossy reflections.',
     "Metal Emboss": ' - Focus on metallic surfaces, raised 3D textures, engraved details, and realistic metal reflections like silver, gold, or steel.',
         "Line Art": ' - Focus on clean, minimalist continuous single-line art, smooth elegant curves, and pure black-and-white ink strokes on a solid white background (or white line on black). Absolutely NO shading, NO colors, NO gradients, NO 3D rendering, and NO textures. CRITICAL: Maintain a pure, clean minimalist aesthetic. Do NOT mix with sketches, pencil coretan, hand-drawn sketch hatching, polygon structures, geometric low-poly/triangulated facets, or any other artistic style. Every path must be a continuous, single, perfectly smooth line with zero clutter.',
-    "Silhouette": ' - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.',
     "Silhouette": ' - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.',
     "Lowpoly": ' - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.',
     "3D CGI": ' - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.',
