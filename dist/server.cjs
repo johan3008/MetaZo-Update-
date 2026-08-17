@@ -2593,6 +2593,13 @@ function extractJSON(raw) {
   }
   return "{}";
 }
+function sanitizeForIndexing(kw) {
+  if (!kw) return "";
+  let clean = String(kw).toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ").trim();
+  const stopWords = /* @__PURE__ */ new Set(["a", "an", "the", "at", "in", "on", "of", "to", "by", "is", "it", "or", "and", "as", "for", "with"]);
+  const words = clean.split(" ").filter((w) => w.length >= 2 && !stopWords.has(w));
+  return words.join(" ");
+}
 var PROHIBITED_KEYWORDS_SET = /* @__PURE__ */ new Set([
   "apple",
   "iphone",

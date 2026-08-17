@@ -243,6 +243,27 @@ function extractJSON(raw: string): string {
 }
 
 
+/**
+ * Sanitasi mendalam khusus untuk memastikan kata kunci 100% ramah indeksasi (Indexable)
+ * pada algoritma mesin pencari microstock (Adobe Stock, Shutterstock, Freepik, Getty).
+ */
+function sanitizeForIndexing(kw: string): string {
+  if (!kw) return '';
+  let clean = String(kw)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
+    .replace(/\s+/g, ' ')          // Normalisasi spasi
+    .trim();
+
+  // Filter stop-words/noise tunggal yang mengganggu indeksasi
+  const stopWords = new Set(['a', 'an', 'the', 'at', 'in', 'on', 'of', 'to', 'by', 'is', 'it', 'or', 'and', 'as', 'for', 'with']);
+  const words = clean.split(' ').filter(w => w.length >= 2 && !stopWords.has(w));
+  
+  return words.join(' ');
+}
+
+
 const COLOR_KEYWORDS = new Set([
   'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'brown', 'black', 'white', 'gray', 'grey', 'gold', 'silver', 'bronze', 
   'violet', 'indigo', 'cyan', 'magenta', 'teal', 'navy', 'beige', 'charcoal', 'cream', 'peach', 'lavender', 'turquoise', 'emerald', 'ruby', 
