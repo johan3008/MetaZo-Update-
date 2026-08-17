@@ -52,7 +52,6 @@ var import_crypto = __toESM(require("crypto"), 1);
 var import_pakasir_client = require("pakasir-client");
 
 // server/gemini.ts
-var import_jsonrepair = require("jsonrepair");
 var import_genai = require("@google/genai");
 var import_node_async_hooks = require("node:async_hooks");
 
@@ -2523,50 +2522,50 @@ var PROVIDER_ENV_KEYS = {
 var NON_GEMINI_PROVIDERS = /* @__PURE__ */ new Set(["groq", "mistral", "openai", "openrouter", "blackbox", "nvidia", "bluesminds", "aivene", "zai"]);
 function extractJSON(raw) {
   if (!raw) return "{}";
+  let str = String(raw).trim();
   try {
-    const trimmed = raw.trim();
-    JSON.parse(trimmed);
-    return trimmed;
+    JSON.parse(str);
+    return str;
   } catch (e) {
   }
-  let cleaned = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+  str = str.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
   try {
-    const repaired = (0, import_jsonrepair.jsonrepair)(cleaned);
+    JSON.parse(str);
+    return str;
+  } catch (e) {
+  }
+  const firstBrace = str.indexOf("{");
+  const lastBrace = str.lastIndexOf("}");
+  const firstBracket = str.indexOf("[");
+  const lastBracket = str.lastIndexOf("]");
+  let candidate = str;
+  if (firstBrace !== -1 && lastBrace > firstBrace && (firstBracket === -1 || firstBrace < firstBracket)) {
+    candidate = str.slice(firstBrace, lastBrace + 1);
+  } else if (firstBracket !== -1 && lastBracket > firstBracket) {
+    candidate = str.slice(firstBracket, lastBracket + 1);
+  }
+  let repaired = candidate.replace(/,\s*([\}\]])/g, "$1").replace(/([{,]\s*)'([^']+)'(\s*:)/g, '$1"$2"$3').replace(/:\s*'([^']*)'/g, ': "$1"');
+  try {
     JSON.parse(repaired);
     return repaired;
   } catch (e) {
   }
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const slice = cleaned.slice(firstBrace, lastBrace + 1);
-    try {
-      const repairedSlice = (0, import_jsonrepair.jsonrepair)(slice);
-      JSON.parse(repairedSlice);
-      return repairedSlice;
-    } catch (e) {
-      try {
-        JSON.parse(slice);
-        return slice;
-      } catch (e2) {
-      }
+  try {
+    let unclosed = repaired;
+    const openBraces = (unclosed.match(/\{/g) || []).length;
+    const closeBraces = (unclosed.match(/\}/g) || []).length;
+    const openBrackets = (unclosed.match(/\[/g) || []).length;
+    const closeBrackets = (unclosed.match(/\]/g) || []).length;
+    if (openBrackets > closeBrackets) {
+      unclosed += "]".repeat(openBrackets - closeBrackets);
     }
-  }
-  const firstBracket = cleaned.indexOf("[");
-  const lastBracket = cleaned.lastIndexOf("]");
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    const slice = cleaned.slice(firstBracket, lastBracket + 1);
-    try {
-      const repairedSlice = (0, import_jsonrepair.jsonrepair)(slice);
-      JSON.parse(repairedSlice);
-      return repairedSlice;
-    } catch (e) {
-      try {
-        JSON.parse(slice);
-        return slice;
-      } catch (e2) {
-      }
+    if (openBraces > closeBraces) {
+      unclosed += "}".repeat(openBraces - closeBraces);
     }
+    unclosed = unclosed.replace(/,\s*([\}\]])/g, "$1");
+    JSON.parse(unclosed);
+    return unclosed;
+  } catch (e) {
   }
   try {
     const titleMatch = raw.match(/"title"\s*:\s*"([^"]+)"/i);
@@ -2587,7 +2586,7 @@ function extractJSON(raw) {
         category_id: catMatch ? parseInt(catMatch[1], 10) : 0,
         shutterstock_category_1: scut1Match ? scut1Match[1] : "",
         shutterstock_category_2: scut2Match ? scut2Match[1] : "",
-        category_reason: "Extracted via failsafe parser"
+        category_reason: "Extracted via failsafe regex parser"
       });
     }
   } catch (e) {

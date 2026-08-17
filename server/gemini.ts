@@ -1,4 +1,3 @@
-import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
@@ -145,61 +144,75 @@ const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter',
  * - Memperbaiki JSON rusak/malformed via jsonrepair
  * - Fallback regex ekstraksi field jika JSON benar-benar corrupt
  */
+/**
+ * Ekstrak & perbaiki JSON mandiri (Zero-Dependency) yang sangat tahan banting:
+ * - Menangani markdown code blocks (```json ... ```)
+ * - Memperbaiki trailing commas, single quotes, kurung unclosed
+ * - Failsafe regex parser jika respons model terpotong/rusak
+ */
 function extractJSON(raw: string): string {
   if (!raw) return "{}";
 
-  // 1. Coba parse langsung jika sudah valid
+  let str = String(raw).trim();
+
+  // 1. Coba parse langsung
   try {
-    const trimmed = raw.trim();
-    JSON.parse(trimmed);
-    return trimmed;
+    JSON.parse(str);
+    return str;
   } catch (e) {}
 
   // 2. Bersihkan markdown fences
-  let cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  str = str.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
 
-  // 3. Coba perbaiki dengan jsonrepair
   try {
-    const repaired = jsonrepair(cleaned);
+    JSON.parse(str);
+    return str;
+  } catch (e) {}
+
+  // 3. Cari batas objek {} atau array [] terluar
+  const firstBrace = str.indexOf('{');
+  const lastBrace = str.lastIndexOf('}');
+  const firstBracket = str.indexOf('[');
+  const lastBracket = str.lastIndexOf(']');
+
+  let candidate = str;
+  if (firstBrace !== -1 && lastBrace > firstBrace && (firstBracket === -1 || firstBrace < firstBracket)) {
+    candidate = str.slice(firstBrace, lastBrace + 1);
+  } else if (firstBracket !== -1 && lastBracket > firstBracket) {
+    candidate = str.slice(firstBracket, lastBracket + 1);
+  }
+
+  // 4. Perbaikan umum sintaks JSON (trailing comma, single quotes)
+  let repaired = candidate
+    .replace(/,\s*([\}\]])/g, '$1') // Hapus trailing comma
+    .replace(/([{,]\s*)'([^']+)'(\s*:)/g, '$1"$2"$3') // Single quote key -> double quote
+    .replace(/:\s*'([^']*)'/g, ': "$1"'); // Single quote string value -> double quote
+
+  try {
     JSON.parse(repaired);
     return repaired;
   } catch (e) {}
 
-  // 4. Cari blok kurung kurawal pertama & terakhir
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const slice = cleaned.slice(firstBrace, lastBrace + 1);
-    try {
-      const repairedSlice = jsonrepair(slice);
-      JSON.parse(repairedSlice);
-      return repairedSlice;
-    } catch (e) {
-      try {
-        JSON.parse(slice);
-        return slice;
-      } catch (e2) {}
-    }
-  }
+  // 5. Coba perbaiki kurung yang belum tertutup (unclosed brackets/braces)
+  try {
+    let unclosed = repaired;
+    const openBraces = (unclosed.match(/\{/g) || []).length;
+    const closeBraces = (unclosed.match(/\}/g) || []).length;
+    const openBrackets = (unclosed.match(/\[/g) || []).length;
+    const closeBrackets = (unclosed.match(/\]/g) || []).length;
 
-  // 5. Cari blok kurung siku array
-  const firstBracket = cleaned.indexOf('[');
-  const lastBracket = cleaned.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    const slice = cleaned.slice(firstBracket, lastBracket + 1);
-    try {
-      const repairedSlice = jsonrepair(slice);
-      JSON.parse(repairedSlice);
-      return repairedSlice;
-    } catch (e) {
-      try {
-        JSON.parse(slice);
-        return slice;
-      } catch (e2) {}
+    if (openBrackets > closeBrackets) {
+      unclosed += ']'.repeat(openBrackets - closeBrackets);
     }
-  }
+    if (openBraces > closeBraces) {
+      unclosed += '}'.repeat(openBraces - closeBraces);
+    }
+    unclosed = unclosed.replace(/,\s*([\}\]])/g, '$1');
+    JSON.parse(unclosed);
+    return unclosed;
+  } catch (e) {}
 
-  // 6. Failsafe Regex Parser: Ekstrak key-value manual jika model mengeluarkan format non-standar
+  // 6. Failsafe Regex Parser: Ekstrak field metadata secara langsung dari teks
   try {
     const titleMatch = raw.match(/"title"\s*:\s*"([^"]+)"/i);
     const descMatch = raw.match(/"description"\s*:\s*"([^"]+)"/i);
@@ -221,7 +234,7 @@ function extractJSON(raw: string): string {
         category_id: catMatch ? parseInt(catMatch[1], 10) : 0,
         shutterstock_category_1: scut1Match ? scut1Match[1] : '',
         shutterstock_category_2: scut2Match ? scut2Match[1] : '',
-        category_reason: 'Extracted via failsafe parser'
+        category_reason: 'Extracted via failsafe regex parser'
       });
     }
   } catch (e) {}
