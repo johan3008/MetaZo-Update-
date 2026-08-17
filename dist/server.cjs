@@ -5170,19 +5170,19 @@ OUTPUT FORMAT:
     const promptText = toolType === "video" /* VIDEO */ ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
     let itemVisionInstruction = visionSystemInstruction;
     let itemExifDesc = "";
-    if (item.exifMetadata && Object.keys(item.exifMetadata).length > 0) {
+    if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
       const exifInstruction = `
 
 [DATA EXIFTOOL - REFERENSI TEKNIS]
 Berikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:
 \`\`\`json
-${JSON.stringify(item.exifMetadata, null, 2)}
+${JSON.stringify(items[i].exifMetadata, null, 2)}
 \`\`\`
 Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
       itemVisionInstruction += exifInstruction;
       itemExifDesc = `
 ASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:
-${JSON.stringify(item.exifMetadata, null, 2)}`;
+${JSON.stringify(items[i].exifMetadata, null, 2)}`;
     }
     try {
       const visionResponse = await callGeminiWithRetry(visionModelToUse, {

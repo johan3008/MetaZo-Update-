@@ -3439,10 +3439,10 @@ OUTPUT FORMAT:
 
       let itemVisionInstruction = visionSystemInstruction;
       let itemExifDesc = "";
-      if (item.exifMetadata && Object.keys(item.exifMetadata).length > 0) {
-        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(item.exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+      if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
+        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(items[i].exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
         itemVisionInstruction += exifInstruction;
-        itemExifDesc = `\nASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:\n${JSON.stringify(item.exifMetadata, null, 2)}`;
+        itemExifDesc = `\nASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:\n${JSON.stringify(items[i].exifMetadata, null, 2)}`;
       }
 
       try {
