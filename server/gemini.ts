@@ -1,3 +1,4 @@
+import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
@@ -138,48 +139,96 @@ const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter',
  * - teks pengantar/penutup di luar JSON
  * - whitespace ekstra
  */
+/**
+ * Ekstrak JSON yang valid dan tahan banting dari respons AI:
+ * - Menangani markdown code fences (```json ... ```)
+ * - Memperbaiki JSON rusak/malformed via jsonrepair
+ * - Fallback regex ekstraksi field jika JSON benar-benar corrupt
+ */
 function extractJSON(raw: string): string {
   if (!raw) return "{}";
-  
-  // Try direct parse first
+
+  // 1. Coba parse langsung jika sudah valid
   try {
     const trimmed = raw.trim();
     JSON.parse(trimmed);
     return trimmed;
   } catch (e) {}
 
+  // 2. Bersihkan markdown fences
   let cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
 
-  // Robust extraction: find the first { or [ and the last matching } or ]
-  // If it fails to parse, try to find the next { or [
-  const tryExtract = (opener: string, closer: string): string | null => {
-    let startIdx = 0;
-    while ((startIdx = cleaned.indexOf(opener, startIdx)) !== -1) {
-      let endIdx = cleaned.lastIndexOf(closer);
-      while (endIdx > startIdx) {
-        const potential = cleaned.slice(startIdx, endIdx + 1);
-        try {
-          JSON.parse(potential);
-          return potential;
-        } catch (e) {
-          // Try a smaller window from the end
-          endIdx = cleaned.lastIndexOf(closer, endIdx - 1);
-        }
-      }
-      startIdx++;
+  // 3. Coba perbaiki dengan jsonrepair
+  try {
+    const repaired = jsonrepair(cleaned);
+    JSON.parse(repaired);
+    return repaired;
+  } catch (e) {}
+
+  // 4. Cari blok kurung kurawal pertama & terakhir
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const slice = cleaned.slice(firstBrace, lastBrace + 1);
+    try {
+      const repairedSlice = jsonrepair(slice);
+      JSON.parse(repairedSlice);
+      return repairedSlice;
+    } catch (e) {
+      try {
+        JSON.parse(slice);
+        return slice;
+      } catch (e2) {}
     }
-    return null;
-  };
+  }
 
-  // Prioritize objects {} as they are more common in our pipeline
-  const objectMatch = tryExtract('{', '}');
-  if (objectMatch) return objectMatch;
+  // 5. Cari blok kurung siku array
+  const firstBracket = cleaned.indexOf('[');
+  const lastBracket = cleaned.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    const slice = cleaned.slice(firstBracket, lastBracket + 1);
+    try {
+      const repairedSlice = jsonrepair(slice);
+      JSON.parse(repairedSlice);
+      return repairedSlice;
+    } catch (e) {
+      try {
+        JSON.parse(slice);
+        return slice;
+      } catch (e2) {}
+    }
+  }
 
-  const arrayMatch = tryExtract('[', ']');
-  if (arrayMatch) return arrayMatch;
+  // 6. Failsafe Regex Parser: Ekstrak key-value manual jika model mengeluarkan format non-standar
+  try {
+    const titleMatch = raw.match(/"title"\s*:\s*"([^"]+)"/i);
+    const descMatch = raw.match(/"description"\s*:\s*"([^"]+)"/i);
+    const kwMatch = raw.match(/"keywords"\s*:\s*\[([^\]]+)\]/i);
+    const catMatch = raw.match(/"category_id"\s*:\s*(\d+)/i);
+    const scut1Match = raw.match(/"shutterstock_category_1"\s*:\s*"([^"]+)"/i);
+    const scut2Match = raw.match(/"shutterstock_category_2"\s*:\s*"([^"]+)"/i);
+
+    let kws: string[] = [];
+    if (kwMatch && kwMatch[1]) {
+      kws = kwMatch[1].split(',').map(s => s.replace(/["'\[\]]/g, '').trim()).filter(Boolean);
+    }
+
+    if (titleMatch || descMatch || kws.length > 0) {
+      return JSON.stringify({
+        title: titleMatch ? titleMatch[1] : '',
+        description: descMatch ? descMatch[1] : '',
+        keywords: kws,
+        category_id: catMatch ? parseInt(catMatch[1], 10) : 0,
+        shutterstock_category_1: scut1Match ? scut1Match[1] : '',
+        shutterstock_category_2: scut2Match ? scut2Match[1] : '',
+        category_reason: 'Extracted via failsafe parser'
+      });
+    }
+  } catch (e) {}
 
   return "{}";
 }
+
 
 const COLOR_KEYWORDS = new Set([
   'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'brown', 'black', 'white', 'gray', 'grey', 'gold', 'silver', 'bronze', 
@@ -3067,8 +3116,32 @@ OUTPUT FORMAT:
     
     return data as StockMetadata;
   } catch (error) {
-    console.warn("[JohMeta Parse Error] Failed to handle output format:", error);
-    throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
+    console.warn("[JohMeta Parse Error] Non-fatal parse warning, applying ultra-resilient fallback:", error);
+    
+    // Failsafe generation from visual facts so user never gets blocked by a parse error
+    const tieredVisual = buildTieredVisualAnalysis(visualFacts);
+    const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
+    const fallbackTitle = ensureTitleLength(applyTitleTemplate(assetSubtype, tieredVisual, titleLength), [], "", titleLength);
+    const fallbackKeywords = processKeywordsWith7StagePipeline(
+      [],
+      targetCount,
+      visualFacts,
+      toolType,
+      keywordMode
+    );
+    const fallbackDesc = ensureDescription("", fallbackTitle, fallbackKeywords);
+    const accurateCat = determineAccurateCategory(fallbackTitle, fallbackKeywords, visualFacts, 0);
+    const validShutterCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
+
+    return {
+      title: fallbackTitle,
+      description: fallbackDesc,
+      keywords: fallbackKeywords,
+      category_id: accurateCat.category_id || 1,
+      shutterstock_category_1: accurateCat.shutterstock_category_1 || validShutterCats[0] || "Abstract",
+      shutterstock_category_2: accurateCat.shutterstock_category_2 || validShutterCats[1] || "Backgrounds/Textures",
+      category_reason: accurateCat.reason || "Generated via resilient fallback pipeline."
+    } as StockMetadata;
   }
 };
 

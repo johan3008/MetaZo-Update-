@@ -52,6 +52,7 @@ var import_crypto = __toESM(require("crypto"), 1);
 var import_pakasir_client = require("pakasir-client");
 
 // server/gemini.ts
+var import_jsonrepair = require("jsonrepair");
 var import_genai = require("@google/genai");
 var import_node_async_hooks = require("node:async_hooks");
 
@@ -2529,27 +2530,68 @@ function extractJSON(raw) {
   } catch (e) {
   }
   let cleaned = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
-  const tryExtract = (opener, closer) => {
-    let startIdx = 0;
-    while ((startIdx = cleaned.indexOf(opener, startIdx)) !== -1) {
-      let endIdx = cleaned.lastIndexOf(closer);
-      while (endIdx > startIdx) {
-        const potential = cleaned.slice(startIdx, endIdx + 1);
-        try {
-          JSON.parse(potential);
-          return potential;
-        } catch (e) {
-          endIdx = cleaned.lastIndexOf(closer, endIdx - 1);
-        }
+  try {
+    const repaired = (0, import_jsonrepair.jsonrepair)(cleaned);
+    JSON.parse(repaired);
+    return repaired;
+  } catch (e) {
+  }
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const slice = cleaned.slice(firstBrace, lastBrace + 1);
+    try {
+      const repairedSlice = (0, import_jsonrepair.jsonrepair)(slice);
+      JSON.parse(repairedSlice);
+      return repairedSlice;
+    } catch (e) {
+      try {
+        JSON.parse(slice);
+        return slice;
+      } catch (e2) {
       }
-      startIdx++;
     }
-    return null;
-  };
-  const objectMatch = tryExtract("{", "}");
-  if (objectMatch) return objectMatch;
-  const arrayMatch = tryExtract("[", "]");
-  if (arrayMatch) return arrayMatch;
+  }
+  const firstBracket = cleaned.indexOf("[");
+  const lastBracket = cleaned.lastIndexOf("]");
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    const slice = cleaned.slice(firstBracket, lastBracket + 1);
+    try {
+      const repairedSlice = (0, import_jsonrepair.jsonrepair)(slice);
+      JSON.parse(repairedSlice);
+      return repairedSlice;
+    } catch (e) {
+      try {
+        JSON.parse(slice);
+        return slice;
+      } catch (e2) {
+      }
+    }
+  }
+  try {
+    const titleMatch = raw.match(/"title"\s*:\s*"([^"]+)"/i);
+    const descMatch = raw.match(/"description"\s*:\s*"([^"]+)"/i);
+    const kwMatch = raw.match(/"keywords"\s*:\s*\[([^\]]+)\]/i);
+    const catMatch = raw.match(/"category_id"\s*:\s*(\d+)/i);
+    const scut1Match = raw.match(/"shutterstock_category_1"\s*:\s*"([^"]+)"/i);
+    const scut2Match = raw.match(/"shutterstock_category_2"\s*:\s*"([^"]+)"/i);
+    let kws = [];
+    if (kwMatch && kwMatch[1]) {
+      kws = kwMatch[1].split(",").map((s) => s.replace(/["'\[\]]/g, "").trim()).filter(Boolean);
+    }
+    if (titleMatch || descMatch || kws.length > 0) {
+      return JSON.stringify({
+        title: titleMatch ? titleMatch[1] : "",
+        description: descMatch ? descMatch[1] : "",
+        keywords: kws,
+        category_id: catMatch ? parseInt(catMatch[1], 10) : 0,
+        shutterstock_category_1: scut1Match ? scut1Match[1] : "",
+        shutterstock_category_2: scut2Match ? scut2Match[1] : "",
+        category_reason: "Extracted via failsafe parser"
+      });
+    }
+  } catch (e) {
+  }
   return "{}";
 }
 var PROHIBITED_KEYWORDS_SET = /* @__PURE__ */ new Set([
@@ -4707,8 +4749,29 @@ OUTPUT FORMAT:
     }
     return data;
   } catch (error) {
-    console.warn("[JohMeta Parse Error] Failed to handle output format:", error);
-    throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
+    console.warn("[JohMeta Parse Error] Non-fatal parse warning, applying ultra-resilient fallback:", error);
+    const tieredVisual = buildTieredVisualAnalysis(visualFacts);
+    const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
+    const fallbackTitle = ensureTitleLength(applyTitleTemplate(assetSubtype, tieredVisual, titleLength), [], "", titleLength);
+    const fallbackKeywords = processKeywordsWith7StagePipeline(
+      [],
+      targetCount,
+      visualFacts,
+      toolType,
+      keywordMode
+    );
+    const fallbackDesc = ensureDescription("", fallbackTitle, fallbackKeywords);
+    const accurateCat = determineAccurateCategory(fallbackTitle, fallbackKeywords, visualFacts, 0);
+    const validShutterCats = toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
+    return {
+      title: fallbackTitle,
+      description: fallbackDesc,
+      keywords: fallbackKeywords,
+      category_id: accurateCat.category_id || 1,
+      shutterstock_category_1: accurateCat.shutterstock_category_1 || validShutterCats[0] || "Abstract",
+      shutterstock_category_2: accurateCat.shutterstock_category_2 || validShutterCats[1] || "Backgrounds/Textures",
+      category_reason: accurateCat.reason || "Generated via resilient fallback pipeline."
+    };
   }
 };
 var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", toolType = "image" /* IMAGE */, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance) => {
