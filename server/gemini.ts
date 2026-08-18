@@ -565,12 +565,126 @@ function sanitizeForIndexing(raw: string): string {
     .trim();
 }
 
+/**
+ * SEO SINGLE KEYWORD ENGINE
+ *
+ * Dedicated mode for stock metadata where every keyword is exactly one word and
+ * the first 10 positions are locked to the strongest buyer/search terms.
+ * This is deliberately heuristic: without a live marketplace search-volume API,
+ * "SEO" is estimated from visual grounding, subject priority, commercial intent,
+ * specificity, and semantic diversity. It must never invent unrelated terms.
+ */
+function buildSeoSingleKeywords(
+  candidates: string[],
+  targetCount: number,
+  visualFacts: any,
+  tieredVisual: TieredVisualAnalysis
+): string[] {
+  const normalize = (v: string) => sanitizeForIndexing(v).toLowerCase();
+  const primary = (tieredVisual.objects || [])
+    .filter(o => o.tier === 'primary' || o.importance >= 70)
+    .map(o => normalize(o.name))
+    .filter(Boolean);
+  const objects = (tieredVisual.objects || []).map(o => normalize(o.name)).filter(Boolean);
+  const attrs = (tieredVisual.attributes || []).map(a => normalize(String(a))).filter(Boolean);
+  const scene = (tieredVisual.scene || []).map(v => normalize(String(v))).filter(Boolean);
+  const concepts = (tieredVisual.concepts || []).map(v => normalize(String(v))).filter(Boolean);
+  const actions = Array.isArray(visualFacts?.actions) ? visualFacts.actions.map((v: any) => normalize(String(v))).filter(Boolean) : [];
+  const colors = Array.isArray(visualFacts?.colors) ? visualFacts.colors.map((v: any) => normalize(String(v))).filter(Boolean) : [];
+  const visualTerms = [...new Set([...primary, ...objects, ...attrs, ...scene, ...concepts, ...actions, ...colors])];
+
+  // These are filler terms or grammar words, not useful stock search terms.
+  const BLOCKED = new Set([
+    'with','and','the','a','an','of','for','to','in','on','at','by','from','as','is','are','be',
+    'image','picture','photo','photograph','stock','asset','file','thing','object','item','stuff',
+    'beautiful','stunning','amazing','awesome','nice','good','great','perfect','best','high',
+    'quality','premium','view','scene','background','wallpaper','design','concept','detail','element'
+  ]);
+
+  const COMMERCIAL = new Set([
+    'winter','forest','river','stream','snow','landscape','aurora','wilderness','nature','pine',
+    'night','stars','sky','water','reflection','frozen','icy','neon','glowing','luminous','lighting',
+    'illumination','snowfall','woodland','evergreen','riverbank','scenic','fantasy','mystical',
+    'futuristic','digital','technology','cinematic','magical','tranquil','serene','peaceful','outdoors'
+  ]);
+
+  const normalizeRoot = (word: string) => word
+    .replace(/(ing|ed|er|ers|es|s)$/i, '')
+    .replace(/(.)\1+$/i, '$1');
+
+  const visualMatch = (kw: string, list: string[]) => list.some(v => v === kw || v.includes(kw) || kw.includes(v));
+  const score = (kw: string) => {
+    let total = 0;
+    const lower = kw.toLowerCase();
+    if (primary.some(v => v === lower)) total += 120;
+    else if (visualMatch(lower, objects)) total += 90;
+    else if (visualMatch(lower, scene)) total += 72;
+    else if (visualMatch(lower, attrs)) total += 68;
+    else if (visualMatch(lower, concepts)) total += 58;
+    else if (visualMatch(lower, actions)) total += 55;
+    else if (visualMatch(lower, colors)) total += 40;
+    else total += 18;
+
+    if (COMMERCIAL.has(lower)) total += 28;
+    if (lower.length >= 5 && lower.length <= 14) total += 8;
+    if (lower.length <= 3) total -= 12;
+    if (/^[a-z]+$/.test(lower)) total += 4;
+    if (lower.includes('with')) total -= 100;
+    return total;
+  };
+
+  const pool = new Map<string, number>();
+  for (const raw of candidates || []) {
+    const cleaned = normalize(raw);
+    if (!cleaned || cleaned.length < 3 || cleaned.includes(' ') || BLOCKED.has(cleaned)) continue;
+    if (!/^[a-z0-9]+$/i.test(cleaned)) continue;
+    if (isProhibitedKeyword(cleaned) || violatesMarketplaceGuidelines(cleaned)) continue;
+    pool.set(cleaned, Math.max(pool.get(cleaned) || -Infinity, score(cleaned)));
+  }
+
+  // Add strongly grounded single-word visual facts as candidates, but never pad with generic words.
+  for (const raw of visualTerms) {
+    if (!raw || raw.includes(' ')) continue;
+    const cleaned = normalize(raw);
+    if (!cleaned || cleaned.length < 3 || BLOCKED.has(cleaned)) continue;
+    if (!/^[a-z0-9]+$/i.test(cleaned)) continue;
+    if (isProhibitedKeyword(cleaned) || violatesMarketplaceGuidelines(cleaned)) continue;
+    pool.set(cleaned, Math.max(pool.get(cleaned) || -Infinity, score(cleaned) + 5));
+  }
+
+  const ranked = [...pool.entries()].sort((a,b) => b[1] - a[1]).map(([kw]) => kw);
+
+  // Stem-family deduplication: keep only the strongest member of each root family.
+  const rootSeen = new Set<string>();
+  const deduped: string[] = [];
+  for (const kw of ranked) {
+    const root = normalizeRoot(kw);
+    if (rootSeen.has(root)) continue;
+    rootSeen.add(root);
+    deduped.push(kw);
+  }
+
+  // Explicitly lock the top 10 by SEO score. Primary subject remains first whenever available.
+  const locked = deduped.slice(0, Math.min(10, targetCount));
+  const primaryIndex = primary.findIndex(p => locked.includes(p));
+  if (primaryIndex > 0) {
+    const [main] = locked.splice(primaryIndex, 1);
+    locked.unshift(main);
+  } else if (primary.length > 0 && targetCount > 0 && !locked.includes(primary[0]) && !BLOCKED.has(primary[0]) && !primary[0].includes(' ')) {
+    locked.unshift(primary[0]);
+    locked.splice(Math.min(10, targetCount));
+  }
+
+  const remainder = deduped.filter(k => !locked.includes(k));
+  return [...locked, ...remainder].slice(0, targetCount);
+}
+
 function processKeywordsWith7StagePipeline(
   rawAiKeywords: string[],
   targetCount: number,
   visualFacts: any,
   toolType?: ToolType,
-  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed'
+  keywordMode: 'mixed' | 'single' | 'multi' | 'seo-single' = 'mixed'
 ): string[] {
   // --- TAHAP 1: OBJECT (Visual Detection Extraction) ---
   const tieredVisual = buildTieredVisualAnalysis(visualFacts);
@@ -602,7 +716,7 @@ function processKeywordsWith7StagePipeline(
     if (typeof k === 'string') {
       const sanitized = sanitizeForIndexing(k);
       if (sanitized.length > 1 && !isProhibitedKeyword(sanitized)) {
-        if (keywordMode === 'single' && sanitized.includes(' ')) {
+        if ((keywordMode === 'single' || keywordMode === 'seo-single') && sanitized.includes(' ')) {
           sanitized.split(/\s+/).forEach(part => {
             if (part.length > 1 && !isProhibitedKeyword(part)) candidatePool.push(part);
           });
@@ -619,7 +733,7 @@ function processKeywordsWith7StagePipeline(
     synonyms.forEach(syn => {
       const cleanSyn = sanitizeForIndexing(syn);
       if (cleanSyn.length > 1 && !isProhibitedKeyword(cleanSyn)) {
-        if (keywordMode === 'single' && cleanSyn.includes(' ')) {
+        if ((keywordMode === 'single' || keywordMode === 'seo-single') && cleanSyn.includes(' ')) {
           // split
           cleanSyn.split(/\s+/).forEach(p => { if (p.length > 1) candidatePool.push(p); });
         } else {
@@ -645,6 +759,13 @@ function processKeywordsWith7StagePipeline(
 
   // --- TAHAP 5: DUPLICATE CHECK (Exact & Stem Deduplication — Anti Suffix Spam) ---
   const deduplicatedList = deduplicateStemVariants(relevantCandidates);
+
+  // SEO SINGLE gets its own ranking engine. This deliberately bypasses the legacy
+  // 70/30 common-word split and the legacy color blacklist because this mode is
+  // designed to maximize useful single-word search coverage.
+  if (keywordMode === 'seo-single') {
+    return buildSeoSingleKeywords(relevantCandidates, targetCount, visualFacts, tieredVisual);
+  }
 
   // --- TAHAP 6: SEO RANKING (3-Tier Buyer Intent Hierarchy) ---
   const rankedKeywords = rankAndWeightKeywords(deduplicatedList, tieredVisual, targetCount);
@@ -745,11 +866,11 @@ function applyAgKeywordsSeoCommonSplit(keywords: string[], targetCount: number):
 
 function enforceStrictKeywordMode(
   keywords: string[],
-  keywordMode: 'mixed' | 'single' | 'multi' | undefined,
+  keywordMode: 'mixed' | 'single' | 'multi' | 'seo-single' | undefined,
   targetCount: number,
   visualFacts: any
 ): string[] {
-  if (keywordMode !== 'single' && keywordMode !== 'multi') {
+  if (keywordMode !== 'single' && keywordMode !== 'seo-single' && keywordMode !== 'multi') {
     // Mode 'mixed' (default): tidak ada pemaksaan format, campuran diperbolehkan.
     return keywords.slice(0, targetCount);
   }
@@ -774,7 +895,7 @@ function enforceStrictKeywordMode(
   const processOne = (kwRaw: string) => {
     const clean = sanitizeForIndexing(kwRaw);
     if (!clean || clean.length <= 1 || isProhibitedKeyword(clean)) return;
-    if (keywordMode === 'single') {
+    if ((keywordMode === 'single' || keywordMode === 'seo-single')) {
       clean.split(/\s+/).forEach(p => {
         if (p.length > 1 && !isProhibitedKeyword(p)) addWord(p);
       });
@@ -810,7 +931,7 @@ function ensureKeywordCount(
   title?: string,
   description?: string,
   categoryId?: number,
-  keywordMode?: 'mixed' | 'single' | 'multi'
+  keywordMode?: 'mixed' | 'single' | 'multi' | 'seo-single'
 ): string[] {
   // STRICT RELEVANCE FILTER: Only keep keywords with direct visual connection.
   // Keywords that don't match any detected visual element are discarded.
@@ -829,7 +950,7 @@ function ensureKeywordCount(
       if (typeof k === 'string') {
         const clean = sanitizeForIndexing(k);
         if (clean.length > 1 && !isProhibitedKeyword(clean)) {
-          if (keywordMode === 'single' && clean.includes(' ')) {
+          if ((keywordMode === 'single' || keywordMode === 'seo-single') && clean.includes(' ')) {
             // Split multi-words into individual single words
             const pieces = clean.split(/\s+/);
             pieces.forEach(p => {
@@ -978,7 +1099,7 @@ function ensureKeywordCount(
       const clean = sanitizeForIndexing(rawWord);
       if (clean.length <= 1 || isProhibitedKeyword(clean)) continue;
 
-      if (keywordMode === 'single' && clean.includes(' ')) {
+      if ((keywordMode === 'single' || keywordMode === 'seo-single') && clean.includes(' ')) {
         // Pecah frasa jadi kata tunggal agar konsisten dengan mode 'single'
         const pieces = clean.split(/\s+/);
         for (const p of pieces) {
@@ -2623,7 +2744,7 @@ export const generateStockMetadata = async (
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
   model?: string,
-  keywordMode?: 'mixed' | 'single' | 'multi',
+  keywordMode?: 'mixed' | 'single' | 'multi' | 'seo-single',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
@@ -2727,7 +2848,7 @@ Pola: Subject → Specific Description → Action → Mood → Style → Concept
 9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
 10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
 11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
-  if (keywordMode === 'single') {
+  if ((keywordMode === 'single' || keywordMode === 'seo-single')) {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
@@ -2793,7 +2914,10 @@ MUST-10. Never prioritize popularity over relevance.
     - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
     EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
 
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  } else if (keywordMode === 'multi') {
+12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+    if (keywordMode === 'seo-single') {
+      keywordRulePromptText += `\nSEO SINGLE OVERRIDE: Ignore any 70/30 SEO/common split and do NOT force exactly five subject words. The application will rank the final list itself. The first 10 keywords must be the strongest grounded buyer-facing terms, and every keyword must remain one word only. Never add filler just to reach the requested count.`;
+    }  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
@@ -3508,7 +3632,7 @@ export const generateBatchStockMetadata = async (
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
   model?: string,
-  keywordMode?: 'mixed' | 'single' | 'multi',
+  keywordMode?: 'mixed' | 'single' | 'multi' | 'seo-single',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
@@ -3601,9 +3725,10 @@ Pola: Subject → Specific Description → Action → Mood → Style → Concept
 9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
 10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
 11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
-  if (keywordMode === 'single') {
+  if ((keywordMode === 'single' || keywordMode === 'seo-single')) {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+   - SEO SINGLE MODE PRIORITY: Put the strongest buyer-intent terms first and make the first 10 positions the highest-priority SEO terms.
    - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
    - Map single-word synonyms, technical terms, and semantic variations.
    - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
@@ -3648,7 +3773,10 @@ Pola: Subject → Specific Description → Action → Mood → Style → Concept
     - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
     EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
 
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  } else if (keywordMode === 'multi') {
+12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+    if (keywordMode === 'seo-single') {
+      keywordRulePromptText += `\nSEO SINGLE OVERRIDE: Ignore any 70/30 SEO/common split and do NOT force exactly five subject words. The application will rank the final list itself. The first 10 keywords must be the strongest grounded buyer-facing terms, and every keyword must remain one word only. Never add filler just to reach the requested count.`;
+    }  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
