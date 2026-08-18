@@ -1,7 +1,7 @@
 import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
+import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt, StructuredKeywords } from "../types";
 import { HOLIDAYS_DATA } from "./holidaysData.ts";
 import { EXTRA_HOLIDAYS_DATA } from "./extraHolidaysData.ts";
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, MIRICANVAS_CATEGORIES, DREAMSTIME_MAIN_CATEGORIES, DREAMSTIME_SUB_CATEGORIES } from "../constants";
@@ -672,9 +672,8 @@ function processKeywordsWith7StagePipeline(
 function applyAgKeywordsSeoCommonSplit(keywords: string[], targetCount: number): string[] {
   if (keywords.length < 5) return keywords;
 
+  // ⚠️ WARNA TIDAK TERMASUK (dibuang dari keyword slot) — per PRD v2.0 8-dimensi
   const COMMON_WORD_SET = new Set([
-    'blue', 'red', 'green', 'yellow', 'black', 'white', 'brown', 'pink',
-    'purple', 'gray', 'grey', 'orange', 'gold', 'silver', 'beige', 'navy',
     'big', 'small', 'large', 'tiny', 'huge', 'medium', 'little',
     'round', 'square', 'flat', 'curved', 'straight', 'long', 'short',
     'wide', 'narrow', 'thick', 'thin', 'tall', 'deep',
@@ -1929,18 +1928,25 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
 /**
- * METAZO BUYER-CENTRIC 3-TIER KEYWORD RANKING ENGINE
+ * METAZO 7-TIER KEYWORD RANKING ENGINE (PRD v2.0)
  * 
- * Struktur Ideal:
- * - Slot 1–10:  Objek Utama Paling Relevan (Core Subject Nouns - Apa yang orang cari di search box)
- * - Slot 11–20: Detail Visual & Aktivitas (Physical Attributes, Colors, Materials & Active Verbs)
- * - Slot 21–30+: Konsep & Search Intent (Commercial Use Case, Emotions, Industry & Context)
+ * Struktur 8-Dimensi Microstock:
+ * 1. MAIN SUBJECT — Subjek utama dalam gambar
+ * 2. SPECIFIC DESCRIPTION — Deskripsi spesifik (demografi, material, tipe)
+ * 3. ACTION / MOTION — Aksi, gerakan, ekspresi, pose
+ * 4. VISUAL ATTRIBUTE — Komposisi, angle, lighting (TANPA WARNA)
+ * 5. MOOD — Suasana & tone emosional
+ * 6. STYLE / ASSET TYPE — Gaya visual, format
+ * 7. CONCEPT — Tema besar, ide abstrak, komersial
+ * 8. USE CASE / CONTEXT — Use case, lokasi, environment
+ * 
+ * ⚠️ Warna tidak termasuk — buang slot keyword
  * 
  * Prinsip:
  * - Akurasi > Jumlah Keyword
  * - Relevansi > Keyword Viral
  * - Buyer Intent > Kata Keren
- * - Urutan Keyword Sangat Penting (Top 10 paling menentukan peringkat)
+ * - Urutan Keyword Sangat Penting
  */
 function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number, title?: string): string[] {
   if (keywords.length === 0) return keywords;
@@ -1956,12 +1962,24 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
   const scene = tiers.scene.map(s => lower(String(s)));
   const concepts = tiers.concepts.map(c => lower(String(c)));
 
-  // Bucket 1 (Slots 1–10): Objek Utama Paling Relevan
-  const tier1_Subjects: string[] = [];
-  // Bucket 2 (Slots 11–20): Detail Visual & Aktivitas
-  const tier2_DetailsAndActions: string[] = [];
-  // Bucket 3 (Slots 21–30+): Konsep, Konteks & Search Intent
-  const tier3_ConceptsAndIntent: string[] = [];
+  // 7-tier buckets
+  const t1_mainSubject: string[] = [];
+  const t2_specificDescription: string[] = [];
+  const t3_actionMotion: string[] = [];
+  const t4_visualAttribute: string[] = [];
+  const t5_moodStyle: string[] = [];
+  const t6_concept: string[] = [];
+  const t7_useCaseContext: string[] = [];
+
+  // ⚠️ Warna TIDAK termasuk keyword — filter out semua warna
+  const COLOR_WORDS = new Set([
+    'red', 'blue', 'green', 'yellow', 'black', 'white', 'brown', 'pink',
+    'purple', 'gray', 'grey', 'orange', 'gold', 'silver', 'beige', 'navy',
+    'teal', 'cyan', 'magenta', 'lavender', 'coral', 'turquoise', 'maroon',
+    'olive', 'indigo', 'violet', 'burgundy', 'crimson', 'amber', 'jade',
+    'ruby', 'sapphire', 'emerald', 'charcoal', 'ivory', 'cream', 'tan',
+    'multicolored', 'colorful', 'vibrant', 'pastel', 'neon', 'monochrome'
+  ]);
 
   const ACTION_TERMS = new Set([
     'running', 'walking', 'jumping', 'sitting', 'standing', 'flying', 'swimming',
@@ -1970,8 +1988,27 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     'laughing', 'smiling', 'looking', 'watching', 'listening', 'thinking',
     'playing', 'climbing', 'falling', 'floating', 'rising', 'flowing', 'moving',
     'growing', 'blooming', 'shining', 'glowing', 'reflecting', 'spinning',
-    'exercise', 'workout', 'yoga', 'meditation', 'training', 'practice',
-    'traveling', 'exploring', 'hiking', 'surfing', 'cycling', 'commuting'
+    'collaborating', 'brainstorming', 'discussing', 'meeting', 'planning',
+    'aiming', 'splashing', 'squirting', 'shooting', 'gesturing'
+  ]);
+
+  const MOOD_TERMS = new Set([
+    'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful',
+    'serious', 'inspiring', 'mysterious', 'joyful', 'melancholic',
+    'nostalgic', 'hopeful', 'tense', 'relaxing', 'uplifting', 'brooding'
+  ]);
+
+  const STYLE_TERMS = new Set([
+    'photo', 'photography', 'lifestyle photography', 'editorial', 'advertisement',
+    'illustration', 'vector', 'flat lay', '3D render', 'digital art',
+    'cinematic', 'documentary', 'portrait', 'landscape', 'aerial',
+    'mockup', 'template', 'isolated', 'realistic', 'minimal', 'vintage'
+  ]);
+
+  const USE_CASE_TERMS = new Set([
+    'social media post', 'website banner', 'presentation', 'blog',
+    'advertisement', 'landing page', 'print', 'billboard', 'brochure',
+    'flyer', 'poster', 'book cover', 'magazine', 'newsletter'
   ]);
 
   const isActionWord = (kw: string): boolean => {
@@ -1988,53 +2025,85 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     return attributes.some(a => kw.includes(a) || a.includes(kw));
   };
 
+  const matchesAnyScene = (kw: string): boolean => {
+    return scene.some(s => kw.includes(s) || s.includes(kw));
+  };
+
   const seen = new Set<string>();
 
   for (const kw of keywords) {
     const k = lower(kw);
     if (!k || k.length < 2 || seen.has(k)) continue;
+    
+    // ⚠️ Skip color words entirely — they waste keyword slots
+    if (COLOR_WORDS.has(k)) continue;
+    
     seen.add(k);
 
-    // 1. TIER 1 Check: Main Visual Subjects & Core Nouns (Slots 1-10)
+    // Tier 1: MAIN SUBJECT
     const isPrimarySubj = primarySubjects.some(s => s === k || k === s || k.includes(s) || s.includes(k));
     const isSubjectMatch = matchesAnySubject(k);
-
-    if (isPrimarySubj || (isSubjectMatch && tier1_Subjects.length < 10)) {
-      tier1_Subjects.push(kw);
+    if (isPrimarySubj || (isSubjectMatch && t1_mainSubject.length < 10)) {
+      t1_mainSubject.push(kw);
       continue;
     }
 
-    // 2. TIER 2 Check: Visual Details, Physical Attributes, Actions/Verbs (Slots 11-20)
-    const isAction = isActionWord(k);
+    // Tier 2: SPECIFIC DESCRIPTION
+    const isDemographic = /\b(asian|caucasian|african|hispanic|millennial|gen z|baby boomer|teenager|senior|child|adult|male|female|man|woman|boy|girl|young|old|middle aged)\b/i.test(k);
+    const isMaterial = /\b(wooden|ceramic|plastic|metallic|glass|fabric|leather|stone|paper|cardboard|steel|bronze|concrete|brick|marble|granite)\b/i.test(k);
+    if ((isDemographic || isMaterial) && t2_specificDescription.length < 8) {
+      t2_specificDescription.push(kw);
+      continue;
+    }
+
+    // Tier 3: ACTION / MOTION
+    if (isActionWord(k) && t3_actionMotion.length < 8) {
+      t3_actionMotion.push(kw);
+      continue;
+    }
+
+    // Tier 4: VISUAL ATTRIBUTE
     const isAttr = matchesAnyAttribute(k);
-
-    if ((isAction || isAttr) && tier2_DetailsAndActions.length < 10) {
-      tier2_DetailsAndActions.push(kw);
+    if (isAttr && t4_visualAttribute.length < 8) {
+      t4_visualAttribute.push(kw);
       continue;
     }
 
-    // 3. TIER 3 Check: Concepts, Search Intent, Environment Context, Commercial Uses (Slots 21-30+)
-    tier3_ConceptsAndIntent.push(kw);
+    // Tier 5: MOOD / STYLE
+    if ((MOOD_TERMS.has(k) || STYLE_TERMS.has(k)) && t5_moodStyle.length < 8) {
+      t5_moodStyle.push(kw);
+      continue;
+    }
+
+    // Tier 7: USE CASE / CONTEXT
+    if ((USE_CASE_TERMS.has(k) || matchesAnyScene(k)) && t7_useCaseContext.length < 8) {
+      t7_useCaseContext.push(kw);
+      continue;
+    }
+
+    // Tier 6: CONCEPT (fallback)
+    t6_concept.push(kw);
   }
 
-  // Ensure Keyword #1 is the EXACT primary subject
   if (primarySubjects.length > 0) {
     const mainSubj = primarySubjects[0];
-    const idxInTier1 = tier1_Subjects.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj));
+    const idxInTier1 = t1_mainSubject.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj));
     if (idxInTier1 > 0) {
-      const [main] = tier1_Subjects.splice(idxInTier1, 1);
-      tier1_Subjects.unshift(main);
+      const [main] = t1_mainSubject.splice(idxInTier1, 1);
+      t1_mainSubject.unshift(main);
     } else if (idxInTier1 === -1 && mainSubj.length > 1) {
-      tier1_Subjects.unshift(mainSubj);
+      t1_mainSubject.unshift(mainSubj);
     }
   }
 
-  // Combine tiers in exact structured order:
-  // 1-10: Objek Utama -> 11-20: Detail Visual & Aktivitas -> 21-30+: Konsep & Search Intent
   const combined = [
-    ...tier1_Subjects,
-    ...tier2_DetailsAndActions,
-    ...tier3_ConceptsAndIntent
+    ...t1_mainSubject,
+    ...t2_specificDescription,
+    ...t3_actionMotion,
+    ...t4_visualAttribute,
+    ...t5_moodStyle,
+    ...t6_concept,
+    ...t7_useCaseContext
   ];
 
   return combined.slice(0, targetCount);
@@ -2414,6 +2483,137 @@ function validateFinalMetadata(
 // END METADATAGEN STRUCTURED PIPELINE
 // ============================================================================
 
+// ============================================================================
+// 8-DIMENSI KEYWORD — buildStructuredKeywords()
+// Mengklasifikasikan keyword AI Vision ke 8-dimensi Microstock:
+// Main Subject → Specific Description → Action/Motion → Visual Attribute
+// → Mood → Style/Asset Type → Concept → Use Case → Context
+// ⚠️ Warna tidak termasuk dalam keyword (buang slot)
+// ============================================================================
+
+function buildStructuredKeywords(
+  keywords: string[],
+  tiers: TieredVisualAnalysis
+): StructuredKeywords {
+  const lower = (s: string) => s.toLowerCase().trim();
+
+  const primarySubjects = tiers.objects
+    .filter(o => o.tier === 'primary' || o.importance >= 70)
+    .map(o => lower(o.name));
+  const allSubjects = tiers.objects.map(o => lower(o.name));
+  const attributes = tiers.attributes.map(a => lower(String(a)));
+  const scene = tiers.scene.map(s => lower(String(s)));
+
+  const ACTION_PATTERNS = new Set([
+    'running', 'walking', 'jumping', 'sitting', 'standing', 'flying', 'swimming',
+    'dancing', 'holding', 'reaching', 'lifting', 'working', 'typing', 'driving',
+    'reading', 'writing', 'cooking', 'eating', 'drinking', 'sleeping', 'talking',
+    'laughing', 'smiling', 'looking', 'watching', 'listening', 'thinking',
+    'playing', 'climbing', 'falling', 'floating', 'rising', 'flowing', 'moving',
+    'collaborating', 'brainstorming', 'discussing', 'meeting', 'planning',
+    'aiming', 'splashing', 'squirting', 'shooting', 'gesturing'
+  ]);
+
+  const MOOD_PATTERNS = new Set([
+    'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful',
+    'serious', 'inspiring', 'mysterious', 'joyful', 'melancholic',
+    'nostalgic', 'hopeful', 'tense', 'relaxing', 'uplifting'
+  ]);
+
+  const STYLE_PATTERNS = new Set([
+    'photo', 'photography', 'lifestyle photography', 'editorial', 'advertisement',
+    'illustration', 'vector', 'flat lay', '3D render', 'digital art',
+    'cinematic', 'documentary', 'portrait', 'landscape', 'aerial',
+    'mockup', 'template', 'isolated', 'realistic', 'minimal', 'vintage'
+  ]);
+
+  const USE_CASE_PATTERNS = new Set([
+    'social media post', 'website banner', 'presentation', 'blog',
+    'advertisement', 'landing page', 'print', 'billboard', 'brochure',
+    'flyer', 'poster', 'book cover', 'magazine', 'newsletter'
+  ]);
+
+  // ⚠️ Warna TIDAK termasuk keyword
+  const COLOR_WORDS = /\b(red|blue|green|yellow|black|white|brown|pink|purple|gray|grey|orange|gold|silver|beige|navy|teal|cyan|magenta|lavender|coral|turquoise|maroon|olive|indigo|violet|burgundy|crimson|amber|jade|ruby|sapphire|emerald|charcoal|ivory|cream|tan|multicolored|colorful|vibrant|pastel|neon|monochrome)\b/i;
+
+  const result: StructuredKeywords = {
+    mainSubject: [],
+    specificDescription: [],
+    actionMotion: [],
+    visualAttribute: [],
+    mood: [],
+    styleAssetType: [],
+    concept: [],
+    useCase: [],
+    context: []
+  };
+
+  const seen = new Set<string>();
+
+  for (const kw of keywords) {
+    const k = lower(kw);
+    if (!k || k.length < 2 || seen.has(k) || COLOR_WORDS.test(k)) continue;
+    seen.add(k);
+
+    // Tier 1: Main Subject
+    if (primarySubjects.some(s => s === k || k === s || k.includes(s) || s.includes(k))) {
+      result.mainSubject.push(kw);
+      continue;
+    }
+
+    // Tier 2: Specific Description
+    const isDemographic = /\b(asian|caucasian|african|hispanic|millennial|gen z|baby boomer|teenager|senior|child|adult|male|female|man|woman|boy|girl|young|old|middle aged)\b/i.test(k);
+    const isMaterial = /\b(wooden|ceramic|plastic|metallic|glass|fabric|leather|stone|paper|cardboard|steel|bronze|concrete|brick|marble|granite)\b/i.test(k);
+    if (isDemographic || isMaterial) {
+      result.specificDescription.push(kw);
+      continue;
+    }
+
+    // Tier 3: Action / Motion
+    if (ACTION_PATTERNS.has(k) || /(ing|ed)$/.test(k)) {
+      result.actionMotion.push(kw);
+      continue;
+    }
+
+    // Tier 4: Visual Attribute (composition, angle, lighting — no colors)
+    const isVisualAttr = /\b(shot|view|angle|light|lighting|depth of field|bokeh|copy space|negative space|close.?up|medium|wide|front|side|top|aerial|bird.?eye|backlit|silhouette|shadow|reflection|texture|pattern|minimal|clean|rustic|wooden|glass|metal|concrete|brick|marble|steel)\b/i.test(k);
+    if (isVisualAttr && !COLOR_WORDS.test(k)) {
+      result.visualAttribute.push(kw);
+      continue;
+    }
+
+    // Tier 5: Mood
+    if (MOOD_PATTERNS.has(k)) {
+      result.mood.push(kw);
+      continue;
+    }
+
+    // Tier 6: Style / Asset Type
+    if (STYLE_PATTERNS.has(k)) {
+      result.styleAssetType.push(kw);
+      continue;
+    }
+
+    // Tier 8: Use Case
+    if (USE_CASE_PATTERNS.has(k)) {
+      result.useCase.push(kw);
+      continue;
+    }
+
+    // Tier 9: Context (location, environment)
+    if (scene.some(s => k.includes(s) || s.includes(k)) ||
+        /\b(indoor|outdoor|office|home|studio|nature|urban|rural|beach|mountain|forest|city|park|building|room|garden|street|road|summer|winter|spring|autumn|fall|day|night|morning|evening)\b/i.test(k)) {
+      result.context.push(kw);
+      continue;
+    }
+
+    // Tier 7: Concept (fallback)
+    result.concept.push(kw);
+  }
+
+  return result;
+}
+
 export const generateStockMetadata = async (
   frames: string[],
   keywordCount: number | string,
@@ -2463,13 +2663,15 @@ export const generateStockMetadata = async (
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `TOP BUYER-INTENT KEYWORD RULES (PRIORITY OVER ALL OTHER RULES):
 CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue search apa?"
-- 10 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
+- 10–15 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
 - SEO microstock itu:
   * Akurasi > Jumlah keyword
   * Relevansi > Keyword viral
   * Buyer intent > Kata keren
-  * Urutan keyword sangat penting (10 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
+  * Urutan keyword sangat penting (10-15 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
   * Keyword harus LITERAL dari apa yang ada di aset, bukan imajinasi/halusinasi AI.
+  * Gunakan kata yang biasa diketik buyer di search bar — bukan istilah teknis yang jarang dicari.
+  * Pikirkan dari sisi pembeli: "Kalau saya butuh gambar seperti ini, kata apa yang akan saya ketik?"
 - Jangan over-niche (nanti gak muncul di pencarian).
 - DILARANG SUFFIX / STEM DUPLICATION (Algoritma Microstock Indexing):
   * Dilarang mengulang kata yang sama dengan tambahan akhiran seperti -ing, -er, -ed, -s, -es, -ment, -tion (misal: JANGAN masukkan 'paint' DAN 'painter' DAN 'painting', atau 'run' DAN 'runner' DAN 'running').
@@ -2477,24 +2679,36 @@ CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue searc
   * Hanya gunakan kata yang berbeda, mandiri, bermakna unik, dan natural.
 - Jangan terlalu generic (tenggelam di antara jutaan aset lain).
 - Keyword mempermudah buyer menemukan aset di halaman pertama Microstock.
+- Tandai 10 keyword INTI paling kuat untuk prioritas utama (buyer-facing core keywords).
 
-STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
-1. SLOT 1–10: OBJEK UTAMA PALING RELEVAN (Core Subject Nouns)
-   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop').
-   - Kata benda konkret dan objek utama yang paling pertama kali diketik buyer di kolom search.
-2. SLOT 11–20: DETAIL VISUAL & AKTIVITAS (Visual Details & Actions)
-   - Detail fisik nyata yang terlihat: warna, tekstur, material, bentuk, dan pencahayaan.
-   - Aksi dan aktivitas yang sedang dilakukan subjek secara nyata (e.g., 'working', 'cooking', 'running', 'smiling').
-3. SLOT 21–30+: KONSEP & SEARCH INTENT (Concepts, Industry & Commercial Use Cases)
-   - Konsep komersial, tema emosi, dan suasana (e.g., 'success', 'growth', 'wellness', 'sustainable').
-   - Target industri & use-case (e.g., 'marketing', 'fintech', 'landing page', 'banner', 'presentation', 'copy space').
+STRUKTUR IDEAL KEYWORD — 8-DIMENSI MICROSTOCK (WAJIB DIIKUTI SECARA BERURUTAN):
+⚠️ WARNA TIDAK TERMASUK KEYWORD — BUANG SLOT. Warna hanya digunakan di internal palette analysis.
+Pola: Subject → Specific Description → Action → Mood → Style → Concept → Use Case → Context
+1. MAIN SUBJECT — Subjek utama dalam gambar (orang, objek, hewan, landscape)
+   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'business team', 'cat', 'vintage car', 'coffee cup').
+2. SPECIFIC DESCRIPTION — Deskripsi spesifik subjek (gender, usia, etnis, material, spesies, tipe)
+   - e.g., 'asian', 'caucasian', 'millennial', 'wooden', 'ceramic', 'metal'
+3. ACTION / MOTION — Aksi, gerakan, ekspresi, pose, aktivitas
+   - e.g., 'collaborating', 'running', 'smiling', 'brainstorming', 'holding'
+4. VISUAL ATTRIBUTE — Komposisi, angle, framing, lighting, depth of field, perspektif (TANPA WARNA)
+   - e.g., 'medium shot', 'front view', 'natural light', 'shallow depth of field', 'daylight'
+5. MOOD — Suasana & tone emosional (WAJIB — buyer sering search by mood)
+   - e.g., 'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful', 'serious', 'inspiring', 'mysterious', 'joyful'
+6. STYLE / ASSET TYPE — Gaya visual, format aset
+   - e.g., 'photo', 'lifestyle photography', 'editorial', 'flat lay', '3D render', 'illustration', 'realistic', 'minimal', 'vintage'
+7. CONCEPT — Tema besar, ide abstrak
+   - e.g., 'business', 'teamwork', 'innovation', 'wellness', 'sustainability', 'growth', 'connection', 'freedom'
+8. USE CASE — Siapa & untuk apa pakainya
+   - e.g., 'social media post', 'website banner', 'presentation', 'blog', 'advertisement', 'landing page', 'print', 'billboard'
+9. CONTEXT — Lokasi, suasana, waktu, environment, event
+   - e.g., 'modern office', 'indoor', 'summer', 'jakarta', 'professional workplace', 'outdoor'
 
 0. AGKEYWORDS 70/30 SEO SPLIT (CRITICAL – Adobe Stock Buyer Intent Optimization):
    - 70% of keywords MUST be SEO-friendly: high-search-volume, buyer-intent terms that professional stock buyers actually type (descriptive nouns, concrete subject terms, industry-specific commercial vocabulary, action verbs, specific attributes).
    - 30% of keywords MUST be common/foundational words: basic, universally-understood descriptive terms (colors, shapes, simple emotions, basic materials, everyday objects).
    - Clearly separate these two groups in keyword ordering: place ALL 70% SEO-friendly keywords FIRST, then ALL 30% common words AFTER.
    - SEO-friendly examples: 'copy space', 'sustainability', 'corporate team', 'digital transformation', 'mindfulness', 'remote work', 'wellness', 'productivity', 'innovation hub'.
-   - Common word examples: 'blue', 'wood', 'smile', 'round', 'large', 'bright', 'modern', 'clean', 'light', 'texture'.
+   - Common word examples: 'wood', 'smile', 'round', 'large', 'modern', 'clean', 'texture', 'smooth', 'wide'.
 1. RISET KEYWORD (Microstock Search Researcher):
    - ${directives.risetKeywordRule}
    - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
@@ -2507,7 +2721,7 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
    - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ${editorialMode ? 'EDITORIAL MODE ACTIVE – You MAY include visible brand names, logos, trademarks, and commercial products exactly as they appear in the image (factual, non-promotional, no inventions). If none are visible, do not add any.' : 'ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone). NEVER include any intellectual property.'}
 7. Every keyword must be strictly in lowercase, clean without punctuation.
-8. NO BACKGROUND COLOR KEYWORDS: Do NOT include background colors like 'white background', 'black background', 'transparent background', or any color that is only the backdrop. Only include colors that are attributes of the MAIN SUBJECT.
+8. ���️ NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names as keywords (e.g., 'red', 'blue', 'white background', 'green', 'gold'). Colors waste keyword slots — they do not help SEO indexing on Adobe Stock / Shutterstock. Color palette is extracted internally for technical metadata only.
 9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
 10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
 11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
@@ -2825,7 +3039,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO BACKGROUND COLOR KEYWORDS: Do NOT include the background color as a keyword unless the background IS the main subject. Keywords like 'white background', 'black background', 'transparent background', 'blue background' are PROHIBITED. Only use color keywords that describe attributes of the MAIN SUBJECT itself (e.g., 'red car', 'blue dress' — but the keyword must just be the subject word, not 'red background').
+7. NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names. Colors waste valuable keyword slots. Color palette is extracted for technical analysis only.
 
 
 MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
@@ -3295,13 +3509,15 @@ export const generateBatchStockMetadata = async (
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
   let keywordRulePromptText = `TOP BUYER-INTENT KEYWORD RULES (PRIORITY OVER ALL OTHER RULES):
 CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue search apa?"
-- 10 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
+- 10–15 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
 - SEO microstock itu:
   * Akurasi > Jumlah keyword
   * Relevansi > Keyword viral
   * Buyer intent > Kata keren
-  * Urutan keyword sangat penting (10 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
+  * Urutan keyword sangat penting (10-15 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
   * Keyword harus LITERAL dari apa yang ada di aset, bukan imajinasi/halusinasi AI.
+  * Gunakan kata yang biasa diketik buyer di search bar — bukan istilah teknis yang jarang dicari.
+  * Pikirkan dari sisi pembeli: "Kalau saya butuh gambar seperti ini, kata apa yang akan saya ketik?"
 - Jangan over-niche (nanti gak muncul di pencarian).
 - DILARANG SUFFIX / STEM DUPLICATION (Algoritma Microstock Indexing):
   * Dilarang mengulang kata yang sama dengan tambahan akhiran seperti -ing, -er, -ed, -s, -es, -ment, -tion (misal: JANGAN masukkan 'paint' DAN 'painter' DAN 'painting', atau 'run' DAN 'runner' DAN 'running').
@@ -3309,24 +3525,36 @@ CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue searc
   * Hanya gunakan kata yang berbeda, mandiri, bermakna unik, dan natural.
 - Jangan terlalu generic (tenggelam di antara jutaan aset lain).
 - Keyword mempermudah buyer menemukan aset di halaman pertama Microstock.
+- Tandai 10 keyword INTI paling kuat untuk prioritas utama (buyer-facing core keywords).
 
-STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
-1. SLOT 1–10: OBJEK UTAMA PALING RELEVAN (Core Subject Nouns)
-   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'cat', 'vintage car', 'borobudur temple', 'coffee cup', 'laptop').
-   - Kata benda konkret dan objek utama yang paling pertama kali diketik buyer di kolom search.
-2. SLOT 11–20: DETAIL VISUAL & AKTIVITAS (Visual Details & Actions)
-   - Detail fisik nyata yang terlihat: warna, tekstur, material, bentuk, dan pencahayaan.
-   - Aksi dan aktivitas yang sedang dilakukan subjek secara nyata (e.g., 'working', 'cooking', 'running', 'smiling').
-3. SLOT 21–30+: KONSEP & SEARCH INTENT (Concepts, Industry & Commercial Use Cases)
-   - Konsep komersial, tema emosi, dan suasana (e.g., 'success', 'growth', 'wellness', 'sustainable').
-   - Target industri & use-case (e.g., 'marketing', 'fintech', 'landing page', 'banner', 'presentation', 'copy space').
+STRUKTUR IDEAL KEYWORD — 8-DIMENSI MICROSTOCK (WAJIB DIIKUTI SECARA BERURUTAN):
+⚠️ WARNA TIDAK TERMASUK KEYWORD — BUANG SLOT. Warna hanya digunakan di internal palette analysis.
+Pola: Subject → Specific Description → Action → Mood → Style → Concept → Use Case → Context
+1. MAIN SUBJECT — Subjek utama dalam gambar (orang, objek, hewan, landscape)
+   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'business team', 'cat', 'vintage car', 'coffee cup').
+2. SPECIFIC DESCRIPTION — Deskripsi spesifik subjek (gender, usia, etnis, material, spesies, tipe)
+   - e.g., 'asian', 'caucasian', 'millennial', 'wooden', 'ceramic', 'metal'
+3. ACTION / MOTION — Aksi, gerakan, ekspresi, pose, aktivitas
+   - e.g., 'collaborating', 'running', 'smiling', 'brainstorming', 'holding'
+4. VISUAL ATTRIBUTE — Komposisi, angle, framing, lighting, depth of field, perspektif (TANPA WARNA)
+   - e.g., 'medium shot', 'front view', 'natural light', 'shallow depth of field', 'daylight'
+5. MOOD — Suasana & tone emosional (WAJIB — buyer sering search by mood)
+   - e.g., 'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful', 'serious', 'inspiring', 'mysterious', 'joyful'
+6. STYLE / ASSET TYPE — Gaya visual, format aset
+   - e.g., 'photo', 'lifestyle photography', 'editorial', 'flat lay', '3D render', 'illustration', 'realistic', 'minimal', 'vintage'
+7. CONCEPT — Tema besar, ide abstrak
+   - e.g., 'business', 'teamwork', 'innovation', 'wellness', 'sustainability', 'growth', 'connection', 'freedom'
+8. USE CASE — Siapa & untuk apa pakainya
+   - e.g., 'social media post', 'website banner', 'presentation', 'blog', 'advertisement', 'landing page', 'print', 'billboard'
+9. CONTEXT — Lokasi, suasana, waktu, environment, event
+   - e.g., 'modern office', 'indoor', 'summer', 'jakarta', 'professional workplace', 'outdoor'
 
 0. AGKEYWORDS 70/30 SEO SPLIT (CRITICAL – Adobe Stock Buyer Intent Optimization):
    - 70% of keywords MUST be SEO-friendly: high-search-volume, buyer-intent terms that professional stock buyers actually type (descriptive nouns, concrete subject terms, industry-specific commercial vocabulary, action verbs, specific attributes).
    - 30% of keywords MUST be common/foundational words: basic, universally-understood descriptive terms (colors, shapes, simple emotions, basic materials, everyday objects).
    - Clearly separate these two groups in keyword ordering: place ALL 70% SEO-friendly keywords FIRST, then ALL 30% common words AFTER.
    - SEO-friendly examples: 'copy space', 'sustainability', 'corporate team', 'digital transformation', 'mindfulness', 'remote work', 'wellness', 'productivity', 'innovation hub'.
-   - Common word examples: 'blue', 'wood', 'smile', 'round', 'large', 'bright', 'modern', 'clean', 'light', 'texture'.
+   - Common word examples: 'wood', 'smile', 'round', 'large', 'modern', 'clean', 'texture', 'smooth', 'wide'.
 1. RISET KEYWORD (Microstock Search Researcher):
    - ${directives.risetKeywordRule}
    - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
@@ -3339,7 +3567,7 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
    - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ${editorialMode ? 'EDITORIAL MODE ACTIVE – You MAY include visible brand names, logos, trademarks, and commercial products exactly as they appear in the image (factual, non-promotional, no inventions). If none are visible, do not add any.' : 'ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone). NEVER include any intellectual property.'}
 7. Every keyword must be strictly in lowercase, clean without punctuation.
-8. NO BACKGROUND COLOR KEYWORDS: Do NOT include background colors like 'white background', 'black background', 'transparent background', or any color that is only the backdrop. Only include colors that are attributes of the MAIN SUBJECT.
+8. ⚠️ NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names as keywords (e.g., 'red', 'blue', 'white background', 'green', 'gold'). Colors waste keyword slots — they do not help SEO indexing on Adobe Stock / Shutterstock. Color palette is extracted internally for technical metadata only.
 9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
 10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
 11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
@@ -3602,7 +3830,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO BACKGROUND COLOR KEYWORDS: Do NOT include the background color as a keyword unless the background IS the main subject. Keywords like 'white background', 'black background', 'transparent background', 'blue background' are PROHIBITED. Only use color keywords that describe attributes of the MAIN SUBJECT itself (e.g., 'red car', 'blue dress' — but the keyword must just be the subject word, not 'red background').
+7. NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names. Colors waste valuable keyword slots. Color palette is extracted for technical analysis only.
 
 
 MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
@@ -3806,7 +4034,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO BACKGROUND COLOR KEYWORDS: Do NOT include the background color as a keyword unless the background IS the main subject. Keywords like 'white background', 'black background', 'transparent background', 'blue background' are PROHIBITED. Only use color keywords that describe attributes of the MAIN SUBJECT itself (e.g., 'red car', 'blue dress' — but the keyword must just be the subject word, not 'red background').
+7. NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names. Colors waste valuable keyword slots. Color palette is extracted for technical analysis only.
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
