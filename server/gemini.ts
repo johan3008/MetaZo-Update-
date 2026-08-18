@@ -2459,6 +2459,60 @@ function expandFromVisualFacts(existingKeywords: string[], visualFacts: any, max
   return expandSynonymsAndLongTail(existingKeywords, pseudoTiers, maxNew);
 }
 
+/**
+ * Fallback darurat: membangun daftar keyword LANGSUNG dari VISUAL_FACTS mentah
+ * (tanpa bergantung pada rawAiKeywords sama sekali). Dipakai ketika respons AI
+ * gagal di-parse jadi JSON valid, supaya user tidak pernah menerima keyword
+ * kosong hanya karena parsing gagal. Tahapannya:
+ *   1) Ambil istilah dasar dari tiers (objects/scene/attributes/concepts).
+ *   2) Bersihkan, dedupe, buang istilah terlarang/generik.
+ *   3) Jika masih kurang dari targetCount, perluas via sinonim & frasa long-tail
+ *      (expandSynonymsAndLongTail) yang juga berbasis visualFacts, bukan template statis.
+ */
+function buildFallbackKeywordsFromVisualFacts(visualFacts: any, targetCount: number): string[] {
+  const target = Math.max(0, Number(targetCount) || 0);
+  if (target === 0) return [];
+
+  const tiers = buildTieredVisualAnalysis(visualFacts);
+  const seen = new Set<string>();
+  const seeds: string[] = [];
+
+  const tryAdd = (raw: string) => {
+    const cleaned = sanitizeForIndexing(String(raw || ''));
+    if (!cleaned) return;
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (parts.length === 0 || parts.length > 4) return;
+    if (parts.some(isKeywordConnector)) return;
+    if (parts.length === 1 && isProhibitedKeyword(cleaned)) return;
+    if (seen.has(cleaned)) return;
+    seen.add(cleaned);
+    seeds.push(cleaned);
+  };
+
+  // 1) Objek terdeteksi, diurutkan dari yang paling penting (primary -> secondary -> background)
+  tiers.objects.forEach(o => tryAdd(o.name));
+  // 2) Konteks scene/komposisi
+  tiers.scene.forEach(tryAdd);
+  // 3) Atribut (warna, aksi, teks yang terlihat)
+  tiers.attributes.forEach(tryAdd);
+  // 4) Konsep/tema komersial yang lebih abstrak (paling akhir, prioritas terendah)
+  tiers.concepts.forEach(c => {
+    // konsep sering berupa kalimat panjang; pecah jadi kata/frasa pendek yang bermakna
+    String(c).split(/[.,;]/).forEach(fragment => tryAdd(fragment));
+  });
+
+  let result = filterBannedKeywords(seeds.slice(0, target));
+
+  // 5) Kalau masih kurang dari target, perluas dengan sinonim & kombinasi long-tail
+  //    yang tetap berakar dari visualFacts (bukan array kosong / template generik).
+  if (result.length < target) {
+    const additional = expandFromVisualFacts(result, visualFacts, target - result.length);
+    result = filterBannedKeywords([...result, ...additional]);
+  }
+
+  return result.slice(0, target);
+}
+
 // ---- LAPISAN 5: FILTER OTOMATIS PEDOMAN ADOBE STOCK & SHUTTERSTOCK --------
 
 const MARKETPLACE_BANNED_TERMS = new Set([
@@ -3435,13 +3489,14 @@ OUTPUT FORMAT:
     const tieredVisual = buildTieredVisualAnalysis(visualFacts);
     const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
     const fallbackTitle = ensureTitleLength(applyTitleTemplate(assetSubtype, tieredVisual, titleLength), [], "", titleLength);
-    const fallbackKeywords = processKeywordsSemantic(
-      [],
-      targetCount,
-      visualFacts,
-      toolType,
-      keywordMode
-    );
+    // PENTING: jangan lagi memanggil processKeywordsSemantic([]) — input array kosong
+    // dijamin selalu menghasilkan output kosong karena fungsi itu hanya MEMFILTER
+    // rawAiKeywords yang diberikan, tidak pernah mengekstrak dari visualFacts sendiri.
+    // Sebagai gantinya, bangun keyword langsung dari VISUAL_FACTS mentah supaya
+    // user tetap mendapat keyword yang relevan meski parsing JSON dari AI gagal.
+    let fallbackKeywords = buildFallbackKeywordsFromVisualFacts(visualFacts, targetCount);
+    // Terapkan aturan mode (single/multi/mixed) yang sama seperti jalur utama.
+    fallbackKeywords = enforceStrictKeywordMode(fallbackKeywords, keywordMode, targetCount, visualFacts);
     const fallbackDesc = ensureDescription("", fallbackTitle, fallbackKeywords);
     const accurateCat = determineAccurateCategory(fallbackTitle, fallbackKeywords, visualFacts, 0);
     const validShutterCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
