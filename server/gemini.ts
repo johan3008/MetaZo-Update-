@@ -283,7 +283,7 @@ const GENERIC_KEYWORDS_SET = new Set([
   'stockphoto', 'stockphotos', 'illustration', 'illustrations', 'vector', 'vectors', 'svg',
   'footage', 'clip', 'clips', 'media', 'template', 'templates', 'format', 'formats',
   'appearance', 'aesthetic', 'aesthetics', 'quality', 'detail', 'details', 'feature', 'features',
-  'general', 'generic', 'common', 'popular', 'commercial', 'marketing', 'advertising', 'search',
+  'general', 'generic', 'common', 'popular', 'commercial', 'marketing', 'advertising', 'search', 'environment',
   'keyword', 'keywords', 'editorial', 'usecase', 'purpose', 'category', 'categories'
 ]);
 
@@ -841,6 +841,79 @@ function processSingleWordSeoKeywords(
   ]);
 
   const normalize = (v: any): string => sanitizeForIndexing(String(v ?? '')).toLowerCase();
+
+  // IMPORTANT: never turn a multi-word camera/composition concept into broken
+  // single-word fragments. For example, "shallow depth of field" must NOT
+  // become shallow, depth, field; and "close up" must NOT become close, up.
+  // Those fragments are not useful standalone stock keywords and waste slots.
+  const SEMANTIC_PHRASE_PATTERNS: Array<{ pattern: RegExp; fragments: string[] }> = [
+    { pattern: /\bshallow\s+depth\s+of\s+field\b/i, fragments: ['shallow','depth','field'] },
+    { pattern: /\bdeep\s+depth\s+of\s+field\b/i, fragments: ['deep','depth','field'] },
+    { pattern: /\bclose\s*-?\s*up\b/i, fragments: ['close','up'] },
+    { pattern: /\bwide\s*-?\s*angle\b/i, fragments: ['wide','angle'] },
+    { pattern: /\blow\s*-?\s*angle\b/i, fragments: ['low','angle'] },
+    { pattern: /\bhigh\s*-?\s*angle\b/i, fragments: ['high','angle'] },
+    { pattern: /\beye\s*-?\s*level\b/i, fragments: ['eye','level'] },
+    { pattern: /\btop\s*-?\s*down\b/i, fragments: ['top','down'] },
+    { pattern: /\bbird\s*(?:s|\'s)?\s*eye\b/i, fragments: ['bird','eye'] },
+    { pattern: /\bthree\s*-?\s*quarter\b/i, fragments: ['three','quarter'] },
+    { pattern: /\bside\s+view\b/i, fragments: ['side','view'] },
+    { pattern: /\bfront\s+view\b/i, fragments: ['front','view'] },
+    { pattern: /\brear\s+view\b/i, fragments: ['rear','view'] }
+  ];
+
+  const phraseFragments = new Set<string>();
+  const collectPhraseFragments = (value: any) => {
+    const text = normalize(value);
+    if (!text) return;
+    for (const item of SEMANTIC_PHRASE_PATTERNS) {
+      if (item.pattern.test(text)) item.fragments.forEach(f => phraseFragments.add(f));
+    }
+  };
+
+  // Only block a fragment when the complete semantic phrase is actually
+  // present in the visual analysis. This preserves legitimate words such as
+  // "field" in an agricultural field or "wide" in another context.
+  [
+    visualFacts?.composition,
+    visualFacts?.attributes,
+    visualFacts?.visual_attributes,
+    visualFacts?.camera,
+    visualFacts?.camera_angle,
+    visualFacts?.camera_view,
+    visualFacts?.focus,
+    visualFacts?.optics,
+    visualFacts?.raw_visual_facts
+  ].forEach(value => {
+    if (Array.isArray(value)) value.forEach(collectPhraseFragments);
+    else collectPhraseFragments(value);
+  });
+
+  // Also inspect the raw AI candidate list as a whole. Models often return a
+  // phrase such as "shallow depth of field" and then separately emit its
+  // broken pieces. If the phrase exists anywhere in the candidate set, remove
+  // the fragments before scoring.
+  if (Array.isArray(rawAiKeywords)) {
+    rawAiKeywords.forEach(collectPhraseFragments);
+    collectPhraseFragments(rawAiKeywords.join(' '));
+
+    // Some models return phrase fragments as separate array items rather than
+    // a phrase. Detect those combinations explicitly. This is what prevents
+    // outputs like close, up, shallow, depth, field from leaking into final SEO.
+    const rawWords = new Set(rawAiKeywords.flatMap(v => normalize(v).split(/\s+/)));
+    const has = (...words: string[]) => words.every(w => rawWords.has(w));
+    if (has('shallow','depth','field')) ['shallow','depth','field'].forEach(w => phraseFragments.add(w));
+    if (has('deep','depth','field')) ['deep','depth','field'].forEach(w => phraseFragments.add(w));
+    if (has('close','up')) ['close','up'].forEach(w => phraseFragments.add(w));
+    if (has('wide','angle')) ['wide','angle'].forEach(w => phraseFragments.add(w));
+    if (has('low','angle')) ['low','angle'].forEach(w => phraseFragments.add(w));
+    if (has('high','angle')) ['high','angle'].forEach(w => phraseFragments.add(w));
+    if (has('eye','level')) ['eye','level'].forEach(w => phraseFragments.add(w));
+    if (has('top','down')) ['top','down'].forEach(w => phraseFragments.add(w));
+    if (has('bird','eye')) ['bird','eye'].forEach(w => phraseFragments.add(w));
+    if (has('three','quarter')) ['three','quarter'].forEach(w => phraseFragments.add(w));
+  }
+
   const extractWords = (value: any): string[] => {
     if (value == null) return [];
     return normalize(value).split(/\s+/)
@@ -849,6 +922,7 @@ function processSingleWordSeoKeywords(
       .filter(w => /^[a-z0-9]+$/.test(w))
       .filter(w => !stopWords.has(w))
       .filter(w => !blocked.has(w))
+      .filter(w => !phraseFragments.has(w))
       .filter(w => !isProhibitedKeyword(w));
   };
   const collect = (arr: any): string[] => Array.isArray(arr)
@@ -1007,10 +1081,20 @@ function processSingleWordSeoKeywords(
   const seen = new Set<string>();
   const roots = new Set<string>();
   const maxKeywords = Math.min(Math.max(1, Number(targetCount) || 25), 25);
+  let cameraViewpointCount = 0;
 
   for (const item of ranked) {
     const word = item.word;
-    if (!word || seen.has(word) || stopWords.has(word) || blocked.has(word) || isProhibitedKeyword(word)) continue;
+    if (!word || seen.has(word) || stopWords.has(word) || blocked.has(word) || phraseFragments.has(word) || isProhibitedKeyword(word)) continue;
+
+    // Camera/viewpoint/focus/composition gets ONE slot maximum in SEO Single.
+    // This prevents close + up + shallow + depth + field + framing + macro
+    // from consuming the metadata budget. Choose the strongest canonical term.
+    if (isCameraOrCompositionKeyword(word)) {
+      if (cameraViewpointCount >= 1) continue;
+      cameraViewpointCount++;
+    }
+
     const root = microstockKeywordRoot(word);
     if (!root || roots.has(root)) continue;
     seen.add(word);
@@ -1033,6 +1117,75 @@ function microstockKeywordRoot(word: string): string {
   return w;
 }
 
+// ============================================================================
+// CAMERA VIEWPOINT SPAM CONTROL
+// Microstock keyword slots are scarce. Camera/viewpoint terms are useful, but
+// they must never consume multiple slots for the same asset. Keep at most ONE
+// camera-angle/viewpoint keyword in the final metadata list.
+// This is deliberately separate from lighting, texture, material, and subject
+// terms such as glowing, textured, metallic, forest, landscape, etc.
+// ============================================================================
+const CAMERA_VIEWPOINT_TERMS = new Set([
+  'angle', 'viewpoint', 'perspective', 'closeup', 'close-up', 'macro',
+  'wideangle', 'wide-angle', 'overhead', 'topdown', 'top-down',
+  'lowangle', 'low-angle', 'highangle', 'high-angle', 'eyelevel', 'eye-level',
+  'sideview', 'side-view', 'frontview', 'front-view', 'rearview', 'rear-view',
+  'aerial', 'birdseye', 'bird-eye', 'birds-eye', 'wormseye', 'worm-eye',
+  'dutchangle', 'dutch-angle', 'pov', 'firstperson', 'first-person',
+  'threequarter', 'three-quarter'
+]);
+
+function isCameraViewpointKeyword(keyword: string): boolean {
+  const normalized = String(keyword || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ');
+  if (!normalized) return false;
+
+  const compact = normalized.replace(/[\s_-]+/g, '');
+  if (CAMERA_VIEWPOINT_TERMS.has(normalized) || CAMERA_VIEWPOINT_TERMS.has(compact)) return true;
+
+  const tokens = normalized.split(/\s+/);
+  return tokens.some(token => {
+    const t = token.replace(/[^a-z0-9-]/g, '');
+    const tc = t.replace(/[-_]/g, '');
+    return CAMERA_VIEWPOINT_TERMS.has(t) || CAMERA_VIEWPOINT_TERMS.has(tc);
+  });
+}
+
+// Camera, focus, and composition terms are low-priority metadata. They should
+// never consume a large share of the keyword budget. Keep one canonical term
+// at most; do not let phrase fragments (close/up/depth/field/etc.) leak through.
+const CAMERA_COMPOSITION_TERMS = new Set([
+  'macro','closeup','wideangle','overhead','topdown','lowangle','highangle',
+  'eyelevel','sideview','frontview','rearview','aerial','birdseye','wormseye',
+  'dutchangle','pov','firstperson','threequarter','framing','symmetry',
+  'asymmetrical','asymmetry','perspective','bokeh','blurred','defocused'
+]);
+
+function isCameraOrCompositionKeyword(keyword: string): boolean {
+  const normalized = String(keyword || '').toLowerCase().trim().replace(/[–—]/g, '-');
+  const compact = normalized.replace(/[\s_-]+/g, '');
+  return CAMERA_COMPOSITION_TERMS.has(normalized) || CAMERA_COMPOSITION_TERMS.has(compact);
+}
+
+function limitCameraViewpointKeywords(keywords: string[], maxCameraTerms = 1): string[] {
+  if (!Array.isArray(keywords) || keywords.length === 0) return keywords || [];
+  const result: string[] = [];
+  let cameraCount = 0;
+
+  for (const keyword of keywords) {
+    if (!keyword) continue;
+    if (isCameraViewpointKeyword(keyword)) {
+      if (cameraCount >= maxCameraTerms) continue;
+      cameraCount++;
+    }
+    result.push(keyword);
+  }
+  return result;
+}
+
 function processKeywordsSemantic(
   rawAiKeywords: string[],
   targetCount: number,
@@ -1043,9 +1196,15 @@ function processKeywordsSemantic(
   description?: string
 ): string[] {
   if (keywordMode === 'single') {
-    return processSingleWordSeoKeywords(rawAiKeywords, targetCount, visualFacts, title, description);
+    return limitCameraViewpointKeywords(
+      processSingleWordSeoKeywords(rawAiKeywords, targetCount, visualFacts, title, description),
+      1
+    );
   }
-  return processKeywordsSemanticLegacy(rawAiKeywords, targetCount, visualFacts, toolType, keywordMode, title, description);
+  return limitCameraViewpointKeywords(
+    processKeywordsSemanticLegacy(rawAiKeywords, targetCount, visualFacts, toolType, keywordMode, title, description),
+    1
+  );
 }
 
 function enforceStrictKeywordMode(
@@ -1297,7 +1456,7 @@ function ensureKeywordCount(
   // relevan (hasil AI + sinonim + long-tail) masih belum mencapai targetCount, fungsi ini
   // akan mengembalikan LEBIH SEDIKIT keyword daripada target, alih-alih memaksakan kata
   // generik yang tidak nyambung dengan gambar.
-  return uniqueKeywords.slice(0, targetCount);
+  return limitCameraViewpointKeywords(uniqueKeywords.slice(0, targetCount), 1);
 }
 
 async function callOpenAICompatibleWithRetry(params: {
@@ -2972,7 +3131,8 @@ ORDER: manually curate the strongest terms first. The first 10 should be the mos
 
 QUALITY: no filler, no keyword padding, no 70/30 split, no fixed taxonomy, no duplicate roots, no brands, no names of famous people or characters, no media-format labels, no connector words, no generic/meta terms, and no color keywords. Only grounded, buyer-useful words survive. Never use color words to fill slots. Descriptive forms such as textured, weathered, resting, showing, representing, glowing are allowed when genuinely supported.
 
-The final list should feel like a skilled human contributor looked at the asset and selected the words a buyer would actually search, not like an AI thesaurus expansion.`;
+The final list should feel like a skilled human contributor looked at the asset and selected the words a buyer would actually search, not like an AI thesaurus expansion.
+CAMERA VIEWPOINT LIMIT: camera/viewpoint/composition terms such as closeup, macro, wide-angle, overhead, aerial, bird's-eye, low-angle, eye-level, POV, etc. may use AT MOST ONE keyword slot in the final list. Choose only the single most useful viewpoint term; do not spam multiple camera-angle synonyms.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word English candidate keywords.`;
     keywordRulePromptText += `\nSINGLE-WORD MODE: every keyword item must contain exactly one word. Use natural words such as pendant, jewelry, faith, symbol, stone, religion, texture, culture, history, devotion, chain, light, surface, metallic, weathered, contrast, highlights, endurance, editorial, belief when the asset supports them. Do not create phrases and do not split artificial phrases into unrelated words.`;
@@ -3195,7 +3355,9 @@ MICROSTOCK KEYWORD SEO HIERARCHY — HUMAN CURATED, DISCOVERABILITY-FIRST (CRITI
 10. SEMANTIC DEDUPLICATION: avoid obvious singular/plural or near-identical duplicates, but keep words with genuinely different meanings such as jewish/judaism or metal/metallic when supported.
 11. DESCRIPTIVE FORMS ARE VALID, COLORS ARE NOT: include meaningful materials, textures, conditions, actions, and participles such as metallic, textured, weathered, resting, representing, glowing when visibly supported. Never output color names.
 12. NO FORMAT LABELS AS KEYWORDS: do not use photo, photography, image, asset, vector, illustration, svg, video, footage, unless a specific platform workflow explicitly requires a format term.
-13. FINAL FEEL: the result must read like a clean, intentional human keyword list, not an AI thesaurus expansion.
+13. NEVER SPLIT SEMANTIC PHRASES INTO USELESS FRAGMENTS: phrases such as "close up", "shallow depth of field", "wide angle", "low angle", "eye level", and "top down" must never become broken standalone keywords such as close, up, shallow, depth, field, wide, angle, eye, level, top, or down. If the selected mode requires single-word keywords, omit the phrase rather than damaging it into fragments.
+14. CAMERA/COMPOSITION SLOT CONTROL: in SEO Single, allow at most ONE camera/viewpoint/focus/composition keyword total. Do not output close, up, shallow, depth, field, framing, asymmetrical, macro, aerial, overhead, perspective, etc. as a cluster. Select only the strongest supported canonical term.
+15. FINAL FEEL: the result must read like a clean, intentional human keyword list, not an AI thesaurus expansion.
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION: Include a location or landmark only when clearly recognizable or explicitly verified by EXIF. Do not infer a place from generic visual characteristics.
@@ -3240,7 +3402,7 @@ Rules for Keywords:
 - Trend terms are only a small relevance boost when the visual genuinely supports them.
 - Never invent use cases, industries, locations, people, objects or events.
 - Keep keywords lowercase, natural and short; respect the selected single/multi/mixed mode.
-- Colors are allowed when useful.
+- Colors are forbidden as standalone keyword terms.
 - No brands, trademarks, famous people, fictional characters or artist names.
 - Put the strongest buyer-facing terms first; the first 10 should be the strongest combination of visual relevance and search intent.
 
@@ -3428,7 +3590,7 @@ Rules for Keywords:
 - Keep keywords natural, lowercase and mode-compliant.
 - NEVER output connector/function words as standalone keywords (for example: a, an, the, and, or, of, in, on, at, to, for, from, by, with, without, as, is, are, this, that).
 - NEVER use connector words as filler inside a keyword phrase. Remove them when constructing keyword phrases.
-- Colors are allowed when useful.
+- Colors are forbidden as standalone keyword terms.
 
 
 Rules for Categories:
