@@ -544,6 +544,21 @@ const getLanguageName = (code?: string) => {
  * Tahap 6: SEO RANKING — Penataan hierarki 3-Tier (1-10: Objek Utama, 11-20: Detail/Aksi, 21-30+: Konsep/Intent).
  * Tahap 7: FINAL KEYWORDS — Penguncian presisi sesuai jumlah target keyword yang diminta.
  */
+/**
+ * Membersihkan keyword untuk indexing: lowercase, trim, hapus karakter non-alfanumerik,
+ * normalisasi spasi, hapus tanda baca di awal/akhir.
+ */
+function sanitizeForIndexing(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')   // hapus karakter spesial kecuali dash dan spasi
+    .replace(/\s+/g, ' ')        // normalisasi spasi ganda
+    .replace(/^-+|-+$/g, '')     // hapus dash di awal/akhir
+    .trim();
+}
+
 function processKeywordsWith7StagePipeline(
   rawAiKeywords: string[],
   targetCount: number,
@@ -1721,7 +1736,7 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
 
 // ============================================================================
 // METADATAGEN STRUCTURED PIPELINE
-// Modul terstruktur untuk MetadataGen ��������� mencakup 8 lapisan sesuai spesifikasi:
+// Modul terstruktur untuk MetadataGen ����������� mencakup 8 lapisan sesuai spesifikasi:
 //   1. Analisis visual bertingkat (scene → object → attributes → concepts)
 //   2. Formula judul per jenis aset (photo, AI image, illustration, vector, video)
 //   3. Sistem pembobotan keyword (SEO / visual / commercial / trend score)
