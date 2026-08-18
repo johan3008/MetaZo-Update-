@@ -137,3 +137,18 @@ export interface MarketTrend {
   opportunityScore: number;
   statusBadge: 'Excellent' | 'High Potential' | 'Moderate' | 'Oversaturated';
 }
+
+// 8-Dimensi Keyword (PRD Metadata Generator v2.0)
+// Pola: Subject → Specific Description → Action → Mood → Style → Concept → Use Case → Context
+// ⚠️ Warna tidak termasuk dalam keyword (buang slot)
+export interface StructuredKeywords {
+  mainSubject: string[];
+  specificDescription: string[];
+  actionMotion: string[];
+  visualAttribute: string[];
+  mood: string[];
+  styleAssetType: string[];
+  concept: string[];
+  useCase: string[];
+  context: string[];
+}
