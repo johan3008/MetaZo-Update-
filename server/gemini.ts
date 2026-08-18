@@ -1312,7 +1312,16 @@ function processKeywordsSemantic(
     }
 
     if (seen.has(clean)) return;
-    if (isProhibitedKeyword(clean)) return;
+
+    // Only reject true trademark / prohibited terms here.
+    // Do NOT globally reject generic visual/context words such as:
+    // background, scene, light, blue, white, nature, landscape, concept.
+    // These can be legitimate stock-search keywords when supported by the asset.
+    const containsProhibitedTerm = clean
+      .split(/\\s+/)
+      .some(word => PROHIBITED_KEYWORDS_SET.has(word.toLowerCase()));
+
+    if (containsProhibitedTerm) return;
     if (!isAllowedFormat(clean)) return;
 
     seen.add(clean);
@@ -1349,6 +1358,15 @@ function processKeywordsSemantic(
   // 1. AI keywords first — preserve their original order.
   (Array.isArray(rawAiKeywords) ? rawAiKeywords : []).forEach(addCandidate);
 
+  // Keyword architecture:
+  // 1) Core subjects / objects
+  // 2) Visual details / attributes / colors / lighting
+  // 3) Actions / environment / scene
+  // 4) Concepts / themes / commercial context / buyer intent
+  // 5) Seasonal or contextual terms when supplied by visual analysis
+  // This intentionally mirrors broad microstock keyword patterns rather than
+  // forcing every keyword to be a literal object name.
+  //
   // 2. Fallback / padding from visual facts + title + description.
   // No unrelated or synthetic keywords are generated.
   if (result.length < max) {
@@ -1361,9 +1379,13 @@ function processKeywordsSemantic(
       visualFacts?.visual_attributes,
       visualFacts?.actions,
       visualFacts?.scene,
+      visualFacts?.environment,
       visualFacts?.concepts,
       visualFacts?.commercial_concepts,
       visualFacts?.commercial_themes,
+      visualFacts?.context,
+      visualFacts?.themes,
+      visualFacts?.intent,
       visualFacts?.composition,
       visualFacts?.camera,
       visualFacts?.camera_angle,
