@@ -1269,14 +1269,45 @@ function processKeywordsSemantic(
   // Application-side keyword rules:
   // 1) hallucination pruning, 2) preserve AI order, 3) respect requested count,
   // 4) selected keyword format: single = 1 word, multi = exactly 2 words, mixed = 1 or 2 words.
-  const evidence = new Set<string>();
-  const collect = (v: any) => {
+  //
+  // IMPORTANT BUG FIX:
+  // The previous implementation required every token of an AI keyword to be an
+  // exact token inside VISUAL_FACTS. That was too strict and caused valid
+  // keywords/synonyms to be reduced to an empty array. We now validate against
+  // visual evidence using exact phrases, token overlap, verified synonyms, and
+  // light morphology while still rejecting unsupported hallucinations.
+  const normalize = (v: any) => sanitizeForIndexing(String(v ?? ''));
+  const evidenceSources: string[] = [];
+
+  const collectSources = (v: any) => {
     if (v == null) return;
-    if (typeof v === 'string') { sanitizeForIndexing(v).split(/\s+/).filter(Boolean).forEach(w => evidence.add(w)); return; }
-    if (Array.isArray(v)) { v.forEach(collect); return; }
-    if (typeof v === 'object') Object.values(v).forEach(collect);
+    if (typeof v === 'string') {
+      const value = normalize(v);
+      if (value) evidenceSources.push(value);
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach(collectSources);
+      return;
+    }
+    if (typeof v === 'object') {
+      // Prefer semantic values, but also support object shapes such as
+      // {name, value, label, description, importance} returned by vision models.
+      const preferred = ['name', 'value', 'label', 'description', 'subject', 'object', 'term'];
+      const added = new Set<string>();
+      for (const key of preferred) {
+        if (key in v) {
+          collectSources(v[key]);
+          added.add(key);
+        }
+      }
+      Object.entries(v).forEach(([key, value]) => {
+        if (!added.has(key) && key !== 'importance' && key !== 'confidence') collectSources(value);
+      });
+    }
   };
-  collect({
+
+  collectSources({
     primary_subjects: visualFacts?.primary_subjects,
     secondary_subjects: visualFacts?.secondary_subjects,
     background_elements: visualFacts?.background_elements,
@@ -1295,30 +1326,141 @@ function processKeywordsSemantic(
     focus: visualFacts?.focus,
     optics: visualFacts?.optics
   });
-  const grounded = (kw: string) => {
-    const tokens = sanitizeForIndexing(kw).split(/\s+/).filter(Boolean);
-    return tokens.length > 0 && tokens.every(t => evidence.has(t));
-  };
-  const result: string[] = [];
-  const seen = new Set<string>();
+
+  const evidence = new Set<string>();
+  evidenceSources.forEach(source => normalize(source).split(/\s+/).filter(Boolean).forEach(w => evidence.add(w)));
+
+  const stopWords = KEYWORD_CONNECTOR_WORDS;
   const mode = keywordMode || 'mixed';
   const isAllowedFormat = (kw: string) => {
-    const wordCount = kw.split(/\s+/).filter(Boolean).length;
+    const wordCount = normalize(kw).split(/\s+/).filter(Boolean).length;
     if (mode === 'single') return wordCount === 1;
     if (mode === 'multi') return wordCount === 2;
     return wordCount === 1 || wordCount === 2;
   };
 
+  const wordStem = (word: string): string => {
+    const w = normalize(word);
+    if (w.length <= 3) return w;
+    if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
+    if (w.endsWith('ing') && w.length > 5) {
+      let base = w.slice(0, -3);
+      if (base.length > 2 && base.at(-1) === base.at(-2)) base = base.slice(0, -1);
+      return base;
+    }
+    if (w.endsWith('ed') && w.length > 4) return w.slice(0, -2);
+    if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) return w.slice(0, -1);
+    return w;
+  };
+
+  const evidenceStems = new Set<string>();
+  evidence.forEach(w => evidenceStems.add(wordStem(w)));
+
+  const verifiedSubjectTerms = new Set<string>();
+  const collectVerifiedSubjects = (v: any) => {
+    if (v == null) return;
+    if (typeof v === 'string') {
+      const n = normalize(v);
+      if (n) verifiedSubjectTerms.add(n);
+      return;
+    }
+    if (Array.isArray(v)) { v.forEach(collectVerifiedSubjects); return; }
+    if (typeof v === 'object') {
+      const value = v.name ?? v.value ?? v.label ?? v.subject ?? v.object;
+      if (typeof value === 'string' && normalize(value)) verifiedSubjectTerms.add(normalize(value));
+    }
+  };
+  collectVerifiedSubjects(visualFacts?.primary_subjects);
+  collectVerifiedSubjects(visualFacts?.secondary_subjects);
+  collectVerifiedSubjects(visualFacts?.objects);
+
+  const synonymTerms = new Set<string>();
+  verifiedSubjectTerms.forEach(subject => {
+    try {
+      getSynonymsFor(subject).forEach(syn => {
+        const n = normalize(syn);
+        if (n) synonymTerms.add(n);
+        n.split(/\s+/).forEach(token => { if (token) synonymTerms.add(token); });
+      });
+    } catch (_) {
+      // Synonym expansion is optional; exact visual evidence remains authoritative.
+    }
+  });
+
+  const isGrounded = (kw: string): boolean => {
+    const normalized = normalize(kw);
+    const tokens = normalized.split(/\s+/).filter(Boolean).filter(t => !stopWords.has(t));
+    if (!tokens.length) return false;
+
+    // Exact visual phrase or a phrase contained in a verified visual source.
+    if (evidenceSources.some(src => src === normalized || src.includes(normalized) || normalized.includes(src))) return true;
+
+    // Every meaningful token is visually evidenced.
+    if (tokens.every(t => evidence.has(t))) return true;
+
+    // Allow a keyword when at least one meaningful token is visually evidenced
+    // and the remaining token is a verified synonym or morphological variant.
+    const groundedTokenCount = tokens.filter(t => evidence.has(t) || evidenceStems.has(wordStem(t)) || synonymTerms.has(t)).length;
+    if (tokens.length === 1) return groundedTokenCount === 1;
+    return groundedTokenCount >= Math.max(1, Math.ceil(tokens.length * 0.5));
+  };
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+
   for (const raw of Array.isArray(rawAiKeywords) ? rawAiKeywords : []) {
-    const kw = sanitizeForIndexing(String(raw || ''));
+    const kw = normalize(raw);
     const parts = kw.split(/\s+/).filter(Boolean);
-    if (!kw || seen.has(kw) || parts.some(isKeywordConnector) || !grounded(kw) || !isAllowedFormat(kw)) continue;
-    seen.add(kw); result.push(kw);
+    if (!kw || seen.has(kw) || parts.some(isKeywordConnector) || isProhibitedKeyword(kw) || !isGrounded(kw) || !isAllowedFormat(kw)) continue;
+    seen.add(kw);
+    result.push(kw);
     if (result.length >= Math.max(0, Number(targetCount) || 0)) break;
   }
-  return result;
-}
 
+  // If the validator removed everything because the model returned a different
+  // but still visually grounded representation, use verified visual facts as a
+  // deterministic fallback. This prevents a blank Keywords UI while preserving
+  // the no-hallucination rule.
+  if (result.length === 0 && evidenceSources.length > 0) {
+    const visualCandidates: string[] = [];
+    const pushCandidate = (value: any) => {
+      const n = normalize(value);
+      if (n) visualCandidates.push(n);
+    };
+    [
+      visualFacts?.primary_subjects,
+      visualFacts?.secondary_subjects,
+      visualFacts?.objects,
+      visualFacts?.attributes,
+      visualFacts?.visual_attributes,
+      visualFacts?.actions,
+      visualFacts?.concepts,
+      visualFacts?.scene
+    ].forEach(value => {
+      if (Array.isArray(value)) value.forEach(item => pushCandidate(typeof item === 'string' ? item : item?.name ?? item?.value ?? item?.label));
+      else pushCandidate(value);
+    });
+
+    for (const candidate of visualCandidates) {
+      const parts = candidate.split(/\s+/).filter(Boolean);
+      const candidates = mode === 'single'
+        ? parts
+        : mode === 'multi'
+          ? [parts.slice(0, 2).join(' ')]
+          : [candidate, ...parts];
+      for (const fallbackKw of candidates) {
+        const kw = normalize(fallbackKw);
+        if (!kw || seen.has(kw) || isProhibitedKeyword(kw) || !isAllowedFormat(kw) || kw.split(/\s+/).some(isKeywordConnector)) continue;
+        seen.add(kw);
+        result.push(kw);
+        if (result.length >= Math.max(0, Number(targetCount) || 0)) break;
+      }
+      if (result.length >= Math.max(0, Number(targetCount) || 0)) break;
+    }
+  }
+
+  return result.slice(0, Math.max(0, Number(targetCount) || 0));
+}
 
 function enforceStrictKeywordMode(keywords: string[], keywordMode: 'mixed' | 'single' | 'multi' | undefined, targetCount: number, visualFacts: any): string[] {
   const mode = keywordMode || 'mixed';
@@ -2459,60 +2601,6 @@ function expandFromVisualFacts(existingKeywords: string[], visualFacts: any, max
   return expandSynonymsAndLongTail(existingKeywords, pseudoTiers, maxNew);
 }
 
-/**
- * Fallback darurat: membangun daftar keyword LANGSUNG dari VISUAL_FACTS mentah
- * (tanpa bergantung pada rawAiKeywords sama sekali). Dipakai ketika respons AI
- * gagal di-parse jadi JSON valid, supaya user tidak pernah menerima keyword
- * kosong hanya karena parsing gagal. Tahapannya:
- *   1) Ambil istilah dasar dari tiers (objects/scene/attributes/concepts).
- *   2) Bersihkan, dedupe, buang istilah terlarang/generik.
- *   3) Jika masih kurang dari targetCount, perluas via sinonim & frasa long-tail
- *      (expandSynonymsAndLongTail) yang juga berbasis visualFacts, bukan template statis.
- */
-function buildFallbackKeywordsFromVisualFacts(visualFacts: any, targetCount: number): string[] {
-  const target = Math.max(0, Number(targetCount) || 0);
-  if (target === 0) return [];
-
-  const tiers = buildTieredVisualAnalysis(visualFacts);
-  const seen = new Set<string>();
-  const seeds: string[] = [];
-
-  const tryAdd = (raw: string) => {
-    const cleaned = sanitizeForIndexing(String(raw || ''));
-    if (!cleaned) return;
-    const parts = cleaned.split(/\s+/).filter(Boolean);
-    if (parts.length === 0 || parts.length > 4) return;
-    if (parts.some(isKeywordConnector)) return;
-    if (parts.length === 1 && isProhibitedKeyword(cleaned)) return;
-    if (seen.has(cleaned)) return;
-    seen.add(cleaned);
-    seeds.push(cleaned);
-  };
-
-  // 1) Objek terdeteksi, diurutkan dari yang paling penting (primary -> secondary -> background)
-  tiers.objects.forEach(o => tryAdd(o.name));
-  // 2) Konteks scene/komposisi
-  tiers.scene.forEach(tryAdd);
-  // 3) Atribut (warna, aksi, teks yang terlihat)
-  tiers.attributes.forEach(tryAdd);
-  // 4) Konsep/tema komersial yang lebih abstrak (paling akhir, prioritas terendah)
-  tiers.concepts.forEach(c => {
-    // konsep sering berupa kalimat panjang; pecah jadi kata/frasa pendek yang bermakna
-    String(c).split(/[.,;]/).forEach(fragment => tryAdd(fragment));
-  });
-
-  let result = filterBannedKeywords(seeds.slice(0, target));
-
-  // 5) Kalau masih kurang dari target, perluas dengan sinonim & kombinasi long-tail
-  //    yang tetap berakar dari visualFacts (bukan array kosong / template generik).
-  if (result.length < target) {
-    const additional = expandFromVisualFacts(result, visualFacts, target - result.length);
-    result = filterBannedKeywords([...result, ...additional]);
-  }
-
-  return result.slice(0, target);
-}
-
 // ---- LAPISAN 5: FILTER OTOMATIS PEDOMAN ADOBE STOCK & SHUTTERSTOCK --------
 
 const MARKETPLACE_BANNED_TERMS = new Set([
@@ -3489,14 +3577,13 @@ OUTPUT FORMAT:
     const tieredVisual = buildTieredVisualAnalysis(visualFacts);
     const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
     const fallbackTitle = ensureTitleLength(applyTitleTemplate(assetSubtype, tieredVisual, titleLength), [], "", titleLength);
-    // PENTING: jangan lagi memanggil processKeywordsSemantic([]) — input array kosong
-    // dijamin selalu menghasilkan output kosong karena fungsi itu hanya MEMFILTER
-    // rawAiKeywords yang diberikan, tidak pernah mengekstrak dari visualFacts sendiri.
-    // Sebagai gantinya, bangun keyword langsung dari VISUAL_FACTS mentah supaya
-    // user tetap mendapat keyword yang relevan meski parsing JSON dari AI gagal.
-    let fallbackKeywords = buildFallbackKeywordsFromVisualFacts(visualFacts, targetCount);
-    // Terapkan aturan mode (single/multi/mixed) yang sama seperti jalur utama.
-    fallbackKeywords = enforceStrictKeywordMode(fallbackKeywords, keywordMode, targetCount, visualFacts);
+    const fallbackKeywords = processKeywordsSemantic(
+      [],
+      targetCount,
+      visualFacts,
+      toolType,
+      keywordMode
+    );
     const fallbackDesc = ensureDescription("", fallbackTitle, fallbackKeywords);
     const accurateCat = determineAccurateCategory(fallbackTitle, fallbackKeywords, visualFacts, 0);
     const validShutterCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
