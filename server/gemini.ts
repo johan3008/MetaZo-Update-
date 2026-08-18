@@ -236,6 +236,33 @@ const COLOR_KEYWORDS = new Set([
   'amber', 'olive', 'coral', 'crimson', 'scarlet', 'maroon', 'plum', 'ivory', 'mustard', 'khaki', 'mint', 'lime', 'tan', 'mauve', 'pastel'
 ]);
 
+// Connector / function words are never valid standalone microstock keywords.
+// They may appear naturally in titles/descriptions, but must never occupy keyword slots.
+const KEYWORD_CONNECTOR_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'nor', 'but', 'if', 'then', 'than',
+  'of', 'in', 'on', 'at', 'to', 'for', 'from', 'by', 'with', 'without',
+  'into', 'onto', 'over', 'under', 'between', 'through', 'during', 'before',
+  'after', 'around', 'against', 'among', 'within', 'across', 'behind', 'beside',
+  'near', 'toward', 'towards', 'upon', 'via', 'as', 'per', 'while',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'am', 'has', 'have', 'had',
+  'this', 'that', 'these', 'those', 'it', 'its', 'their', 'there', 'here'
+]);
+
+function isKeywordConnector(word: string): boolean {
+  return KEYWORD_CONNECTOR_WORDS.has(String(word || '').toLowerCase().trim());
+}
+
+function cleanKeywordOutput(raw: string): string {
+  const clean = sanitizeForIndexing(raw);
+  if (!clean) return '';
+  return clean
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(word => !isKeywordConnector(word))
+    .join(' ')
+    .trim();
+}
+
 const PROHIBITED_KEYWORDS_SET = new Set([
   'apple', 'iphone', 'ipad', 'macbook', 'mac', 'ios', 'android', 'microsoft', 'windows', 'xbox', 'playstation', 
   'sony', 'samsung', 'nike', 'adidas', 'gucci', 'rolex', 'cocacola', 'coca-cola', 'pepsi', 'starbucks', 'amazon', 
@@ -565,230 +592,177 @@ function sanitizeForIndexing(raw: string): string {
     .trim();
 }
 
-/**
- * SEO SINGLE KEYWORD ENGINE
- *
- * Dedicated mode for stock metadata where every keyword is exactly one word and
- * the first 10 positions are locked to the strongest buyer/search terms.
- * This is deliberately heuristic: without a live marketplace search-volume API,
- * "SEO" is estimated from visual grounding, subject priority, commercial intent,
- * specificity, and semantic diversity. It must never invent unrelated terms.
- */
-function buildSeoSingleKeywords(
-  candidates: string[],
-  targetCount: number,
-  visualFacts: any,
-  tieredVisual: TieredVisualAnalysis
-): string[] {
-  const normalize = (v: string) => sanitizeForIndexing(v).toLowerCase();
-  const primary = (tieredVisual.objects || [])
-    .filter(o => o.tier === 'primary' || o.importance >= 70)
-    .map(o => normalize(o.name))
-    .filter(Boolean);
-  const objects = (tieredVisual.objects || []).map(o => normalize(o.name)).filter(Boolean);
-  const attrs = (tieredVisual.attributes || []).map(a => normalize(String(a))).filter(Boolean);
-  const scene = (tieredVisual.scene || []).map(v => normalize(String(v))).filter(Boolean);
-  const concepts = (tieredVisual.concepts || []).map(v => normalize(String(v))).filter(Boolean);
-  const actions = Array.isArray(visualFacts?.actions) ? visualFacts.actions.map((v: any) => normalize(String(v))).filter(Boolean) : [];
-  const colors = Array.isArray(visualFacts?.colors) ? visualFacts.colors.map((v: any) => normalize(String(v))).filter(Boolean) : [];
-  const visualTerms = [...new Set([...primary, ...objects, ...attrs, ...scene, ...concepts, ...actions, ...colors])];
-
-  // These are filler terms or grammar words, not useful stock search terms.
-  const BLOCKED = new Set([
-    'with','and','the','a','an','of','for','to','in','on','at','by','from','as','is','are','be',
-    'image','picture','photo','photograph','stock','asset','file','thing','object','item','stuff',
-    'beautiful','stunning','amazing','awesome','nice','good','great','perfect','best','high',
-    'quality','premium','view','scene','background','wallpaper','design','concept','detail','element'
-  ]);
-
-  const COMMERCIAL = new Set([
-    'winter','forest','river','stream','snow','landscape','aurora','wilderness','nature','pine',
-    'night','stars','sky','water','reflection','frozen','icy','neon','glowing','luminous','lighting',
-    'illumination','snowfall','woodland','evergreen','riverbank','scenic','fantasy','mystical',
-    'futuristic','digital','technology','cinematic','magical','tranquil','serene','peaceful','outdoors'
-  ]);
-
-  const normalizeRoot = (word: string) => word
-    .replace(/(ing|ed|er|ers|es|s)$/i, '')
-    .replace(/(.)\1+$/i, '$1');
-
-  const visualMatch = (kw: string, list: string[]) => list.some(v => v === kw || v.includes(kw) || kw.includes(v));
-  const score = (kw: string) => {
-    let total = 0;
-    const lower = kw.toLowerCase();
-    if (primary.some(v => v === lower)) total += 120;
-    else if (visualMatch(lower, objects)) total += 90;
-    else if (visualMatch(lower, scene)) total += 72;
-    else if (visualMatch(lower, attrs)) total += 68;
-    else if (visualMatch(lower, concepts)) total += 58;
-    else if (visualMatch(lower, actions)) total += 55;
-    else if (visualMatch(lower, colors)) total += 40;
-    else total += 18;
-
-    if (COMMERCIAL.has(lower)) total += 28;
-    if (lower.length >= 5 && lower.length <= 14) total += 8;
-    if (lower.length <= 3) total -= 12;
-    if (/^[a-z]+$/.test(lower)) total += 4;
-    if (lower.includes('with')) total -= 100;
-    return total;
-  };
-
-  const pool = new Map<string, number>();
-  for (const raw of candidates || []) {
-    const cleaned = normalize(raw);
-    if (!cleaned || cleaned.length < 3 || cleaned.includes(' ') || BLOCKED.has(cleaned)) continue;
-    if (!/^[a-z0-9]+$/i.test(cleaned)) continue;
-    if (isProhibitedKeyword(cleaned) || violatesMarketplaceGuidelines(cleaned)) continue;
-    pool.set(cleaned, Math.max(pool.get(cleaned) || -Infinity, score(cleaned)));
-  }
-
-  // Add strongly grounded single-word visual facts as candidates, but never pad with generic words.
-  for (const raw of visualTerms) {
-    if (!raw || raw.includes(' ')) continue;
-    const cleaned = normalize(raw);
-    if (!cleaned || cleaned.length < 3 || BLOCKED.has(cleaned)) continue;
-    if (!/^[a-z0-9]+$/i.test(cleaned)) continue;
-    if (isProhibitedKeyword(cleaned) || violatesMarketplaceGuidelines(cleaned)) continue;
-    pool.set(cleaned, Math.max(pool.get(cleaned) || -Infinity, score(cleaned) + 5));
-  }
-
-  const ranked = [...pool.entries()].sort((a,b) => b[1] - a[1]).map(([kw]) => kw);
-
-  // Stem-family deduplication: keep only the strongest member of each root family.
-  const rootSeen = new Set<string>();
-  const deduped: string[] = [];
-  for (const kw of ranked) {
-    const root = normalizeRoot(kw);
-    if (rootSeen.has(root)) continue;
-    rootSeen.add(root);
-    deduped.push(kw);
-  }
-
-  // Explicitly lock the top 10 by SEO score. Primary subject remains first whenever available.
-  const locked = deduped.slice(0, Math.min(10, targetCount));
-  const primaryIndex = primary.findIndex(p => locked.includes(p));
-  if (primaryIndex > 0) {
-    const [main] = locked.splice(primaryIndex, 1);
-    locked.unshift(main);
-  } else if (primary.length > 0 && targetCount > 0 && !locked.includes(primary[0]) && !BLOCKED.has(primary[0]) && !primary[0].includes(' ')) {
-    locked.unshift(primary[0]);
-    locked.splice(Math.min(10, targetCount));
-  }
-
-  const remainder = deduped.filter(k => !locked.includes(k));
-  return [...locked, ...remainder].slice(0, targetCount);
-}
-
-function processKeywordsWith7StagePipeline(
+function processKeywordsSemantic(
   rawAiKeywords: string[],
   targetCount: number,
   visualFacts: any,
   toolType?: ToolType,
-  keywordMode: 'mixed' | 'single' | 'multi' | 'seo-single' = 'mixed'
+  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed',
+  title?: string,
+  description?: string
 ): string[] {
-  // --- TAHAP 1: OBJECT (Visual Detection Extraction) ---
-  const tieredVisual = buildTieredVisualAnalysis(visualFacts);
-  const primarySubjects = (tieredVisual.objects || [])
-    .filter(o => o.tier === 'primary' || o.importance >= 70)
-    .map(o => o.name.toLowerCase().trim());
-  const allVisualObjects = (tieredVisual.objects || []).map(o => o.name.toLowerCase().trim());
-  const visualAttributes = (tieredVisual.attributes || []).map(a => String(a).toLowerCase().trim());
-  const visualActions = (visualFacts?.actions || []).map((a: any) => String(a).toLowerCase().trim());
-  const visualConcepts = (tieredVisual.concepts || []).map(c => String(c).toLowerCase().trim());
+  /**
+   * Semantic keyword engine.
+   *
+   * There is deliberately no fixed 70/30 split, no fixed 8/9-stage quota,
+   * no forced "common words", and no synthetic padding such as "forest scene".
+   * The engine ranks only candidates that can be grounded in the asset analysis.
+   */
+  const clean = (v: any) => sanitizeForIndexing(String(v ?? ''));
+  const tokens = (v: string) => clean(v).split(/\s+/).filter(Boolean);
+  const facts = buildTieredVisualAnalysis(visualFacts);
 
-  // Grounding corpus untuk validasi relevansi visual
-  const visualGroundingText = [
-    ...allVisualObjects,
-    ...visualAttributes,
-    ...visualActions,
-    ...visualConcepts,
-    ...(Array.isArray(visualFacts?.colors) ? visualFacts.colors : [])
-  ].join(' ').toLowerCase();
+  const primary = facts.objects.filter(o => o.tier === 'primary').map(o => clean(o.name));
+  const secondary = facts.objects.filter(o => o.tier !== 'background').map(o => clean(o.name));
+  const background = facts.objects.filter(o => o.tier === 'background').map(o => clean(o.name));
+  const attributes = facts.attributes.map(clean).filter(Boolean);
+  const scenes = facts.scene.map(clean).filter(Boolean);
+  const concepts = facts.concepts.map(clean).filter(Boolean);
+  const actions = Array.isArray(visualFacts?.actions) ? visualFacts.actions.map(clean).filter(Boolean) : [];
+  const colors = Array.isArray(visualFacts?.colors) ? visualFacts.colors.map(clean).filter(Boolean) : [];
 
-  // --- TAHAP 2: PRIMARY KEYWORD (Keyword #1 Establishment) ---
-  const primarySubjectKeyword = primarySubjects.length > 0 ? primarySubjects[0] : (allVisualObjects[0] || '');
+  const titleText = clean(title || '');
+  const descriptionText = clean(description || '');
+  const visualCorpus = [...primary, ...secondary, ...background, ...attributes, ...scenes, ...concepts, ...actions, ...colors].join(' ');
+  const visualTokens = new Set(visualCorpus.split(/\s+/).filter(w => w.length > 2));
 
-  // --- TAHAP 3: SYNONYM CHECK (High-Quality Natural Synonyms & Suffix-Free Expansion) ---
-  const candidatePool: string[] = [];
-  
-  // 3a. Masukkan raw AI keywords yang sudah dibersihkan
-  (rawAiKeywords || []).forEach(k => {
-    if (typeof k === 'string') {
-      const sanitized = sanitizeForIndexing(k);
-      if (sanitized.length > 1 && !isProhibitedKeyword(sanitized)) {
-        if ((keywordMode === 'single' || keywordMode === 'seo-single') && sanitized.includes(' ')) {
-          sanitized.split(/\s+/).forEach(part => {
-            if (part.length > 1 && !isProhibitedKeyword(part)) candidatePool.push(part);
-          });
-        } else {
-          candidatePool.push(sanitized);
-        }
+  const trendTerms: Record<string, number> = {
+    // Current Adobe 2026 trend vocabulary, used only as a small boost when grounded.
+    'all the feels': 8, 'sensory': 7, 'tactile': 7, 'texture': 5,
+    'connectioneering': 6, 'connection': 5, 'surreal': 8, 'surrealism': 8,
+    'local flavor': 6, 'authentic': 5, 'nostalgia': 7, 'nostalgic': 7,
+    'glassmorphism': 9, 'minimalism': 7, 'minimalist': 7, 'halftone': 7,
+    'stippling': 6, 'grainy': 5, 'fantasy': 7, 'cinematic': 4,
+    'futuristic': 7, '3d': 6, 'artificial intelligence': 8, 'ai': 7
+  };
+
+  const commercialTerms = new Set([
+    'background','banner','wallpaper','advertising','marketing','campaign','design','template',
+    'technology','innovation','sustainability','travel','tourism','hospitality','education',
+    'healthcare','finance','business','environment','seasonal','christmas','holiday'
+  ]);
+
+  const stop = new Set(['a','an','the','and','or','of','in','on','at','to','for','with','by','from','as','is','are','this','that','image','picture','asset','stock']);
+
+  const normalizeCandidate = (raw: string): string => cleanKeywordOutput(raw);
+  const isAllowedMode = (kw: string) => {
+    const parts = kw.split(/\s+/).filter(Boolean);
+    if (!parts.length || parts.some(isKeywordConnector)) return false;
+    const count = parts.length;
+    if (keywordMode === 'single') return count === 1;
+    if (keywordMode === 'multi') return count >= 2 && count <= 4;
+    return count >= 1 && count <= 4;
+  };
+
+  // Token overlap is intentionally strict: a candidate must share vocabulary
+  // with visual facts/title/description OR be an exact AI-generated concept.
+  // A long word is NOT considered relevant merely because it has 4+ characters.
+  const phraseOverlap = (kw: string, source: string[]) => {
+    const kTokens = tokens(kw).filter(t => !stop.has(t));
+    if (!kTokens.length) return 0;
+    const joined = kTokens.join(' ');
+    let hits = 0;
+    for (const src of source) {
+      const srcTokens = new Set(tokens(src));
+      if (src === joined || src.includes(joined) || joined.includes(src)) hits += 2;
+      hits += kTokens.filter(t => srcTokens.has(t)).length;
+    }
+    return Math.min(8, hits);
+  };
+
+  const synonymGrounding = (kw: string) => {
+    const kTokens = tokens(kw);
+    let score = 0;
+    for (const token of kTokens) {
+      for (const src of [...primary, ...secondary, ...background]) {
+        if (getSynonymsFor(src).some(s => clean(s) === token)) score += 2;
       }
     }
+    return Math.min(6, score);
+  };
+
+  const candidates = new Map<string, { raw: string; source: 'ai' | 'visual' }>();
+  (rawAiKeywords || []).forEach(raw => {
+    const k = normalizeCandidate(raw);
+    if (k && !candidates.has(k)) candidates.set(k, { raw: k, source: 'ai' });
   });
 
-  // 3b. Tambahkan sinonim alami dari visual objects terdeteksi (tanpa membuat varian -ing/-er/-s)
-  allVisualObjects.forEach(obj => {
-    const synonyms = getSynonymsFor(obj);
-    synonyms.forEach(syn => {
-      const cleanSyn = sanitizeForIndexing(syn);
-      if (cleanSyn.length > 1 && !isProhibitedKeyword(cleanSyn)) {
-        if ((keywordMode === 'single' || keywordMode === 'seo-single') && cleanSyn.includes(' ')) {
-          // split
-          cleanSyn.split(/\s+/).forEach(p => { if (p.length > 1) candidatePool.push(p); });
-        } else {
-          candidatePool.push(cleanSyn);
-        }
-      }
+  // Add only literal visual terms as fallback. No random padding and no invented modifiers.
+  [...primary, ...secondary, ...background, ...attributes, ...scenes, ...actions, ...concepts, ...colors].forEach(raw => {
+    const k = normalizeCandidate(raw);
+    if (k && !candidates.has(k)) candidates.set(k, { raw: k, source: 'visual' });
+    // Useful atomic terms from multi-word visual facts.
+    tokens(k).filter(t => t.length > 2 && !stop.has(t)).forEach(t => {
+      if (!candidates.has(t)) candidates.set(t, { raw: t, source: 'visual' });
     });
   });
 
-  // --- TAHAP 4: RELEVANCE CHECK (Visual Grounding & Search Intent) ---
-  const relevantCandidates = candidatePool.filter(kw => {
-    if (!kw || kw.length < 2 || isProhibitedKeyword(kw)) return false;
-    if (violatesMarketplaceGuidelines(kw)) return false;
+  const scored = [...candidates.values()].map((candidate, index) => {
+    const kw = candidate.raw;
+    if (!kw || kw.split(/\s+/).some(t => isKeywordConnector(t))) return { kw, score: -999, grounding: 0 };
+    const kTokens = tokens(kw).filter(t => !stop.has(t) && !isKeywordConnector(t));
+    const overlap = phraseOverlap(kw, [...primary, ...secondary, ...background, ...attributes, ...scenes, ...actions, ...concepts, titleText, descriptionText]);
+    const syn = synonymGrounding(kw);
+    const exactPrimary = primary.some(p => p === kw);
+    const subjectMatch = secondary.some(o => o === kw || o.includes(kw) || kw.includes(o));
+    const contextMatch = [...scenes, ...attributes, ...colors].some(a => a === kw || a.includes(kw) || kw.includes(a));
+    const conceptMatch = concepts.some(c => c === kw || c.includes(kw) || kw.includes(c));
+    const actionMatch = actions.some(a => a === kw || a.includes(kw) || kw.includes(a));
 
-    // Jika visual grounding corpus tersedia, pastikan ada relevansi kata atau kecocokan konsep
-    if (visualGroundingText.length > 5) {
-      const words = kw.split(/\s+/);
-      const isGrounded = words.some(w => visualGroundingText.includes(w) || w.length >= 4);
-      return isGrounded;
-    }
-    return true;
-  });
+    const grounding = Math.min(100, overlap * 10 + syn * 8 + (exactPrimary ? 25 : 0) + (subjectMatch ? 15 : 0) + (contextMatch ? 10 : 0) + (conceptMatch ? 12 : 0) + (actionMatch ? 10 : 0));
+    if (grounding < 18 && candidate.source === 'ai') return { kw, score: -999, grounding };
+    if (grounding < 12) return { kw, score: -999, grounding };
 
-  // --- TAHAP 5: DUPLICATE CHECK (Exact & Stem Deduplication — Anti Suffix Spam) ---
-  const deduplicatedList = deduplicateStemVariants(relevantCandidates);
+    // Search intent: what a buyer would type to find this exact visual.
+    const searchIntent = Math.min(100,
+      (exactPrimary ? 35 : 0) +
+      (subjectMatch ? 20 : 0) +
+      (contextMatch ? 15 : 0) +
+      (conceptMatch ? 15 : 0) +
+      (actionMatch ? 10 : 0) +
+      (commercialTerms.has(kw) ? 5 : 0)
+    );
 
-  // SEO SINGLE gets its own ranking engine. This deliberately bypasses the legacy
-  // 70/30 common-word split and the legacy color blacklist because this mode is
-  // designed to maximize useful single-word search coverage.
-  if (keywordMode === 'seo-single') {
-    return buildSeoSingleKeywords(relevantCandidates, targetCount, visualFacts, tieredVisual);
+    const specificity = Math.min(100, 35 + kTokens.length * 15 + (kw.length >= 8 ? 15 : 0));
+    const trendBoost = Object.entries(trendTerms).reduce((best, [term, weight]) => {
+      if (kw === term || kw.includes(term) || term.includes(kw)) return Math.max(best, weight);
+      return best;
+    }, 0) * (grounding >= 45 ? 1 : 0);
+
+    const naturalnessPenalty = kTokens.filter(t => stop.has(t)).length * 12;
+    const genericPenalty = /^(thing|stuff|scene|element|detail|asset|content|backgrounds?)$/.test(kw) ? 25 : 0;
+    const sourceBonus = candidate.source === 'ai' ? 4 : 0;
+    const priorityBonus = index < 10 ? 2 : 0;
+
+    const score = Math.round(
+      grounding * 0.42 +
+      searchIntent * 0.28 +
+      specificity * 0.14 +
+      trendBoost * 0.10 +
+      sourceBonus + priorityBonus - naturalnessPenalty - genericPenalty
+    );
+
+    return { kw, score, grounding };
+  }).filter(x => x.score > 0);
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Exact/semantic deduplication, but do not aggressively stem legitimate concepts.
+  const result: string[] = [];
+  const signatures = new Set<string>();
+  for (const item of scored) {
+    const kw = cleanKeywordOutput(item.kw);
+    if (!kw || !isAllowedMode(kw)) continue;
+    const signature = tokens(kw).filter(t => !stop.has(t)).sort().join(' ');
+    if (!signature || signatures.has(signature)) continue;
+    if (result.some(existing => existing === kw)) continue;
+    signatures.add(signature);
+    result.push(kw);
+    if (result.length >= targetCount) break;
   }
 
-  // --- TAHAP 6: SEO RANKING (3-Tier Buyer Intent Hierarchy) ---
-  const rankedKeywords = rankAndWeightKeywords(deduplicatedList, tieredVisual, targetCount);
-
-  // Pastikan Keyword #1 adalah Primary Subject
-  if (primarySubjectKeyword && primarySubjectKeyword.length > 1 && rankedKeywords.length > 0) {
-    const pSubjClean = sanitizeForIndexing(primarySubjectKeyword);
-    const existingIdx = rankedKeywords.findIndex(k => k === pSubjClean || k.includes(pSubjClean) || pSubjClean.includes(k));
-    if (existingIdx > 0) {
-      const [mainKw] = rankedKeywords.splice(existingIdx, 1);
-      rankedKeywords.unshift(mainKw);
-    } else if (existingIdx === -1) {
-      rankedKeywords.unshift(pSubjClean);
-    }
-  }
-
-  // --- TAHAP 7: FINAL KEYWORDS (Precision Count Locking) ---
-  let finalKeywords = enforceStrictKeywordMode(rankedKeywords, keywordMode, targetCount, visualFacts);
-  // AGKEYWORDS: Apply 70/30 SEO-common word split
-  finalKeywords = applyAgKeywordsSeoCommonSplit(finalKeywords, targetCount);
-  return finalKeywords.slice(0, targetCount);
+  return result.slice(0, targetCount);
 }
-
 
 /**
  * AGKEYWORDS RULE: Split keywords into 70% SEO-friendly + 30% common words.
@@ -866,11 +840,11 @@ function applyAgKeywordsSeoCommonSplit(keywords: string[], targetCount: number):
 
 function enforceStrictKeywordMode(
   keywords: string[],
-  keywordMode: 'mixed' | 'single' | 'multi' | 'seo-single' | undefined,
+  keywordMode: 'mixed' | 'single' | 'multi' | undefined,
   targetCount: number,
   visualFacts: any
 ): string[] {
-  if (keywordMode !== 'single' && keywordMode !== 'seo-single' && keywordMode !== 'multi') {
+  if (keywordMode !== 'single' && keywordMode !== 'multi') {
     // Mode 'mixed' (default): tidak ada pemaksaan format, campuran diperbolehkan.
     return keywords.slice(0, targetCount);
   }
@@ -886,8 +860,8 @@ function enforceStrictKeywordMode(
 
   const result: string[] = [];
   const addWord = (w: string) => {
-    const v = w.trim().toLowerCase();
-    if (v.length > 1 && !isProhibitedKeyword(v) && !result.includes(v)) {
+    const v = cleanKeywordOutput(w);
+    if (v.length > 1 && !isProhibitedKeyword(v) && !v.split(/\s+/).some(isKeywordConnector) && !result.includes(v)) {
       result.push(v);
     }
   };
@@ -895,7 +869,7 @@ function enforceStrictKeywordMode(
   const processOne = (kwRaw: string) => {
     const clean = sanitizeForIndexing(kwRaw);
     if (!clean || clean.length <= 1 || isProhibitedKeyword(clean)) return;
-    if ((keywordMode === 'single' || keywordMode === 'seo-single')) {
+    if (keywordMode === 'single') {
       clean.split(/\s+/).forEach(p => {
         if (p.length > 1 && !isProhibitedKeyword(p)) addWord(p);
       });
@@ -931,7 +905,7 @@ function ensureKeywordCount(
   title?: string,
   description?: string,
   categoryId?: number,
-  keywordMode?: 'mixed' | 'single' | 'multi' | 'seo-single'
+  keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
   // STRICT RELEVANCE FILTER: Only keep keywords with direct visual connection.
   // Keywords that don't match any detected visual element are discarded.
@@ -948,9 +922,9 @@ function ensureKeywordCount(
   if (Array.isArray(keywords)) {
     keywords.forEach(k => {
       if (typeof k === 'string') {
-        const clean = sanitizeForIndexing(k);
-        if (clean.length > 1 && !isProhibitedKeyword(clean)) {
-          if ((keywordMode === 'single' || keywordMode === 'seo-single') && clean.includes(' ')) {
+        const clean = cleanKeywordOutput(k);
+        if (clean.length > 1 && !isProhibitedKeyword(clean) && !clean.split(/\s+/).some(isKeywordConnector)) {
+          if (keywordMode === 'single' && clean.includes(' ')) {
             // Split multi-words into individual single words
             const pieces = clean.split(/\s+/);
             pieces.forEach(p => {
@@ -1099,7 +1073,7 @@ function ensureKeywordCount(
       const clean = sanitizeForIndexing(rawWord);
       if (clean.length <= 1 || isProhibitedKeyword(clean)) continue;
 
-      if ((keywordMode === 'single' || keywordMode === 'seo-single') && clean.includes(' ')) {
+      if (keywordMode === 'single' && clean.includes(' ')) {
         // Pecah frasa jadi kata tunggal agar konsisten dengan mode 'single'
         const pieces = clean.split(/\s+/);
         for (const p of pieces) {
@@ -2744,7 +2718,7 @@ export const generateStockMetadata = async (
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
   model?: string,
-  keywordMode?: 'mixed' | 'single' | 'multi' | 'seo-single',
+  keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
@@ -2783,228 +2757,31 @@ export const generateStockMetadata = async (
   const directives = getToolTypeDirectives(toolType);
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `TOP BUYER-INTENT KEYWORD RULES (PRIORITY OVER ALL OTHER RULES):
-CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue search apa?"
-- 10–15 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
-- SEO microstock itu:
-  * Akurasi > Jumlah keyword
-  * Relevansi > Keyword viral
-  * Buyer intent > Kata keren
-  * Urutan keyword sangat penting (10-15 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
-  * Keyword harus LITERAL dari apa yang ada di aset, bukan imajinasi/halusinasi AI.
-  * Gunakan kata yang biasa diketik buyer di search bar — bukan istilah teknis yang jarang dicari.
-  * Pikirkan dari sisi pembeli: "Kalau saya butuh gambar seperti ini, kata apa yang akan saya ketik?"
-- Jangan over-niche (nanti gak muncul di pencarian).
-- DILARANG SUFFIX / STEM DUPLICATION (Algoritma Microstock Indexing):
-  * Dilarang mengulang kata yang sama dengan tambahan akhiran seperti -ing, -er, -ed, -s, -es, -ment, -tion (misal: JANGAN masukkan 'paint' DAN 'painter' DAN 'painting', atau 'run' DAN 'runner' DAN 'running').
-  * Mesin pencari stok otomatis melakukan stemming pada satu akar kata. Pengulangan sufiks hanya membuang kuota keyword dan terdeteksi sebagai spam.
-  * Hanya gunakan kata yang berbeda, mandiri, bermakna unik, dan natural.
-- Jangan terlalu generic (tenggelam di antara jutaan aset lain).
-- Keyword mempermudah buyer menemukan aset di halaman pertama Microstock.
-- Tandai 10 keyword INTI paling kuat untuk prioritas utama (buyer-facing core keywords).
+  let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}. Use natural stock-search terms grounded in the supplied visual analysis.`;
+  let keywordRulePromptText = `SEMANTIC STOCK SEARCH — think like a real buyer searching for this exact asset.
+VISUAL TRUTH: every keyword must be supported by the asset or a clear concept directly represented by it.
+SEARCH INTENT: ask what a buyer would actually type to find this exact visual. Start with concrete subjects, then useful distinguishing attributes, setting, action, mood, style, season or concept when relevant.
+SPECIFICITY: prefer terms that distinguish this asset from similar assets. Avoid filler and do not manufacture phrases just to reach the count.
+TREND SIGNAL: current trends are only a small boost when genuinely supported by the visual.
+FORMAT: lowercase, clean, short and natural. Respect the selected mode. Colors are allowed when useful. No brands, trademarks, famous people, fictional characters or artist names.
+ORDER: strongest buyer-facing terms first; the first 10 should be the strongest combination of visual relevance and search intent, not a forced category sequence.`;
+  if (keywordMode === 'single') {
+    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+    keywordRulePromptText += `\nSINGLE MODE: one word per keyword.`;
+  } else if (keywordMode === 'multi') {
+    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} meaningful multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+    keywordRulePromptText += `\nMULTI MODE: use natural 2–4 word search phrases.`;
+  } else {
+    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} mixed single-word and multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+  }
 
-STRUKTUR IDEAL KEYWORD — 8-DIMENSI MICROSTOCK (WAJIB DIIKUTI SECARA BERURUTAN):
-⚠️ WARNA TIDAK TERMASUK KEYWORD — BUANG SLOT. Warna hanya digunakan di internal palette analysis.
-Pola: Subject → Specific Description → Action → Mood → Style → Concept → Use Case → Context
-1. MAIN SUBJECT — Subjek utama dalam gambar (orang, objek, hewan, landscape)
-   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'business team', 'cat', 'vintage car', 'coffee cup').
-2. SPECIFIC DESCRIPTION — Deskripsi spesifik subjek (gender, usia, etnis, material, spesies, tipe)
-   - e.g., 'asian', 'caucasian', 'millennial', 'wooden', 'ceramic', 'metal'
-3. ACTION / MOTION — Aksi, gerakan, ekspresi, pose, aktivitas
-   - e.g., 'collaborating', 'running', 'smiling', 'brainstorming', 'holding'
-4. VISUAL ATTRIBUTE — Komposisi, angle, framing, lighting, depth of field, perspektif (TANPA WARNA)
-   - e.g., 'medium shot', 'front view', 'natural light', 'shallow depth of field', 'daylight'
-5. MOOD — Suasana & tone emosional (WAJIB — buyer sering search by mood)
-   - e.g., 'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful', 'serious', 'inspiring', 'mysterious', 'joyful'
-6. STYLE / ASSET TYPE — Gaya visual, format aset
-   - e.g., 'photo', 'lifestyle photography', 'editorial', 'flat lay', '3D render', 'illustration', 'realistic', 'minimal', 'vintage'
-7. CONCEPT — Tema besar, ide abstrak
-   - e.g., 'business', 'teamwork', 'innovation', 'wellness', 'sustainability', 'growth', 'connection', 'freedom'
-8. USE CASE — Siapa & untuk apa pakainya
-   - e.g., 'social media post', 'website banner', 'presentation', 'blog', 'advertisement', 'landing page', 'print', 'billboard'
-9. CONTEXT — Lokasi, suasana, waktu, environment, event
-   - e.g., 'modern office', 'indoor', 'summer', 'jakarta', 'professional workplace', 'outdoor'
-
-0. AGKEYWORDS 70/30 SEO SPLIT (CRITICAL – Adobe Stock Buyer Intent Optimization):
-   - 70% of keywords MUST be SEO-friendly: high-search-volume, buyer-intent terms that professional stock buyers actually type (descriptive nouns, concrete subject terms, industry-specific commercial vocabulary, action verbs, specific attributes).
-   - 30% of keywords MUST be common/foundational words: basic, universally-understood descriptive terms (colors, shapes, simple emotions, basic materials, everyday objects).
-   - Clearly separate these two groups in keyword ordering: place ALL 70% SEO-friendly keywords FIRST, then ALL 30% common words AFTER.
-   - SEO-friendly examples: 'copy space', 'sustainability', 'corporate team', 'digital transformation', 'mindfulness', 'remote work', 'wellness', 'productivity', 'innovation hub'.
-   - Common word examples: 'wood', 'smile', 'round', 'large', 'modern', 'clean', 'texture', 'smooth', 'wide'.
-1. RISET KEYWORD (Microstock Search Researcher):
-   - ${directives.risetKeywordRule}
-   - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
-2. SEO BOOST (Microstock SEO Expert):
-   - ${directives.seoBoostRule}
-   - Optimalkan keterlihatan halaman pertama di Adobe Stock dan Shutterstock.
-3. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-4. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY (e.g., avoid listing both 'tree' and 'trees').
-5. CROSS-SEARCH DISCOVERABILITY (Search Intent):
-   - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ${editorialMode ? 'EDITORIAL MODE ACTIVE – You MAY include visible brand names, logos, trademarks, and commercial products exactly as they appear in the image (factual, non-promotional, no inventions). If none are visible, do not add any.' : 'ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone). NEVER include any intellectual property.'}
-7. Every keyword must be strictly in lowercase, clean without punctuation.
-8. ���️ NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names as keywords (e.g., 'red', 'blue', 'white background', 'green', 'gold'). Colors waste keyword slots — they do not help SEO indexing on Adobe Stock / Shutterstock. Color palette is extracted internally for technical metadata only.
-9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
-10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
-11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
-  if ((keywordMode === 'single' || keywordMode === 'seo-single')) {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
-MUST-0.7 AGKEYWORDS 70/30 SINGLE-WORD SPLIT (CRITICAL):
-   - 70% of all single-word keywords MUST be SEO-friendly high-search-volume buyer-intent terms.
-   - 30% of all single-word keywords MUST be common/foundational descriptive words.
-   - Place all 70% SEO keywords FIRST in the list, then all 30% common words AFTER.
-MUST-1. Directly describe the visible subject.
-MUST-2. Describe the main action.
-MUST-3. Include specific objects.
-MUST-4. Include the strongest visual context (environment, setting, lighting).
-MUST-5. Represent the primary commercial concept.
-MUST-6. Be 100% relevant to the actual asset.
-MUST-7. Avoid generic filler words AND avoid overloading the list with broad buzzwords ("object", "item", "thing", "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative") unless genuinely one of the strongest descriptors of THIS asset — keep such broad terms to a small minority; prioritize concrete, specific, literally-visible terms.
-MUST-8. Avoid duplicates and near-duplicates.
-MUST-9. Never invent unseen attributes.
-MUST-10. Never prioritize popularity over relevance.
-
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is SINGLE-WORD mode, ensure any keyword phrase is split or shortened into a single word.
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-4.5 MAIN-SUBJECT-WORDS (Top 5 Priority Keywords): Identify exactly 5 main subject words that represent the CORE visual subject. These 5 words MUST appear as keywords #1 through #5 in the output. They must be the most important, buyer-facing subject nouns that describe what the image is primarily about. Examples: 'cat', 'laptop', 'mountain', 'coffee', 'office', 'sunset', 'flower', 'car', 'woman', 'child'.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
-
-    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
-    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
-
-11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
-    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
-    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
-    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
-    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
-    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
-    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
-    if (keywordMode === 'seo-single') {
-      keywordRulePromptText += `\nSEO SINGLE OVERRIDE: Ignore any 70/30 SEO/common split and do NOT force exactly five subject words. The application will rank the final list itself. The first 10 keywords must be the strongest grounded buyer-facing terms, and every keyword must remain one word only. Never add filler just to reach the requested count.`;
-    }  } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
-MUST-0.7 AGKEYWORDS 70/30 SINGLE-WORD SPLIT (CRITICAL):
-   - 70% of all single-word keywords MUST be SEO-friendly high-search-volume buyer-intent terms.
-   - 30% of all single-word keywords MUST be common/foundational descriptive words.
-   - Place all 70% SEO keywords FIRST in the list, then all 30% common words AFTER.
-MUST-1. Directly describe the visible subject.
-MUST-2. Describe the main action.
-MUST-3. Include specific objects.
-MUST-4. Include the strongest visual context (environment, setting, lighting).
-MUST-5. Represent the primary commercial concept.
-MUST-6. Be 100% relevant to the actual asset.
-MUST-7. Avoid generic filler words AND avoid overloading the list with broad buzzwords ("object", "item", "thing", "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative") unless genuinely one of the strongest descriptors of THIS asset — keep such broad terms to a small minority; prioritize concrete, specific, literally-visible terms.
-MUST-8. Avoid duplicates and near-duplicates.
-MUST-9. Never invent unseen attributes.
-MUST-10. Never prioritize popularity over relevance.
-
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
-
-    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
-    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
-
-11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
-    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
-    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
-    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
-    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
-    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
-    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  }
-
-  const noMediaFormatRule = `
-12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
-The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
-- Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
-- Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
-- Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
-Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.
-13. NO HYPHENS / DASHES RULE (CRITICAL - APPLIES TO EVERY AI PROVIDER): NEVER use a hyphen, dash, en-dash, or em-dash (-, \u2013, \u2014) anywhere in the Title or in any Keyword. This applies to compound words too: write them as two separate words instead of joining them with a hyphen (e.g. write "close up" not "close-up", "eco friendly" not "eco-friendly", "black and white" not "black-and-white", "high resolution" not "high-resolution"). Do not use a hyphen or dash as a separator/punctuation inside the Title either. Every Title and every Keyword must consist only of letters, numbers, and single spaces between words.`;
-  keywordRulePromptText += noMediaFormatRule;
-
-  // --- TAHAP 1: PROVIDER 1 ��������� GEMINI VISION (VISUAL DETECTION) ---
+  // --- STAGE 1: GEMINI VISION ---
   let visualFactsJson = "";
-  
-  console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
-  
+  console.log(`[JohMeta Pipeline] Stage 1: Running Gemini Vision (Visual Facts Detection)...`);
   const mediaTypeContext = directives.mediaTypeContext;
-
   const fallbackGeminiModel = 'gemini-3-flash-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
-  
+
   const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
 Analyze only what is visually verifiable in the image.
@@ -3193,7 +2970,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names. Colors waste valuable keyword slots. Color palette is extracted for technical analysis only.
+7. COLORS ARE OPTIONAL: Include a color when it materially helps identify the visual; never add colors merely to fill slots.
 
 
 MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
@@ -3240,9 +3017,16 @@ Rules for Descriptions:
 5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
-2. Ensure no IP, brands, or names are included.
-${keywordRulePromptText}
+- Generate only keywords grounded in VISUAL_FACTS.
+- Rank by realistic buyer search intent: exact subject first, then useful distinguishing details, setting, action, mood/style, season and concept when supported.
+- Do not force category quotas, 70/30 splits, viral terms or filler.
+- Trend terms are only a small relevance boost when the visual genuinely supports them.
+- Never invent use cases, industries, locations, people, objects or events.
+- Keep keywords lowercase, natural and short; respect the selected single/multi/mixed mode.
+- Colors are allowed when useful.
+- No brands, trademarks, famous people, fictional characters or artist names.
+- Put the strongest buyer-facing terms first; the first 10 should be the strongest combination of visual relevance and search intent.
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3420,7 +3204,15 @@ Rules for Descriptions:
 5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
-${keywordRulePromptText}
+- Generate only keywords grounded in VISUAL_FACTS.
+- Rank by realistic buyer search intent and visual relevance.
+- Do not force quotas, 70/30 splits, trend buzzwords or filler.
+- Use trend language only when genuinely supported by the asset.
+- Keep keywords natural, lowercase and mode-compliant.
+- NEVER output connector/function words as standalone keywords (for example: a, an, the, and, or, of, in, on, at, to, for, from, by, with, without, as, is, are, this, that).
+- NEVER use connector words as filler inside a keyword phrase. Remove them when constructing keyword phrases.
+- Colors are allowed when useful.
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3529,7 +3321,7 @@ OUTPUT FORMAT:
     const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
 
         // 1. Pemrosesan Keyword via 7-Stage Pipeline (OBJECT -> PRIMARY KW -> SYNONYM -> RELEVANCE -> DEDUP -> SEO RANK -> FINAL)
-    data.keywords = processKeywordsWith7StagePipeline(
+    data.keywords = processKeywordsSemantic(
       Array.isArray(data.keywords) ? data.keywords : [],
       targetCount,
       visualFacts,
@@ -3602,7 +3394,7 @@ OUTPUT FORMAT:
     const tieredVisual = buildTieredVisualAnalysis(visualFacts);
     const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
     const fallbackTitle = ensureTitleLength(applyTitleTemplate(assetSubtype, tieredVisual, titleLength), [], "", titleLength);
-    const fallbackKeywords = processKeywordsWith7StagePipeline(
+    const fallbackKeywords = processKeywordsSemantic(
       [],
       targetCount,
       visualFacts,
@@ -3632,7 +3424,7 @@ export const generateBatchStockMetadata = async (
   toolType: ToolType = ToolType.IMAGE,
   temperature?: number,
   model?: string,
-  keywordMode?: 'mixed' | 'single' | 'multi' | 'seo-single',
+  keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
@@ -3660,179 +3452,20 @@ export const generateBatchStockMetadata = async (
   // Amankan hitungan target keyword sejak awal
   const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
   const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `TOP BUYER-INTENT KEYWORD RULES (PRIORITY OVER ALL OTHER RULES):
-CORE MINDSET: "Think like a real stock buyer — Kalau gue jadi buyer, gue search apa?"
-- 10–15 Keyword pertama = apa yang orang cari, bukan apa yang lo pikir keren.
-- SEO microstock itu:
-  * Akurasi > Jumlah keyword
-  * Relevansi > Keyword viral
-  * Buyer intent > Kata keren
-  * Urutan keyword sangat penting (10-15 kata pertama berbobot hingga 80% di Adobe Stock / Shutterstock)
-  * Keyword harus LITERAL dari apa yang ada di aset, bukan imajinasi/halusinasi AI.
-  * Gunakan kata yang biasa diketik buyer di search bar — bukan istilah teknis yang jarang dicari.
-  * Pikirkan dari sisi pembeli: "Kalau saya butuh gambar seperti ini, kata apa yang akan saya ketik?"
-- Jangan over-niche (nanti gak muncul di pencarian).
-- DILARANG SUFFIX / STEM DUPLICATION (Algoritma Microstock Indexing):
-  * Dilarang mengulang kata yang sama dengan tambahan akhiran seperti -ing, -er, -ed, -s, -es, -ment, -tion (misal: JANGAN masukkan 'paint' DAN 'painter' DAN 'painting', atau 'run' DAN 'runner' DAN 'running').
-  * Mesin pencari stok otomatis melakukan stemming pada satu akar kata. Pengulangan sufiks hanya membuang kuota keyword dan terdeteksi sebagai spam.
-  * Hanya gunakan kata yang berbeda, mandiri, bermakna unik, dan natural.
-- Jangan terlalu generic (tenggelam di antara jutaan aset lain).
-- Keyword mempermudah buyer menemukan aset di halaman pertama Microstock.
-- Tandai 10 keyword INTI paling kuat untuk prioritas utama (buyer-facing core keywords).
-
-STRUKTUR IDEAL KEYWORD — 8-DIMENSI MICROSTOCK (WAJIB DIIKUTI SECARA BERURUTAN):
-⚠️ WARNA TIDAK TERMASUK KEYWORD — BUANG SLOT. Warna hanya digunakan di internal palette analysis.
-Pola: Subject → Specific Description → Action → Mood → Style → Concept → Use Case → Context
-1. MAIN SUBJECT — Subjek utama dalam gambar (orang, objek, hewan, landscape)
-   - Keyword #1 WAJIB nama subjek visual utama (e.g., 'business team', 'cat', 'vintage car', 'coffee cup').
-2. SPECIFIC DESCRIPTION — Deskripsi spesifik subjek (gender, usia, etnis, material, spesies, tipe)
-   - e.g., 'asian', 'caucasian', 'millennial', 'wooden', 'ceramic', 'metal'
-3. ACTION / MOTION — Aksi, gerakan, ekspresi, pose, aktivitas
-   - e.g., 'collaborating', 'running', 'smiling', 'brainstorming', 'holding'
-4. VISUAL ATTRIBUTE — Komposisi, angle, framing, lighting, depth of field, perspektif (TANPA WARNA)
-   - e.g., 'medium shot', 'front view', 'natural light', 'shallow depth of field', 'daylight'
-5. MOOD — Suasana & tone emosional (WAJIB — buyer sering search by mood)
-   - e.g., 'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful', 'serious', 'inspiring', 'mysterious', 'joyful'
-6. STYLE / ASSET TYPE — Gaya visual, format aset
-   - e.g., 'photo', 'lifestyle photography', 'editorial', 'flat lay', '3D render', 'illustration', 'realistic', 'minimal', 'vintage'
-7. CONCEPT — Tema besar, ide abstrak
-   - e.g., 'business', 'teamwork', 'innovation', 'wellness', 'sustainability', 'growth', 'connection', 'freedom'
-8. USE CASE — Siapa & untuk apa pakainya
-   - e.g., 'social media post', 'website banner', 'presentation', 'blog', 'advertisement', 'landing page', 'print', 'billboard'
-9. CONTEXT — Lokasi, suasana, waktu, environment, event
-   - e.g., 'modern office', 'indoor', 'summer', 'jakarta', 'professional workplace', 'outdoor'
-
-0. AGKEYWORDS 70/30 SEO SPLIT (CRITICAL – Adobe Stock Buyer Intent Optimization):
-   - 70% of keywords MUST be SEO-friendly: high-search-volume, buyer-intent terms that professional stock buyers actually type (descriptive nouns, concrete subject terms, industry-specific commercial vocabulary, action verbs, specific attributes).
-   - 30% of keywords MUST be common/foundational words: basic, universally-understood descriptive terms (colors, shapes, simple emotions, basic materials, everyday objects).
-   - Clearly separate these two groups in keyword ordering: place ALL 70% SEO-friendly keywords FIRST, then ALL 30% common words AFTER.
-   - SEO-friendly examples: 'copy space', 'sustainability', 'corporate team', 'digital transformation', 'mindfulness', 'remote work', 'wellness', 'productivity', 'innovation hub'.
-   - Common word examples: 'wood', 'smile', 'round', 'large', 'modern', 'clean', 'texture', 'smooth', 'wide'.
-1. RISET KEYWORD (Microstock Search Researcher):
-   - ${directives.risetKeywordRule}
-   - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
-2. SEO BOOST (Microstock SEO Expert):
-   - ${directives.seoBoostRule}
-   - Optimalkan keterlihatan halaman pertama di Adobe Stock dan Shutterstock.
-3. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-4. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY (e.g., avoid listing both 'tree' and 'trees').
-5. CROSS-SEARCH DISCOVERABILITY (Search Intent):
-   - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ${editorialMode ? 'EDITORIAL MODE ACTIVE – You MAY include visible brand names, logos, trademarks, and commercial products exactly as they appear in the image (factual, non-promotional, no inventions). If none are visible, do not add any.' : 'ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone). NEVER include any intellectual property.'}
-7. Every keyword must be strictly in lowercase, clean without punctuation.
-8. ⚠️ NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names as keywords (e.g., 'red', 'blue', 'white background', 'green', 'gold'). Colors waste keyword slots — they do not help SEO indexing on Adobe Stock / Shutterstock. Color palette is extracted internally for technical metadata only.
-9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
-10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
-11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
-  if ((keywordMode === 'single' || keywordMode === 'seo-single')) {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - SEO SINGLE MODE PRIORITY: Put the strongest buyer-intent terms first and make the first 10 positions the highest-priority SEO terms.
-   - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-4.5 MAIN-SUBJECT-WORDS (Top 5 Priority Keywords): Identify exactly 5 main subject words that represent the CORE visual subject. These 5 words MUST appear as keywords #1 through #5 in the output. They must be the most important, buyer-facing subject nouns that describe what the image is primarily about. Examples: 'cat', 'laptop', 'mountain', 'coffee', 'office', 'sunset', 'flower', 'car', 'woman', 'child'.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
-
-    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
-    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
-
-11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
-    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
-    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
-    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
-    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
-    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
-    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
-    if (keywordMode === 'seo-single') {
-      keywordRulePromptText += `\nSEO SINGLE OVERRIDE: Ignore any 70/30 SEO/common split and do NOT force exactly five subject words. The application will rank the final list itself. The first 10 keywords must be the strongest grounded buyer-facing terms, and every keyword must remain one word only. Never add filler just to reach the requested count.`;
-    }  } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance — WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms — only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
-
-    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
-    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
-
-11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
-    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
-    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
-    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
-    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
-    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
-    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  }
+  let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+  let keywordRulePromptText = `SEMANTIC STOCK SEARCH: think like a buyer searching for this exact asset. Generate only terms grounded in the supplied visual facts. Start with concrete subjects, then useful distinguishing attributes, setting, action, mood, style, season or concept when relevant. Do not force category quotas, 70/30 splits, viral buzzwords or filler. Trend terms are only a small boost when visually supported. Do not invent use cases, industries, locations, people, objects or events. Keep terms natural, searchable, lowercase and short. Colors are allowed when useful. No brands, trademarks, famous people, fictional characters or artist names.`;
+  if (keywordMode === 'single') {
+    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+    keywordRulePromptText += `\nSINGLE MODE: one word per keyword.`;
+  } else if (keywordMode === 'multi') {
+    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} meaningful multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+    keywordRulePromptText += `\nMULTI MODE: use natural 2–4 word search phrases.`;
+  } else {
+    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} mixed single-word and multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+  }
 
   const noMediaFormatRule = `
-12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
-The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
-- Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
-- Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
-- Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
-Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.
-13. NO HYPHENS / DASHES RULE (CRITICAL - APPLIES TO EVERY AI PROVIDER): NEVER use a hyphen, dash, en-dash, or em-dash (-, \u2013, \u2014) anywhere in the Title or in any Keyword. This applies to compound words too: write them as two separate words instead of joining them with a hyphen (e.g. write "close up" not "close-up", "eco friendly" not "eco-friendly", "black and white" not "black-and-white", "high resolution" not "high-resolution"). Do not use a hyphen or dash as a separator/punctuation inside the Title either. Every Title and every Keyword must consist only of letters, numbers, and single spaces between words.`;
+Keep metadata focused on the actual subject matter. Avoid subjective marketing language, brands, trademarks, famous people, fictional characters and artist names. Use clean lowercase keywords without hashtags or punctuation.`;
   keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
@@ -4014,7 +3647,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names. Colors waste valuable keyword slots. Color palette is extracted for technical analysis only.
+7. COLORS ARE OPTIONAL: Include a color when it materially helps identify the visual; never add colors merely to fill slots.
 
 
 MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
@@ -4218,7 +3851,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO COLOR KEYWORDS AT ALL: Do NOT include ANY color names. Colors waste valuable keyword slots. Color palette is extracted for technical analysis only.
+7. COLORS ARE OPTIONAL: Include a color when it materially helps identify the visual; never add colors merely to fill slots.
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
@@ -4403,12 +4036,14 @@ OUTPUT FORMAT:
 
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         // 1. Pemrosesan Keyword Batch via 7-Stage Pipeline
-            metadata.keywords = processKeywordsWith7StagePipeline(
+            metadata.keywords = processKeywordsSemantic(
               Array.isArray(metadata.keywords) ? metadata.keywords : [],
               targetCount,
               assetVisualFacts,
               toolType,
-              keywordMode
+              keywordMode,
+              metadata.title || "",
+              metadata.description || ""
             );
 
         // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
