@@ -399,8 +399,13 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
     title = String(title);
   }
   
-  // Clean input title: remove all commas, periods, double spaces
-  let cleanedTitle = title.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  // Clean input title: remove all commas, periods, hyphens/dashes, double spaces
+  let cleanedTitle = title
+    .replace(/[\u2010-\u2015_]/g, ' ') // en-dash, em-dash, dan varian unicode lain -> spasi
+    .replace(/-/g, ' ')                // tanda hubung biasa -> spasi (title tidak boleh ada tanda hubung)
+    .replace(/,/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (cleanedTitle.endsWith('.')) {
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
@@ -445,8 +450,8 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
   }
   cleanedTitle = deduplicatedWords.join(' ');
 
-  // Guarantee absolute removal of any commas, periods, double spaces
-  cleanedTitle = cleanedTitle.replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  // Guarantee absolute removal of any commas, periods, hyphens/dashes, double spaces
+  cleanedTitle = cleanedTitle.replace(/[\u2010-\u2015_-]/g, ' ').replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
 
   // Sentence case capitalisation
   if (cleanedTitle.length > 0) {
@@ -553,9 +558,10 @@ function sanitizeForIndexing(raw: string): string {
   return raw
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')   // hapus karakter spesial kecuali dash dan spasi
+    .replace(/[\u2010-\u2015_]/g, ' ') // ganti semua jenis dash/hyphen unicode dan underscore dengan spasi
+    .replace(/-/g, ' ')          // ganti tanda hubung biasa dengan spasi (jangan pernah ada tanda hubung di keyword)
+    .replace(/[^\w\s]/g, '')     // hapus karakter spesial lainnya
     .replace(/\s+/g, ' ')        // normalisasi spasi ganda
-    .replace(/^-+|-+$/g, '')     // hapus dash di awal/akhir
     .trim();
 }
 
@@ -1962,14 +1968,22 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
   const scene = tiers.scene.map(s => lower(String(s)));
   const concepts = tiers.concepts.map(c => lower(String(c)));
 
-  // 7-tier buckets
+  // ==== DYNAMIC 4-TIER PERCENTAGE STRUCTURE (applies to every provider, scales with targetCount) ====
+  // TIER 1 (~25%): MAIN SUBJECT — the single most important keyword(s)
+  // TIER 2 (~25%): SCENE CONTEXT — setting, environment, lighting, mood, location, use case
+  // TIER 3 (~25%): OBJECT / ACTIVITY — secondary objects, demographic/material detail, action/motion
+  // TIER 4 (remainder ~25%): ADDITIONAL CONCEPTS — abstract/commercial concepts + overflow from tiers 1-3
+  // Caps are computed as a PERCENTAGE of targetCount so the pattern stays proportionally identical
+  // whether the user requests 40, 30, 20, or any other keyword count — never hardcoded fixed numbers.
+  const tier1Cap = Math.max(1, Math.round(targetCount * 0.25));
+  const tier2Cap = Math.max(1, Math.round(targetCount * 0.25));
+  const tier3Cap = Math.max(1, Math.round(targetCount * 0.25));
+  // Tier 4 has no hard cap — it absorbs the remainder plus any overflow so no keyword is ever dropped.
+
   const t1_mainSubject: string[] = [];
-  const t2_specificDescription: string[] = [];
-  const t3_actionMotion: string[] = [];
-  const t4_visualAttribute: string[] = [];
-  const t5_moodStyle: string[] = [];
-  const t6_concept: string[] = [];
-  const t7_useCaseContext: string[] = [];
+  const t2_sceneContext: string[] = [];
+  const t3_objectActivity: string[] = [];
+  const t4_additionalConcepts: string[] = [];
 
   // ⚠️ Warna TIDAK termasuk keyword — filter out semua warna
   const COLOR_WORDS = new Set([
@@ -2034,55 +2048,40 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
   for (const kw of keywords) {
     const k = lower(kw);
     if (!k || k.length < 2 || seen.has(k)) continue;
-    
+
     // ⚠️ Skip color words entirely — they waste keyword slots
     if (COLOR_WORDS.has(k)) continue;
-    
+
     seen.add(k);
 
-    // Tier 1: MAIN SUBJECT
     const isPrimarySubj = primarySubjects.some(s => s === k || k === s || k.includes(s) || s.includes(k));
     const isSubjectMatch = matchesAnySubject(k);
-    if (isPrimarySubj || (isSubjectMatch && t1_mainSubject.length < 10)) {
+    const isDemographic = /\b(asian|caucasian|african|hispanic|millennial|gen z|baby boomer|teenager|senior|child|adult|male|female|man|woman|boy|girl|young|old|middle aged)\b/i.test(k);
+    const isMaterial = /\b(wooden|ceramic|plastic|metallic|glass|fabric|leather|stone|paper|cardboard|steel|bronze|concrete|brick|marble|granite)\b/i.test(k);
+    const isAction = isActionWord(k);
+    const isAttr = matchesAnyAttribute(k);
+    const isSceneContext = matchesAnyScene(k) || USE_CASE_TERMS.has(k) || MOOD_TERMS.has(k) || STYLE_TERMS.has(k) || isAttr;
+
+    // TIER 1 (~25%): MAIN SUBJECT — the single most important keyword(s)
+    if ((isPrimarySubj || isSubjectMatch) && t1_mainSubject.length < tier1Cap) {
       t1_mainSubject.push(kw);
       continue;
     }
 
-    // Tier 2: SPECIFIC DESCRIPTION
-    const isDemographic = /\b(asian|caucasian|african|hispanic|millennial|gen z|baby boomer|teenager|senior|child|adult|male|female|man|woman|boy|girl|young|old|middle aged)\b/i.test(k);
-    const isMaterial = /\b(wooden|ceramic|plastic|metallic|glass|fabric|leather|stone|paper|cardboard|steel|bronze|concrete|brick|marble|granite)\b/i.test(k);
-    if ((isDemographic || isMaterial) && t2_specificDescription.length < 8) {
-      t2_specificDescription.push(kw);
+    // TIER 2 (~25%): SCENE CONTEXT — setting, environment, lighting, mood, location, use case
+    if (isSceneContext && t2_sceneContext.length < tier2Cap) {
+      t2_sceneContext.push(kw);
       continue;
     }
 
-    // Tier 3: ACTION / MOTION
-    if (isActionWord(k) && t3_actionMotion.length < 8) {
-      t3_actionMotion.push(kw);
+    // TIER 3 (~25%): OBJECT / ACTIVITY — secondary objects, demographic/material detail, action/motion
+    if ((isSubjectMatch || isAction || isDemographic || isMaterial) && t3_objectActivity.length < tier3Cap) {
+      t3_objectActivity.push(kw);
       continue;
     }
 
-    // Tier 4: VISUAL ATTRIBUTE
-    const isAttr = matchesAnyAttribute(k);
-    if (isAttr && t4_visualAttribute.length < 8) {
-      t4_visualAttribute.push(kw);
-      continue;
-    }
-
-    // Tier 5: MOOD / STYLE
-    if ((MOOD_TERMS.has(k) || STYLE_TERMS.has(k)) && t5_moodStyle.length < 8) {
-      t5_moodStyle.push(kw);
-      continue;
-    }
-
-    // Tier 7: USE CASE / CONTEXT
-    if ((USE_CASE_TERMS.has(k) || matchesAnyScene(k)) && t7_useCaseContext.length < 8) {
-      t7_useCaseContext.push(kw);
-      continue;
-    }
-
-    // Tier 6: CONCEPT (fallback)
-    t6_concept.push(kw);
+    // TIER 4 (remainder): ADDITIONAL CONCEPTS — abstract/commercial concepts + overflow from tiers 1-3
+    t4_additionalConcepts.push(kw);
   }
 
   if (primarySubjects.length > 0) {
@@ -2096,14 +2095,14 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     }
   }
 
+  // Final assembly follows the mandatory 4-tier order: MAIN SUBJECT -> SCENE CONTEXT ->
+  // OBJECT/ACTIVITY -> ADDITIONAL CONCEPTS. Tier boundaries scale proportionally (~25% each)
+  // with targetCount, so the same pattern holds whether the request is for 40, 30, 20, etc.
   const combined = [
     ...t1_mainSubject,
-    ...t2_specificDescription,
-    ...t3_actionMotion,
-    ...t4_visualAttribute,
-    ...t5_moodStyle,
-    ...t6_concept,
-    ...t7_useCaseContext
+    ...t2_sceneContext,
+    ...t3_objectActivity,
+    ...t4_additionalConcepts
   ];
 
   return combined.slice(0, targetCount);
@@ -2780,6 +2779,17 @@ MUST-10. Never prioritize popularity over relevance.
     GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
     Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
 
+    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
+    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
+
+11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
+    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
+    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
+    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
+    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
+    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
+    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
+
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
@@ -2835,6 +2845,17 @@ MUST-10. Never prioritize popularity over relevance.
     GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
     Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
 
+    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
+    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
+
+11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
+    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
+    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
+    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
+    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
+    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
+    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
+
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  }
 
   const noMediaFormatRule = `
@@ -2843,7 +2864,8 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 - Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
 - Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
 - Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
-Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
+Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.
+13. NO HYPHENS / DASHES RULE (CRITICAL - APPLIES TO EVERY AI PROVIDER): NEVER use a hyphen, dash, en-dash, or em-dash (-, \u2013, \u2014) anywhere in the Title or in any Keyword. This applies to compound words too: write them as two separate words instead of joining them with a hyphen (e.g. write "close up" not "close-up", "eco friendly" not "eco-friendly", "black and white" not "black-and-white", "high resolution" not "high-resolution"). Do not use a hyphen or dash as a separator/punctuation inside the Title either. Every Title and every Keyword must consist only of letters, numbers, and single spaces between words.`;
   keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 ��������� GEMINI VISION (VISUAL DETECTION) ---
@@ -3607,6 +3629,17 @@ Pola: Subject → Specific Description → Action → Mood → Style → Concept
     GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
     Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
 
+    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
+    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
+
+11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
+    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
+    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
+    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
+    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
+    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
+    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
+
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
@@ -3643,6 +3676,17 @@ Pola: Subject → Specific Description → Action → Mood → Style → Concept
     GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
     Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
 
+    GOOD EXAMPLE OF NATURAL FLOW (multi-generational family decorating a gingerbread house together in a home kitchen): christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade
+    Notice how the exact subject and concrete visible nouns (christmas, family, gingerbread, house, decorating, holiday, grandparents, children, parents) lead, then setting/attribute/action terms (winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, baking, food, dessert) follow naturally, and abstract concept/emotion/commercial terms (togetherness, celebration, happiness, love, generations, cozy, warmth, bonding, childhood) round out the list near the end - same buyer-intent flow as the extreme-adventure example above, just applied to a warm lifestyle/indoor scene.
+
+11.5 DYNAMIC PERCENTAGE-BASED TIER STRUCTURE (MANDATORY - APPLIES TO EVERY AI PROVIDER AND EVERY KEYWORD COUNT):
+    Divide the FULL keyword list into 4 sequential tiers, sized as a PERCENTAGE of the total requested keyword count (not fixed numbers) - so the pattern stays proportionally identical whether the user asks for 40, 30, 20, or any other amount:
+    - TIER 1 - MAIN SUBJECT (first ~25% of the list): the single most important keyword(s) - the exact main subject of the asset, most concrete and highest buyer-intent term(s) first.
+    - TIER 2 - SCENE CONTEXT (next ~25%): the setting, environment, location, lighting, time of day, mood/atmosphere - where and how the scene is happening.
+    - TIER 3 - OBJECT / ACTIVITY (next ~25%): secondary visible objects, props, and the specific actions/activities taking place in the scene.
+    - TIER 4 - ADDITIONAL CONCEPTS (remaining ~25%, i.e. whatever keywords are left): abstract concepts, emotions, commercial/use-case terms, and any other supporting keywords.
+    EXAMPLE OF THE SCALING RULE: for 40 keywords -> tier boundaries are approximately #1-10 / #11-20 / #21-30 / #31-40. For 30 keywords -> approximately #1-8 / #9-15 / #16-23 / #24-30. For 20 keywords -> approximately #1-5 / #6-10 / #11-15 / #16-20. Always recompute the 4 boundaries as ~25% each of whatever the actual target keyword count is - NEVER use the fixed 40-keyword numbers when a different count is requested.
+
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  }
 
   const noMediaFormatRule = `
@@ -3651,7 +3695,8 @@ The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generat
 - Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
 - Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
 - Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
-Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
+Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.
+13. NO HYPHENS / DASHES RULE (CRITICAL - APPLIES TO EVERY AI PROVIDER): NEVER use a hyphen, dash, en-dash, or em-dash (-, \u2013, \u2014) anywhere in the Title or in any Keyword. This applies to compound words too: write them as two separate words instead of joining them with a hyphen (e.g. write "close up" not "close-up", "eco friendly" not "eco-friendly", "black and white" not "black-and-white", "high resolution" not "high-resolution"). Do not use a hyphen or dash as a separator/punctuation inside the Title either. Every Title and every Keyword must consist only of letters, numbers, and single spaces between words.`;
   keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
