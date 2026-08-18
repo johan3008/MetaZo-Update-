@@ -1263,79 +1263,127 @@ function limitCameraViewpointKeywords(keywords: string[], maxCameraTerms = 1): s
 }
 
 function processKeywordsSemantic(
-  rawAiKeywords: string[], targetCount: number, visualFacts: any, toolType?: ToolType,
-  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed', title?: string, description?: string
+  rawAiKeywords: string[],
+  targetCount: number,
+  visualFacts: any,
+  toolType?: ToolType,
+  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed',
+  title?: string,
+  description?: string
 ): string[] {
-  // KEYWORD POLICY: Do NOT over-filter AI keywords.
-  // The AI is responsible for generating relevant keywords from the image.
-  // This stage only performs safe cleanup: empty values, duplicates, connectors,
-  // prohibited terms, and the optional output format. It must NOT require exact
-  // token matches against VISUAL_FACTS because that removes valid synonyms and
-  // commercially useful descriptors.
+  // KEYWORD POLICY: Do not over-filter AI keywords.
+  // The AI remains responsible for semantic relevance. This function only
+  // normalizes, deduplicates, applies the selected output format, and fills
+  // missing slots from the asset's own visual facts / metadata.
   const normalize = (v: any) => sanitizeForIndexing(String(v ?? ''));
   const mode = keywordMode || 'mixed';
+  const max = Math.max(1, Number(targetCount) || 25);
 
   const isAllowedFormat = (kw: string) => {
-    const count = normalize(kw).split(/\s+/).filter(Boolean).length;
-    if (mode === 'single') return count === 1;
-    if (mode === 'multi') return count === 2;
-    return count >= 1;
+    const parts = normalize(kw).split(/\s+/).filter(Boolean);
+    if (!parts.length) return false;
+
+    if (mode === 'single') {
+      return parts.length === 1 && !isKeywordConnector(parts[0]);
+    }
+
+    if (mode === 'multi') {
+      return parts.length === 2 && !parts.some(isKeywordConnector);
+    }
+
+    // Mixed accepts both single-word and multi-word keywords.
+    return !parts.some(isKeywordConnector);
   };
 
   const result: string[] = [];
   const seen = new Set<string>();
-  const max = Math.max(0, Number(targetCount) || 0);
 
-  // Preserve AI order. Do not rank, stem-deduplicate, synonym-filter, or
-  // visually-token-match here. Relevance/self-audit is handled by the model.
-  for (const raw of Array.isArray(rawAiKeywords) ? rawAiKeywords : []) {
-    const kw = normalize(raw);
-    if (!kw || seen.has(kw)) continue;
-    if (isProhibitedKeyword(kw)) continue;
-    if (kw.split(/\s+/).some(isKeywordConnector)) continue;
-    if (!isAllowedFormat(kw)) continue;
+  const addCandidate = (raw: any) => {
+    const clean = normalize(raw);
+    if (!clean) return;
 
-    seen.add(kw);
-    result.push(kw);
-    if (result.length >= max) break;
-  }
+    // SINGLE mode: intentionally split phrases into atomic words.
+    // Example: "water gun playground" -> "water", "gun", "playground".
+    if (mode === 'single' && clean.includes(' ')) {
+      clean.split(/\s+/)
+        .filter(Boolean)
+        .forEach(word => addCandidate(word));
+      return;
+    }
 
-  // Failsafe: if the AI returned an empty/invalid list, derive a small set from
-  // clearly available visual facts rather than returning keywords: [].
-  if (result.length === 0 && max > 0 && visualFacts) {
-    const fallbackCandidates: any[] = [];
-    const collect = (v: any) => {
-      if (typeof v === 'string') fallbackCandidates.push(v);
-      else if (Array.isArray(v)) v.forEach(collect);
-      else if (v && typeof v === 'object') {
-        if (typeof v.name === 'string') fallbackCandidates.push(v.name);
-        else if (typeof v.value === 'string') fallbackCandidates.push(v.value);
-        else if (typeof v.label === 'string') fallbackCandidates.push(v.label);
-      }
-    };
+    if (seen.has(clean)) return;
+    if (isProhibitedKeyword(clean)) return;
+    if (!isAllowedFormat(clean)) return;
 
-    collect(visualFacts.primary_subjects);
-    collect(visualFacts.secondary_subjects);
-    collect(visualFacts.objects);
-    collect(visualFacts.attributes);
-    collect(visualFacts.actions);
-    collect(visualFacts.scene);
-    collect(visualFacts.concepts);
+    seen.add(clean);
+    result.push(clean);
+  };
 
-    for (const raw of fallbackCandidates) {
-      const kw = normalize(raw);
-      if (!kw || seen.has(kw) || isProhibitedKeyword(kw)) continue;
-      if (kw.split(/\s+/).some(isKeywordConnector)) continue;
-      if (!isAllowedFormat(kw)) continue;
-      seen.add(kw);
-      result.push(kw);
+  // Recursively extract useful strings from visualFacts structures.
+  const extractStrings = (value: any) => {
+    if (value == null) return;
+
+    if (typeof value === 'string') {
+      addCandidate(value);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(extractStrings);
+      return;
+    }
+
+    if (typeof value === 'object') {
+      if (typeof value.name === 'string') addCandidate(value.name);
+      if (typeof value.value === 'string') addCandidate(value.value);
+      if (typeof value.label === 'string') addCandidate(value.label);
+
+      // Inspect nested objects/arrays when present.
+      Object.entries(value).forEach(([key, nested]) => {
+        if (key === 'name' || key === 'value' || key === 'label') return;
+        if (nested && typeof nested === 'object') extractStrings(nested);
+      });
+    }
+  };
+
+  // 1. AI keywords first — preserve their original order.
+  (Array.isArray(rawAiKeywords) ? rawAiKeywords : []).forEach(addCandidate);
+
+  // 2. Fallback / padding from visual facts + title + description.
+  // No unrelated or synthetic keywords are generated.
+  if (result.length < max) {
+    const fallbackPool: any[] = [
+      visualFacts?.primary_subjects,
+      visualFacts?.secondary_subjects,
+      visualFacts?.objects,
+      visualFacts?.background_elements,
+      visualFacts?.attributes,
+      visualFacts?.visual_attributes,
+      visualFacts?.actions,
+      visualFacts?.scene,
+      visualFacts?.concepts,
+      visualFacts?.commercial_concepts,
+      visualFacts?.commercial_themes,
+      visualFacts?.composition,
+      visualFacts?.camera,
+      visualFacts?.camera_angle,
+      visualFacts?.camera_view,
+      visualFacts?.focus,
+      visualFacts?.optics,
+      title,
+      description
+    ];
+
+    for (const value of fallbackPool) {
       if (result.length >= max) break;
+      extractStrings(value);
     }
   }
 
+  // 3. Final cap: never exceed targetCount.
+  // If grounded candidates are fewer than targetCount, return what exists.
   return result.slice(0, max);
 }
-
 
 function enforceStrictKeywordMode(keywords: string[], keywordMode: 'mixed' | 'single' | 'multi' | undefined, targetCount: number, visualFacts: any): string[] {
   const mode = keywordMode || 'mixed';
