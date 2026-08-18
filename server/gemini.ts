@@ -601,17 +601,13 @@ const getLanguageName = (code?: string) => {
  * mode 'single' dan 'multi' selalu dipaksa murni sesuai definisinya.
  */
 /**
- * METAZO 7-STAGE SEO KEYWORD ARCHITECTURE:
+ * METAZO HUMAN SEO KEYWORD ARCHITECTURE:
  * 
- * OBJECT ──> PRIMARY KEYWORD ──> SYNONYM CHECK ──> RELEVANCE CHECK ──> DUPLICATE CHECK ──> SEO RANKING ──> FINAL KEYWORDS
- * 
- * Tahap 1: OBJECT — Ekstraksi subjek visual & elemen konkret dari VISUAL_FACTS.
- * Tahap 2: PRIMARY KEYWORD — Penetapan kata kunci utama objek inti (Keyword #1).
- * Tahap 3: SYNONYM CHECK — Ekspansi sinonim profesional lintas-wilayah (tanpa pengulangan sufiks -ing/-er/-s).
- * Tahap 4: RELEVANCE CHECK — Validasi grounding visual literal & search intent pembeli.
- * Tahap 5: DUPLICATE CHECK — Deduplikasi eksak & varian morfologi/stemming (anti root redundancy).
- * Tahap 6: SEO RANKING — Penataan hierarki 3-Tier (1-10: Objek Utama, 11-20: Detail/Aksi, 21-30+: Konsep/Intent).
- * Tahap 7: FINAL KEYWORDS — Penguncian presisi sesuai jumlah target keyword yang diminta.
+ * VISUAL FACTS ──> CANDIDATES ──> GROUNDING ──> SEO LAYERS ──> SEARCH INTENT ──> DEDUP ──> FINAL
+ *
+ * SEO layers: Main Subject -> Supporting Objects -> Attributes/Actions -> Context -> Concept.
+ * Synonyms, search intent, and trends may only rank a grounded candidate; they never create one.
+ * Missing layers redistribute unused capacity to grounded candidates so the requested count can be met without filler.
  */
 /**
  * Membersihkan keyword untuk indexing: lowercase, trim, hapus karakter non-alfanumerik,
@@ -641,8 +637,8 @@ function processKeywordsSemanticLegacy(
   /**
    * Semantic keyword engine.
    *
-   * There is deliberately no fixed 70/30 split, no fixed 8/9-stage quota,
-   * no forced "common words", and no synthetic padding such as "forest scene".
+   * There is deliberately no fixed 70/30 split and no synthetic padding such as
+   * "forest scene". The five SEO layers are soft targets for semantic breadth.
    * The engine ranks only candidates that can be grounded in the asset analysis.
    */
   const clean = (v: any) => sanitizeForIndexing(String(v ?? ''));
@@ -811,7 +807,7 @@ function processKeywordsSemanticLegacy(
  * Principles:
  * - exactly one word per keyword
  * - no connectors / stop words / phrases
- * - no forced category quotas
+ * - no forced irrelevant category quotas; soft Main Subject -> Objects -> Attributes -> Context -> Concept targets
  * - no 70/30 split
  * - no synthetic filler
  * - no artificial "keyword + concept" padding
@@ -839,8 +835,8 @@ function processSingleWordSeoKeywords(
    *
    * Search intent and trends can only BOOST a grounded candidate.
    * They can never create a candidate that is not supported by visual facts.
-   * Final output is capped at 25 for SEO Single because Adobe recommends 15–25
-   * keywords as an ideal range; the user can still request fewer.
+   * Final output respects the user's requested count (1–49). The UI may recommend 15–25
+   * for quality, but the engine must not silently change the requested count.
    */
   const stopWords = KEYWORD_CONNECTOR_WORDS;
   const blocked = new Set([
@@ -956,6 +952,18 @@ function processSingleWordSeoKeywords(
   const attributes = collect(visualFacts?.attributes || visualFacts?.visual_attributes);
   const actions = collect(visualFacts?.actions);
   const composition = collect(visualFacts?.composition);
+
+  // SEO CONTEXT layer: explicit visual context only. Title/description and EXIF
+  // are never treated as visual evidence or keyword sources.
+  const context = [
+    ...collect(visualFacts?.scene),
+    ...collect(visualFacts?.context),
+    ...collect(visualFacts?.environment),
+    ...collect(visualFacts?.setting),
+    ...collect(visualFacts?.season),
+    ...collect(visualFacts?.time_of_day),
+    ...collect(visualFacts?.weather)
+  ];
   const concepts = [
     ...collect(visualFacts?.concepts),
     ...collect(visualFacts?.commercial_concepts),
@@ -971,6 +979,7 @@ function processSingleWordSeoKeywords(
     attributes: new Set(attributes),
     actions: new Set(actions),
     composition: new Set(composition),
+    context: new Set(context),
     concepts: new Set(concepts)
   };
 
@@ -996,7 +1005,7 @@ function processSingleWordSeoKeywords(
     organic: 2, automation: 2, digital: 1, innovation: 1
   };
 
-  type Evidence = 'primary'|'secondary'|'background'|'attribute'|'action'|'composition'|'concept'|'synonym'|'ai';
+  type Evidence = 'primary'|'secondary'|'background'|'attribute'|'action'|'composition'|'context'|'concept'|'synonym'|'ai';
   type Candidate = {
     word:string; score:number; band:number; firstSeen:number; evidence:Set<Evidence>;
     visual:number; intent:number; trend:number; specificity:number;
@@ -1012,6 +1021,7 @@ function processSingleWordSeoKeywords(
     if (sets.attributes.has(word)) e.add('attribute');
     if (sets.actions.has(word)) e.add('action');
     if (sets.composition.has(word)) e.add('composition');
+    if (sets.context.has(word)) e.add('context');
     if (sets.concepts.has(word)) e.add('concept');
     if (synonymSet.has(word)) e.add('synonym');
     return e;
@@ -1025,15 +1035,17 @@ function processSingleWordSeoKeywords(
 
       // AI candidate must be grounded in explicit visual facts, never merely title/description.
       const grounded = evidence.has('primary') || evidence.has('secondary') || evidence.has('background') ||
-        evidence.has('attribute') || evidence.has('action') || evidence.has('composition') || evidence.has('concept') ||
-        evidence.has('synonym');
+        evidence.has('attribute') || evidence.has('action') || evidence.has('composition') ||
+        evidence.has('context') || evidence.has('concept') || evidence.has('synonym');
       if (!grounded) continue;
 
+      // SEO layers: Main Subject -> Supporting Objects -> Attributes/Actions -> Context -> Concept.
       let band = 4;
       if (evidence.has('primary')) band = 1;
-      else if (evidence.has('secondary')) band = 1;
-      else if (evidence.has('attribute') || evidence.has('action')) band = 2;
-      else if (evidence.has('concept') || evidence.has('background')) band = 3;
+      else if (evidence.has('secondary')) band = 2;
+      else if (evidence.has('attribute') || evidence.has('action')) band = 3;
+      else if (evidence.has('context') || evidence.has('background')) band = 4;
+      else if (evidence.has('concept')) band = 5;
       else if (evidence.has('composition') || evidence.has('synonym')) band = 4;
 
       let visual = 0;
@@ -1044,6 +1056,7 @@ function processSingleWordSeoKeywords(
       if (evidence.has('background')) visual += 50;
       if (evidence.has('concept')) visual += 48;
       if (evidence.has('composition')) visual += 42;
+      if (evidence.has('context')) visual += 58;
       if (evidence.has('synonym')) visual += 20;
       if (source === 'ai') visual += 2;
 
@@ -1084,6 +1097,7 @@ function processSingleWordSeoKeywords(
   attributes.forEach(x=>add(x,'attribute'));
   actions.forEach(x=>add(x,'action'));
   composition.forEach(x=>add(x,'composition'));
+  context.forEach(x=>add(x,'context'));
   concepts.forEach(x=>add(x,'concept'));
   synonymSet.forEach(x=>add(x,'synonym'));
   (rawAiKeywords || []).forEach(x=>add(x,'ai'));
@@ -1093,10 +1107,9 @@ function processSingleWordSeoKeywords(
   );
 
   // V10 HUMAN SEARCH-VALUE GATE
-  // A word can be visually true but still be a poor stock-search keyword. Keep
-  // the final list buyer-oriented: subjects, distinctive attributes, concrete
-  // context, and meaningful concepts. Weak sentence fragments and photographic
-  // jargon do not deserve a slot merely because the model mentioned them.
+  // A word can be visually true but still be a poor stock-search keyword.
+  // These are sentence fragments / photography jargon that should never
+  // consume a slot by themselves.
   const WEAK_STANDALONE_DESCRIPTORS = new Set([
     'covered','faint','dense','leading','balance','lines','line','depth','field',
     'symmetrical','asymmetrical','framing','composition','close','up','shallow',
@@ -1106,15 +1119,56 @@ function processSingleWordSeoKeywords(
   const isStrongSearchCandidate = (item: Candidate): boolean => {
     const w = item.word;
     if (WEAK_STANDALONE_DESCRIPTORS.has(w)) return false;
-    // Concrete subjects and secondary objects are always eligible.
     if (item.evidence.has('primary') || item.evidence.has('secondary')) return true;
-    // Attributes/actions/concepts must carry meaningful visual strength.
     if ((item.evidence.has('attribute') || item.evidence.has('action')) && item.visual >= 75) return true;
+    if (item.evidence.has('context') && item.visual >= 62) return true;
     if ((item.evidence.has('concept') || item.evidence.has('background')) && item.visual >= 60) return true;
-    // Synonyms are allowed only when they also have buyer intent or strong specificity.
     if (item.evidence.has('synonym') && (item.intent > 0 || item.specificity >= 8) && item.visual >= 35) return true;
     return false;
   };
+
+  // HUMAN SEO HIERARCHY:
+  // 1 Main Subject -> 2 Supporting Objects -> 3 Attributes/Actions ->
+  // 4 Context -> 5 Concept.
+  // These are SOFT targets, not hard quotas. Missing tiers redistribute their
+  // unused slots to other grounded tiers so the requested count can be met
+  // without injecting unrelated filler.
+  const maxKeywords = Math.min(Math.max(1, Number(targetCount) || 25), 49);
+  const tierTargetMap = (count: number): Record<number, number> => {
+    const total = Math.max(1, Math.min(49, count));
+    const raw: Record<number, number> = {
+      1: Math.round(total * 0.20), // Main Subject
+      2: Math.round(total * 0.25), // Supporting Objects
+      3: Math.round(total * 0.25), // Attributes / Actions
+      4: Math.round(total * 0.20), // Context
+      5: Math.round(total * 0.10)  // Concept
+    };
+
+    if (total >= 5) {
+      for (const tier of [1,2,3,4,5]) raw[tier] = Math.max(1, raw[tier]);
+    }
+
+    let sum = Object.values(raw).reduce((a,b)=>a+b,0);
+    const floor = total >= 5 ? 1 : 0;
+    while (sum > total) {
+      const tier = [3,2,4,1,5].find(t => raw[t] > floor);
+      if (tier == null) break;
+      raw[tier]--; sum--;
+    }
+    while (sum < total) {
+      const tier = [2,3,1,4,5][(sum - 1) % 5];
+      raw[tier]++; sum++;
+    }
+    return raw;
+  };
+
+  const tierTargets = tierTargetMap(maxKeywords);
+  const byTier = new Map<number, Candidate[]>();
+  for (const item of ranked) {
+    const list = byTier.get(item.band) || [];
+    list.push(item);
+    byTier.set(item.band, list);
+  }
 
   const output:string[] = [];
   const seen = new Set<string>();
@@ -1129,35 +1183,71 @@ function processSingleWordSeoKeywords(
     ['landscape','scene'],['scenery','scene'],['wilderness','scene']
   ]);
   const familyCounts = new Map<string, number>();
-  const maxKeywords = Math.min(Math.max(1, Number(targetCount) || 25), 25);
   let cameraViewpointCount = 0;
 
-  for (const item of ranked) {
+  const tryAdd = (item: Candidate, relaxed: boolean | 'extended' = false) => {
     const word = item.word;
-    if (!isStrongSearchCandidate(item)) continue;
-    if (!word || seen.has(word) || stopWords.has(word) || blocked.has(word) || phraseFragments.has(word) || isProhibitedKeyword(word)) continue;
+    if (!word || seen.has(word) || stopWords.has(word) || blocked.has(word) || phraseFragments.has(word) || isProhibitedKeyword(word)) return false;
+    if (!relaxed && !isStrongSearchCandidate(item)) return false;
+    if (WEAK_STANDALONE_DESCRIPTORS.has(word)) return false;
 
-    // Camera/viewpoint/focus/composition gets ONE slot maximum in SEO Single.
-    // This prevents close + up + shallow + depth + field + framing + macro
-    // from consuming the metadata budget. Choose the strongest canonical term.
+    // Camera/viewpoint/composition remains a single optional slot.
     if (isCameraOrCompositionKeyword(word)) {
-      if (cameraViewpointCount >= 1) continue;
+      if (cameraViewpointCount >= 1) return false;
       cameraViewpointCount++;
     }
 
     const family = semanticFamilies.get(word);
-    const familyLimit = family === 'vegetation' || family === 'winter' || family === 'water' || family === 'scene' ? 2 : 1;
-    if (family && (familyCounts.get(family) || 0) >= familyLimit) continue;
+    const strictFamilyLimit = (family === 'vegetation' || family === 'winter' || family === 'water' || family === 'scene') ? 2 : 1;
+    const refillFamilyLimit = (family === 'vegetation' || family === 'winter' || family === 'water') ? 3 : family === 'scene' ? 2 : 1;
+    const extendedFamilyLimit = (family === 'vegetation' || family === 'winter' || family === 'water') ? 4 : family === 'scene' ? 3 : 2;
+    const familyLimit = relaxed === 'extended' ? extendedFamilyLimit : (relaxed ? refillFamilyLimit : strictFamilyLimit);
+    if (family && (familyCounts.get(family) || 0) >= familyLimit) return false;
 
     const root = microstockKeywordRoot(word);
-    if (!root || roots.has(root)) continue;
+    if (!root || roots.has(root)) return false;
     seen.add(word);
     roots.add(root);
     if (family) familyCounts.set(family, (familyCounts.get(family) || 0) + 1);
     output.push(word);
-    if (output.length >= maxKeywords) break;
+    return true;
+  };
+
+  // PASS 1: deliberately walk the five SEO layers. This gives the final list
+  // a natural human rhythm instead of a flat AI ranking.
+  for (const tier of [1,2,3,4,5]) {
+    const target = tierTargets[tier] || 0;
+    const pool = byTier.get(tier) || [];
+    let added = 0;
+    for (const item of pool) {
+      if (added >= target || output.length >= maxKeywords) break;
+      if (tryAdd(item, false)) added++;
+    }
   }
-  return output;
+
+  // PASS 2: redistribute any unused tier capacity to the strongest remaining
+  // grounded candidates. This is how the exact count is reached without filler.
+  if (output.length < maxKeywords) {
+    for (const tier of [1,2,3,4,5]) {
+      if (output.length >= maxKeywords) break;
+      for (const item of (byTier.get(tier) || [])) {
+        if (output.length >= maxKeywords) break;
+        tryAdd(item, true);
+      }
+    }
+  }
+
+  // PASS 3: for requests above 25, widen semantic-family capacity while keeping
+  // every relevance, generic, color, connector and camera restriction intact.
+  if (output.length < maxKeywords && maxKeywords > 25) {
+    for (const item of ranked) {
+      if (output.length >= maxKeywords) break;
+      if (item.visual < 30) continue;
+      tryAdd(item, 'extended');
+    }
+  }
+
+  return output.slice(0, maxKeywords);
 }
 
 function microstockKeywordRoot(word: string): string {
@@ -1251,10 +1341,9 @@ function processKeywordsSemantic(
   description?: string
 ): string[] {
   if (keywordMode === 'single') {
-    return limitCameraViewpointKeywords(
-      processSingleWordSeoKeywords(rawAiKeywords, targetCount, visualFacts, title, description),
-      1
-    );
+    // The SEO Single engine already enforces the one-camera-slot rule. Do not
+    // run a second post-filter because it can silently reduce the requested count.
+    return processSingleWordSeoKeywords(rawAiKeywords, targetCount, visualFacts, title, description);
   }
   return limitCameraViewpointKeywords(
     processKeywordsSemanticLegacy(rawAiKeywords, targetCount, visualFacts, toolType, keywordMode, title, description),
@@ -3165,8 +3254,10 @@ export const generateStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const requestedKeywordCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
-  const targetCount = keywordMode === 'single' ? Math.min(Math.max(1, requestedKeywordCount), 25) : Math.min(Math.max(1, requestedKeywordCount), 49);
-  const aiRequestCount = Math.min(40, Math.max(25, targetCount + 10)); // candidates for ranking; final SEO Single is capped at 25
+  const targetCount = Math.min(Math.max(1, requestedKeywordCount), 49);
+  // Generate a surplus candidate pool so deterministic filtering can still hit the user's requested count.
+  // Final output is never padded with generic terms; only grounded candidates may fill the target.
+  const aiRequestCount = Math.min(49, Math.max(30, targetCount + 12));
 
   const directives = getToolTypeDirectives(toolType);
 
@@ -3182,7 +3273,7 @@ SEARCH INTENT: ask what a real buyer would type when trying to find this exact v
 
 TREND: a trend can slightly raise the priority of a grounded keyword, but it must never create a keyword that the asset does not support.
 
-ORDER: manually curate the strongest terms first. The first 10 should be the most useful combination of exact subject, distinctive detail, and buyer intent. Do not arrange them into artificial subject/detail/concept buckets.
+SEO STRUCTURE: build the candidate pool across five natural layers: Main Subject, Supporting Objects, Attributes/Actions, Context/Setting, and Concept/Meaning. These are soft layers, not hard quotas; missing layers redistribute to other grounded candidates. The first 10 must still be the strongest buyer-facing terms.
 
 QUALITY: no filler, no keyword padding, no 70/30 split, no fixed taxonomy, no duplicate roots, no brands, no names of famous people or characters, no media-format labels, no connector words, no generic/meta terms, and no color keywords. Only grounded, buyer-useful words survive. Never use color words to fill slots. Descriptive forms such as textured, weathered, resting, showing, representing, glowing are allowed when genuinely supported.
 
@@ -3190,7 +3281,7 @@ The final list should feel like a skilled human contributor looked at the asset 
 CAMERA VIEWPOINT LIMIT: camera/viewpoint/composition terms such as closeup, macro, wide-angle, overhead, aerial, bird's-eye, low-angle, eye-level, POV, etc. may use AT MOST ONE keyword slot in the final list. Choose only the single most useful viewpoint term; do not spam multiple camera-angle synonyms.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word English candidate keywords.`;
-    keywordRulePromptText += `\nSINGLE-WORD MODE: every keyword item must contain exactly one word. Use natural words such as pendant, jewelry, faith, symbol, stone, religion, texture, culture, history, devotion, chain, light, surface, metallic, weathered, contrast, highlights, endurance, editorial, belief when the asset supports them. Do not create phrases and do not split artificial phrases into unrelated words.`;
+    keywordRulePromptText += `\nSINGLE-WORD MODE: every keyword item must contain exactly one word. Build candidates across Main Subject, Supporting Objects, Attributes/Actions, Context/Setting, and Concept/Meaning. These are soft semantic layers used to provide breadth and fulfill the requested count without invention. Use natural stock words only when the asset supports them. Do not create phrases and never split artificial phrases into unrelated fragments.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} natural multi-word search terms.`;
     keywordRulePromptText += `\nMULTI MODE: use only genuinely natural 2–4 word search phrases that a buyer would type. Do not manufacture long-tail phrases just to increase coverage.`;
@@ -3406,7 +3497,7 @@ MICROSTOCK KEYWORD SEO HIERARCHY — HUMAN CURATED, DISCOVERABILITY-FIRST (CRITI
 6. TOP 10 PRIORITY: the first ten surviving keywords should answer what the asset is and what makes it distinctive. Do not fill the top ten with generic words.
 7. SEARCH INTENT: use buyer search intent only to rank visually grounded candidates. Search demand must NEVER create an unsupported keyword.
 8. TREND: use current trend relevance only as a small boost to an already grounded keyword. Never inject trend buzzwords.
-9. NO FILLER / NO PADDING: do not add keywords just to reach the requested count. Fewer strong keywords are better than weak metadata.
+9. EXACT TARGET WITHOUT SPAM: return the requested number when enough grounded candidates exist. Never use generic, color, connector, camera-spam, or unsupported filler just to hit the count. If the first candidate set is too small, generate additional grounded candidates from the same visual evidence before finalizing.
 10. SEMANTIC DEDUPLICATION: avoid obvious singular/plural or near-identical duplicates, but keep words with genuinely different meanings such as jewish/judaism or metal/metallic when supported.
 11. DESCRIPTIVE FORMS ARE VALID, COLORS ARE NOT: include meaningful materials, textures, conditions, actions, and participles such as metallic, textured, weathered, resting, representing, glowing when visibly supported. Never output color names.
 12. NO FORMAT LABELS AS KEYWORDS: do not use photo, photography, image, asset, vector, illustration, svg, video, footage, unless a specific platform workflow explicitly requires a format term.
@@ -3893,13 +3984,13 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const requestedKeywordCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
-  const targetCount = keywordMode === 'single' ? Math.min(Math.max(1, requestedKeywordCount), 25) : Math.min(Math.max(1, requestedKeywordCount), 49);
-  const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
+  const targetCount = Math.min(Math.max(1, requestedKeywordCount), 49);
+  const aiRequestCount = Math.min(49, Math.max(30, targetCount + 12)); // surplus candidates for deterministic filtering
   let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-  let keywordRulePromptText = `SEMANTIC STOCK SEARCH: think like a buyer searching for this exact asset. Generate only terms grounded in the supplied visual facts. Start with concrete subjects, then useful distinguishing attributes, setting, action, mood, style, season or concept when relevant. Do not force category quotas, 70/30 splits, viral buzzwords or filler. Trend terms are only a small boost when visually supported. Do not invent use cases, industries, locations, people, objects or events. Keep terms natural, searchable, lowercase and short. Colors are allowed when useful. No brands, trademarks, famous people, fictional characters or artist names.`;
+  let keywordRulePromptText = `SEMANTIC STOCK SEARCH: think like a buyer searching for this exact asset. Generate only terms grounded in the supplied visual facts. Build the candidate pool across Main Subject, Supporting Objects, Attributes/Actions, Context/Setting, and Concept/Meaning. These are soft SEO layers for semantic breadth, not permission to invent or pad. Do not force 70/30 splits, viral buzzwords or filler. Trend terms are only a small boost when visually supported. Do not invent use cases, industries, locations, people, objects or events. Keep terms natural, searchable, lowercase and short. Colors are forbidden as standalone keyword terms. No brands, trademarks, famous people, fictional characters or artist names.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-    keywordRulePromptText = `SINGLE-WORD MICROSTOCK METADATA. Generate only individual English words, separated as separate keyword items. Follow this natural stock pattern: pendant, jewelry, faith, symbol, religion, stone, texture, culture, history, devotion, chain, light, surface, metallic, weathered, contrast, highlights, endurance, editorial, belief. Every word must be directly visible, clearly implied by the visual, or a defensible one-word synonym of a detected subject or concept. Rank by buyer search intent and visual relevance. Use concrete subjects first, then specific attributes, materials, actions, setting, concepts, editorial/commercial context when genuinely supported. Do not invent buzzwords or force trends. No phrases, no compound keywords, no connector words, no filler, no duplicate roots, no brands, no names, no media-type labels, no punctuation. Colors are allowed when they materially describe the asset. Keep useful forms such as resting, showing, representing, textured when they are genuinely supported by the asset.`;
+    keywordRulePromptText = `SINGLE-WORD MICROSTOCK METADATA. Generate individual English words as candidates. Build the candidate pool across Main Subject, Supporting Objects, Attributes/Actions, Context/Setting, and Concept/Meaning. This gives the final list natural semantic breadth and helps fulfill the requested count, but it is NOT permission to invent or pad. Every word must be directly visible, clearly implied by the visual, or a defensible one-word synonym of a verified visual subject or concept. Rank by visual relevance and buyer search intent. Do not invent buzzwords or force trends. No phrases, compound fragments, connector words, generic filler, duplicate roots, brands, names, media-type labels, or color terms. Keep useful forms such as textured, weathered, glowing, resting, representing only when genuinely supported by the asset.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} meaningful multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
     keywordRulePromptText += `\nMULTI MODE: use natural 2–4 word search phrases.`;
@@ -4103,7 +4194,7 @@ MICROSTOCK KEYWORD SEO HIERARCHY — HUMAN CURATED, DISCOVERABILITY-FIRST (CRITI
 6. TOP 10 PRIORITY: the first ten surviving keywords should answer what the asset is and what makes it distinctive. Do not fill the top ten with generic words.
 7. SEARCH INTENT: use buyer search intent only to rank visually grounded candidates. Search demand must NEVER create an unsupported keyword.
 8. TREND: use current trend relevance only as a small boost to an already grounded keyword. Never inject trend buzzwords.
-9. NO FILLER / NO PADDING: do not add keywords just to reach the requested count. Fewer strong keywords are better than weak metadata.
+9. EXACT TARGET WITHOUT SPAM: return the requested number when enough grounded candidates exist. Never use generic, color, connector, camera-spam, or unsupported filler just to hit the count. If the first candidate set is too small, generate additional grounded candidates from the same visual evidence before finalizing.
 10. SEMANTIC DEDUPLICATION: avoid obvious singular/plural or near-identical duplicates, but keep words with genuinely different meanings such as jewish/judaism or metal/metallic when supported.
 11. DESCRIPTIVE FORMS ARE VALID, COLORS ARE NOT: include meaningful materials, textures, conditions, actions, and participles such as metallic, textured, weathered, resting, representing, glowing when visibly supported. Never output color names.
 12. NO FORMAT LABELS AS KEYWORDS: do not use photo, photography, image, asset, vector, illustration, svg, video, footage, unless a specific platform workflow explicitly requires a format term.
