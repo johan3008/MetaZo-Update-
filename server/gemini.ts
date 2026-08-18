@@ -297,6 +297,18 @@ const COLOR_KEYWORD_SET = new Set([
   'jade','sapphire','multicolor','multicolored','colorful','colourful','pastel','monochrome'
 ]);
 
+// Low-information descriptors should not consume scarce microstock keyword slots.
+const LOW_VALUE_GENERIC_KEYWORDS = new Set([
+  'light','lights','sky','terrain','environment','scene','scenery','view','visual',
+  'area','space','shape','form','appearance','look','detail','details','background','foreground',
+  'center','middle','top','bottom','side','part','parts','thing','things','place','location',
+  'setting','atmosphere','mood','balance','lines','line','depth','field','framing','composition',
+  'contrast','faint','dense','covered','showing','representing','resting','leading','trailhead','trail','trails',
+  'symmetrical','asymmetrical','asymmetry','natural','beautiful','calm','peaceful','scenic',
+  'outdoor','indoors','inside','outside','close','up','down','wide','high','low','sharp','soft',
+  'bright','dark','blurred','focused','defocused'
+]);
+
 function isProhibitedKeyword(word: string): boolean {
   if (!word) return true;
   const lower = word.toLowerCase().trim();
@@ -834,6 +846,7 @@ function processSingleWordSeoKeywords(
   const blocked = new Set([
     ...GENERIC_KEYWORDS_SET,
     ...COLOR_KEYWORD_SET,
+    ...LOW_VALUE_GENERIC_KEYWORDS,
     'a','an','the','and','or','but','of','in','on','at','to','for','with','by','from','as',
     'is','are','was','were','be','been','being','this','that','these','those','into','over','under',
     'image','picture','asset','stock','photo','photograph','photography','vector','illustration',
@@ -1052,7 +1065,9 @@ function processSingleWordSeoKeywords(
       const titleLower = String(title || '').toLowerCase();
       const titleBoost = titleLower.split(/\s+/).includes(word) ? 5 : 0;
 
-      const score = visual + specificity + intent + trend + titleBoost;
+      const lowValuePenalty = LOW_VALUE_GENERIC_KEYWORDS.has(word) ? 35 : 0;
+      const weakDescriptorPenalty = /^(covered|faint|dense|winding|glowing|frozen|snowy|weathered|wooden|metal|evergreen)$/.test(word) ? 3 : 0;
+      const score = visual + specificity + intent + trend + titleBoost - lowValuePenalty - weakDescriptorPenalty;
       const existing = candidates.get(word);
       if (!existing || score > existing.score) {
         candidates.set(word, {
@@ -1077,14 +1092,49 @@ function processSingleWordSeoKeywords(
     a.band - b.band || b.score - a.score || b.visual - a.visual || a.firstSeen - b.firstSeen
   );
 
+  // V10 HUMAN SEARCH-VALUE GATE
+  // A word can be visually true but still be a poor stock-search keyword. Keep
+  // the final list buyer-oriented: subjects, distinctive attributes, concrete
+  // context, and meaningful concepts. Weak sentence fragments and photographic
+  // jargon do not deserve a slot merely because the model mentioned them.
+  const WEAK_STANDALONE_DESCRIPTORS = new Set([
+    'covered','faint','dense','leading','balance','lines','line','depth','field',
+    'symmetrical','asymmetrical','framing','composition','close','up','shallow',
+    'wide','angle','high','low','level','bright','dark','soft','sharp','blurred',
+    'focused','defocused','showing','representing','resting'
+  ]);
+  const isStrongSearchCandidate = (item: Candidate): boolean => {
+    const w = item.word;
+    if (WEAK_STANDALONE_DESCRIPTORS.has(w)) return false;
+    // Concrete subjects and secondary objects are always eligible.
+    if (item.evidence.has('primary') || item.evidence.has('secondary')) return true;
+    // Attributes/actions/concepts must carry meaningful visual strength.
+    if ((item.evidence.has('attribute') || item.evidence.has('action')) && item.visual >= 75) return true;
+    if ((item.evidence.has('concept') || item.evidence.has('background')) && item.visual >= 60) return true;
+    // Synonyms are allowed only when they also have buyer intent or strong specificity.
+    if (item.evidence.has('synonym') && (item.intent > 0 || item.specificity >= 8) && item.visual >= 35) return true;
+    return false;
+  };
+
   const output:string[] = [];
   const seen = new Set<string>();
   const roots = new Set<string>();
+  const semanticFamilies = new Map<string, string>([
+    ['tree','vegetation'],['trees','vegetation'],['pine','vegetation'],['evergreen','vegetation'],
+    ['forest','vegetation'],['woodland','vegetation'],
+    ['snow','winter'],['snowy','winter'],['frozen','winter'],['frosted','winter'],
+    ['river','water'],['stream','water'],['water','water'],
+    ['night','time'],['twilight','time'],
+    ['stars','skyfamily'],['sky','skyfamily'],
+    ['landscape','scene'],['scenery','scene'],['wilderness','scene']
+  ]);
+  const familyCounts = new Map<string, number>();
   const maxKeywords = Math.min(Math.max(1, Number(targetCount) || 25), 25);
   let cameraViewpointCount = 0;
 
   for (const item of ranked) {
     const word = item.word;
+    if (!isStrongSearchCandidate(item)) continue;
     if (!word || seen.has(word) || stopWords.has(word) || blocked.has(word) || phraseFragments.has(word) || isProhibitedKeyword(word)) continue;
 
     // Camera/viewpoint/focus/composition gets ONE slot maximum in SEO Single.
@@ -1095,10 +1145,15 @@ function processSingleWordSeoKeywords(
       cameraViewpointCount++;
     }
 
+    const family = semanticFamilies.get(word);
+    const familyLimit = family === 'vegetation' || family === 'winter' || family === 'water' || family === 'scene' ? 2 : 1;
+    if (family && (familyCounts.get(family) || 0) >= familyLimit) continue;
+
     const root = microstockKeywordRoot(word);
     if (!root || roots.has(root)) continue;
     seen.add(word);
     roots.add(root);
+    if (family) familyCounts.set(family, (familyCounts.get(family) || 0) + 1);
     output.push(word);
     if (output.length >= maxKeywords) break;
   }
@@ -3357,7 +3412,15 @@ MICROSTOCK KEYWORD SEO HIERARCHY — HUMAN CURATED, DISCOVERABILITY-FIRST (CRITI
 12. NO FORMAT LABELS AS KEYWORDS: do not use photo, photography, image, asset, vector, illustration, svg, video, footage, unless a specific platform workflow explicitly requires a format term.
 13. NEVER SPLIT SEMANTIC PHRASES INTO USELESS FRAGMENTS: phrases such as "close up", "shallow depth of field", "wide angle", "low angle", "eye level", and "top down" must never become broken standalone keywords such as close, up, shallow, depth, field, wide, angle, eye, level, top, or down. If the selected mode requires single-word keywords, omit the phrase rather than damaging it into fragments.
 14. CAMERA/COMPOSITION SLOT CONTROL: in SEO Single, allow at most ONE camera/viewpoint/focus/composition keyword total. Do not output close, up, shallow, depth, field, framing, asymmetrical, macro, aerial, overhead, perspective, etc. as a cluster. Select only the strongest supported canonical term.
+15. BUYER-VALUE FILTER: Do NOT output words merely because they occur in a visual description. Reject low-search-value fragments such as light, trail, covered, faint, sky, dense, terrain, balance, lines, depth, field, framing, leading, symmetrical, asymmetrical, scenery, scenic, environment, close, up. A final keyword must stand alone as a useful buyer search term.
+16. SEMANTIC FAMILY CONTROL: avoid near-duplicate slot waste. Forest/pine/evergreen/trees/woodland are one vegetation family; snow/snowy/frozen/frosted are one winter-state family; river/stream/water are one water family. Keep only the strongest 1–2 terms from a family unless each adds clearly different buyer intent.
+17. HUMAN ORDERING: rank exact subject and scene identity first, then distinctive visual treatment, then grounded context/concept, then secondary detail. Never sort alphabetically and never preserve raw AI order.
+18. LANDSCAPE RULE: for a landscape, prefer meaningful search terms such as winter, forest, river, landscape, snow, pine, neon, glowing, aurora, wilderness, twilight, futuristic, fantasy, reflection, mystical when visibly supported. Do not replace these with photographic-analysis vocabulary.
 15. FINAL FEEL: the result must read like a clean, intentional human keyword list, not an AI thesaurus expansion.
+16. SEARCH-VALUE TEST: before emitting each keyword ask: would a real stock buyer plausibly type this standalone word to find this exact asset? If the answer is weak, omit it. A word being grammatically descriptive is not enough.
+17. DO NOT TAG SENTENCE FRAGMENTS: omit standalone words such as covered, faint, dense, leading, balance, lines, depth, field, shallow, close, up, framing, symmetrical, asymmetrical when they only come from a longer description or photography/composition phrase.
+18. PHYSICAL ROUTE VALIDATION: use trail, path, road, walkway, track, route only when an actual traversable physical route is clearly visible. Never infer a trail/path from a glowing line, river edge, reflection, light strip, leading line, or winding watercourse.
+19. DISTINCTIVE-VISUAL PRIORITY: prefer concrete searchable terms such as forest, river, snow, pine, neon, aurora, frozen, twilight, evergreen, winding, illuminated, futuristic, fantasy, reflection, mystical when they are genuinely visible. Do not replace these with vague photographic terminology.
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION: Include a location or landmark only when clearly recognizable or explicitly verified by EXIF. Do not infer a place from generic visual characteristics.
