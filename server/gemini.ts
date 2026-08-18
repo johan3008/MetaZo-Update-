@@ -2636,8 +2636,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
+    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash' || activeModel === 'gemini-3-flash-preview') {
+      activeModel = 'gemini-3-flash-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -2878,7 +2878,7 @@ Ensure your title and keywords focus 100% on the core visual subject matter, act
   
   const mediaTypeContext = directives.mediaTypeContext;
 
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
+  const fallbackGeminiModel = 'gemini-3-flash-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   
   const visionSystemInstruction = `ROLE:
@@ -3521,8 +3521,8 @@ export const generateBatchStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
+    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash' || activeModel === 'gemini-3-flash-preview') {
+      activeModel = 'gemini-3-flash-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -3710,7 +3710,7 @@ Ensure your title and keywords focus 100% on the core visual subject matter, act
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.5-flash' : 'gemini-3.6-pro-preview';
+  const fallbackGeminiModel = 'gemini-3-flash-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
