@@ -1794,9 +1794,12 @@ function buildTieredVisualAnalysis(visualFacts: any): TieredVisualAnalysis {
   ].filter((x: any) => typeof x === 'string');
 
   const concepts: string[] = [
+    ...(Array.isArray(visualFacts?.concepts) ? visualFacts.concepts : []),
+    ...(Array.isArray(visualFacts?.commercial_concepts) ? visualFacts.commercial_concepts : []),
+    ...(Array.isArray(visualFacts?.commercial_themes) ? visualFacts.commercial_themes : []),
     ...(visualFacts?.deeper_meaning_and_symbolism ? [String(visualFacts.deeper_meaning_and_symbolism)] : []),
     ...(visualFacts?.understanding_and_context ? [String(visualFacts.understanding_and_context)] : [])
-  ];
+  ].filter((x: any) => typeof x === 'string' && x.trim().length > 0);
 
   return { scene, objects, attributes, concepts };
 }
@@ -2889,7 +2892,10 @@ VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
 2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. GEOGRAPHICAL LOCATION & LANDMARKS (MANDATORY DETECTION): You must actively detect, extract, and report any geographical location, city, country, or specific landmark details from BOTH the EXIF metadata (GPS Latitude, Longitude, City, Country, Location names, if available) and visual cues in the image (such as recognizable architectural styles, geological landmarks, city skylines, vegetation, or cultural landmarks like Borobudur, Eiffel Tower, Sydney Opera House, etc.). If a location is detected, explicitly specify the city, country, and landmark name in your analysis under background_elements, primary_subjects, or primary visual facts.
+4. COMMERCIAL & ABSTRACT CONCEPTS (MANDATORY DETECTION):
+You MUST deeply identify and report all high-value commercial concepts, business themes, industry metaphors, and abstract search intents represented in the visual asset (e.g. teamwork, innovation, digital transformation, sustainability, wellness, cybersecurity, remote collaboration, growth, financial freedom, agile workflow, mindfulness, success, partnership). Put these into the  and  fields.
+
+5. GEOGRAPHICAL LOCATION & LANDMARKS (MANDATORY DETECTION): You must actively detect, extract, and report any geographical location, city, country, or specific landmark details from BOTH the EXIF metadata (GPS Latitude, Longitude, City, Country, Location names, if available) and visual cues in the image (such as recognizable architectural styles, geological landmarks, city skylines, vegetation, or cultural landmarks like Borobudur, Eiffel Tower, Sydney Opera House, etc.). If a location is detected, explicitly specify the city, country, and landmark name in your analysis under background_elements, primary_subjects, or primary visual facts.
 5. Never hallucinate brands, trademarked logos, or copyrighted characters.
 6. If uncertain, provide the closest accurate generic description.
 7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
@@ -2969,6 +2975,8 @@ OUTPUT FORMAT:
           colors: { type: Type.ARRAY, items: { type: Type.STRING } },
           actions: { type: Type.ARRAY, items: { type: Type.STRING } },
           composition: { type: Type.ARRAY, items: { type: Type.STRING } },
+          concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Core commercial concepts, business themes, abstract metaphors, and buyer search intents (e.g., teamwork, digital transformation, sustainability, wellness, innovation, remote work, freedom, growth)" },
+          commercial_concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific high-value buyer commercial concepts and industry use cases" },
           deeper_meaning_and_symbolism: { type: Type.STRING },
           understanding_and_context: { type: Type.STRING },
           semantic_category_analysis: {
@@ -3722,7 +3730,10 @@ VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
 2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. GEOGRAPHICAL LOCATION & LANDMARKS (MANDATORY DETECTION): You must actively detect, extract, and report any geographical location, city, country, or specific landmark details from BOTH the EXIF metadata (GPS Latitude, Longitude, City, Country, Location names, if available) and visual cues in the image (such as recognizable architectural styles, geological landmarks, city skylines, vegetation, or cultural landmarks like Borobudur, Eiffel Tower, Sydney Opera House, etc.). If a location is detected, explicitly specify the city, country, and landmark name in your analysis under background_elements, primary_subjects, or primary visual facts.
+4. COMMERCIAL & ABSTRACT CONCEPTS (MANDATORY DETECTION):
+You MUST deeply identify and report all high-value commercial concepts, business themes, industry metaphors, and abstract search intents represented in the visual asset (e.g. teamwork, innovation, digital transformation, sustainability, wellness, cybersecurity, remote collaboration, growth, financial freedom, agile workflow, mindfulness, success, partnership). Put these into the  and  fields.
+
+5. GEOGRAPHICAL LOCATION & LANDMARKS (MANDATORY DETECTION): You must actively detect, extract, and report any geographical location, city, country, or specific landmark details from BOTH the EXIF metadata (GPS Latitude, Longitude, City, Country, Location names, if available) and visual cues in the image (such as recognizable architectural styles, geological landmarks, city skylines, vegetation, or cultural landmarks like Borobudur, Eiffel Tower, Sydney Opera House, etc.). If a location is detected, explicitly specify the city, country, and landmark name in your analysis under background_elements, primary_subjects, or primary visual facts.
 5. Never hallucinate brands, trademarked logos, or copyrighted characters.
 6. If uncertain, provide the closest accurate generic description.
 7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
