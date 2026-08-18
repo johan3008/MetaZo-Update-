@@ -1,3 +1,4 @@
+import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
@@ -144,75 +145,61 @@ const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter',
  * - Memperbaiki JSON rusak/malformed via jsonrepair
  * - Fallback regex ekstraksi field jika JSON benar-benar corrupt
  */
-/**
- * Ekstrak & perbaiki JSON mandiri (Zero-Dependency) yang sangat tahan banting:
- * - Menangani markdown code blocks (```json ... ```)
- * - Memperbaiki trailing commas, single quotes, kurung unclosed
- * - Failsafe regex parser jika respons model terpotong/rusak
- */
 function extractJSON(raw: string): string {
   if (!raw) return "{}";
 
-  let str = String(raw).trim();
-
-  // 1. Coba parse langsung
+  // 1. Coba parse langsung jika sudah valid
   try {
-    JSON.parse(str);
-    return str;
+    const trimmed = raw.trim();
+    JSON.parse(trimmed);
+    return trimmed;
   } catch (e) {}
 
   // 2. Bersihkan markdown fences
-  str = str.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
 
+  // 3. Coba perbaiki dengan jsonrepair
   try {
-    JSON.parse(str);
-    return str;
-  } catch (e) {}
-
-  // 3. Cari batas objek {} atau array [] terluar
-  const firstBrace = str.indexOf('{');
-  const lastBrace = str.lastIndexOf('}');
-  const firstBracket = str.indexOf('[');
-  const lastBracket = str.lastIndexOf(']');
-
-  let candidate = str;
-  if (firstBrace !== -1 && lastBrace > firstBrace && (firstBracket === -1 || firstBrace < firstBracket)) {
-    candidate = str.slice(firstBrace, lastBrace + 1);
-  } else if (firstBracket !== -1 && lastBracket > firstBracket) {
-    candidate = str.slice(firstBracket, lastBracket + 1);
-  }
-
-  // 4. Perbaikan umum sintaks JSON (trailing comma, single quotes)
-  let repaired = candidate
-    .replace(/,\s*([\}\]])/g, '$1') // Hapus trailing comma
-    .replace(/([{,]\s*)'([^']+)'(\s*:)/g, '$1"$2"$3') // Single quote key -> double quote
-    .replace(/:\s*'([^']*)'/g, ': "$1"'); // Single quote string value -> double quote
-
-  try {
+    const repaired = jsonrepair(cleaned);
     JSON.parse(repaired);
     return repaired;
   } catch (e) {}
 
-  // 5. Coba perbaiki kurung yang belum tertutup (unclosed brackets/braces)
-  try {
-    let unclosed = repaired;
-    const openBraces = (unclosed.match(/\{/g) || []).length;
-    const closeBraces = (unclosed.match(/\}/g) || []).length;
-    const openBrackets = (unclosed.match(/\[/g) || []).length;
-    const closeBrackets = (unclosed.match(/\]/g) || []).length;
-
-    if (openBrackets > closeBrackets) {
-      unclosed += ']'.repeat(openBrackets - closeBrackets);
+  // 4. Cari blok kurung kurawal pertama & terakhir
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const slice = cleaned.slice(firstBrace, lastBrace + 1);
+    try {
+      const repairedSlice = jsonrepair(slice);
+      JSON.parse(repairedSlice);
+      return repairedSlice;
+    } catch (e) {
+      try {
+        JSON.parse(slice);
+        return slice;
+      } catch (e2) {}
     }
-    if (openBraces > closeBraces) {
-      unclosed += '}'.repeat(openBraces - closeBraces);
-    }
-    unclosed = unclosed.replace(/,\s*([\}\]])/g, '$1');
-    JSON.parse(unclosed);
-    return unclosed;
-  } catch (e) {}
+  }
 
-  // 6. Failsafe Regex Parser: Ekstrak field metadata secara langsung dari teks
+  // 5. Cari blok kurung siku array
+  const firstBracket = cleaned.indexOf('[');
+  const lastBracket = cleaned.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    const slice = cleaned.slice(firstBracket, lastBracket + 1);
+    try {
+      const repairedSlice = jsonrepair(slice);
+      JSON.parse(repairedSlice);
+      return repairedSlice;
+    } catch (e) {
+      try {
+        JSON.parse(slice);
+        return slice;
+      } catch (e2) {}
+    }
+  }
+
+  // 6. Failsafe Regex Parser: Ekstrak key-value manual jika model mengeluarkan format non-standar
   try {
     const titleMatch = raw.match(/"title"\s*:\s*"([^"]+)"/i);
     const descMatch = raw.match(/"description"\s*:\s*"([^"]+)"/i);
@@ -234,33 +221,12 @@ function extractJSON(raw: string): string {
         category_id: catMatch ? parseInt(catMatch[1], 10) : 0,
         shutterstock_category_1: scut1Match ? scut1Match[1] : '',
         shutterstock_category_2: scut2Match ? scut2Match[1] : '',
-        category_reason: 'Extracted via failsafe regex parser'
+        category_reason: 'Extracted via failsafe parser'
       });
     }
   } catch (e) {}
 
   return "{}";
-}
-
-
-/**
- * Sanitasi mendalam khusus untuk memastikan kata kunci 100% ramah indeksasi (Indexable)
- * pada algoritma mesin pencari microstock (Adobe Stock, Shutterstock, Freepik, Getty).
- */
-function sanitizeForIndexing(kw: string): string {
-  if (!kw) return '';
-  let clean = String(kw)
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
-    .replace(/\s+/g, ' ')          // Normalisasi spasi
-    .trim();
-
-  // Filter stop-words/noise tunggal yang mengganggu indeksasi
-  const stopWords = new Set(['a', 'an', 'the', 'at', 'in', 'on', 'of', 'to', 'by', 'is', 'it', 'or', 'and', 'as', 'for', 'with']);
-  const words = clean.split(' ').filter(w => w.length >= 2 && !stopWords.has(w));
-  
-  return words.join(' ');
 }
 
 
@@ -675,8 +641,86 @@ function processKeywordsWith7StagePipeline(
   }
 
   // --- TAHAP 7: FINAL KEYWORDS (Precision Count Locking) ---
-  const finalKeywords = enforceStrictKeywordMode(rankedKeywords, keywordMode, targetCount, visualFacts);
+  let finalKeywords = enforceStrictKeywordMode(rankedKeywords, keywordMode, targetCount, visualFacts);
+  // AGKEYWORDS: Apply 70/30 SEO-common word split
+  finalKeywords = applyAgKeywordsSeoCommonSplit(finalKeywords, targetCount);
   return finalKeywords.slice(0, targetCount);
+}
+
+
+/**
+ * AGKEYWORDS RULE: Split keywords into 70% SEO-friendly + 30% common words.
+ * SEO-friendly = high search volume, buyer intent, commercial terms.
+ * Common words = basic descriptors (colors, shapes, simple emotions, materials).
+ * Called as a final post-processing step on the ranked keyword list.
+ */
+function applyAgKeywordsSeoCommonSplit(keywords: string[], targetCount: number): string[] {
+  if (keywords.length < 5) return keywords;
+
+  const COMMON_WORD_SET = new Set([
+    'blue', 'red', 'green', 'yellow', 'black', 'white', 'brown', 'pink',
+    'purple', 'gray', 'grey', 'orange', 'gold', 'silver', 'beige', 'navy',
+    'big', 'small', 'large', 'tiny', 'huge', 'medium', 'little',
+    'round', 'square', 'flat', 'curved', 'straight', 'long', 'short',
+    'wide', 'narrow', 'thick', 'thin', 'tall', 'deep',
+    'old', 'new', 'young', 'modern', 'ancient', 'vintage', 'classic',
+    'bright', 'dark', 'light', 'dim', 'colorful', 'vibrant', 'pale',
+    'clean', 'dirty', 'clear', 'blurry', 'sharp', 'soft', 'hard',
+    'smooth', 'rough', 'shiny', 'dull', 'glossy', 'matte',
+    'high', 'low', 'top', 'bottom', 'left', 'right', 'front', 'back',
+    'side', 'center', 'middle', 'edge', 'corner',
+    'wood', 'metal', 'glass', 'plastic', 'stone', 'paper', 'cloth',
+    'fabric', 'leather', 'steel', 'concrete', 'brick', 'marble',
+    'man', 'woman', 'child', 'baby', 'girl', 'boy', 'person', 'people',
+    'human', 'male', 'female', 'adult', 'teenager', 'senior',
+    'smile', 'laugh', 'cry', 'happy', 'sad', 'angry', 'calm', 'excited',
+    'day', 'night', 'morning', 'evening', 'sun', 'moon', 'sky', 'cloud',
+    'rain', 'snow', 'wind', 'storm', 'fog', 'mist',
+    'tree', 'flower', 'grass', 'leaf', 'plant', 'water', 'fire', 'earth',
+    'food', 'drink', 'fruit', 'vegetable', 'meat', 'bread', 'rice',
+    'house', 'room', 'door', 'window', 'wall', 'floor', 'roof', 'table',
+    'chair', 'bed', 'desk', 'shelf', 'lamp', 'mirror',
+    'car', 'bus', 'train', 'plane', 'boat', 'bike', 'road', 'street',
+    'open', 'closed', 'empty', 'full', 'single', 'double', 'triple',
+    'horizontal', 'vertical', 'diagonal', 'angled', 'parallel',
+    'summer', 'winter', 'spring', 'autumn', 'fall', 'seasonal',
+  ]);
+
+  const seoKeywords: string[] = [];
+  const commonKeywords: string[] = [];
+
+  for (const kw of keywords) {
+    const w = kw.toLowerCase().trim();
+    if (COMMON_WORD_SET.has(w) || (w.length <= 3 && !/^[A-Z]/.test(kw))) {
+      commonKeywords.push(kw);
+    } else {
+      seoKeywords.push(kw);
+    }
+  }
+
+  // Target: 70% SEO + 30% common, capped at targetCount
+  const targetCommonCount = Math.round(targetCount * 0.30);
+
+  // Trim excess common words if we have too many
+  const finalCommon = commonKeywords.slice(0, targetCommonCount);
+  // Move excess common words to SEO side
+  const promoted = commonKeywords.slice(targetCommonCount);
+  const finalSeo = [...seoKeywords, ...promoted];
+
+  // If we don't have enough common words, take shorter words from SEO
+  let result: string[];
+  if (finalCommon.length < targetCommonCount) {
+    const deficit = targetCommonCount - finalCommon.length;
+    // Take the shortest SEO keywords as common
+    const sortedSeo = [...finalSeo].sort((a, b) => a.length - b.length);
+    const promotedToCommon = sortedSeo.slice(0, deficit);
+    const remainingSeo = finalSeo.filter(k => !promotedToCommon.includes(k));
+    result = [...remainingSeo, ...finalCommon, ...promotedToCommon];
+  } else {
+    result = [...finalSeo, ...finalCommon];
+  }
+
+  return result.slice(0, targetCount);
 }
 
 function enforceStrictKeywordMode(
@@ -1677,7 +1721,7 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
 
 // ============================================================================
 // METADATAGEN STRUCTURED PIPELINE
-// Modul terstruktur untuk MetadataGen — mencakup 8 lapisan sesuai spesifikasi:
+// Modul terstruktur untuk MetadataGen ��������� mencakup 8 lapisan sesuai spesifikasi:
 //   1. Analisis visual bertingkat (scene → object → attributes → concepts)
 //   2. Formula judul per jenis aset (photo, AI image, illustration, vector, video)
 //   3. Sistem pembobotan keyword (SEO / visual / commercial / trend score)
@@ -2366,7 +2410,9 @@ export const generateStockMetadata = async (
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
-  exifMetadata?: any
+  exifMetadata?: any,
+  keyConcepts?: string,
+  editorialMode?: boolean
 ): Promise<StockMetadata> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -2428,6 +2474,12 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
    - Konsep komersial, tema emosi, dan suasana (e.g., 'success', 'growth', 'wellness', 'sustainable').
    - Target industri & use-case (e.g., 'marketing', 'fintech', 'landing page', 'banner', 'presentation', 'copy space').
 
+0. AGKEYWORDS 70/30 SEO SPLIT (CRITICAL – Adobe Stock Buyer Intent Optimization):
+   - 70% of keywords MUST be SEO-friendly: high-search-volume, buyer-intent terms that professional stock buyers actually type (descriptive nouns, concrete subject terms, industry-specific commercial vocabulary, action verbs, specific attributes).
+   - 30% of keywords MUST be common/foundational words: basic, universally-understood descriptive terms (colors, shapes, simple emotions, basic materials, everyday objects).
+   - Clearly separate these two groups in keyword ordering: place ALL 70% SEO-friendly keywords FIRST, then ALL 30% common words AFTER.
+   - SEO-friendly examples: 'copy space', 'sustainability', 'corporate team', 'digital transformation', 'mindfulness', 'remote work', 'wellness', 'productivity', 'innovation hub'.
+   - Common word examples: 'blue', 'wood', 'smile', 'round', 'large', 'bright', 'modern', 'clean', 'light', 'texture'.
 1. RISET KEYWORD (Microstock Search Researcher):
    - ${directives.risetKeywordRule}
    - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
@@ -2438,16 +2490,21 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
 4. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY (e.g., avoid listing both 'tree' and 'trees').
 5. CROSS-SEARCH DISCOVERABILITY (Search Intent):
    - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone).
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ${editorialMode ? 'EDITORIAL MODE ACTIVE – You MAY include visible brand names, logos, trademarks, and commercial products exactly as they appear in the image (factual, non-promotional, no inventions). If none are visible, do not add any.' : 'ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone). NEVER include any intellectual property.'}
 7. Every keyword must be strictly in lowercase, clean without punctuation.
-8. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
-10. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
+8. NO BACKGROUND COLOR KEYWORDS: Do NOT include background colors like 'white background', 'black background', 'transparent background', or any color that is only the backdrop. Only include colors that are attributes of the MAIN SUBJECT.
+9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
+10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
+11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
 MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
+MUST-0.7 AGKEYWORDS 70/30 SINGLE-WORD SPLIT (CRITICAL):
+   - 70% of all single-word keywords MUST be SEO-friendly high-search-volume buyer-intent terms.
+   - 30% of all single-word keywords MUST be common/foundational descriptive words.
+   - Place all 70% SEO keywords FIRST in the list, then all 30% common words AFTER.
 MUST-1. Directly describe the visible subject.
 MUST-2. Describe the main action.
 MUST-3. Include specific objects.
@@ -2469,6 +2526,7 @@ MUST-10. Never prioritize popularity over relevance.
    - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
+4.5 MAIN-SUBJECT-WORDS (Top 5 Priority Keywords): Identify exactly 5 main subject words that represent the CORE visual subject. These 5 words MUST appear as keywords #1 through #5 in the output. They must be the most important, buyer-facing subject nouns that describe what the image is primarily about. Examples: 'cat', 'laptop', 'mountain', 'coffee', 'office', 'sunset', 'flower', 'car', 'woman', 'child'.
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
    - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
@@ -2498,6 +2556,10 @@ MUST-10. Never prioritize popularity over relevance.
     keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
 MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
 MUST-0.5 NATURAL, FORMAL, HUMAN LANGUAGE (CRITICAL): Every keyword/phrase MUST be a real, correctly spelled, grammatically valid word or phrase in proper formal register — exactly what a professional buyer (designer, marketing team, photo editor) would naturally type into a search box. NEVER produce robotic word fragments, broken/awkward literal translations, invented compound words, slang, txt-speak, or keyword-stuffing artifacts that no real human would type or say out loud. If unsure between a stiff literal term and the natural professional term a buyer actually uses, ALWAYS choose the natural, formal, buyer-understandable one.
+MUST-0.7 AGKEYWORDS 70/30 SINGLE-WORD SPLIT (CRITICAL):
+   - 70% of all single-word keywords MUST be SEO-friendly high-search-volume buyer-intent terms.
+   - 30% of all single-word keywords MUST be common/foundational descriptive words.
+   - Place all 70% SEO keywords FIRST in the list, then all 30% common words AFTER.
 MUST-1. Directly describe the visible subject.
 MUST-2. Describe the main action.
 MUST-3. Include specific objects.
@@ -2735,7 +2797,7 @@ ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
-${mediaContext}${customPromptCommand}${exifInstruction}
+${mediaContext}${customPromptCommand}${exifInstruction}${keyConcepts ? `\n\nKEY CONCEPTS REFERENCE (Use these as ~30% semantic reference for keyword generation): "${keyConcepts}"` : ''}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -2748,6 +2810,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
+7. NO BACKGROUND COLOR KEYWORDS: Do NOT include the background color as a keyword unless the background IS the main subject. Keywords like 'white background', 'black background', 'transparent background', 'blue background' are PROHIBITED. Only use color keywords that describe attributes of the MAIN SUBJECT itself (e.g., 'red car', 'blue dress' — but the keyword must just be the subject word, not 'red background').
 
 
 MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
@@ -3189,7 +3252,9 @@ export const generateBatchStockMetadata = async (
   keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
-  aiModelPerformance?: 'speed' | 'detail'
+  aiModelPerformance?: 'speed' | 'detail',
+  keyConcepts?: string,
+  editorialMode?: boolean
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -3241,6 +3306,12 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
    - Konsep komersial, tema emosi, dan suasana (e.g., 'success', 'growth', 'wellness', 'sustainable').
    - Target industri & use-case (e.g., 'marketing', 'fintech', 'landing page', 'banner', 'presentation', 'copy space').
 
+0. AGKEYWORDS 70/30 SEO SPLIT (CRITICAL – Adobe Stock Buyer Intent Optimization):
+   - 70% of keywords MUST be SEO-friendly: high-search-volume, buyer-intent terms that professional stock buyers actually type (descriptive nouns, concrete subject terms, industry-specific commercial vocabulary, action verbs, specific attributes).
+   - 30% of keywords MUST be common/foundational words: basic, universally-understood descriptive terms (colors, shapes, simple emotions, basic materials, everyday objects).
+   - Clearly separate these two groups in keyword ordering: place ALL 70% SEO-friendly keywords FIRST, then ALL 30% common words AFTER.
+   - SEO-friendly examples: 'copy space', 'sustainability', 'corporate team', 'digital transformation', 'mindfulness', 'remote work', 'wellness', 'productivity', 'innovation hub'.
+   - Common word examples: 'blue', 'wood', 'smile', 'round', 'large', 'bright', 'modern', 'clean', 'light', 'texture'.
 1. RISET KEYWORD (Microstock Search Researcher):
    - ${directives.risetKeywordRule}
    - Petakan sinonim berkualitas tinggi dan variasi istilah yang dicari pembeli.
@@ -3251,11 +3322,12 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
 4. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY (e.g., avoid listing both 'tree' and 'trees').
 5. CROSS-SEARCH DISCOVERABILITY (Search Intent):
    - Include regional variants (e.g., 'lift' and 'elevator') and commercial layout terms ('copy space', 'isolated').
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone).
+6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: ${editorialMode ? 'EDITORIAL MODE ACTIVE – You MAY include visible brand names, logos, trademarks, and commercial products exactly as they appear in the image (factual, non-promotional, no inventions). If none are visible, do not add any.' : 'ZERO brand names, logos, trademarks, or fictional characters (e.g., Apple, Nike, iPhone). NEVER include any intellectual property.'}
 7. Every keyword must be strictly in lowercase, clean without punctuation.
-8. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
-10. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
+8. NO BACKGROUND COLOR KEYWORDS: Do NOT include background colors like 'white background', 'black background', 'transparent background', or any color that is only the backdrop. Only include colors that are attributes of the MAIN SUBJECT.
+9. No subjective aesthetic-only terms ("beautiful", "stunning", "high quality").
+10. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES.
+11. STRICT VISUAL GROUNDING: Every keyword MUST literally relate to what is in the visual asset.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
     keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
@@ -3267,6 +3339,7 @@ STRUKTUR IDEAL KEYWORD (WAJIB DIIKUTI SECARA BERURUTAN):
    - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
    - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
 4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
+4.5 MAIN-SUBJECT-WORDS (Top 5 Priority Keywords): Identify exactly 5 main subject words that represent the CORE visual subject. These 5 words MUST appear as keywords #1 through #5 in the output. They must be the most important, buyer-facing subject nouns that describe what the image is primarily about. Examples: 'cat', 'laptop', 'mountain', 'coffee', 'office', 'sunset', 'flower', 'car', 'woman', 'child'.
 5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
 5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
    - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
@@ -3514,6 +3587,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
+7. NO BACKGROUND COLOR KEYWORDS: Do NOT include the background color as a keyword unless the background IS the main subject. Keywords like 'white background', 'black background', 'transparent background', 'blue background' are PROHIBITED. Only use color keywords that describe attributes of the MAIN SUBJECT itself (e.g., 'red car', 'blue dress' — but the keyword must just be the subject word, not 'red background').
 
 
 MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
@@ -3717,6 +3791,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
+7. NO BACKGROUND COLOR KEYWORDS: Do NOT include the background color as a keyword unless the background IS the main subject. Keywords like 'white background', 'black background', 'transparent background', 'blue background' are PROHIBITED. Only use color keywords that describe attributes of the MAIN SUBJECT itself (e.g., 'red car', 'blue dress' — but the keyword must just be the subject word, not 'red background').
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
@@ -4043,6 +4118,7 @@ export const generateOptimizedPrompt = async (options: {
   darkHorrorSubStyle?: string;
   referenceImages?: string[];
   cameraAngles?: string[];
+  isLicensed?: boolean;
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -4060,17 +4136,24 @@ export const generateOptimizedPrompt = async (options: {
     vectorSubType = undefined,
     darkHorrorSubStyle = undefined,
     referenceImages = undefined,
-    cameraAngles = undefined
+    cameraAngles = undefined,
+    isLicensed = false
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
 
+  // 🏷️ PRO vs TRIAL differentiation: PRO gets full quality, Trial gets basic
+  const promptTier = isLicensed ? 'PRO' : 'TRIAL';
+  
+  // TRIAL: cap variations at 15, reduce word richness
+  const effectiveCount = isLicensed ? count : Math.min(count, 15);
+  
   // ELEMEN KEJUTAN (Surprise Element) - Random Salt & Diversity Injection (Expanded for Adobe Stock Similarity Protection)
   const defaultAngles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot", "extreme close-up", "Dutch angle", "worm's-eye view", "bird's-eye view", "first-person POV"];
   const angles = cameraAngles && cameraAngles.length > 0 ? cameraAngles : defaultAngles;
-  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "neon cyberpunk glow", "chiaroscuro lighting", "bioluminescent ambient light", "ethereal volumetric rays", "harsh cinematic spotlight", "dramatic backlighting with lens flare"];
+  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "warm indoor ambient light", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "warm sunset backlight", "bright natural daylight", "soft diffused studio light", "gentle afternoon sunlight", "warm golden sidelight"];
   const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background", "forced perspective", "kaleidoscopic symmetry", "abstract fragmented framing", "dramatic low-angle heroic composition", "ultra-wide architectural framing"];
-  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky", "thunderstorm dramatic sky", "heavy snow blizzard", "post-apocalyptic ash fall", "magical glowing floating embers", "surreal cosmic starscape"];
+  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "gentle winter light", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "golden dusk sunset sky", "bright midday sun", "cool overcast daylight", "soft warm evening glow", "peaceful twilight sky", "bright morning sunlight"];
   const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream", "vibrant neon cyberpunk palette", "dark moody cinematic tones", "surreal iridiscent colors", "high-contrast duotone", "hyper-saturated pop art colors"];
 
   // Linear Congruential Generator (PRNG) using the seed to ensure deterministic but highly varied selections
@@ -4085,35 +4168,43 @@ export const generateOptimizedPrompt = async (options: {
     return arr[Math.floor(r * arr.length)];
   };
 
+  // 🚫 PNG MODE check — must be defined BEFORE camera angle logic
+  const isPngMode = promptMode === 'png';
+  
   const userCameraAngle = cameraAngles && cameraAngles.length > 0 ? cameraAngles.join(', ') : null;
-  const randomAngle = userCameraAngle || selectRandom(defaultAngles);
+  
+  // 🚫 PNG MODE: Camera angles are FORBIDDEN — they belong to Background/Photographic mode only
+  const effectiveUserCameraAngle = isPngMode ? null : userCameraAngle;
+  
+  const randomAngle = effectiveUserCameraAngle || selectRandom(defaultAngles);
   const randomLighting = selectRandom(lightings);
   const randomComp = selectRandom(compositions);
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
 
   // 🎲 [Backend Helper] — Dynamic Injection Engine
-  const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
+  const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "serene", "kinetic", "immersive", "transcendent", "majestic", "delicate", "vivid", "radiant", "tranquil", "refined"];
   const dynamicMood = selectRandom(creativeSurprise);
   const randomTemp = 0.80 + Math.random() * 0.15;
 
   // Camera angle directive — minimal & natural, especially for Photorealistic
-  const cameraAngleDirective = userCameraAngle
+  // 🚫 DISABLED for PNG mode: Camera angles only apply in Background mode
+  const cameraAngleDirective = !isPngMode && effectiveUserCameraAngle
     ? (styleCategory === 'Photorealistic'
-        ? ` Blend the "${userCameraAngle}" perspective naturally as a candid real-world photo angle — like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.`
+        ? ` Blend the "${effectiveUserCameraAngle}" perspective naturally as a candid real-world photo angle — like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.`
         : styleCategory === 'Cinematic'
-        ? ` Use "${userCameraAngle}" with cinematic framing and movie-like composition.`
-        : ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.`)
+        ? ` Use "${effectiveUserCameraAngle}" with cinematic framing and movie-like composition.`
+        : ` MUST use this specific camera angle: "${effectiveUserCameraAngle}". Do not randomize or substitute.`)
     : '';
 
   // When user selected camera angle, omit angle from randomSaltInjection to prevent over-emphasis
-  const saltAngle = userCameraAngle ? 'User-selected angle (see Camera details rule)' : randomAngle;
+  // 🚫 PNG mode: always use randomAngle (no camera), never user camera
+  const saltAngle = !isPngMode && effectiveUserCameraAngle ? 'User-selected angle (see Camera details rule)' : randomAngle;
   const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
-  const isPngMode = promptMode === 'png';
   let modeConstraint = "";
 
   const styleSpecificDirectives: Record<string, string> = {
@@ -4343,6 +4434,12 @@ Rules for the Generated Prompts:
    - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
    - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
    - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
+4.1 WEATHER & ATMOSPHERE — NATURAL & STYLE-APPROPRIATE ONLY (CRITICAL FOR ALL STYLES):
+   - ABSOLUTELY FORBIDDEN weather/atmosphere terms across ALL styles: "thunderstorm", "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", "ominous black clouds", "post-apocalyptic ash", "doomsday sky", "hellish red sky", "tornado", "hurricane", "tsunami", "volcanic eruption".
+   - For PHOTOREALISTIC / CINEMATIC / LIFESTYLE styles: Use ONLY natural, believable weather — sunny, partly cloudy, golden hour, soft overcast, gentle morning mist, warm afternoon light, crisp autumn air, peaceful twilight. The mood comes from COMPOSITION and LIGHTING, not from forced dramatic weather.
+   - For FANTASY / SCIFI / DARK HORROR: Atmospheric elements must serve the genre authentically — not default to lightning and thunder. Use fog, shadow, eerie stillness, bioluminescent glow, or cosmic ambiance instead.
+   - DEFAULT WEATHER RULE: When no specific weather is requested, ALWAYS default to neutral/pleasant conditions: "clear sunny day", "soft natural daylight", "gentle overcast light", or "warm ambient indoor lighting". Never default to dramatic weather.
+   - Variety in weather comes from subtle shifts: morning vs afternoon light, angle of sun, indoor vs outdoor, season-appropriate conditions — NOT from inserting storms and darkness.
 5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
@@ -4405,7 +4502,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       prompts: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: `An array containing exactly ${count} unique generated prompt variations based on the visual idea, strictly in English.`
+        description: `An array containing exactly ${effectiveCount} unique generated prompt variations based on the visual idea, strictly in English.${promptTier === 'TRIAL' ? ' (NOTE: This is a TRIAL account — limited to basic prompt quality. Upgrade to PRO for premium detailed prompts with advanced composition, lighting, and artistic depth.)' : ''}`
       },
       negativePrompt: {
         type: Type.STRING,
@@ -4439,7 +4536,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
+          contents: `Expand the concept into ${effectiveCount} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
           config: { temperature: randomTemp, seed: seed, topP: 0.99 },
@@ -4487,9 +4584,9 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             });
           }
 
-          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+          let instructionText = `Expand the concept into ${effectiveCount} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
           if (referenceImages && referenceImages.length > 0) {
-            instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
+            instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${effectiveCount} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
           }
           parts.push({ text: instructionText });
 
