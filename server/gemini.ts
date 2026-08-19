@@ -2287,11 +2287,11 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - Do NOT add generic SEO keywords merely to reach the requested count.
-- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Prioritize quality and relevance over rigid evidence matching. Generate the requested number when possible using relevant synonyms and semantic variations of the detected visual content. Avoid unrelated or hallucinated subjects, but allow reasonable SEO synonyms and semantic expansions of what Vision detected.
 - Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
 
 Rules for Categories:
@@ -2445,11 +2445,11 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - Do NOT add generic SEO keywords merely to reach the requested count.
-- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Prioritize quality and relevance over rigid evidence matching. Generate the requested number when possible using relevant synonyms and semantic variations of the detected visual content. Avoid unrelated or hallucinated subjects, but allow reasonable SEO synonyms and semantic expansions of what Vision detected.
 - Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
 
 Rules for Categories:
@@ -2561,7 +2561,7 @@ OUTPUT FORMAT:
       
       const uniqueKeywords = Array.from(new Set(cleanedKeywords));
       
-      // HARD VISUAL-EVIDENCE GATE: every keyword must be traceable to AI Vision VISUAL_FACTS.
+      // VISUAL RELEVANCE CHECK: every keyword should remain relevant to the AI Vision findings; remove keywords that introduce unrelated objects, people, brands, or concepts.
       const visualEvidenceText = JSON.stringify({
         primary_subjects: visualFacts?.primary_subjects || [],
         secondary_subjects: visualFacts?.secondary_subjects || [],
@@ -2947,11 +2947,11 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - Do NOT add generic SEO keywords merely to reach the requested count.
-- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Prioritize quality and relevance over rigid evidence matching. Generate the requested number when possible using relevant synonyms and semantic variations of the detected visual content. Avoid unrelated or hallucinated subjects, but allow reasonable SEO synonyms and semantic expansions of what Vision detected.
 - Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
 
 Rules for Categories:
@@ -3111,11 +3111,11 @@ Rules for Keywords:
 ${keywordRulePromptText}
 
 HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - Do NOT add generic SEO keywords merely to reach the requested count.
-- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Prioritize quality and relevance over rigid evidence matching. Generate the requested number when possible using relevant synonyms and semantic variations of the detected visual content. Avoid unrelated or hallucinated subjects, but allow reasonable SEO synonyms and semantic expansions of what Vision detected.
 - Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
 
 Rules for Categories:
@@ -3264,7 +3264,7 @@ OUTPUT FORMAT:
             const uniqueKeywords = Array.from(new Set(cleanedKeywords));
             
             const assetVisualFacts = parsedVisualFactsList[index] || {};
-            // HARD VISUAL-EVIDENCE GATE: every keyword must be traceable to AI Vision VISUAL_FACTS.
+            // VISUAL RELEVANCE CHECK: every keyword should remain relevant to the AI Vision findings; remove keywords that introduce unrelated objects, people, brands, or concepts.
       const visualEvidenceText = JSON.stringify({
         primary_subjects: visualFacts?.primary_subjects || [],
         secondary_subjects: visualFacts?.secondary_subjects || [],
