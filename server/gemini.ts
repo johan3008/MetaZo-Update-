@@ -2559,8 +2559,6 @@ OUTPUT FORMAT:
         }
       });
       
-      const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-      
       // VISUAL RELEVANCE CHECK: every keyword should remain relevant to the AI Vision findings; remove keywords that introduce unrelated objects, people, brands, or concepts.
       const visualEvidenceText = JSON.stringify({
         primary_subjects: visualFacts?.primary_subjects || [],
@@ -3261,7 +3259,6 @@ OUTPUT FORMAT:
                     }
                 }
             });
-            const uniqueKeywords = Array.from(new Set(cleanedKeywords));
             
             const assetVisualFacts = parsedVisualFactsList[index] || {};
             // VISUAL RELEVANCE CHECK: every keyword should remain relevant to the AI Vision findings; remove keywords that introduce unrelated objects, people, brands, or concepts.
