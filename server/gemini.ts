@@ -1624,9 +1624,14 @@ export const generateStockMetadata = async (
     exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
   }
 
-  // Amankan hitungan target keyword sejak awal
+  // Amankan hitungan target keyword sejak awal.
+  // PENTING: jangan paksa minimum 30 di sini. Memaksa floor 30-40 terlepas dari
+  // permintaan user (dan terlepas dari seberapa kaya konten visualnya) adalah
+  // sumber utama keyword tidak relevan: AI dipaksa "mengarang" keyword tambahan
+  // untuk memenuhi kuota meskipun instruksi lain melarangnya. Cukup batasi ke
+  // rentang aman (5-60) dan hormati jumlah yang benar-benar diminta.
   const requestedCount = parseInt(String(keywordCount), 10) || 40;
-  const targetCount = Math.max(30, Math.min(40, requestedCount));
+  const targetCount = Math.max(5, Math.min(60, requestedCount));
   const aiRequestCount = targetCount;
 
   const directives = getToolTypeDirectives(toolType);
@@ -2205,8 +2210,11 @@ OUTPUT FORMAT:
       });
       
       // AI owns relevance, SEO judgment, semantic expansion, and ordering.
-      // Application code only normalizes the response and removes exact duplicates.
-      const finalKeywordList = cleanedKeywords;
+      // Application code normalizes the response, collapses near-duplicate/
+      // semantically redundant terms (e.g. "golden"/"gold", "xmas"/"christmas"),
+      // and removes exact duplicates. semanticDeduplicate() only ever removes
+      // or canonicalizes terms — it never adds/invents keywords.
+      const finalKeywordList = semanticDeduplicate(cleanedKeywords);
 
       data.keywords = ensureKeywordCount(
         finalKeywordList, targetCount, visualFacts, undefined, undefined, undefined, keywordMode
@@ -2905,8 +2913,9 @@ OUTPUT FORMAT:
             
             const assetVisualFacts = parsedVisualFactsList[index] || {};
             // AI owns relevance, SEO judgment, semantic expansion, and ordering.
-      // Application code only normalizes the response and removes exact duplicates.
-      const finalKeywordList = cleanedKeywords;
+      // Application code normalizes the response and collapses near-duplicate/
+      // semantically redundant terms via semanticDeduplicate() before locking count.
+      const finalKeywordList = semanticDeduplicate(cleanedKeywords);
 
             metadata.keywords = ensureKeywordCount(
               finalKeywordList,
