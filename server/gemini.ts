@@ -2062,7 +2062,7 @@ export const generateStockMetadata = async (
   const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
 ${seasonalEventKeywordContext}
    - ${directives.risetKeywordRule}
@@ -2190,10 +2190,19 @@ STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
-PRIMARY OBJECTIVE:
-Detect every visible subject, action, color, visible text, and composition detail.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
+PRIMARY OBJECTIVE — ANALYZE THE ACTUAL ASSET THROUGH 8 VISUAL DIMENSIONS:
+1. OBJECTS: Identify visible primary, secondary, and background objects.
+2. ACTIVITIES: Identify only actions that are visibly happening.
+3. CONCEPTS: Identify clear themes or concepts strongly supported by the visual scene.
+4. ATMOSPHERE: Identify visible mood/atmosphere such as professional, calm, festive, dramatic, minimal, etc. only when visually supported.
+5. LOCATION / SETTING: Identify the visible environment or setting; do not guess an exact place.
+6. VISUAL CHARACTERISTICS: Identify framing, orientation, camera angle, close-up, copy space, composition, perspective, texture, lighting, and other visible characteristics.
+7. COLORS / VISUAL ELEMENTS: Identify actual visible colors, materials, textures, lighting, and distinctive visual elements.
+8. EVENT / SEASONAL RELEVANCE: Identify named events or seasons only when unmistakable visual evidence supports them (for example Christmas decorations, Halloween costumes, Ramadan/Eid cues, Valentine's symbols). The calendar alone is never evidence.
+
+ANALYSIS PRINCIPLE: AI Vision is the source of truth for what the asset contains. Do not hallucinate or infer unsupported religion, culture, exact location, profession, audience, industry, tourism, emotion, event, or commercial use case. If a dimension is not supported, return an empty array.
+
+Also perform visual semantic analysis for the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
@@ -2228,7 +2237,12 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
-    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
+    "concepts": [],
+    "atmosphere": [],
+    "location_setting": [],
+    "visual_characteristics": [],
+    "event_seasonal_relevance": [],
+    "deeper_meaning_and_symbolism": "Only describe a concept or meaning when it is strongly supported by visible evidence. Do not infer religion, culture, profession, location, emotion, event, or use case without clear visual support.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
@@ -2240,7 +2254,7 @@ OUTPUT FORMAT:
 
   const promptText = toolType === ToolType.VIDEO 
     ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
-    : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+    : `Tugas: Analyze the actual asset across 8 dimensions: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, and Event/Seasonal Relevance. Use only visible evidence; leave unsupported dimensions empty. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
@@ -2256,33 +2270,21 @@ OUTPUT FORMAT:
       throw new Error("Vision Analysis produced empty results.");
     }
   } catch (err: any) {
-    console.warn("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
-    // Fallback static facts if vision fails
-    visualFactsJson = JSON.stringify({
-      VISUAL_FACTS: {
-        primary_subjects: [{ name: "main subject", importance: 100 }],
-        secondary_subjects: [],
-        background_elements: [],
-        visible_text: [],
-        colors: ["natural"],
-        actions: ["commercial poses"],
-        composition: ["professional"],
-        semantic_category_analysis: {
-          adobe_id: 0,
-          shutterstock_category_1: "",
-          shutterstock_category_2: "",
-          reason: "Fallback static categories used."
-        }
-      }
-    });
+    console.error("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
+    throw new Error(`AI Vision gagal menganalisis aset: ${err.message || "Vision analysis failed"}`);
   }
 
-  // Parse facts for next stages
+  // Parse facts for next stages. Never invent visual facts when Vision returns malformed data.
   let visualFacts: any = {};
   try {
-    visualFacts = JSON.parse(extractJSON(visualFactsJson)).VISUAL_FACTS || {};
-  } catch (e) {
-    visualFacts = { primary_subjects: [{ name: "subject", importance: 100 }], actions: ["posing"] };
+    const parsedVision = JSON.parse(extractJSON(visualFactsJson));
+    visualFacts = parsedVision?.VISUAL_FACTS;
+    if (!visualFacts || typeof visualFacts !== "object" || Array.isArray(visualFacts)) {
+      throw new Error("VISUAL_FACTS missing or invalid");
+    }
+  } catch (e: any) {
+    console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
+    throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
   }
 
   const dominantSubjects = [
@@ -2366,8 +2368,10 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-VISUAL_FACTS:
+VISUAL_FACTS (SOURCE OF TRUTH):
 ${JSON.stringify(visualFacts, null, 2)}
+
+Use these 8 Vision dimensions when generating keywords: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, Event/Seasonal Relevance.
 
 CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
@@ -2781,7 +2785,7 @@ export const generateBatchStockMetadata = async (
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
   const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
+  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
 ${seasonalEventKeywordContext}
    - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
@@ -2952,32 +2956,18 @@ OUTPUT FORMAT:
           visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}${itemExifDesc}`);
           let parsedFacts: any = {};
           try {
-             parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
-          } catch(e) {
-             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [], semantic_category_analysis: { adobe_id: 0, shutterstock_category_1: "", shutterstock_category_2: "", reason: "Fallback default." } };
+             parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
+             if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
+               throw new Error("VISUAL_FACTS missing or invalid");
+             }
+          } catch(e: any) {
+             console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
+             throw new Error(`AI Vision mengembalikan hasil analisis yang tidak valid untuk aset #${i + 1}.`);
           }
           parsedVisualFactsList.push(parsedFacts);
       } catch (err: any) {
-          console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
-          const fallbackFacts = {
-              VISUAL_FACTS: {
-                primary_subjects: [{ name: "main subject", importance: 100 }],
-                secondary_subjects: [],
-                background_elements: [],
-                visible_text: [],
-                colors: ["natural"],
-                actions: ["commercial posing"],
-                composition: ["professional"],
-                semantic_category_analysis: {
-                  adobe_id: 0,
-                  shutterstock_category_1: "",
-                  shutterstock_category_2: "",
-                  reason: "Fallback static categories used."
-                }
-              }
-          };
-          visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${JSON.stringify(fallbackFacts)}`);
-          parsedVisualFactsList.push(fallbackFacts.VISUAL_FACTS);
+          console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
+          throw new Error(`AI Vision gagal menganalisis aset #${i + 1}: ${err.message || "Vision analysis failed"}`);
       }
   }
 
