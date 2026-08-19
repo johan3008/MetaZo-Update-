@@ -2004,6 +2004,55 @@ function buildStructuredKeywords(
   return result;
 }
 
+const processFrameServer = (frame: any) => {
+  if (typeof frame !== 'string') {
+    console.error('[processFrameServer] Expected string, got:', typeof frame, frame);
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: ''
+      }
+    };
+  }
+  
+  if (!frame.includes(';base64,')) {
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: frame
+      }
+    };
+  }
+  
+  const parts = frame.split(';base64,');
+  if (parts.length < 2) {
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: frame
+      }
+    };
+  }
+  
+  const mimePart = parts[0];
+  const dataPart = parts[1];
+  const mimeSplit = mimePart.split(':');
+  let mimeType = mimeSplit.length > 1 ? mimeSplit[1] : 'image/jpeg';
+  
+  // Gemini Vision only supports specific image types. Fallback to jpeg for others like application/postscript
+  const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  if (!validMimes.includes(mimeType)) {
+    mimeType = 'image/jpeg';
+  }
+  
+  return {
+    inlineData: {
+      mimeType,
+      data: dataPart
+    }
+  };
+};
+
 export const generateStockMetadata = async (
   frames: string[],
   keywordCount: number | string,
