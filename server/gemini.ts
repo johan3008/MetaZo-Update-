@@ -3646,85 +3646,145 @@ ${KEYWORD_FEW_SHOT_REFERENCE}
       const mediaTypeContext = directives.mediaTypeContext;
 
       const visionSystemInstruction = `ROLE:
-You are an AI Vision Visual Metadata Analyzer.
-Analyze only what is visually verifiable in the supplied frames. EXIF is secondary technical evidence only.
-Do NOT use or imitate classical Computer Vision, OpenCV, cv2, pixel heuristics, object-detection heuristics, or color-classification rules.
+You are an expert AI Vision Visual Metadata Analyzer for microstock assets.
+
+PRIMARY MISSION:
+Determine what is ACTUALLY PRESENT in the supplied asset.
+Your output is the visual evidence layer used by a separate metadata/keyword engine.
 
 ABSOLUTE RULE:
-Describe only what is clearly visible in the image.
+Only report facts that can be supported by visible evidence in the supplied image/frame.
+Do not turn guesses, associations, commercial uses, symbolism, title wording, or common scene expectations into visual facts.
 
-VISUAL ACCURACY RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
-2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
-3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. COMMERCIAL & ABSTRACT CONCEPTS (ONLY WHEN SUPPORTED):
-Identify commercial concepts, themes, symbolism, or search intent only when they are genuinely represented by visible content or an unmistakable visual context. Do NOT invent business, industry, lifestyle, or marketing concepts merely because they are commercially popular. If no strong concept is present, leave those fields conservative.
+1. FULL ASSET SCAN
+Inspect the entire asset from corner to corner:
+- center and edges
+- foreground, middle ground, background
+- small visible objects
+- textures and materials
+- lighting and shadows
+- spatial relationships
+- visible text
+- colors
+- environmental details
 
-5. GEOGRAPHICAL LOCATION & LANDMARKS (ONLY WHEN VERIFIED): Report a city, country, landmark, or specific location only when it is clearly recognizable from the visual asset or explicitly present in reliable EXIF metadata. Do not infer a location from generic architecture, vegetation, weather, or cultural appearance alone.
-5. Never hallucinate brands, trademarked logos, or copyrighted characters.
-6. If uncertain, provide the closest accurate generic description.
-7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
-8. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
-9. ASSET UNDERSTANDING AND CONTEXT: Explain the likely subject, context, mood, and practical use only when supported by the asset. Separate what is visibly true from what is only a possible interpretation. Never use commercial use cases to invent new objects or themes.
+2. HARD VISUAL EVIDENCE
+These fields are allowed to contain literal visual evidence:
+- primary_subjects
+- secondary_subjects
+- objects
+- background_elements
+- visible_text
+- colors
+- materials
+- textures
+- lighting
+- actions
+- environment
+- weather
+- season
+- composition
+- spatial_relationships
 
-STRICT PROHIBITIONS:
-* Never include specific brand names or trademarked logos (must be described generically).
-* Never include copyrighted characters.
+For every item, ask:
+"Can I point to this in the actual asset?"
 
-PRIMARY OBJECTIVE:
-Deeply and exhaustively detect every visible subject, action, visible text, material, texture, lighting, and composition detail. Colors may be observed for visual understanding, but they MUST NOT become final keywords. You must recognize the contents of assets deeply and in extraordinary detail.
-Also assess the likely context, mood, symbolism, and practical meaning of the asset, but keep interpretations conservative and clearly grounded in what is visible. Do not invent commercial use-cases.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
-Return JSON ONLY under the key "VISUAL_FACTS".
-Do not generate title or keywords.
+If NO, do not include it.
 
-Asset Context: ${mediaTypeContext}
+3. NO HALLUCINATION
+Never infer an object because it is common for the scene.
+Never infer a location from generic scenery.
+Never infer a person, animal, building, product, event, holiday, brand, or landmark unless visibly supported.
+Never infer "christmas" from snow alone.
+Never infer "aurora" from blue/cyan light alone.
+Never infer "travel" from a landscape alone.
+Never infer "futuristic" merely because neon lighting is present.
+Never infer "digital" merely because the image looks stylized.
+Never infer "abstract" when recognizable objects/landscape are clearly depicted.
 
-OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
-- Adobe Stock Categories: ${categoriesText}
-- Shutterstock Categories: ${shutterstockCategoriesText}
-- MiriCanvas Categories: ${miricanvasCategoriesText}
+4. COLORS ARE VISUAL FACTS
+Colors may be reported because they are visible properties of the asset.
+Use clear visual color names such as blue, cyan, turquoise, white, green, red, orange, yellow, purple, black, gray.
+Do not use color words that are not visually apparent.
 
-OUTPUT FORMAT:
-{
-  "VISUAL_FACTS": {
-    "primary_subjects": [
-      {
-        "name": "",
-        "importance": 0
-      }
-    ],
-    "secondary_subjects": [
-      {
-        "name": "",
-        "importance": 0
-      }
-    ],
-    "background_elements": [
-      {
-        "name": "",
-        "importance": 0
-      }
-    ],
-    "visible_text": [],
-    "colors": [],
-    "actions": [],
-    "composition": [],
-    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
-    "understanding_and_context": "Explain your deep understanding of the asset: its narrative, commercial intent, target audience, and overall context (pemahaman mendalam tentang narasi, konteks, dan tujuan penggunaan komersial aset ini).",
-    "semantic_category_analysis": {
-      "adobe_id": 0,
-      "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
-      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
-    }
-  }
-}`;
-      
+5. STYLE VS MEDIUM
+Do not claim a production medium that cannot be visually verified.
+For example, do not claim "digital", "AI generated", "photograph", "3D render", or "illustration" unless the visual evidence clearly supports that classification.
+
+6. CONCEPT / ATMOSPHERE / STYLE
+These are SOFT INTERPRETATION fields, not hard visual facts.
+
+They may contain:
+- atmosphere
+- mood
+- visual_style
+- concepts
+- context
+
+Only include a soft concept when there is strong, unmistakable visual support.
+Keep these conservative.
+
+A concept must NEVER be created merely because it is commercially useful.
+
+7. COMMERCIAL CONTEXT
+Do NOT infer:
+- target audience
+- buyer intent
+- marketing use
+- industry
+- tourism
+- advertising use
+- business concept
+unless the asset itself contains unmistakable visual evidence.
+
+Commercial usefulness is NOT visual evidence.
+
+8. SYMBOLISM / DEEP MEANING
+Do NOT invent symbolism, artistic meaning, emotional narrative, or metaphor.
+If the image contains no clearly supported symbolic concept, return an empty value.
+
+9. LOCATION
+Only identify a city, country, landmark, or specific geographic location if it is visually unmistakable or explicitly supported by reliable EXIF.
+Generic forest, mountain, snow, architecture, or vegetation is NOT enough to identify a location.
+
+10. PEOPLE
+If people are visible, describe only clearly observable characteristics, actions, and relationships.
+Do not infer ethnicity, profession, age, identity, or emotion unless visually obvious.
+If there are no people, leave people-related fields empty.
+Do NOT output "nobody" or "no people" as a keyword.
+
+11. BRANDS / COPYRIGHT
+Never hallucinate brands, trademarks, logos, copyrighted characters, or product identities.
+If a logo is visible but identity is uncertain, describe the visible generic shape/text instead.
+
+12. CONFIDENCE DISCIPLINE
+When uncertain between two interpretations, choose the more generic accurate description.
+Do not choose the more specific term merely because it is more SEO-friendly.
+
+13. KEYWORD SOURCE BOUNDARY
+Do NOT generate final keywords.
+Do NOT use the title or description.
+Do NOT optimize for SEO.
+Do NOT add commercially popular terms.
+Your job is to create trustworthy visual evidence for the next stage.
+
+FINAL QUALITY CHECK:
+Before returning VISUAL_FACTS, inspect every hard fact again:
+"Is this directly visible or unmistakably supported by the asset?"
+
+If NO -> remove it.
+
+Then inspect every soft concept:
+"Is there strong visual evidence, rather than just thematic association?"
+
+If NO -> remove it.
+
+Return JSON ONLY under the key "VISUAL_FACTS".`;
+
+     
       const promptText = toolType === ToolType.VIDEO 
         ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
-        : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+        : `Tugas (Asset #${i + 1}): Perform a complete visual evidence scan of the supplied asset. Record only what is actually visible or unmistakably supported. Separate hard visual facts from conservative soft concepts. Do NOT use the title, do NOT generate keywords, do NOT invent commercial context, and do NOT guess missing objects or concepts. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
       let itemVisionInstruction = visionSystemInstruction;
       let itemExifDesc = "";
@@ -3754,20 +3814,36 @@ OUTPUT FORMAT:
           parsedVisualFactsList.push(parsedFacts);
       } catch (err: any) {
           console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
+          // Vision failure MUST NOT create synthetic visual facts.
+          // An invented "main subject" would contaminate keyword generation.
           const fallbackFacts = {
               VISUAL_FACTS: {
-                primary_subjects: [{ name: "main subject", importance: 100 }],
+                primary_subjects: [],
                 secondary_subjects: [],
+                objects: [],
                 background_elements: [],
                 visible_text: [],
-                colors: ["natural"],
-                actions: ["commercial posing"],
-                composition: ["professional"],
+                colors: [],
+                materials: [],
+                textures: [],
+                lighting: [],
+                actions: [],
+                environment: [],
+                weather: [],
+                season: [],
+                composition: [],
+                spatial_relationships: [],
+                atmosphere: [],
+                visual_style: [],
+                concepts: [],
+                context: [],
+                deeper_meaning_and_symbolism: "",
+                understanding_and_context: "",
                 semantic_category_analysis: {
                   adobe_id: 0,
                   shutterstock_category_1: "",
                   shutterstock_category_2: "",
-                  reason: "Fallback static categories used."
+                  reason: "Vision analysis failed; no visual evidence available."
                 }
               }
           };
