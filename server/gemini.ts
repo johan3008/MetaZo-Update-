@@ -1281,7 +1281,9 @@ function processKeywordsSemantic(
 
   const normalize = (v: any) => sanitizeForIndexing(String(v ?? ''));
   const mode = keywordMode || 'mixed';
-  // targetCount is a MAXIMUM, never a minimum/quota.\n  // The engine must return fewer keywords when fewer grounded keywords exist.\n  const max = Math.max(1, Number(targetCount) || 49);
+  // targetCount is a MAXIMUM, never a minimum/quota.
+  // The engine must return fewer keywords when fewer grounded keywords exist.
+  const max = Math.max(1, Number(targetCount) || 49);
   const result: string[] = [];
   const seen = new Set<string>();
 
