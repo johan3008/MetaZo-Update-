@@ -9,8 +9,6 @@ interface LiveRemotionRunnerProps {
     durationInFrames: number;
     width: number;
     height: number;
-    onError?: (error: string | null) => void;
-    inputProps?: any;
 }
 
 // Register custom presets once at module level (Babel 8 compatible)
@@ -36,7 +34,7 @@ function ensurePresetsRegistered() {
     }
 }
 
-export function LiveRemotionRunner({ code, fps, durationInFrames, width, height, onError, inputProps }: LiveRemotionRunnerProps) {
+export function LiveRemotionRunner({ code, fps, durationInFrames, width, height }: LiveRemotionRunnerProps) {
     const [Component, setComponent] = useState<React.FC | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [renderKey, setRenderKey] = useState(0);
@@ -120,29 +118,25 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
                 const NewComponent = finalExports.MotionComposition;
                 setComponent(() => NewComponent);
                 setError(null);
-                if (onError) onError(null);
                 setRenderKey(prev => prev + 1);
             } else if (finalExports.default) {
                 const NewComponent = finalExports.default;
                 setComponent(() => NewComponent);
                 setError(null);
-                if (onError) onError(null);
                 setRenderKey(prev => prev + 1);
             } else {
                 const availableExports = Object.keys(finalExports).filter(k => k !== '__esModule');
                 console.warn('[LiveRemotionRunner] No MotionComposition found. Available:', availableExports);
-                const errMsg = availableExports.length > 0
+                setError(
+                    availableExports.length > 0
                         ? `Export ditemukan: "${availableExports.join('", "')}". Harus pakai nama "MotionComposition".`
-                        : "Kode harus mengekspor komponen bernama 'MotionComposition' atau default export";
-                setError(errMsg);
-                if (onError) onError(errMsg);
+                        : "Kode harus mengekspor komponen bernama 'MotionComposition' atau default export"
+                );
                 setComponent(null);
             }
         } catch (err: any) {
             console.error('[LiveRemotionRunner] Compilation Error:', err);
-            const errMsg = err.message || 'Terjadi kesalahan saat kompilasi JSX';
-            setError(errMsg);
-            if (onError) onError(errMsg);
+            setError(err.message || 'Terjadi kesalahan saat kompilasi JSX');
             setComponent(null);
         }
     }, [code, compileAndEval]);
@@ -170,7 +164,7 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
         <Player
             key={renderKey}
             component={Component}
-            inputProps={inputProps || {}}
+            inputProps={{}}
             durationInFrames={durationInFrames}
             fps={fps}
             compositionWidth={width}

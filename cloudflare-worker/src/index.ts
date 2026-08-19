@@ -547,24 +547,6 @@ export default {
         return new Response(object.body, { headers });
       }
 
-      // ----------------------------------------------------
-      // R2 PRESIGNED-STYLE UPLOAD URL GENERATOR
-      // ----------------------------------------------------
-      if (path === "/api/storage/upload-url" && request.method === "GET") {
-        const filename = url.searchParams.get("filename") || "file";
-        const contentType = url.searchParams.get("contentType") || "application/octet-stream";
-        const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const folder = contentType.startsWith("video/") ? "metazostorage/Video" : "eps-uploads";
-        const uniqueKey = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitized}`;
-        
-        return jsonResponse({
-          uploadUrl: `${url.origin}/api/storage/upload?file=${encodeURIComponent(uniqueKey)}`,
-          fileUrl: `${url.origin}/api/storage/download?file=${encodeURIComponent(uniqueKey)}`,
-          pathKey: uniqueKey,
-          contentType
-        });
-      }
-
       // Default fallback
       return jsonResponse({ error: "Not Found" }, 404);
 

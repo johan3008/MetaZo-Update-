@@ -102,9 +102,7 @@ const PREMIUM_ONLY_STYLES = [
   'Lego Style',
   'Voxel Art',
   'Graphic Design',
-  'Line Art',
-  'Corporate Technology Concept',
-  'Painterly Digital Art'
+  'Line Art'
 ];
 
 const VECTOR_SUB_TYPES = {
@@ -503,8 +501,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
           vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined,
           referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined,
-          cameraAngles: selectedCameraAngles.length > 0 ? selectedCameraAngles : undefined,
-          isLicensed: isLicensed
+          cameraAngles: selectedCameraAngles.length > 0 ? selectedCameraAngles : undefined
         })
       });
 

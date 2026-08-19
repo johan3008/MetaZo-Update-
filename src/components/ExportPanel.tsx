@@ -226,7 +226,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               </div>
               <div>
                 <span className="text-xs font-extrabold text-slate-700 dark:text-slate-100 block">MiriCanvas</span>
-                <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Name, keywords & category</span>
+                <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight font-medium">Basic attributes</span>
               </div>
             </label>
 

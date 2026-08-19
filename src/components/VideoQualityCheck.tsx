@@ -200,18 +200,10 @@ export const VideoQualityCheck: React.FC<{
 
 
   useEffect(() => {
-    // Cek R2 status — prioritas Worker, fallback Vercel
-    const workerUrl = localStorage.getItem('cf_worker_url') || '';
-    if (workerUrl) {
-      fetch(`${workerUrl}/api/storage/upload-url?filename=test.txt`)
-        .then(res => res.ok ? setR2Configured(true) : setR2Configured(null))
-        .catch(() => setR2Configured(null));
-    } else {
-      fetch(`/api/r2-status?t=${Date.now()}`)
-        .then(res => res.json())
-        .then(data => setR2Configured(!!data.configured))
-        .catch(() => setR2Configured(null));
-    }
+    fetch(`/api/r2-status?t=${Date.now()}`)
+      .then(res => res.json())
+      .then(data => setR2Configured(!!data.configured))
+      .catch(() => setR2Configured(null));
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,7 +230,7 @@ export const VideoQualityCheck: React.FC<{
     return () => window.removeEventListener('globalFileDrop', handleGlobalDrop);
   }, []);
 
-  const extractVideoFrames = (file: File, frameCount: number = 3): Promise<string[]> => {
+  const extractVideoFrames = (file: File, frameCount: number = 4): Promise<string[]> => {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const video = document.createElement('video');
@@ -270,12 +262,12 @@ export const VideoQualityCheck: React.FC<{
       video.onseeked = () => {
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = 640; 
-          canvas.height = 360;
+          canvas.width = 800; 
+          canvas.height = 450;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            frames.push(canvas.toDataURL('image/jpeg', 0.85));
+            frames.push(canvas.toDataURL('image/jpeg', 0.8));
           }
           currentStep++;
           seekToNextFrame();
@@ -301,70 +293,89 @@ export const VideoQualityCheck: React.FC<{
 
   const analyzeVideo = async () => {
     if (!file) return;
+
     if (!isLicensed && dailyGenCount >= getDailyLimit()) {
         if (setShowLimitModal) setShowLimitModal(true);
         return;
     }
-    setLoading(true); setError(null); setReport(null);
+
+    setLoading(true);
+    setError(null);
+    setReport(null);
+
     try {
-      // PERBAIKAN TIMEOUT: Ekstrak frame di browser, server hanya AI
-      console.log('[Video Audit] Extracting frames client-side...');
-      const frames = await extractVideoFrames(file, 3);
-      const activeModel = aiOptions?.model || 'gemini-2.0-flash';
-      
+      let response;
+      let uploadedUrl = null;
+      let getUrlData = null;
 
-      // ⚡ BYPASS VERCEL TIMEOUT: Panggil Gemini langsung dari browser
-      const apiKey = Array.isArray(aiOptions?.geminiKeys)
-        ? aiOptions.geminiKeys[0]
-        : String(aiOptions?.geminiKeys || '');
-      if (!apiKey) throw new Error('Gemini API key not configured in Settings.');
-
-      const imageParts = frames.map(f => ({
-        inlineData: { mimeType: 'image/jpeg', data: f.split(',')[1] }
-      }));
-
-      const systemPrompt = `You are a strict Adobe Stock QA Curator. Analyze ${frames.length} video frames.
-Check: blur, noise, overexposure, underexposure, black/frozen frames, flickering, camera shake, out of focus, motion consistency, temporal morphing, texture warping, ghosting, geometry consistency, AI artifacts, watermark, logo, text, deformed objects, bad anatomy, compression artifacts, blocking, banding, white balance, motion blur, duplicate/empty frames, cropped subjects, wrong perspective, low aesthetic quality, log profile, upscaled video, visible transitions, audio quality.
-FAIL for any defect. Return JSON with: visual_scan_analysis, legal_status, technical_issues[], strengths[], overall_score, technical_score, visual_score, recommendation (PASS/FAIL/RETOUCH), adobe_stock_readiness, detailed_feedback, quality_checks{}. Be concise, valid JSON only.`;
-
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`,
-        { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ parts: [...imageParts, { text: `Tolerance: ${tolerance}. Language: ${t.language || 'English'}. Return full JSON.` }] }],
-            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
-          })
+      if (r2Configured) {
+        try {
+          const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
+          if (getUrlRes.ok) {
+            getUrlData = await getUrlRes.json().catch(() => ({}));
+            if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+              const putRes = await fetch(getUrlData.uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type || 'video/mp4' }
+              });
+              if (putRes.ok) {
+                uploadedUrl = getUrlData.fileUrl;
+              }
+            }
+          }
+        } catch (uploadErr) {
+          console.warn("[Video Audit] Failed to upload to Cloudflare R2", uploadErr);
         }
-      );
-
-      if (!geminiRes.ok) {
-        const errText = await geminiRes.text();
-        throw new Error(`Gemini error (${geminiRes.status}): ${errText.substring(0, 200)}`);
       }
 
-      const geminiJson = await geminiRes.json();
-      const raw = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      let data;
-      try { data = JSON.parse(raw); } catch(e) {
-        data = JSON.parse(raw.replace(/```json\s*/gi,'').replace(/```/g,'').trim());
+      const activeModel = aiOptions?.model || 'gemini-3.5-flash';
+
+      if (uploadedUrl) {
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getHeaders(aiOptions)
+          },
+          body: JSON.stringify({
+            fileUrl: uploadedUrl,
+            pathKey: getUrlData?.pathKey,
+            tolerance,
+            language: t.language || 'English',
+            model: activeModel
+          })
+        });
+      } else {
+        if (file.size > 4.5 * 1024 * 1024) {
+          throw new Error('File terlalu besar (> 4.5MB). Silakan konfigurasikan Cloudflare R2 dengan benar (termasuk CORS) untuk file besar.');
+        }
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('tolerance', tolerance);
+        formData.append('language', t.language || 'English');
+        formData.append('model', activeModel);
+
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: getHeaders(aiOptions),
+          body: formData
+        });
       }
-      console.log('[Video Audit] Result:', data.recommendation, 'score:', data.overall_score);
-      
-      // Ensure all quality_checks keys exist
-      if (!data.quality_checks) data.quality_checks = {};
-      ['blur','noise','overexposure','underexposure','black_frame','frozen_frame','flickering','camera_shake','out_of_focus','motion_consistency','visual_quality','temporal_morphing','texture_warping','ghosting','geometry_consistency','ai_artifact','watermark','logo','text','deformed_object','bad_anatomy','compression_artifacts','blocking','banding','white_balance','motion_blur','duplicate_frame','empty_frame','cropped_subject','cut_off_object','wrong_perspective','low_aesthetic_quality','log_profile','upscaled_video','visible_transitions'].forEach(k => {
-        if (!data.quality_checks[k]) data.quality_checks[k] = { status: 'UNKNOWN', note: 'Not assessed by AI' };
-      });
-      
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Gagal menganalisis kualitas video.");
+      }
+
+      const data = await response.json();
       setReport(data);
 
       if (incrementDailyCount) {
-        incrementDailyCount(1);
+          incrementDailyCount(1);
       }
     } catch (err: any) {
-      console.error('[Video Audit] Error:', err);
-      setError(err.message || 'An unexpected error occurred while analyzing the video.');
+      setError(err.message || "An unexpected error occurred while analyzing the video.");
     } finally {
       setLoading(false);
     }

@@ -126,9 +126,7 @@ export const generateStockMetadata = async (
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
-  exifMetadata?: any,
-  keyConcepts?: string,
-  editorialMode?: boolean
+  exifMetadata?: any
 ): Promise<StockMetadata> => {
   // Convert any blob: URLs into Base64 data URLs on the client side
   const base64Frames = await Promise.all(frames.map(ensureBase64));
@@ -136,7 +134,7 @@ export const generateStockMetadata = async (
   const response = await fetchWithRetry('/api/generate-metadata', {
     method: 'POST',
     headers: getHeaders(aiOptions),
-    body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, keyConcepts, editorialMode })
+    body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata })
   });
   
   const rawText = await response.text();
@@ -160,9 +158,7 @@ export const generateBatchStockMetadata = async (
   aiOptions?: ServiceOptions,
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
-  aiModelPerformance?: 'speed' | 'detail',
-  keyConcepts?: string,
-  editorialMode?: boolean
+  aiModelPerformance?: 'speed' | 'detail'
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   // Convert any blob: URLs to Base64 data URLs inside items
   const processedItems = await Promise.all(items.map(async (item) => {
@@ -173,7 +169,7 @@ export const generateBatchStockMetadata = async (
   const response = await fetchWithRetry('/api/generate-batch-metadata', {
     method: 'POST',
     headers: getHeaders(aiOptions),
-    body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, keyConcepts, editorialMode })
+    body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance })
   });
 
   const rawText = await response.text();

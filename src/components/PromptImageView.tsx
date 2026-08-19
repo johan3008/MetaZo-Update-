@@ -34,8 +34,7 @@ const PREMIUM_ONLY_STYLES = [
   'Disney Cartoon',
   'Lego Style',
   'Voxel Art',
-  'Graphic Design',
-  'Painterly Digital Art'
+  'Graphic Design'
 ];
 
 const DARK_HORROR_SUB_STYLES = [

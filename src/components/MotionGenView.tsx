@@ -458,27 +458,11 @@ export function MotionGenView({
                     <span className="text-[10px] bg-slate-200 dark:bg-[#222] text-slate-600 dark:text-gray-400 px-2 py-0.5 rounded-md ml-1">{width}x{height}</span>
                 </div>
 
-                <div id="motion-gen-player" className="w-full h-full min-h-[400px] max-h-[80vh] flex items-center justify-center relative bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden">
-                    <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} onError={handleLiveRunnerError} inputProps={dynamicProps} />
-                    {genError && (
-                        <div className="absolute bottom-4 left-4 right-4 bg-red-100 dark:bg-red-900/80 border border-red-300 dark:border-red-500/50 rounded-xl p-4 shadow-xl flex items-center justify-between z-20 backdrop-blur-md">
-                            <div className="flex items-center gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                                <div>
-                                    <p className="text-sm font-bold text-red-800 dark:text-red-200">Kompilasi Gagal</p>
-                                    <p className="text-xs text-red-600 dark:text-red-300 line-clamp-1 max-w-sm">{genError}</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => handleAutoFix(genError)}
-                                disabled={isGenerating || isAtLimit}
-                                className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
-                            >
-                                {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                                Auto-Fix
-                            </button>
-                        </div>
-                    )}
+                <div id="motion-gen-player" className="w-full h-full max-h-[80vh] flex items-center justify-center relative">
+                    {/* Mengatur rasio kontainer */}
+                    <div style={{ aspectRatio: `${width}/${height}`, maxHeight: '100%', maxWidth: '100%' }} className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-[#333] shadow-2xl shadow-black/10 overflow-hidden relative">
+                        <LiveRemotionRunner code={code} fps={fps} durationInFrames={durationInFrames} width={width} height={height} />
+                    </div>
                 </div>
 
                 {/* Render Progress Overlay */}
