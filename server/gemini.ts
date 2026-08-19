@@ -471,510 +471,73 @@ function ensureKeywordCount(
   categoryId?: number,
   keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
-  // STRICT RELEVANCE FILTER: Only keep keywords with direct visual connection.
-  // Keywords that don't match any detected visual element are discarded.
-  const hashString = (str: string): number => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return hash;
+  // Vision-grounded post-processing only: never fabricate keyword padding.
+  const target = Math.max(0, Number(targetCount) || 0);
+  const normalize = (value: any): string => {
+    if (typeof value !== 'string') return '';
+    return sanitizeForIndexing(value)
+      .replace(/\bnewyear\b/g, 'new year')
+      .replace(/\bxmas\b/g, 'christmas')
+      .trim();
   };
-
-  // 1. Clean and deduplicate input keywords
-  let uniqueKeywords: string[] = [];
-  if (Array.isArray(keywords)) {
-    keywords.forEach(k => {
-      if (typeof k === 'string') {
-        const clean = sanitizeForIndexing(k);
-        if (clean.length > 1 && !isProhibitedKeyword(clean)) {
-          if (keywordMode === 'single' && clean.includes(' ')) {
-            // Split multi-words into individual single words
-            const pieces = clean.split(/\s+/);
-            pieces.forEach(p => {
-              if (p.length > 1 && !isProhibitedKeyword(p)) {
-                // Check for exact and near duplicates (plurals/singulars)
-                const isDuplicate = uniqueKeywords.some(existing => 
-                  existing === p || 
-                  existing === p + 's' || 
-                  p === existing + 's' || 
-                  existing === p + 'es' || 
-                  p === existing + 'es' ||
-                  existing.replace(/ies$/, 'y') === p ||
-                  p.replace(/ies$/, 'y') === existing
-                );
-                if (!isDuplicate) {
-                  uniqueKeywords.push(p);
-                }
-              }
-            });
-          } else {
-            let cleanVal = clean;
-            if (keywordMode === 'multi' && !clean.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
-              cleanVal = `${clean} ${mod}`;
-            }
-
-            // Check for exact and near duplicates (plurals/singulars)
-            const isDuplicate = uniqueKeywords.some(existing => 
-              existing === cleanVal || 
-              existing === cleanVal + 's' || 
-              cleanVal === existing + 's' || 
-              existing === cleanVal + 'es' || 
-              cleanVal === existing + 'es' ||
-              existing.replace(/ies$/, 'y') === cleanVal ||
-              cleanVal.replace(/ies$/, 'y') === existing
-            );
-            if (!isDuplicate) {
-              uniqueKeywords.push(cleanVal);
-            }
-          }
-        }
-      }
-    });
-  }
-
-  if (uniqueKeywords.length >= targetCount) {
-    return uniqueKeywords.slice(0, targetCount);
-  }
-
-  // Define lookup of category-based keywords
-  const categoryFallbackKeywords: Record<number, string[]> = {
-    1: ['animal', 'nature', 'wildlife', 'fauna', 'creature', 'outdoor', 'mammal', 'species', 'wilderness', 'natural', 'habitat', 'furry', 'adorable', 'portrait', 'close-up', 'environment', 'beast', 'pet', 'wild', 'zoology'],
-    2: ['architecture', 'building', 'structure', 'construction', 'city', 'urban', 'exterior', 'interior', 'design', 'modern', 'concrete', 'glass', 'steel', 'landmark', 'monument', 'facade', 'metropolis', 'tower', 'estate', 'house', 'contemporary'],
-    3: ['business', 'office', 'corporate', 'work', 'workplace', 'finance', 'company', 'management', 'team', 'meeting', 'strategy', 'success', 'professional', 'marketing', 'leadership', 'organization', 'colleague', 'career', 'investment', 'growth', 'concept'],
-    4: ['drink', 'beverage', 'glass', 'liquid', 'refreshing', 'cold', 'hot', 'cup', 'bottle', 'mug', 'bar', 'cafe', 'cocktail', 'juice', 'water', 'coffee', 'tea', 'alcohol', 'brew', 'ice'],
-    5: ['environment', 'nature', 'landscape', 'green', 'eco', 'ecology', 'sustainability', 'recycle', 'conservation', 'earth', 'planet', 'wild', 'scenery', 'outdoor', 'forest', 'climate', 'natural', 'environmental', 'organic'],
-    6: ['concept', 'mood', 'feeling', 'emotion', 'mental', 'mind', 'thought', 'isolated', 'abstract', 'idea', 'expression', 'psychology', 'imagination', 'sensation', 'attitude', 'behavior'],
-    7: ['food', 'delicious', 'tasty', 'dish', 'meal', 'gourmet', 'culinary', 'plate', 'eating', 'ingredient', 'fresh', 'vegetable', 'fruit', 'cooking', 'kitchen', 'recipe', 'diet', 'lunch', 'dinner', 'breakfast', 'cuisine'],
-    8: ['graphic', 'design', 'resource', 'vector', 'illustration', 'element', 'abstract', 'background', 'template', 'pattern', 'asset', 'layout', 'creative', 'art', 'flat', 'logo', 'icon', 'backdrop', 'seamless'],
-    9: ['hobby', 'leisure', 'recreation', 'activity', 'fun', 'game', 'play', 'relaxation', 'lifestyle', 'entertainment', 'pastime', 'craft', 'indoor', 'outdoor', 'enjoyment'],
-    10: ['industry', 'industrial', 'factory', 'manufacture', 'production', 'technology', 'engineering', 'machinery', 'worker', 'equipment', 'facility', 'metal', 'power', 'warehouse', 'technical', 'automated', 'construction'],
-    11: ['landscape', 'scenery', 'scenic', 'nature', 'view', 'outdoor', 'mountain', 'hill', 'valley', 'field', 'panorama', 'horizon', 'wilderness', 'beautiful', 'vista', 'natural', 'sky'],
-    12: ['lifestyle', 'life', 'daily', 'routine', 'modern', 'human', 'person', 'people', 'home', 'domestic', 'activity', 'casual', 'habits', 'style', 'comfort', 'leisure'],
-    13: ['people', 'person', 'human', 'individual', 'portrait', 'man', 'woman', 'adult', 'young', 'lifestyle', 'group', 'crowd', 'interaction', 'relationship', 'face', 'expressive', 'posing'],
-    14: ['plant', 'flower', 'flora', 'botany', 'botanical', 'leaf', 'nature', 'garden', 'green', 'blossom', 'petal', 'growth', 'stem', 'outdoor', 'natural', 'organic', 'vegetation', 'spring', 'summer'],
-    15: ['culture', 'religion', 'religious', 'spiritual', 'belief', 'faith', 'tradition', 'custom', 'heritage', 'sacred', 'ceremony', 'ritual', 'symbol', 'history', 'traditional', 'temple', 'church', 'holiday', 'celebration'],
-    16: ['science', 'scientific', 'research', 'laboratory', 'lab', 'technology', 'analysis', 'experiment', 'discovery', 'study', 'chemistry', 'biology', 'physics', 'tech', 'equipment', 'microscope', 'test', 'data', 'concept'],
-    17: ['social', 'issue', 'community', 'society', 'problem', 'awareness', 'support', 'help', 'advocacy', 'global', 'campaign', 'concept', 'message', 'public', 'humanity', 'care'],
-    18: ['sports', 'sport', 'athletic', 'athlete', 'exercise', 'fitness', 'training', 'game', 'competition', 'player', 'workout', 'active', 'healthy', 'stadium', 'court', 'field', 'gym', 'recreation', 'action'],
-    19: ['technology', 'tech', 'digital', 'device', 'modern', 'electronic', 'innovation', 'computer', 'network', 'connection', 'internet', 'future', 'futuristic', 'concept', 'data', 'communication', 'virtual', 'smart'],
-    20: ['transport', 'transportation', 'vehicle', 'car', 'automobile', 'traffic', 'road', 'street', 'travel', 'highway', 'drive', 'engine', 'movement', 'logistics', 'delivery', 'auto', 'transit'],
-    21: ['travel', 'tourism', 'destination', 'vacation', 'holiday', 'trip', 'journey', 'adventure', 'explore', 'tourist', 'sightseeing', 'scenic', 'landmark', 'outdoor', 'recreation', 'passport', 'luggage']
-  };
-
-  const STOP_WORDS = new Set([
-    'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'in', 'with', 'by', 'of', 'to', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'us', 'our', 'you', 'your', 'he', 'him', 'his', 'she', 'her', 'isolated', 'stock', 'photo', 'image', 'picture', 'vector', 'illustration', 'captured', 'professional', 'high', 'quality', 'resolution', 'super', 'ultra', 'beautiful', 'stunning', 'amazing', 'perfect', 'ideal'
-  ]);
-
-  // Helper helper to clean a string of words and append to list
-  const extractWords = (str: any) => {
-    if (!str || typeof str !== 'string') return [];
-    return str.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .split(/\s+/)
-      .map(w => w.trim())
-      .filter(w => w.length > 1 && !new Set(['the','and','of','in','on','for','with','a','an','to','is','are','at','from','by','this','that']).has(w) && !isProhibitedKeyword(w));
-  };
-
-  // Build candidate sources in order of priority (only from actual visually-detected facts):
-  const sources: string[][] = [];
-
-  // 1. From visual facts primary subjects
-  if (visualFacts && visualFacts.primary_subjects && Array.isArray(visualFacts.primary_subjects)) {
-    const words: string[] = [];
-    visualFacts.primary_subjects.forEach((x: any) => {
-      if (x && typeof x === 'object' && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-
-  // 2. From visual facts secondary subjects
-  if (visualFacts && visualFacts.secondary_subjects && Array.isArray(visualFacts.secondary_subjects)) {
-    const words: string[] = [];
-    visualFacts.secondary_subjects.forEach((x: any) => {
-      if (x && typeof x === 'object' && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-
-  // 3. From visual facts colors & actions
-  if (visualFacts && visualFacts.colors && Array.isArray(visualFacts.colors)) {
-    sources.push(visualFacts.colors.flatMap((c: any) => {
-      if (typeof c === 'string') return extractWords(c);
-      return [];
-    }));
-  }
-  if (visualFacts && visualFacts.actions && Array.isArray(visualFacts.actions)) {
-    sources.push(visualFacts.actions.flatMap((a: any) => {
-      if (typeof a === 'string') return extractWords(a);
-      return [];
-    }));
-  }
-
-  // 4. From Title and Description (already generated based on visual facts)
-  if (title && typeof title === 'string') {
-    sources.push(extractWords(title));
-  }
-  if (description && typeof description === 'string') {
-    sources.push(extractWords(description));
-  }
-
-  // Categories are classification metadata, NOT visual evidence.
-  // Never use category fallback terms as keyword candidates.
-
-  // Pad the uniqueKeywords checking each source
-  for (const source of sources) {
-    if (uniqueKeywords.length >= targetCount) break;
-    if (Array.isArray(source)) {
-      const cleanSource = Array.from(new Set(source));
-      for (const word of cleanSource) {
-        if (uniqueKeywords.length >= targetCount) break;
-        if (typeof word === 'string') {
-          let cleanWord = word.trim().toLowerCase();
-          if (cleanWord.length > 1 && !isProhibitedKeyword(cleanWord)) {
-            if (keywordMode === 'multi' && !cleanWord.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(cleanWord)) % modifiers.length];
-              cleanWord = `${cleanWord} ${mod}`;
-            }
-            if (!uniqueKeywords.includes(cleanWord)) {
-              uniqueKeywords.push(cleanWord);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return uniqueKeywords.slice(0, targetCount);
-}
-
-async function callOpenAICompatibleWithRetry(params: {
-  systemInstruction?: string;
-  contents: any;
-  responseMimeType?: string;
-  responseSchema?: any;
-  config?: any;
-  model?: string;
-}): Promise<string> {
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
-
-  if (!PROVIDER_ENDPOINTS[provider]) {
-    throw new Error(`Unsupported provider: ${provider}`);
-  }
-
-  const endpoint = PROVIDER_ENDPOINTS[provider];
-  const providerState = store?.[provider];
-  const keysList: string[] = (providerState && providerState.keys) || [];
-  const maxRotationAttempts = keysList.length > 0 ? keysList.length : 1;
-  let lastErr: any;
-
-  for (let rot = 0; rot < maxRotationAttempts; rot++) {
-    let apiKey = '';
-
-    if (keysList.length > 0) {
-      const activeIdx = providerState.activeIndex || 0;
-      apiKey = keysList[activeIdx];
-      if (provider === 'nvidia') {
-        console.log(`[NVIDIA DEBUG] Using key index ${activeIdx}/${keysList.length} (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
-      }
-    } else {
-      apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || '';
-      if (provider === 'nvidia') {
-        console.log(`[NVIDIA DEBUG] Using key from process.env (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
-      }
-    }
-
-    if (!apiKey && provider === 'nvidia') {
-      console.warn('NVIDIA key missing. Fallback to Gemini.');
-      const fallbackResult = await getAIClient().models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: params.contents,
-        config: params.config
+  const candidates: string[] = [];
+  const push = (value: any) => {
+    const clean = normalize(value);
+    if (!clean || isProhibitedKeyword(clean)) return;
+    if (keywordMode === 'single' && clean.includes(' ')) {
+      clean.split(/\s+/).forEach(word => {
+        if (word.length > 1 && !isProhibitedKeyword(word)) candidates.push(word);
       });
-      // Handle both raw Gemini response and our normalized {text} response
-      return typeof fallbackResult.text === 'function' ? await fallbackResult.text() : (fallbackResult.text || '');
+      return;
     }
+    if (keywordMode === 'multi' && !clean.includes(' ')) return;
+    candidates.push(clean);
+  };
+  (Array.isArray(keywords) ? keywords : []).forEach(push);
 
-    if (!apiKey) {
-      throw new Error(`API Key untuk ${provider.toUpperCase()} belum dikonfigurasi. Silakan tambahkan Key Anda di pengaturan.`);
-    }
-
-    const messages: any[] = [];
-    let userSystemInstruction = '';
-    if (params.systemInstruction) {
-      if (provider === 'aivene') {
-        userSystemInstruction = `[SYSTEM INSTRUCTION]\n${params.systemInstruction}\n\n[USER INPUT]\n`;
-      } else {
-        messages.push({ role: 'system', content: params.systemInstruction });
+  // If AI returned too few candidates, enrich ONLY from explicit Vision evidence.
+  const visionGroups = [
+    visualFacts?.primary_subjects, visualFacts?.secondary_subjects,
+    visualFacts?.background_elements, visualFacts?.actions, visualFacts?.colors,
+    visualFacts?.composition, visualFacts?.deeper_meaning_and_symbolism,
+    visualFacts?.semantic_category_analysis?.reason
+  ];
+  for (const group of visionGroups) {
+    if (Array.isArray(group)) {
+      for (const item of group) {
+        if (typeof item === 'string') push(item);
+        else if (item && typeof item === 'object') push(item.name);
       }
-    }
-
-    let hasImages = false;
-    const contentParts: any[] = [];
-    
-    if (userSystemInstruction) {
-      contentParts.push({ type: 'text', text: userSystemInstruction });
-    }
-
-    const addPart = (part: any) => {
-      if (!part) return;
-      if (typeof part === 'string') {
-        contentParts.push({ type: 'text', text: part });
-      } else if (part.text) {
-        contentParts.push({ type: 'text', text: part.text });
-      } else if (part.inlineData) {
-        hasImages = true;
-        contentParts.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    };
-
-    if (typeof params.contents === 'string') {
-      contentParts.push({ type: 'text', text: params.contents });
-    } else if (Array.isArray(params.contents)) {
-      params.contents.forEach(addPart);
-    } else if (params.contents && typeof params.contents === 'object') {
-      if (Array.isArray(params.contents.parts)) {
-        params.contents.parts.forEach(addPart);
-      } else {
-        addPart(params.contents);
-      }
-    }
-
-    let finalContent: any;
-    if (!hasImages) {
-      finalContent = contentParts.map(p => p.text).join('\n');
-    } else {
-      finalContent = contentParts.length === 1 && contentParts[0].type === 'text' ? contentParts[0].text : contentParts;
-    }
-
-    messages.push({
-      role: 'user',
-      content: finalContent
-    });
-
-    let model = params.model || PROVIDER_DEFAULT_MODELS[provider];
-
-    // NVIDIA NIM mapping and sanitization
-    if (provider === 'nvidia') {
-      // mapping legacy or short names to official NIM names
-      if (model === 'stepfun_step35_flash') model = 'stepfun-ai/step-3.5-flash';
-      if (model.startsWith('stepfun/')) model = model.replace('stepfun/', 'stepfun-ai/');
-      if (model === 'nemotron') model = 'nvidia/llama-3.1-nemotron-70b-instruct';
-      if (!model.includes('/')) {
-         // If it's a bare name like 'llama-3.2-90b-vision-instruct', prepend 'meta/'
-         if (model.includes('llama-3.2')) model = `meta/${model}`;
-         else if (model.includes('nemotron')) model = `nvidia/${model}`;
-         else if (model.includes('paligemma')) model = `google/${model}`;
-         else if (model.includes('step')) model = `stepfun-ai/${model}`;
-      }
-      
-      // Sanitasi: NVIDIA NIM sometimes dislikes double slashes or missing namespaces
-      model = model.trim();
-      if (model.startsWith('/')) model = model.substring(1);
-    }
-
-    // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
-    // (artinya caller belum sempat resolve), pakai default provider ini.
-    if (provider !== 'aivene' && (model?.startsWith('gemini-') || model?.startsWith('gemma-'))) {
-      model = PROVIDER_DEFAULT_MODELS[provider];
-    }
-
-    // Map the model 'llama-4-scout-17b-16e-instruct' to the exact name required by Groq
-    if (provider === 'groq' && model === 'llama-4-scout-17b-16e-instruct') {
-      model = 'meta-llama/llama-4-scout-17b-16e-instruct';
-    }
-
-    const payload: any = {
-      model,
-      messages,
-      temperature: params.config?.temperature ?? 0.85,
-    };
-    
-    if (params.config?.topP !== undefined) {
-      payload.top_p = params.config.topP;
-    }
-
-    if (params.config?.seed !== undefined) {
-      payload.seed = params.config.seed;
-    }
-
-    if (SUPPORTS_JSON_MODE.has(provider)) {
-      payload.response_format = { type: "json_object" };
-    }
-
-    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene' || provider === 'zai') {
-      payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
-    } else if (provider === 'bluesminds') {
-      // Do not send max_tokens to avoid pre-check reservation failures on limited balance or custom endpoints
-    }
-    payload.stream = false;
-
-    if (params.responseMimeType === 'application/json') {
-      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested). DO NOT write any introductory or concluding text. DO NOT use markdown code blocks. The response MUST be a valid JSON object or array.';
-      if (provider === 'nvidia') {
-        schemaInstruction = '\n\nOutput only a valid JSON. Do not include any explanation or markdown formatting. The JSON must directly start with { or [ and end with } or ].';
-      }
-      if (params.responseSchema) {
-        schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
-      }
-
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === 'user') {
-        if (typeof lastMessage.content === 'string') {
-          lastMessage.content += schemaInstruction;
-        } else if (Array.isArray(lastMessage.content)) {
-          lastMessage.content.push({ type: 'text', text: schemaInstruction });
-        }
-      } else {
-        messages.push({ role: 'user', content: schemaInstruction });
-      }
-    }
-
-    let tryCount = 0;
-    while (tryCount < 2) {
-      try {
-        console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
-
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`,
-        };
-        // OpenRouter butuh header tambahan untuk identifikasi (opsional tapi disarankan)
-        if (provider === 'openrouter') {
-          headers['HTTP-Referer'] = process.env.APP_URL || 'http://localhost';
-          headers['X-Title'] = 'JohMeta';
-        }
-
-        // Z.AI requires Accept-Language header
-        if (provider === 'zai') {
-          headers['Accept-Language'] = 'en-US,en';
-          payload.do_sample = false;
-        }
-
-        if (provider === 'nvidia') {
-          const sanPayload = { ...payload, messages: payload.messages.map((m: any) => ({ ...m, content: typeof m.content === 'string' ? m.content : '[REDACTED CONTENT]' })) };
-          console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
-        }
-
-        const fetchTimeout = (provider === 'nvidia' || provider === 'mistral') ? 30000 : 25000;
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-          // @ts-ignore - undici/node-fetch support signal/timeout
-          signal: AbortSignal.timeout(fetchTimeout)
-        });
-
-        // Safe logging of the response
-        const responseDataRawForLogging = await response.clone().text();
-        console.log(`[${provider.toUpperCase()} DEBUG] Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.warn(`[${provider.toUpperCase()} API FAILURE] Status: ${response.status}, Response: ${errText}`);
-          throw new Error(`HTTP ${response.status}: ${errText}`);
-        }
-
-        const responseDataRaw = await response.text();
-        let responseData;
-        try {
-          responseData = JSON.parse(responseDataRaw);
-        } catch (e) {
-          console.error(`[callOpenAICompatibleWithRetry] Failed to parse JSON. Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, RawResponse: ${responseDataRaw.substring(0, 500)}`);
-          throw new Error(`Failed to parse JSON from ${provider}. RawResponse Sample: ${responseDataRaw.substring(0, 200)}`);
-        }
-        let answer = responseData.choices?.[0]?.message?.content;
-        if (!answer && responseData.choices?.[0]?.message) {
-          answer = responseData.choices[0].message.reasoning || responseData.choices[0].message.reasoning_content;
-        }
-        if (!answer) {
-          console.warn(`[callOpenAICompatibleWithRetry] Empty answer received from ${provider}. Response payload:`, JSON.stringify(responseData));
-          if (responseData.error) {
-            throw new Error(`${provider.toUpperCase()} API Error: ${responseData.error.message || JSON.stringify(responseData.error)} (Code: ${responseData.error.code || 'unknown'})`);
-          }
-          throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
-        }
-        if (params.responseMimeType === 'application/json') {
-          answer = extractJSON(answer);
-          if (answer.replace(/\s/g, '') === '{}') {
-            console.warn(`[callOpenAICompatibleWithRetry] Model hallucinated empty JSON string. Retrying...`);
-            // Add 'quota' to trigger a retry gracefully
-            throw new Error(`Model returned empty json object string {}. Trigger quota rotation/retry.`);
-          }
-        }
-        return answer;
-      } catch (err: any) {
-        console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
-        const status = err.status || (err.message && err.message.includes('HTTP ') ? err.message.split(' ')[1].replace(':', '') : 'unknown');
-        console.warn(`[${provider.toUpperCase()} ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
-        lastErr = err;
-
-        const errorMsg = String(err.message || "").toLowerCase();
-
-        // Handle API key rotation on limit or auth errors
-        const isRateLimit = errorMsg.includes('429') && (errorMsg.includes('try again') || errorMsg.includes('retry in') || errorMsg.includes('wait'));
-        const shouldRotate = (errorMsg.includes('429') && !isRateLimit) || errorMsg.includes('quota') || 
-                             errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || 
-                             errorMsg.includes('403') || errorMsg.includes('401');
-        
-        if (shouldRotate) {
-           console.warn(`[${provider.toUpperCase()}] Error requires rotation: ${errorMsg}. Trying next key.`);
-           if (providerState && providerState.keys && keysList.length > 1) {
-              providerState.activeIndex = (providerState.activeIndex + 1) % keysList.length;
-              break;
-           } else {
-              throw err;
-           }
-        }
-
-        // Automatic model fallback and exponential backoff
-        tryCount++;
-        const fallback = PROVIDER_FALLBACK_MODELS[provider];
-        const isRetryableError = errorMsg.includes('429') || 
-                                 errorMsg.includes('quota') || 
-                                 errorMsg.includes('limit') || 
-                                 errorMsg.includes('timeout') || 
-                                 errorMsg.includes('exceeded') || 
-                                 errorMsg.includes('fetch failed') ||
-                                 errorMsg.includes('400') || errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('invalid') ||
-                                 errorMsg.includes('500') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504') || errorMsg.includes('524') || errorMsg.includes('upstream_error') ||
-                                 errorMsg.includes('extra data') ||
-                                 errorMsg.includes('empty response content') ||
-                                 errorMsg.includes('empty json object') ||
-                                 errorMsg.includes('bad_response_status_code');
-
-        if (tryCount === 1 && fallback && fallback !== model) {
-          model = fallback;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model}`);
-          payload.model = model;
-          continue;
-        }
-
-        if (tryCount < 2 && isRetryableError) {
-          const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/2) after ${backoff / 1000}s...`);
-          await new Promise(resolve => setTimeout(resolve, backoff));
-          continue;
-        }
-
-        throw err;
-      }
-    }
+    } else if (typeof group === 'string') push(group);
   }
-  throw lastErr;
+
+  const deduped = semanticDeduplicate(candidates);
+  const primaryNames = new Set((Array.isArray(visualFacts?.primary_subjects) ? visualFacts.primary_subjects : [])
+    .map((x: any) => normalize(x?.name || x)).filter(Boolean));
+  const secondaryNames = new Set((Array.isArray(visualFacts?.secondary_subjects) ? visualFacts.secondary_subjects : [])
+    .map((x: any) => normalize(x?.name || x)).filter(Boolean));
+
+  const score = (kw: string): number => {
+    const lower = kw.toLowerCase();
+    const words = lower.split(/\s+/);
+    let value = 0;
+    if (primaryNames.has(lower)) value += 1000;
+    else if (Array.from(primaryNames).some((p: string) => p && (lower.includes(p) || p.includes(lower)))) value += 800;
+    else if (secondaryNames.has(lower)) value += 650;
+    else if (Array.from(secondaryNames).some((p: string) => p && (lower.includes(p) || p.includes(lower)))) value += 500;
+    if (words.length === 2) value += 90;
+    else if (words.length === 3) value += 80;
+    else if (words.length === 1) value += 35;
+    value += Math.min(60, Math.max(0, kw.length - 8) * 2);
+    const generic = new Set(['object','thing','item','element','fauna','mammal','species','culture','tradition','heritage','tourism','success','elegance','celebration','seasonal','modern','beautiful','stunning']);
+    if (generic.has(lower)) value -= 250;
+    return value;
+  };
+
+  const ranked = deduped.map((keyword, index) => ({ keyword, index, score: score(keyword) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(x => x.keyword);
+  return target > 0 ? ranked.slice(0, target) : ranked;
 }
 
 function getAIClient(): any {
@@ -1372,7 +935,7 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
       descriptionRule: `- Detail physical realism, authentic human expressions, real-world textures, lighting qualities, and photographic depth of field.
 - MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning photography uses, e.g., "Ideal for commercial advertising, marketing campaigns, editorial web blogs, or social media banner graphics."`,
       risetKeywordRule: `- Conduct deep photographic and real-world concept research: identify visual subjects, authentic expressions, clothing textures, environment details, weather conditions, lighting attributes, and depth of field.
-- Map realistic physical synonyms, human-centric emotional adjectives, and situational contexts.`,
+- Map only natural visual synonyms and clearly supported contexts. Avoid speculative emotional, cultural, industry, or situational expansion.`,
       seoBoostRule: `- Heavily front-load high-converting keywords to capture exact search patterns of commercial buyers.
 - Focus keywords on the actual visual subjects, environments, clothing, emotional expressions, lighting styles (e.g. golden hour, soft studio light), and commercial contexts, while strictly avoiding terms like "photo", "photography", "realistic", "candid", "lifestyle shot", dsb.`,
       prohibitedExemptions: "Keep titles and keywords completely free of photography terms or camera styles, focusing exclusively on visual subject matter and actions."
@@ -1910,15 +1473,57 @@ function semanticKeySignature(phrase: string): string {
 }
 
 function semanticDeduplicate(keywords: string[]): string[] {
-  const seenSignatures = new Set<string>();
   const result: string[] = [];
-  for (const kw of keywords) {
-    const sig = semanticKeySignature(kw);
-    if (!sig || seenSignatures.has(sig)) continue;
-    seenSignatures.add(sig);
-    result.push(kw);
+  const seenSignatures = new Set<string>();
+
+  // Common microstock redundancies: keep the more standard/searchable form.
+  const familyCanonical: Record<string, string> = {
+    xmas: 'christmas',
+    'newyear': 'new year',
+    decor: 'decoration',
+    decorative: 'decoration',
+    golden: 'gold',
+    elegance: 'elegant',
+    glossy: 'shiny',
+    seasonal: 'holiday'
+  };
+
+  const canonicalize = (phrase: string): string => {
+    const words = phrase.toLowerCase().split(/\s+/).map(w => familyCanonical[w] || w);
+    return words.join(' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const familyKeys = new Set<string>();
+  for (const raw of keywords) {
+    const kw = sanitizeForIndexing(raw);
+    if (!kw) continue;
+    const canonical = canonicalize(kw);
+    const signature = semanticKeySignature(canonical);
+    if (!signature || seenSignatures.has(signature)) continue;
+
+    // Exact semantic-family dedupe for near-equivalent single words/phrases.
+    const familyKey = canonical.split(/\s+/).map(w => familyCanonical[w] || w).join(' ');
+    if (familyKeys.has(familyKey)) continue;
+
+    seenSignatures.add(signature);
+    familyKeys.add(familyKey);
+    result.push(canonical);
   }
-  return result;
+
+  // Phrase prioritization: when a generic one-word term is already represented
+  // by a more specific phrase, keep the phrase and drop the redundant singleton.
+  const multiWord = result.filter(k => k.includes(' '));
+  return result.filter(k => {
+    if (k.includes(' ')) return true;
+    return !multiWord.some(phrase => {
+      const words = phrase.split(/\s+/);
+      if (words.length < 2 || !words.includes(k)) return false;
+      // Only suppress generic singleton repetition; keep useful standalone
+      // color/material terms such as gold, white, ceramic.
+      const preserve = new Set(['gold','white','black','blue','red','green','brown','silver','ceramic','porcelain','wood','metal']);
+      return !preserve.has(k);
+    });
+  });
 }
 
 // ---- LAPISAN 7: PENENTUAN KATEGORI YANG LEBIH AKURAT -----------------------
@@ -2116,7 +1721,7 @@ ${seasonalEventKeywordContext}
      G. VISUAL CHARACTERISTICS: composition/format such as horizontal, vertical, close up, copy space, workspace, background, isolated.
      H. COLORS/VISUAL ELEMENTS: visible colors, natural light, textures, materials, and distinctive visual elements.
    - This is a flexible map, NOT a checklist. Do not force every group and never add a keyword solely to fill a group.
-   - Map single-word synonyms, technical terms, and semantic variations.
+   - Use synonyms only when they preserve the same visual meaning. Prefer the most standard buyer-facing term and remove redundant variants such as christmas/xmas, gold/golden, decor/decoration, elegant/elegance, and similar semantic duplicates.
    - Prioritize concrete visual terms first; use concept, mood, event, and search-intent terms only when supported by Vision. Do not add speculative abstract terms.
 3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
    - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
@@ -2154,7 +1759,7 @@ ${seasonalEventKeywordContext}
    - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
    - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
    - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
+   - Use commercial/search-intent phrases only when they are a natural way buyers would search for the clearly supported asset. Do not invent metaphors, audiences, industries, or use cases.
 4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
@@ -2328,7 +1933,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
+- SEMANTIC TAXONOMY: Start with concrete visual keywords (exact subjects, actions, settings, visual characteristics, colors, and elements). Add concepts, mood, events, and search-intent terms only when clearly supported by AI Vision and useful for a real buyer search.
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
@@ -2820,7 +2425,7 @@ ${seasonalEventKeywordContext}
     keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
 ${seasonalEventKeywordContext}
    - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
-   - Map single-word synonyms, technical terms, and semantic variations.
+   - Use synonyms only when they preserve the same visual meaning. Prefer the most standard buyer-facing term and remove redundant variants such as christmas/xmas, gold/golden, decor/decoration, elegant/elegance, and similar semantic duplicates.
    - Prioritize concrete visual terms first; use concept, mood, event, and search-intent terms only when supported by Vision. Do not add speculative abstract terms.
 3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
    - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
@@ -2846,7 +2451,7 @@ ${seasonalEventKeywordContext}
    - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
    - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
    - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
+   - Use commercial/search-intent phrases only when they are a natural way buyers would search for the clearly supported asset. Do not invent metaphors, audiences, industries, or use cases.
 4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 5. Avoid duplicates and keyword stuffing.
 6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
@@ -3017,7 +2622,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
+- SEMANTIC TAXONOMY: Start with concrete visual keywords (exact subjects, actions, settings, visual characteristics, colors, and elements). Add concepts, mood, events, and search-intent terms only when clearly supported by AI Vision and useful for a real buyer search.
 - HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
@@ -4423,13 +4028,6 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
       "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
     ],
-    "Silhouette": [
-      "minimalist high-contrast black silhouette vector graphic, clean solid black outline shape on solid white background, elegant look",
-      "contemporary fine silhouette design asset, crisp solid black vector contours, minimalist aesthetic, graceful curves",
-      "modern solid shape profile silhouette illustration, sleek black shapes, high contrast minimalist art on solid white, no details",
-      "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
-      "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
-    ]
   };
 
   const activeModifiers = styleFallbackMap[styleCategory] || styleFallbackMap["Cinematic"];
