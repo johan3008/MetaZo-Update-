@@ -1271,112 +1271,164 @@ function processKeywordsSemantic(
   title?: string,
   description?: string
 ): string[] {
-  // KEYWORD POLICY: Do not over-filter AI keywords.
-  // The AI remains responsible for semantic relevance. This function only
-  // normalizes, deduplicates, applies the selected output format, and fills
-  // missing slots from the asset's own visual facts / metadata.
+  // VISION-GROUNDED MICROSTOCK KEYWORD ENGINE:
+  // Keywords describe the ASSET, not the title.
+  // Broad SEO coverage is allowed, including grounded concepts/context,
+  // but every candidate must be supported by AI Vision visual facts.
+  // Title/description are deliberately excluded from evidence and padding.
+
   const normalize = (v: any) => sanitizeForIndexing(String(v ?? ''));
   const mode = keywordMode || 'mixed';
   const max = Math.max(1, Number(targetCount) || 25);
-
-  const isAllowedFormat = (kw: string) => {
-    const parts = normalize(kw).split(/\s+/).filter(Boolean);
-    if (!parts.length) return false;
-
-    if (mode === 'single') {
-      return parts.length === 1 && !isKeywordConnector(parts[0]);
-    }
-
-    if (mode === 'multi') {
-      return parts.length === 2 && !parts.some(isKeywordConnector);
-    }
-
-    // Mixed accepts both single-word and multi-word keywords.
-    return !parts.some(isKeywordConnector);
-  };
-
   const result: string[] = [];
   const seen = new Set<string>();
 
+  const isAllowedFormat = (kw: string) => {
+    const parts = normalize(kw).split(/\s+/).filter(Boolean);
+    if (!parts.length || parts.some(isKeywordConnector)) return false;
+    if (mode === 'single') return parts.length === 1;
+    if (mode === 'multi') return parts.length === 2;
+    return true;
+  };
+
+  const extractFacts = (value: any): string[] => {
+    const out: string[] = [];
+    const walk = (v: any) => {
+      if (v == null) return;
+      if (typeof v === 'string' || typeof v === 'number') {
+        const s = normalize(v);
+        if (s) out.push(s);
+        return;
+      }
+      if (Array.isArray(v)) {
+        v.forEach(walk);
+        return;
+      }
+      if (typeof v === 'object') {
+        for (const key of ['name', 'value', 'label', 'term', 'keyword']) {
+          if (v[key] != null) walk(v[key]);
+        }
+      }
+    };
+    walk(value);
+    return out;
+  };
+
+  const primary = extractFacts(visualFacts?.primary_subjects);
+  const secondary = extractFacts(visualFacts?.secondary_subjects);
+  const objects = extractFacts(visualFacts?.objects);
+  const background = extractFacts(
+    visualFacts?.background_elements ?? visualFacts?.background
+  );
+  const attributes = extractFacts(
+    visualFacts?.attributes ?? visualFacts?.visual_attributes
+  );
+  const colors = extractFacts(visualFacts?.colors);
+  const actions = extractFacts(visualFacts?.actions);
+  const scene = extractFacts(visualFacts?.scene);
+  const environment = extractFacts(visualFacts?.environment);
+  const concepts = extractFacts(
+    visualFacts?.concepts ??
+    visualFacts?.commercial_concepts ??
+    visualFacts?.commercial_themes
+  );
+  const context = extractFacts(
+    visualFacts?.context ??
+    visualFacts?.themes ??
+    visualFacts?.season ??
+    visualFacts?.holidays ??
+    visualFacts?.events
+  );
+  const composition = extractFacts(visualFacts?.composition);
+  const camera = extractFacts(
+    visualFacts?.camera ??
+    visualFacts?.camera_angle ??
+    visualFacts?.camera_view ??
+    visualFacts?.focus ??
+    visualFacts?.optics
+  );
+
+  const allFacts = [
+    ...primary, ...secondary, ...objects, ...background,
+    ...attributes, ...colors, ...actions, ...scene, ...environment,
+    ...concepts, ...context, ...composition, ...camera
+  ];
+
+  const factTokens = new Set(
+    allFacts.flatMap(f => normalize(f).split(/\s+/).filter(Boolean))
+  );
+
+  const verifiedSubjects = [...primary, ...secondary, ...objects];
+
+  const exactFactMatch = (kw: string) => {
+    const candidate = normalize(kw);
+    return allFacts.some(f =>
+      f === candidate ||
+      f.includes(candidate) ||
+      candidate.includes(f)
+    );
+  };
+
+  const tokenEvidence = (kw: string) => {
+    const tokens = normalize(kw)
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(t => !isKeywordConnector(t));
+
+    const matched = tokens.filter(t => factTokens.has(t)).length;
+    if (tokens.length === 1) return matched >= 1;
+    if (tokens.length === 2) return matched === 2;
+    return matched === tokens.length;
+  };
+
+  // Synonyms are allowed only for subjects that the vision model actually found.
+  const synonymEvidence = (kw: string) => {
+    const tokens = normalize(kw)
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(t => !isKeywordConnector(t));
+
+    return tokens.length > 0 && tokens.every(token =>
+      verifiedSubjects.some(subject =>
+        getSynonymsFor(subject).some(syn => normalize(syn) === token)
+      )
+    );
+  };
+
+  const isGrounded = (kw: string) =>
+    exactFactMatch(kw) || tokenEvidence(kw) || synonymEvidence(kw);
+
   const addCandidate = (raw: any) => {
     const clean = normalize(raw);
-    if (!clean) return;
+    if (!clean || seen.has(clean)) return;
 
-    // SINGLE mode: intentionally split phrases into atomic words.
-    // Example: "water gun playground" -> "water", "gun", "playground".
-    if (mode === 'single' && clean.includes(' ')) {
-      clean.split(/\s+/)
-        .filter(Boolean)
-        .forEach(word => addCandidate(word));
-      return;
-    }
-
-    if (seen.has(clean)) return;
-
-    // Only reject true trademark / prohibited terms here.
-    // Do NOT globally reject generic visual/context words such as:
-    // background, scene, light, blue, white, nature, landscape, concept.
-    // These can be legitimate stock-search keywords when supported by the asset.
-    const containsProhibitedTerm = clean
-      .split(/\\s+/)
-      .some(word => PROHIBITED_KEYWORDS_SET.has(word.toLowerCase()));
-
-    if (containsProhibitedTerm) return;
+    // Block brands/IP, but do not block legitimate terms such as
+    // background, light, blue, nature, landscape, scene, or concept.
+    if (clean.split(/\s+/).some(word => PROHIBITED_KEYWORDS_SET.has(word))) return;
     if (!isAllowedFormat(clean)) return;
+
+    // This is the important anti-hallucination gate.
+    if (!isGrounded(clean)) return;
 
     seen.add(clean);
     result.push(clean);
   };
 
-  // Recursively extract useful strings from visualFacts structures.
-  const extractStrings = (value: any) => {
-    if (value == null) return;
-
-    if (typeof value === 'string') {
-      addCandidate(value);
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach(extractStrings);
-      return;
-    }
-
-    if (typeof value === 'object') {
-      if (typeof value.name === 'string') addCandidate(value.name);
-      if (typeof value.value === 'string') addCandidate(value.value);
-      if (typeof value.label === 'string') addCandidate(value.label);
-
-      // Inspect nested objects/arrays when present.
-      Object.entries(value).forEach(([key, nested]) => {
-        if (key === 'name' || key === 'value' || key === 'label') return;
-        if (nested && typeof nested === 'object') extractStrings(nested);
-      });
-    }
-  };
-
-  // 1. AI keywords first — preserve their original order.
+  // 1. AI keywords: keep natural ordering, but remove unsupported hallucinations.
   (Array.isArray(rawAiKeywords) ? rawAiKeywords : []).forEach(addCandidate);
 
-  // Keyword architecture:
-  // 1) Core subjects / objects
-  // 2) Visual details / attributes / colors / lighting
-  // 3) Actions / environment / scene
-  // 4) Concepts / themes / commercial context / buyer intent
-  // 5) Seasonal or contextual terms when supplied by visual analysis
-  // This intentionally mirrors broad microstock keyword patterns rather than
-  // forcing every keyword to be a literal object name.
-  //
-  // 2. Fallback / padding from visual facts + title + description.
-  // No unrelated or synthetic keywords are generated.
+  // 2. Grounded fallback/padding from VISUAL_FACTS only.
+  // Never use title/description as evidence or padding because they are AI text.
   if (result.length < max) {
-    const fallbackPool: any[] = [
+    const fallbackPool = [
       visualFacts?.primary_subjects,
       visualFacts?.secondary_subjects,
       visualFacts?.objects,
       visualFacts?.background_elements,
+      visualFacts?.background,
       visualFacts?.attributes,
       visualFacts?.visual_attributes,
+      visualFacts?.colors,
       visualFacts?.actions,
       visualFacts?.scene,
       visualFacts?.environment,
@@ -1385,25 +1437,35 @@ function processKeywordsSemantic(
       visualFacts?.commercial_themes,
       visualFacts?.context,
       visualFacts?.themes,
-      visualFacts?.intent,
+      visualFacts?.season,
+      visualFacts?.holidays,
+      visualFacts?.events,
       visualFacts?.composition,
       visualFacts?.camera,
       visualFacts?.camera_angle,
       visualFacts?.camera_view,
       visualFacts?.focus,
-      visualFacts?.optics,
-      title,
-      description
+      visualFacts?.optics
     ];
 
     for (const value of fallbackPool) {
       if (result.length >= max) break;
-      extractStrings(value);
+
+      for (const fact of extractFacts(value)) {
+        addCandidate(fact);
+
+        // In SINGLE mode, split only verified visual phrases into words.
+        if (mode === 'single') {
+          fact.split(/\s+/)
+            .filter(Boolean)
+            .forEach(word => addCandidate(word));
+        }
+
+        if (result.length >= max) break;
+      }
     }
   }
 
-  // 3. Final cap: never exceed targetCount.
-  // If grounded candidates are fewer than targetCount, return what exists.
   return result.slice(0, max);
 }
 
@@ -2948,13 +3010,13 @@ export const generateStockMetadata = async (
 
 ${KEYWORD_FEW_SHOT_REFERENCE}
 
-1. HALLUCINATION PRUNING: Every keyword must describe something actually visible or directly verifiable in the image. Remove keywords for objects, people, actions, locations, or concepts that are not present. Example: if the image only shows a hand and laptop, remove "woman" unless a woman is actually visible.
-2. TOP PRIORITY: Put the 5–7 strongest and most important keywords first. Preserve the AI's natural order after that.
-3. PLATFORM COUNT: Respect the selected platform keyword-count range: Adobe Stock 5–49, Shutterstock up to 50, Freepik approximately 30–50. Never add filler just to reach a minimum.
-4. KEYWORD FORMAT: Single Word = exactly 1 word per keyword. Multi Word = exactly 2 words per keyword (natural 2-word phrases). Mixed = only 1-word or 2-word keywords. Do not use 3+ word phrases.
-5. SEARCH INTENT: Think like a real buyer searching for this exact asset. Choose the words or 2-word phrases a buyer would realistically type into a stock platform search. Prioritize precise, useful, commercially searchable terms over vague descriptions. Search intent may improve priority, but must never introduce an unsupported subject. Use the FEW-SHOT BEST-SELLER REFERENCE as a pattern for breadth, ordering, and buyer usefulness — never as a vocabulary list to copy.
-6. NO CONNECTOR WORDS: Never use connector/function words as keyword terms, including a, an, the, and, or, of, in, on, at, to, for, from, by, with, without, into, over, under, between, through, during, before, after, around, against, among, within, across, behind, beside, near, toward, via, as, is, are, was, were, be, been, being, this, that, these, those. A 2-word phrase is valid only when neither word is a connector.
-7. AI SELF-AUDIT: Before displaying the result, review the keyword list again and remove any keyword that has no visual evidence in the image. Do this final visual-evidence check before returning the metadata.`;
+1. ASSET-FIRST KEYWORDING: Keywords MUST be derived from the actual visual asset and AI Vision analysis of that asset. NEVER derive, validate, or pad keywords from the title. The title is NOT visual evidence.
+2. DEEP VISION SCAN: Analyze the entire asset corner-to-corner before generating keywords. Inspect primary subjects, secondary subjects, objects, materials, textures, colors, lighting, atmosphere, environment, background elements, actions, spatial relationships, season, weather, cultural/contextual cues, and clearly supported concepts.
+3. HALLUCINATION PRUNING: Every keyword must have direct visual evidence or strong contextual evidence from AI Vision. Remove anything merely plausible, generic, title-derived, or unrelated. Example: if the image shows a snowy forest at night but no car, never output "car". If Christmas cues are absent, never output "christmas" merely because the scene is wintry.
+4. CONCEPTS ARE ALLOWED BUT MUST BE GROUNDED: Concepts such as travel, holiday, Christmas, tranquility, tourism, celebration, nature, winter, and seasonal context are allowed only when visual evidence strongly supports them. Never invent a concept for SEO.
+5. SEO ORDER: Put the 5–7 strongest asset-specific keywords first, then expand into visual details, attributes, environment, atmosphere, season/context, and grounded concepts.
+6. PLATFORM COUNT: Respect the selected platform keyword-count range. Never invent filler merely to reach a minimum.
+7. KEYWORD FORMAT: Single Word = exactly 1 word. Multi Word = exactly 2 words. Mixed = 1-word or 2-word keywords. Do not use 3+ word phrases.
 
   // --- STAGE 1: GEMINI VISION ---
   let visualFactsJson = "";
