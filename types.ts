@@ -43,22 +43,6 @@ export interface AdobeCategory {
   name: string;
 }
 
-export interface MiriCanvasCategory {
-  id: number;
-  name: string;
-}
-
-export interface DreamstimeCategory {
-  id: number;
-  name: string;
-}
-
-export interface DreamstimeSubCategory {
-  id: number;
-  name: string;
-  parentId: number;
-}
-
 export interface StockMetadata {
   title: string;
   description: string;
@@ -66,9 +50,6 @@ export interface StockMetadata {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
-  miriCanvas_category_id?: number;
-  dreamstime_main_category_id?: number;
-  dreamstime_sub_category_id?: number;
   category_reason?: string;
 }
 
@@ -84,9 +65,6 @@ export interface FileItem {
   adobeCategoryId: number | '';
   shutterstockCategory1: string;
   shutterstockCategory2: string;
-  miriCanvasCategoryId: number | '';
-  dreamstimeMainCategoryId: number | '';
-  dreamstimeSubCategoryId: number | '';
   categoryReason?: string;
   isGenerating: boolean;
   isExtracting?: boolean;
@@ -136,19 +114,4 @@ export interface MarketTrend {
   totalSupply: number;
   opportunityScore: number;
   statusBadge: 'Excellent' | 'High Potential' | 'Moderate' | 'Oversaturated';
-}
-
-// 8-Dimensi Keyword (PRD Metadata Generator v2.0)
-// Pola: Subject → Specific Description → Action → Mood → Style → Concept → Use Case → Context
-// ⚠️ Warna tidak termasuk dalam keyword (buang slot)
-export interface StructuredKeywords {
-  mainSubject: string[];
-  specificDescription: string[];
-  actionMotion: string[];
-  visualAttribute: string[];
-  mood: string[];
-  styleAssetType: string[];
-  concept: string[];
-  useCase: string[];
-  context: string[];
 }

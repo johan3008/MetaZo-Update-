@@ -1449,22 +1449,10 @@ app.get('/api/debug-uploads', (req, res) => {
             console.log(`[ExifTool API] Extracting metadata from: ${filePath}`);
             const exifData: any = {};
             try {
-              // Verify file exists before attempting extraction
-              if (!fs.existsSync(filePath)) {
-                throw new Error(`File not found at path: ${filePath}`);
-              }
-
-              const execAsync = util.promisify(exec);
-              let stdout = '';
-
-              // Try magick (ImageMagick v7+) first, then fallback to identify (v6)
-              try {
-                ({ stdout } = await execAsync(`magick identify -verbose "${filePath}"`, { timeout: 15000, maxBuffer: 1024 * 1024 }));
-              } catch {
-                // Fallback to legacy identify command (ImageMagick v6)
-                ({ stdout } = await execAsync(`identify -verbose "${filePath}"`, { timeout: 15000, maxBuffer: 1024 * 1024 }));
-              }
-
+              const { stdout } = await require('util').promisify(require('child_process').exec)(
+                `magick identify -verbose "${filePath}" 2>/dev/null`,
+                { timeout: 15000, maxBuffer: 1024 * 1024 }
+              );
               // Parse ImageMagick verbose output for key EXIF fields
               for (const line of stdout.split('\n')) {
                 const trimmed = line.trim();
@@ -1478,7 +1466,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
               }
             } catch (magickErr: any) {
-              console.warn('[ExifTool API] ImageMagick EXIF extraction fallback failed:', magickErr.message || magickErr);
+              console.warn('[ExifTool API] ImageMagick EXIF extraction fallback failed:', magickErr.message);
             }
             
             // Clean up noisy tags to save tokens
@@ -1501,12 +1489,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-metadata', async (req, res) => {
         try {
-            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, keyConcepts, editorialMode } = req.body;
+            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata } = req.body;
             if (!frames || !Array.isArray(frames)) {
                 return res.status(400).json({ error: 'Missing or invalid frames' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, keyConcepts, editorialMode);
+            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
             res.json(metadata);
         } catch (e: any) {
             console.warn('Server generate-metadata error:', e);
@@ -1520,12 +1508,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-batch-metadata', async (req, res) => {
         try {
-            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, keyConcepts, editorialMode } = req.body;
+            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance } = req.body;
             if (!items || !Array.isArray(items)) {
                 return res.status(400).json({ error: 'Missing or invalid items' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, keyConcepts, editorialMode);
+            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance);
             res.json(batchMetadata);
         } catch (e: any) {
             console.warn('Server generate-batch-metadata error:', e);
@@ -1540,160 +1528,112 @@ app.get('/api/debug-uploads', (req, res) => {
     // ═══════════════════════════════════════════════════════════
     // EMBED METADATA: Full R2 Pipeline — Upload → AI Generate → Embed → Download
     // ═══════════════════════════════════════════════════════════
-    app.post('/api/embed-metadata', upload.any(), async (req, res) => {
-        const outputPaths: string[] = [];
-        const cleanupFns: (() => void)[] = [];
-        const allMetadata: any[] = [];
-        
+    app.post('/api/embed-metadata', upload.single('file'), async (req, res) => {
+        let localInputPath = '';
+        let localOutputPath = '';
+        let cleanupLocal = () => {};
         try {
-            const files = (req.files as Express.Multer.File[]) || [];
-            const { keywordCount = 50, model, metadataLanguage, aiModelPerformance } = req.body;
+            let originalName = '';
+            let contentType = '';
 
-            // Determine input sources
-            let inputSources: { localPath: string; originalName: string; contentType: string; cleanup: () => void }[] = [];
-
-            // Backward-compatible: support both fileUrl/pathKey (single) and fileUrls/pathKeys (multiple)
-            const r2Urls = req.body.fileUrls ? JSON.parse(req.body.fileUrls) : (req.body.fileUrl ? [req.body.fileUrl] : null);
-            const r2Keys = req.body.pathKeys ? JSON.parse(req.body.pathKeys) : (req.body.pathKey ? [req.body.pathKey] : null);
-
-            if (r2Urls && r2Keys && r2Urls.length === r2Keys.length) {
-                // R2 files (single or multiple)
-                for (let i = 0; i < r2Urls.length; i++) {
-                    const ext = path.extname(r2Keys[i]) || '.jpg';
-                    const name = path.basename(r2Keys[i]);
-                    console.log(`[Embed Metadata] Downloading from R2: ${r2Keys[i]}`);
-                    const result = await downloadFileFromStorage(r2Urls[i], r2Keys[i], ext);
-                    inputSources.push({ localPath: result.localPath, originalName: name, contentType: req.body.contentType || 'image/jpeg', cleanup: result.cleanup });
-                }
-            } else if (files.length > 0) {
-                // Direct uploads (works with both 'file' and 'files' field names)
-                for (const file of files) {
-                    const cleanup = () => { try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch(e) {} };
-                    inputSources.push({ localPath: file.path, originalName: file.originalname || 'image.jpg', contentType: file.mimetype || 'image/jpeg', cleanup });
-                }
+            // Step 1: Receive file — R2 path (preferred) or direct upload (fallback)
+            if (req.body.fileUrl && req.body.pathKey) {
+                const ext = path.extname(req.body.pathKey) || '.jpg';
+                originalName = path.basename(req.body.pathKey);
+                contentType = req.body.contentType || 'image/jpeg';
+                console.log(`[Embed Metadata] Downloading from R2: ${req.body.pathKey}`);
+                const result = await downloadFileFromStorage(req.body.fileUrl, req.body.pathKey, ext);
+                localInputPath = result.localPath;
+                cleanupLocal = result.cleanup;
+            } else if (req.file) {
+                localInputPath = req.file.path;
+                originalName = req.file.originalname || 'image.jpg';
+                contentType = req.file.mimetype || 'image/jpeg';
+                cleanupLocal = () => {
+                    try { if (fs.existsSync(localInputPath)) fs.unlinkSync(localInputPath); } catch(e) {}
+                };
             } else {
                 return res.status(400).json({ error: 'File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2).' });
             }
 
-            console.log(`[Embed Metadata] Processing ${inputSources.length} file(s)...`);
+            // Step 2: AI Generate Metadata from the image
+            console.log(`[Embed Metadata] Generating AI metadata for: ${originalName}`);
+            const imageBase64 = fs.readFileSync(localInputPath, { encoding: 'base64' });
+            const dataUri = `data:image/jpeg;base64,${imageBase64}`;
+            const { keywordCount = 50, model, metadataLanguage, aiModelPerformance } = req.body;
+            const generatedMetadata = await generateStockMetadata(
+                [dataUri],
+                parseInt(String(keywordCount), 10) || 50,
+                '',
+                ToolType.IMAGE,
+                undefined,
+                model,
+                undefined,
+                undefined,
+                metadataLanguage || 'English',
+                aiModelPerformance || 'detail'
+            );
+            const { title = '', description = '', keywords = [] } = generatedMetadata;
+            console.log(`[Embed Metadata] AI generated title, ${keywords.length} keywords`);
 
-            // Process each file
-            for (const input of inputSources) {
-                cleanupFns.push(input.cleanup);
-                
-                // Step 2: AI Generate Metadata
-                console.log(`[Embed Metadata] Generating AI metadata for: ${input.originalName}`);
-                const imageBase64 = fs.readFileSync(input.localPath, { encoding: 'base64' });
-                const dataUri = `data:image/jpeg;base64,${imageBase64}`;
-                const generatedMetadata = await generateStockMetadata(
-                    [dataUri],
-                    parseInt(String(keywordCount), 10) || 50,
-                    '',
-                    ToolType.IMAGE,
-                    undefined,
-                    model,
-                    undefined,
-                    undefined,
-                    metadataLanguage || 'English',
-                    aiModelPerformance || 'detail'
-                );
-                const { title = '', description = '', keywords = [] } = generatedMetadata;
-                allMetadata.push({ fileName: input.originalName, title, description, keywords });
+            // Step 3: ExifTool / ImageMagick — write metadata into file
+            const keywordStr = Array.isArray(keywords) ? keywords.join('; ') : String(keywords || '');
+            localOutputPath = localInputPath + '_embedded' + path.extname(originalName);
 
-                // Step 3: Write metadata into file
-                const keywordStr = Array.isArray(keywords) ? keywords.join('; ') : String(keywords || '');
-                const outputPath = input.localPath + '_embedded' + path.extname(input.originalName);
-
-                const magickArgs = [input.localPath];
-                if (title && title.trim()) {
-                    magickArgs.push('-set', 'iptc:2:5', title.trim());
-                    magickArgs.push('-set', 'exif:ImageDescription', title.trim());
-                    magickArgs.push('-set', 'xmp:Title', title.trim());
-                }
-                if (description && description.trim()) {
-                    magickArgs.push('-set', 'iptc:2:120', description.trim());
-                    magickArgs.push('-set', 'xmp:Description', description.trim());
-                }
-                if (keywordStr) {
-                    magickArgs.push('-set', 'iptc:2:25', keywordStr);
-                    magickArgs.push('-set', 'xmp:Keywords', keywordStr);
-                }
-                magickArgs.push(outputPath);
-
-                console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
-                try {
-                    await spawnAsync('magick', magickArgs, { timeout: 30000 });
-                } catch {
-                    console.warn(`[Embed Metadata] magick (v7) failed, trying convert (v6)...`);
-                    await spawnAsync('convert', magickArgs, { timeout: 30000 });
-                }
-
-                if (!fs.existsSync(outputPath)) {
-                    throw new Error(`ImageMagick gagal menulis file output untuk ${input.originalName}`);
-                }
-                outputPaths.push(outputPath);
+            const magickArgs = [localInputPath];
+            if (title && title.trim()) {
+                magickArgs.push('-set', 'iptc:2:5', title.trim());
+                magickArgs.push('-set', 'exif:ImageDescription', title.trim());
+                magickArgs.push('-set', 'xmp:Title', title.trim());
             }
+            if (description && description.trim()) {
+                magickArgs.push('-set', 'iptc:2:120', description.trim());
+                magickArgs.push('-set', 'xmp:Description', description.trim());
+            }
+            if (keywordStr) {
+                magickArgs.push('-set', 'iptc:2:25', keywordStr);
+                magickArgs.push('-set', 'xmp:Keywords', keywordStr);
+            }
+            magickArgs.push(localOutputPath);
 
-            // Step 4: Return results
-            const isMulti = outputPaths.length > 1;
+            console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
+            await spawnAsync('magick', magickArgs, { timeout: 30000 });
 
+            // Step 4: Upload embedded file to Cloudflare R2 + return download URL
+            const embeddedName = `embedded_${originalName}`;
             if (isR2Configured()) {
-                // Upload all to R2 and return URLs
-                const uploadResults = [];
-                for (let i = 0; i < outputPaths.length; i++) {
-                    const embeddedName = `embedded_${inputSources[i].originalName}`;
-                    console.log(`[Embed Metadata] Uploading ${embeddedName} to R2...`);
-                    const { fileUrl } = await uploadFileToStorage(outputPaths[i], embeddedName, inputSources[i].contentType);
-                    uploadResults.push({ fileName: embeddedName, downloadUrl: fileUrl });
-                }
-                // Cleanup
-                for (const fn of cleanupFns) fn();
-                for (const p of outputPaths) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch(e) {} }
-                return res.json({ success: true, files: uploadResults, metadata: allMetadata });
-            }
-
-            // Fallback: direct download — ZIP if multiple, single file otherwise
-            if (isMulti) {
-                // Create ZIP archive
-                const zipPath = path.join(uploadDir, `embedded_batch_${Date.now()}.zip`);
-                const zipArgs = ['-j', zipPath, ...outputPaths];
-                console.log(`[Embed Metadata] Creating ZIP with ${outputPaths.length} files...`);
-                await spawnAsync('zip', zipArgs, { timeout: 60000 });
-
-                if (!fs.existsSync(zipPath)) {
-                    throw new Error('Gagal membuat ZIP archive.');
-                }
-
-                res.setHeader('Content-Type', 'application/zip');
-                res.setHeader('Content-Disposition', `attachment; filename="embedded_batch_${outputPaths.length}files.zip"`);
-                res.sendFile(zipPath, { root: '/' }, (err) => {
-                    for (const fn of cleanupFns) fn();
-                    for (const p of outputPaths) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch(e) {} }
-                    try { if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath); } catch(e) {}
-                    if (err) console.error('[Embed Metadata] ZIP send error:', err);
-                });
-            } else {
-                // Single file — direct download
-                const embeddedName = `embedded_${inputSources[0].originalName}`;
-                res.setHeader('Content-Type', inputSources[0].contentType);
-                res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(embeddedName)}"`);
-                res.sendFile(outputPaths[0], { root: '/' }, (err) => {
-                    for (const fn of cleanupFns) fn();
-                    for (const p of outputPaths) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch(e) {} }
-                    if (err) console.error('[Embed Metadata] Send error:', err);
+                console.log(`[Embed Metadata] Uploading embedded file to R2...`);
+                const { fileUrl: r2Url } = await uploadFileToStorage(localOutputPath, embeddedName, contentType);
+                console.log(`[Embed Metadata] R2 upload complete: ${r2Url}`);
+                cleanupLocal();
+                try { if (fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
+                return res.json({
+                    success: true,
+                    downloadUrl: r2Url,
+                    fileName: embeddedName,
+                    metadata: { title, description, keywords }
                 });
             }
+
+            // Fallback: direct download (no R2 configured)
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(embeddedName)}"`);
+            res.sendFile(localOutputPath, { root: '/' }, (err) => {
+                cleanupLocal();
+                try { if (fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
+                if (err) console.error('[Embed Metadata] Send error:', err);
+            });
         } catch (e: any) {
             console.error('[Embed Metadata] Pipeline error:', e);
-            for (const fn of cleanupFns) fn();
-            for (const p of outputPaths) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch(e) {} }
+            cleanupLocal();
+            try { if (localOutputPath && fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
             res.status(500).json({ error: e.message || 'Gagal dalam pipeline Embed Metadata.' });
         }
     });
 
     app.post('/api/generate-prompt', async (req, res) => {
         try {
-            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles, isLicensed } = req.body;
+            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles } = req.body;
             if (!subject) {
                 return res.status(400).json({ error: 'Missing subject field' });
             }
@@ -1712,8 +1652,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 vectorSubType,
                 darkHorrorSubStyle,
                 referenceImages,
-                cameraAngles,
-                isLicensed: !!isLicensed
+                cameraAngles
             });
             res.json(promptData);
         } catch (e: any) {
@@ -1849,12 +1788,92 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'No video uploaded, fileUrl, or frames provided.' });
             }
 
-                        let videoFile = null;
+            let videoFile = null;
             if (videoPath) {
-                // ⚡ SKIP FFmpeg — langsung upload ke Gemini atau R2
-                console.log('Server check-video-quality: Uploading video to Gemini...');
+                // 1. Extract keyframes using FFmpeg if available (extract 6 frames across duration for temporal analysis)
+                if (ffmpeg && (!frames || frames.length === 0)) {
+                    try {
+                        console.log('Server check-video-quality: Extracting keyframes with FFmpeg...');
+                        const outDir = path.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+                        fs.mkdirSync(outDir, { recursive: true });
+
+                        frames = await new Promise<string[]>((resolve, reject) => {
+                            let isDone = false;
+                            const timeout = setTimeout(() => {
+                                if (!isDone) {
+                                    isDone = true;
+                                    reject(new Error("Video extraction timed out."));
+                                }
+                            }, 90000);
+
+                            const extractFast = async () => {
+                                try {
+                                    const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
+                                    const ffprobePath = _require('@ffprobe-installer/ffprobe').path;
+                                    const execPromise = util.promisify(exec);
+
+                                    const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
+                                    const duration = parseFloat(probeOut.trim());
+                                    if (isNaN(duration) || duration <= 0) {
+                                        throw new Error("Could not determine video duration");
+                                    }
+
+                                    // Extract 6 keyframes across duration (10%, 25%, 40%, 55%, 70%, 85%)
+                                    const timestamps = [
+                                        duration * 0.10,
+                                        duration * 0.25,
+                                        duration * 0.40,
+                                        duration * 0.55,
+                                        duration * 0.70,
+                                        duration * 0.85
+                                    ];
+
+                                    const framePaths = [];
+                                    for (let i = 0; i < timestamps.length; i++) {
+                                        const fPathFull = path.join(outDir, `frame-full-${i + 1}.jpg`);
+                                        const fPathZoom = path.join(outDir, `frame-zoom-${i + 1}.jpg`);
+                                        
+                                        // 1. Full Frame (scaled down to 1280x720 for composition/morphing check)
+                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPathFull}" -y`);
+                                        
+                                        // 2. Zoomed Crop (100-200% zoom crop of the absolute center to detect raw pixel defects)
+                                        await execPromise(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(800,iw):min(800,ih)" "${fPathZoom}" -y`);
+                                        
+                                        framePaths.push(fPathFull);
+                                        framePaths.push(fPathZoom);
+                                    }
+
+                                    const frameData = framePaths.map(fPath => fs.readFileSync(fPath, 'base64'));
+                                    fs.rmSync(outDir, { recursive: true, force: true });
+
+                                    if (!isDone) {
+                                        isDone = true;
+                                        clearTimeout(timeout);
+                                        resolve(frameData.map(f => `data:image/jpeg;base64,${f}`));
+                                    }
+                                } catch (e) {
+                                    if (!isDone) {
+                                        isDone = true;
+                                        clearTimeout(timeout);
+                                        reject(e);
+                                    }
+                                }
+                            };
+                            
+                            extractFast();
+                        });
+                        extractionSuccess = true;
+                    } catch (extractionErr: any) {
+                        console.warn('[Video Audit] FFmpeg frame extraction failed:', extractionErr);
+                    }
+                }
+
+                // 2. Get video reference for Gemini — use R2 presigned URL instead of base64
                 try {
+                    console.log('Server check-video-quality: Getting video reference for Gemini...');
                     const videoMime = req.file ? req.file.mimetype : 'video/mp4';
+                    
+                    // If video is in R2, generate presigned URL so Gemini fetches directly (no base64, no OOM)
                     if (req.body.pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
                         const presignCmd = new GetObjectCommand({
                             Bucket: process.env.S3_BUCKET_NAME,
@@ -1862,36 +1881,54 @@ app.get('/api/debug-uploads', (req, res) => {
                         });
                         const presignedUrl = await getSignedUrl(getS3Client(), presignCmd, { expiresIn: 3600 });
                         videoFile = { fileUri: presignedUrl, mimeType: videoMime };
+                        console.log('[Video Audit] Using R2 presigned URL for Gemini direct fetch');
                     } else {
+                        // Fallback: use uploadVideoToGemini for local files (skips >25MB)
                         videoFile = await uploadVideoToGemini(videoPath, videoMime);
                     }
-                    if (videoFile) console.log('[Video Audit] Video uploaded to Gemini successfully');
+                    extractionSuccess = true;
                 } catch (uploadErr: any) {
-                    console.warn('[Video Audit] Video upload failed:', uploadErr.message);
+                    console.warn('[Video Audit] Video reference failed:', uploadErr.message);
                 }
             }
 
-            if ((frames && frames.length > 0) || videoFile) {
-                console.log('Server check-video-quality: ' + frames.length + ' frames from client, AI-only mode...');
-
-                // ⚡ PERBAIKAN TIMEOUT: Server hanya AI call — tanpa FFmpeg, tanpa ffprobe, tanpa videoAnalyzer
-                // Frames sudah diekstrak di frontend browser. Server cuma forward ke Gemini.
+            if (extractionSuccess && (videoFile || (frames && frames.length > 0))) {
+                console.log('Server check-video-quality: Analyzing frames with Gemini...');
+                // Timeout helper: wraps any promise with a max execution time
                 const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
                     Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms/1000}s`)), ms))]);
 
-                const data = await withTimeout(
-                    checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, null, videoFile || null, null),
-                    35000,
-                    'checkVideoQuality'
-                );
-
+                let videoMetadata: any = null;
+                if (videoPath) {
+                    try {
+                        console.log('Server check-video-quality: Extracting video metadata...');
+                        const { stdout } = await require('util').promisify(require('child_process').exec)(
+                          `magick identify -verbose "${videoPath}" 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
+                          { timeout: 15000, maxBuffer: 1024 * 1024 }
+                        );
+                        videoMetadata = { raw: stdout.substring(0, 5000) };
+                    } catch (exifErr: any) {
+                        console.warn('[Video Audit] Metadata extraction failed:', exifErr.message);
+                    }
+                }
+                let technicalReport = null;
+                if (videoPath && frames && frames.length > 0) {
+                    try {
+                        console.log('Server check-video-quality: Running videoAnalyzer...');
+                        const { analyzeVideoTechnically } = await import('./server/videoAnalyzer.ts');
+                        technicalReport = await withTimeout(analyzeVideoTechnically(videoPath, frames), 90000, 'videoAnalyzer');
+                        console.log('Server check-video-quality: videoAnalyzer completed successfully');
+                    } catch (techErr: any) {
+                        console.warn('[Video Audit] Technical analysis failed, proceeding without it:', techErr.message);
+                    }
+                }
+                const data = await withTimeout(checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model, videoMetadata, videoFile, technicalReport), 90000, 'checkVideoQuality');
                 console.log('Server check-video-quality: Analysis successful');
-
-                const enrichedData = { ...data };
-
+                cleanupFn();
+                res.json({ ...data, technical_details: technicalReport });
             } else {
                 cleanupFn();
-                return res.status(500).json({ error: 'Upload video gagal. Pastikan: 1) File < 25MB, atau 2) Cloudflare R2 sudah dikonfigurasi, atau 3) Rebuild frontend dengan npm run build.' });
+                return res.status(500).json({ error: 'Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi).' });
             }
         } catch (e: any) {
             console.warn('Server check-video-quality error:', e);
@@ -2243,7 +2280,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         let tempFilePath = "";
         let cleanupFn = () => {};
         try {
-            const { image, fileUrl, pathKey, tolerance, language, model, fileType, detailCrops } = req.body;
+            const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
             
             let imageBase64 = "";
             if (fileUrl) {
@@ -2302,142 +2339,35 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
-
-            // FORENSIC DETAIL CROPS — kirim crop resolusi asli 100% pixel (TANPA upscale palsu)
-            // dari wilayah TENGAH, KIRI, dan KANAN agar cacat AI di luar pusat ikut terinspeksi.
-            // Prioritas: crop detail yang dikirim frontend (diambil dari file ASLI resolusi penuh).
-            const cropFilePaths: string[] = [];
+            
+            // Generate zoom-in center crop 200% as the second image for forensic detail checks
+            const zoomFilePath = tempFilePath + "_zoom.jpg";
             let imagesToSend: string | string[] = imageBase64;
             try {
-                const validClientCrops = Array.isArray(detailCrops)
-                    ? detailCrops.filter((c: any) => typeof c === 'string' && c.startsWith('data:image/')).slice(0, 4)
-                    : [];
-
-                if (validClientCrops.length > 0) {
-                    imagesToSend = [imageBase64, ...validClientCrops];
-                    console.log(`Server check-image-quality: Using ${validClientCrops.length} native-resolution detail crops from client`);
-                } else {
-                    const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
-                    const execPromise = util.promisify(exec);
-                    // FIX QC (full-frame coverage): crop lama (center/left/right) hanya mengambil
-                    // pita TENGAH secara vertikal (25%-75% tinggi gambar), sehingga 25% area PALING
-                    // ATAS dan 25% area PALING BAWAH tidak pernah diperiksa dalam resolusi piksel asli.
-                    // Pada foto orang memegang objek (produk, model arsitektur, botol, dll.), titik
-                    // kontak tangan-jari-objek yang paling rawan cacat AI generatif umumnya berada di
-                    // paruh BAWAH frame — tepat di zona buta crop lama. Diganti dengan 4 crop KUADRAN
-                    // ber-overlap 20% agar seluruh permukaan gambar (termasuk sudut & tepi bawah)
-                    // tercakup minimal sekali dalam resolusi asli, sejajar dengan logika client-side.
-                    const cropRegions = [
-                        { name: 'top-left',     filter: 'crop=iw*0.6:ih*0.6:0:0' },
-                        { name: 'top-right',    filter: 'crop=iw*0.6:ih*0.6:iw*0.4:0' },
-                        { name: 'bottom-left',  filter: 'crop=iw*0.6:ih*0.6:0:ih*0.4' },
-                        { name: 'bottom-right', filter: 'crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4' }
-                    ];
-                    const cropBase64s: string[] = [];
-                    for (const region of cropRegions) {
-                        try {
-                            const cropPath = `${tempFilePath}_crop_${region.name}.jpg`;
-                            await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${region.filter}" -q:v 2 "${cropPath}"`);
-                            if (fs.existsSync(cropPath)) {
-                                cropFilePaths.push(cropPath);
-                                const cropBuffer = fs.readFileSync(cropPath);
-                                cropBase64s.push(`data:image/jpeg;base64,${cropBuffer.toString('base64')}`);
-                            }
-                        } catch (oneCropErr: any) {
-                            console.warn(`Server check-image-quality: Failed to generate ${region.name} crop:`, oneCropErr);
-                        }
-                    }
-                    if (cropBase64s.length > 0) {
-                        imagesToSend = [imageBase64, ...cropBase64s];
-                        console.log(`Server check-image-quality: Successfully generated ${cropBase64s.length} native-resolution detail crops via FFmpeg`);
-                    }
+                const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
+                const execPromise = util.promisify(exec);
+                await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "crop=iw/2:ih/2:iw/4:ih/4,scale=iw*2:ih*2" "${zoomFilePath}"`);
+                if (fs.existsSync(zoomFilePath)) {
+                    const zoomBuffer = fs.readFileSync(zoomFilePath);
+                    const mime = fileType || 'image/jpeg';
+                    const zoomBase64 = `data:${mime};base64,${zoomBuffer.toString('base64')}`;
+                    imagesToSend = [imageBase64, zoomBase64];
+                    console.log('Server check-image-quality: Successfully generated zoom-in center crop 200% via FFmpeg');
                 }
             } catch (zoomErr: any) {
-                console.warn('Server check-image-quality: Failed to prepare detail crops:', zoomErr);
+                console.warn('Server check-image-quality: Failed to generate zoom center crop:', zoomErr);
             }
 
             const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType);
-
-            // GERBANG TEKNIS DETERMINISTIK: hasil analisis piksel (Python/FFmpeg) ikut memutuskan,
-            // bukan sekadar ditampilkan. Hanya nilai EKSTREM yang memaksa FAIL agar tidak ada false-positive.
-            try {
-                const techGateReasons: string[] = [];
-                const sharpVal = ffmpegStats?.sharpness?.value;
-                const noiseVal = ffmpegStats?.noise?.value;
-                const brightVal = ffmpegStats?.brightness?.value;
-                if (typeof sharpVal === 'number' && sharpVal < 15) {
-                    techGateReasons.push(`Ketajaman sangat rendah (sharpness ${sharpVal}/100) — indikasi kuat soft focus / motion blur parah di seluruh gambar`);
-                }
-                if (ffmpegStats?.sharpness?.has_local_blur_anomaly) {
-                    techGateReasons.push(`Ketajaman lokal tidak seragam (has_local_blur_anomaly) — terdeteksi area soft focus atau blur lokal yang parah (sharpness regional minimum: ${ffmpegStats?.local_analysis?.min_local_sharpness})`);
-                }
-                if (typeof noiseVal === 'number' && noiseVal > 60) {
-                    techGateReasons.push(`Noise sangat tinggi (noise ${noiseVal}/100) — melebihi batas wajar Adobe Stock`);
-                }
-                if (ffmpegStats?.local_analysis?.max_local_noise > 45) {
-                    techGateReasons.push(`Noise lokal sangat tinggi (max_local_noise ${ffmpegStats?.local_analysis?.max_local_noise}/100) di area bayangan tertentu`);
-                }
-                if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) {
-                    techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) — indikasi over/under exposure parah`);
-                }
-                // PNG/RGBA transparency must never be treated as black pixels. The
-                // Python analyzer reports visible-pixel metrics only and exposes alpha
-                // diagnostics separately. Transparency itself is valid for isolated assets.
-                if (ffmpegStats?.transparency?.has_alpha) {
-                    const partialAlpha = Number(ffmpegStats.transparency.partial_alpha_percent || 0);
-                    const haloRisk = Number(ffmpegStats.transparency.edge_halo_risk_percent || 0);
-                    if (haloRisk > 30 && partialAlpha > 0.05) {
-                        techGateReasons.push(`Risiko matte/halo pada alpha edge tinggi (${haloRisk.toFixed(1)}%) — periksa rambut/kain/tepi objek pada background kontras`);
-                    }
-                }
-                if (Number(ffmpegStats?.banding?.score || 0) > 65) {
-                    techGateReasons.push(`Sinyal banding/posterization tinggi (${ffmpegStats.banding.score}/100) — periksa area gradasi halus pada 100%`);
-                }
-                if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) {
-                    techGateReasons.push(`Sinyal JPEG blocking tinggi (${ffmpegStats.jpeg_blocking.score}/100) — periksa kompresi pada 100%`);
-                }
-                if (techGateReasons.length > 0) {
-                    console.warn('Server check-image-quality: Deterministic technical gate triggered:', techGateReasons);
-                    aiVisionStats.technical_issues = [...(aiVisionStats.technical_issues || []), ...techGateReasons];
-                    const deterministicKeys: string[] = [];
-                    if (typeof sharpVal === 'number' && sharpVal < 15) deterministicKeys.push('blur');
-                    if (ffmpegStats?.sharpness?.has_local_blur_anomaly) deterministicKeys.push('blur');
-                    if (typeof noiseVal === 'number' && noiseVal > 60) deterministicKeys.push('noise');
-                    if (ffmpegStats?.local_analysis?.max_local_noise > 45) deterministicKeys.push('noise');
-                    if (typeof brightVal === 'number' && (brightVal > 92 || brightVal < 8)) deterministicKeys.push('exposure');
-                    if (Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0) > 30) deterministicKeys.push('artifacts');
-                    if (Number(ffmpegStats?.banding?.score || 0) > 65) deterministicKeys.push('artifacts');
-                    if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) deterministicKeys.push('artifacts');
-                    (aiVisionStats as any).failed_checks = Array.from(new Set([...(aiVisionStats as any).failed_checks || [], ...deterministicKeys]));
-                    if (aiVisionStats.recommendation !== 'FAIL') {
-                        aiVisionStats.recommendation = 'FAIL';
-                        if (typeof aiVisionStats.overall_score !== 'number' || aiVisionStats.overall_score >= 66) {
-                            aiVisionStats.overall_score = 65;
-                        }
-                        if (aiVisionStats.ai_vision_checks?.stock_acceptance) {
-                            aiVisionStats.ai_vision_checks.stock_acceptance.status = 'FAIL';
-                            aiVisionStats.ai_vision_checks.stock_acceptance.note =
-                                (aiVisionStats.ai_vision_checks.stock_acceptance.note || '') + ' [Sistem] Ditolak otomatis oleh gerbang teknis: ' + techGateReasons.join('; ');
-                        }
-                    }
-                }
-            } catch (gateErr: any) {
-                console.warn('Server check-image-quality: Technical gate evaluation failed (non-blocking):', gateErr);
-            }
-
+            
             console.log('Server check-image-quality: Integration successful');
-
+            
             // Combine results while ensuring backward compatibility
             const combinedReport = {
                 ...aiVisionStats,
                 ffmpeg: ffmpegStats,
                 ai_vision: aiVisionStats
             };
-
-            // Bersihkan file crop sementara
-            for (const cp of cropFilePaths) {
-                try { if (fs.existsSync(cp)) fs.unlinkSync(cp); } catch (e) {}
-            }
             
             res.json(combinedReport);
         } catch (e: any) {
