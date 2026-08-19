@@ -1276,10 +1276,12 @@ function processKeywordsSemantic(
   // Broad SEO coverage is allowed, including grounded concepts/context,
   // but every candidate must be supported by AI Vision visual facts.
   // Title/description are deliberately excluded from evidence and padding.
+  // Generate broadly first, then prune aggressively. targetCount is a MAXIMUM,
+  // never a minimum. Relevance always wins over quantity.
 
   const normalize = (v: any) => sanitizeForIndexing(String(v ?? ''));
   const mode = keywordMode || 'mixed';
-  const max = Math.max(1, Number(targetCount) || 25);
+  // targetCount is a MAXIMUM, never a minimum/quota.\n  // The engine must return fewer keywords when fewer grounded keywords exist.\n  const max = Math.max(1, Number(targetCount) || 49);
   const result: string[] = [];
   const seen = new Set<string>();
 
@@ -1360,43 +1362,123 @@ function processKeywordsSemantic(
 
   const verifiedSubjects = [...primary, ...secondary, ...objects];
 
-  const exactFactMatch = (kw: string) => {
+  // Strong evidence pools. Concepts/context are deliberately separated from
+  // literal visual objects so abstract SEO terms cannot validate themselves.
+  const literalFacts = [
+    ...primary, ...secondary, ...objects, ...background,
+    ...attributes, ...colors, ...actions, ...scene, ...environment,
+    ...composition, ...camera
+  ];
+
+  const conceptFacts = [...concepts, ...context];
+
+  const literalTokens = new Set(
+    literalFacts.flatMap(f =>
+      normalize(f).split(/\s+/).filter(t => t.length >= 2)
+    )
+  );
+
+  const conceptTokens = new Set(
+    conceptFacts.flatMap(f =>
+      normalize(f).split(/\s+/).filter(t => t.length >= 2)
+    )
+  );
+
+  const verifiedSubjects = [...primary, ...secondary, ...objects];
+
+  const exactFactMatch = (kw: string): boolean => {
     const candidate = normalize(kw);
-    return allFacts.some(f =>
+    return literalFacts.some(f =>
       f === candidate ||
       f.includes(candidate) ||
       candidate.includes(f)
     );
   };
 
-  const tokenEvidence = (kw: string) => {
-    const tokens = normalize(kw)
-      .split(/\s+/)
-      .filter(Boolean)
-      .filter(t => !isKeywordConnector(t));
-
-    const matched = tokens.filter(t => factTokens.has(t)).length;
-    if (tokens.length === 1) return matched >= 1;
-    if (tokens.length === 2) return matched === 2;
-    return matched === tokens.length;
+  const exactConceptMatch = (kw: string): boolean => {
+    const candidate = normalize(kw);
+    return conceptFacts.some(f =>
+      f === candidate ||
+      f.includes(candidate) ||
+      candidate.includes(f)
+    );
   };
 
-  // Synonyms are allowed only for subjects that the vision model actually found.
-  const synonymEvidence = (kw: string) => {
+  const tokenCount = (kw: string) =>
+    normalize(kw)
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(t => !isKeywordConnector(t)).length;
+
+  const hasLiteralTokenEvidence = (kw: string): boolean => {
     const tokens = normalize(kw)
       .split(/\s+/)
       .filter(Boolean)
       .filter(t => !isKeywordConnector(t));
 
-    return tokens.length > 0 && tokens.every(token =>
+    if (!tokens.length) return false;
+
+    // Single words need direct visual evidence.
+    if (tokens.length === 1) {
+      return literalTokens.has(tokens[0]);
+    }
+
+    // Phrases require every meaningful token to be visually grounded.
+    return tokens.every(t => literalTokens.has(t));
+  };
+
+  const hasConceptEvidence = (kw: string): boolean => {
+    // Concepts/context must be explicitly represented by Vision.
+    if (exactConceptMatch(kw)) return true;
+
+    const tokens = normalize(kw)
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(t => !isKeywordConnector(t));
+
+    // Do not let one generic concept token validate another concept.
+    // Multi-word concepts require complete concept evidence.
+    return tokens.length > 0 && tokens.every(t => conceptTokens.has(t));
+  };
+
+  // Synonyms are only accepted for an actual visual subject/object.
+  // This prevents unrelated AI synonyms from entering the list.
+  const synonymEvidence = (kw: string): boolean => {
+    const tokens = normalize(kw)
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(t => !isKeywordConnector(t));
+
+    if (!tokens.length || tokens.length > 2) return false;
+
+    return tokens.every(token =>
       verifiedSubjects.some(subject =>
         getSynonymsFor(subject).some(syn => normalize(syn) === token)
       )
     );
   };
 
-  const isGrounded = (kw: string) =>
-    exactFactMatch(kw) || tokenEvidence(kw) || synonymEvidence(kw);
+  /**
+   * STRICT ASSET RELEVANCE:
+   *
+   * A keyword must satisfy ONE of:
+   *   A) exact/direct visual evidence
+   *   B) all meaningful words have direct visual evidence
+   *   C) explicit Vision concept/context evidence
+   *   D) synonym of a verified visible subject
+   *
+   * Title and description are NEVER evidence.
+   *
+   * This intentionally rejects "SEO plausible" words that are not actually
+   * supported by the asset.
+   */
+  const isGrounded = (kw: string): boolean => {
+    if (exactFactMatch(kw)) return true;
+    if (hasLiteralTokenEvidence(kw)) return true;
+    if (hasConceptEvidence(kw)) return true;
+    if (synonymEvidence(kw)) return true;
+    return false;
+  };
 
   const addCandidate = (raw: any) => {
     const clean = normalize(raw);
@@ -1417,55 +1499,22 @@ function processKeywordsSemantic(
   // 1. AI keywords: keep natural ordering, but remove unsupported hallucinations.
   (Array.isArray(rawAiKeywords) ? rawAiKeywords : []).forEach(addCandidate);
 
-  // 2. Grounded fallback/padding from VISUAL_FACTS only.
-  // Never use title/description as evidence or padding because they are AI text.
-  if (result.length < max) {
-    const fallbackPool = [
-      visualFacts?.primary_subjects,
-      visualFacts?.secondary_subjects,
-      visualFacts?.objects,
-      visualFacts?.background_elements,
-      visualFacts?.background,
-      visualFacts?.attributes,
-      visualFacts?.visual_attributes,
-      visualFacts?.colors,
-      visualFacts?.actions,
-      visualFacts?.scene,
-      visualFacts?.environment,
-      visualFacts?.concepts,
-      visualFacts?.commercial_concepts,
-      visualFacts?.commercial_themes,
-      visualFacts?.context,
-      visualFacts?.themes,
-      visualFacts?.season,
-      visualFacts?.holidays,
-      visualFacts?.events,
-      visualFacts?.composition,
-      visualFacts?.camera,
-      visualFacts?.camera_angle,
-      visualFacts?.camera_view,
-      visualFacts?.focus,
-      visualFacts?.optics
-    ];
+  // 2. NO FORCED PADDING.
+  //
+  // Every keyword must first survive the asset-evidence gate above.
+  // Do NOT manufacture additional keywords just to reach targetCount.
+  //
+  // targetCount is a maximum output limit only:
+  // - targetCount = 49 means "up to 49 relevant keywords"
+  // - it does NOT mean "must produce 49 keywords"
+  //
+  // If Vision finds 37 strong keywords, return 37.
+  // If Vision finds 49 strong keywords, return 49.
+  // If Vision finds 24 strong keywords, return 24.
 
-    for (const value of fallbackPool) {
-      if (result.length >= max) break;
 
-      for (const fact of extractFacts(value)) {
-        addCandidate(fact);
-
-        // In SINGLE mode, split only verified visual phrases into words.
-        if (mode === 'single') {
-          fact.split(/\s+/)
-            .filter(Boolean)
-            .forEach(word => addCandidate(word));
-        }
-
-        if (result.length >= max) break;
-      }
-    }
-  }
-
+  // Quantity is secondary to relevance.
+  // Never add filler to satisfy a requested count.
   return result.slice(0, max);
 }
 
@@ -3006,242 +3055,173 @@ export const generateStockMetadata = async (
 
   // Human-curated keyword generation: candidates first, ranking later.
   let keywordRuleSchemaDesc = `Generate keywords freely in ${getLanguageName(metadataLanguage)} based on the image.`;
-  let keywordRulePromptText = `KEYWORDS: Generate natural keywords freely from the image. The application rules below are the only keyword constraints:
+  let keywordRulePromptText = `KEYWORDS: Generate a broad candidate pool internally from the actual visual asset, then audit and return only strongly relevant keywords.
 
-${KEYWORD_FEW_SHOT_REFERENCE}
+CORE KEYWORD ALGORITHM:
 
-1. ASSET-FIRST KEYWORDING: Keywords MUST be derived from the actual visual asset and AI Vision analysis of that asset. NEVER derive, validate, or pad keywords from the title. The title is NOT visual evidence.
-2. DEEP VISION SCAN: Analyze the entire asset corner-to-corner before generating keywords. Inspect primary subjects, secondary subjects, objects, materials, textures, colors, lighting, atmosphere, environment, background elements, actions, spatial relationships, season, weather, cultural/contextual cues, and clearly supported concepts.
-3. HALLUCINATION PRUNING: Every keyword must have direct visual evidence or strong contextual evidence from AI Vision. Remove anything merely plausible, generic, title-derived, or unrelated. Example: if the image shows a snowy forest at night but no car, never output "car". If Christmas cues are absent, never output "christmas" merely because the scene is wintry.
-4. CONCEPTS ARE ALLOWED BUT MUST BE GROUNDED: Concepts such as travel, holiday, Christmas, tranquility, tourism, celebration, nature, winter, and seasonal context are allowed only when visual evidence strongly supports them. Never invent a concept for SEO.
-5. SEO ORDER: Put the 5–7 strongest asset-specific keywords first, then expand into visual details, attributes, environment, atmosphere, season/context, and grounded concepts.
-6. PLATFORM COUNT: Respect the selected platform keyword-count range. Never invent filler merely to reach a minimum.
-7. KEYWORD FORMAT: Single Word = exactly 1 word. Multi Word = exactly 2 words. Mixed = 1-word or 2-word keywords. Do not use 3+ word phrases.
+1. DEEP AI VISION ANALYSIS
+Before generating keywords, inspect the entire asset from corner to corner.
 
-  // --- STAGE 1: GEMINI VISION ---
-  let visualFactsJson = "";
-  console.log(`[JohMeta Pipeline] Stage 1: Running AI Vision (Gemini Vision) + EXIF context (no classical Computer Vision)...`);
-  const mediaTypeContext = directives.mediaTypeContext;
-  const fallbackGeminiModel = 'gemini-3-flash-preview';
-  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
+Identify and verify:
+- primary subjects
+- secondary subjects
+- objects
+- environment
+- background elements
+- colors
+- lighting
+- textures
+- materials
+- actions
+- spatial relationships
+- weather
+- season
+- atmosphere
+- visual style
+- clearly supported concepts
+- commercially useful visual context
 
-  const visionSystemInstruction = `ROLE:
-You are an AI Vision Visual Metadata Analyzer.
-Analyze only what is visually verifiable in the supplied frames. EXIF is secondary technical evidence only.
-Do NOT use or imitate classical Computer Vision, OpenCV, cv2, pixel heuristics, object-detection heuristics, or color-classification rules.
+Never assume something exists simply because it is common for the scene.
 
-ABSOLUTE RULE:
-Describe only what is clearly visible in the image.
+2. GENERATE MANY CANDIDATES
+Internally generate a broad pool of approximately 40–80 candidate keywords from the asset.
 
-VISUAL ACCURACY RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
-2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
-3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. COMMERCIAL & ABSTRACT CONCEPTS (ONLY WHEN SUPPORTED):
-Identify commercial concepts, themes, symbolism, or search intent only when they are genuinely represented by visible content or an unmistakable visual context. Do NOT invent business, industry, lifestyle, or marketing concepts merely because they are commercially popular. If no strong concept is present, leave those fields conservative.
+Explore:
+- subjects
+- objects
+- visual attributes
+- colors
+- lighting
+- environment
+- atmosphere
+- weather
+- season
+- style
+- actions
+- grounded concepts
+- grounded commercial context
 
-5. GEOGRAPHICAL LOCATION & LANDMARKS (ONLY WHEN VERIFIED): Report a city, country, landmark, or specific location only when it is clearly recognizable from the visual asset or explicitly present in reliable EXIF metadata. Do not infer a location from generic architecture, vegetation, weather, or cultural appearance alone.
-5. Never hallucinate brands, trademarked logos, or copyrighted characters.
-6. If uncertain, provide the closest accurate generic description.
-7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
-8. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
-9. ASSET UNDERSTANDING AND CONTEXT: Explain the likely subject, context, mood, and practical use only when supported by the asset. Separate what is visibly true from what is only a possible interpretation. Never use commercial use cases to invent new objects or themes.
+Do NOT output the raw candidate pool.
 
-STRICT PROHIBITIONS:
-* Never include specific brand names or trademarked logos (must be described generically).
-* Never include copyrighted characters.
+3. VISUAL RELEVANCE AUDIT
+Audit every candidate individually against the actual asset.
 
-PRIMARY OBJECTIVE:
-Deeply and exhaustively detect every visible subject, action, visible text, material, texture, lighting, and composition detail. Colors may be observed for visual understanding, but they MUST NOT become final keywords. You must recognize the contents of assets deeply and in extraordinary detail.
-Also assess the likely context, mood, symbolism, and practical meaning of the asset, but keep interpretations conservative and clearly grounded in what is visible. Do not invent commercial use-cases.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
-Return JSON ONLY under the key "VISUAL_FACTS".
-Do not generate title or keywords.
+REMOVE a keyword when:
+- the object is not visible
+- the action is not visible
+- the environment is not present
+- the attribute is not visually supported
+- the concept is only a weak assumption
+- the keyword comes only from the title
+- the keyword comes only from the description
+- the keyword is merely commercially popular
+- the keyword is thematically related but not sufficiently supported
+- the keyword is redundant or meaningless
 
-Asset Context: ${mediaTypeContext}
+Example:
+A snowy forest does NOT automatically justify "christmas", "travel", "aurora", "futuristic", "digital", "galaxy", or "holiday".
 
-OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
-- Adobe Stock Categories: ${categoriesText}
-- Shutterstock Categories: ${shutterstockCategoriesText}
-- MiriCanvas Categories: ${miricanvasCategoriesText}
+Those terms are allowed ONLY when the visual evidence supports them.
 
-OUTPUT FORMAT:
-{
-  "VISUAL_FACTS": {
-    "primary_subjects": [
-      {
-        "name": "",
-        "importance": 0
-      }
-    ],
-    "secondary_subjects": [
-      {
-        "name": "",
-        "importance": 0
-      }
-    ],
-    "background_elements": [
-      {
-        "name": "",
-        "importance": 0
-      }
-    ],
-    "visible_text": [],
-    "colors": [],
-    "actions": [],
-    "composition": [],
-    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
-    "understanding_and_context": "Explain your deep understanding of the asset: its narrative, commercial intent, target audience, and overall context (pemahaman mendalam tentang narasi, konteks, dan tujuan penggunaan komersial aset ini).",
-    "semantic_category_analysis": {
-      "adobe_id": 0,
-      "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
-      "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
-    }
-  }
-}${exifInstruction}`;
+4. CONCEPTS ARE ALLOWED BUT MUST BE GROUNDED
+Concept keywords such as winter, fantasy, tranquility, wilderness, futuristic, holiday, tourism, or celebration are valid only when strongly supported by the visual asset.
 
-  const promptText = toolType === ToolType.VIDEO 
-    ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
-    : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+Never invent a concept merely to improve SEO.
 
-  // Enforced responseSchema for clean, structured Vision output
-  const visionResponseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      VISUAL_FACTS: {
-        type: Type.OBJECT,
-        properties: {
-          primary_subjects: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
-          secondary_subjects: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
-          background_elements: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
-          visible_text: { type: Type.ARRAY, items: { type: Type.STRING } },
-          colors: { type: Type.ARRAY, items: { type: Type.STRING } },
-          actions: { type: Type.ARRAY, items: { type: Type.STRING } },
-          composition: { type: Type.ARRAY, items: { type: Type.STRING } },
-          concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Core commercial concepts, business themes, abstract metaphors, and buyer search intents (e.g., teamwork, digital transformation, sustainability, wellness, innovation, remote work, freedom, growth)" },
-          commercial_concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific high-value buyer commercial concepts and industry use cases" },
-          deeper_meaning_and_symbolism: { type: Type.STRING },
-          understanding_and_context: { type: Type.STRING },
-          semantic_category_analysis: {
-            type: Type.OBJECT,
-            properties: { adobe_id: { type: Type.NUMBER }, shutterstock_category_1: { type: Type.STRING }, shutterstock_category_2: { type: Type.STRING }, reason: { type: Type.STRING } },
-            required: ["adobe_id", "shutterstock_category_1", "shutterstock_category_2", "reason"]
-          }
-        },
-        required: ["primary_subjects", "secondary_subjects", "background_elements", "visible_text", "colors", "actions", "composition", "deeper_meaning_and_symbolism", "understanding_and_context", "semantic_category_analysis"]
-      }
-    },
-    required: ["VISUAL_FACTS"]
-  };
+5. TITLE IS NOT KEYWORD EVIDENCE
+The title MUST NEVER be used as evidence for a keyword.
 
-  try {
-    const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
-      parts: [...imageParts, { text: promptText }] 
-    }, {
-      systemInstruction: visionSystemInstruction,
-      responseMimeType: "application/json",
-      responseSchema: visionResponseSchema,
-      temperature: 0.0,
-      topP: 0.8 });
-    
-    visualFactsJson = visionResponse.text || "{}";
-    if (!visualFactsJson || visualFactsJson.trim() === "{}") {
-      throw new Error("Vision Analysis produced empty results.");
-    }
-  } catch (err: any) {
-    console.warn("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
-    // Fallback static facts if vision fails
-    visualFactsJson = JSON.stringify({
-      VISUAL_FACTS: {
-        primary_subjects: [{ name: "main subject", importance: 100 }],
-        secondary_subjects: [],
-        background_elements: [],
-        visible_text: [],
-        colors: ["natural"],
-        actions: ["commercial poses"],
-        composition: ["professional"],
-        semantic_category_analysis: {
-          adobe_id: 0,
-          shutterstock_category_1: "",
-          shutterstock_category_2: "",
-          reason: "Fallback static categories used."
-        }
-      }
-    });
-  }
+If the title says "Futuristic Winter Forest Landscape" but the asset does not visually support "futuristic", do NOT include "futuristic".
 
-  // Parse facts for next stages
-  let visualFacts: any = {};
-  try {
-    visualFacts = JSON.parse(extractJSON(visualFactsJson)).VISUAL_FACTS || {};
-  } catch (e) {
-    visualFacts = { primary_subjects: [{ name: "subject", importance: 100 }], actions: ["posing"] };
-  }
+Keywords must come from the visual asset and AI Vision analysis.
 
-  const dominantSubjects = [
-    ...(Array.isArray(visualFacts.primary_subjects) ? visualFacts.primary_subjects : []),
-    ...(Array.isArray(visualFacts.secondary_subjects) ? visualFacts.secondary_subjects : [])
-  ].filter((item: any) => item && typeof item === 'object' && typeof item.importance === 'number' && item.importance >= 50).map((item: any) => item.name);
+6. ORDER MATTERS
+Rank final keywords by relevance.
 
-  // --- TAHAP 2 & 3: PROVIDER 2 (GPT ROLE) & PROVIDER 3 (CLAUDE ROLE) — CONTENT GENERATION ---
-  console.log(`[JohMeta Pipeline] Stage 2 & 3: Generating Content (Title, Description, Keywords)...`);
-  
-  const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / CONCEPT KEY (ABSOLUTE PRIORITY):
-The user has provided a custom instruction, concept key, or target keywords: "${customPrompt}"
-ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
-1. ALIGN WITH CONCEPT: You MUST deeply adapt and shape the ENTIRE metadata (Title, Description, and Keywords) to strictly follow and embody this exact instruction or concept key.
-2. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), you MUST act as an expert human graphic designer. Describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
-3. INTEGRATE TARGET KEYWORDS: If the input contains specific target keywords, you MUST heavily prioritize and integrate those exact words naturally into both the Title and the Keywords list.
-4. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset (do not hallucinate elements that aren't there, but frame the existing elements through the lens of the custom instruction).` : "";
+The first 10 keywords must contain the strongest direct visual descriptors.
 
-  const mediaContext = mediaTypeContext;
-  const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
-Your goal is to maximize discoverability and search relevance on microstock marketplaces. Never promise or imply guaranteed first-page placement; ranking is controlled by each marketplace and changes dynamically.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
+Priority:
+1. Primary subject
+2. Secondary subject
+3. Specific object
+4. Action
+5. Core environment
+6. Strong visual attribute
+7. Lighting
+8. Atmosphere
+9. Style
+10. Strong grounded concept
 
-${mediaContext}${customPromptCommand}${exifInstruction}${keyConcepts ? `\n\nKEY CONCEPTS REFERENCE (Use only as a user-provided context check. Never introduce a keyword unless it is supported by VISUAL_FACTS): "${keyConcepts}"` : ''}
+Do not sacrifice relevance just to satisfy this formula.
 
-CRITICAL KEYWORD RULES — ONLY THESE THREE:
-1. HALLUCINATION PRUNING: Remove any keyword that describes an object, person, action, location, or concept not actually visible or directly verifiable in the image.
-2. TOP PRIORITY: Put the 5–7 strongest and most important keywords first.
-3. PLATFORM COUNT: Respect the selected platform keyword-count range: Adobe Stock 5–49, Shutterstock up to 50, Freepik approximately 30–50. Never add filler just to reach a minimum.
+7. KEYWORD COUNT
+The requested keyword count is a MAXIMUM, NOT A MINIMUM.
 
-Rules for Titles:
-1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
-   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
-   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
-   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
-   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
-2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
-   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
-   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
-   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
-3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
-   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
-   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
-4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
-   ${directives.titleRule}
-5. FORMAT & KEPATUHAN:
-   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
-   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
-   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
+Generate many candidates internally, audit them aggressively, then output only the strongest relevant keywords.
 
-Rules for Descriptions:
-1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
-2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
-   ${directives.descriptionRule}
-3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
-4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
+NEVER use padding.
 
-Rules for Keywords:
-- Generate keywords freely from the image.
-- Remove hallucinated keywords that describe objects, people, actions, locations, or concepts not actually visible.
-- Put the 5–7 strongest keywords first.
-- Respect the selected platform keyword-count range without adding filler.
-- AI SELF-AUDIT: Before displaying the result, review the keyword list again and remove any keyword that has no visual evidence in the image.
+If only 31 keywords are strongly supported, output 31.
+If 42 are strongly supported, output 42.
+If 49 are strongly supported, output 49.
+
+Never invent keywords to reach targetCount.
+
+8. KEYWORD FORMAT
+- lowercase
+- natural English keywords
+- use single words whenever appropriate
+- allow natural two-word phrases when they provide meaningful specificity
+- use nouns, adjectives, and base verbs when visually appropriate
+- avoid unnatural fragments
+- avoid unnecessary repetition
+
+9. PEOPLE
+If people are visible, describe only clearly observable characteristics and actions.
+
+If people are not visible, do NOT add "nobody" or "no people".
+Absence is not a keyword.
+
+10. BANNED
+Never use:
+- trademarks or brand names
+- camera specifications
+- ISO
+- focal length
+- resolution
+- quality buzzwords
+- photorealistic
+- masterpiece
+- trending
+- artist names
+- in the style of
+- irrelevant marketing terminology
+- unsupported concepts
+
+11. DEDUPLICATION
+Remove exact duplicates and redundant keyword variants that do not add meaningful search value.
+
+12. FINAL SELF-AUDIT
+Before returning the result, inspect every final keyword one more time.
+
+For EACH keyword ask:
+"Can I point to something in the actual asset that supports this keyword?"
+
+If NO: REMOVE IT.
+
+Do not keep a keyword simply because it sounds good for SEO.
+
+FINAL PRINCIPLE:
+VISUAL EVIDENCE > RELEVANCE > SEARCH VALUE > QUANTITY
+
+Generate broadly.
+Audit strictly.
+Remove hallucinations.
+Deduplicate.
+Rank by relevance.
+Output only grounded keywords.
+Never force the keyword count.
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3259,7 +3239,7 @@ ${miricanvasCategoriesText}
 Dreamstime Main Categories:
 ${dreamstimeCategoriesText}
 
-VISUAL_FACTS:
+AUTHORITATIVE VISUAL_FACTS (use this as visual evidence, NOT the title):
 ${JSON.stringify(visualFacts, null, 2)}
 
 CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
