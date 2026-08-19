@@ -1499,15 +1499,28 @@ function processKeywordsSemantic(
   // 1. AI keywords: keep natural ordering, but remove unsupported hallucinations.
   (Array.isArray(rawAiKeywords) ? rawAiKeywords : []).forEach(addCandidate);
 
-  // 2. NO FORCED PADDING.
+  // 2. RECOVER GROUNDED KEYWORDS THE AI FORGOT TO MENTION (not "padding").
   //
-  // Every keyword must first survive the asset-evidence gate above.
-  // Do NOT manufacture additional keywords just to reach targetCount.
-  //
-  // targetCount is a maximum output limit only:
-  // - targetCount = 49 means "up to 49 relevant keywords"
-  // - it does NOT mean "must produce 49 keywords"
-  //
+  // targetCount is still a MAXIMUM, never a forced quota — we never invent a
+  // concept/object that isn't visually supported. But it's common for the
+  // drafting model to under-report: it may only return 12-18 keywords even
+  // when Stage 1 Vision detected far more grounded subjects/attributes/colors.
+  // expandFromVisualFacts builds ADDITIONAL candidates purely from data that
+  // already passed the Stage 1 Vision grounding gate: synonyms of subjects we
+  // already verified, meaningful single words split out of already-accepted
+  // phrases, and subject x detected-modifier long-tail combinations. Every
+  // candidate still goes through the exact same format/mode/banned-word gate
+  // as AI-provided keywords before being accepted — nothing here bypasses
+  // relevance, it only recovers signal that was already proven grounded.
+  if (result.length < max) {
+    const stillNeeded = max - result.length;
+    const recovered = expandFromVisualFacts(result, visualFacts, stillNeeded * 4);
+    for (const candidate of recovered) {
+      if (result.length >= max) break;
+      addCandidate(candidate);
+    }
+  }
+
   // If Vision finds 37 strong keywords, return 37.
   // If Vision finds 49 strong keywords, return 49.
   // If Vision finds 24 strong keywords, return 24.
