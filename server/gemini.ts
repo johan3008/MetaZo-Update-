@@ -203,11 +203,7 @@ function isProhibitedKeyword(word: string): boolean {
   const lower = word.toLowerCase().trim();
   if (PROHIBITED_KEYWORDS_SET.has(lower)) return true;
   
-  // Exclude keywords containing color names
-  const parts = lower.split(/[\s-_]+/);
-  if (parts.some(part => COLOR_KEYWORDS.has(part))) {
-    return true;
-  }
+  // Colors are valid keywords when they are visually verified by VISUAL_FACTS.
   
   return false;
 }
@@ -321,7 +317,8 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
   }
   
   // Clean input title: remove all commas, periods, double spaces
-  let cleanedTitle = title.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  let cleanedTitle = title.replace(/,/g, ' ').replace(/[\-–—_]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
   if (cleanedTitle.endsWith('.')) {
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
@@ -1564,6 +1561,117 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * kedekatan semantik dengan setiap kategori. Urutan ini dirancang untuk
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
+/**
+ * VERIFIED KEYWORD PIPELINE
+ * VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
+ *
+ * VISUAL_FACTS is the ground truth. AI-generated keywords are candidates only.
+ * No fallback/category padding is allowed here; quality beats reaching targetCount.
+ */
+function buildVerifiedKeywordPipeline(
+  aiCandidates: string[],
+  visualFacts: any,
+  tiers: TieredVisualAnalysis,
+  targetCount: number,
+  keywordMode?: 'mixed' | 'single' | 'multi'
+): string[] {
+  const normalize = (value: any): string => String(value ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const evidenceGroups: string[][] = [
+    ...(Array.isArray(visualFacts?.primary_subjects) ? [visualFacts.primary_subjects.map((x: any) => x?.name || '')] : []),
+    ...(Array.isArray(visualFacts?.secondary_subjects) ? [visualFacts.secondary_subjects.map((x: any) => x?.name || '')] : []),
+    ...(Array.isArray(visualFacts?.background_elements) ? [visualFacts.background_elements.map((x: any) => x?.name || '')] : []),
+    ...(Array.isArray(visualFacts?.colors) ? [visualFacts.colors] : []),
+    ...(Array.isArray(visualFacts?.actions) ? [visualFacts.actions] : []),
+    ...(Array.isArray(visualFacts?.composition) ? [visualFacts.composition] : []),
+    ...(Array.isArray(visualFacts?.visible_text) ? [visualFacts.visible_text] : []),
+    ...(visualFacts?.deeper_meaning_and_symbolism ? [[visualFacts.deeper_meaning_and_symbolism]] : []),
+    ...(visualFacts?.understanding_and_context ? [[visualFacts.understanding_and_context]] : [])
+  ].map(group => group.map(normalize).filter(Boolean));
+
+  const evidence = evidenceGroups.flat();
+  const evidenceText = evidence.join(' ');
+  const evidenceTokens = new Set(evidenceText.split(/\s+/).filter(w => w.length > 1));
+
+  // Builder: AI candidates + directly observed VISUAL_FACTS terms.
+  // Visual facts are inserted by semantic tier, not by arbitrary category fallback.
+  const builderCandidates: { keyword: string; sourcePriority: number }[] = [];
+  const pushCandidate = (value: any, priority: number) => {
+    const raw = String(value ?? '').trim();
+    if (/[-–—_\/]/.test(raw)) return;
+    const k = normalize(raw);
+    if (!k || k.length < 2 || isProhibitedKeyword(k)) return;
+    if (keywordMode === 'single') {
+      k.split(/\s+/).forEach(part => {
+        if (part.length > 1 && !isProhibitedKeyword(part)) builderCandidates.push({ keyword: part, sourcePriority: priority });
+      });
+    } else {
+      builderCandidates.push({ keyword: k, sourcePriority: priority });
+    }
+  };
+
+  (Array.isArray(visualFacts?.primary_subjects) ? visualFacts.primary_subjects : [])
+    .sort((a: any, b: any) => Number(b?.importance || 0) - Number(a?.importance || 0))
+    .forEach((x: any) => pushCandidate(x?.name, 100 + Number(x?.importance || 0)));
+  (Array.isArray(visualFacts?.secondary_subjects) ? visualFacts.secondary_subjects : [])
+    .sort((a: any, b: any) => Number(b?.importance || 0) - Number(a?.importance || 0))
+    .forEach((x: any) => pushCandidate(x?.name, 80 + Number(x?.importance || 0)));
+  (Array.isArray(visualFacts?.background_elements) ? visualFacts.background_elements : [])
+    .sort((a: any, b: any) => Number(b?.importance || 0) - Number(a?.importance || 0))
+    .forEach((x: any) => pushCandidate(x?.name, 55 + Number(x?.importance || 0)));
+  (visualFacts?.actions || []).forEach((x: any) => pushCandidate(x, 65));
+  (visualFacts?.colors || []).forEach((x: any) => pushCandidate(x, 60));
+  (visualFacts?.composition || []).forEach((x: any) => pushCandidate(x, 45));
+  (visualFacts?.visible_text || []).forEach((x: any) => pushCandidate(x, 50));
+  // Meaning/context fields are evidence only; never turn an entire sentence into a keyword.
+  (aiCandidates || []).forEach(k => pushCandidate(k, 70));
+
+  // Self Audit: a keyword must have visual/semantic evidence. No evidence = reject.
+  const scored = new Map<string, { score: number; sourcePriority: number; index: number }>();
+  builderCandidates.forEach((candidate, index) => {
+    const k = candidate.keyword;
+    const tokens = k.split(/\s+/).filter(Boolean);
+    const exactPhrase = evidence.some(e => e === k || e.includes(k));
+    const tokenHits = tokens.filter(t => evidenceTokens.has(t)).length;
+    const meaningfulHits = tokens.filter(t => t.length > 2 && evidenceTokens.has(t)).length;
+
+    let evidenceScore = 0;
+    if (exactPhrase) evidenceScore += 80;
+    if (tokenHits > 0) evidenceScore += Math.min(50, tokenHits * 25);
+    if (meaningfulHits === tokens.length && tokens.length > 0) evidenceScore += 30;
+    if (tokens.length > 1 && meaningfulHits < Math.max(1, Math.ceil(tokens.length * 0.5)) && !exactPhrase) return;
+
+    // For semantic concepts, evidence must come from the dedicated context/meaning fields.
+    const semanticEvidence = [
+      normalize(visualFacts?.deeper_meaning_and_symbolism),
+      normalize(visualFacts?.understanding_and_context)
+    ].join(' ');
+    if (semanticEvidence && tokens.some(t => semanticEvidence.split(/\s+/).includes(t))) evidenceScore += 20;
+
+    if (evidenceScore <= 0) return; // SELF AUDIT FAIL
+
+    const finalScore = evidenceScore + candidate.sourcePriority;
+    const previous = scored.get(k);
+    if (!previous || finalScore > previous.score) scored.set(k, { score: finalScore, sourcePriority: candidate.sourcePriority, index });
+  });
+
+  const audited = Array.from(scored.entries())
+    .map(([keyword, meta]) => ({ keyword, ...meta }))
+    .filter(item => !isProhibitedKeyword(item.keyword))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.keyword);
+
+  const deduped = semanticDeduplicate(filterBannedKeywords(audited));
+
+  // Final ranking is the ONLY place that decides order. Do not pad to targetCount.
+  return rankAndWeightKeywords(deduped.slice(0, targetCount), tiers, targetCount);
+}
+
 function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number): string[] {
   if (keywords.length === 0) return keywords;
 
@@ -1701,13 +1809,8 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
 
     const wordsCount = k.split(/\s+/).length;
 
-    // STAGE 8: SEMANTIC/LONG-TAIL (multi-word phrases that aren't exact main subjects)
-    if (wordsCount >= 2 && !primarySubjects.some(s => s === k || k === s) && !matchesSubject(k)) {
-      stages[7].items.push(kw);
-      continue;
-    }
-
-    // STAGE 1: SUBJECT
+    // STAGE 1: SUBJECT — exact primary/secondary visual subjects always come first,
+    // including multi-word subjects such as "prosthetic arm" or "red apple".
     if (primarySubjects.some(s => s === k || k === s) || (matchesSubject(k) && allSubjects.length > 0)) {
       stages[0].items.push(kw);
       continue;
@@ -1753,6 +1856,13 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
       continue;
     }
 
+    // STAGE 8: SEMANTIC/LONG-TAIL — only after subject/action/attribute/context
+    // checks have had a chance to classify the phrase naturally.
+    if (wordsCount >= 2) {
+      stages[7].items.push(kw);
+      continue;
+    }
+
     // Fallback based on length if somehow it wasn't caught
     if (wordsCount === 1) {
       stages[2].items.push(kw); // Default to ATTRIBUTE
@@ -1761,165 +1871,12 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     }
   }
 
-  // --- Dynamic Proportional Allocation ---
-  const proportions = [
-    0.20, // SUBJECT
-    0.15, // ACTION
-    0.15, // ATTRIBUTE
-    0.10, // LOCATION
-    0.10, // CONCEPT
-    0.10, // EMOTION
-    0.10, // COMMERCIAL
-    0.10  // LONG-TAIL
-  ];
-
-  let allocations = proportions.map(p => Math.floor(p * targetCount));
-  
-  // Distribute remaining slots to ensure EXACTLY targetCount
-  let currentTotal = allocations.reduce((a, b) => a + b, 0);
-  let remainder = targetCount - currentTotal;
-  
-  // Assign remainders top-down starting from SUBJECT
-  for (let i = 0; i < remainder; i++) {
-    allocations[i % allocations.length]++;
-  }
-
-  const finalResult: string[] = [];
-  const excess: string[] = [];
-
-  // Phase 1: Try to meet allocations
-  for (let i = 0; i < stages.length; i++) {
-    const bucket = stages[i].items;
-    const alloc = allocations[i];
-    
-    if (bucket.length <= alloc) {
-      finalResult.push(...bucket);
-      allocations[i] -= bucket.length; // Remaining quota not met
-    } else {
-      finalResult.push(...bucket.slice(0, alloc));
-      excess.push(...bucket.slice(alloc));
-      allocations[i] = 0; // Met exactly
-    }
-  }
-
-  // Phase 2: If we didn't meet the targetCount, fill the shortfall from the excess pool
-  let shortfall = targetCount - finalResult.length;
-  if (shortfall > 0 && excess.length > 0) {
-    const extraToTake = Math.min(shortfall, excess.length);
-    finalResult.push(...excess.slice(0, extraToTake));
-  }
-
-  // Phase 3: If STILL short, create dynamic long-tail combinations naturally
-  shortfall = targetCount - finalResult.length;
-  if (shortfall > 0) {
-     const generatedPool = new Set(finalResult.map(k=>k.toLowerCase()));
-     const baseSubject = stages[0].items[0] || 'element';
-     
-     // Mix subject with attributes/actions
-     for(let i=0; i<stages[2].items.length && shortfall > 0; i++) {
-         const combo = baseSubject + ' ' + stages[2].items[i];
-         if(!generatedPool.has(combo)) {
-            finalResult.push(combo);
-            generatedPool.add(combo);
-            shortfall--;
-         }
-     }
-     for(let i=0; i<stages[1].items.length && shortfall > 0; i++) {
-         const combo = stages[1].items[i] + ' ' + baseSubject;
-         if(!generatedPool.has(combo)) {
-            finalResult.push(combo);
-            generatedPool.add(combo);
-            shortfall--;
-         }
-     }
-     
-     // If truly desperate, use single words from generic concepts that are somewhat natural
-     const desperateFallback = ['digital', 'visual', 'composition', 'image', 'picture', 'color', 'detail', 'focus', 'format', 'style'];
-     for(let i=0; i<desperateFallback.length && shortfall > 0; i++) {
-         if(!generatedPool.has(desperateFallback[i])) {
-            finalResult.push(desperateFallback[i]);
-            generatedPool.add(desperateFallback[i]);
-            shortfall--;
-         }
-     }
-  }
-
-  // Ensure main subject is first
-  if (primarySubjects.length > 0 && finalResult.length > 0) {
-    const mainSubj = primarySubjects[0];
-    const idx = finalResult.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
-    if (idx > 0) {
-      const [main] = finalResult.splice(idx, 1);
-      finalResult.unshift(main);
-    } else if (idx === -1 && mainSubj.length > 1) {
-      finalResult.pop(); // Keep exact count
-      finalResult.unshift(mainSubj);
-    }
-  }
-
-  return finalResult;
+  // Final Ranking: preserve evidence-backed candidates and order them by semantic priority.
+  // IMPORTANT: never pad, synthesize, or invent keywords here.
+  const finalResult = stages.flatMap(stage => stage.items);
+  return finalResult.slice(0, targetCount);
 }
-// ---- LAPISAN 4: EKSPANSI SINONIM & LONG-TAIL KEYWORD -----------------------
 
-const SYNONYM_MAP: Record<string, string[]> = {
-  'car': ['automobile', 'vehicle', 'automotive'],
-  'phone': ['smartphone', 'mobile phone', 'cellular phone', 'mobile device'],
-  'lift': ['elevator'],
-  'sidewalk': ['pavement', 'walkway'],
-  'doctor': ['physician', 'healthcare worker', 'medical professional'],
-  'shop': ['store', 'retail outlet', 'boutique'],
-  'computer': ['laptop', 'pc', 'workstation', 'digital device'],
-  'big': ['large', 'huge', 'massive'],
-  'small': ['compact', 'miniature', 'tiny'],
-  'old': ['aged', 'vintage', 'retro', 'antique'],
-  'new': ['modern', 'contemporary', 'futuristic'],
-  'work': ['job', 'career', 'employment', 'business'],
-  'home': ['house', 'residence', 'residential'],
-  'city': ['urban', 'metropolitan', 'downtown'],
-  'nature': ['natural', 'outdoors', 'environment', 'eco'],
-  'food': ['cuisine', 'meal', 'dish', 'refreshment'],
-  'money': ['finance', 'currency', 'capital', 'wealth', 'cash'],
-  'idea': ['concept', 'notion', 'thought', 'solution'],
-  'fast': ['quick', 'rapid', 'speedy', 'express'],
-  'happy': ['joyful', 'cheerful', 'delighted', 'smiling'],
-  'autumn': ['fall', 'autumnal'],
-  'fall': ['autumn', 'autumnal'],
-  'trolley': ['shopping cart', 'cart'],
-  'subway': ['underground', 'metro', 'transit'],
-  'trash': ['garbage', 'rubbish', 'waste'],
-  'copyspace': ['copy space', 'text space', 'blank space']
-};
-
-/**
- * Ekspansi dua arah: (a) sinonim/istilah regional untuk cross-search discoverability,
- * (b) long-tail phrase dengan menggabungkan subjek utama + modifier atribut/scene.
- */
-function expandSynonymsAndLongTail(keywords: string[], tiers: TieredVisualAnalysis, maxNew: number): string[] {
-  if (maxNew <= 0) return [];
-  const existing = new Set(keywords.map(k => k.toLowerCase()));
-  const expansions: string[] = [];
-
-  keywords.forEach(k => {
-    const syns = SYNONYM_MAP[k.toLowerCase()];
-    if (syns) {
-      syns.forEach(s => { if (!existing.has(s)) { expansions.push(s); existing.add(s); } });
-    }
-  });
-
-  const primarySubject = tiers.objects[0]?.name;
-  if (primarySubject) {
-    const modifiers = [...tiers.attributes.slice(0, 4), ...tiers.scene.slice(0, 3)];
-    modifiers.forEach(mod => {
-      const phrase = `${primarySubject.toLowerCase()} ${String(mod).toLowerCase()}`.trim();
-      if (!existing.has(phrase) && phrase.split(/\s+/).length <= 4 && phrase.split(/\s+/).length >= 2) {
-        expansions.push(phrase);
-        existing.add(phrase);
-      }
-    });
-  }
-
-  return expansions.slice(0, maxNew);
-}
 
 // ---- LAPISAN 5: FILTER OTOMATIS PEDOMAN ADOBE STOCK & SHUTTERSTOCK --------
 
@@ -1982,7 +1939,7 @@ function sanitizeForIndexing(kw: string): string {
   let clean = kw
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
+    .replace(/[^a-z0-9\s]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
     .replace(/\s+/g, ' ')          // Normalisasi spasi
     .trim();
 
@@ -2170,7 +2127,7 @@ MUST-8. Avoid duplicates and near-duplicates — NEVER repeat root concepts ("pe
 MUST-9. Never invent unseen attributes — if it is NOT visible in the asset, DO NOT include it.
 MUST-10. Never prioritize a keyword merely because it sounds popular — relevance to actual visual content ALWAYS beats search volume.
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
+1. COLOR KEYWORDS: Include color names only when they are clearly visible and confirmed by VISUAL_FACTS.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
@@ -2222,7 +2179,7 @@ MUST-8. Avoid duplicates and near-duplicates.
 MUST-9. Never invent unseen attributes.
 MUST-10. Never prioritize popularity over relevance.
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
+1. COLOR KEYWORDS: Include color names only when they are clearly visible and confirmed by VISUAL_FACTS.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - ${directives.risetKeywordRule}
    - Map single-word synonyms, technical terms, and semantic variations.
@@ -2309,6 +2266,47 @@ MUST-10. Never prioritize popularity over relevance.
     Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last — all without being forced into even numbered slots.
 
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;  }
+
+  // NATURAL HUMAN-LIKE KEYWORD RULES (applies to every keyword mode)
+  // The tightrope example is the canonical ordering pattern: concrete visual nouns first,
+  // then attributes/actions/context, then strong concepts/use-cases. Never manufacture phrases.
+  keywordRulePromptText += `
+
+NATURAL KEYWORD GENERATION — CANONICAL PATTERN:
+Use this proven natural stock-keyword flow as the structural reference:
+"tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely"
+
+Interpret the pattern, do NOT copy it unless the asset actually contains those elements.
+- First: exact visible primary subject(s) and distinctive concrete objects.
+- Next: visible attributes, materials, physical relationships, actions, environment, and setting.
+- Last: only strong conceptual meanings, emotional themes, commercial use cases, or search-intent terms that are clearly supported by the asset.
+- The list must read like a knowledgeable human stock contributor selected it for this exact asset.
+- Search intent means realistic buyer queries for this specific visual, NOT generic popular keywords.
+- Prefer natural dictionary words and established stock-search phrases.
+- NEVER invent a phrase by attaching generic modifiers such as "concept", "design", "style", "scene", "asset", "element", "background", "creative", or "professional" to an otherwise valid word.
+- NEVER create awkward AI-generated combinations, SEO stuffing, keyword chains, or phrases that a human contributor would not naturally submit.
+- NEVER use hyphens, en dashes, em dashes, underscores, slashes, or concatenated words inside keywords. Multi-word keywords use normal spaces only.
+- Do not force a fixed 40/35/25 ratio. Use literal/contextual/conceptual balance naturally; relevance always wins.
+
+ANTI-HALLUCINATION / VISUAL EVIDENCE:
+Before adding any keyword, internally verify one of these:
+A) The object, attribute, action, environment, or visible detail is clearly seen.
+B) The term is a direct, strong semantic interpretation of what is clearly seen.
+C) The term represents a realistic buyer search intent directly supported by the visible scene.
+If none applies, OMIT the keyword.
+Do not infer hidden objects, unseen locations, occupations, demographics, brands, industries, or use cases merely because they are commonly associated with the subject.
+Do not turn a weak possibility into a keyword.
+If uncertain, leave it out.
+
+SEARCH INTENT:
+Optimize for what a real stock buyer would type when looking for THIS exact visual.
+Prioritize specific, descriptive, commercially useful search terms over generic high-volume buzzwords.
+Do not add a keyword simply because it has high search volume.
+
+SELF REVIEW BEFORE OUTPUT:
+For every keyword, ask: "Can I point to the visual evidence or a strong direct semantic reason for this exact term? Would a human microstock contributor naturally submit it for this asset? Would a buyer plausibly search it for this asset?"
+If the answer is no or uncertain, remove it.
+`;
 
   const noMediaFormatRule = `
 12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
@@ -2765,7 +2763,7 @@ OUTPUT FORMAT:
         if (typeof k === 'string') {
           const cleanPhrase = k.toLowerCase()
                                .trim()
-                               .replace(/[^a-z0-9\s-]/g, '')
+                               .replace(/[^a-z0-9\s]/g, '')
                                .replace(/\s+/g, ' ');
           if (cleanPhrase.length > 1) {
             if (keywordMode === 'single') {
@@ -2802,44 +2800,14 @@ OUTPUT FORMAT:
         return hasMatchingWord && !isProhibitedKeyword(keyword);
       });
 
-       // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
-      const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-      let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-
-      // [LAPISAN 5] Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
-      // (superlatif tak terverifikasi, klaim medis, konten eksplisit, spam CTA, kalimat penuh, brand/IP)
-      finalKeywordList = filterBannedKeywords(finalKeywordList);
-
-      // [LAPISAN 6] Deduplikasi semantik: menghapus frasa yang secara makna identik
-      // walau berbeda bentuk kata/urutan (bukan hanya deduplikasi string yang persis sama)
-      finalKeywordList = semanticDeduplicate(finalKeywordList);
-
-      // [LAPISAN 4] Ekspansi sinonim & long-tail keyword jika masih kurang dari target,
-      // sebelum fallback generik dari ensureKeywordCount, agar kualitas relevansi tetap tinggi
-      if (finalKeywordList.length < targetCount) {
-        const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
-        finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
-      }
-
-      data.keywords = ensureKeywordCount(
-        finalKeywordList,
-        targetCount,
+       // [NEW WORKFLOW] VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
+      data.keywords = buildVerifiedKeywordPipeline(
+        uniqueKeywords,
         visualFacts,
-        data.title,
-        data.description,
-        data.category_id,
+        tieredVisual,
+        targetCount,
         keywordMode
       );
-
-      // Final safety pass: re-filter/re-dedupe after ensureKeywordCount's fallback padding,
-      // then re-slice to keep the exact target count intact.
-      let safeKw1 = semanticDeduplicate(filterBannedKeywords(data.keywords));
-      data.keywords = safeKw1;
-
-      // [LAPISAN 3] Sistem pembobotan keyword: SEO score, visual score, commercial score, trend score.
-      // Reorder di dalam tiap kuintil struktural (subject → technical → context → commercial → emotional)
-      // supaya urutan SEO tetap terjaga sambil keyword paling relevan/bernilai naik ke atas kuintilnya.
-      data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual, targetCount);
 
     // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
     // illustration/vector/video) sebagai fallback bila judul dari AI kosong/generik/placeholder.
@@ -2937,7 +2905,7 @@ export const generateBatchStockMetadata = async (
   const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
   const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
   let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
+  let keywordRulePromptText = `1. COLOR KEYWORDS: Include color names only when they are clearly visible and confirmed by VISUAL_FACTS.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
    - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
@@ -2975,7 +2943,7 @@ export const generateBatchStockMetadata = async (
 12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP — MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset — e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" — unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short — a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
+    keywordRulePromptText = `1. COLOR KEYWORDS: Include color names only when they are clearly visible and confirmed by VISUAL_FACTS.
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
    - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
    - Map single-word synonyms, technical terms, and semantic variations.
@@ -3559,7 +3527,7 @@ OUTPUT FORMAT:
                 if (typeof k === 'string') {
                     const cleanPhrase = k.toLowerCase()
                                          .trim()
-                                         .replace(/[^a-z0-9\s-]/g, '')
+                                         .replace(/[^a-z0-9\s]/g, '')
                                          .replace(/\s+/g, ' ');
                     if (cleanPhrase.length > 1) {
                         if (keywordMode === 'single') {
@@ -3595,37 +3563,14 @@ OUTPUT FORMAT:
               return hasMatchingWord && !isProhibitedKeyword(keyword);
             });
 
-            const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-            let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-
-            // [LAPISAN 5] Filter otomatis pelanggaran pedoman Adobe Stock & Shutterstock
-            finalKeywordList = filterBannedKeywords(finalKeywordList);
-
-            // [LAPISAN 6] Deduplikasi semantik (bukan hanya teks sama)
-            finalKeywordList = semanticDeduplicate(finalKeywordList);
-
-            // [LAPISAN 4] Ekspansi sinonim & long-tail keyword bila masih kurang dari target
-            if (finalKeywordList.length < targetCount) {
-              const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
-              finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
-            }
-
-            metadata.keywords = ensureKeywordCount(
-              finalKeywordList,
-              targetCount,
+            // [NEW WORKFLOW] VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
+            metadata.keywords = buildVerifiedKeywordPipeline(
+              uniqueKeywords,
               assetVisualFacts,
-              metadata.title,
-              metadata.description,
-              metadata.category_id,
+              tieredVisual,
+              targetCount,
               keywordMode
             );
-
-            // Final safety pass setelah fallback padding dari ensureKeywordCount
-            let safeKw2 = semanticDeduplicate(filterBannedKeywords(metadata.keywords));
-            metadata.keywords = safeKw2;
-
-            // [LAPISAN 3] Sistem pembobotan keyword: reorder di dalam tiap kuintil struktural
-            metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, targetCount);
 
         // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
         let candidateTitle = String(metadata.title || "").trim();
