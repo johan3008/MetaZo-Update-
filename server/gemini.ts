@@ -1576,21 +1576,62 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
 /**
- * AI selects the keywords. Application code only cleans and deduplicates them.
+ * AI-first, but GUARANTEED-COUNT keyword pipeline (AG Keyword / premium microstock style):
+ * 1) Sanitize AI candidates for 100% indexable syntax.
+ * 2) Semantic deduplication (not just identical-string dedup) to remove near-duplicate
+ *    phrases (e.g. "beach sunset" vs "sunset at the beach") while keeping true diversity.
+ * 3) PAD (never just truncate): if the AI under-delivered, or dedup thinned the list below
+ *    the user's requested count, fill the gap with visually-grounded fallback terms drawn
+ *    from VISUAL_FACTS (subjects/colors/actions), title, description, and category —
+ *    never generic/irrelevant filler.
+ * 4) STRUCTURAL RANKING: reorder into the 8-stage SEO pattern top microstock keyword tools
+ *    use (Subject → Action → Attribute → Location/Environment → Concept → Emotion →
+ *    Commercial Use → Semantic/Long-tail) so keyword #1 is always the main subject and the
+ *    highest-SEO-weight terms are front-loaded, exactly as Adobe Stock/Shutterstock indexing
+ *    algorithms reward.
+ * 5) LOCK to the exact requested count.
  */
 function buildVerifiedKeywordPipeline(
   aiCandidates: string[],
-  _visualFacts: any,
-  _tiers: TieredVisualAnalysis,
+  visualFacts: any,
+  tiers: TieredVisualAnalysis,
   targetCount: number,
-  _keywordMode?: 'mixed' | 'single' | 'multi'
+  keywordMode?: 'mixed' | 'single' | 'multi',
+  title?: string,
+  description?: string,
+  categoryId?: number
 ): string[] {
+  // 1. Sanitize
   const cleaned = (aiCandidates || [])
     .filter(k => typeof k === 'string')
     .map(k => sanitizeForIndexing(k))
     .filter(Boolean);
-  const deduped = semanticDeduplicate(cleaned);
-  return targetCount > 0 ? deduped.slice(0, targetCount) : deduped;
+
+  // 2. Semantic dedup
+  let deduped = semanticDeduplicate(cleaned);
+
+  // 3. Pad up to targetCount using visually-grounded fallback sources.
+  //    This is the step that was previously missing: the pipeline used to only
+  //    `.slice(0, targetCount)`, which can only shrink the list, never grow it —
+  //    so if the AI (or dedup) returned fewer keywords than requested, the final
+  //    output silently fell short of the count set in the UI.
+  if (targetCount > 0 && deduped.length < targetCount) {
+    deduped = ensureKeywordCount(
+      deduped,
+      targetCount,
+      visualFacts,
+      title,
+      description,
+      categoryId,
+      keywordMode
+    );
+  }
+
+  // 4. Structural SEO ranking (Subject-first ordering)
+  const ranked = rankAndWeightKeywords(deduped, tiers, deduped.length);
+
+  // 5. Exact-count lock
+  return targetCount > 0 ? ranked.slice(0, targetCount) : ranked;
 }
 
 function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number): string[] {
@@ -2021,9 +2062,13 @@ export const generateStockMetadata = async (
 
   const directives = getToolTypeDirectives(toolType);
 
-  // Keyword generation rules intentionally removed.
-  const keywordRuleSchemaDesc = `Generate natural keywords from the supplied asset in ${getLanguageName(metadataLanguage)}. Return keywords only, as short words or natural phrases.`;
-  const keywordRulePromptText = `Generate keywords naturally from the actual asset. No additional application-specific keyword rules are imposed.`;
+  // CRITICAL: the target count MUST be explicitly told to the model. Without this,
+  // the AI has no idea how many keywords the user actually requested in the UI and
+  // will generate an arbitrary, often smaller, number.
+  const keywordRulePromptText = `Generate EXACTLY ${aiRequestCount} unique, natural keywords/phrases that describe the actual visual content of this asset in ${getLanguageName(metadataLanguage)}.
+STRICT KEYWORD COUNT REQUIREMENT: The "keywords" array in your JSON output MUST contain ${aiRequestCount} items — no fewer. This buffer above the user's requested ${targetCount} keywords exists to absorb any items lost to cleaning/deduplication, so the final delivered list still reaches exactly ${targetCount}.
+Do NOT stop early, and do NOT pad with irrelevant, generic, or repetitive filler just to hit the count — every keyword must be grounded in the actual visual facts, title, or description of the asset. Prioritize a rich, diverse mix of: main subject, secondary subjects, actions/poses, colors, materials/textures, setting/environment, mood/concept, and commercial use-case terms — exactly like a professional Adobe Stock/Shutterstock contributor using a premium keyword-research tool (e.g. AG Keyword) would tag it.
+Keyword #1 in the array MUST be the single most important main visual subject.`;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
@@ -2507,13 +2552,24 @@ OUTPUT FORMAT:
         return hasMatchingWord && !isProhibitedKeyword(keyword);
       });
 
-       // [NEW WORKFLOW] VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
+      // Preliminary category guess — used ONLY to pick a relevant fallback keyword
+      // pool if the AI under-delivers the requested count. Final category is still
+      // determined properly later via determineAccurateCategory (Lapisan 7).
+      const prelimAdobeId = Number(visualFacts?.semantic_category_analysis?.adobe_id);
+      const prelimCategoryId = (prelimAdobeId >= 1 && prelimAdobeId <= 21)
+        ? prelimAdobeId
+        : getHeuristicCategories(data.title || "", rigorouslyFilteredKeywords).category_id;
+
+       // [NEW WORKFLOW] VISUAL_FACTS -> RELEVANCE FILTER -> KEYWORD BUILDER (pad+rank) -> FINAL RANKING
       data.keywords = buildVerifiedKeywordPipeline(
-        uniqueKeywords,
+        rigorouslyFilteredKeywords,
         visualFacts,
         tieredVisual,
         targetCount,
-        keywordMode
+        keywordMode,
+        data.title,
+        data.description,
+        prelimCategoryId
       );
 
     // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
@@ -2610,9 +2666,14 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
-  const aiRequestCount = targetCount;
-  const keywordRuleSchemaDesc = `Generate natural keywords from the supplied asset in ${getLanguageName(metadataLanguage)}. Return keywords only, as short words or natural phrases.`;
-  const keywordRulePromptText = `Generate keywords naturally from the actual asset. No additional application-specific keyword rules are imposed.`;
+  const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi per item
+
+  // CRITICAL: same fix as generateStockMetadata — explicitly tell the model the target
+  // count per asset, otherwise it silently under-delivers relative to the UI setting.
+  const keywordRulePromptText = `For EACH asset in the batch, generate EXACTLY ${aiRequestCount} unique, natural keywords/phrases that describe that asset's actual visual content in ${getLanguageName(metadataLanguage)}.
+STRICT KEYWORD COUNT REQUIREMENT: Every item's "keywords" array MUST contain ${aiRequestCount} items — no fewer, even though the user's final requested count per asset is ${targetCount} (the buffer absorbs items lost to cleaning/deduplication).
+Do NOT stop early, and do NOT pad with irrelevant, generic, or repetitive filler just to hit the count — every keyword must be grounded in that specific asset's visual facts, title, or description. Prioritize a rich, diverse mix of: main subject, secondary subjects, actions/poses, colors, materials/textures, setting/environment, mood/concept, and commercial use-case terms — exactly like a professional Adobe Stock/Shutterstock contributor using a premium keyword-research tool (e.g. AG Keyword) would tag it.
+Keyword #1 for each asset MUST be that asset's single most important main visual subject.`;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
@@ -3151,13 +3212,23 @@ OUTPUT FORMAT:
               return hasMatchingWord && !isProhibitedKeyword(keyword);
             });
 
-            // [NEW WORKFLOW] VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
+            // Preliminary category guess — used ONLY to pick a relevant fallback keyword
+            // pool if the AI under-delivers the requested count for this item.
+            const prelimAdobeId = Number(assetVisualFacts?.semantic_category_analysis?.adobe_id);
+            const prelimCategoryId = (prelimAdobeId >= 1 && prelimAdobeId <= 21)
+              ? prelimAdobeId
+              : getHeuristicCategories(metadata.title || "", rigorouslyFilteredKeywords).category_id;
+
+            // [NEW WORKFLOW] VISUAL_FACTS -> RELEVANCE FILTER -> KEYWORD BUILDER (pad+rank) -> FINAL RANKING
             metadata.keywords = buildVerifiedKeywordPipeline(
-              uniqueKeywords,
+              rigorouslyFilteredKeywords,
               assetVisualFacts,
               tieredVisual,
               targetCount,
-              keywordMode
+              keywordMode,
+              metadata.title,
+              metadata.description,
+              prelimCategoryId
             );
 
         // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
