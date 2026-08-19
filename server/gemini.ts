@@ -215,11 +215,17 @@ const PROHIBITED_KEYWORDS_SET = new Set([
 ]);
 
 /**
- * Checks if a word is a prohibited brand, IP, standard name, or contains a color.
+ * Enforces the keyword IP/brand/name exclusion at the application layer.
+ * The AI prompt remains the primary semantic rule; this is a safety net for
+ * known protected terms that should never survive into final keywords.
  */
 function isProhibitedKeyword(word: string): boolean {
-  // Keyword semantic rules are disabled. This helper only rejects empty values.
-  return !String(word || '').trim();
+  const normalized = String(word || '').trim().toLowerCase();
+  if (!normalized) return true;
+
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  return tokens.some(token => PROHIBITED_KEYWORDS_SET.has(token)) ||
+         PROHIBITED_KEYWORDS_SET.has(normalized);
 }
 
 function getHeuristicCategories(title: string, keywords: string[]): {
@@ -1576,62 +1582,21 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
 /**
- * AI-first, but GUARANTEED-COUNT keyword pipeline (AG Keyword / premium microstock style):
- * 1) Sanitize AI candidates for 100% indexable syntax.
- * 2) Semantic deduplication (not just identical-string dedup) to remove near-duplicate
- *    phrases (e.g. "beach sunset" vs "sunset at the beach") while keeping true diversity.
- * 3) PAD (never just truncate): if the AI under-delivered, or dedup thinned the list below
- *    the user's requested count, fill the gap with visually-grounded fallback terms drawn
- *    from VISUAL_FACTS (subjects/colors/actions), title, description, and category —
- *    never generic/irrelevant filler.
- * 4) STRUCTURAL RANKING: reorder into the 8-stage SEO pattern top microstock keyword tools
- *    use (Subject → Action → Attribute → Location/Environment → Concept → Emotion →
- *    Commercial Use → Semantic/Long-tail) so keyword #1 is always the main subject and the
- *    highest-SEO-weight terms are front-loaded, exactly as Adobe Stock/Shutterstock indexing
- *    algorithms reward.
- * 5) LOCK to the exact requested count.
+ * AI selects the keywords. Application code only cleans and deduplicates them.
  */
 function buildVerifiedKeywordPipeline(
   aiCandidates: string[],
-  visualFacts: any,
-  tiers: TieredVisualAnalysis,
+  _visualFacts: any,
+  _tiers: TieredVisualAnalysis,
   targetCount: number,
-  keywordMode?: 'mixed' | 'single' | 'multi',
-  title?: string,
-  description?: string,
-  categoryId?: number
+  _keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
-  // 1. Sanitize
   const cleaned = (aiCandidates || [])
     .filter(k => typeof k === 'string')
     .map(k => sanitizeForIndexing(k))
     .filter(Boolean);
-
-  // 2. Semantic dedup
-  let deduped = semanticDeduplicate(cleaned);
-
-  // 3. Pad up to targetCount using visually-grounded fallback sources.
-  //    This is the step that was previously missing: the pipeline used to only
-  //    `.slice(0, targetCount)`, which can only shrink the list, never grow it —
-  //    so if the AI (or dedup) returned fewer keywords than requested, the final
-  //    output silently fell short of the count set in the UI.
-  if (targetCount > 0 && deduped.length < targetCount) {
-    deduped = ensureKeywordCount(
-      deduped,
-      targetCount,
-      visualFacts,
-      title,
-      description,
-      categoryId,
-      keywordMode
-    );
-  }
-
-  // 4. Structural SEO ranking (Subject-first ordering)
-  const ranked = rankAndWeightKeywords(deduped, tiers, deduped.length);
-
-  // 5. Exact-count lock
-  return targetCount > 0 ? ranked.slice(0, targetCount) : ranked;
+  const deduped = semanticDeduplicate(cleaned);
+  return targetCount > 0 ? deduped.slice(0, targetCount) : deduped;
 }
 
 function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number): string[] {
@@ -2062,13 +2027,12 @@ export const generateStockMetadata = async (
 
   const directives = getToolTypeDirectives(toolType);
 
-  // CRITICAL: the target count MUST be explicitly told to the model. Without this,
-  // the AI has no idea how many keywords the user actually requested in the UI and
-  // will generate an arbitrary, often smaller, number.
-  const keywordRulePromptText = `Generate EXACTLY ${aiRequestCount} unique, natural keywords/phrases that describe the actual visual content of this asset in ${getLanguageName(metadataLanguage)}.
-STRICT KEYWORD COUNT REQUIREMENT: The "keywords" array in your JSON output MUST contain ${aiRequestCount} items — no fewer. This buffer above the user's requested ${targetCount} keywords exists to absorb any items lost to cleaning/deduplication, so the final delivered list still reaches exactly ${targetCount}.
-Do NOT stop early, and do NOT pad with irrelevant, generic, or repetitive filler just to hit the count — every keyword must be grounded in the actual visual facts, title, or description of the asset. Prioritize a rich, diverse mix of: main subject, secondary subjects, actions/poses, colors, materials/textures, setting/environment, mood/concept, and commercial use-case terms — exactly like a professional Adobe Stock/Shutterstock contributor using a premium keyword-research tool (e.g. AG Keyword) would tag it.
-Keyword #1 in the array MUST be the single most important main visual subject.`;
+  // Keyword rules: intentionally minimal and AI-driven.
+  const keywordRuleSchemaDesc = `Generate keywords from the actual asset in ${getLanguageName(metadataLanguage)}. Prioritize high-converting commercial descriptors by descending relevance. Never include IP, brands, trademarks, product brand names, or names of real/famous people, artists, fictional characters, or other proper names.`;
+const keywordRulePromptText = `Rules for Keywords:
+1. Start with the most important, high-converting commercial descriptors. Sort keywords in descending order of relevance to the actual asset, with the strongest and most commercially useful descriptors first.
+2. Ensure no IP, brands, trademarks, product brand names, or names are included. Use generic descriptive terms instead of protected names or proper names.
+Base every keyword on the actual asset and its visual content.`;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
@@ -2235,21 +2199,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
    ${directives.prohibitedExemptions}
 
 
-MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
-1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
-2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
-3. HIGH-CONVERSION COMPOUND PHRASES: Generate 1-to-3 word compound terms (e.g. 'copy space', 'landing page', 'digital marketing', 'green energy', 'isolated background') which Adobe Stock indexes both as exact compound phrases and individual token words, doubling search visibility.
-4. FULL INDEX CAPACITY: Maximize unique search term coverage across all keyword slots up to the target count, blending core subject nouns, action verbs, environmental setting, commercial intent, regional synonyms, and target industry use-cases.
-5. KEYWORD #1 STRICT MAIN SUBJECT: Keyword #1 MUST strictly be the main visual subject (Subjek Utama).
-
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION (CRITICAL): If the visual analysis or EXIF technical metadata detects any geographical location, city, country, or specific landmark (such as Borobudur, Paris, Jakarta, Mt. Fuji, Bali, etc.), you MUST integrate this location and landmark details naturally and detailedly into BOTH the Title and the Description. For example, instead of "Old temple in a forest", write "Borobudur temple surrounded by lush tropical forest in Magelang, Indonesia".
-- NATURAL & DETAILED PHRASING (NO ROBOTIC CLICHES): Write titles and descriptions that are highly detailed, evocative, and sound completely natural, as if written by a professional native English stock curator. Avoid robotic, repetitive, or dry templates. Do not use cheap, subjective marketing adjectives like "beautiful", "stunning", "high-quality", but use highly descriptive and precise nouns, active verbs, and atmospheric adjectives (e.g., "warm golden hour lighting", "misty morning atmosphere", "lush tropical foliage"). Ensure descriptions flow like real, coherent human-written captions rather than disconnected visual details.
-- HUMAN-FRIENDLY SEARCH INTENT (LONG-TAIL SEO): Write metadata that sounds completely natural and conversational. Search engine algorithms and microstock indexers now heavily prioritize human-friendly, long-tail search queries over robotic keyword stuffing (e.g., use natural phrasing like "young business woman working on a laptop in a modern bright cafe" instead of disconnected terms).
-- SEMANTIC & CONTEXTUAL TAXONOMY: Blend high-weight concrete keywords with natural context. Answer the 5Ws (Who, What, Where, When, Why) to ensure the asset ranks across a broad spectrum of semantic search indexes.
-- HIGH-VALUE NICHE FRONT-LOADING: Place the most descriptive, highly specific visual keywords at the very beginning of the Title. Search algorithms weigh the first 3-5 words significantly higher than the rest!
-- SPECIAL ASSET TYPES (FLATLAY & GREEN SCREEN): If the visual facts indicate a "Flatlay" (top-down view) or "Green Screen" (chroma key background), you MUST include "Flatlay" or "Green Screen" (and their variations like "Top-down view", "Chroma Key") prominently in BOTH the Title and Keywords.
-
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
 2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
@@ -2268,7 +2217,6 @@ Rules for Descriptions:
 5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Keywords:
-Generate keywords naturally from the asset. No additional application-specific keyword rules are imposed.
 ${keywordRulePromptText}
 
 Rules for Categories:
@@ -2552,24 +2500,13 @@ OUTPUT FORMAT:
         return hasMatchingWord && !isProhibitedKeyword(keyword);
       });
 
-      // Preliminary category guess — used ONLY to pick a relevant fallback keyword
-      // pool if the AI under-delivers the requested count. Final category is still
-      // determined properly later via determineAccurateCategory (Lapisan 7).
-      const prelimAdobeId = Number(visualFacts?.semantic_category_analysis?.adobe_id);
-      const prelimCategoryId = (prelimAdobeId >= 1 && prelimAdobeId <= 21)
-        ? prelimAdobeId
-        : getHeuristicCategories(data.title || "", rigorouslyFilteredKeywords).category_id;
-
-       // [NEW WORKFLOW] VISUAL_FACTS -> RELEVANCE FILTER -> KEYWORD BUILDER (pad+rank) -> FINAL RANKING
+       // [NEW WORKFLOW] VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
       data.keywords = buildVerifiedKeywordPipeline(
-        rigorouslyFilteredKeywords,
+        uniqueKeywords,
         visualFacts,
         tieredVisual,
         targetCount,
-        keywordMode,
-        data.title,
-        data.description,
-        prelimCategoryId
+        keywordMode
       );
 
     // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
@@ -2666,14 +2603,12 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
-  const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi per item
-
-  // CRITICAL: same fix as generateStockMetadata — explicitly tell the model the target
-  // count per asset, otherwise it silently under-delivers relative to the UI setting.
-  const keywordRulePromptText = `For EACH asset in the batch, generate EXACTLY ${aiRequestCount} unique, natural keywords/phrases that describe that asset's actual visual content in ${getLanguageName(metadataLanguage)}.
-STRICT KEYWORD COUNT REQUIREMENT: Every item's "keywords" array MUST contain ${aiRequestCount} items — no fewer, even though the user's final requested count per asset is ${targetCount} (the buffer absorbs items lost to cleaning/deduplication).
-Do NOT stop early, and do NOT pad with irrelevant, generic, or repetitive filler just to hit the count — every keyword must be grounded in that specific asset's visual facts, title, or description. Prioritize a rich, diverse mix of: main subject, secondary subjects, actions/poses, colors, materials/textures, setting/environment, mood/concept, and commercial use-case terms — exactly like a professional Adobe Stock/Shutterstock contributor using a premium keyword-research tool (e.g. AG Keyword) would tag it.
-Keyword #1 for each asset MUST be that asset's single most important main visual subject.`;
+  const aiRequestCount = targetCount;
+  const keywordRuleSchemaDesc = `Generate keywords from the actual asset in ${getLanguageName(metadataLanguage)}. Prioritize high-converting commercial descriptors by descending relevance. Never include IP, brands, trademarks, product brand names, or names of real/famous people, artists, fictional characters, or other proper names.`;
+const keywordRulePromptText = `Rules for Keywords:
+1. Start with the most important, high-converting commercial descriptors. Sort keywords in descending order of relevance to the actual asset, with the strongest and most commercially useful descriptors first.
+2. Ensure no IP, brands, trademarks, product brand names, or names are included. Use generic descriptive terms instead of protected names or proper names.
+Base every keyword on the actual asset and its visual content.`;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
@@ -2852,20 +2787,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
    ${directives.prohibitedExemptions}
 
 
-MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
-1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
-2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
-3. HIGH-CONVERSION COMPOUND PHRASES: Generate 1-to-3 word compound terms (e.g. 'copy space', 'landing page', 'digital marketing', 'green energy', 'isolated background') which Adobe Stock indexes both as exact compound phrases and individual token words, doubling search visibility.
-4. FULL INDEX CAPACITY: Maximize unique search term coverage across all keyword slots up to the target count, blending core subject nouns, action verbs, environmental setting, commercial intent, regional synonyms, and target industry use-cases.
-5. KEYWORD #1 STRICT MAIN SUBJECT: Keyword #1 MUST strictly be the main visual subject (Subjek Utama).
-
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION (CRITICAL): If the visual analysis or EXIF technical metadata detects any geographical location, city, country, or specific landmark (such as Borobudur, Paris, Jakarta, Mt. Fuji, Bali, etc.), you MUST integrate this location and landmark details naturally and detailedly into BOTH the Title and the Description. For example, instead of "Old temple in a forest", write "Borobudur temple surrounded by lush tropical forest in Magelang, Indonesia".
-- NATURAL & DETAILED PHRASING (NO ROBOTIC CLICHES): Write titles and descriptions that are highly detailed, evocative, and sound completely natural, as if written by a professional native English stock curator. Avoid robotic, repetitive, or dry templates. Do not use cheap, subjective marketing adjectives like "beautiful", "stunning", "high-quality", but use highly descriptive and precise nouns, active verbs, and atmospheric adjectives (e.g., "warm golden hour lighting", "misty morning atmosphere", "lush tropical foliage"). Ensure descriptions flow like real, coherent human-written captions rather than disconnected visual details.
-- SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
-
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
 2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
@@ -2884,7 +2805,6 @@ Rules for Descriptions:
 5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Keywords:
-Generate keywords naturally from the asset. No additional application-specific keyword rules are imposed.
 ${keywordRulePromptText}
 
 Rules for Categories:
@@ -3212,23 +3132,13 @@ OUTPUT FORMAT:
               return hasMatchingWord && !isProhibitedKeyword(keyword);
             });
 
-            // Preliminary category guess — used ONLY to pick a relevant fallback keyword
-            // pool if the AI under-delivers the requested count for this item.
-            const prelimAdobeId = Number(assetVisualFacts?.semantic_category_analysis?.adobe_id);
-            const prelimCategoryId = (prelimAdobeId >= 1 && prelimAdobeId <= 21)
-              ? prelimAdobeId
-              : getHeuristicCategories(metadata.title || "", rigorouslyFilteredKeywords).category_id;
-
-            // [NEW WORKFLOW] VISUAL_FACTS -> RELEVANCE FILTER -> KEYWORD BUILDER (pad+rank) -> FINAL RANKING
+            // [NEW WORKFLOW] VISUAL_FACTS -> KEYWORD BUILDER -> SELF AUDIT -> FINAL RANKING
             metadata.keywords = buildVerifiedKeywordPipeline(
-              rigorouslyFilteredKeywords,
+              uniqueKeywords,
               assetVisualFacts,
               tieredVisual,
               targetCount,
-              keywordMode,
-              metadata.title,
-              metadata.description,
-              prelimCategoryId
+              keywordMode
             );
 
         // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
