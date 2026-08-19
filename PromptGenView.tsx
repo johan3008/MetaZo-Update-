@@ -57,26 +57,22 @@ const BACKGROUND_STYLE_OPTIONS = [
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic (Estetika Horor Gelap)', icon: '🦇' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
   { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
-  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' },
-  { id: 'Corporate Technology Concept', label: 'Corporate Technology Concept (Konsep Teknologi Perusahaan)', icon: '💼' }
+  { id: 'Graphic Design', label: 'Graphic Design (Banner/Poster/Promo)', icon: '📐' }
 ];
 
 const DARK_HORROR_SUB_STYLES = [
-  { id: 'classic', label: 'Classic / Mixed', desc: 'Campuran estetika horor gelap secara umum.' },
-  { id: 'grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
-  { id: 'gothic', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
-  { id: 'lovecraftian', label: 'Lovecraftian / Cosmic', desc: 'Entitas tak terpahami, geometri non-Euclidean, kengerian kosmik.' },
-  { id: 'infernal', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
-  { id: 'macabre', label: 'Macabre Art', desc: 'Lingkungan yang menyeramkan dengan detail surealisme gelap.' },
-  { id: 'occult', label: 'Occult Horror', desc: 'Rune kuno, ritual sihir gelap, dan suasana misterius.' },
-  { id: 'biomechanical', label: 'Biomechanical / Body Horror', desc: 'Daging menyatu dengan mesin, kebusukan organik, fiksi ilmiah surealis.' },
-  { id: 'cinematic', label: 'Cinematic Concept Art', desc: 'Pencahayaan chiaroscuro berbayang pekat ala film.' },
-  { id: 'painterly', label: 'Painterly Digital Art', desc: 'Goresan kuas tebal (impasto) ala mahakarya lukisan digital.' }
+  { id: 'Dark Horror Aesthetic', label: 'Classic / Mixed', desc: 'Campuran estetika horor gelap secara umum.' },
+  { id: 'Grimdark', label: 'Grimdark', desc: 'Bayangan menekan dan hiper-detail fantasi gelap.' },
+  { id: 'Gothic Horror', label: 'Gothic Horror', desc: 'Kabut menakutkan dan arsitektur kuno yang membusuk.' },
+  { id: 'Infernal / Hellscape', label: 'Infernal / Hellscape', desc: 'Elemen iblis, lahar, dan api.' },
+  { id: 'Macabre Art', label: 'Macabre Art', desc: 'Lingkungan yang menyeramkan dengan detail surealisme gelap.' },
+  { id: 'Occult Horror', label: 'Occult Horror', desc: 'Rune kuno, ritual sihir gelap, dan suasana misterius.' },
+  { id: 'Cinematic Horror Concept Art', label: 'Cinematic Horror Concept Art', desc: 'Pencahayaan chiaroscuro berbayang pekat ala film.' },
+  { id: 'Painterly Digital Art', label: 'Painterly Digital Art', desc: 'Goresan kuas tebal (impasto) ala mahakarya lukisan digital.' }
 ];
 
 const PNG_STYLE_OPTIONS = [
-  { id: 'Photorealistic', label: 'Photorealistic (Foto Realistis)', icon: '📷' },
-  { id: '3D Render', label: '3D Render (Unreal Engine)', icon: '🎮' },
+  { id: '3D Render', label: '3D Render (Animasi 3D)', icon: '🎮' },
   { id: 'Isometric', label: 'Isometric (Isometrik 3D)', icon: '📦' },
   { id: 'Lowpoly', label: 'Lowpoly (Poli Rendah)', icon: '💎' },
   { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
@@ -91,8 +87,7 @@ const PNG_STYLE_OPTIONS = [
   { id: 'Line Art', label: 'Line Art (Seni Garis)', icon: '✏️' },
   { id: 'Silhouette', label: 'Silhouette (Siluet)', icon: '👤' },
   { id: 'Lego Style', label: 'Lego Style (Gaya Mainan Balok)', icon: '🧱' },
-  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' },
-  { id: 'Painterly Digital Art', label: 'Painterly Digital Art (Lukisan Digital)', icon: '🖌️' }
+  { id: 'Voxel Art', label: 'Voxel Art (Gaya Kubus Voxel)', icon: '🟩' }
 ];
 
 const PREMIUM_ONLY_STYLES = [
@@ -145,10 +140,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   uiLanguage = 'en'
 }) => {
   const [subject, setSubject] = useState('');
-  const [referenceImages, setReferenceImages] = useState<string[]>([]);
-  const [isAutoGeneratingSubject, setIsAutoGeneratingSubject] = useState(false);
   const [styleCategory, setStyleCategory] = useState('Cinematic');
-  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('classic');
+  const [darkHorrorSubStyle, setDarkHorrorSubStyle] = useState('Dark Horror Aesthetic');
   const [variation, setVariation] = useState<number>(30); // Default to a realistic 30 variations
   const [minWords, setMinWords] = useState<number>(15);
   const [maxWords, setMaxWords] = useState<number>(60);
@@ -159,71 +152,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [pngBgColor, setPngBgColor] = useState<'white' | 'black' | 'transparent'>('white');
   const [bgNegativePrompt, setBgNegativePrompt] = useState('blurry, low quality, worst quality, text, watermark, signature, bad proportions, bad anatomy');
   const [pngNegativePrompt, setPngNegativePrompt] = useState('scenery, context backdrop, ground shadow, drop shadow, ambient background, blurry, watermark, text');
-  const [selectedCameraAngles, setSelectedCameraAngles] = useState<string[]>([]);
-  const [customCameraAngle, setCustomCameraAngle] = useState('');
   const [flatIconType, setFlatIconType] = useState<'sheet' | 'single'>('single');
   const [showFlatIconModal, setShowFlatIconModal] = useState(false);
   const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat'>('minimal_flat');
   const [showVectorModal, setShowVectorModal] = useState(false);
   
-  
-  const handleReferenceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      const remainingSlots = 5 - referenceImages.length;
-      const filesToProcess = files.slice(0, remainingSlots);
-      
-      filesToProcess.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setReferenceImages(prev => [...prev, reader.result as string].slice(0, 5));
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  };
-
-  const removeReferenceImage = (index: number) => {
-    setReferenceImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const triggerAutoSubject = async () => {
-    setIsAutoGeneratingSubject(true);
-    try {
-      const response = await fetch('/api/auto-subject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-        body: JSON.stringify({ styleCategory, currentSubject: subject })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.subject) {
-          setSubject(data.subject);
-          setError(null);
-        }
-      }
-    } catch (err) {
-      console.warn("Auto subject generation failed:", err);
-    } finally {
-      setIsAutoGeneratingSubject(false);
-    }
-  };
-
-  
-  const toggleCameraAngle = (angle) => {
-    setSelectedCameraAngles(prev => {
-      if (prev.includes(angle)) return prev.filter(a => a !== angle);
-      if (prev.length >= 2) return [...prev.slice(1), angle];
-      return [...prev, angle];
-    });
-  };
-  const addCustomAngle = () => {
-    const trimmed = customCameraAngle.trim();
-    if (!trimmed || selectedCameraAngles.includes(trimmed)) { setCustomCameraAngle(''); return; }
-    setSelectedCameraAngles(prev => prev.length >= 2 ? [...prev.slice(1), trimmed] : [...prev, trimmed]);
-    setCustomCameraAngle('');
-  };
-
   const currentStyleOptions = promptMode === 'background' ? BACKGROUND_STYLE_OPTIONS : PNG_STYLE_OPTIONS;
   
   const [result, setResult] = useState<{
@@ -488,9 +421,8 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         headers: getHeaders(aiOptions),
         body: JSON.stringify({
           subject: subject.trim(),
-          styleCategory,
-          darkHorrorSubStyle: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : undefined,
-          variation: variation,
+          styleCategory: styleCategory === 'Dark Horror Aesthetic' ? darkHorrorSubStyle : styleCategory,
+          count: variation,
           promptMode,
           pngBgColor,
           minWords,
@@ -499,9 +431,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           model: aiOptions?.model,
           seed,
           flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
-          vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined,
-          referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined,
-          cameraAngles: selectedCameraAngles.length > 0 ? selectedCameraAngles : undefined
+          vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
         })
       });
 
@@ -743,21 +673,10 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
               {/* 1. Subject Area */}
               <div className="space-y-2 group">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                      <AlignLeft size={14} className="text-emerald-500" />
-                      {t.prompt_subject_label}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={triggerAutoSubject}
-                      disabled={isAutoGeneratingSubject}
-                      className="p-1.5 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer group"
-                      title="AI Auto Ide Subject"
-                    >
-                      <Wand2 size={13} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'group-hover:rotate-12 transition-transform'}`} />
-                    </button>
-                  </div>
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlignLeft size={14} className="text-emerald-500" />
+                    {t.prompt_subject_label}
+                  </label>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">Bilingual Support</span>
                 </div>
                 
@@ -769,55 +688,6 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     placeholder={t.prompt_subject_placeholder}
                     className="relative w-full min-h-[140px] rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all font-medium leading-relaxed resize-y shadow-inner z-10"
                   />
-                </div>
-
-                {/* Reference Images Upload Area (Max 5) */}
-                <div className="space-y-2 mt-3 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-3.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Gambar Referensi ({referenceImages.length}/5)
-                    </span>
-                    {referenceImages.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setReferenceImages([])}
-                        className="text-[9px] font-black text-rose-500 uppercase hover:underline"
-                      >
-                        Hapus Semua
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2.5 items-center">
-                    {referenceImages.map((img, idx) => (
-                      <div key={idx} className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 group">
-                        <img src={img} alt="Reference" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removeReferenceImage(idx)}
-                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                    
-                    {referenceImages.length < 5 && (
-                      <label className="w-12 h-12 border-2 border-dashed border-slate-300 dark:border-white/10 hover:border-emerald-500/50 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors text-slate-400 hover:text-emerald-500 bg-white/50 dark:bg-black/20">
-                        <span className="text-lg font-bold leading-none">+</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleReferenceImageUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
-                  <p className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold leading-normal uppercase">
-                    💡 Unggah hingga 5 gambar referensi untuk memandu AI menciptakan prompt yang jauh lebih kaya, artistik, dan kreatif!
-                  </p>
                 </div>
               </div>
 
@@ -880,92 +750,6 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   {t.prompt_negative_desc}
                 </p>
               </div>
-
-              {/* Camera Angle Selection — only for realistic Background styles, hidden on PNG tab */}
-              {promptMode === 'background' && (
-              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-white/5">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    🎥 Camera Angle ({selectedCameraAngles.length}/2)
-                  </label>
-                </div>
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-                  {(() => {
-                    const presetAngles = ["Eye Level","High Angle","Low Angle","Bird's Eye View","Worm's Eye View","Dutch Angle","Overhead Shot","POV Shot","Over-the-Shoulder Shot","Front View","Side Profile","Three-Quarter View","Back View","Aerial View","Drone Shot","Close-Up","Medium Shot","Wide Shot","Extreme Close-Up","Extreme Wide Shot"];
-                    const angleTransforms = {
-                      "Eye Level": "", "High Angle": "rotateX(-12deg)", "Low Angle": "rotateX(12deg)",
-                      "Bird's Eye View": "rotateX(-55deg)", "Worm's Eye View": "rotateX(55deg)",
-                      "Dutch Angle": "rotateZ(14deg)", "Overhead Shot": "rotateX(-60deg)",
-                      "POV Shot": "scale(1.05)", "Over-the-Shoulder Shot": "rotateY(18deg)",
-                      "Front View": "", "Side Profile": "rotateY(85deg)",
-                      "Three-Quarter View": "rotateY(40deg)", "Back View": "rotateY(175deg)",
-                      "Aerial View": "rotateX(-45deg)", "Drone Shot": "rotateX(-25deg) scale(0.9)",
-                      "Close-Up": "scale(1.3)", "Medium Shot": "scale(1)", "Wide Shot": "scale(0.72)",
-                      "Extreme Close-Up": "scale(1.5)", "Extreme Wide Shot": "scale(0.55)"
-                    };
-                    const allAngles = [...new Set([...presetAngles, ...selectedCameraAngles])];
-                    return allAngles.map(angle => {
-                      const isSelected = selectedCameraAngles.includes(angle);
-                      const isCustom = !presetAngles.includes(angle);
-                      const transform = angleTransforms[angle] || "";
-                      return (
-                      <div key={angle} className="relative group/cam">
-                        <button
-                          type="button"
-                          onClick={() => toggleCameraAngle(angle)}
-                          className={`relative text-[9px] font-bold rounded-xl px-2 py-2.5 border transition-all duration-200 flex items-center justify-center text-center leading-tight cursor-pointer w-full ${isSelected ? 'bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-300 shadow-sm shadow-violet-500/10' : isCustom ? 'bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:border-amber-400' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-violet-300 dark:hover:border-violet-700 hover:text-violet-600 dark:hover:text-violet-400'}`}
-                        >
-                          {isCustom && <span className="text-[8px] mr-0.5">✨</span>}{angle}
-                          {isSelected && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-500 rounded-full flex items-center justify-center">
-                              <Check size={10} className="text-white" />
-                            </span>
-                          )}
-                        </button>
-                        {/* Hover Tooltip - Camera Animation */}
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none opacity-0 group-hover/cam:opacity-100 transition-opacity duration-300">
-                          <div className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl px-4 py-3 shadow-2xl border border-white/10 dark:border-slate-200/50 flex flex-col items-center gap-2 min-w-[140px]">
-                            <div className="w-12 h-12 flex items-center justify-center" style={{ transform, transition: 'transform 0.3s ease' }}>
-                              <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10 text-violet-400">
-                                <rect x="8" y="14" width="32" height="24" rx="4" stroke="currentColor" strokeWidth="2" fill="none"/>
-                                <circle cx="24" cy="26" r="7" stroke="currentColor" strokeWidth="2" fill="none"/>
-                                <circle cx="24" cy="26" r="3" fill="currentColor" opacity="0.4"/>
-                                <rect x="18" y="8" width="12" height="6" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
-                                <rect x="32" y="17" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.6"/>
-                                <line x1="24" y1="6" x2="24" y2="2" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/>
-                              </svg>
-                            </div>
-                            <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap">{angle}</span>
-                            <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-violet-500 to-transparent rounded-full animate-pulse" />
-                          </div>
-                          <div className="w-3 h-3 bg-slate-900 dark:bg-white rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2 border-r border-b border-white/10 dark:border-slate-200/50"></div>
-                        </div>
-                      </div>
-                    );
-                    });
-                  })()}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={customCameraAngle}
-                    onChange={(e) => setCustomCameraAngle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addCustomAngle()}
-                    placeholder="Custom angle..."
-                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 outline-none text-[10px] font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:border-violet-500 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCustomAngle}
-                    disabled={!customCameraAngle.trim()}
-                    className="px-3 py-1.5 bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all"
-                  >
-                    + Add
-                  </button>
-                </div>
-              </div>
-              )}
             </div>
 
             {/* Right side within the input panel */}
@@ -1154,6 +938,30 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                             {flatIconType === 'sheet' 
                               ? (styleCategory === 'Line Art' ? 'Koleksi beberapa elemen seni garis bertema serupa dalam satu lembar.' : styleCategory === 'Silhouette' ? 'Koleksi beberapa seni siluet bertema serupa dalam satu lembar.' : 'Koleksi beberapa ikon bertema serupa dalam satu lembar.') 
                               : (styleCategory === 'Line Art' ? 'Satu elemen seni garis tunggal terfokus yang siap digunakan.' : styleCategory === 'Silhouette' ? 'Satu elemen seni siluet tunggal terfokus yang siap digunakan.' : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                        <div className="p-2 bg-teal-500/10 text-teal-550 rounded-lg">
+                          {flatIconType === 'sheet' ? (
+                            <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            {flatIconType === 'sheet' ? (styleCategory === 'Line Art' ? 'Sheet / Collection Art' : 'Icon Sheet (Collection Icon)') : (styleCategory === 'Line Art' ? 'Single Icon / Art' : 'Single Icon')}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                            {flatIconType === 'sheet' 
+                              ? (styleCategory === 'Line Art' ? 'Koleksi beberapa elemen seni garis bertema serupa dalam satu lembar.' : 'Koleksi beberapa ikon bertema serupa dalam satu lembar.') 
+                              : (styleCategory === 'Line Art' ? 'Satu elemen seni garis tunggal terfokus yang siap digunakan.' : 'Satu ikon tunggal terfokus yang siap digunakan secara individu.')}
                           </div>
                         </div>
                       </div>

@@ -30,7 +30,7 @@ import { MotionGenView } from './src/components/MotionGenView';
 import { RemovalGenView } from './src/components/RemovalGenView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
-import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, MIRICANVAS_CATEGORIES, DREAMSTIME_MAIN_CATEGORIES, DREAMSTIME_SUB_CATEGORIES } from './constants';
+import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
@@ -43,7 +43,6 @@ import {
 import { LoginScreen } from './src/components/LoginScreen';
 import { Meteors } from './src/components/Meteors';
 import { AboutModal } from './src/components/AboutModal';
-import CustomProviderPanel, { loadCustomProviders, loadActiveCustomProviderId, saveCustomProviders, saveActiveCustomProviderId } from './src/components/CustomProviderPanel';
 
 // --- IndexedDB Helper for Auto-Resume ---
 const DB_NAME = 'EPS_Batch_DB';
@@ -918,9 +917,7 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
                 const duration = video.duration;
                 if (!duration || duration === Infinity) throw new Error("Invalid duration");
                 
-                // Match the FFmpeg fallback resolution (1280px) so AI Vision accuracy
-                // doesn't silently degrade when the faster native path succeeds.
-                const frameWidth = 1280;
+                const frameWidth = 320;
                 const frameHeight = Math.floor(frameWidth * (video.videoHeight / video.videoWidth));
 
                 const seekTimes = [
@@ -952,7 +949,7 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
                         ctx.drawImage(video, 0, 0, frameWidth, frameHeight);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                         extractedFrames.push(dataUrl);
                     }
                 }
@@ -1292,17 +1289,13 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai' | 'custom'>(() => {
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai'>(() => {
     const val = localStorage.getItem('ai_provider') || 'gemini';
-    const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'zai', 'custom'];
+    const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'zai'];
     if (!validProviders.includes(val)) { localStorage.setItem('ai_provider', 'gemini'); return 'gemini'; }
     return val as any;
   });
-
-  // Custom Provider State
-  const [customProviders, setCustomProviders] = useState(() => loadCustomProviders());
-  const [selectedCustomProviderId, setSelectedCustomProviderId] = useState<string | null>(() => loadActiveCustomProviderId());
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai' | 'custom' | 'reseller' | 'faq_billing'>(selectedProvider);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'appearance' | 'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai' | 'reseller' | 'faq_billing'>(selectedProvider);
 
   useEffect(() => {
     if (showSettingsModal) {
@@ -1317,10 +1310,6 @@ const App: React.FC = () => {
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
   const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
-  // Guards against the "subscription expired" alert firing repeatedly (e.g. from
-  // the Firestore snapshot listener re-triggering the license check effect).
-  const hasShownExpiryAlertRef = useRef(false);
-  const lastExpiredKeyRef = useRef<string>('');
   const [isMzLicensedState, setIsMzLicensed] = useState(() => { const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase(); return !!k; });
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
   const isMzLicensed = isMzLicensedState;
@@ -2317,23 +2306,7 @@ const App: React.FC = () => {
               const remainingDays = 30 - elapsedDays;
 
               if (remainingDays <= 0) {
-                // Deactivate the key itself in Firestore so it can no longer be
-                // rediscovered by findActiveKeyForEmail() on the next profile
-                // sync tick. Without this, the snapshot listener kept re-assigning
-                // the same expired key back to the user, which re-triggered this
-                // effect and made the alert pop up repeatedly every few seconds.
-                updateDoc(doc(db, 'keys', k), {
-                  activated: false,
-                  deactivatedReason: 'expired_30days',
-                  deactivatedAt: new Date().toISOString()
-                }).catch(e => console.info('db_op', e));
-
-                // Only show the alert once per expired key, per session.
-                const alreadyShown = hasShownExpiryAlertRef.current && lastExpiredKeyRef.current === k;
-                lastExpiredKeyRef.current = k;
-                hasShownExpiryAlertRef.current = true;
-
-                clearLicenseKey(alreadyShown ? undefined : 'Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
+                clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
                 return;
               }
               setSubDaysLeft(Math.max(0, remainingDays));
@@ -2811,9 +2784,6 @@ const App: React.FC = () => {
     }
 
     localStorage.setItem('ai_provider', selectedProvider);
-    if (selectedProvider === 'custom' && selectedCustomProviderId) {
-      localStorage.setItem('active_custom_provider_id', selectedCustomProviderId);
-    }
     setHasCustomKeySaved(
       cleanGemini.length > 0 || 
       cleanGroq.length > 0 || 
@@ -2840,7 +2810,6 @@ const App: React.FC = () => {
         'settings.aivene_api_key': cleanAivene.join(','),
         'settings.zai_api_key': cleanZai.join(','),
         'settings.ai_provider': selectedProvider,
-        'settings.custom_provider_id': selectedProvider === 'custom' ? selectedCustomProviderId || '' : '',
       }).catch(err => console.info('db_op', err));
     }
 
@@ -2859,8 +2828,6 @@ const App: React.FC = () => {
     localStorage.removeItem('aivene_api_key');
     localStorage.removeItem('zai_api_key');
     localStorage.removeItem('ai_provider');
-    localStorage.removeItem('mz_custom_providers');
-    localStorage.removeItem('mz_active_custom_provider_id');
     
     setGeminiKeysList([]);
     setGroqKeysList([]);
@@ -3077,8 +3044,8 @@ const App: React.FC = () => {
                   const img = new Image();
                   img.onload = () => {
                       const canvas = document.createElement('canvas');
-                      // Higher res + quality so AI Vision can pick up fine detail/small text accurately.
-                      const MAX_SIZE = 1536;
+                      // Reduce MAX_SIZE to 768px. AI doesn't need high res, and this makes base64 7x smaller!
+                      const MAX_SIZE = 768;
                       let width = img.width;
                       let height = img.height;
                       
@@ -3095,7 +3062,8 @@ const App: React.FC = () => {
                           ctx.fillStyle = '#FFFFFF';
                           ctx.fillRect(0, 0, width, height);
                           ctx.drawImage(img, 0, 0, width, height);
-                          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                          // Lower quality to 0.6 for massive speedup in network transfer
+                          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                           canvas.width = 0;
                           canvas.height = 0;
                           resolve([dataUrl]);
@@ -3130,8 +3098,8 @@ const App: React.FC = () => {
                       const originalWidth = img.width || 1024;
                       const originalHeight = img.height || 1024;
                       
-                      // Scale down to max 1536px
-                      const scale = Math.min(1536 / originalWidth, 1536 / originalHeight);
+                      // Scale down to max 768px
+                      const scale = Math.min(768 / originalWidth, 768 / originalHeight);
                       canvas.width = originalWidth * scale;
                       canvas.height = originalHeight * scale;
                       
@@ -3140,7 +3108,7 @@ const App: React.FC = () => {
                           ctx.fillStyle = '#FFFFFF';
                           ctx.fillRect(0, 0, canvas.width, canvas.height);
                           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                           canvas.width = 0;
                           canvas.height = 0;
                           resolve([dataUrl]);
@@ -3393,7 +3361,6 @@ const App: React.FC = () => {
             adobeCategoryId: '',
             shutterstockCategory1: '',
             shutterstockCategory2: '',
-            miriCanvasCategoryId: '',
             isGenerating: false,
             isExtracting: false,
             error: errorMsg,
@@ -3708,9 +3675,6 @@ const App: React.FC = () => {
                             adobeCategoryId: result.metadata.category_id,
                             shutterstockCategory1: result.metadata.shutterstock_category_1,
                             shutterstockCategory2: result.metadata.shutterstock_category_2,
-                            miriCanvasCategoryId: (result.metadata as any).miriCanvas_category_id || '',
-                            dreamstimeMainCategoryId: (result.metadata as any).dreamstime_main_category_id || '',
-                            dreamstimeSubCategoryId: (result.metadata as any).dreamstime_sub_category_id || '',
                             categoryReason: result.metadata.category_reason,
                             isGenerating: false,
                             error: null
@@ -3916,9 +3880,6 @@ const App: React.FC = () => {
       adobeCategoryId: f.adobeCategoryId,
       shutterstockCategory1: f.shutterstockCategory1,
       shutterstockCategory2: f.shutterstockCategory2,
-      miriCanvasCategoryId: f.miriCanvasCategoryId,
-      dreamstimeMainCategoryId: f.dreamstimeMainCategoryId,
-      dreamstimeSubCategoryId: f.dreamstimeSubCategoryId,
       categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
@@ -3971,9 +3932,6 @@ const App: React.FC = () => {
             adobeCategoryId: backupItem.adobeCategoryId || newFiles[existingIdx].adobeCategoryId,
             shutterstockCategory1: backupItem.shutterstockCategory1 || newFiles[existingIdx].shutterstockCategory1,
             shutterstockCategory2: backupItem.shutterstockCategory2 || newFiles[existingIdx].shutterstockCategory2,
-            miriCanvasCategoryId: backupItem.miriCanvasCategoryId || newFiles[existingIdx].miriCanvasCategoryId,
-            dreamstimeMainCategoryId: backupItem.dreamstimeMainCategoryId || newFiles[existingIdx].dreamstimeMainCategoryId,
-            dreamstimeSubCategoryId: backupItem.dreamstimeSubCategoryId || newFiles[existingIdx].dreamstimeSubCategoryId,
             categoryReason: backupItem.categoryReason || newFiles[existingIdx].categoryReason,
             isGenerating: false,
             error: null
@@ -3996,9 +3954,6 @@ const App: React.FC = () => {
             adobeCategoryId: backupItem.adobeCategoryId || '',
             shutterstockCategory1: backupItem.shutterstockCategory1 || '',
             shutterstockCategory2: backupItem.shutterstockCategory2 || '',
-            miriCanvasCategoryId: backupItem.miriCanvasCategoryId || '',
-            dreamstimeMainCategoryId: backupItem.dreamstimeMainCategoryId || '',
-            dreamstimeSubCategoryId: backupItem.dreamstimeSubCategoryId || '',
             categoryReason: backupItem.categoryReason || '',
             isGenerating: false,
             error: null
@@ -4024,9 +3979,6 @@ const App: React.FC = () => {
       adobeCategoryId: f.adobeCategoryId,
       shutterstockCategory1: f.shutterstockCategory1,
       shutterstockCategory2: f.shutterstockCategory2,
-      miriCanvasCategoryId: f.miriCanvasCategoryId,
-      dreamstimeMainCategoryId: f.dreamstimeMainCategoryId,
-      dreamstimeSubCategoryId: f.dreamstimeSubCategoryId,
       categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
@@ -4316,12 +4268,11 @@ const App: React.FC = () => {
     }
 
     if (exportMiriCanvas) {
-      const headers = ['Filename', 'Name', 'Keywords', 'Category'];
+      const headers = ['Filename', 'Name', 'Keywords'];
       const rows = toolFiles.map(f => [
           escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
           escapeCsv(f.title || ''),
-          escapeCsv((f.keywords || []).join(',')),
-          escapeCsv(f.miriCanvasCategoryId ? MIRICANVAS_CATEGORIES.find(c => c.id === f.miriCanvasCategoryId)?.name || String(f.miriCanvasCategoryId) : '')
+          escapeCsv((f.keywords || []).join(','))
       ]);
       const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -5175,8 +5126,7 @@ const App: React.FC = () => {
                   { id: 'nvidia', name: 'NVIDIA', desc: 'NVIDIA NIM' },
                   { id: 'bluesminds', name: 'Bluesminds', desc: 'Fast Proxy' },
                   { id: 'aivene', name: 'Aivene', desc: 'Aivene Endpoints' },
-                  { id: 'zai', name: 'Z.AI', desc: 'GLM Series' },
-                  { id: 'custom', name: 'Custom', desc: 'OpenAI-compatible endpoint' }
+                  { id: 'zai', name: 'Z.AI', desc: 'GLM Series' }
                 ].map(prov => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name} - {prov.desc}
@@ -5191,27 +5141,15 @@ const App: React.FC = () => {
               onChange={(e) => setActiveSettingsTab(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all mb-4 shadow-md shadow-black/5"
             >
-              {(['appearance', selectedProvider, 'custom', 'faq_billing', ...(isAdminAccount ? ['reseller'] : [])] as const).map(tab => (
+              {(['appearance', selectedProvider, 'faq_billing', ...(isAdminAccount ? ['reseller'] : [])] as const).map(tab => (
                 <option key={tab} value={tab}>
-                  {tab === 'appearance' ? (uiLanguage === 'id' ? '🎨 Tampilan & Tema' : '🎨 Appearance & Theme') : tab === 'custom' ? (uiLanguage === 'id' ? '🔌 Provider Kustom' : '🔌 Custom Providers') : tab === 'faq_billing' ? (uiLanguage === 'id' ? '💳 FAQ Tagihan & Langganan' : '💳 Billing & Subscription FAQ') : tab === 'reseller' ? '🏷️ Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : tab === 'zai' ? 'Z.AI Keys' : `${(tab as string).toUpperCase()} Keys`}
+                  {tab === 'appearance' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ Tampilan & Tema' : 'ï¿½ï¿½ Appearance & Theme') : tab === 'faq_billing' ? (uiLanguage === 'id' ? 'ï¿½ï¿½ FAQ Tagihan & Langganan' : 'ï¿½ï¿½ Billing & Subscription FAQ') : tab === 'reseller' ? 'ï¿½ï¿½ Reseller Portal' : tab === 'bluesminds' ? 'Bluesminds Keys' : tab === 'aivene' ? 'Aivene Keys' : tab === 'zai' ? 'Z.AI Keys' : `${(tab as string).toUpperCase()} Keys`}
                 </option>
               ))}
             </select>
 
             {/* Tab Content */}
             <div className="space-y-4 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
-              {activeSettingsTab === 'custom' && (
-                <CustomProviderPanel
-                  customProviders={customProviders}
-                  setCustomProviders={(p) => { setCustomProviders(p); saveCustomProviders(p); }}
-                  selectedCustomProviderId={selectedCustomProviderId}
-                  setSelectedCustomProviderId={(id) => { setSelectedCustomProviderId(id); saveActiveCustomProviderId(id); }}
-                  t={t}
-                  uiLanguage={uiLanguage}
-                  isDark={theme === 'dark'}
-                />
-              )}
-
               {activeSettingsTab === 'appearance' && (
                 <div className="space-y-4 animate-in fade-in duration-100">
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
