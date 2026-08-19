@@ -1384,8 +1384,6 @@ function processKeywordsSemantic(
     )
   );
 
-  const verifiedSubjects = [...primary, ...secondary, ...objects];
-
   const exactFactMatch = (kw: string): boolean => {
     const candidate = normalize(kw);
     return literalFacts.some(f =>
@@ -3052,6 +3050,73 @@ export const generateStockMetadata = async (
   const aiRequestCount = targetCount;
 
   const directives = getToolTypeDirectives(toolType);
+  const fallbackGeminiModel = 'gemini-3-flash-preview';
+  const mediaContext = directives.mediaTypeContext;
+
+  const customPromptCommand = customPrompt ? `\nCRITICAL CUSTOM INSTRUCTION / CONCEPT KEY (ABSOLUTE PRIORITY):
+The user has provided a custom instruction, concept key, or target keywords: "${customPrompt}"
+ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
+1. ALIGN WITH CONCEPT: You MUST deeply adapt and shape the ENTIRE metadata (Title, Description, and Keywords) to strictly follow and embody this exact instruction or concept key.
+2. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), you MUST act as an expert human graphic designer. Describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
+3. INTEGRATE TARGET KEYWORDS: If the input contains specific target keywords, you MUST heavily prioritize and integrate those exact words naturally into both the Title and the Keywords list.
+4. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset (do not hallucinate elements that aren't there, but frame the existing elements through the lens of the custom instruction).` : "";
+
+  // --- STAGE 1: REAL AI VISION EXTRACTION (previously MISSING — this is why keywords were not
+  // grounded in the actual image, especially on faster/lighter models like Gemini Flash-Lite,
+  // which do not compensate well for an empty/undefined visual-evidence layer). ---
+  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
+  console.log(`[JohMeta Pipeline] Stage 1: Running AI Vision (${visionModelToUse}) + EXIF context...`);
+
+  const visionSystemInstruction = `ROLE:
+You are an expert AI Vision Visual Metadata Analyzer for microstock assets.
+
+PRIMARY MISSION:
+Determine what is ACTUALLY PRESENT in the supplied asset. Your output is the visual evidence layer used by a separate metadata/keyword engine.
+
+ABSOLUTE RULE:
+Only report facts that can be supported by visible evidence in the supplied image/frame. Do not turn guesses, associations, commercial uses, symbolism, title wording, or common scene expectations into visual facts.
+
+HARD VISUAL EVIDENCE FIELDS (only what is literally visible):
+primary_subjects, secondary_subjects, objects, background_elements, visible_text, colors, materials, textures, lighting, actions, environment, weather, season, composition, spatial_relationships.
+
+SOFT INTERPRETATION FIELDS (only with strong, unmistakable visual support): atmosphere, mood, visual_style, concepts, context.
+
+NO HALLUCINATION: Never infer an object, holiday, location, brand, or concept merely because it is common for the scene (e.g. do NOT infer "christmas" from snow alone, do NOT infer "travel" from a landscape alone).
+
+KEYWORD SOURCE BOUNDARY: Do NOT generate final keywords, do NOT use the title, do NOT optimize for SEO here. Your job is to produce trustworthy visual evidence for the next stage.
+
+Return JSON ONLY under the key "VISUAL_FACTS", including a "semantic_category_analysis" object with fields adobe_id, shutterstock_category_1, shutterstock_category_2, reason.${exifInstruction}`;
+
+  const visionPromptText = toolType === ToolType.VIDEO
+    ? `Analyze the supplied video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, composition, and color. Perform visual semantic category analysis against the official category lists. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
+    : `Perform a complete visual evidence scan of the supplied asset. Record only what is actually visible or unmistakably supported. Do NOT use the title, do NOT generate keywords, do NOT invent commercial context. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+
+  let visualFacts: any = {
+    primary_subjects: [], secondary_subjects: [], objects: [], background_elements: [],
+    visible_text: [], colors: [], materials: [], textures: [], lighting: [], actions: [],
+    environment: [], weather: [], season: [], composition: [], spatial_relationships: [],
+    atmosphere: [], visual_style: [], concepts: [], context: [],
+    deeper_meaning_and_symbolism: "", understanding_and_context: "",
+    semantic_category_analysis: { adobe_id: 0, shutterstock_category_1: "", shutterstock_category_2: "", reason: "Vision analysis unavailable; no visual evidence extracted." }
+  };
+
+  try {
+    const visionResponse = await callGeminiWithRetry(visionModelToUse, {
+      parts: [...imageParts, { text: visionPromptText }]
+    }, {
+      systemInstruction: visionSystemInstruction,
+      responseMimeType: "application/json",
+      temperature: 0.0,
+      topP: 0.8
+    });
+    const rawFacts = (typeof visionResponse === 'string' ? visionResponse : visionResponse.text) || "{}";
+    const parsed = JSON.parse(extractJSON(rawFacts));
+    if (parsed && parsed.VISUAL_FACTS && Object.keys(parsed.VISUAL_FACTS).length > 0) {
+      visualFacts = parsed.VISUAL_FACTS;
+    }
+  } catch (visionErr: any) {
+    console.warn('[JohMeta Pipeline] Stage 1 Vision failed, keeping empty visual facts (no synthetic hallucination):', visionErr?.message || visionErr);
+  }
 
   // Human-curated keyword generation: candidates first, ranking later.
   let keywordRuleSchemaDesc = `Generate keywords freely in ${getLanguageName(metadataLanguage)} based on the image.`;
@@ -3154,6 +3219,14 @@ Priority:
 
 Do not sacrifice relevance just to satisfy this formula.
 
+6B. MICROSTOCK SEARCH-INTENT OPTIMIZATION
+After the relevance audit, classify the surviving grounded keywords into the search-intent tiers a real stock buyer types into Adobe Stock / Shutterstock / Freepik search bars, and make sure ALL tiers that are visually supported are represented — not just literal object names:
+- HEAD TERMS: the single-word core subject/object a buyer searches first (e.g. "coffee", "mountain", "laptop").
+- LONG-TAIL DESCRIPTORS: natural 2-3 word combinations that narrow the search (subject + attribute, subject + action, subject + setting) — only when visually true (e.g. "steaming coffee cup", "hiker mountain trail").
+- USE-CASE / CONCEPT TERMS: grounded commercial-context words a buyer searches when looking for a concept, not just an object (e.g. "morning routine", "remote work", "wellness") — include ONLY when strongly supported by the visual scene, never invented for SEO.
+- ATTRIBUTE / STYLE TERMS: visually verified color, mood, lighting, composition, or medium terms buyers use to filter results (e.g. "minimalist", "top view", "warm tones").
+Do not add a term to satisfy a tier if the image does not support it — an empty tier is correct if the asset does not visually justify it. This step re-orders and enriches the already-grounded pool; it never overrides Section 3's visual relevance audit.
+
 7. KEYWORD COUNT
 The requested keyword count is a MAXIMUM, NOT A MINIMUM.
 
@@ -3255,6 +3328,42 @@ OUTPUT FORMAT:
 }
 If generation fails, return {"error": "metadata_generation_failed"}.`;
 
+  const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist.
+Your goal is to maximize discoverability and search relevance on microstock marketplaces. Never promise or imply guaranteed first-page placement; ranking is controlled by each marketplace and changes dynamically.
+OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+
+${mediaContext}${customPromptCommand}
+
+Rules for Titles:
+1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
+   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
+   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
+   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
+   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
+2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
+   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
+   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
+   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
+3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
+   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
+   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
+4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+   ${directives.titleRule}
+5. FORMAT & KEPATUHAN:
+   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
+   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
+   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
+
+Rules for Descriptions:
+1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
+   ${directives.descriptionRule}
+3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
+4. Limit to 200 characters.
+5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
+
+${keywordRulePromptText}`;
+
   let draftMetadata: any = {};
   try {
     let genResponse: any;
@@ -3287,7 +3396,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
              console.warn(`[JohMeta Pipeline] ${provider.toUpperCase()} failed completely:`, providerError.message);
              console.warn(`[JohMeta Pipeline] Falling back to Gemini as absolute failsafe...`);
              genResponse = await callGeminiWithRetry(fallbackGeminiModel, { 
-                  parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
+                  parts: [...imageParts, { text: `Generate draft metadata based on the supplied image and the provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
                 }, {
                   systemInstruction: genSystemInstruction,
                   responseMimeType: "application/json",
@@ -3298,7 +3407,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
         }
     } else {
         genResponse = await callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : fallbackGeminiModel, { 
-            parts: [{ text: `Generate draft metadata based on provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
+            parts: [...imageParts, { text: `Generate draft metadata based on the supplied image and the provided VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]` }] 
           }, {
             systemInstruction: genSystemInstruction,
             responseMimeType: "application/json",
@@ -3447,7 +3556,7 @@ OUTPUT FORMAT:
           model: activeModel
         })
       : callGeminiWithRetry(activeModel && activeModel.startsWith('gemini-') ? activeModel : fallbackGeminiModel, { 
-          parts: [{ text: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
+          parts: [...imageParts, { text: `Audit and validate the Draft Metadata against the supplied image and VISUAL_FACTS. Remove any keyword you cannot directly point to in the image. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]` }] 
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
