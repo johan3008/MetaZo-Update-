@@ -625,15 +625,8 @@ function ensureKeywordCount(
     sources.push(extractWords(description));
   }
 
-  // 6. From specific category keywords
-  if (categoryId) {
-    const catIdNum = Number(categoryId);
-    if (categoryFallbackKeywords[catIdNum]) {
-      sources.push(categoryFallbackKeywords[catIdNum]);
-    }
-  }
-
-  // 7. Generic fallback removed to maintain purely natural keywords.
+  // Categories are classification metadata, NOT visual evidence.
+  // Never use category fallback terms as keyword candidates.
 
   // Pad the uniqueKeywords checking each source
   for (const source of sources) {
@@ -2293,6 +2286,14 @@ Rules for Keywords:
 2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
+HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
+- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
+- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
+- Do NOT add generic SEO keywords merely to reach the requested count.
+- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
+
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if they are a perfect fit.
@@ -2443,6 +2444,14 @@ Rules for Descriptions:
 Rules for Keywords:
 ${keywordRulePromptText}
 
+HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
+- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
+- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
+- Do NOT add generic SEO keywords merely to reach the requested count.
+- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
+
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if accurate.
@@ -2552,33 +2561,40 @@ OUTPUT FORMAT:
       
       const uniqueKeywords = Array.from(new Set(cleanedKeywords));
       
-      const allowedTerms = [
-        ...(Array.isArray(visualFacts.primary_subjects) ? visualFacts.primary_subjects : []).map((x: any) => x?.name || ""),
-        ...(Array.isArray(visualFacts.secondary_subjects) ? visualFacts.secondary_subjects : []).map((x: any) => x?.name || ""),
-        ...(Array.isArray(visualFacts.actions) ? visualFacts.actions : []),
-        ...(Array.isArray(visualFacts.colors) ? visualFacts.colors : [])
-      ].join(" ").toLowerCase();
+      // HARD VISUAL-EVIDENCE GATE: every keyword must be traceable to AI Vision VISUAL_FACTS.
+      const visualEvidenceText = JSON.stringify({
+        primary_subjects: visualFacts?.primary_subjects || [],
+        secondary_subjects: visualFacts?.secondary_subjects || [],
+        background_elements: visualFacts?.background_elements || [],
+        visible_text: visualFacts?.visible_text || [],
+        colors: visualFacts?.colors || [],
+        actions: visualFacts?.actions || [],
+        composition: visualFacts?.composition || [],
+        deeper_meaning_and_symbolism: visualFacts?.deeper_meaning_and_symbolism || '',
+        semantic_category_analysis: visualFacts?.semantic_category_analysis || {}
+      }).toLowerCase();
 
-      // Rule 5: Tambahkan Keyword Validator (Hanya lolos jika keyword memiliki kecocokan kata)
-      const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) => {
-        if (!allowedTerms || allowedTerms.length < 5) return true;
-        const words = keyword.split(/\s+/);
-        const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-        return hasMatchingWord && !isProhibitedKeyword(keyword);
-      });
+      const evidenceTokens = new Set(
+        visualEvidenceText.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w: string) => w.length > 1)
+      );
 
-       // Priority: rigorously filtered first, then pad with remaining keywords to approach target count
-      const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-      const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+      const keywordHasVisualEvidence = (keyword: string): boolean => {
+        const tokens = sanitizeForIndexing(keyword).toLowerCase()
+          .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+          .filter((w: string) => w.length > 1 && !STOP_WORDS.has(w));
+        return tokens.length > 0 && tokens.some((token: string) => evidenceTokens.has(token));
+      };
+
+      const uniqueKeywords = Array.from(new Set(cleanedKeywords));
+      const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) =>
+        !isProhibitedKeyword(keyword) && keywordHasVisualEvidence(keyword)
+      );
+
+      // Never pad with unsupported SEO terms.
+      const finalKeywordList = rigorouslyFilteredKeywords;
 
       data.keywords = ensureKeywordCount(
-        finalKeywordList,
-        targetCount,
-        visualFacts,
-        data.title,
-        data.description,
-        data.category_id,
-        keywordMode
+        finalKeywordList, targetCount, visualFacts, undefined, undefined, undefined, keywordMode
       );
 
     // 1.5. Enforce professional title length strictly
@@ -2930,6 +2946,14 @@ Rules for Keywords:
 2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
+HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
+- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
+- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
+- Do NOT add generic SEO keywords merely to reach the requested count.
+- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
+
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
@@ -3086,6 +3110,14 @@ Rules for Descriptions:
 Rules for Keywords:
 ${keywordRulePromptText}
 
+HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
+- Every keyword MUST be supported by the supplied VISUAL_FACTS.
+- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
+- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
+- Do NOT add generic SEO keywords merely to reach the requested count.
+- If fewer valid keywords are supported by VISUAL_FACTS, return fewer keywords. Never fabricate missing keywords.
+- Before returning the result, self-audit every keyword against VISUAL_FACTS and remove any keyword without evidence.
+
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
@@ -3232,23 +3264,37 @@ OUTPUT FORMAT:
             const uniqueKeywords = Array.from(new Set(cleanedKeywords));
             
             const assetVisualFacts = parsedVisualFactsList[index] || {};
-            const allowedTerms = [
-              ...(Array.isArray(assetVisualFacts.primary_subjects) ? assetVisualFacts.primary_subjects : []).map((x: any) => x?.name || ""),
-              ...(Array.isArray(assetVisualFacts.secondary_subjects) ? assetVisualFacts.secondary_subjects : []).map((x: any) => x?.name || ""),
-              ...(Array.isArray(assetVisualFacts.actions) ? assetVisualFacts.actions : []),
-              ...(Array.isArray(assetVisualFacts.colors) ? assetVisualFacts.colors : [])
-            ].join(" ").toLowerCase();
+            // HARD VISUAL-EVIDENCE GATE: every keyword must be traceable to AI Vision VISUAL_FACTS.
+      const visualEvidenceText = JSON.stringify({
+        primary_subjects: visualFacts?.primary_subjects || [],
+        secondary_subjects: visualFacts?.secondary_subjects || [],
+        background_elements: visualFacts?.background_elements || [],
+        visible_text: visualFacts?.visible_text || [],
+        colors: visualFacts?.colors || [],
+        actions: visualFacts?.actions || [],
+        composition: visualFacts?.composition || [],
+        deeper_meaning_and_symbolism: visualFacts?.deeper_meaning_and_symbolism || '',
+        semantic_category_analysis: visualFacts?.semantic_category_analysis || {}
+      }).toLowerCase();
 
-            // Rule 5: Tambahkan Keyword Validator (Hanya lolos jika keyword memiliki kecocokan kata)
-            const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) => {
-              if (!allowedTerms || allowedTerms.length < 5) return true;
-              const words = keyword.split(/\s+/);
-              const hasMatchingWord = words.some(w => allowedTerms.includes(w));
-              return hasMatchingWord && !isProhibitedKeyword(keyword);
-            });
+      const evidenceTokens = new Set(
+        visualEvidenceText.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w: string) => w.length > 1)
+      );
 
-            const remainingKeywords = uniqueKeywords.filter((k: string) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-            const finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
+      const keywordHasVisualEvidence = (keyword: string): boolean => {
+        const tokens = sanitizeForIndexing(keyword).toLowerCase()
+          .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+          .filter((w: string) => w.length > 1 && !STOP_WORDS.has(w));
+        return tokens.length > 0 && tokens.some((token: string) => evidenceTokens.has(token));
+      };
+
+      const uniqueKeywords = Array.from(new Set(cleanedKeywords));
+      const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword: string) =>
+        !isProhibitedKeyword(keyword) && keywordHasVisualEvidence(keyword)
+      );
+
+      // Never pad with unsupported SEO terms.
+      const finalKeywordList = rigorouslyFilteredKeywords;
 
             metadata.keywords = ensureKeywordCount(
               finalKeywordList,
