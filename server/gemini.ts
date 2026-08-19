@@ -2633,8 +2633,54 @@ OUTPUT FORMAT:
     
     return data as StockMetadata;
   } catch (error) {
-    console.warn("[JohMeta Parse Error] Failed to handle output format:", error);
-    throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
+    // FINAL RECOVERY: never fail the whole metadata request because one
+    // optional field returned by an AI/provider has an unexpected shape.
+    // Normalize the last known draft and return a valid StockMetadata object.
+    console.warn("[JohMeta Parse Recovery] Final metadata normalization recovered from:", error);
+
+    try {
+      const recovery: any = (draftMetadata && typeof draftMetadata === 'object' && !Array.isArray(draftMetadata))
+        ? { ...draftMetadata }
+        : {};
+
+      recovery.title = String(recovery.title || recovery.name || recovery.headline || "Stock asset").trim();
+      recovery.description = String(recovery.description || recovery.desc || recovery.caption || recovery.title || "Visual stock asset").trim();
+
+      const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
+      const safeKeywords = rawKeywords
+        .filter((k: any) => typeof k === 'string')
+        .map((k: string) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' '))
+        .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
+
+      recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
+      if (recovery.keywords.length === 0) {
+        recovery.keywords = ensureKeywordCount([], Math.min(targetCount, 10), visualFacts || {}, recovery.title, recovery.description, undefined, keywordMode);
+      }
+
+      const parsedRecoveryCategory = parseInt(String(recovery.category_id), 10);
+      if (!Number.isFinite(parsedRecoveryCategory) || parsedRecoveryCategory < 1 || parsedRecoveryCategory > 21) {
+        const heur = getHeuristicCategories(recovery.title, recovery.keywords);
+        recovery.category_id = heur.category_id;
+        recovery.shutterstock_category_1 = heur.shutterstock_category_1;
+        recovery.shutterstock_category_2 = heur.shutterstock_category_2;
+      }
+
+      recovery.category_reason = recovery.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+      recovery.confidence_score = Number.isFinite(Number(recovery.confidence_score)) ? Number(recovery.confidence_score) : 0.5;
+
+      return recovery as StockMetadata;
+    } catch (recoveryError) {
+      console.error("[JohMeta Parse Recovery] Recovery failed:", recoveryError);
+      return {
+        title: "Stock asset",
+        description: "Visual stock asset",
+        keywords: [],
+        category_id: 8,
+        shutterstock_category_1: "Abstract",
+        shutterstock_category_2: "Backgrounds/Textures",
+        category_reason: "Fallback metadata generated after response normalization failure."
+      } as StockMetadata;
+    }
   }
 };
 
