@@ -485,7 +485,7 @@ function ensureKeywordCount(
   const raw: string[] = [];
   for (const value of Array.isArray(keywords) ? keywords : []) {
     const clean = normalize(value);
-    if (!clean || isProhibitedKeyword(clean)) continue;
+    if (!clean || isProhibitedKeyword(clean) || violatesMarketplaceGuidelines(clean)) continue;
     if (keywordMode === 'single' && clean.includes(' ')) continue;
     if (keywordMode === 'multi' && !clean.includes(' ')) continue;
     raw.push(clean);
@@ -556,6 +556,20 @@ function ensureKeywordCount(
     if (words.length > 3) intent -= 20;
     if (k.length > 35) intent -= 15;
 
+    // Market intelligence: popularity + conversion + trend - competition.
+    // When no real market dataset is configured, the score stays neutral rather
+    // than pretending that an AI guess is real sales/search data.
+    const market = getKeywordMarketSignal(k);
+    const marketPopularity = normalizeSignal(market.popularity);
+    const marketConversion = normalizeSignal(market.conversion);
+    const marketTrend = normalizeSignal(market.trend);
+    const marketCompetition = normalizeSignal(market.competition);
+    const hasMarketData = [market.popularity, market.conversion, market.trend, market.competition]
+      .some(v => Number.isFinite(Number(v)));
+    const marketScore = hasMarketData
+      ? (marketPopularity * 0.35 + marketConversion * 0.35 + marketTrend * 0.20 + (100 - marketCompetition) * 0.10)
+      : 0;
+
     // Reward specificity without forcing a fixed slot pattern.
     const specificity = Math.min(20, Math.max(0, (words.length - 1) * 7));
     const titleWords = new Set(String(title || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
@@ -563,13 +577,23 @@ function ensureKeywordCount(
     const titleBonus = Math.min(12, titleOverlap * 4);
 
     // Avoid overvaluing generic commercial words.
-    const genericPenalty = /^(lifestyle|home|warm|comfort|weather|texture|interior|clothing|garment|accessory)$/.test(k) ? 8 : 0;
+    const genericPenalty = /^(lifestyle|home|warm|comfort|weather|texture|interior|clothing|garment|accessory|background|concept)$/.test(k) ? 8 : 0;
+
+    // KeyPilot-like principle: relevance first, market signal second, search intent
+    // third. If market data is unavailable, its weight is transferred to visual
+    // evidence/search intent instead of fabricating a popularity score.
+    const visualWeight = hasMarketData ? 0.52 : 0.62;
+    const marketWeight = hasMarketData ? 0.18 : 0;
+    const intentWeight = hasMarketData ? 0.16 : 0.20;
+    const specificityWeight = hasMarketData ? 0.07 : 0.08;
+    const titleWeight = hasMarketData ? 0.07 : 0.10;
 
     return Math.round(
-      visual * 0.62 +
-      intent * 0.18 +
-      specificity * 0.08 +
-      titleBonus * 0.08 -
+      visual * visualWeight +
+      marketScore * marketWeight +
+      intent * intentWeight +
+      specificity * specificityWeight +
+      titleBonus * titleWeight -
       genericPenalty
     ) + Math.max(0, 3 - originalIndex * 0.02);
   };
@@ -1511,11 +1535,75 @@ const MARKETPLACE_BANNED_TERMS = new Set([
  * Keyword post-processing is mechanical only: cleaning and deduplication.
  */
 function violatesMarketplaceGuidelines(keyword: string): boolean {
-  return !String(keyword || '').trim();
+  const normalized = String(keyword || '').trim().toLowerCase();
+  if (!normalized) return true;
+  if (isProhibitedKeyword(normalized)) return true;
+  if (MARKETPLACE_BANNED_TERMS.has(normalized)) return true;
+
+  // Reject obvious spam/CTA phrases while keeping legitimate natural search phrases.
+  const spamPatterns = [
+    /\b(best|top|number one|no1|cheapest|guaranteed)\b/i,
+    /\b(download now|click here|subscribe now|like and share)\b/i,
+    /\b(free download)\b/i
+  ];
+  return spamPatterns.some(pattern => pattern.test(normalized));
 }
 
 function filterBannedKeywords(keywords: string[]): string[] {
   return keywords.filter(k => !violatesMarketplaceGuidelines(k));
+}
+
+// Optional market-intelligence layer. The app remains fully functional without
+// external data, but can consume a local/remote keyword intelligence snapshot
+// when available. This is the architectural equivalent of KeyPilot's ranking
+// layer; it must never override visual relevance.
+type KeywordMarketSignal = {
+  popularity?: number;
+  competition?: number;
+  conversion?: number;
+  trend?: number;
+};
+
+let keywordMarketSignals: Record<string, KeywordMarketSignal> | null = null;
+
+function loadKeywordMarketSignals(): Record<string, KeywordMarketSignal> {
+  if (keywordMarketSignals) return keywordMarketSignals;
+  keywordMarketSignals = {};
+
+  try {
+    const inline = process.env.KEYWORD_MARKET_DATA_JSON;
+    if (inline) {
+      const parsed = JSON.parse(inline);
+      if (parsed && typeof parsed === 'object') keywordMarketSignals = parsed;
+    } else if (process.env.KEYWORD_MARKET_DATA_PATH) {
+      const file = path.resolve(process.env.KEYWORD_MARKET_DATA_PATH);
+      if (fs.existsSync(file)) {
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (parsed && typeof parsed === 'object') keywordMarketSignals = parsed;
+      }
+    }
+  } catch (error) {
+    console.warn('[Keyword Market Intelligence] Could not load market data:', error);
+  }
+
+  return keywordMarketSignals;
+}
+
+function getKeywordMarketSignal(keyword: string): KeywordMarketSignal {
+  const data = loadKeywordMarketSignals();
+  const key = sanitizeForIndexing(keyword);
+  const direct = data[key];
+  if (direct) return direct;
+
+  // Support simple aliases from data sources that store underscores/hyphens.
+  const normalizedKey = key.replace(/[-_]+/g, ' ');
+  return data[normalizedKey] || {};
+}
+
+function normalizeSignal(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(100, n));
 }
 
 // ---- LAPISAN 6: DEDUPLIKASI SEMANTIK (BUKAN HANYA TEKS SAMA) --------------
@@ -1739,6 +1827,7 @@ what the asset visibly supports.
 
 2. SEARCH INTENT MICROSTOCK
 - Think like a real stock buyer searching for this exact asset, not like a thesaurus.
+- When market-intelligence data is supplied by the application, use popularity, conversion, trend, and competition signals as ranking evidence; never invent numeric market metrics.
 - Ask: "What exact phrase would a designer, marketer, publisher, or content buyer realistically type to find this asset?"
 - Prefer standard buyer-facing search vocabulary and natural 1-3 word phrases.
 - Search intent is valid only when the visual evidence supports the intended use or concept.
@@ -1795,7 +1884,7 @@ Before returning the list, evaluate every keyword:
 Remove weak or unsupported terms.
 
 12. EXACT COUNT HANDLING
-The requested count is the final output target. If the user requests 25, return the 25 BEST keywords, not 25 random keywords.
+The requested count is the final output target. If the user requests 25, the system must return the 25 BEST keywords after global ranking, not simply the first 25 generated by the model. Generate a larger candidate pool first, then rank, deduplicate, filter, and select exactly the requested number.
 Never lower quality to fill the count. If expansion is necessary, generate additional evidence-backed candidates and re-rank the entire pool dynamically.
 The final ranking is global: there are no category quotas or fixed keyword slots.
 When additional keywords are needed, expand only from verified visual facts using natural synonyms,
@@ -1946,7 +2035,7 @@ export const generateStockMetadata = async (
   const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant microstock keywords based on the actual asset and VISUAL_FACTS. Lowercase only. Return keywords as a clean JSON array in the final schema. Rank the strongest keywords first using global semantic relevance and realistic microstock search intent. Do not use fixed category slots. The requested count is the final output target. Never use unrelated filler; if the candidate pool is short, expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, and genuine buyer search intent.`;
+  let keywordRuleSchemaDesc = `Generate a larger candidate pool for downstream ranking: ${Math.min(100, Math.max(targetCount * 3, targetCount + 20))} strong candidates based on the actual asset and VISUAL_FACTS. Lowercase only. Return keywords as a clean JSON array. Rank candidates by global semantic relevance and realistic microstock search intent, but do not assume the first N are final. Do not use fixed category slots. The application will perform a second-stage ranking and return exactly ${targetCount} winners. Never use unrelated filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, and genuine buyer search intent.`;
   let keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
 ${seasonalEventKeywordContext}
    - ${directives.risetKeywordRule}
@@ -2661,7 +2750,7 @@ export const generateBatchStockMetadata = async (
   const aiRequestCount = targetCount;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_SPECIFICATION + `\n\nBATCH MODE: Apply the same provider-invariant keyword standard to every asset.\n`;
   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of exactly ${targetCount} highly-relevant, commercially useful keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
+  let keywordRuleSchemaDesc = `Provide a broad candidate pool of highly-relevant, commercially useful keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
 ${seasonalEventKeywordContext}
    - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
