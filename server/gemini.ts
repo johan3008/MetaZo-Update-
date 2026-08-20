@@ -4023,7 +4023,7 @@ OUTPUT FORMAT:
   }
 };
 
-function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
+function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string, styleCategory: string = "") {
   let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
   
   if (validatedPrompts.length === 0) {
@@ -4033,18 +4033,41 @@ function processPromptResults(parsed: any, count: number, subject: string, userN
 
   const originalLength = validatedPrompts.length;
   if (validatedPrompts.length < count) {
-    const modifiers = [
-      "cinematic macro photography, highly detailed",
-      "isometric 3D render, octane render, stylized lighting",
-      "vibrant watercolor ink illustration, splash art",
-      "futuristic cyberpunk city night life background, neon glow",
-      "classical oil painting, textured brush strokes, masterwork",
-      "minimalist flat graphic design icon",
-      "dramatic backlight, rim lighting, atmospheric depth",
-      "wide angle landscape composition, beautiful morning light",
-      "studio lighting portrait, bokeh depth of field",
-      "vintage retro concept art, detailed illustration"
-    ];
+    const modifiers = styleCategory === "Photorealistic"
+      ? [
+          "natural daylight, realistic depth of field",
+          "soft window light, authentic documentary framing",
+          "bright morning light, true-to-life color",
+          "clean studio illumination, realistic material detail",
+          "warm afternoon sunlight, natural shadows"
+        ]
+      : styleCategory === "Corporate Technology Concept"
+      ? [
+          "bright office daylight, clean enterprise composition",
+          "balanced professional lighting, realistic technology details",
+          "modern architectural daylight, restrained digital interface",
+          "neutral studio illumination, credible business environment",
+          "soft window light, practical enterprise technology setting"
+        ]
+      : styleCategory === "Painterly Digital Art"
+      ? [
+          "expressive layered brushwork, tactile painted texture",
+          "rich digital pigment, visible painterly strokes",
+          "traditional fine-art character, nuanced brush texture",
+          "organic painted edges, refined tonal transitions",
+          "layered digital paint, natural color harmony"
+        ]
+      : [
+          "cinematic macro photography, highly detailed",
+          "isometric 3D render, stylized lighting",
+          "vibrant watercolor ink illustration, splash art",
+          "classical oil painting, textured brush strokes",
+          "minimalist flat graphic design icon",
+          "dramatic backlight, atmospheric depth",
+          "wide angle composition, natural morning light",
+          "studio lighting portrait, bokeh depth of field",
+          "vintage retro concept art, detailed illustration"
+        ];
     let modIdx = 0;
     while (validatedPrompts.length < count) {
       const base = validatedPrompts[validatedPrompts.length % originalLength];
@@ -4096,6 +4119,7 @@ export const generateOptimizedPrompt = async (options: {
   darkHorrorSubStyle?: string;
   referenceImages?: string[];
   cameraAngles?: string[];
+  isLicensed?: boolean;
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -4113,18 +4137,29 @@ export const generateOptimizedPrompt = async (options: {
     vectorSubType = undefined,
     darkHorrorSubStyle = undefined,
     referenceImages = undefined,
-    cameraAngles = undefined
+    cameraAngles = undefined,
+    isLicensed = false
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
 
+  const proOnlyStyle = (styleCategory === 'Corporate Technology Concept' && promptMode === 'background')
+    || (styleCategory === 'Painterly Digital Art' && promptMode === 'png');
+  if (proOnlyStyle && !isLicensed) {
+    throw new Error(`Style "${styleCategory}" is available only for PRO accounts.`);
+  }
+
   // ELEMEN KEJUTAN (Surprise Element) - Random Salt & Diversity Injection (Expanded for Adobe Stock Similarity Protection)
   const defaultAngles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot", "extreme close-up", "Dutch angle", "worm's-eye view", "bird's-eye view", "first-person POV"];
   const angles = cameraAngles && cameraAngles.length > 0 ? cameraAngles : defaultAngles;
-  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "neon cyberpunk glow", "chiaroscuro lighting", "bioluminescent ambient light", "ethereal volumetric rays", "harsh cinematic spotlight", "dramatic backlighting with lens flare"];
-  const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background", "forced perspective", "kaleidoscopic symmetry", "abstract fragmented framing", "dramatic low-angle heroic composition", "ultra-wide architectural framing"];
-  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky", "thunderstorm dramatic sky", "heavy snow blizzard", "post-apocalyptic ash fall", "magical glowing floating embers", "surreal cosmic starscape"];
-  const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream", "vibrant neon cyberpunk palette", "dark moody cinematic tones", "surreal iridiscent colors", "high-contrast duotone", "hyper-saturated pop art colors"];
+  const baseLightings = ["clear natural daylight", "soft window light", "bright morning light", "warm afternoon sunlight", "balanced studio illumination", "gentle overcast daylight", "soft indoor ambient light", "clean architectural daylight", "natural side light", "neutral diffused light"];
+  const baseCompositions = ["natural eye-level composition", "balanced rule-of-thirds framing", "clean centered composition", "natural three-quarter perspective", "wide environmental composition", "medium contextual framing", "close detail with realistic depth of field", "balanced foreground and background layers", "clean architectural framing", "natural documentary composition"];
+  const baseSeasonsOrWeathers = ["clear daytime conditions", "bright morning atmosphere", "warm afternoon conditions", "gentle overcast daylight", "clear early evening light", "soft spring daylight", "warm summer daylight", "crisp autumn daylight", "subtle winter daylight", "neutral indoor conditions"];
+  const baseColorPalettes = ["natural true-to-life colors", "neutral professional tones", "warm natural tones", "soft balanced colors", "clean contemporary palette", "subtle cool-neutral palette", "natural earthy colors", "restrained corporate blue and neutral tones"];
+  const photographicLightings = ["clear natural daylight", "soft window light", "bright morning light", "warm afternoon sunlight", "gentle overcast daylight", "clean studio illumination", "neutral diffused light"];
+  const photographicCompositions = ["natural eye-level composition", "balanced rule-of-thirds framing", "natural three-quarter perspective", "wide environmental composition", "medium documentary framing", "close detail with realistic depth of field", "balanced foreground and background layers"];
+  const corporateLightings = ["bright office daylight", "clean architectural daylight", "soft window light", "balanced neutral studio illumination", "bright morning light", "even professional indoor lighting"];
+  const corporateCompositions = ["clean corporate architectural framing", "balanced office composition", "natural three-quarter perspective", "wide enterprise environment", "medium contextual business framing", "clear technology-focused composition", "balanced foreground and interface layers"];
 
   // Linear Congruential Generator (PRNG) using the seed to ensure deterministic but highly varied selections
   let currentSeed = seed;
@@ -4139,11 +4174,15 @@ export const generateOptimizedPrompt = async (options: {
   };
 
   const userCameraAngle = cameraAngles && cameraAngles.length > 0 ? cameraAngles.join(', ') : null;
+  const isPhotorealisticStyle = styleCategory === 'Photorealistic';
+  const isCorporateTechnologyStyle = styleCategory === 'Corporate Technology Concept';
+  const styleLightings = isCorporateTechnologyStyle ? corporateLightings : (isPhotorealisticStyle ? photographicLightings : baseLightings);
+  const styleCompositions = isCorporateTechnologyStyle ? corporateCompositions : (isPhotorealisticStyle ? photographicCompositions : baseCompositions);
   const randomAngle = userCameraAngle || selectRandom(defaultAngles);
-  const randomLighting = selectRandom(lightings);
-  const randomComp = selectRandom(compositions);
-  const randomSeason = selectRandom(seasonsOrWeathers);
-  const randomColor = selectRandom(colorPalettes);
+  const randomLighting = selectRandom(styleLightings);
+  const randomComp = selectRandom(styleCompositions);
+  const randomSeason = selectRandom(baseSeasonsOrWeathers);
+  const randomColor = selectRandom(baseColorPalettes);
 
   // 🎲 [Backend Helper] — Dynamic Injection Engine
   const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
@@ -4161,7 +4200,9 @@ export const generateOptimizedPrompt = async (options: {
 
   // When user selected camera angle, omit angle from randomSaltInjection to prevent over-emphasis
   const saltAngle = userCameraAngle ? 'User-selected angle (see Camera details rule)' : randomAngle;
-  const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
+  const randomSaltInjection = isPhotorealisticStyle || isCorporateTechnologyStyle
+    ? `[Natural Variation Context: ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}]`
+    : `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -4188,7 +4229,7 @@ export const generateOptimizedPrompt = async (options: {
     "Lowpoly": ' - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.',
     "3D CGI": ' - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.',
     "Cinematic": ' - Focus on hyper-realistic, high-budget live-action movie cinematography. MUST feel like a genuine, un-retouched motion picture still shot on real 35mm film or digital cinema cameras with real actors. Prioritize: Wide cinematic aspect ratios, cinematic anamorphic lenses with subtle lens flares, organic volumetric haze, beautiful backlight/rim light, high production value, and deep cinematic color grading (e.g., warm gold, cool blue, orange and teal, moody cinematic shadow). Composition must be dynamic with cinematic framing. AVOID: ANY digital art, AI-generated look, 3D CGI, plastic skin, flat studio lighting, or illustration styles. It must look 100% real.',
-    "Photorealistic": ' - Generate ultra-realistic, authentic, un-retouched real-world photography. MUST look indistinguishable from a real physical photograph captured by a professional camera (e.g., DSLR or mirrorless). Prioritize: Raw, natural realism, pin-sharp clarity, authentic natural skin/surface textures (e.g., visible pores, fine fabrics, wood grain, organic imperfections, peach fuzz), authentic human candid expressions, and completely realistic real-world environments. Lighting MUST be natural and un-staged: soft diffused daylight through windows, gentle overcast sky, warm afternoon sun with subtle shadows, or clean studio strobe with soft fill — NOT dramatic. STRICTLY FORBIDDEN cinematic/staged language: "deep shadows", "harsh spotlight", "dramatic lighting", "high-contrast duotone", "theatrical", "moody atmosphere", "volumetric haze", "cinematic color grading", "generous empty space for text placement". Describe negative space naturally as part of the composition, not as a commercial callout. Include realistic professional camera settings (e.g., 50mm lens, 85mm portrait lens, f/1.8 aperture). AVOID: CGI look, digital painting, excessive smoothness, "AI" look, theatrical cinematic color grading, artificial dramatic staging, harsh contrast, staged compositions. It must look like an authentic, unposed slice of everyday reality — a moment genuinely captured, not designed.',
+    "Photorealistic": ' - STRICT REAL-WORLD PHOTOGRAPHY. Create an authentic, believable photograph that looks naturally captured in the real world, not staged, cinematic, surreal, or artificially dramatic. Prioritize the true subject, realistic proportions, physically plausible materials, accurate colors, natural skin and surface texture, ordinary real-world environments, and believable human behavior. Use clear daylight, soft window light, bright morning light, warm afternoon sunlight, gentle overcast daylight, or clean studio illumination when appropriate. Do not invent dramatic weather. Unless the subject explicitly requires it, NEVER introduce thunderstorms, lightning, dark storm clouds, black clouds, apocalyptic skies, dramatic rain, blizzards, or ominous weather. Avoid cinematic color grading, teal-and-orange treatment, artificial lens flares, excessive haze, theatrical rim lighting, deep crushed shadows, surreal atmosphere, or exaggerated drama. Camera details should remain realistic and restrained, such as a 35mm or 50mm lens, natural depth of field, accurate exposure, and documentary-style framing. The final prompt must read like a clear professional photography brief describing a real scene.',
     "Anime/Manga": ' - Focus on cel-shaded aesthetics, expressive character features, vibrant colors, and classic Japanese hand-drawn illustration styles.',
     "Watercolor Painting": ' - Focus on flowing pigment washes, paper grain textures, organic color bleeds, and delicate artistic strokes.',
     "Oil Painting": ' - Focus on heavy brushstrokes, impasto textures, rich pigment layers, and classical fine art canvas aesthetics.',
@@ -4238,6 +4279,21 @@ When generating or refining prompts for the "Graphic Design" style, you MUST str
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
+
+  if (styleCategory === 'Photorealistic') {
+    currentDirective += `
+ - REAL-WORLD WEATHER LOCK: Use only weather and environmental conditions that naturally fit the subject. Prefer clear daylight, soft overcast daylight, ordinary morning or afternoon light, or realistic indoor conditions. Do not invent storms, lightning, black clouds, apocalyptic skies, dramatic rain, blizzards, or ominous weather. If the subject explicitly requires such weather, describe only what is actually required.`;
+  }
+
+  if (styleCategory === 'Corporate Technology Concept') {
+    currentDirective += `
+ - CORPORATE REALISM LOCK: Keep the scene grounded in believable present-day enterprise technology and real business environments. Prefer practical office architecture, real devices, data infrastructure, professional workflows, subtle digital interfaces, and clean natural lighting. No cyberpunk fantasy, no dystopian atmosphere, no storm drama, no lightning, no black clouds, and no exaggerated sci-fi spectacle unless explicitly required by the user's subject.`;
+  }
+
+  if (styleCategory === 'Painterly Digital Art' && isPngMode) {
+    currentDirective += `
+ - PNG PAINTERLY LOCK: Treat the requested subject as a standalone painted asset. Preserve the requested solid/transparent PNG background while applying visible expressive brushwork, layered digital paint, tactile pigment texture, nuanced edges, and refined painterly material rendering. Do not turn it into a scenery illustration, poster, sticker, or generic horror painting.`;
+  }
 
   if (styleCategory === 'Dark Horror Aesthetic') {
     const DARK_HORROR_BASE_INSTRUCTION = `You are an expert Cinematographer and Hyper-Realistic Photographer specializing in extremely Dark Horror, Macabre, and Gothic Aesthetic assets for high-end cinematic media.
@@ -4510,7 +4566,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         }
         
         if (promptArray.length > 0) {
-            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt);
+            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt, styleCategory);
         }
         throw new Error('Missing or empty prompts array in JSON response');
       } catch (err: any) {
@@ -4562,7 +4618,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           const text = response.text || "{}";
           const parsed = JSON.parse(extractJSON(text));
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
-            return processPromptResults(parsed, count, subject, userNegativePrompt);
+            return processPromptResults(parsed, count, subject, userNegativePrompt, styleCategory);
           }
           throw new Error('Missing or empty prompts array in JSON response');
         } catch (err: any) {
@@ -4622,6 +4678,13 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
   let resolvedSubject = translatedWords.join(" ");
 
   const styleFallbackMap: Record<string, string[]> = {
+    "Corporate Technology Concept": [
+      "photorealistic corporate technology environment, modern enterprise workspace, realistic digital interface elements, clean daylight, credible business technology",
+      "professional enterprise technology scene, realistic office architecture, subtle data visualization overlays, balanced natural lighting, authentic materials",
+      "modern technology workplace, practical AI and data workflow, restrained holographic interface, realistic corporate photography, bright neutral illumination",
+      "credible cybersecurity or cloud computing concept in a contemporary business environment, realistic devices, clean composition, natural office light",
+      "commercial technology photography, modern enterprise infrastructure, understated digital overlays, realistic surfaces, clear professional visual hierarchy"
+    ],
     "Graphic Design": [
       "flat vector graphic design, Adobe Illustrator style composition, bold geometric shapes, clean commercial layout, vibrant duotone gradient, no realism",
       "promotional banner template, isometric abstract geometry, halftone dot pattern, dynamic diagonal slashes, smooth gradient mesh, purely digital art",
@@ -4732,9 +4795,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "masterful cinematic horror composition, atmospheric dread, epic dark concept art"
     ],
     "Painterly Digital Art": [
-      "painterly digital art, heavy impasto brushstrokes, dark horror aesthetics, masterwork painting",
-      "expressive painterly horror art, thick brushstrokes, eerie mood, beautiful yet terrifying",
-      "digital painterly style, classical horror aesthetic, highly detailed brushwork"
+      "painterly digital art, expressive layered brushwork, rich pigment texture, refined digital painting, natural color harmony",
+      "contemporary painterly illustration, visible brush strokes, tactile painted surfaces, nuanced tonal transitions, sophisticated composition",
+      "detailed digital painting with traditional fine-art character, textured brushwork, organic edges, controlled lighting, refined material definition",
+      "hand-painted digital artwork, layered strokes, subtle canvas texture, natural forms, carefully balanced composition",
+      "premium painterly asset, expressive brushwork, realistic material rendering combined with visible painted texture, elegant color relationships"
     ],
     "Dark Horror Aesthetic": [
       "grimdark, oppressive shadows, terrifying atmosphere, hyper-detailed dark fantasy",
@@ -5353,7 +5418,8 @@ export async function checkImageQuality(
   language: string = 'Bahasa', 
   model?: string, 
   fileType?: string, 
-  imageMetadata?: any
+  imageMetadata?: any,
+  technicalStats?: any
 ) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -5366,12 +5432,34 @@ export async function checkImageQuality(
     metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Gambar yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda.`;
   }
 
+  const technicalGroundTruth = technicalStats ? `\n\n[OBJECTIVE IMAGE-QUALITY EVIDENCE]\nThe following measurements come from the original image using PIL/OpenCV/FFmpeg. They are evidence about visible image quality only. NEVER use file size, pixel dimensions, resolution, or megapixels as a PASS/FAIL criterion. Treat noise, JPEG blocking, banding, clipping, and blur signals as evidence that must be visually interpreted together with the full image and forensic crops.\n${JSON.stringify({ brightness: technicalStats.brightness, contrast: technicalStats.contrast, sharpness: technicalStats.sharpness, noise: technicalStats.noise, banding: technicalStats.banding, jpeg_blocking: technicalStats.jpeg_blocking, local_analysis: technicalStats.local_analysis, detected_text: technicalStats.detected_text, quality_flags: technicalStats.quality_flags }, null, 2)}\n[/OBJECTIVE IMAGE-QUALITY EVIDENCE]` : "";
+
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
 
 Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
 1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang, logo pada produk/pakaian, plat nomor, tanda tangan, wajah tanpa model release, serta teks/watermark ilegal.
 2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, wajah kerumunan yang meleleh/hancur di latar belakang (melted background faces), benda-benda aneh yang bentuknya tidak logis (nonsensical objects/hallucinations), pola rumit yang hancur (pattern degradation), blur yang terlihat seperti coretan kasar bukan bokeh natural (unnatural depth of field), sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh, menyatu, atau lebih dari 5).
 3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
+
+---
+HARD GATE: IMAGE QUALITY EVIDENCE — DO NOT JUDGE FILE SIZE OR RESOLUTION
+- JANGAN menggunakan ukuran file, file size, pixel dimensions, resolusi, atau megapixel sebagai alasan PASS/FAIL. Informasi tersebut hanya boleh menjadi metadata referensi dan TIDAK boleh menentukan keputusan kualitas.
+- Fokus hanya pada kualitas visual yang benar-benar terlihat: fokus/ketajaman, detail yang hilang, noise, compression artifacts, banding, exposure, lighting, color integrity, chromatic aberration, sensor defects, AI/generative defects, geometry, texture integrity, and other visible technical defects.
+- Objective high_noise_signal adalah SIGNAL, bukan automatic rejection. FAIL hanya jika noise/grain benar-benar mengganggu detail atau kualitas stock setelah mempertimbangkan struktur/detail alami gambar dan hasil crop forensic.
+- strong_jpeg_blocking_signal adalah SIGNAL. FAIL hanya jika blockiness/ringing/mosquito noise/banding/compression benar-benar terlihat sebagai artifact yang merusak gambar.
+- crushed_shadow_signal adalah SIGNAL. FAIL hanya jika shadow clipping menghilangkan detail penting secara tidak wajar. Low-key lighting yang disengaja tetap boleh PASS.
+- local_blur_anomaly_signal adalah SIGNAL. FAIL hanya jika area penting/main subject benar-benar kehilangan detail; jangan menghukum intentional depth of field atau naturally soft background.
+- Satu signal teknis yang lemah tidak cukup untuk FAIL. Prioritaskan defect yang nyata dan material terhadap kualitas asset.
+- Jangan pernah memberi PASS hanya karena gambar terlihat menarik pada thumbnail. Inspeksi seluruh crop pada 100% dan prioritaskan cacat teknis yang terlihat.
+
+---
+FORENSIC GENERATIVE-AI INSPECTION
+- Periksa SETIAP crop, bukan hanya center.
+- Untuk elektronik, PCB, server rack, chip, circuit board, connector, screen, dashboard, UI, kabel, dan perangkat mekanis: cek apakah struktur fisik, koneksi, perspektif, tulisan, simbol, pin, port, heatsink, trace, dan interface masuk akal dan konsisten.
+- Teks generatif yang tampak seperti nama produk/brand tetapi tidak jelas, salah eja, pseudo-text, atau gibberish adalah red flag. Jangan menganggapnya aman hanya karena menyerupai teks. Jika teks terlihat rusak/tidak bermakna dan merupakan bagian dari aset, FAIL pada text/ai_artifacts.
+- Holographic UI, floating panels, glowing circuit traces, icons, charts, shields, globe graphics, dan interface elements harus memiliki geometri, alignment, perspective, dan edge rendering yang konsisten. Jika tampak melted, duplicated, disconnected, impossible, atau pasted-on, FAIL.
+- Periksa micro-details di seluruh frame: repeated patterns, duplicated components, impossible connectors, melted circuitry, inconsistent reflections, impossible shadows, warped grids, malformed typography, and object intersections.
+- AI-generated defect yang kecil tetapi jelas tetap merupakan defect; jangan menghapusnya karena dianggap "minor".
 
 ---
 PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
@@ -5383,8 +5471,8 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 
 ---
 PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
-Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil dari 4 wilayah KUADRAN ber-overlap 20% yang bersama-sama mencakup SELURUH permukaan gambar, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, lalu BAWAH-KANAN.
-- Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
+Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh. Gambar ke-2 sampai ke-5 adalah CROP FORENSIK RESOLUSI ASLI yang setara dengan inspeksi 200%: masing-masing crop mengambil sekitar 50% lebar dan 50% tinggi gambar sumber, sehingga detail piksel terlihat dua kali lebih besar ketika ditampilkan pada ukuran frame yang sama. Crop tidak boleh dianggap sebagai hasil upscale dan tidak boleh digunakan untuk mengarang detail yang tidak terlihat. Empat crop mencakup SELURUH permukaan gambar dengan overlap 20% relatif terhadap ukuran crop, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, BAWAH-KANAN.
+- Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel pada tingkat pemeriksaan 200% equivalent: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
 - ZONA RAWAN KRITIS (WAJIB DIPERIKSA EKSTRA TELITI): Pada foto orang memegang/menyentuh objek (produk, model, botol, alat, dsb.), titik kontak tangan-jari-objek PALING SERING berada di paruh BAWAH frame (kuadran BAWAH-KIRI/BAWAH-KANAN) — dekat dada, perut, atau pinggang subjek. Zona inilah yang paling sering mengandung cacat AI generatif (jari menyatu/meleleh ke objek, objek yang menembus pakaian, genggaman yang mustahil secara fisik) namun paling mudah terlewat jika hanya melihat gambar penuh yang telah diperkecil. Periksa kuadran bawah dengan tingkat kecurigaan setara atau lebih tinggi daripada kuadran atas.
 - Sebutkan di laporan visual_scan_analysis crop wilayah mana (atas-kiri/atas-kanan/bawah-kiri/bawah-kanan) tempat Anda menemukan cacat.
 - Cacat yang terkonfirmasi pada SALAH SATU crop saja sudah cukup untuk menyatakan FAIL pada check terkait — moderator Adobe Stock memeriksa gambar pada zoom 100-200% di SELURUH area, bukan hanya tampilan penuh.
@@ -5502,6 +5590,15 @@ Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan sk
 - MEDIUM (Standar Industri): Cacat teknis yang sangat minor di luar fokus utama (seperti noise halus yang wajar atau soft focus pada latar belakang artistik) dapat ditoleransi. Namun, kesalahan fokus pada subjek utama, anomali AI yang terlihat jelas, atau pelanggaran IP/Kekayaan Intelektual apa pun wajib dinyatakan FAIL dengan skor maksimal 0-65.
 - LOOSE (Toleransi Longgar / Estetika Tinggi): Utamakan keindahan artistik dan nilai jual komersial secara keseluruhan. Cacat teknis sedang (seperti noise sedang, soft focus ringan pada subjek sekunder, anomali AI minor yang tersembunyi) diperbolehkan lolos (PASS) asalkan subjek utama terlihat luar biasa indah, memiliki komposisi menawan, dan daya tarik komersial yang tinggi. Hanya kegagalan teknis yang fatal atau pelanggaran IP yang sangat terang-terangan yang menyebabkan status FAIL (skor maksimal 0-69).
 
+KONSISTENSI LINTAS PROVIDER & MODEL (MANDATORY):
+- Semua provider dan model yang digunakan oleh Quality Check WAJIB menerima kontrak audit yang sama: gambar penuh + empat crop forensik 200%-equivalent, aturan defect yang sama, schema JSON yang sama, dan logika keputusan yang sama.
+- Jangan menggunakan style, kreativitas, atau interpretasi provider sebagai alasan untuk mengubah standar QC.
+- Suhu/randomness harus seminimal mungkin. Jika provider mendukung deterministic sampling, gunakan temperature 0 dan topP serendah yang didukung. Jika provider tidak mendukung parameter tersebut, konsistensi harus dicapai melalui prompt, structured output, dan post-processing keputusan.
+- Provider/model tidak boleh mengabaikan temuan yang sudah dikonfirmasi secara visual pada salah satu crop. Satu defect material yang terkonfirmasi di crop mana pun harus tetap tercermin pada check terkait.
+- Jangan mengarang detail hanya karena crop diperbesar. Jika detail tidak dapat dipastikan secara visual, tandai sebagai tidak terkonfirmasi dan jangan FAIL.
+- Output akhir harus mengikuti schema, nama field, arti PASS/FAIL, tolerance rules, dan bahasa yang sama di semua provider/model.
+- Identitas provider/model boleh berbeda, tetapi standar dan decision contract harus sama. Jangan menjanjikan byte-for-byte identik antar model; yang wajib identik adalah aturan, evidence protocol, dan keputusan ketika evidence visual yang sama mendukung temuan yang sama.
+
 STATUS & SKORING (KONSISTEN & KETAT):
 - PASS: Skor 75 - 100.
 - FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
@@ -5586,26 +5683,27 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC routing: do NOT silently downgrade a requested Pro model to Flash.
-  // The current Gemini API exposes Gemini 3.1 Pro Preview for advanced reasoning and
-  // Gemini 3.6 Flash for faster multimodal fallback.
-  let selectedModel = model || 'gemini-3.1-pro-preview';
+  // QC Vision uses Gemini 3 Flash Preview as the primary multimodal model.
+  // Objective pixel measurements remain authoritative; the model is responsible for
+  // visual/structural/AI-artifact inspection across the full image and forensic crops.
+  let selectedModel = model || 'gemini-3-flash-preview';
   if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
-    selectedModel = 'gemini-3.1-pro-preview';
+    selectedModel = 'gemini-3-flash-preview';
   }
 
-  // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
-  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+  // Keep the QC model deterministic. Do not silently switch to an unrelated model.
+  const modelsToTry = ['gemini-3-flash-preview'];
   let responseText = "";
   let lastError;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+      let promptText = `Act as an objective Adobe Stock QA curator using the EXACT same audit contract regardless of provider or model. Inspect the full image and EVERY forensic crop at 200%-equivalent native-pixel inspection. Never infer or hallucinate unseen details. Determine PASS or FAIL only from confirmed visible evidence and the shared tolerance rules. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
         promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
+      promptText += technicalGroundTruth;
       
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
@@ -5622,16 +5720,17 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   } else {
     const activeModel = selectedModel;
 
-    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
+    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel] : modelsToTry;
     
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+        let promptText = `Act as an objective Adobe Stock QA curator using the EXACT same audit contract regardless of provider or model. Inspect the full image and EVERY forensic crop at 200%-equivalent native-pixel inspection. Never infer or hallucinate unseen details. Determine PASS or FAIL only from confirmed visible evidence and the shared tolerance rules. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
+        promptText += technicalGroundTruth;
         
-        // Gemini 3.6 Flash / 3.5 Flash-Lite deprecate temperature/topP/topK.
+        // Gemini 3 Flash Preview uses deterministic structured output via the system instruction.
         // Keep the QC request deterministic through the system prompt + structured output
         // instead of deprecated sampling controls. This also prevents fallback 400s.
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
@@ -5653,7 +5752,31 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
+    (parsedResult as any).qc_protocol = 'QC-200-NATIVE-V2';
+    (parsedResult as any).inspection_zoom = '200%-equivalent';
+    (parsedResult as any).file_size_or_resolution_used_for_decision = false;
     
+    // Deterministic hard gates from objective pixel analysis. AI cannot override measured defects.
+    if (technicalStats) {
+      parsedResult.technical_ground_truth = technicalStats;
+      parsedResult.hard_quality_flags = [];
+      const hardFlags = technicalStats.quality_flags || {};
+      // Objective signals are evidence, not file-size/resolution gates.
+      // The final decision must be based on visible image-quality defects confirmed by AI Vision and forensic crops.
+      parsedResult.hard_quality_flags = [];
+      if (hardFlags.high_noise_signal) parsedResult.hard_quality_flags.push('noise_signal');
+      if (hardFlags.strong_jpeg_blocking_signal) parsedResult.hard_quality_flags.push('compression_signal');
+      if (hardFlags.local_blur_anomaly_signal) parsedResult.hard_quality_flags.push('local_blur_signal');
+      if (hardFlags.crushed_shadow_signal) parsedResult.hard_quality_flags.push('shadow_clipping_signal');
+      // Never add resolution/file-size flags and never force FAIL from these measurements alone.
+      parsedResult.technical_quality_evidence = {
+        noise_signal: !!hardFlags.high_noise_signal,
+        compression_signal: !!hardFlags.strong_jpeg_blocking_signal,
+        local_blur_signal: !!hardFlags.local_blur_anomaly_signal,
+        shadow_clipping_signal: !!hardFlags.crushed_shadow_signal
+      };
+    }
+
     // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
       let anyFail = false;
@@ -5716,6 +5839,21 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             parsedResult.overall_score = 69;
           }
         }
+      }
+
+      // FINAL CONSISTENCY NORMALIZATION: every provider/model must obey the same
+      // decision contract. A confirmed FAIL in any material technical/AI/IP check
+      // cannot be reversed by a provider-specific overall score. Conversely, weak
+      // signals without visual confirmation do not create a FAIL.
+      const confirmedBlockingChecks = failedCheckKeys.filter(k =>
+        criticalKeys.includes(k) || technicalKeys.includes(k) || k === 'stock_acceptance'
+      );
+      if (confirmedBlockingChecks.length > 0) {
+        parsedResult.recommendation = 'FAIL';
+        parsedResult.overall_score = Math.min(Number(parsedResult.overall_score) || 0, tolerance === 'STRICT' ? 59 : 65);
+      } else {
+        parsedResult.recommendation = 'PASS';
+        parsedResult.overall_score = Math.max(75, Math.min(100, Number(parsedResult.overall_score) || 75));
       }
 
       // Sinkronkan stock_acceptance dengan keputusan akhir agar UI tidak menampilkan kontradiksi

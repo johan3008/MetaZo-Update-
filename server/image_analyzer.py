@@ -296,6 +296,48 @@ def local_region_analysis(gray, visible_mask):
     }
 
 
+
+def detect_visible_text(img):
+    """OCR is advisory only: return text candidates for AI Vision to inspect for gibberish/fake branding."""
+    try:
+        import pytesseract
+        # Work on a moderately large RGB image; do not upscale beyond a modest OCR working size.
+        work = img.convert("RGB")
+        max_w = 1800
+        if work.width > max_w:
+            ratio = max_w / float(work.width)
+            work = work.resize((max_w, max(1, int(work.height * ratio))), Image.Resampling.LANCZOS)
+        data = pytesseract.image_to_data(work, output_type=pytesseract.Output.DICT, config="--psm 11")
+        items = []
+        n = len(data.get("text", []))
+        for i in range(n):
+            text = (data["text"][i] or "").strip()
+            try:
+                conf = float(data["conf"][i])
+            except Exception:
+                conf = -1
+            if text and conf >= 35:
+                items.append({
+                    "text": text,
+                    "confidence": round(conf, 1),
+                    "x": int(data["left"][i]),
+                    "y": int(data["top"][i]),
+                    "w": int(data["width"][i]),
+                    "h": int(data["height"][i])
+                })
+        # De-duplicate repeated OCR tokens while retaining positions.
+        seen = set()
+        out = []
+        for item in items:
+            key = item["text"].lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(item)
+        return out[:40]
+    except Exception:
+        return []
+
 def main():
     try:
         import os
@@ -451,6 +493,8 @@ def main():
         ext = Path(file_path).suffix.lower() if file_path else ""
         jpeg_blocking = jpeg_blocking_score(gray, solid_mask) if ext in {".jpg", ".jpeg"} else 0.0
         
+        detected_text = detect_visible_text(img)
+
         report = {
             "resolution": f"{width} x {height} ({mp:.2f} MP)",
             "width": width,
@@ -500,7 +544,15 @@ def main():
             "local_analysis": local_grid,
             "visible_pixel_analysis": True,
             "file_validation": "Valid (Passed Alpha-Aware Pixel Analysis)",
-            "file_size_kb": file_size_kb
+            "file_size_kb": file_size_kb,
+            "detected_text": detected_text,
+            "quality_flags": {
+                # Resolution/file size are intentionally NOT quality gates.
+                "high_noise_signal": bool(noise_val >= 30),
+                "strong_jpeg_blocking_signal": bool(jpeg_blocking >= 65),
+                "crushed_shadow_signal": bool(clipped_low_pct > 12.0 and p50 < 28),
+                "local_blur_anomaly_signal": bool(local_sharpness_alert)
+            }
         }
 
         print(json.dumps(report, ensure_ascii=False))
