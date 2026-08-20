@@ -864,7 +864,7 @@ export function getKeywordIntelligenceSnapshot(limit = 100) {
     }))
     .sort((a, b) => b.marketScore - a.marketScore);
   return {
-    version: '5.0',
+    version: '5.1',
     meta: keywordMarketMeta,
     availableKeywords: entries.length,
     derivedAssetPerformance: true,
@@ -920,7 +920,7 @@ function calculateMarketOpportunity(signal: KeywordMarketSignal): number {
 
 
 // ============================================================================
-// V5 MARKET INTELLIGENCE: MASTER CANDIDATE POOL + USER PERFORMANCE
+// V5.1 MARKET INTELLIGENCE: MASTER CANDIDATE POOL + SEMANTIC ROLE HIERARCHY + USER PERFORMANCE
 // ============================================================================
 // Market data is a discovery/ranking signal only. It NEVER overrides visual truth.
 // The engine can combine built-in market corpus, imported contributor performance,
@@ -1005,6 +1005,190 @@ export function resetKeywordIntelligenceToBuiltin() {
   return getKeywordIntelligenceStatus();
 }
 
+
+// ============================================================================
+// V5.1 SEMANTIC KEYWORD ROLE HIERARCHY
+// ============================================================================
+// Keyword order follows the information architecture of the asset, not fixed
+// slots. Main subject gets the strongest priority, followed by environment,
+// seasonal context, concept, style/visual attributes, commercial intent and
+// secondary attributes. A role is optional: it only exists when VISUAL_FACTS
+// provide evidence for it.
+
+type KeywordSemanticRole =
+  | 'main_subject'
+  | 'subject_variation'
+  | 'environment'
+  | 'action_state'
+  | 'secondary_subject'
+  | 'visual_style'
+  | 'composition'
+  | 'seasonal'
+  | 'concept'
+  | 'commercial_use'
+  | 'color'
+  | 'attribute'
+  | 'generic';
+
+interface KeywordRoleContext {
+  primary: string[];
+  secondary: string[];
+  environment: string[];
+  actions: string[];
+  style: string[];
+  composition: string[];
+  seasonal: string[];
+  concepts: string[];
+  commercial: string[];
+  colors: string[];
+  attributes: string[];
+}
+
+const SEMANTIC_ROLE_PRIORITY: Record<KeywordSemanticRole, number> = {
+  main_subject: 100,
+  subject_variation: 94,
+  environment: 86,
+  action_state: 82,
+  secondary_subject: 78,
+  visual_style: 72,
+  composition: 68,
+  seasonal: 64,
+  concept: 60,
+  commercial_use: 56,
+  color: 48,
+  attribute: 44,
+  generic: 20
+};
+
+const SEASONAL_TERMS = new Set([
+  'christmas','xmas','holiday','holidays','festive','seasonal','winter','summer',
+  'spring','autumn','fall','easter','halloween','valentines','valentine',
+  'thanksgiving','new year','newyear','ramadan','diwali','hanukkah','birthday'
+]);
+
+const COMMERCIAL_TERMS = new Set([
+  'background','banner','poster','template','advertising','advertisement',
+  'marketing','social media','copy space','web banner','cover','flyer',
+  'brochure','presentation','branding','mockup','card','invitation'
+]);
+
+function uniqueCleanStrings(values: any[]): string[] {
+  return Array.from(new Set((values || [])
+    .filter((x: any) => typeof x === 'string')
+    .map((x: string) => sanitizeForIndexing(x))
+    .filter(Boolean)));
+}
+
+function buildKeywordRoleContext(visualFacts: any): KeywordRoleContext {
+  const tiers = buildTieredVisualAnalysis(visualFacts || {});
+  const primary = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'primary').map(o => o.name));
+  const secondary = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'secondary').map(o => o.name));
+  const environment = uniqueCleanStrings([
+    ...tiers.scene,
+    ...tiers.objects.filter(o => o.tier === 'background').map(o => o.name),
+    ...(Array.isArray(visualFacts?.environment) ? visualFacts.environment : []),
+    ...(Array.isArray(visualFacts?.setting) ? visualFacts.setting : []),
+    ...(Array.isArray(visualFacts?.location) ? visualFacts.location : [])
+  ]);
+  const actions = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.actions) ? visualFacts.actions : []),
+    ...(Array.isArray(visualFacts?.action) ? visualFacts.action : []),
+    ...(Array.isArray(visualFacts?.states) ? visualFacts.states : [])
+  ]);
+  const style = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.style) ? visualFacts.style : []),
+    ...(Array.isArray(visualFacts?.visual_style) ? visualFacts.visual_style : []),
+    ...(Array.isArray(visualFacts?.visualStyle) ? visualFacts.visualStyle : []),
+    ...(Array.isArray(visualFacts?.attributes) ? visualFacts.attributes : [])
+  ]);
+  const composition = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.composition) ? visualFacts.composition : []),
+    ...(Array.isArray(visualFacts?.layout) ? visualFacts.layout : []),
+    ...(Array.isArray(visualFacts?.camera_composition) ? visualFacts.camera_composition : [])
+  ]);
+  const seasonal = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.seasonal_context) ? visualFacts.seasonal_context : []),
+    ...(Array.isArray(visualFacts?.seasonal) ? visualFacts.seasonal : []),
+    ...(Array.isArray(visualFacts?.occasion) ? visualFacts.occasion : []),
+    ...(Array.isArray(visualFacts?.events) ? visualFacts.events : []),
+    ...(visualFacts?.season ? [visualFacts.season] : []),
+    ...(visualFacts?.holiday ? [visualFacts.holiday] : [])
+  ]).filter(v => [...SEASONAL_TERMS].some(t => v === t || v.includes(t)));
+  const concepts = uniqueCleanStrings([
+    ...tiers.concepts,
+    ...(Array.isArray(visualFacts?.concepts) ? visualFacts.concepts : []),
+    ...(Array.isArray(visualFacts?.themes) ? visualFacts.themes : []),
+    ...(Array.isArray(visualFacts?.commercial_concepts) ? visualFacts.commercial_concepts : [])
+  ]);
+  const commercial = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.commercial_use) ? visualFacts.commercial_use : []),
+    ...(Array.isArray(visualFacts?.use_cases) ? visualFacts.use_cases : []),
+    ...(Array.isArray(visualFacts?.applications) ? visualFacts.applications : [])
+  ]).filter(v => [...COMMERCIAL_TERMS].some(t => v === t || v.includes(t)));
+  const colors = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.colors) ? visualFacts.colors : []),
+    ...(Array.isArray(visualFacts?.color) ? visualFacts.color : [])
+  ]).filter(v => v.split(/\s+/).some(w => COLOR_KEYWORDS.has(w)));
+  const attributes = uniqueCleanStrings([
+    ...tiers.attributes,
+    ...(Array.isArray(visualFacts?.technical_attributes) ? visualFacts.technical_attributes : []),
+    ...(Array.isArray(visualFacts?.technicalAttributes) ? visualFacts.technicalAttributes : [])
+  ]);
+  return { primary, secondary, environment, actions, style, composition, seasonal, concepts, commercial, colors, attributes };
+}
+
+function keywordMatchesEvidence(keyword: string, evidence: string[]): boolean {
+  const k = sanitizeForIndexing(keyword);
+  if (!k || !evidence.length) return false;
+  return evidence.some(e => e === k || e.includes(k) || k.includes(e) ||
+    k.split(/\s+/).some(w => w.length > 2 && e.split(/\s+/).includes(w)));
+}
+
+function classifyKeywordSemanticRole(keyword: string, ctx: KeywordRoleContext): KeywordSemanticRole {
+  const k = sanitizeForIndexing(keyword);
+  if (!k) return 'generic';
+  const words = k.split(/\s+/);
+  const isColor = words.some(w => COLOR_KEYWORDS.has(w));
+  if (isColor && keywordMatchesEvidence(k, ctx.colors)) return 'color';
+  if (keywordMatchesEvidence(k, ctx.primary)) {
+    const exactPrimary = ctx.primary.some(x => x === k);
+    return exactPrimary ? 'main_subject' : 'subject_variation';
+  }
+  if (keywordMatchesEvidence(k, ctx.environment)) return 'environment';
+  if (keywordMatchesEvidence(k, ctx.actions)) return 'action_state';
+  if (keywordMatchesEvidence(k, ctx.secondary)) return 'secondary_subject';
+  if (keywordMatchesEvidence(k, ctx.style)) return 'visual_style';
+  if (keywordMatchesEvidence(k, ctx.composition)) return 'composition';
+  if (keywordMatchesEvidence(k, ctx.seasonal) || words.some(w => SEASONAL_TERMS.has(w))) return 'seasonal';
+  if (keywordMatchesEvidence(k, ctx.concepts)) return 'concept';
+  if (keywordMatchesEvidence(k, ctx.commercial) || COMMERCIAL_TERMS.has(k)) return 'commercial_use';
+  if (keywordMatchesEvidence(k, ctx.attributes)) return 'attribute';
+  return 'generic';
+}
+
+/** Generate only evidence-backed phrase combinations; there are no role quotas. */
+function buildStructuredKeywordCandidates(ctx: KeywordRoleContext): string[] {
+  const out: string[] = [];
+  const push = (v: string) => {
+    const k = sanitizeForIndexing(v);
+    if (!k || isProhibitedKeyword(k) || containsKeywordConnector(k)) return;
+    out.push(k);
+  };
+  for (const subject of ctx.primary.slice(0, 4)) {
+    push(subject);
+    for (const style of ctx.style.slice(0, 4)) push(`${style} ${subject}`);
+    for (const season of ctx.seasonal.slice(0, 3)) push(`${season} ${subject}`);
+    for (const env of ctx.environment.slice(0, 3)) push(`${subject} ${env}`);
+    for (const concept of ctx.concepts.slice(0, 3)) push(`${concept} ${subject}`);
+  }
+  for (const secondary of ctx.secondary.slice(0, 4)) push(secondary);
+  for (const env of ctx.environment.slice(0, 5)) push(env);
+  for (const season of ctx.seasonal.slice(0, 5)) push(season);
+  for (const concept of ctx.concepts.slice(0, 6)) push(concept);
+  for (const style of ctx.style.slice(0, 6)) push(style);
+  return Array.from(new Set(out));
+}
+
 function ensureKeywordCount(
   keywords: string[],
   targetCount: number,
@@ -1040,6 +1224,16 @@ function ensureKeywordCount(
   // semantic deduplication, IP rules, and global ranking below.
   const marketCandidates = discoverMarketCandidates(visualFacts || {}, Math.max(80, target * 6));
   for (const candidate of marketCandidates) {
+    if (keywordMode === 'single' && candidate.includes(' ')) continue;
+    if (keywordMode === 'multi' && !candidate.includes(' ')) continue;
+    if (!raw.includes(candidate)) raw.push(candidate);
+  }
+
+  // V5.1: add evidence-backed semantic phrases. This creates the required
+  // Main Subject → Environment → Seasonal → Concept pattern dynamically,
+  // without reserving fixed slots for any role.
+  const roleContext = buildKeywordRoleContext(visualFacts || {});
+  for (const candidate of buildStructuredKeywordCandidates(roleContext)) {
     if (keywordMode === 'single' && candidate.includes(' ')) continue;
     if (keywordMode === 'multi' && !candidate.includes(' ')) continue;
     if (!raw.includes(candidate)) raw.push(candidate);
@@ -1087,6 +1281,8 @@ function ensureKeywordCount(
   const score = (keyword: string, originalIndex: number): number => {
     const k = keyword.toLowerCase();
     const words = getWords(k);
+    const semanticRole = classifyKeywordSemanticRole(k, roleContext);
+    const rolePriority = SEMANTIC_ROLE_PRIORITY[semanticRole];
     const primaryMatch = containsEvidence(k, primary);
     const secondaryMatch = containsEvidence(k, secondary);
     const backgroundMatch = containsEvidence(k, background);
@@ -1126,6 +1322,7 @@ function ensureKeywordCount(
 
     // V5: market intelligence is meaningful but never dominates visual truth.
     // 40% visual + 20% market + 15% search intent + 8% specificity + 7% title + 10% corpus.
+    // Semantic role priority is an ordering assist, not a fixed slot quota.
     const visualWeight = hasMarketData ? 0.40 : 0.62;
     const marketWeight = hasMarketData ? 0.20 : 0;
     const intentWeight = hasMarketData ? 0.15 : 0.18;
@@ -1134,14 +1331,22 @@ function ensureKeywordCount(
     const corpusWeight = hasMarketData ? 0.10 : 0;
     const corpusSignal = hasMarketData ? Math.min(100, Math.log1p(Number(market.assets || 0)) * 22) : 0;
 
+    // Role priority is deliberately small enough that a weak visual keyword
+    // cannot beat a strongly supported main subject merely because of its role.
+    // It mainly controls the natural ordering inside similarly relevant terms.
+    const roleBonus = rolePriority * 0.10;
+    const rolePenalty = semanticRole === 'generic' ? 8 : 0;
+
     return Math.round(
       visual * visualWeight +
       marketScore * marketWeight +
       intent * intentWeight +
       specificity * specificityWeight +
       titleBonus * titleWeight +
-      corpusSignal * corpusWeight -
-      genericPenalty
+      corpusSignal * corpusWeight +
+      roleBonus -
+      genericPenalty -
+      rolePenalty
     ) + Math.max(0, 3 - originalIndex * 0.02);
   };
 
