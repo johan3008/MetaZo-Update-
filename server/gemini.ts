@@ -492,21 +492,109 @@ function ensureKeywordCount(
   }
 
   const tiers = buildTieredVisualAnalysis(visualFacts || {});
+  const primary = tiers.objects.filter(o => o.tier === 'primary').map(o => o.name.toLowerCase());
+  const secondary = tiers.objects.filter(o => o.tier === 'secondary').map(o => o.name.toLowerCase());
+  const background = tiers.objects.filter(o => o.tier === 'background').map(o => o.name.toLowerCase());
+  const attributes = tiers.attributes.map(x => String(x).toLowerCase());
+  const scene = tiers.scene.map(x => String(x).toLowerCase());
+  const concepts = tiers.concepts.map(x => String(x).toLowerCase());
+
+  const colorWords = new Set(Array.from(COLOR_KEYWORDS).map(x => x.toLowerCase()));
+  const getWords = (k: string) => k.split(/\s+/).filter(Boolean);
+  const isColor = (k: string) => getWords(k).some(w => colorWords.has(w));
+
+  const containsEvidence = (keyword: string, source: string[]) => {
+    const k = keyword.toLowerCase();
+    return source.some(x => x === k || x.includes(k) || k.includes(x));
+  };
+
+  // Buyer-search intent is only rewarded when it is supported by the actual asset.
+  const SEARCH_INTENT_PATTERNS: Array<{ term: string; evidence: string[] }> = [
+    { term: 'background', evidence: ['background', 'empty space', 'negative space', 'texture', 'interior', 'scene'] },
+    { term: 'home decor', evidence: ['home', 'interior', 'fireplace', 'hearth', 'blanket', 'textile', 'decor'] },
+    { term: 'winter decor', evidence: ['winter', 'snow', 'fireplace', 'blanket', 'knitted', 'holiday'] },
+    { term: 'holiday', evidence: ['holiday', 'christmas', 'festive', 'decoration', 'ornament'] },
+    { term: 'lifestyle', evidence: ['lifestyle', 'home', 'indoor', 'domestic', 'daily life'] },
+    { term: 'cozy home', evidence: ['cozy', 'home', 'fireplace', 'hearth', 'blanket', 'warmth'] },
+    { term: 'winter lifestyle', evidence: ['winter', 'cold', 'indoor', 'cozy', 'blanket', 'knitted'] },
+    { term: 'seasonal', evidence: ['winter', 'summer', 'autumn', 'fall', 'spring', 'holiday', 'christmas'] },
+    { term: 'advertising', evidence: ['product', 'display', 'copy space', 'commercial', 'branding'] },
+    { term: 'social media', evidence: ['copy space', 'lifestyle', 'food', 'fashion', 'travel', 'home'] },
+    { term: 'interior design', evidence: ['interior', 'room', 'home', 'furniture', 'architecture'] }
+  ];
+
+  const supportedSearchIntent = (k: string): boolean => {
+    const match = SEARCH_INTENT_PATTERNS.find(x => x.term === k);
+    if (!match) return false;
+    const allEvidence = [...primary, ...secondary, ...background, ...attributes, ...scene, ...concepts];
+    return match.evidence.some(e => allEvidence.some(v => v === e || v.includes(e) || e.includes(v)));
+  };
+
+  const score = (keyword: string, originalIndex: number): number => {
+    const k = keyword.toLowerCase();
+    const words = getWords(k);
+    const primaryMatch = containsEvidence(k, primary);
+    const secondaryMatch = containsEvidence(k, secondary);
+    const backgroundMatch = containsEvidence(k, background);
+    const attrMatch = containsEvidence(k, attributes);
+    const sceneMatch = containsEvidence(k, scene);
+    const conceptMatch = containsEvidence(k, concepts);
+    const intentMatch = supportedSearchIntent(k);
+
+    let visual = 0;
+    if (primaryMatch) visual = 100;
+    else if (secondaryMatch) visual = 88;
+    else if (backgroundMatch) visual = 70;
+    else if (attrMatch) visual = 78;
+    else if (sceneMatch) visual = 72;
+    else if (conceptMatch) visual = 64;
+    else if (intentMatch) visual = 55;
+    else visual = 18;
+
+    // Search intent is an enrichment signal, never a substitute for visual evidence.
+    let intent = intentMatch ? 92 : 28;
+    if (words.length > 3) intent -= 20;
+    if (k.length > 35) intent -= 15;
+
+    // Reward specificity without forcing a fixed slot pattern.
+    const specificity = Math.min(20, Math.max(0, (words.length - 1) * 7));
+    const titleWords = new Set(String(title || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
+    const titleOverlap = words.filter(w => titleWords.has(w)).length;
+    const titleBonus = Math.min(12, titleOverlap * 4);
+
+    // Avoid overvaluing generic commercial words.
+    const genericPenalty = /^(lifestyle|home|warm|comfort|weather|texture|interior|clothing|garment|accessory)$/.test(k) ? 8 : 0;
+
+    return Math.round(
+      visual * 0.62 +
+      intent * 0.18 +
+      specificity * 0.08 +
+      titleBonus * 0.08 -
+      genericPenalty
+    ) + Math.max(0, 3 - originalIndex * 0.02);
+  };
+
+  // Semantic dedup first, then dynamic relevance ranking. No stage quotas.
   const deduped = semanticDeduplicate(raw);
-  const scored = deduped.map((keyword, index) =>
-    scoreKeyword(keyword, tiers, index, Math.max(1, deduped.length), title)
-  );
+  const ranked = deduped
+    .map((keyword, index) => ({ keyword, index, score: score(keyword, index) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  // Rank by quality while preserving AI order for near-ties.
-  // Visual relevance remains the dominant signal; SEO/commercial/trend signals
-  // must never rescue an unsupported keyword.
-  scored.sort((a, b) => {
-    const diff = b.totalScore - a.totalScore;
-    return Math.abs(diff) < 3 ? 0 : diff;
-  });
+  // Colors are useful but consume scarce keyword slots. Keep at most the two
+  // strongest color terms, and prefer the colors that are actually represented
+  // in VISUAL_FACTS / original AI ordering.
+  const selected: string[] = [];
+  let colorCount = 0;
+  for (const item of ranked) {
+    if (isColor(item.keyword)) {
+      if (colorCount >= 2) continue;
+      colorCount++;
+    }
+    selected.push(item.keyword);
+    if (selected.length >= target) break;
+  }
 
-  return scored
-    .map(x => x.keyword)
+  return selected
     .filter(k => !isProhibitedKeyword(k))
     .slice(0, target);
 }
@@ -1649,16 +1737,18 @@ what the asset visibly supports.
 - Never invent objects, people, places, materials, actions, professions, emotions, industries, audiences,
   events, or use cases.
 
-2. SEARCH INTENT
-- Think like a real stock buyer searching for this exact asset.
-- Prefer standard buyer-facing vocabulary over obscure taxonomy.
-- Prefer precise, useful terms over broad generic words when the visual evidence supports precision.
+2. SEARCH INTENT MICROSTOCK
+- Think like a real stock buyer searching for this exact asset, not like a thesaurus.
+- Ask: "What exact phrase would a designer, marketer, publisher, or content buyer realistically type to find this asset?"
+- Prefer standard buyer-facing search vocabulary and natural 1-3 word phrases.
+- Search intent is valid only when the visual evidence supports the intended use or concept.
+- Never add generic commercial words such as advertising, marketing, website, social media, business, or branding just because they sound SEO-friendly.
+- A keyword must earn its place through visual relevance + realistic search usefulness.
 
-3. KEYWORD HIERARCHY
-Rank in descending relevance:
-primary subject → specific subject/attribute → visible action → important setting → distinctive visual
-characteristics → supported concept → supported commercial/search intent → secondary context.
-The first 10 keywords must be the strongest overall search terms, not merely the first 10 words generated.
+3. DYNAMIC KEYWORD HIERARCHY — NO FIXED SLOTS
+Rank every candidate dynamically by actual visual importance, semantic specificity, and realistic buyer search intent.
+There is NO quota for subject, action, attribute, concept, context, commercial use, or composition.
+Do not force a keyword into a category merely to fill a slot. The best keywords for this exact asset win, regardless of category.
 
 4. NATURAL LANGUAGE
 - Use natural single words and short multi-word search phrases where appropriate.
@@ -1670,9 +1760,12 @@ The first 10 keywords must be the strongest overall search terms, not merely the
 Expand only from verified visual meanings. Useful dimensions include:
 subject, object, action, material, color, texture, setting, composition, style, concept, industry,
 commercial application, and seasonal/event relevance — but only when supported.
+Do not manufacture coverage ratios. If one dimension is absent, skip it.
 
-6. SYNONYMS
+6. SYNONYMS & COLOR CONTROL
 Use standard synonyms only when they represent meaningful alternative search intent.
+Do not create redundant synonym families.
+COLOR RULE: use a maximum of 1-2 color keywords for the entire final list. Choose only the most visually dominant/useful colors. Never spend keyword slots listing every visible color.
 Do not create redundant families such as christmas/xmas, gold/golden, decor/decoration unless the
 platform/search behavior genuinely benefits from the distinction.
 
@@ -1702,7 +1795,9 @@ Before returning the list, evaluate every keyword:
 Remove weak or unsupported terms.
 
 12. EXACT COUNT HANDLING
-The requested count is the final output target. Do NOT invent filler to reach it.
+The requested count is the final output target. If the user requests 25, return the 25 BEST keywords, not 25 random keywords.
+Never lower quality to fill the count. If expansion is necessary, generate additional evidence-backed candidates and re-rank the entire pool dynamically.
+The final ranking is global: there are no category quotas or fixed keyword slots.
 When additional keywords are needed, expand only from verified visual facts using natural synonyms,
 specific attributes, supported contexts, and genuine buyer search intent. A separate application-level
 expansion pass may request additional candidates from the same provider/model using this exact contract.
@@ -1851,7 +1946,7 @@ export const generateStockMetadata = async (
   const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant microstock keywords based on the actual asset and VISUAL_FACTS. Lowercase only. Return keywords as a clean JSON array in the final schema. Rank the 10 most specific and important keywords first. The requested count is the final output target. Never use unrelated filler; if the candidate pool is short, expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, and genuine buyer search intent.`;
+  let keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant microstock keywords based on the actual asset and VISUAL_FACTS. Lowercase only. Return keywords as a clean JSON array in the final schema. Rank the strongest keywords first using global semantic relevance and realistic microstock search intent. Do not use fixed category slots. The requested count is the final output target. Never use unrelated filler; if the candidate pool is short, expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, and genuine buyer search intent.`;
   let keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
 ${seasonalEventKeywordContext}
    - ${directives.risetKeywordRule}
