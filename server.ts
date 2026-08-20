@@ -1633,7 +1633,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-prompt', async (req, res) => {
         try {
-            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles } = req.body;
+            const { subject, styleCategory, variation, promptMode, pngBgColor, userNegativePrompt, minWords, maxWords, model, seed, flatIconType, vectorSubType, darkHorrorSubStyle, referenceImages, cameraAngles, isLicensed } = req.body;
             if (!subject) {
                 return res.status(400).json({ error: 'Missing subject field' });
             }
@@ -1652,7 +1652,8 @@ app.get('/api/debug-uploads', (req, res) => {
                 vectorSubType,
                 darkHorrorSubStyle,
                 referenceImages,
-                cameraAngles
+                cameraAngles,
+                isLicensed: isLicensed === true
             });
             res.json(promptData);
         } catch (e: any) {
@@ -2280,7 +2281,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         let tempFilePath = "";
         let cleanupFn = () => {};
         try {
-            const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
+            const { image, fileUrl, pathKey, tolerance, language, model, fileType, detailCrops } = req.body;
             
             let imageBase64 = "";
             if (fileUrl) {
@@ -2340,25 +2341,54 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
             
-            // Generate zoom-in center crop 200% as the second image for forensic detail checks
-            const zoomFilePath = tempFilePath + "_zoom.jpg";
+            // Generate native-resolution forensic quadrants. Never upscale the source.
+            // Adobe recommends inspecting content at 100%: a single center crop is not enough.
             let imagesToSend: string | string[] = imageBase64;
             try {
                 const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
                 const execPromise = util.promisify(exec);
-                await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "crop=iw/2:ih/2:iw/4:ih/4,scale=iw*2:ih*2" "${zoomFilePath}"`);
-                if (fs.existsSync(zoomFilePath)) {
-                    const zoomBuffer = fs.readFileSync(zoomFilePath);
-                    const mime = fileType || 'image/jpeg';
-                    const zoomBase64 = `data:${mime};base64,${zoomBuffer.toString('base64')}`;
-                    imagesToSend = [imageBase64, zoomBase64];
-                    console.log('Server check-image-quality: Successfully generated zoom-in center crop 200% via FFmpeg');
+                const probePath = _require('@ffprobe-installer/ffprobe').path;
+                const probe = await execPromise(`"${probePath}" -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "${tempFilePath}"`);
+                const [srcW, srcH] = (probe.stdout.trim().split('x').map(Number));
+                const width = Number.isFinite(srcW) ? srcW : 0;
+                const height = Number.isFinite(srcH) ? srcH : 0;
+                const crops: string[] = [];
+                if (width >= 800 && height >= 600) {
+                    const cropW = Math.floor(width / 2);
+                    const cropH = Math.floor(height / 2);
+                    // 200% inspection equivalent: each forensic crop contains 50% of the
+                    // original width/height and is inspected at native pixels. The second
+                    // crop starts at 40% of the source, creating 20% overlap relative to
+                    // the crop itself. No upscaling is performed.
+                    const startX2 = Math.floor(width * 0.40);
+                    const startY2 = Math.floor(height * 0.40);
+                    const positions = [
+                        [0, 0, 'top-left-200'],
+                        [startX2, 0, 'top-right-200'],
+                        [0, startY2, 'bottom-left-200'],
+                        [startX2, startY2, 'bottom-right-200']
+                    ];
+                    for (const [x, y, label] of positions) {
+                        const cropPath = `${tempFilePath}_${label}.png`;
+                        await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "crop=${cropW}:${cropH}:${x}:${y}" -c:v png "${cropPath}"`);
+                        if (fs.existsSync(cropPath)) {
+                            const buf = fs.readFileSync(cropPath);
+                            crops.push(`data:image/png;base64,${buf.toString('base64')}`);
+                        }
+                    }
                 }
-            } catch (zoomErr: any) {
-                console.warn('Server check-image-quality: Failed to generate zoom center crop:', zoomErr);
+                if (crops.length === 4) {
+                    imagesToSend = [imageBase64, ...crops];
+                    console.log('Server check-image-quality: Sent full image + 4 native-resolution 200%-equivalent forensic quadrants');
+                } else if (Array.isArray(detailCrops) && detailCrops.length === 4) {
+                    imagesToSend = [imageBase64, ...detailCrops];
+                    console.log('Server check-image-quality: Using 4 client-generated native-resolution 200%-equivalent forensic quadrants');
+                }
+            } catch (cropErr: any) {
+                console.warn('Server check-image-quality: forensic quadrant generation failed:', cropErr?.message || cropErr);
             }
 
-            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType);
+            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, undefined, ffmpegStats);
             
             console.log('Server check-image-quality: Integration successful');
             
@@ -2379,9 +2409,9 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 try { fs.unlinkSync(tempFilePath); } catch (err) {}
             }
             if (tempFilePath) {
-                const zoomFilePath = tempFilePath + "_zoom.jpg";
-                if (fs.existsSync(zoomFilePath)) {
-                    try { fs.unlinkSync(zoomFilePath); } catch (err) {}
+                for (const suffix of ["_top-left-200.jpg", "_top-right-200.jpg", "_bottom-left-200.jpg", "_bottom-right-200.jpg", "_top-left-200.png", "_top-right-200.png", "_bottom-left-200.png", "_bottom-right-200.png", "_top-left.jpg", "_top-right.jpg", "_bottom-left.jpg", "_bottom-right.jpg", "_zoom.jpg"]) {
+                    const cropPath = tempFilePath + suffix;
+                    if (fs.existsSync(cropPath)) { try { fs.unlinkSync(cropPath); } catch (err) {} }
                 }
             }
         }
