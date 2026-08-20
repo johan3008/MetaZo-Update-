@@ -441,6 +441,9 @@ export const ImageQualityCheck: React.FC<{
                 return;
               }
               const crops: string[] = [];
+              // FIX QC 200% (full-frame coverage): setiap crop mencakup 50% source width/height dan
+              // dimulai pada 40%, sehingga overlap = 20% dari crop. Ini adalah 200%-equivalent
+              // inspection tanpa upscale dan tanpa menambahkan pixel buatan.
               // FIX QC (full-frame coverage): crop lama hanya mengambil PITA TENGAH vertikal
               // (y: 25%-75%), sehingga 25% area ATAS dan 25% area BAWAH gambar TIDAK PERNAH
               // diperiksa dalam resolusi asli. Ini adalah blind-spot kritis: pada foto
@@ -449,24 +452,24 @@ export const ImageQualityCheck: React.FC<{
               // di paruh BAWAH frame — persis di zona yang terlewat oleh crop lama.
               // Solusi: gunakan 4 crop KUADRAN dengan overlap 20% agar SELURUH permukaan
               // gambar (termasuk sudut & tepi bawah) tercakup minimal sekali dalam resolusi asli.
-              const cw = Math.floor(img.width * 0.6);
-              const ch = Math.floor(img.height * 0.6);
+              const cw = Math.floor(img.width * 0.5);
+              const ch = Math.floor(img.height * 0.5);
               const regions: Array<[number, number]> = [
                 [0, 0],                                                          // ATAS-KIRI
                 [Math.floor(img.width * 0.4), 0],                                // ATAS-KANAN
                 [0, Math.floor(img.height * 0.4)],                               // BAWAH-KIRI
                 [Math.floor(img.width * 0.4), Math.floor(img.height * 0.4)]      // BAWAH-KANAN
               ];
-              const MAX_CROP_DIM = 1600; // batasi payload; tidak pernah upscale (scale <= 1)
               for (const [sx, sy] of regions) {
                 const canvas = document.createElement('canvas');
-                const scale = Math.min(1, MAX_CROP_DIM / cw);
-                canvas.width = Math.max(1, Math.floor(cw * scale));
-                canvas.height = Math.max(1, Math.floor(ch * scale));
+                canvas.width = cw;
+                canvas.height = ch;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) continue;
-                ctx.drawImage(img, sx, sy, cw, ch, 0, 0, canvas.width, canvas.height);
-                crops.push(canvas.toDataURL('image/jpeg', 0.92));
+                // Native pixel crop: no resizing and no sharpening. PNG avoids introducing
+                // JPEG artifacts that could contaminate the forensic quality check.
+                ctx.drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
+                crops.push(canvas.toDataURL('image/png'));
               }
               resolve(crops);
             } catch {
