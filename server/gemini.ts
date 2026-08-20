@@ -1350,24 +1350,110 @@ function ensureKeywordCount(
     ) + Math.max(0, 3 - originalIndex * 0.02);
   };
 
-  // Semantic dedup first, then dynamic relevance ranking. No stage quotas.
+  // V5.2: percentage-based semantic coverage. The percentages are SOFT targets,
+  // not fixed slots. A role only receives quota when evidence-backed candidates
+  // actually exist. Unused quota is redistributed to the strongest available roles.
   const deduped = semanticDeduplicate(raw);
   const ranked = deduped
-    .map((keyword, index) => ({ keyword, index, score: score(keyword, index) }))
+    .map((keyword, index) => ({ keyword, index, score: score(keyword, index), role: classifyKeywordSemanticRole(keyword, roleContext) }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  // Colors are useful but consume scarce keyword slots. Keep at most the two
-  // strongest color terms, and prefer the colors that are actually represented
-  // in VISUAL_FACTS / original AI ordering.
-  const selected: string[] = [];
-  let colorCount = 0;
+  const ROLE_WEIGHTS: Record<KeywordSemanticRole, number> = {
+    main_subject: 24,
+    subject_variation: 10,
+    environment: 12,
+    action_state: 5,
+    secondary_subject: 7,
+    visual_style: 10,
+    composition: 5,
+    seasonal: 8,
+    concept: 10,
+    commercial_use: 3,
+    color: 3,
+    attribute: 3,
+    generic: 0
+  };
+
+  const roleGroups = new Map<KeywordSemanticRole, typeof ranked>();
   for (const item of ranked) {
+    if (item.role === 'generic') continue;
+    if (!roleGroups.has(item.role)) roleGroups.set(item.role, []);
+    roleGroups.get(item.role)!.push(item);
+  }
+
+  // Allocate the requested count proportionally to roles that actually exist.
+  // Largest-remainder allocation prevents fixed-slot behaviour and works for
+  // 5, 10, 25, 40, 50, etc. For small counts, the strongest weighted roles win.
+  const availableRoles = [...roleGroups.keys()];
+  const allocation = new Map<KeywordSemanticRole, number>();
+  if (target > 0 && availableRoles.length) {
+    const totalWeight = availableRoles.reduce((sum, role) => sum + ROLE_WEIGHTS[role], 0);
+    const rawQuota = availableRoles.map(role => ({
+      role,
+      exact: totalWeight > 0 ? target * ROLE_WEIGHTS[role] / totalWeight : 0
+    }));
+
+    let assigned = 0;
+    for (const q of rawQuota) {
+      const base = Math.min(roleGroups.get(q.role)!.length, Math.floor(q.exact));
+      allocation.set(q.role, base);
+      assigned += base;
+    }
+
+    // Largest remainder distribution. This makes 25 keywords cover the
+    // semantic pattern broadly instead of allowing Main Subject to consume
+    // nearly the entire output.
+    const remainders = rawQuota
+      .map(q => ({ ...q, remainder: q.exact - Math.floor(q.exact) }))
+      .sort((a, b) => b.remainder - a.remainder || ROLE_WEIGHTS[b.role] - ROLE_WEIGHTS[a.role]);
+
+    let cursor = 0;
+    while (assigned < target && remainders.length) {
+      const q = remainders[cursor % remainders.length];
+      const current = allocation.get(q.role) || 0;
+      const capacity = roleGroups.get(q.role)!.length;
+      if (current < capacity) {
+        allocation.set(q.role, current + 1);
+        assigned++;
+      }
+      cursor++;
+      if (cursor > target * remainders.length + remainders.length) break;
+    }
+  }
+
+  const selected: string[] = [];
+  const selectedKeys = new Set<string>();
+  let colorCount = 0;
+
+  // First pass: satisfy the soft semantic percentages.
+  for (const role of availableRoles) {
+    const quota = allocation.get(role) || 0;
+    const group = roleGroups.get(role) || [];
+    for (const item of group.slice(0, quota)) {
+      if (isColor(item.keyword)) {
+        if (colorCount >= 2) continue;
+        colorCount++;
+      }
+      const key = sanitizeForIndexing(item.keyword);
+      if (!selectedKeys.has(key)) {
+        selected.push(item.keyword);
+        selectedKeys.add(key);
+      }
+    }
+  }
+
+  // Second pass: redistribute unused quota/capacity by global score. This is
+  // deliberately dynamic: unsupported roles never receive fabricated keywords.
+  for (const item of ranked) {
+    if (selected.length >= target) break;
+    const key = sanitizeForIndexing(item.keyword);
+    if (selectedKeys.has(key)) continue;
     if (isColor(item.keyword)) {
       if (colorCount >= 2) continue;
       colorCount++;
     }
     selected.push(item.keyword);
-    if (selected.length >= target) break;
+    selectedKeys.add(key);
   }
 
   return selected
