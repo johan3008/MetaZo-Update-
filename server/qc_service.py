@@ -2,12 +2,11 @@
 """Dedicated Python 3/OpenCV forensic QC microservice for MetaZo.
 Run separately from the Node/Vercel app. POST JSON {image: data-url/base64, file_type: ...} to /analyze.
 """
-import base64, json, os, subprocess, tempfile
+import base64, json, os, tempfile, traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-ANALYZER = ROOT / "image_analyzer.py"
 HOST = os.getenv("QC_HOST", "0.0.0.0")
 PORT = int(os.getenv("QC_PORT", "8088"))
 MAX_BYTES = int(os.getenv("QC_MAX_IMAGE_BYTES", str(50 * 1024 * 1024)))
@@ -48,16 +47,13 @@ class Handler(BaseHTTPRequestHandler):
                 f.write(image_bytes)
                 temp_path = f.name
             try:
-                proc = subprocess.run(
-                    ["python3", str(ANALYZER), temp_path],
-                    capture_output=True, text=True, timeout=55
-                )
-                if proc.returncode != 0:
-                    return self._send(500, {"error": proc.stderr.strip() or "Python analyzer failed"})
                 try:
-                    result = json.loads(proc.stdout.strip().splitlines()[-1])
-                except Exception:
-                    return self._send(500, {"error": "Invalid analyzer JSON output", "raw": proc.stdout[-1000:]})
+                    from image_analyzer import analyze_image_file
+                    result = analyze_image_file(temp_path)
+                except Exception as analyzer_exc:
+                    print("[metazo-qc] analyzer exception:", analyzer_exc)
+                    traceback.print_exc()
+                    return self._send(500, {"error": f"OpenCV analyzer failed: {analyzer_exc}"})
                 if result.get("error"):
                     return self._send(422, result)
                 result["engine"] = "Python 3 + OpenCV + Pillow"
