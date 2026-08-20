@@ -441,9 +441,6 @@ export const ImageQualityCheck: React.FC<{
                 return;
               }
               const crops: string[] = [];
-              // FIX QC 200% (full-frame coverage): setiap crop mencakup 50% source width/height dan
-              // dimulai pada 40%, sehingga overlap = 20% dari crop. Ini adalah 200%-equivalent
-              // inspection tanpa upscale dan tanpa menambahkan pixel buatan.
               // FIX QC (full-frame coverage): crop lama hanya mengambil PITA TENGAH vertikal
               // (y: 25%-75%), sehingga 25% area ATAS dan 25% area BAWAH gambar TIDAK PERNAH
               // diperiksa dalam resolusi asli. Ini adalah blind-spot kritis: pada foto
@@ -452,24 +449,24 @@ export const ImageQualityCheck: React.FC<{
               // di paruh BAWAH frame — persis di zona yang terlewat oleh crop lama.
               // Solusi: gunakan 4 crop KUADRAN dengan overlap 20% agar SELURUH permukaan
               // gambar (termasuk sudut & tepi bawah) tercakup minimal sekali dalam resolusi asli.
-              const cw = Math.floor(img.width * 0.5);
-              const ch = Math.floor(img.height * 0.5);
+              const cw = Math.floor(img.width * 0.6);
+              const ch = Math.floor(img.height * 0.6);
               const regions: Array<[number, number]> = [
                 [0, 0],                                                          // ATAS-KIRI
                 [Math.floor(img.width * 0.4), 0],                                // ATAS-KANAN
                 [0, Math.floor(img.height * 0.4)],                               // BAWAH-KIRI
                 [Math.floor(img.width * 0.4), Math.floor(img.height * 0.4)]      // BAWAH-KANAN
               ];
+              const MAX_CROP_DIM = 1600; // batasi payload; tidak pernah upscale (scale <= 1)
               for (const [sx, sy] of regions) {
                 const canvas = document.createElement('canvas');
-                canvas.width = cw;
-                canvas.height = ch;
+                const scale = Math.min(1, MAX_CROP_DIM / cw);
+                canvas.width = Math.max(1, Math.floor(cw * scale));
+                canvas.height = Math.max(1, Math.floor(ch * scale));
                 const ctx = canvas.getContext('2d');
                 if (!ctx) continue;
-                // Native pixel crop: no resizing and no sharpening. PNG avoids introducing
-                // JPEG artifacts that could contaminate the forensic quality check.
-                ctx.drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
-                crops.push(canvas.toDataURL('image/png'));
+                ctx.drawImage(img, sx, sy, cw, ch, 0, 0, canvas.width, canvas.height);
+                crops.push(canvas.toDataURL('image/jpeg', 0.92));
               }
               resolve(crops);
             } catch {
@@ -513,43 +510,6 @@ export const ImageQualityCheck: React.FC<{
     if (e.target.files) {
       handleFilesSelected(e.target.files);
     }
-  };
-
-  const handleDragEnter = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer?.types?.includes('Files')) {
-      e.dataTransfer.dropEffect = 'copy';
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer?.types?.includes('Files')) {
-      e.dataTransfer.dropEffect = 'copy';
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const current = e.currentTarget;
-    const related = e.relatedTarget as Node | null;
-    if (!related || !current.contains(related)) {
-      setIsDragging(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const droppedFiles = e.dataTransfer?.files;
-    if (!droppedFiles || droppedFiles.length === 0) return;
-    void handleFilesSelected(droppedFiles);
   };
 
   const handleAnalyze = async (filesToAnalyze?: File[]) => {
@@ -904,11 +864,7 @@ export const ImageQualityCheck: React.FC<{
             </div>
             
             <label 
-              onDragEnter={handleDragEnter}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 ${isDragging ? 'border-emerald-500 bg-emerald-500/5 scale-[0.98]' : 'border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50'}`}
+              className="group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50"
             >
               <div className="p-4 rounded-2xl bg-white dark:bg-white/5 shadow-xl transition-transform duration-500 group-hover:scale-110">
                 <Upload className="text-emerald-500" size={32} />
