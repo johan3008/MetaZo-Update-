@@ -2079,42 +2079,6 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
-    function analyzeImageWithPython(tempFilePath: string): Promise<any> {
-        return new Promise((resolve, reject) => {
-            const pythonScriptPath = path.join(__dirname_safe, 'server/image_analyzer.py');
-            const pythonProcess = spawn('python3', [pythonScriptPath, tempFilePath]);
-            let stdoutData = '';
-            let stderrData = '';
-
-            pythonProcess.on('error', (err) => {
-                reject(new Error(`Failed to spawn Python process: ${err.message}`));
-            });
-
-            pythonProcess.stdout.on('data', (data) => {
-                stdoutData += data.toString();
-            });
-
-            pythonProcess.stderr.on('data', (data) => {
-                stderrData += data.toString();
-            });
-
-            pythonProcess.on('close', (code) => {
-                if (code !== 0) {
-                    return reject(new Error(`Python process exited with code ${code}. Stderr: ${stderrData}`));
-                }
-                try {
-                    const parsed = JSON.parse(stdoutData.trim());
-                    if (parsed.error) {
-                        return reject(new Error(parsed.error));
-                    }
-                    resolve(parsed);
-                } catch (err: any) {
-                    reject(new Error(`Failed to parse Python output: ${err.message}. Raw output: ${stdoutData}`));
-                }
-            });
-        });
-    }
-
     async function analyzeImageWithFFmpeg(tempFilePath: string) {
         let ffmpegPath: string;
         let ffprobePath: string;
@@ -2313,28 +2277,51 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 return res.status(400).json({ error: 'Missing image data or fileUrl' });
             }
 
-            // 2. Perform in-memory Python PIL + Scikit-Image analysis
-            console.log('Server check-image-quality: Running in-memory Python PIL + Scikit-Image analysis...');
-            let ffmpegStats;
-            try {
-                ffmpegStats = await analyzeImageWithPython(tempFilePath);
-            } catch (pyErr: any) {
-                console.warn('[Image Audit] Python in-memory analysis failed, falling back to FFmpeg:', pyErr);
+            // 2. Serious forensic analysis: Python 3 + OpenCV runs as a dedicated QC service.
+            // Never spawn python3 from the Vercel/serverless runtime. Configure
+            // IMAGE_QC_PYTHON_URL to point to the Python QC microservice.
+            console.log('Server check-image-quality: Running forensic pixel analysis...');
+            let pythonStats: any = null;
+            let ffmpegStats: any = null;
+            const pythonQcUrl = process.env.IMAGE_QC_PYTHON_URL?.trim();
+            if (pythonQcUrl) {
                 try {
-                    ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
-                } catch (ffErr: any) {
-                    console.warn('[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:', ffErr);
-                    ffmpegStats = {
-                        resolution: "Estimated from file structure",
-                        color_space: "sRGB (Standard)",
-                        histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
-                        brightness: { value: 50, status: "Optimal (Estimated by AI)" },
-                        contrast: { value: 50, status: "Normal (Estimated by AI)" },
-                        sharpness: { value: 50, status: "Normal (Estimated by AI)" },
-                        noise: { value: 5, status: "Low Noise / Clean" },
-                        file_validation: "Valid (Passed Structure Integrity Check)",
-                        file_size_kb: fs.existsSync(tempFilePath) ? Math.round(fs.statSync(tempFilePath).size / 1024) : 1024
-                    };
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), 60000);
+                    const pyResponse = await fetch(pythonQcUrl.replace(/\/$/, '') + '/analyze', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ image: imageBase64, file_type: fileType || 'image/jpeg' }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timer);
+                    const raw = await pyResponse.text();
+                    let parsed: any = null;
+                    try { parsed = JSON.parse(raw); } catch (_) {}
+                    if (!pyResponse.ok || !parsed || parsed.error) {
+                        throw new Error(parsed?.error || raw || `Python QC service HTTP ${pyResponse.status}`);
+                    }
+                    pythonStats = parsed;
+                    console.log('Server check-image-quality: Python/OpenCV forensic analysis successful');
+                } catch (pythonErr: any) {
+                    console.error('[Image Audit] Python QC service failed:', pythonErr?.message || pythonErr);
+                    // Continue with FFmpeg only as a degraded evidence source. Never invent metrics.
+                }
+            } else {
+                console.warn('[Image Audit] IMAGE_QC_PYTHON_URL is not configured; Python/OpenCV forensic service is unavailable.');
+            }
+
+            // FFmpeg remains a secondary, serverless-safe evidence source.
+            try {
+                ffmpegStats = await analyzeImageWithFFmpeg(tempFilePath);
+            } catch (analysisErr: any) {
+                console.error('[Image Audit] FFmpeg evidence analysis failed:', analysisErr);
+                if (!pythonStats) {
+                    return res.status(503).json({
+                        error: 'Image quality analysis is temporarily unavailable.',
+                        code: 'IMAGE_ANALYSIS_UNAVAILABLE',
+                        detail: analysisErr?.message || 'No technical evidence source available'
+                    });
                 }
             }
 
@@ -2358,10 +2345,11 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                     const cropH = Math.floor(height / 2);
                     // 200% inspection equivalent: each forensic crop contains 50% of the
                     // original width/height and is inspected at native pixels. The second
-                    // crop starts at 40% of the source, creating 20% overlap relative to
-                    // the crop itself. No upscaling is performed.
-                    const startX2 = Math.floor(width * 0.40);
-                    const startY2 = Math.floor(height * 0.40);
+                    // Exact 2x inspection equivalent: each crop is 50% of source width/height.
+                    // Four quadrants tile the complete source without uncovered edges.
+                    // No upscaling is performed.
+                    const startX2 = width - cropW;
+                    const startY2 = height - cropH;
                     const positions = [
                         [0, 0, 'top-left-200'],
                         [startX2, 0, 'top-right-200'],
@@ -2388,7 +2376,8 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 console.warn('Server check-image-quality: forensic quadrant generation failed:', cropErr?.message || cropErr);
             }
 
-            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, undefined, ffmpegStats);
+            const technicalEvidence = { python_opencv: pythonStats, ffmpeg: ffmpegStats };
+            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, undefined, technicalEvidence);
             
             console.log('Server check-image-quality: Integration successful');
             
@@ -2396,6 +2385,8 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             const combinedReport = {
                 ...aiVisionStats,
                 ffmpeg: ffmpegStats,
+                python_opencv: pythonStats,
+                technical_evidence: technicalEvidence,
                 ai_vision: aiVisionStats
             };
             
