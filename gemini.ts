@@ -5766,7 +5766,7 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 
 ---
 PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
-Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh. Gambar ke-2 sampai ke-5 adalah CROP FORENSIK RESOLUSI ASLI setara inspeksi 200%-equivalent, masing-masing sekitar 50% lebar dan 50% tinggi sumber, tanpa upscale dan tanpa pixel buatan. Empat crop mencakup seluruh permukaan dengan overlap 20% relatif terhadap ukuran crop.
+Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil dari 4 wilayah KUADRAN ber-overlap 20% yang bersama-sama mencakup SELURUH permukaan gambar, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, lalu BAWAH-KANAN.
 - Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
 - ZONA RAWAN KRITIS (WAJIB DIPERIKSA EKSTRA TELITI): Pada foto orang memegang/menyentuh objek (produk, model, botol, alat, dsb.), titik kontak tangan-jari-objek PALING SERING berada di paruh BAWAH frame (kuadran BAWAH-KIRI/BAWAH-KANAN) — dekat dada, perut, atau pinggang subjek. Zona inilah yang paling sering mengandung cacat AI generatif (jari menyatu/meleleh ke objek, objek yang menembus pakaian, genggaman yang mustahil secara fisik) namun paling mudah terlewat jika hanya melihat gambar penuh yang telah diperkecil. Periksa kuadran bawah dengan tingkat kecurigaan setara atau lebih tinggi daripada kuadran atas.
 - Sebutkan di laporan visual_scan_analysis crop wilayah mana (atas-kiri/atas-kanan/bawah-kiri/bawah-kanan) tempat Anda menemukan cacat.
@@ -5992,7 +5992,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator using the EXACT same audit contract regardless of provider or model. Inspect the full image and EVERY forensic crop at 200%-equivalent native-pixel inspection. Never infer or hallucinate unseen details. Determine PASS or FAIL only from confirmed visible evidence and shared tolerance rules. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
         promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
@@ -6017,7 +6017,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator using the EXACT same audit contract regardless of provider or model. Inspect the full image and EVERY forensic crop at 200%-equivalent native-pixel inspection. Never infer or hallucinate unseen details. Determine PASS or FAIL only from confirmed visible evidence and shared tolerance rules. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
