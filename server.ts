@@ -2244,6 +2244,15 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
     app.post('/api/check-image-quality', async (req, res) => {
         let tempFilePath = "";
         let cleanupFn = () => {};
+        // Large images must use the R2 URL path. Never accept full-resolution base64 JSON here.
+        if (req.body?.image && !req.body?.fileUrl) {
+            const estimatedBytes = typeof req.body.image === 'string' ? Math.floor(req.body.image.length * 0.75) : 0;
+            return res.status(413).json({
+                error: 'Quality Check requires a storage URL for image analysis.',
+                code: 'QC_STORAGE_REQUIRED',
+                detail: `Inline image payload detected (~${Math.round(estimatedBytes / 1024)} KB). Upload the image to Cloudflare R2 first to avoid serverless payload limits.`
+            });
+        }
         try {
             const { image, fileUrl, pathKey, tolerance, language, model, fileType, detailCrops } = req.body;
             
