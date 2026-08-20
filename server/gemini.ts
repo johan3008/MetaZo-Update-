@@ -970,19 +970,14 @@ function buildMasterKeywordCandidatePool(
   visualFacts: any,
   targetCount: number
 ): string[] {
-  const marketCandidates = getMarketCandidatePool(Math.min(180, Math.max(80, targetCount * 4)));
-  const combined = [...aiCandidates, ...marketCandidates];
-  const normalized = combined
+  // Keep expansion AI-driven. Market data must never inject or manufacture
+  // keywords into the final metadata. The Vision model remains the source of truth.
+  const normalized = aiCandidates
     .map(k => sanitizeForIndexing(k))
     .filter(Boolean)
     .filter(k => !isProhibitedKeyword(k));
 
-  // Do not let popularity create unsupported keywords. Keep AI candidates intact,
-  // while market-only candidates must pass a lightweight visual evidence gate.
-  const aiSet = new Set(aiCandidates.map(k => sanitizeForIndexing(k)).filter(Boolean));
-  return semanticDeduplicate(
-    normalized.filter(k => aiSet.has(k) || isKeywordVisuallySupported(k, visualFacts))
-  );
+  return semanticDeduplicate(normalized);
 }
 
 export function getKeywordIntelligenceStatus() {
@@ -1218,236 +1213,100 @@ function ensureKeywordCount(
     raw.push(clean);
   }
 
-  // V5: enrich the candidate pool with market-backed terms that have a direct
-  // bridge to VISUAL_FACTS. This is discovery, not automatic acceptance.
-  // Every discovered term is still passed through the same visual scorer,
-  // semantic deduplication, IP rules, and global ranking below.
-  const marketCandidates = discoverMarketCandidates(visualFacts || {}, Math.max(80, target * 6));
-  for (const candidate of marketCandidates) {
-    if (keywordMode === 'single' && candidate.includes(' ')) continue;
-    if (keywordMode === 'multi' && !candidate.includes(' ')) continue;
-    if (!raw.includes(candidate)) raw.push(candidate);
-  }
-
-  // V5.1: add evidence-backed semantic phrases. This creates the required
-  // Main Subject → Environment → Seasonal → Concept pattern dynamically,
-  // without reserving fixed slots for any role.
   const roleContext = buildKeywordRoleContext(visualFacts || {});
-  for (const candidate of buildStructuredKeywordCandidates(roleContext)) {
-    if (keywordMode === 'single' && candidate.includes(' ')) continue;
-    if (keywordMode === 'multi' && !candidate.includes(' ')) continue;
-    if (!raw.includes(candidate)) raw.push(candidate);
-  }
-
   const tiers = buildTieredVisualAnalysis(visualFacts || {});
-  const primary = tiers.objects.filter(o => o.tier === 'primary').map(o => o.name.toLowerCase());
-  const secondary = tiers.objects.filter(o => o.tier === 'secondary').map(o => o.name.toLowerCase());
-  const background = tiers.objects.filter(o => o.tier === 'background').map(o => o.name.toLowerCase());
-  const attributes = tiers.attributes.map(x => String(x).toLowerCase());
-  const scene = tiers.scene.map(x => String(x).toLowerCase());
-  const concepts = tiers.concepts.map(x => String(x).toLowerCase());
-
-  const colorWords = new Set(Array.from(COLOR_KEYWORDS).map(x => x.toLowerCase()));
-  const getWords = (k: string) => k.split(/\s+/).filter(Boolean);
-  const isColor = (k: string) => getWords(k).some(w => colorWords.has(w));
+  const primary = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'primary').map(o => o.name));
+  const secondary = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'secondary').map(o => o.name));
+  const background = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'background').map(o => o.name));
+  const attributes = uniqueCleanStrings(tiers.attributes);
+  const scene = uniqueCleanStrings(tiers.scene);
+  const concepts = uniqueCleanStrings(tiers.concepts);
+  const actions = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.actions) ? visualFacts.actions : []),
+    ...(Array.isArray(visualFacts?.action) ? visualFacts.action : []),
+    ...(Array.isArray(visualFacts?.states) ? visualFacts.states : [])
+  ]);
+  const colors = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.colors) ? visualFacts.colors : []),
+    ...(Array.isArray(visualFacts?.color) ? visualFacts.color : [])
+  ]);
 
   const containsEvidence = (keyword: string, source: string[]) => {
-    const k = keyword.toLowerCase();
+    const k = sanitizeForIndexing(keyword);
     return source.some(x => x === k || x.includes(k) || k.includes(x));
   };
+  const words = (k: string) => k.split(/\s+/).filter(Boolean);
+  const colorSet = new Set(Array.from(COLOR_KEYWORDS).map(x => x.toLowerCase()));
+  const isColor = (k: string) => words(k).some(w => colorSet.has(w));
 
-  // Buyer-search intent is only rewarded when it is supported by the actual asset.
-  const SEARCH_INTENT_PATTERNS: Array<{ term: string; evidence: string[] }> = [
-    { term: 'background', evidence: ['background', 'empty space', 'negative space', 'texture', 'interior', 'scene'] },
-    { term: 'home decor', evidence: ['home', 'interior', 'fireplace', 'hearth', 'blanket', 'textile', 'decor'] },
-    { term: 'winter decor', evidence: ['winter', 'snow', 'fireplace', 'blanket', 'knitted', 'holiday'] },
-    { term: 'holiday', evidence: ['holiday', 'christmas', 'festive', 'decoration', 'ornament'] },
-    { term: 'lifestyle', evidence: ['lifestyle', 'home', 'indoor', 'domestic', 'daily life'] },
-    { term: 'cozy home', evidence: ['cozy', 'home', 'fireplace', 'hearth', 'blanket', 'warmth'] },
-    { term: 'winter lifestyle', evidence: ['winter', 'cold', 'indoor', 'cozy', 'blanket', 'knitted'] },
-    { term: 'seasonal', evidence: ['winter', 'summer', 'autumn', 'fall', 'spring', 'holiday', 'christmas'] },
-    { term: 'advertising', evidence: ['product', 'display', 'copy space', 'commercial', 'branding'] },
-    { term: 'social media', evidence: ['copy space', 'lifestyle', 'food', 'fashion', 'travel', 'home'] },
-    { term: 'interior design', evidence: ['interior', 'room', 'home', 'furniture', 'architecture'] }
-  ];
-
-  const supportedSearchIntent = (k: string): boolean => {
-    const match = SEARCH_INTENT_PATTERNS.find(x => x.term === k);
-    if (!match) return false;
-    const allEvidence = [...primary, ...secondary, ...background, ...attributes, ...scene, ...concepts];
-    return match.evidence.some(e => allEvidence.some(v => v === e || v.includes(e) || e.includes(v)));
-  };
-
-  const score = (keyword: string, originalIndex: number): number => {
-    const k = keyword.toLowerCase();
-    const words = getWords(k);
+  const score = (keyword: string, index: number): number => {
+    const k = normalize(keyword);
     const semanticRole = classifyKeywordSemanticRole(k, roleContext);
-    const rolePriority = SEMANTIC_ROLE_PRIORITY[semanticRole];
     const primaryMatch = containsEvidence(k, primary);
     const secondaryMatch = containsEvidence(k, secondary);
     const backgroundMatch = containsEvidence(k, background);
-    const attrMatch = containsEvidence(k, attributes);
+    const actionMatch = containsEvidence(k, actions);
+    const attributeMatch = containsEvidence(k, attributes);
     const sceneMatch = containsEvidence(k, scene);
     const conceptMatch = containsEvidence(k, concepts);
-    const intentMatch = supportedSearchIntent(k);
+    const colorMatch = containsEvidence(k, colors);
 
+    // Main Subject is deliberately dominant. This is the central behavior of
+    // the new AI Vision + Keyword workflow.
     let visual = 0;
-    if (primaryMatch) visual = 100;
-    else if (secondaryMatch) visual = 88;
-    else if (backgroundMatch) visual = 70;
-    else if (attrMatch) visual = 78;
+    if (primaryMatch) visual = 120;
+    else if (secondaryMatch) visual = 96;
+    else if (backgroundMatch) visual = 78;
+    else if (actionMatch) visual = 82;
+    else if (attributeMatch) visual = 74;
     else if (sceneMatch) visual = 72;
-    else if (conceptMatch) visual = 64;
-    else if (intentMatch) visual = 55;
-    else visual = 18;
+    else if (conceptMatch) visual = 62;
+    else if (colorMatch) visual = 58;
+    else visual = 12;
 
-    // Search intent is an enrichment signal, never a substitute for visual evidence.
-    let intent = intentMatch ? 92 : 28;
-    if (words.length > 3) intent -= 20;
-    if (k.length > 35) intent -= 15;
+    // Specific phrases are useful when they stay anchored to the Main Subject.
+    const phraseBonus = words(k).length === 2 && (primaryMatch || secondaryMatch) ? 14 :
+      words(k).length === 3 && primaryMatch ? 18 : 0;
 
-    // Optional market intelligence. Missing data means no market bonus.
-    const market = getKeywordMarketSignal(k);
-    const hasMarketData = hasUsableMarketSignal(market);
-    const marketScore = calculateMarketOpportunity(market);
+    // Stronger preference for the exact Main Subject wording returned by Vision.
+    const exactPrimary = primary.some(x => x === k) ? 35 : 0;
+    const subjectVariation = semanticRole === 'subject_variation' ? 24 : 0;
+    const roleBonus = semanticRole === 'main_subject' ? 30 :
+      semanticRole === 'subject_variation' ? 20 :
+      semanticRole === 'secondary_subject' ? 8 : 0;
 
-    // Reward specificity without forcing a fixed slot pattern.
-    const specificity = Math.min(20, Math.max(0, (words.length - 1) * 7));
     const titleWords = new Set(String(title || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
-    const titleOverlap = words.filter(w => titleWords.has(w)).length;
-    const titleBonus = Math.min(12, titleOverlap * 4);
+    const titleOverlap = words(k).filter(w => titleWords.has(w)).length;
+    const titleBonus = Math.min(8, titleOverlap * 2);
 
-    // Avoid overvaluing generic commercial words.
-    const genericPenalty = /^(lifestyle|home|warm|comfort|weather|texture|interior|clothing|garment|accessory)$/.test(k) ? 8 : 0;
+    const market = getKeywordMarketSignal(k);
+    const marketScore = hasUsableMarketSignal(market) ? calculateMarketOpportunity(market) : 0;
+    const marketBonus = Math.min(8, marketScore * 0.08); // market never outranks visual truth
 
-    // V5: market intelligence is meaningful but never dominates visual truth.
-    // 40% visual + 20% market + 15% search intent + 8% specificity + 7% title + 10% corpus.
-    // Semantic role priority is an ordering assist, not a fixed slot quota.
-    const visualWeight = hasMarketData ? 0.40 : 0.62;
-    const marketWeight = hasMarketData ? 0.20 : 0;
-    const intentWeight = hasMarketData ? 0.15 : 0.18;
-    const specificityWeight = hasMarketData ? 0.08 : 0.08;
-    const titleWeight = hasMarketData ? 0.07 : 0.08;
-    const corpusWeight = hasMarketData ? 0.10 : 0;
-    const corpusSignal = hasMarketData ? Math.min(100, Math.log1p(Number(market.assets || 0)) * 22) : 0;
-
-    // Role priority is deliberately small enough that a weak visual keyword
-    // cannot beat a strongly supported main subject merely because of its role.
-    // It mainly controls the natural ordering inside similarly relevant terms.
-    const roleBonus = rolePriority * 0.10;
-    const rolePenalty = semanticRole === 'generic' ? 8 : 0;
+    const genericPenalty = /^(lifestyle|home|warm|comfort|weather|texture|interior|clothing|garment|accessory|city|night)$/.test(k) ? 8 : 0;
+    const longPenalty = words(k).length > 3 ? 10 : 0;
+    const colorPenalty = isColor(k) ? 0 : 0;
 
     return Math.round(
-      visual * visualWeight +
-      marketScore * marketWeight +
-      intent * intentWeight +
-      specificity * specificityWeight +
-      titleBonus * titleWeight +
-      corpusSignal * corpusWeight +
-      roleBonus -
-      genericPenalty -
-      rolePenalty
-    ) + Math.max(0, 3 - originalIndex * 0.02);
+      visual + exactPrimary + subjectVariation + roleBonus + phraseBonus + titleBonus + marketBonus
+      - genericPenalty - longPenalty - colorPenalty
+    ) + Math.max(0, 2 - index * 0.01);
   };
 
-  // V5.2: percentage-based semantic coverage. The percentages are SOFT targets,
-  // not fixed slots. A role only receives quota when evidence-backed candidates
-  // actually exist. Unused quota is redistributed to the strongest available roles.
-  const deduped = semanticDeduplicate(raw);
-  const ranked = deduped
-    .map((keyword, index) => ({ keyword, index, score: score(keyword, index), role: classifyKeywordSemanticRole(keyword, roleContext) }))
+  const ranked = semanticDeduplicate(raw)
+    .map((keyword, index) => ({ keyword, index, score: score(keyword, index) }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  const ROLE_WEIGHTS: Record<KeywordSemanticRole, number> = {
-    main_subject: 24,
-    subject_variation: 10,
-    environment: 12,
-    action_state: 5,
-    secondary_subject: 7,
-    visual_style: 10,
-    composition: 5,
-    seasonal: 8,
-    concept: 10,
-    commercial_use: 3,
-    color: 3,
-    attribute: 3,
-    generic: 0
-  };
-
-  const roleGroups = new Map<KeywordSemanticRole, typeof ranked>();
-  for (const item of ranked) {
-    if (item.role === 'generic') continue;
-    if (!roleGroups.has(item.role)) roleGroups.set(item.role, []);
-    roleGroups.get(item.role)!.push(item);
-  }
-
-  // Allocate the requested count proportionally to roles that actually exist.
-  // Largest-remainder allocation prevents fixed-slot behaviour and works for
-  // 5, 10, 25, 40, 50, etc. For small counts, the strongest weighted roles win.
-  const availableRoles = [...roleGroups.keys()];
-  const allocation = new Map<KeywordSemanticRole, number>();
-  if (target > 0 && availableRoles.length) {
-    const totalWeight = availableRoles.reduce((sum, role) => sum + ROLE_WEIGHTS[role], 0);
-    const rawQuota = availableRoles.map(role => ({
-      role,
-      exact: totalWeight > 0 ? target * ROLE_WEIGHTS[role] / totalWeight : 0
-    }));
-
-    let assigned = 0;
-    for (const q of rawQuota) {
-      const base = Math.min(roleGroups.get(q.role)!.length, Math.floor(q.exact));
-      allocation.set(q.role, base);
-      assigned += base;
-    }
-
-    // Largest remainder distribution. This makes 25 keywords cover the
-    // semantic pattern broadly instead of allowing Main Subject to consume
-    // nearly the entire output.
-    const remainders = rawQuota
-      .map(q => ({ ...q, remainder: q.exact - Math.floor(q.exact) }))
-      .sort((a, b) => b.remainder - a.remainder || ROLE_WEIGHTS[b.role] - ROLE_WEIGHTS[a.role]);
-
-    let cursor = 0;
-    while (assigned < target && remainders.length) {
-      const q = remainders[cursor % remainders.length];
-      const current = allocation.get(q.role) || 0;
-      const capacity = roleGroups.get(q.role)!.length;
-      if (current < capacity) {
-        allocation.set(q.role, current + 1);
-        assigned++;
-      }
-      cursor++;
-      if (cursor > target * remainders.length + remainders.length) break;
-    }
-  }
-
+  // Keep no more than two color keywords, but otherwise let the global ranking
+  // decide the order. There are no semantic quotas or category allocations.
   const selected: string[] = [];
   const selectedKeys = new Set<string>();
   let colorCount = 0;
 
-  // First pass: satisfy the soft semantic percentages.
-  for (const role of availableRoles) {
-    const quota = allocation.get(role) || 0;
-    const group = roleGroups.get(role) || [];
-    for (const item of group.slice(0, quota)) {
-      if (isColor(item.keyword)) {
-        if (colorCount >= 2) continue;
-        colorCount++;
-      }
-      const key = sanitizeForIndexing(item.keyword);
-      if (!selectedKeys.has(key)) {
-        selected.push(item.keyword);
-        selectedKeys.add(key);
-      }
-    }
-  }
-
-  // Second pass: redistribute unused quota/capacity by global score. This is
-  // deliberately dynamic: unsupported roles never receive fabricated keywords.
   for (const item of ranked) {
     if (selected.length >= target) break;
     const key = sanitizeForIndexing(item.keyword);
-    if (selectedKeys.has(key)) continue;
+    if (!key || selectedKeys.has(key)) continue;
     if (isColor(item.keyword)) {
       if (colorCount >= 2) continue;
       colorCount++;
@@ -1456,9 +1315,7 @@ function ensureKeywordCount(
     selectedKeys.add(key);
   }
 
-  return selected
-    .filter(k => !isProhibitedKeyword(k))
-    .slice(0, target);
+  return selected.slice(0, target);
 }
 
 function getAIClient(): any {
@@ -2586,87 +2443,93 @@ const UNIVERSAL_KEYWORD_SPECIFICATION = `
 UNIVERSAL MICROSTOCK KEYWORD SPECIFICATION — APPLY IDENTICALLY TO EVERY PROVIDER AND MODEL
 
 ROLE:
-You are an expert Microstock Metadata Optimizer and Visual Content Analyst.
+You are an expert AI Vision + Microstock Keyword Specialist.
 
 PRIMARY OBJECTIVE:
-Generate natural, commercially useful stock keywords that accurately describe the actual asset.
-Visual truth is the source of truth. SEO improves wording and ranking, but SEO must NEVER override
-what the asset visibly supports.
+Look at the actual asset first, understand it like a human stock contributor, then produce the most useful keywords for that exact asset. The keyword list must describe the asset naturally and help a real buyer find it.
 
-1. VISUAL EVIDENCE FIRST
-- Inspect the complete supplied asset / VISUAL_FACTS.
-- Every keyword must have a defensible connection to visible content or a clearly communicated concept.
-- Never invent objects, people, places, materials, actions, professions, emotions, industries, audiences,
-  events, or use cases.
+1. AI VISION IS THE SOURCE OF TRUTH
+- Carefully inspect the complete asset from edge to edge.
+- Understand the dominant visual subject before thinking about SEO.
+- Every keyword must be supported by the supplied visual evidence or by a directly supported, natural search phrase.
+- Never invent objects, people, places, materials, actions, professions, events, emotions, brands, names, industries, audiences, or use cases.
 
-2. SEARCH INTENT MICROSTOCK
-- Think like a real stock buyer searching for this exact asset, not like a thesaurus.
-- Ask: "What exact phrase would a designer, marketer, publisher, or content buyer realistically type to find this asset?"
-- Prefer standard buyer-facing search vocabulary and natural 1-3 word phrases.
-- Search intent is valid only when the visual evidence supports the intended use or concept.
-- Never add generic commercial words such as advertising, marketing, website, social media, business, or branding just because they sound SEO-friendly.
-- A keyword must earn its place through visual relevance + realistic search usefulness.
+2. MAIN SUBJECT FIRST — THIS IS THE CORE ORDER
+- Identify the MAIN SUBJECT that is visually dominant, central, distinctive, or most important to the asset.
+- The strongest Main Subject keyword MUST appear first whenever it is a valid keyword.
+- After the Main Subject, add useful specific descriptions of that subject, natural subject variations, and closely related visible details.
+- Then add important secondary subjects and supporting objects.
+- Only after the important subjects are covered should the list expand into setting, action/state, visual attributes, seasonal context, concepts, and genuinely useful search intent.
+- Never force this order when the image itself clearly makes another subject more important. AI Vision decides the hierarchy.
 
-3. DYNAMIC KEYWORD HIERARCHY — NO FIXED SLOTS
-Rank every candidate dynamically by actual visual importance, semantic specificity, and realistic buyer search intent.
-There is NO quota for subject, action, attribute, concept, context, commercial use, or composition.
-Do not force a keyword into a category merely to fill a slot. The best keywords for this exact asset win, regardless of category.
+3. NATURAL MICROSTOCK KEYWORD ORDER
+Use this hierarchy as a priority, NOT as fixed slots:
+MAIN SUBJECT → SPECIFIC MAIN SUBJECT → SECONDARY SUBJECTS → SUPPORTING OBJECTS → SETTING/CONTEXT → ACTION/STATE → VISUAL ATTRIBUTES → SEASON/EVENT → CONCEPT → USE/SEARCH INTENT.
+- The list must remain natural.
+- Do not reserve percentages or quotas for any category.
+- Do not deliberately spread keywords across categories.
+- The best relevant keyword wins the next position.
 
-4. NATURAL LANGUAGE
-- Use natural single words and short multi-word search phrases where appropriate.
-- A multi-word phrase is preferred when it represents a natural search concept that is more useful intact.
-- Do not manufacture awkward combinations just to increase count.
-- Do not use full sentences.
+4. SEARCH INTENT
+- Think like a real stock buyer searching for this exact visual.
+- Prefer normal buyer-facing words and natural short phrases.
+- Search intent may improve wording, but it can NEVER override visual truth.
+- Do not add generic SEO words such as marketing, business, website, advertising, lifestyle, or social media unless the visual genuinely supports that search intent.
 
-5. SEMANTIC COVERAGE
-Expand only from verified visual meanings. Useful dimensions include:
-subject, object, action, material, color, texture, setting, composition, style, concept, industry,
-commercial application, and seasonal/event relevance — but only when supported.
-Do not manufacture coverage ratios. If one dimension is absent, skip it.
+5. SINGLE WORDS AND PHRASES
+- Use single words when they are the strongest natural term.
+- Use 2-3 word phrases when the phrase is more specific and useful intact.
+- Prefer “ramadan lanterns” over splitting the meaning when that phrase is a natural description.
+- Never manufacture awkward keyword combinations.
+- Never use full sentences.
 
-6. SYNONYMS & COLOR CONTROL
-Use standard synonyms only when they represent meaningful alternative search intent.
-Do not create redundant synonym families.
-COLOR RULE: use a maximum of 1-2 color keywords for the entire final list. Choose only the most visually dominant/useful colors. Never spend keyword slots listing every visible color.
-Do not create redundant families such as christmas/xmas, gold/golden, decor/decoration unless the
-platform/search behavior genuinely benefits from the distinction.
+6. SEMANTIC EXPANSION
+- Expand only from meanings already established by AI Vision.
+- Natural synonyms and specific variations are allowed when they provide real search value.
+- Do not create synonym spam such as multiple nearly identical variants simply to increase count.
+- A longer keyword is valid only when it adds meaningful specificity.
 
-7. COMMERCIAL VALUE
-Commercial/search-intent keywords are enrichment, not permission to hallucinate.
-For example, a laptop may support technology/productivity only when the visual context supports it;
-do not automatically add business, startup, office, entrepreneur, or marketing.
+7. COLOR CONTROL
+- Use a maximum of 1–2 color keywords in the final list.
+- Choose only the most visually important/useful colors.
+- Never fill the keyword list with many shades or redundant color variants.
 
-8. NO SPAM / NO FILLER
-Never add unrelated keywords, generic taxonomy, weak associations, or filler simply to satisfy quantity.
-If a keyword cannot be defended against VISUAL_FACTS, remove it.
+8. COMMERCIAL VALUE
+- Commercial usefulness is an enrichment signal, not a license to hallucinate.
+- Prefer concrete subject relevance over vague marketing language.
+- Do not manufacture buyer use cases.
 
 9. IP / NAMES
-Never include brands, trademarks, company names, product names, celebrities, fictional characters,
-protected creative works, or artist names.
+- Never include brands, trademarks, company names, product names, celebrities, fictional characters, artists, protected creative works, or other identifying names.
 
 10. FORMAT
-All final keywords must follow the selected keyword mode, remain lowercase, be concise, and be deduplicated.
+- Follow the selected keyword mode.
+- Final keywords must be lowercase.
+- Remove duplicates and semantic duplicates.
+- Do not include media-type filler such as photo, image, picture, stock, vector, or illustration unless explicitly allowed by the asset/platform rules.
 
 11. FINAL SELF-AUDIT
-Before returning the list, evaluate every keyword:
-- Is it visually or semantically supported?
-- Would a stock buyer realistically search for it?
-- Is it more useful than a generic alternative?
-- Is it redundant with another keyword?
+Before returning the list, check every keyword:
+- Is it supported by the asset?
+- Is it useful for finding this exact asset?
+- Is it more useful than a weaker generic alternative?
+- Is it redundant?
 - Is it speculative?
-Remove weak or unsupported terms.
+- Does its position make sense compared with the Main Subject?
+Remove weak, unrelated, or spammy terms.
 
-12. EXACT COUNT HANDLING
-The requested count is the final output target. If the user requests 25, return the 25 BEST keywords, not 25 random keywords.
-Never lower quality to fill the count. If expansion is necessary, generate additional evidence-backed candidates and re-rank the entire pool dynamically.
-The final ranking is global: there are no category quotas or fixed keyword slots.
-When additional keywords are needed, expand only from verified visual facts using natural synonyms,
-specific attributes, supported contexts, and genuine buyer search intent. A separate application-level expansion pass may request additional candidates from the same provider/model using this exact contract. The application may also add market-backed candidates, but only when they have a direct visual-evidence bridge.
+12. EXACT COUNT
+The requested count is mandatory.
+- If the user requests 10, return exactly the 10 strongest valid keywords.
+- If the user requests 25, return exactly the 25 strongest valid keywords.
+- If the user requests 40, return exactly the 40 strongest valid keywords.
+- Never use filler merely to hit the number.
+- If the first generation is short, perform another AI generation pass using the same VISUAL_FACTS and ask only for additional valid keywords that have not already been represented.
+- Re-rank the complete candidate list after expansion.
 
 13. PROVIDER CONSISTENCY
-Do not change keyword philosophy based on whether the model is Gemini, GPT, Mistral, Llama, Claude,
-GLM, or another provider. The same semantic standard must be applied everywhere.
-`;
+The same keyword philosophy applies to Gemini, GPT, Mistral, Claude, Llama, Groq, OpenRouter, NVIDIA, or any other provider. The provider may phrase a keyword differently, but Main Subject priority, visual accuracy, natural ordering, and exact count remain mandatory.
+`
 
 
 /**
@@ -2697,16 +2560,17 @@ async function expandKeywordsWithAI(
   const language = getLanguageName(metadataLanguage);
   let candidates = [...current];
 
-  for (let pass = 0; pass < 4 && candidates.length < targetCount; pass++) {
+  for (let pass = 0; pass < 6 && candidates.length < targetCount; pass++) {
     const needed = Math.min(30, Math.max(10, targetCount - candidates.length + 8));
     const expansionSystem = `${UNIVERSAL_KEYWORD_SPECIFICATION}
 
 EXPANSION PASS:
 The first keyword generation pass produced ${candidates.length} valid keywords but the target is ${targetCount}.
 Generate ${needed} ADDITIONAL candidate keywords that are genuinely supported by VISUAL_FACTS.
-Do not repeat existing keywords. Explore verified secondary subjects, attributes, colors, materials,
-setting, action, composition, supported concepts, and realistic buyer search intent that have not
-already been represented. Do not invent anything merely to reach the count.
+Do not repeat existing keywords. Continue from the existing Main Subject hierarchy. First look for missing specific Main Subject
+terms or natural subject phrases, then missing important secondary/supporting subjects, then setting,
+action/state, visual attributes, seasonal context, supported concepts, and realistic buyer search intent.
+Do not invent anything merely to reach the count.
 ${modeRule}
 Output keywords in ${language}. Return JSON only in this form: {"keywords":["keyword 1","keyword 2"]}`;
 
@@ -2810,107 +2674,46 @@ export const generateStockMetadata = async (
   const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
 
   // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant microstock keywords based on the actual asset and VISUAL_FACTS. Lowercase only. Return keywords as a clean JSON array in the final schema. Rank the strongest keywords first using global semantic relevance and realistic microstock search intent. Do not use fixed category slots. The requested count is the final output target. Never use unrelated filler; if the candidate pool is short, expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, and genuine buyer search intent.`;
-  let keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+  let keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant microstock keywords based on the actual asset and VISUAL_FACTS. Lowercase only. Return a clean JSON array. The first keyword must normally be the strongest Main Subject. Then continue naturally from the Main Subject to specific subject details, secondary subjects, supporting objects, context, and only then other relevant concepts or search terms. No fixed slots or category quotas. Never use filler.`;
+  let keywordRulePromptText = `2. KEYWORD GENERATION — AI VISION FIRST:
 ${seasonalEventKeywordContext}
-   - ${directives.risetKeywordRule}
-   - Use these 8 optional keyword groups as a flexible framework, populated only when supported by AI Vision:
-     A. OBJECTS: visible main/secondary objects, people, animals, materials, tools, structures.
-     B. ACTIVITIES: clearly visible actions or interactions.
-     C. CONCEPTS: strong concepts directly communicated by the scene; do not invent abstract meanings.
-     D. MOOD/ATMOSPHERE: only when visually evident, such as professional, modern, focused, calm, creative.
-     E. LOCATION/SETTING: visible settings such as office, workplace, home office, indoor, courtyard.
-     F. USE/SEARCH INTENT: natural stock-search applications such as website, advertising, presentation, marketing, education only when the asset genuinely supports them.
-     G. VISUAL CHARACTERISTICS: composition/format such as horizontal, vertical, close up, copy space, workspace, background, isolated.
-     H. COLORS/VISUAL ELEMENTS: visible colors, natural light, textures, materials, and distinctive visual elements.
-   - This is a flexible map, NOT a quota checklist. Use every group that genuinely helps describe or sell the asset; skip only groups that have no useful relevance.
-   - Expand only from meanings already supported by AI Vision: use natural synonyms, common buyer search phrases, and closely related variations.
-   - SEO expansion may improve discoverability, but MUST NOT introduce a new object, location, event, industry, audience, emotion, or use case that Vision did not support.
-   - Rank keywords by the likelihood that a real stock buyer would search for this exact asset, while keeping visual relevance as the primary constraint.
-   - Use seasonal/event terms only when the asset visibly or conceptually supports the event; never inject an event merely because it is currently in season.
-   - Prefer commercially useful specificity over broad taxonomy words such as fauna, mammal, culture, heritage, serenity, tourism, or success when they add little search value.
-- REQUIRED KEYWORD MIX: aim for approximately 40% specific subject/action terms, 30% visual/style/technical terms, and 30% concept/theme/search-intent terms when supported by the asset. This is a ranking guideline, NOT a quota. Never invent keywords to satisfy the ratio.
-   - AI VISION IS THE SOURCE OF TRUTH: SEO may optimize wording, synonyms, and buyer search intent, but it must preserve the visual meaning identified by Vision.
-   - FINAL LIST QUALITY: keep the list clean, coherent, deduplicated, and commercially useful. Remove random taxonomy, filler, weak associations, and speculative concepts.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule}
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on realistic buyer search intent and commercially useful phrases that match the asset. Do not manufacture industry applications, business use cases, or target audiences from weak associations.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated or spammy keywords. The requested count is the final output target, but relevance always wins: expand only with verified synonyms, natural search phrases, supported concepts, attributes, settings, seasonal relevance, and genuine commercial search intent. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD ORDER: prioritize the strongest OBJECTS and ACTIVITIES first, followed by supported CONCEPTS, LOCATION/SETTING, VISUAL CHARACTERISTICS, COLORS/VISUAL ELEMENTS, MOOD/ATMOSPHERE, and relevant USE/SEARCH INTENT. The exact mix depends on the asset. Do not force irrelevant categories, but do use the full range of relevant groups when they genuinely improve discoverability.
-    NOTE: The requested count is mandatory. Use expert microstock judgment to find additional relevant search terms, concepts, attributes, and buyer-intent phrases when needed.`;
+   - Understand the asset visually before generating any keyword.
+   - Identify the strongest MAIN SUBJECT and place its strongest natural keyword first.
+   - Follow with useful specific descriptions or natural phrases for the Main Subject.
+   - Then cover important secondary subjects and supporting objects.
+   - After the important visual subjects are covered, add setting/context, action/state, visual characteristics, seasonal/event relevance, concepts, and search-intent terms only when they genuinely improve discoverability.
+   - This is a natural priority order, NOT a slot system and NOT a percentage quota.
+   - Let the actual image determine how many keywords come from each area.
+   - Use natural microstock search language. Do not write keywords like a thesaurus.
+   - Do not prioritize generic commercial words merely because they sound SEO-friendly.
+   - Use 1-3 word phrases when they are more precise than a single word.
+   - Keep every keyword grounded in AI Vision. Never add unsupported objects, locations, events, emotions, industries, or use cases.
+   - Rank the final list from the most important visual/search term to the least important useful term.
+   - The requested count is mandatory. If more keywords are needed, expand naturally from the same visual understanding rather than changing the subject hierarchy.
+3. KEYWORD QUALITY:
+   - Natural, relevant, concise, deduplicated, lowercase.
+   - Main Subject first. Supporting information follows.
+   - Maximum 1-2 color keywords when color is genuinely useful.
+   - No IP, brands, names, spam, filler, or generic media-type words.
+4. Include single-word and/or multi-word phrases naturally according to the selected keyword mode.
+5. Never write full sentences as keywords.`
 
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of exactly ${targetCount} highly-relevant commercially useful SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+    keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant SINGLE-WORD microstock keywords in ${getLanguageName(metadataLanguage)}. Main Subject first. Lowercase only.`;
+    keywordRulePromptText = `2. KEYWORD MODE — SINGLE WORD:
 ${seasonalEventKeywordContext}
-   - ${directives.risetKeywordRule}
-   - Use these 8 optional keyword groups as a flexible framework, populated only when supported by AI Vision:
-     A. OBJECTS: visible main/secondary objects, people, animals, materials, tools, structures.
-     B. ACTIVITIES: clearly visible actions or interactions.
-     C. CONCEPTS: strong concepts directly communicated by the scene; do not invent abstract meanings.
-     D. MOOD/ATMOSPHERE: only when visually evident, such as professional, modern, focused, calm, creative.
-     E. LOCATION/SETTING: visible settings such as office, workplace, home office, indoor, courtyard.
-     F. USE/SEARCH INTENT: natural stock-search applications such as website, advertising, presentation, marketing, education only when the asset genuinely supports them.
-     G. VISUAL CHARACTERISTICS: composition/format such as horizontal, vertical, close up, copy space, workspace, background, isolated.
-     H. COLORS/VISUAL ELEMENTS: visible colors, natural light, textures, materials, and distinctive visual elements.
-   - This is a flexible map, NOT a quota checklist. Use every group that genuinely helps describe or sell the asset; skip only groups that have no useful relevance.
-   - Use synonyms only when they preserve the same visual meaning. Prefer the most standard buyer-facing term and remove redundant variants such as christmas/xmas, gold/golden, decor/decoration, elegant/elegance, and similar semantic duplicates.
-   - Prioritize concrete visual terms first; use concept, mood, event, and search-intent terms only when supported by Vision. Do not add speculative abstract terms.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is SINGLE-WORD mode, ensure any keyword phrase is split or shortened into a single word.
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Use concept, industry, and business-use terms only when clearly supported by the asset and VISUAL_FACTS. Never invent a use case from a weak association.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated or spammy keywords. The requested count is the final output target, but relevance always wins: expand only with verified synonyms, natural search phrases, supported concepts, attributes, settings, seasonal relevance, and genuine commercial search intent. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD ORDER: prioritize the strongest OBJECTS and ACTIVITIES first, followed by supported CONCEPTS, LOCATION/SETTING, VISUAL CHARACTERISTICS, COLORS/VISUAL ELEMENTS, MOOD/ATMOSPHERE, and relevant USE/SEARCH INTENT. The exact mix depends on the asset. Do not force irrelevant categories, but do use the full range of relevant groups when they genuinely improve discoverability.
-    NOTE: The requested count is mandatory. Use expert microstock judgment to find additional relevant search terms, concepts, attributes, and buyer-intent phrases when needed.`;
+   - Use only one-word keywords.
+   - Preserve the same Main Subject → specific subject → secondary subject → context hierarchy.
+   - Do not use multi-word phrases or sentence-like terms.
+   - Never add filler just to reach the requested count.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of exactly ${targetCount} highly-relevant commercially useful MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
+    keywordRuleSchemaDesc = `Generate exactly ${targetCount} highly relevant MULTI-WORD microstock keyword phrases in ${getLanguageName(metadataLanguage)}. Main Subject first. Lowercase only.`;
+    keywordRulePromptText = `2. KEYWORD MODE — MULTI WORD:
 ${seasonalEventKeywordContext}
-   - ${directives.risetKeywordRule}
-   - Use these 8 optional keyword groups as a flexible framework, populated only when supported by AI Vision:
-     A. OBJECTS: visible main/secondary objects, people, animals, materials, tools, structures.
-     B. ACTIVITIES: clearly visible actions or interactions.
-     C. CONCEPTS: strong concepts directly communicated by the scene; do not invent abstract meanings.
-     D. MOOD/ATMOSPHERE: only when visually evident, such as professional, modern, focused, calm, creative.
-     E. LOCATION/SETTING: visible settings such as office, workplace, home office, indoor, courtyard.
-     F. USE/SEARCH INTENT: natural stock-search applications such as website, advertising, presentation, marketing, education only when the asset genuinely supports them.
-     G. VISUAL CHARACTERISTICS: composition/format such as horizontal, vertical, close up, copy space, workspace, background, isolated.
-     H. COLORS/VISUAL ELEMENTS: visible colors, natural light, textures, materials, and distinctive visual elements.
-   - This is a flexible map, NOT a quota checklist. Use every group that genuinely helps describe or sell the asset; skip only groups that have no useful relevance.
-   - Use natural multi-word synonyms and search phrases only when they preserve the same visual meaning identified by AI Vision.
-   - Prioritize concrete visual phrases first; use concept, mood, event, and search-intent phrases only when supported by Vision. Do not add speculative abstract phrases.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Use commercial/search-intent phrases only when they are a natural way buyers would search for the clearly supported asset. Do not invent metaphors, audiences, industries, or use cases.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated or spammy keywords. The requested count is the final output target, but relevance always wins: expand only with verified synonyms, natural search phrases, supported concepts, attributes, settings, seasonal relevance, and genuine commercial search intent. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD ORDER: prioritize the strongest OBJECTS and ACTIVITIES first, followed by supported CONCEPTS, LOCATION/SETTING, VISUAL CHARACTERISTICS, COLORS/VISUAL ELEMENTS, MOOD/ATMOSPHERE, and relevant USE/SEARCH INTENT. The exact mix depends on the asset. Do not force irrelevant categories, but do use the full range of relevant groups when they genuinely improve discoverability.
-    NOTE: The requested count is mandatory. Use expert microstock judgment to find additional relevant search terms, concepts, attributes, and buyer-intent phrases when needed.`;
+   - Use natural 2-3 word phrases only.
+   - The first phrase should normally describe the Main Subject as specifically as possible.
+   - Continue naturally with specific subject details, secondary subjects, supporting objects, context, and other supported concepts.
+   - Never create awkward phrases or filler.`;
   }
 
   // Apply the same keyword contract to every provider/model and every keyword mode.
@@ -2932,6 +2735,14 @@ Analyze only what is visually verifiable in the image.
 
 ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
+
+MAIN SUBJECT PRIORITY:
+Before listing secondary details, determine the single strongest MAIN SUBJECT of the asset.
+Choose it by visual dominance, central importance, distinctive identity, size/prominence, and the role it plays in the overall composition.
+Do not choose a subject merely because it is culturally interesting or commercially popular.
+If multiple subjects exist, rank them by actual visual importance and assign importance scores.
+The first primary_subject should represent the strongest visual subject whenever one can be identified.
+The downstream keyword generator will use this order to place the Main Subject first in the final keyword list.
 
 VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
@@ -3097,7 +2908,7 @@ Rules for Descriptions:
 4. Limit to 200 characters.
 
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
+1. Start with the strongest MAIN SUBJECT keyword identified by AI Vision, then continue by visual importance and search relevance.
 2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
@@ -3107,11 +2918,11 @@ HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Use a balanced SEO strategy: visual relevance first, then search intent, commercial usefulness, and keyword diversity.
-- Synonyms and search phrases are allowed when they preserve the same visual meaning detected by Vision.
+- Prioritize the Main Subject and its strongest natural variations before secondary information.
+- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
 - Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Prefer strong, discoverable keywords, but still return the exact requested count by expanding intelligently when additional relevant terms exist.
-- Before returning the result, self-audit for obvious hallucinations, IP, spam, and irrelevance. Do not aggressively prune legitimate conceptual, commercial, seasonal, or search-intent keywords simply because they are not literal object labels.
+- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
+- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3271,11 +3082,11 @@ HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Use a balanced SEO strategy: visual relevance first, then search intent, commercial usefulness, and keyword diversity.
-- Synonyms and search phrases are allowed when they preserve the same visual meaning detected by Vision.
+- Prioritize the Main Subject and its strongest natural variations before secondary information.
+- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
 - Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Prefer strong, discoverable keywords, but still return the exact requested count by expanding intelligently when additional relevant terms exist.
-- Before returning the result, self-audit for obvious hallucinations, IP, spam, and irrelevance. Do not aggressively prune legitimate conceptual, commercial, seasonal, or search-intent keywords simply because they are not literal object labels.
+- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
+- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3551,7 +3362,7 @@ ${seasonalEventKeywordContext}
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated or spammy keywords. The requested count is the final output target, but relevance always wins: expand only with verified synonyms, natural search phrases, supported concepts, attributes, settings, seasonal relevance, and genuine commercial search intent. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD ORDER: prioritize the strongest OBJECTS and ACTIVITIES first, followed by supported CONCEPTS, LOCATION/SETTING, VISUAL CHARACTERISTICS, COLORS/VISUAL ELEMENTS, MOOD/ATMOSPHERE, and relevant USE/SEARCH INTENT. The exact mix depends on the asset. Do not force irrelevant categories, but do use the full range of relevant groups when they genuinely improve discoverability.
+11. CRITICAL KEYWORD ORDER: Main Subject first. Then specific Main Subject descriptions/variations, important secondary subjects, supporting objects, setting/context, action/state, visual characteristics, seasonal/event terms, concepts, and only then useful search-intent terms. This is a natural priority order, not fixed slots or quotas.
     NOTE: The requested count is mandatory. Use expert microstock judgment to find additional relevant search terms, concepts, attributes, and buyer-intent phrases when needed.`;
 
   if (keywordMode === 'single') {
@@ -3572,7 +3383,7 @@ ${seasonalEventKeywordContext}
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated or spammy keywords. The requested count is the final output target, but relevance always wins: expand only with verified synonyms, natural search phrases, supported concepts, attributes, settings, seasonal relevance, and genuine commercial search intent. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD ORDER: prioritize the strongest OBJECTS and ACTIVITIES first, followed by supported CONCEPTS, LOCATION/SETTING, VISUAL CHARACTERISTICS, COLORS/VISUAL ELEMENTS, MOOD/ATMOSPHERE, and relevant USE/SEARCH INTENT. The exact mix depends on the asset. Do not force irrelevant categories, but do use the full range of relevant groups when they genuinely improve discoverability.
+11. CRITICAL KEYWORD ORDER: Main Subject first. Then specific Main Subject descriptions/variations, important secondary subjects, supporting objects, setting/context, action/state, visual characteristics, seasonal/event terms, concepts, and only then useful search-intent terms. This is a natural priority order, not fixed slots or quotas.
     NOTE: The requested count is mandatory. Use expert microstock judgment to find additional relevant search terms, concepts, attributes, and buyer-intent phrases when needed.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `List of exactly ${targetCount} highly-relevant commercially useful MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
@@ -3593,7 +3404,7 @@ ${seasonalEventKeywordContext}
 8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
 9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
 10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated or spammy keywords. The requested count is the final output target, but relevance always wins: expand only with verified synonyms, natural search phrases, supported concepts, attributes, settings, seasonal relevance, and genuine commercial search intent. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD ORDER: prioritize the strongest OBJECTS and ACTIVITIES first, followed by supported CONCEPTS, LOCATION/SETTING, VISUAL CHARACTERISTICS, COLORS/VISUAL ELEMENTS, MOOD/ATMOSPHERE, and relevant USE/SEARCH INTENT. The exact mix depends on the asset. Do not force irrelevant categories, but do use the full range of relevant groups when they genuinely improve discoverability.
+11. CRITICAL KEYWORD ORDER: Main Subject first. Then specific Main Subject descriptions/variations, important secondary subjects, supporting objects, setting/context, action/state, visual characteristics, seasonal/event terms, concepts, and only then useful search-intent terms. This is a natural priority order, not fixed slots or quotas.
     NOTE: The requested count is mandatory. Use expert microstock judgment to find additional relevant search terms, concepts, attributes, and buyer-intent phrases when needed.`;
   }
 
@@ -3616,6 +3427,14 @@ Analyze only what is visually verifiable in the image.
 
 ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
+
+MAIN SUBJECT PRIORITY:
+Before listing secondary details, determine the single strongest MAIN SUBJECT of the asset.
+Choose it by visual dominance, central importance, distinctive identity, size/prominence, and the role it plays in the overall composition.
+Do not choose a subject merely because it is culturally interesting or commercially popular.
+If multiple subjects exist, rank them by actual visual importance and assign importance scores.
+The first primary_subject should represent the strongest visual subject whenever one can be identified.
+The downstream keyword generator will use this order to place the Main Subject first in the final keyword list.
 
 VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
@@ -3803,7 +3622,7 @@ Rules for Descriptions:
 4. Limit to 200 characters.
 
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
+1. Start with the strongest MAIN SUBJECT keyword identified by AI Vision, then continue by visual importance and search relevance.
 2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
 
@@ -3813,11 +3632,11 @@ HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Use a balanced SEO strategy: visual relevance first, then search intent, commercial usefulness, and keyword diversity.
-- Synonyms and search phrases are allowed when they preserve the same visual meaning detected by Vision.
+- Prioritize the Main Subject and its strongest natural variations before secondary information.
+- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
 - Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Prefer strong, discoverable keywords, but still return the exact requested count by expanding intelligently when additional relevant terms exist.
-- Before returning the result, self-audit for obvious hallucinations, IP, spam, and irrelevance. Do not aggressively prune legitimate conceptual, commercial, seasonal, or search-intent keywords simply because they are not literal object labels.
+- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
+- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
@@ -3981,11 +3800,11 @@ HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
 - Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
 - Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
 - The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Use a balanced SEO strategy: visual relevance first, then search intent, commercial usefulness, and keyword diversity.
-- Synonyms and search phrases are allowed when they preserve the same visual meaning detected by Vision.
+- Prioritize the Main Subject and its strongest natural variations before secondary information.
+- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
 - Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Prefer strong, discoverable keywords, but still return the exact requested count by expanding intelligently when additional relevant terms exist.
-- Before returning the result, self-audit for obvious hallucinations, IP, spam, and irrelevance. Do not aggressively prune legitimate conceptual, commercial, seasonal, or search-intent keywords simply because they are not literal object labels.
+- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
+- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
