@@ -2317,11 +2317,15 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             } catch (analysisErr: any) {
                 console.error('[Image Audit] FFmpeg evidence analysis failed:', analysisErr);
                 if (!pythonStats) {
-                    return res.status(503).json({
-                        error: 'Image quality analysis is temporarily unavailable.',
-                        code: 'IMAGE_ANALYSIS_UNAVAILABLE',
-                        detail: analysisErr?.message || 'No technical evidence source available'
-                    });
+                    // Do not block the Vision audit just because optional technical evidence is unavailable.
+                    // The response explicitly marks the technical layer as unavailable so the UI can distinguish
+                    // a degraded audit from a successful forensic audit.
+                    ffmpegStats = {
+                        available: false,
+                        status: 'UNAVAILABLE',
+                        error: analysisErr?.message || 'No FFmpeg technical evidence available'
+                    };
+                    console.warn('[Image Audit] Continuing with Vision-only audit because no technical evidence source is available.');
                 }
             }
 
@@ -2377,7 +2381,23 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             }
 
             const technicalEvidence = { python_opencv: pythonStats, ffmpeg: ffmpegStats };
-            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, undefined, technicalEvidence);
+            let aiVisionStats: any;
+            try {
+                aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, undefined, technicalEvidence);
+            } catch (visionErr: any) {
+                const providerName = (apiKeyStorage.getStore()?.provider || 'gemini');
+                const detail = visionErr?.message || String(visionErr);
+                console.error(`[Image Audit] Vision analysis failed | provider=${providerName} | model=${model || 'auto'} | ${detail}`);
+                return res.status(502).json({
+                    error: `Quality Check gagal pada Vision AI (${providerName}${model ? ` / ${model}` : ''}).`,
+                    code: 'VISION_ANALYSIS_FAILED',
+                    provider: providerName,
+                    model: model || 'auto',
+                    detail,
+                    technical_evidence_available: !!(pythonStats || ffmpegStats?.available !== false),
+                    hint: 'Periksa API key, model vision, payload gambar, dan provider endpoint.'
+                });
+            }
             
             console.log('Server check-image-quality: Integration successful');
             
@@ -2393,7 +2413,12 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             res.json(combinedReport);
         } catch (e: any) {
             console.warn('Server check-image-quality error:', e);
-            res.status(500).json({ error: e.message || 'Error checking image quality' });
+            res.status(500).json({
+                error: 'Quality Check gagal.',
+                code: 'IMAGE_QUALITY_CHECK_FAILED',
+                detail: e?.message || String(e),
+                stage: 'image-quality-endpoint'
+            });
         } finally {
             cleanupFn();
             if (tempFilePath && fs.existsSync(tempFilePath)) {
