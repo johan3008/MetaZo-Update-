@@ -1527,6 +1527,330 @@ function getAIClient(): any {
   };
 }
 
+async function callOpenAICompatibleWithRetry(params: {
+  systemInstruction?: string;
+  contents: any;
+  responseMimeType?: string;
+  responseSchema?: any;
+  config?: any;
+  model?: string;
+}): Promise<string> {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
+  if (!PROVIDER_ENDPOINTS[provider]) {
+    throw new Error(`Unsupported provider: ${provider}`);
+  }
+
+  const endpoint = PROVIDER_ENDPOINTS[provider];
+  const strictModel = params.config?.qcStrictModel === true;
+  const providerState = store?.[provider];
+  const keysList: string[] = (providerState && providerState.keys) || [];
+  const maxRotationAttempts = keysList.length > 0 ? keysList.length : 1;
+  let lastErr: any;
+
+  for (let rot = 0; rot < maxRotationAttempts; rot++) {
+    let apiKey = '';
+
+    if (keysList.length > 0) {
+      const activeIdx = providerState.activeIndex || 0;
+      apiKey = keysList[activeIdx];
+      if (provider === 'nvidia') {
+        console.log(`[NVIDIA DEBUG] Using key index ${activeIdx}/${keysList.length} (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
+      }
+    } else {
+      apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || '';
+      if (provider === 'nvidia') {
+        console.log(`[NVIDIA DEBUG] Using key from process.env (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
+      }
+    }
+
+    if (!apiKey && provider === 'nvidia') {
+      console.warn('NVIDIA key missing. Fallback to Gemini.');
+      const fallbackResult = await getAIClient().models.generateContent({
+        model: 'gemini-3.6-pro-preview',
+        contents: params.contents,
+        config: params.config
+      });
+      // Handle both raw Gemini response and our normalized {text} response
+      return typeof fallbackResult.text === 'function' ? await fallbackResult.text() : (fallbackResult.text || '');
+    }
+
+    if (!apiKey) {
+      throw new Error(`API Key untuk ${provider.toUpperCase()} belum dikonfigurasi. Silakan tambahkan Key Anda di pengaturan.`);
+    }
+
+    const messages: any[] = [];
+    let userSystemInstruction = '';
+    if (params.systemInstruction) {
+      if (provider === 'aivene') {
+        userSystemInstruction = `[SYSTEM INSTRUCTION]\n${params.systemInstruction}\n\n[USER INPUT]\n`;
+      } else {
+        messages.push({ role: 'system', content: params.systemInstruction });
+      }
+    }
+
+    let hasImages = false;
+    const contentParts: any[] = [];
+    
+    if (userSystemInstruction) {
+      contentParts.push({ type: 'text', text: userSystemInstruction });
+    }
+
+    const addPart = (part: any) => {
+      if (!part) return;
+      if (typeof part === 'string') {
+        contentParts.push({ type: 'text', text: part });
+      } else if (part.text) {
+        contentParts.push({ type: 'text', text: part.text });
+      } else if (part.inlineData) {
+        hasImages = true;
+        contentParts.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+          }
+        });
+      }
+    };
+
+    if (typeof params.contents === 'string') {
+      contentParts.push({ type: 'text', text: params.contents });
+    } else if (Array.isArray(params.contents)) {
+      params.contents.forEach(addPart);
+    } else if (params.contents && typeof params.contents === 'object') {
+      if (Array.isArray(params.contents.parts)) {
+        params.contents.parts.forEach(addPart);
+      } else {
+        addPart(params.contents);
+      }
+    }
+
+    let finalContent: any;
+    if (!hasImages) {
+      finalContent = contentParts.map(p => p.text).join('\n');
+    } else {
+      finalContent = contentParts.length === 1 && contentParts[0].type === 'text' ? contentParts[0].text : contentParts;
+    }
+
+    messages.push({
+      role: 'user',
+      content: finalContent
+    });
+
+    let model = params.model || PROVIDER_DEFAULT_MODELS[provider];
+
+    // NVIDIA NIM mapping and sanitization
+    if (provider === 'nvidia') {
+      // mapping legacy or short names to official NIM names
+      if (model === 'stepfun_step35_flash') model = 'stepfun-ai/step-3.5-flash';
+      if (model.startsWith('stepfun/')) model = model.replace('stepfun/', 'stepfun-ai/');
+      if (model === 'nemotron') model = 'nvidia/llama-3.1-nemotron-70b-instruct';
+      if (!model.includes('/')) {
+         // If it's a bare name like 'llama-3.2-90b-vision-instruct', prepend 'meta/'
+         if (model.includes('llama-3.2')) model = `meta/${model}`;
+         else if (model.includes('nemotron')) model = `nvidia/${model}`;
+         else if (model.includes('paligemma')) model = `google/${model}`;
+         else if (model.includes('step')) model = `stepfun-ai/${model}`;
+      }
+      
+      // Sanitasi: NVIDIA NIM sometimes dislikes double slashes or missing namespaces
+      model = model.trim();
+      if (model.startsWith('/')) model = model.substring(1);
+    }
+
+    // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
+    // (artinya caller belum sempat resolve), pakai default provider ini.
+    if (provider !== 'aivene' && (model?.startsWith('gemini-') || model?.startsWith('gemma-'))) {
+      model = PROVIDER_DEFAULT_MODELS[provider];
+    }
+
+    // Map the model 'llama-4-scout-17b-16e-instruct' to the exact name required by Groq
+    if (provider === 'groq' && model === 'llama-4-scout-17b-16e-instruct') {
+      model = 'meta-llama/llama-4-scout-17b-16e-instruct';
+    }
+
+    const payload: any = {
+      model,
+      messages,
+      temperature: params.config?.temperature ?? 0.85,
+    };
+    
+    if (params.config?.topP !== undefined) {
+      payload.top_p = params.config.topP;
+    }
+
+    if (params.config?.seed !== undefined) {
+      payload.seed = params.config.seed;
+    }
+
+    if (SUPPORTS_JSON_MODE.has(provider)) {
+      payload.response_format = { type: "json_object" };
+    }
+
+    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene' || provider === 'zai') {
+      payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
+    } else if (provider === 'bluesminds') {
+      // Do not send max_tokens to avoid pre-check reservation failures on limited balance or custom endpoints
+    }
+    payload.stream = false;
+
+    if (params.responseMimeType === 'application/json') {
+      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested). DO NOT write any introductory or concluding text. DO NOT use markdown code blocks. The response MUST be a valid JSON object or array.';
+      if (provider === 'nvidia') {
+        schemaInstruction = '\n\nOutput only a valid JSON. Do not include any explanation or markdown formatting. The JSON must directly start with { or [ and end with } or ].';
+      }
+      if (params.responseSchema) {
+        schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
+      }
+
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'user') {
+        if (typeof lastMessage.content === 'string') {
+          lastMessage.content += schemaInstruction;
+        } else if (Array.isArray(lastMessage.content)) {
+          lastMessage.content.push({ type: 'text', text: schemaInstruction });
+        }
+      } else {
+        messages.push({ role: 'user', content: schemaInstruction });
+      }
+    }
+
+    let tryCount = 0;
+    while (tryCount < 2) {
+      try {
+        console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`,
+        };
+        // OpenRouter butuh header tambahan untuk identifikasi (opsional tapi disarankan)
+        if (provider === 'openrouter') {
+          headers['HTTP-Referer'] = process.env.APP_URL || 'http://localhost';
+          headers['X-Title'] = 'JohMeta';
+        }
+
+        // Z.AI requires Accept-Language header
+        if (provider === 'zai') {
+          headers['Accept-Language'] = 'en-US,en';
+          payload.do_sample = false;
+        }
+
+        if (provider === 'nvidia') {
+          const sanPayload = { ...payload, messages: payload.messages.map((m: any) => ({ ...m, content: typeof m.content === 'string' ? m.content : '[REDACTED CONTENT]' })) };
+          console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
+        }
+
+        const fetchTimeout = (provider === 'nvidia' || provider === 'mistral') ? 30000 : 25000;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          // @ts-ignore - undici/node-fetch support signal/timeout
+          signal: AbortSignal.timeout(fetchTimeout)
+        });
+
+        // Safe logging of the response
+        const responseDataRawForLogging = await response.clone().text();
+        console.log(`[${provider.toUpperCase()} DEBUG] Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn(`[${provider.toUpperCase()} API FAILURE] Status: ${response.status}, Response: ${errText}`);
+          throw new Error(`HTTP ${response.status}: ${errText}`);
+        }
+
+        const responseDataRaw = await response.text();
+        let responseData;
+        try {
+          responseData = JSON.parse(responseDataRaw);
+        } catch (e) {
+          console.error(`[callOpenAICompatibleWithRetry] Failed to parse JSON. Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, RawResponse: ${responseDataRaw.substring(0, 500)}`);
+          throw new Error(`Failed to parse JSON from ${provider}. RawResponse Sample: ${responseDataRaw.substring(0, 200)}`);
+        }
+        let answer = responseData.choices?.[0]?.message?.content;
+        if (!answer && responseData.choices?.[0]?.message) {
+          answer = responseData.choices[0].message.reasoning || responseData.choices[0].message.reasoning_content;
+        }
+        if (!answer) {
+          console.warn(`[callOpenAICompatibleWithRetry] Empty answer received from ${provider}. Response payload:`, JSON.stringify(responseData));
+          if (responseData.error) {
+            throw new Error(`${provider.toUpperCase()} API Error: ${responseData.error.message || JSON.stringify(responseData.error)} (Code: ${responseData.error.code || 'unknown'})`);
+          }
+          throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
+        }
+        if (params.responseMimeType === 'application/json') {
+          answer = extractJSON(answer);
+          if (answer.replace(/\s/g, '') === '{}') {
+            console.warn(`[callOpenAICompatibleWithRetry] Model hallucinated empty JSON string. Retrying...`);
+            // Add 'quota' to trigger a retry gracefully
+            throw new Error(`Model returned empty json object string {}. Trigger quota rotation/retry.`);
+          }
+        }
+        return answer;
+      } catch (err: any) {
+        console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
+        const status = err.status || (err.message && err.message.includes('HTTP ') ? err.message.split(' ')[1].replace(':', '') : 'unknown');
+        console.warn(`[${provider.toUpperCase()} ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
+        lastErr = err;
+
+        const errorMsg = String(err.message || "").toLowerCase();
+
+        // Handle API key rotation on limit or auth errors
+        const isRateLimit = errorMsg.includes('429') && (errorMsg.includes('try again') || errorMsg.includes('retry in') || errorMsg.includes('wait'));
+        const shouldRotate = (errorMsg.includes('429') && !isRateLimit) || errorMsg.includes('quota') || 
+                             errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || 
+                             errorMsg.includes('403') || errorMsg.includes('401');
+        
+        if (shouldRotate) {
+           console.warn(`[${provider.toUpperCase()}] Error requires rotation: ${errorMsg}. Trying next key.`);
+           if (providerState && providerState.keys && keysList.length > 1) {
+              providerState.activeIndex = (providerState.activeIndex + 1) % keysList.length;
+              break;
+           } else {
+              throw err;
+           }
+        }
+
+        // Automatic model fallback and exponential backoff
+        tryCount++;
+        const fallback = PROVIDER_FALLBACK_MODELS[provider];
+        const isRetryableError = errorMsg.includes('429') || 
+                                 errorMsg.includes('quota') || 
+                                 errorMsg.includes('limit') || 
+                                 errorMsg.includes('timeout') || 
+                                 errorMsg.includes('exceeded') || 
+                                 errorMsg.includes('fetch failed') ||
+                                 errorMsg.includes('400') || errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('invalid') ||
+                                 errorMsg.includes('500') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504') || errorMsg.includes('524') || errorMsg.includes('upstream_error') ||
+                                 errorMsg.includes('extra data') ||
+                                 errorMsg.includes('empty response content') ||
+                                 errorMsg.includes('empty json object') ||
+                                 errorMsg.includes('bad_response_status_code');
+
+        if (!strictModel && tryCount === 1 && fallback && fallback !== model) {
+          model = fallback;
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model}`);
+          payload.model = model;
+          continue;
+        }
+
+        if (tryCount < 2 && isRetryableError) {
+          const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
+          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/2) after ${backoff / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, backoff));
+          continue;
+        }
+
+        throw err;
+      }
+    }
+  }
+  throw lastErr;
+}
+
+
 // Helper for robust API calls with retry
 const callGeminiWithRetry = async (
   modelName: string,
@@ -5432,7 +5756,7 @@ export async function checkImageQuality(
     metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Gambar yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda.`;
   }
 
-  const technicalGroundTruth = technicalStats ? `\n\n[OBJECTIVE IMAGE-QUALITY EVIDENCE]\nThe following measurements come from the original image using PIL/OpenCV/FFmpeg. They are evidence about visible image quality only. NEVER use file size, pixel dimensions, resolution, or megapixels as a PASS/FAIL criterion. Treat noise, JPEG blocking, banding, clipping, and blur signals as evidence that must be visually interpreted together with the full image and forensic crops.\n${JSON.stringify({ brightness: technicalStats.brightness, contrast: technicalStats.contrast, sharpness: technicalStats.sharpness, noise: technicalStats.noise, banding: technicalStats.banding, jpeg_blocking: technicalStats.jpeg_blocking, local_analysis: technicalStats.local_analysis, detected_text: technicalStats.detected_text, quality_flags: technicalStats.quality_flags }, null, 2)}\n[/OBJECTIVE IMAGE-QUALITY EVIDENCE]` : "";
+  const technicalGroundTruth = technicalStats ? `\n\n[OBJECTIVE IMAGE-QUALITY EVIDENCE]\nThe following measurements come from the original image using Python 3/OpenCV/Pillow and FFmpeg. They are evidence about visible image quality only. NEVER use file size, pixel dimensions, resolution, or megapixels as a PASS/FAIL criterion. Treat noise, JPEG blocking, banding, clipping, and blur signals as evidence that must be visually interpreted together with the full image and forensic crops. Python/OpenCV evidence is preferred for forensic pixel metrics; FFmpeg is a secondary corroboration source.\n${JSON.stringify(technicalStats, null, 2)}\n[/OBJECTIVE IMAGE-QUALITY EVIDENCE]` : "";
 
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
 
@@ -5686,13 +6010,17 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   // QC Vision uses Gemini 3 Flash Preview as the primary multimodal model.
   // Objective pixel measurements remain authoritative; the model is responsible for
   // visual/structural/AI-artifact inspection across the full image and forensic crops.
-  let selectedModel = model || 'gemini-3-flash-preview';
-  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
-    selectedModel = 'gemini-3-flash-preview';
-  }
+  const isNonGeminiProvider = NON_GEMINI_PROVIDERS.has(provider);
+  // Gemini QC is pinned to Gemini 3 Flash Preview. Other providers use their own configured
+  // vision-capable model, but receive the exact same QC contract/schema and deterministic settings.
+  let selectedModel = isNonGeminiProvider
+    ? ((model && model !== 'auto' && !model.startsWith('gemini-') && !model.startsWith('gemma-'))
+        ? model
+        : (PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini'))
+    : 'gemini-3-flash-preview';
 
   // Keep the QC model deterministic. Do not silently switch to an unrelated model.
-  const modelsToTry = ['gemini-3-flash-preview'];
+  const modelsToTry = [selectedModel];
   let responseText = "";
   let lastError;
 
@@ -5710,7 +6038,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.0, topP: 0.1 },
+        config: { temperature: 0.0, topP: 0.1, qcStrictModel: true },
         model: activeModel
       });
     } catch (err: any) {
@@ -5736,7 +6064,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
-          responseSchema
+          responseSchema,
+          qcStrictModel: true
         });
         responseText = res.text || "{}";
         break;
@@ -5760,20 +6089,20 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     if (technicalStats) {
       parsedResult.technical_ground_truth = technicalStats;
       parsedResult.hard_quality_flags = [];
-      const hardFlags = technicalStats.quality_flags || {};
+      const py = technicalStats.python_opencv || {};
+      const hardFlags = py.quality_flags || technicalStats.quality_flags || {};
       // Objective signals are evidence, not file-size/resolution gates.
-      // The final decision must be based on visible image-quality defects confirmed by AI Vision and forensic crops.
-      parsedResult.hard_quality_flags = [];
       if (hardFlags.high_noise_signal) parsedResult.hard_quality_flags.push('noise_signal');
       if (hardFlags.strong_jpeg_blocking_signal) parsedResult.hard_quality_flags.push('compression_signal');
       if (hardFlags.local_blur_anomaly_signal) parsedResult.hard_quality_flags.push('local_blur_signal');
       if (hardFlags.crushed_shadow_signal) parsedResult.hard_quality_flags.push('shadow_clipping_signal');
-      // Never add resolution/file-size flags and never force FAIL from these measurements alone.
       parsedResult.technical_quality_evidence = {
         noise_signal: !!hardFlags.high_noise_signal,
         compression_signal: !!hardFlags.strong_jpeg_blocking_signal,
         local_blur_signal: !!hardFlags.local_blur_anomaly_signal,
-        shadow_clipping_signal: !!hardFlags.crushed_shadow_signal
+        shadow_clipping_signal: !!hardFlags.crushed_shadow_signal,
+        python_opencv_available: !!technicalStats.python_opencv,
+        ffmpeg_available: !!technicalStats.ffmpeg
       };
     }
 
