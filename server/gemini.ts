@@ -497,9 +497,13 @@ function ensureKeywordCount(
     scoreKeyword(keyword, tiers, index, Math.max(1, deduped.length), title)
   );
 
-  // Stable ranking: score first, AI order second. This keeps the model's semantic
-  // judgment while consistently putting the strongest visual/search terms first.
-  scored.sort((a, b) => b.totalScore - a.totalScore);
+  // Rank by quality while preserving AI order for near-ties.
+  // Visual relevance remains the dominant signal; SEO/commercial/trend signals
+  // must never rescue an unsupported keyword.
+  scored.sort((a, b) => {
+    const diff = b.totalScore - a.totalScore;
+    return Math.abs(diff) < 3 ? 0 : diff;
+  });
 
   return scored
     .map(x => x.keyword)
@@ -1737,8 +1741,8 @@ async function expandKeywordsWithAI(
   const language = getLanguageName(metadataLanguage);
   let candidates = [...current];
 
-  for (let pass = 0; pass < 2 && candidates.length < targetCount; pass++) {
-    const needed = Math.min(20, Math.max(8, targetCount - candidates.length + 6));
+  for (let pass = 0; pass < 4 && candidates.length < targetCount; pass++) {
+    const needed = Math.min(30, Math.max(10, targetCount - candidates.length + 8));
     const expansionSystem = `${UNIVERSAL_KEYWORD_SPECIFICATION}
 
 EXPANSION PASS:
@@ -1839,8 +1843,8 @@ export const generateStockMetadata = async (
   }
 
   // Amankan hitungan target keyword sejak awal
-  const requestedCount = parseInt(String(keywordCount), 10) || 40;
-  const targetCount = Math.max(30, Math.min(40, requestedCount));
+  const requestedCount = parseInt(String(keywordCount), 10) || 25;
+  const targetCount = Math.max(1, Math.min(100, requestedCount));
   const aiRequestCount = targetCount;
 
   const directives = getToolTypeDirectives(toolType);
@@ -2558,7 +2562,7 @@ export const generateBatchStockMetadata = async (
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 60;
+  const targetCount = Math.max(1, Math.min(100, parseInt(String(keywordCount), 10) || 25));
   const aiRequestCount = targetCount;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_SPECIFICATION + `\n\nBATCH MODE: Apply the same provider-invariant keyword standard to every asset.\n`;
   // Rules for keywords depending on keywordMode for batch
@@ -2660,10 +2664,38 @@ STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
-PRIMARY OBJECTIVE:
-Detect every visible subject, action, color, visible text, and composition detail.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
+PRIMARY OBJECTIVE — BUILD GROUNDED VISUAL_FACTS:
+Analyze the actual asset as a structured evidence record for downstream metadata generation.
+Do not write a caption, title, description, or keywords here.
+Every fact must be traceable to visible evidence in the supplied frame(s).
+If a fact is uncertain or not visible, omit it or mark confidence low rather than guessing.
+
+VISUAL ANALYSIS DIMENSIONS:
+1. PRIMARY SUBJECTS — the main visually dominant objects/people/animals.
+2. SECONDARY SUBJECTS — supporting visible objects or subjects.
+3. BACKGROUND ELEMENTS — visible environmental/background details that can support keywords.
+4. ACTIONS — only actions that are visibly occurring.
+5. RELATIONSHIPS — visible spatial/interacting relationships between subjects.
+6. ATTRIBUTES — visible material, shape, texture, pattern, condition, size relationship, clothing, etc.
+7. COLORS — actual dominant and secondary visible colors.
+8. TEXT — exact visible text only; do not invent or repair unreadable text.
+9. SETTING — generic visible setting/environment; never guess exact location.
+10. COMPOSITION — orientation, framing, angle, perspective, close-up, copy space, symmetry, layout, foreground/midground/background.
+11. LIGHTING — visible light direction/quality, shadows, highlights, natural/artificial appearance.
+12. CONCEPTS — only concepts clearly communicated by the image; distinguish direct visual meaning from interpretation.
+13. EVENT/SEASON — only when unmistakably supported by visual cues.
+14. TECHNICAL/VISUAL CHARACTERISTICS — photo/illustration/render appearance, isolated/background treatment, transparency if actually evident, etc.
+
+EVIDENCE DISCIPLINE:
+- Visual evidence is the source of truth.
+- Do not infer profession, nationality, religion, culture, exact location, audience, industry, emotion, use case, or symbolism unless the visual evidence strongly supports it.
+- A color alone is not evidence of a holiday or cultural event.
+- A generic object is not evidence of a brand or product model.
+- Do not convert subjective aesthetic judgments into facts.
+- Do not use EXIF to invent visual content; EXIF is technical corroboration only.
+- Prefer precise generic descriptions when identification is uncertain.
+
+For important subjects, provide importance and confidence scores. Use 0–100 scores.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
