@@ -1210,92 +1210,32 @@ function ensureKeywordCount(
     return v;
   };
 
-  const stopWords = new Set([
-    ...KEYWORD_CONNECTOR_WORDS,
-    'stock', 'photo', 'photography', 'image', 'picture', 'vector',
-    'illustration', 'captured', 'professional', 'high', 'quality',
-    'beautiful', 'stunning', 'amazing', 'perfect'
-  ]);
+  const seen = new Set<string>();
+  const result: string[] = [];
 
-  const tokenize = (value: string): string[] => normalize(value)
-    .split(/\\s+/)
-    .filter(Boolean)
-    .filter(w => w.length > 1 && !stopWords.has(w) && !isProhibitedKeyword(w));
+  for (const raw of Array.isArray(keywords) ? keywords : []) {
+    let keyword = normalize(raw);
+    if (!keyword || isProhibitedKeyword(keyword)) continue;
 
-  const context = new Set<string>();
-  const addContext = (value: any) => {
-    if (typeof value !== 'string') return;
-    const n = normalize(value);
-    if (!n || isProhibitedKeyword(n)) return;
-    context.add(n);
-    tokenize(n).forEach(t => context.add(t));
-  };
-
-  addContext(title);
-  addContext(description);
-
-  const fields = [
-    'primary_subject','primary_subjects','secondary_subject','secondary_subjects',
-    'objects','attributes','scene','environment','setting','location',
-    'actions','action','states','style','visual_style','visualStyle',
-    'composition','layout','seasonal_context','seasonal','occasion','events',
-    'season','holiday','concepts','themes','commercial_concepts',
-    'commercial_use','use_cases','applications','colors','color'
-  ];
-
-  for (const field of fields) {
-    const value = visualFacts?.[field];
-    if (Array.isArray(value)) {
-      value.forEach(item => {
-        if (typeof item === 'string') addContext(item);
-        else if (item && typeof item === 'object') {
-          addContext(item.name); addContext(item.label); addContext(item.value);
-        }
-      });
-    } else if (typeof value === 'string') {
-      addContext(value);
+    if (keywordMode === 'single') {
+      keyword = keyword.split(/\\s+/)[0] || '';
     }
+
+    if (!keyword) continue;
+
+    const key = singularKey(keyword);
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    result.push(keyword);
+
+    if (result.length >= target) break;
   }
 
-  const candidates = new Map<string, { value: string; score: number; order: number }>();
-
-  (Array.isArray(keywords) ? keywords : []).forEach((raw, index) => {
-    let value = normalize(raw);
-    if (!value || isProhibitedKeyword(value)) return;
-
-    if (keywordMode === 'single') value = tokenize(value)[0] || '';
-    if (!value) return;
-
-    const words = tokenize(value);
-    if (!words.length) return;
-
-    const exactContext = context.has(value);
-    const matchedWords = words.filter(w => context.has(w)).length;
-
-    // AI order is the primary signal. Context only helps distinguish candidates.
-    // No category quota, fixed percentage, SEO engine, market signal or expansion.
-    let score = 1000 - index;
-    score += exactContext ? 45 : 0;
-    score += matchedWords * 12;
-    score += words.length > 1 ? 8 : 0;
-
-    const generic = new Set([
-      'thing','object','item','design','element','content',
-      'creative','modern','simple','general','concept'
-    ]);
-    if (words.length === 1 && generic.has(words[0])) score -= 80;
-
-    const key = singularKey(value);
-    const previous = candidates.get(key);
-    if (!previous || score > previous.score) {
-      candidates.set(key, { value, score, order: index });
-    }
-  });
-
-  return Array.from(candidates.values())
-    .sort((a, b) => b.score - a.score || a.order - b.order)
-    .slice(0, target)
-    .map(x => x.value);
+  // No category quotas, semantic expansion, SEO engine, market ranking,
+  // visual-grounding gate, fallback keywords, or artificial modifiers.
+  // The AI-generated order is preserved after basic cleanup/deduplication.
+  return result;
 }
 function getAIClient(): any {
   return {
@@ -2610,25 +2550,60 @@ Generate only NEW, evidence-backed candidates.`;
 }
 
 const UNIVERSAL_KEYWORD_RULES = `
-UNIVERSAL KEYWORD RULES — APPLY TO EVERY PROVIDER AND EVERY MODEL
+UNIVERSAL NATURAL MICROSTOCK KEYWORD RULES
+APPLY IDENTICALLY TO EVERY PROVIDER AND EVERY MODEL
 
-Generate the best stock keywords for the asset using natural search-intent judgment.
+Generate keywords as an experienced microstock contributor would.
 
-1. Understand the asset first: primary subject, secondary subjects, attributes, action/state, environment, composition, visual characteristics, concepts and other meaningful information.
-2. Search intent first: think like a real stock buyer searching for this exact asset.
-3. Start from the strongest Primary Subject terms, then consider Secondary Subjects and other relevant information naturally.
-4. NO FIXED PATTERN: never reserve a fixed number or percentage for any category. Primary Subject, Secondary Subject, Attributes, Environment, Concept, Style, Color and Commercial Use are candidate sources, not slots.
-5. Dynamically select the strongest candidates together. If a secondary subject is a stronger search term than a weak primary variation, it may rank higher.
-6. Prefer realistic buyer search terms and specific natural phrases when they are genuinely useful.
-7. Do not force synonyms, commercial terms, seasonal terms, concepts, context, style or colors.
-8. Avoid repetitive, near-duplicate and keyword-stuffed terms.
-9. Do not add generic filler merely to reach the requested count.
-10. Never include brands, trademarks, company names, product lines, celebrities, copyrighted characters or prohibited names.
-11. Keywords must be lowercase, single words or short natural phrases, never sentences.
-12. Order keywords by actual search value and relevance, not by a predefined category sequence.
-13. Return exactly the requested count whenever enough valid candidates exist. If more candidates are needed, continue with progressively weaker but still genuinely useful terms from the asset. Never use unrelated filler.
-14. Final test: would a real stock buyer plausibly use this term to find this exact asset?
+1. Use natural, everyday search language commonly used to describe stock assets.
+2. Keywords must describe what buyers would naturally type when looking for the asset.
+3. Prefer simple nouns, concrete terms, and short natural phrases.
+4. Prefer the common/base form of a word when it is more natural for stock search.
+   Example: "fire damage" instead of "damaged by fire".
+   Example: "fire investigation" instead of "investigating a fire".
+5. Never write sentences.
+6. Never create descriptive sentences disguised as keywords.
+7. Avoid unnecessary grammatical words such as "of", "with", "for", "in",
+   "on", "and", or "the", unless they are naturally necessary inside a
+   common search phrase.
+8. Do not force word endings, grammatical variations, or artificial inflections.
+9. Prefer common stock terminology over complicated vocabulary.
+10. Use short natural phrases when they represent a real search term.
+11. Do not generate keyword variations merely to increase the count.
+12. Do not use synonyms mechanically. Include a synonym only when it is a
+    genuinely useful alternative search.
+13. Avoid vague words when a more specific natural term exists.
+    Example: "fire damage" is better than "damage".
+    Example: "fire investigation" is better than "investigation".
+    Example: "protective gear" is better than "equipment".
+14. Primary subject, secondary subject, action, environment, attributes,
+    composition, concept, and commercial context may all contribute keywords.
+    They are candidate sources only. There are NO fixed category quotas.
+15. Do not force every visual category into the keyword list.
+16. Select keywords dynamically according to how useful and natural they are
+    for finding the specific asset.
+17. Avoid abstract words such as "resilience", "duty", "analysis",
+    "importance", or "professionalism" unless they represent a clear and
+    commonly searched concept for the asset.
+18. Avoid generic filler such as "thing", "object", "content", "creative",
+    "modern", "beautiful", "amazing", "high quality", or "professional".
+19. Do not use brands, trademarks, company names, celebrities, copyrighted
+    characters, or protected names.
+20. Keep every keyword lowercase.
+21. Keywords must be single words or short natural phrases, never sentences.
+22. Order keywords from the strongest natural search terms to weaker relevant
+    terms. This is a relevance decision, not a fixed category sequence.
+23. The requested keyword count is the final output count.
+24. If the user requests 25 keywords, return 25. If the user requests 40,
+    return 40.
+25. Never add unrelated keywords simply to satisfy the requested count.
+
+FINAL TEST:
+For every keyword ask:
+"Would a real microstock buyer naturally type this when searching for this asset?"
+If not, remove it.
 `;
+
 
 
 export const generateStockMetadata = async (
