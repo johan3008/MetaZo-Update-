@@ -2476,22 +2476,45 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             // 3. Run AI Vision Analysis (Gemini)
             console.log('Server check-image-quality: Running AI Vision Analysis...');
             
-            // Generate zoom-in center crop 200% as the second image for forensic detail checks
-            const zoomFilePath = tempFilePath + "_zoom.jpg";
+            // Generate 4 overlapping quadrant crops at NATIVE pixel resolution (no upscale) so the
+            // AI actually gets a forensic 100% pixel-level view of the ENTIRE frame — not just the
+            // center. Previously this only cropped the center 50% and artificially upscaled it 2x,
+            // which (a) left the outer ~50% of every image (edges/corners — where things like
+            // whiteboard text, wall signage, or small background props usually sit) completely
+            // un-inspected at pixel level, and (b) contradicted the system prompt, which already
+            // tells the AI it is receiving "4 native-resolution, non-upscaled quadrant crops
+            // covering the entire image" (it wasn't). Each quadrant is ~55% of width/height so
+            // adjacent quadrants overlap by ~20%, matching what the prompt describes.
+            const quadrantSuffixes = ['tl', 'tr', 'bl', 'br'];
+            const quadrantFilePaths = quadrantSuffixes.map(s => `${tempFilePath}_${s}.jpg`);
             let imagesToSend: string | string[] = imageBase64;
             try {
                 const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
                 const execPromise = util.promisify(exec);
-                await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "crop=iw/2:ih/2:iw/4:ih/4,scale=iw*2:ih*2" "${zoomFilePath}"`);
-                if (fs.existsSync(zoomFilePath)) {
-                    const zoomBuffer = fs.readFileSync(zoomFilePath);
+                // crop=w:h:x:y — 60% width/height per quadrant, positioned so neighboring
+                // quadrants overlap by exactly 20% of the frame (matches the system prompt's
+                // documented "4 kuadran ber-overlap 20%" protocol), together covering 100%
+                // of the image with no un-inspected region left over.
+                const quadrantFilters = [
+                    'crop=iw*0.6:ih*0.6:0:0',                 // top-left
+                    'crop=iw*0.6:ih*0.6:iw*0.4:0',            // top-right
+                    'crop=iw*0.6:ih*0.6:0:ih*0.4',            // bottom-left
+                    'crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4'        // bottom-right
+                ];
+                await Promise.all(quadrantFilters.map((filter, i) =>
+                    execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${filter}" -q:v 2 "${quadrantFilePaths[i]}"`)
+                ));
+                if (quadrantFilePaths.every(p => fs.existsSync(p))) {
                     const mime = fileType || 'image/jpeg';
-                    const zoomBase64 = `data:${mime};base64,${zoomBuffer.toString('base64')}`;
-                    imagesToSend = [imageBase64, zoomBase64];
-                    console.log('Server check-image-quality: Successfully generated zoom-in center crop 200% via FFmpeg');
+                    const quadrantBase64s = quadrantFilePaths.map(p => {
+                        const buf = fs.readFileSync(p);
+                        return `data:${mime};base64,${buf.toString('base64')}`;
+                    });
+                    imagesToSend = [imageBase64, ...quadrantBase64s];
+                    console.log('Server check-image-quality: Successfully generated 4 native-resolution quadrant crops (top-left, top-right, bottom-left, bottom-right) via FFmpeg');
                 }
             } catch (zoomErr: any) {
-                console.warn('Server check-image-quality: Failed to generate zoom center crop:', zoomErr);
+                console.warn('Server check-image-quality: Failed to generate quadrant crops:', zoomErr);
             }
 
             // Ground the AI vision pass in the REAL measured pixel stats (sharpness/noise/exposure/
@@ -2563,9 +2586,11 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 try { fs.unlinkSync(tempFilePath); } catch (err) {}
             }
             if (tempFilePath) {
-                const zoomFilePath = tempFilePath + "_zoom.jpg";
-                if (fs.existsSync(zoomFilePath)) {
-                    try { fs.unlinkSync(zoomFilePath); } catch (err) {}
+                for (const suffix of ['tl', 'tr', 'bl', 'br']) {
+                    const qPath = `${tempFilePath}_${suffix}.jpg`;
+                    if (fs.existsSync(qPath)) {
+                        try { fs.unlinkSync(qPath); } catch (err) {}
+                    }
                 }
             }
         }
