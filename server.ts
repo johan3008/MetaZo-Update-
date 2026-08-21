@@ -2138,15 +2138,20 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
         let resolution = "Unknown";
         let color_space = "sRGB (Standard)";
         let fileSizeKb = 0;
+        let megapixels = 0;
+        let probedWidth = 0;
+        let probedHeight = 0;
         try {
             const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
             const probeData = JSON.parse(probeOut);
             const stream = probeData.streams?.[0] || {};
             const width = stream.width || 0;
             const height = stream.height || 0;
+            probedWidth = width;
+            probedHeight = height;
             if (width && height) {
-                const mp = ((width * height) / 1000000).toFixed(2);
-                resolution = `${width} x ${height} (${mp} MP)`;
+                megapixels = (width * height) / 1000000;
+                resolution = `${width} x ${height} (${megapixels.toFixed(2)} MP)`;
             }
             if (stream.pix_fmt) {
                 color_space = `${stream.pix_fmt} (${stream.color_space || 'sRGB'} range ${stream.color_range || 'N/A'})`;
@@ -2265,6 +2270,9 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
 
         return {
             resolution,
+            width: probedWidth,
+            height: probedHeight,
+            megapixels: Math.round(megapixels * 1000) / 1000,
             color_space,
             histogram,
             brightness: { value: brightnessVal, status: brightnessStatus },
@@ -2274,6 +2282,133 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             file_validation: fileValidation,
             file_size_kb: fileSizeKb
         };
+    }
+
+    // --- Adobe Stock hard technical gate ---------------------------------------------------
+    // Reference: https://helpx.adobe.com/stock/contributor/submit-your-content/submit-photos/technical-legal-requirements-photo-submission.html
+    //   Image resolution: 4MP-100MP | File size: max 45MB | Format: JPEG sRGB | Content: no watermark/timestamp/branding
+    // Reference: https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html
+    //   Sharp focus, balanced exposure, minimal noise/artifacts, no color fringing/banding/blocking.
+    //
+    // These thresholds are checked on the REAL pixel measurements coming from image_analyzer.py
+    // (Laplacian sharpness, noise sigma, clipping percentages, banding/blocking scores) so an
+    // asset can never be marked PASS by this app when it objectively violates Adobe's own
+    // published technical requirements — regardless of what the subjective AI-vision pass says.
+    interface TechGateFailure { key: string; reason_en: string; reason_id: string; }
+    interface TechGateResult { passed: boolean; failures: TechGateFailure[]; }
+
+    function evaluateAdobeTechnicalGate(stats: any): TechGateResult {
+        const failures: TechGateFailure[] = [];
+        if (!stats || stats.estimated) {
+            // Synthetic/estimated fallback data (both Python and FFmpeg analysis failed) —
+            // never gate on guessed numbers, only on real measurements.
+            return { passed: true, failures: [] };
+        }
+
+        // 1. Resolution — Adobe Stock requires 4MP-100MP for photos.
+        let mp: number | null = typeof stats.megapixels === 'number' ? stats.megapixels : null;
+        if (mp === null && typeof stats.resolution === 'string') {
+            const m = /([\d.]+)\s*MP/i.exec(stats.resolution);
+            if (m) mp = parseFloat(m[1]);
+        }
+        if (typeof mp === 'number' && mp > 0) {
+            if (mp < 4) {
+                failures.push({
+                    key: 'resolution',
+                    reason_en: `Resolution is only ${mp.toFixed(2)}MP, below Adobe Stock's required minimum of 4MP.`,
+                    reason_id: `Resolusi gambar hanya ${mp.toFixed(2)}MP, di bawah batas minimum wajib Adobe Stock yaitu 4MP.`
+                });
+            } else if (mp > 100) {
+                failures.push({
+                    key: 'resolution',
+                    reason_en: `Resolution is ${mp.toFixed(2)}MP, above Adobe Stock's maximum of 100MP.`,
+                    reason_id: `Resolusi gambar ${mp.toFixed(2)}MP, melebihi batas maksimum Adobe Stock yaitu 100MP.`
+                });
+            }
+        }
+
+        // 2. File size — Adobe Stock max 45MB.
+        if (typeof stats.file_size_kb === 'number' && stats.file_size_kb > 45 * 1024) {
+            const mb = (stats.file_size_kb / 1024).toFixed(1);
+            failures.push({
+                key: 'file_size',
+                reason_en: `File size is ${mb}MB, above Adobe Stock's 45MB limit.`,
+                reason_id: `Ukuran file ${mb}MB, melebihi batas maksimum Adobe Stock yaitu 45MB.`
+            });
+        }
+
+        // 3. Color profile — Adobe Stock requires JPEG in sRGB. CMYK/indexed palettes are refused.
+        const colorSpace = String(stats.color_space || '');
+        if (/CMYK/i.test(colorSpace)) {
+            failures.push({
+                key: 'color_profile',
+                reason_en: `Image uses CMYK color mode. Adobe Stock requires JPEG files in sRGB color profile.`,
+                reason_id: `Gambar menggunakan mode warna CMYK. Adobe Stock mewajibkan file JPEG dengan profil warna sRGB.`
+            });
+        } else if (/^P\b|\(P\)/.test(colorSpace)) {
+            failures.push({
+                key: 'color_profile',
+                reason_en: `Image uses an indexed/palette color mode instead of standard RGB, which is not accepted for photo submissions.`,
+                reason_id: `Gambar menggunakan mode warna indexed/palette, bukan RGB standar, yang tidak diterima untuk foto.`
+            });
+        }
+
+        // 4. Severe, GLOBAL sharpness failure (genuinely out-of-focus image, not artistic partial blur).
+        const sharpnessVal = stats.sharpness?.value;
+        if (typeof sharpnessVal === 'number' && sharpnessVal < 12) {
+            failures.push({
+                key: 'sharpness',
+                reason_en: `Measured sharpness score is critically low (${sharpnessVal}/100), indicating the image is globally out of focus.`,
+                reason_id: `Skor ketajaman terukur sangat rendah (${sharpnessVal}/100), menandakan gambar secara keseluruhan tidak fokus/blur.`
+            });
+        }
+
+        // 5. Severe noise.
+        const noiseVal = stats.noise?.value;
+        if (typeof noiseVal === 'number' && noiseVal > 55) {
+            failures.push({
+                key: 'noise',
+                reason_en: `Measured noise level is severe (${noiseVal}/100), well beyond acceptable grain for commercial licensing.`,
+                reason_id: `Tingkat noise terukur sangat parah (${noiseVal}/100), jauh melebihi batas wajar untuk lisensi komersial.`
+            });
+        }
+
+        // 6. Severe highlight/shadow clipping covering a large portion of the frame
+        //    (studio white/black backgrounds are excluded — see image_analyzer.py).
+        const clipHigh = stats.brightness?.clipped_high_percent;
+        const clipLow = stats.brightness?.clipped_low_percent;
+        if (typeof clipHigh === 'number' && clipHigh > 15 && !stats.brightness?.is_studio_white_bg) {
+            failures.push({
+                key: 'exposure',
+                reason_en: `${clipHigh.toFixed(1)}% of the frame is blown-out highlights (overexposed), exceeding an acceptable range.`,
+                reason_id: `${clipHigh.toFixed(1)}% area gambar mengalami highlight terbakar (overexposed), melebihi batas wajar.`
+            });
+        }
+        if (typeof clipLow === 'number' && clipLow > 25 && !stats.brightness?.is_studio_black_bg) {
+            failures.push({
+                key: 'exposure',
+                reason_en: `${clipLow.toFixed(1)}% of the frame is crushed shadow (underexposed), exceeding an acceptable range.`,
+                reason_id: `${clipLow.toFixed(1)}% area gambar mengalami shadow gelap total (underexposed), melebihi batas wajar.`
+            });
+        }
+
+        // 7. Severe JPEG blocking / color banding.
+        if (typeof stats.jpeg_blocking?.score === 'number' && stats.jpeg_blocking.score > 80) {
+            failures.push({
+                key: 'artifacts',
+                reason_en: `Severe JPEG compression blocking detected (score ${stats.jpeg_blocking.score}/100).`,
+                reason_id: `Terdeteksi artefak blocking kompresi JPEG yang parah (skor ${stats.jpeg_blocking.score}/100).`
+            });
+        }
+        if (typeof stats.banding?.score === 'number' && stats.banding.score > 80) {
+            failures.push({
+                key: 'artifacts',
+                reason_en: `Severe color banding/posterization detected in gradient areas (score ${stats.banding.score}/100).`,
+                reason_id: `Terdeteksi color banding/posterisasi parah pada area gradasi (skor ${stats.banding.score}/100).`
+            });
+        }
+
+        return { passed: failures.length === 0, failures };
     }
 
     app.post('/api/check-image-quality', async (req, res) => {
@@ -2324,6 +2459,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 } catch (ffErr: any) {
                     console.warn('[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:', ffErr);
                     ffmpegStats = {
+                        estimated: true, // guessed stats — never used for hard technical gating, see evaluateAdobeTechnicalGate()
                         resolution: "Estimated from file structure",
                         color_space: "sRGB (Standard)",
                         histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
@@ -2358,15 +2494,63 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 console.warn('Server check-image-quality: Failed to generate zoom center crop:', zoomErr);
             }
 
-            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType);
-            
+            // Ground the AI vision pass in the REAL measured pixel stats (sharpness/noise/exposure/
+            // resolution/color profile) computed above, instead of letting it judge purely off a
+            // copy of the image that the vision API may have downscaled/recompressed internally.
+            const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, ffmpegStats);
+
+            // Hard technical gate against Adobe Stock's own published requirements. This can only
+            // ever turn a PASS into a FAIL (never the reverse) — it exists so the app can never
+            // report PASS for an asset that objectively violates Adobe's technical spec, even if
+            // the AI vision pass judged the (possibly downscaled) image as looking fine.
+            const gateResult = evaluateAdobeTechnicalGate(ffmpegStats);
+            const isIndonesianLang = !language || language === 'Bahasa' || language === 'id' || /indonesian/i.test(String(language));
+
+            if (!gateResult.passed) {
+                console.warn('Server check-image-quality: Adobe technical gate FAILED:', gateResult.failures.map(f => f.key));
+                aiVisionStats.recommendation = 'FAIL';
+                aiVisionStats.overall_score = Math.min(typeof aiVisionStats.overall_score === 'number' ? aiVisionStats.overall_score : 69, 55);
+
+                const gateNotes = gateResult.failures.map(f => isIndonesianLang ? f.reason_id : f.reason_en);
+                aiVisionStats.technical_issues = [...(Array.isArray(aiVisionStats.technical_issues) ? aiVisionStats.technical_issues : []), ...gateNotes];
+
+                const gateHeader = isIndonesianLang
+                    ? '\n\n[GERBANG TEKNIS ADOBE STOCK - OTOMATIS, BERDASARKAN PENGUKURAN PIKSEL NYATA]\n'
+                    : "\n\n[ADOBE STOCK TECHNICAL GATE - AUTOMATIC, BASED ON REAL PIXEL MEASUREMENTS]\n";
+                aiVisionStats.detailed_feedback = `${aiVisionStats.detailed_feedback || ''}${gateHeader}${gateNotes.map(n => `- ${n}`).join('\n')}`;
+
+                if (!aiVisionStats.ai_vision_checks) aiVisionStats.ai_vision_checks = {};
+                const checksToFail = new Set<string>();
+                for (const f of gateResult.failures) {
+                    if (f.key === 'sharpness') checksToFail.add('blur');
+                    else if (f.key === 'noise') checksToFail.add('noise');
+                    else if (f.key === 'exposure') { checksToFail.add('lighting'); checksToFail.add('exposure'); }
+                    else if (f.key === 'artifacts') checksToFail.add('artifacts');
+                    checksToFail.add('stock_acceptance');
+                }
+                for (const checkKey of checksToFail) {
+                    const relevantReasons = gateResult.failures
+                        .filter(f => (f.key === 'sharpness' && checkKey === 'blur') ||
+                                     (f.key === 'noise' && checkKey === 'noise') ||
+                                     (f.key === 'exposure' && (checkKey === 'lighting' || checkKey === 'exposure')) ||
+                                     (f.key === 'artifacts' && checkKey === 'artifacts') ||
+                                     checkKey === 'stock_acceptance')
+                        .map(f => isIndonesianLang ? f.reason_id : f.reason_en);
+                    aiVisionStats.ai_vision_checks[checkKey] = {
+                        status: 'FAIL',
+                        note: relevantReasons.length ? relevantReasons.join(' ') : (isIndonesianLang ? 'Gagal pada gerbang teknis otomatis Adobe Stock.' : 'Failed the automatic Adobe Stock technical gate.')
+                    };
+                }
+            }
+
             console.log('Server check-image-quality: Integration successful');
             
             // Combine results while ensuring backward compatibility
             const combinedReport = {
                 ...aiVisionStats,
                 ffmpeg: ffmpegStats,
-                ai_vision: aiVisionStats
+                ai_vision: aiVisionStats,
+                technical_gate: gateResult
             };
             
             res.json(combinedReport);
