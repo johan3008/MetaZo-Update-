@@ -5476,7 +5476,7 @@ export async function checkImageQuality(
 
   let metadataInstruction = "";
   if (imageMetadata) {
-    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Gambar yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda.`;
+    metadataInstruction = `\n\n---\n[DATA PENGUKURAN PIKSEL OBJEKTIF - WAJIB DIJADIKAN ACUAN UTAMA]\nBerikut adalah hasil pengukuran teknis NYATA dari piksel file gambar asli (dihitung menggunakan analisis Laplacian/statistik piksel, BUKAN estimasi visual):\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nATURAN PENTING TERKAIT DATA INI:\n1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI, sedangkan gambar yang Anda lihat secara visual mungkin telah di-downscale/dikompresi oleh sistem vision API sehingga cacat halus (blur ringan, noise, banding, blocking) BISA JADI TIDAK TERLIHAT JELAS secara visual oleh Anda. JANGAN mengabaikan indikasi cacat pada data pengukuran hanya karena gambar "terlihat baik-baik saja" secara visual — gabungkan kedua sumber bukti (visual + numerik).\n2. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus yang WAJIB memengaruhi status \`blur\`.\n3. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.\n4. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.\n5. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar (bukan seluruh gambar) terdeteksi jauh lebih blur dari area lain — ini adalah pola cacat AI generatif atau motion blur parsial yang sangat mudah TERLEWAT jika hanya melihat gambar secara sekilas. Periksa dan pertimbangkan dengan serius.\n6. Field \`megapixels\`, \`file_size_kb\`, dan \`color_space\` adalah data teknis mentah wajib Adobe Stock (resolusi 4-100MP, ukuran file maks 45MB, profil warna sRGB) — sebutkan secara eksplisit di \`detailed_feedback\` jika salah satu di luar batas ini.\nJadikan data teknis di atas sebagai BUKTI UTAMA yang menguatkan atau mengoreksi kesan visual Anda, bukan sekadar informasi tambahan.`;
   }
 
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
@@ -5630,7 +5630,7 @@ ATURAN BAHASA:
 ATURAN HEATMAPS:
 Untuk bagian heatmaps, petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
 
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
+Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.` + metadataInstruction;
 
   const responseSchema = {
     type: Type.OBJECT,
