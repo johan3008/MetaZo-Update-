@@ -965,19 +965,153 @@ function isKeywordVisuallySupported(keyword: string, visualFacts: any): boolean 
   return direct || (words.length > 1 && words.some(w => evidenceText.includes(w)));
 }
 
+
+type SimilarAssetRecord = {
+  id?: string;
+  title?: string;
+  description?: string;
+  keywords?: string[];
+  visual_terms?: string[];
+  category_id?: number;
+};
+
+let similarAssetCorpus: SimilarAssetRecord[] | null = null;
+
+function loadSimilarAssetCorpus(): SimilarAssetRecord[] {
+  if (similarAssetCorpus) return similarAssetCorpus;
+  similarAssetCorpus = [];
+  try {
+    let parsed: any = null;
+    if (process.env.SIMILAR_ASSET_CORPUS_JSON) {
+      parsed = JSON.parse(process.env.SIMILAR_ASSET_CORPUS_JSON);
+    } else if (process.env.SIMILAR_ASSET_CORPUS_PATH) {
+      const filePath = path.resolve(process.env.SIMILAR_ASSET_CORPUS_PATH);
+      if (fs.existsSync(filePath)) parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    const records = Array.isArray(parsed) ? parsed :
+      Array.isArray(parsed?.assets) ? parsed.assets :
+      Array.isArray(parsed?.records) ? parsed.records : [];
+    similarAssetCorpus = records.map((r: any) => ({
+      id: r?.id ? String(r.id) : undefined,
+      title: r?.title ? String(r.title) : undefined,
+      description: r?.description ? String(r.description) : undefined,
+      keywords: Array.isArray(r?.keywords) ? r.keywords.map((x: any) => sanitizeForIndexing(String(x))).filter(Boolean) : [],
+      visual_terms: Array.isArray(r?.visual_terms) ? r.visual_terms.map((x: any) => sanitizeForIndexing(String(x))).filter(Boolean) : [],
+      category_id: Number.isFinite(Number(r?.category_id)) ? Number(r.category_id) : undefined
+    })).filter((r: SimilarAssetRecord) =>
+      Boolean(r.title || r.description || (r.keywords && r.keywords.length) || (r.visual_terms && r.visual_terms.length))
+    );
+  } catch (error: any) {
+    console.warn('[Similar Asset Corpus] Invalid corpus:', error?.message || error);
+    similarAssetCorpus = [];
+  }
+  return similarAssetCorpus;
+}
+
+function getSimilarityTokens(value: unknown): string[] {
+  return sanitizeForIndexing(String(value || ''))
+    .split(/\s+/)
+    .filter(w => w.length >= 3)
+    .filter(w => !KEYWORD_CONNECTOR_WORDS.has(w))
+    .filter(w => !isProhibitedKeyword(w));
+}
+
+function getVisualSearchProfile(visualFacts: any) {
+  const tiers = buildTieredVisualAnalysis(visualFacts || {});
+  const primary = tiers.objects.filter((o: any) => o?.tier === 'primary').map((o: any) => String(o?.name || '')).filter(Boolean);
+  const secondary = tiers.objects.filter((o: any) => o?.tier !== 'primary').map((o: any) => String(o?.name || '')).filter(Boolean);
+  const environment = tiers.scene.map((x: any) => String(x || '')).filter(Boolean);
+  const attributes = tiers.attributes.map((x: any) => String(x || '')).filter(Boolean);
+  const concepts = tiers.concepts.map((x: any) => String(x || '')).filter(Boolean);
+  const actions = Array.isArray(visualFacts?.actions) ? visualFacts.actions.map((x: any) => String(x || '')).filter(Boolean) : [];
+  const allValues = [...primary, ...secondary, ...environment, ...attributes, ...actions, ...concepts];
+  const all = new Set<string>();
+  allValues.forEach(value => {
+    getSimilarityTokens(value).forEach(t => all.add(t));
+    const phrase = sanitizeForIndexing(value);
+    if (phrase && phrase.split(/\s+/).length >= 2 && phrase.split(/\s+/).length <= 4 && !isProhibitedKeyword(phrase)) all.add(phrase);
+  });
+  return { primary, secondary, environment, attributes, actions, concepts, all };
+}
+
+function scoreSimilarAsset(record: SimilarAssetRecord, profile: ReturnType<typeof getVisualSearchProfile>, visualFacts: any): number {
+  const corpusText = [record.title || '', record.description || '', ...(record.keywords || []), ...(record.visual_terms || [])].join(' ');
+  const corpusTokens = new Set(getSimilarityTokens(corpusText));
+  const overlap = (values: string[]) => {
+    const tokens = new Set(values.flatMap(getSimilarityTokens));
+    let count = 0;
+    tokens.forEach(token => { if (corpusTokens.has(token)) count++; });
+    return count;
+  };
+  const primary = overlap(profile.primary);
+  const secondary = overlap(profile.secondary);
+  const environment = overlap(profile.environment);
+  const attributes = overlap(profile.attributes);
+  const actions = overlap(profile.actions);
+  const concepts = overlap(profile.concepts);
+  let score = primary * 30 + secondary * 10 + environment * 7 + attributes * 5 + actions * 5 + concepts * 4;
+  for (const phrase of [...profile.primary, ...profile.secondary, ...profile.environment, ...profile.attributes].map(sanitizeForIndexing)) {
+    if (phrase.split(/\s+/).length >= 2 && corpusText.toLowerCase().includes(phrase)) score += 12;
+  }
+  const visualCategory = Number(visualFacts?.semantic_category_analysis?.adobe_id || 0);
+  if (visualCategory > 0 && Number(record.category_id || 0) === visualCategory) score += 8;
+  return Math.min(100, score);
+}
+
+function discoverSimilarAssetKeywords(visualFacts: any, limit = 8): { assets: SimilarAssetRecord[]; keywords: string[] } {
+  const corpus = loadSimilarAssetCorpus();
+  if (!corpus.length) return { assets: [], keywords: [] };
+  const profile = getVisualSearchProfile(visualFacts);
+  if (!profile.all.size) return { assets: [], keywords: [] };
+
+  const ranked = corpus.map(record => ({
+    record,
+    similarity: scoreSimilarAsset(record, profile, visualFacts)
+  })).filter(x => x.similarity >= 15).sort((a, b) => b.similarity - a.similarity).slice(0, Math.max(1, limit));
+
+  const mined: string[] = [];
+  for (const item of ranked) {
+    for (const raw of item.record.keywords || []) {
+      const keyword = sanitizeForIndexing(raw);
+      if (!keyword || isProhibitedKeyword(keyword)) continue;
+      const tokens = getSimilarityTokens(keyword);
+      const visualOverlap = tokens.filter(t => profile.all.has(t)).length;
+      if (visualOverlap > 0 || profile.all.has(keyword)) mined.push(keyword);
+    }
+  }
+  return { assets: ranked.map(x => x.record), keywords: semanticDeduplicate(mined) };
+}
+
+export function getSimilarAssetIntelligenceStatus() {
+  const corpus = loadSimilarAssetCorpus();
+  return {
+    enabled: corpus.length > 0,
+    assets: corpus.length,
+    source: process.env.SIMILAR_ASSET_CORPUS_PATH ? 'SIMILAR_ASSET_CORPUS_PATH' :
+      process.env.SIMILAR_ASSET_CORPUS_JSON ? 'SIMILAR_ASSET_CORPUS_JSON' : 'none'
+  };
+}
+
+
 function buildMasterKeywordCandidatePool(
   aiCandidates: string[],
   visualFacts: any,
   targetCount: number
 ): string[] {
-  // Keep expansion AI-driven. Market data must never inject or manufacture
-  // keywords into the final metadata. The Vision model remains the source of truth.
   const normalized = aiCandidates
     .map(k => sanitizeForIndexing(k))
     .filter(Boolean)
     .filter(k => !isProhibitedKeyword(k));
 
-  return semanticDeduplicate(normalized);
+  // ImStocker-style secondary discovery:
+  // similar works can contribute candidates, but they still pass the final
+  // visual relevance + market ranking pipeline.
+  const similar = discoverSimilarAssetKeywords(
+    visualFacts,
+    Math.min(8, Math.max(3, targetCount))
+  );
+
+  return semanticDeduplicate([...normalized, ...similar.keywords]);
 }
 
 export function getKeywordIntelligenceStatus() {
@@ -2596,9 +2730,18 @@ KEYWORD GENERATION:
 17. Keep keywords lowercase.
 18. Order keywords from strongest to weakest by usefulness for finding the asset.
 19. Ordering must NOT follow a fixed category pattern.
-20. The requested keyword count is the final count.
-21. If the user requests 25, output 25. If 50, output 50.
-22. Never fill the requested count with unrelated or artificial keywords.
+20. Rank globally by exact visual relevance first, then market opportunity.
+21. When market data exists, evaluate demand/downloads, views when available,
+    competition/asset density, and current trend. Do not invent missing data.
+22. When a similar-asset corpus is available, use similar works as a discovery
+    source, following the ImStocker-style search -> similar works -> keywords flow.
+23. Similar-asset keywords are suggestions only. The current image's visual
+    evidence always has final authority.
+24. High-demand or low-competition terms may outrank weaker terms only when they
+    remain visually supported by the asset.
+25. Prefer specific natural search phrases over generic single-word fillers.
+26. The requested keyword count is the final count.
+27. Never fill the requested count with unrelated or artificial keywords.
 
 FINAL TEST:
 "Would an actual microstock buyer naturally use this word or phrase
