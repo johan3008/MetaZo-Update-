@@ -2295,37 +2295,20 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
     // asset can never be marked PASS by this app when it objectively violates Adobe's own
     // published technical requirements — regardless of what the subjective AI-vision pass says.
     interface TechGateFailure { key: string; reason_en: string; reason_id: string; }
-    interface TechGateResult { passed: boolean; failures: TechGateFailure[]; }
+    interface TechGateResult { passed: boolean; failures: TechGateFailure[]; warnings: TechGateFailure[]; }
 
     function evaluateAdobeTechnicalGate(stats: any): TechGateResult {
         const failures: TechGateFailure[] = [];
+        const warnings: TechGateFailure[] = [];
         if (!stats || stats.estimated) {
             // Synthetic/estimated fallback data (both Python and FFmpeg analysis failed) —
             // never gate on guessed numbers, only on real measurements.
-            return { passed: true, failures: [] };
+            return { passed: true, failures: [], warnings: [] };
         }
 
-        // 1. Resolution — Adobe Stock requires 4MP-100MP for photos.
-        let mp: number | null = typeof stats.megapixels === 'number' ? stats.megapixels : null;
-        if (mp === null && typeof stats.resolution === 'string') {
-            const m = /([\d.]+)\s*MP/i.exec(stats.resolution);
-            if (m) mp = parseFloat(m[1]);
-        }
-        if (typeof mp === 'number' && mp > 0) {
-            if (mp < 4) {
-                failures.push({
-                    key: 'resolution',
-                    reason_en: `Resolution is only ${mp.toFixed(2)}MP, below Adobe Stock's required minimum of 4MP.`,
-                    reason_id: `Resolusi gambar hanya ${mp.toFixed(2)}MP, di bawah batas minimum wajib Adobe Stock yaitu 4MP.`
-                });
-            } else if (mp > 100) {
-                failures.push({
-                    key: 'resolution',
-                    reason_en: `Resolution is ${mp.toFixed(2)}MP, above Adobe Stock's maximum of 100MP.`,
-                    reason_id: `Resolusi gambar ${mp.toFixed(2)}MP, melebihi batas maksimum Adobe Stock yaitu 100MP.`
-                });
-            }
-        }
+        // Resolution is intentionally NOT a Quality Check criterion.
+        // It is measured for informational/debug metadata only and must never affect
+        // PASS/FAIL, score, warnings, or technical gating.
 
         // 2. File size — Adobe Stock max 45MB.
         if (typeof stats.file_size_kb === 'number' && stats.file_size_kb > 45 * 1024) {
@@ -2406,19 +2389,95 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 reason_en: `Severe color banding/posterization detected in gradient areas (score ${stats.banding.score}/100).`,
                 reason_id: `Terdeteksi color banding/posterisasi parah pada area gradasi (skor ${stats.banding.score}/100).`
             });
+        } else if (typeof stats.banding?.score === 'number' && stats.banding.score > 45) {
+            warnings.push({
+                key: 'artifacts',
+                reason_en: `Moderate banding signal detected (score ${stats.banding.score}/100); inspect gradients at 100%.`,
+                reason_id: `Ada indikasi banding sedang (skor ${stats.banding.score}/100); periksa gradasi pada zoom 100%.`
+            });
         }
 
-        return { passed: failures.length === 0, failures };
+        // JPEG blocking: moderate scores are advisory; only strong repeated 8x8 evidence is a hard failure.
+        const jpegBlockScore = stats.jpeg_blocking?.score;
+        if (typeof jpegBlockScore === 'number' && jpegBlockScore > 80) {
+            failures.push({
+                key: 'artifacts',
+                reason_en: `Strong repeated JPEG 8x8 blocking detected (score ${jpegBlockScore.toFixed(1)}/100).`,
+                reason_id: `Terdeteksi blocking JPEG 8x8 berulang yang kuat (skor ${jpegBlockScore.toFixed(1)}/100).`
+            });
+        } else if (typeof jpegBlockScore === 'number' && jpegBlockScore > 40) {
+            warnings.push({
+                key: 'artifacts',
+                reason_en: `Moderate JPEG blocking signal (${jpegBlockScore.toFixed(1)}/100). Confirm visually at 100%; this is not an automatic rejection.`,
+                reason_id: `Ada indikasi blocking JPEG sedang (${jpegBlockScore.toFixed(1)}/100). Konfirmasi visual pada zoom 100%; ini bukan auto-reject.`
+            });
+        }
+
+        // OCR and uniform-background analysis are evidence for AI Vision, not automatic rejection.
+        if (stats.ocr?.text_detected) {
+            const ocrText = String(stats.ocr?.text || '').trim();
+            warnings.push({
+                key: 'ocr',
+                reason_en: `OCR detected text-like elements${ocrText ? `: ${ocrText.slice(0, 180)}` : ''}. AI Vision must confirm whether the text is real, legible, decorative, or gibberish.`,
+                reason_id: `OCR mendeteksi elemen mirip teks${ocrText ? `: ${ocrText.slice(0, 180)}` : ''}. AI Vision wajib mengonfirmasi apakah teks benar-benar ada, terbaca, dekoratif, atau gibberish.`
+            });
+        }
+        if (stats.background_edge_analysis?.uniform_border) {
+            warnings.push({
+                key: 'background_edge',
+                reason_en: 'Uniform dark/light background detected. Inspect isolated-subject edges for matte contamination or halos at 100–200%; natural high-contrast edges are not automatically defects.',
+                reason_id: 'Background gelap/terang seragam terdeteksi. Periksa tepi subjek untuk matte contamination/halo pada zoom 100–200%; edge kontras alami bukan otomatis cacat.'
+            });
+        }
+
+        // Alpha-edge QC: transparent PNGs are allowed to have anti-aliased edges.
+        // Only a strong, spatially correlated chromatic/matte fringe is a hard failure.
+        const edgeScore = stats.transparency?.edge_halo_risk_percent;
+        if (typeof edgeScore === 'number') {
+            if (edgeScore >= 72) {
+                failures.push({
+                    key: 'alpha_edge',
+                    reason_en: `Strong alpha-edge matte/chromatic fringe detected (score ${edgeScore.toFixed(1)}/100). Inspect the cutout on white and mid-gray backgrounds.`,
+                    reason_id: `Terdeteksi fringe/matte warna yang kuat pada tepi alpha (skor ${edgeScore.toFixed(1)}/100). Periksa cutout pada background putih dan abu-abu.`
+                });
+            } else if (edgeScore >= 42) {
+                warnings.push({
+                    key: 'alpha_edge',
+                    reason_en: `Possible alpha-edge contamination detected (score ${edgeScore.toFixed(1)}/100). Inspect edges at 100–200%; normal anti-aliasing is not a rejection by itself.`,
+                    reason_id: `Ada indikasi kontaminasi tepi alpha (skor ${edgeScore.toFixed(1)}/100). Periksa tepi pada 100–200%; anti-aliasing normal bukan alasan reject.`
+                });
+            }
+        }
+
+        if (stats.sharpness?.has_local_blur_anomaly === true) {
+            warnings.push({
+                key: 'localized_blur',
+                reason_en: 'Localized sharpness variation detected. Inspect the softest region at 100% before submission.',
+                reason_id: 'Terdeteksi variasi ketajaman lokal. Periksa area paling lembut pada zoom 100% sebelum upload.'
+            });
+        }
+
+        return { passed: failures.length === 0, failures, warnings };
     }
 
-    app.post('/api/check-image-quality', async (req, res) => {
+    app.post('/api/check-image-quality', upload.single('image'), async (req, res) => {
         let tempFilePath = "";
         let cleanupFn = () => {};
         try {
             const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
             
             let imageBase64 = "";
-            if (fileUrl) {
+            if (req.file) {
+                // ORIGINAL-BYTES PATH: multer writes the exact uploaded file to disk.
+                // No resize, JPEG conversion, canvas rasterization, or recompression occurs.
+                // All forensic pixel analysis and AI crops start from this exact source file.
+                tempFilePath = req.file.path;
+                cleanupFn = () => {};
+                const fileBuffer = fs.readFileSync(tempFilePath);
+                const mime = req.file.mimetype || fileType || 'application/octet-stream';
+                imageBase64 = `data:${mime};base64,${fileBuffer.toString('base64')}`;
+                console.log(`Server check-image-quality: Using ORIGINAL multipart file: ${req.file.originalname} (${req.file.size} bytes)`);
+            } else if (fileUrl) {
                 console.log(`Server check-image-quality: Downloading file from storage: ${fileUrl}`);
                 const ext = fileType?.includes('png') ? '.png' : fileType?.includes('gif') ? '.gif' : '.jpg';
                 const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
@@ -2486,7 +2545,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             // covering the entire image" (it wasn't). Each quadrant is ~55% of width/height so
             // adjacent quadrants overlap by ~20%, matching what the prompt describes.
             const quadrantSuffixes = ['tl', 'tr', 'bl', 'br'];
-            const quadrantFilePaths = quadrantSuffixes.map(s => `${tempFilePath}_${s}.jpg`);
+            const quadrantFilePaths = quadrantSuffixes.map(s => `${tempFilePath}_${s}.png`);
             let imagesToSend: string | string[] = imageBase64;
             try {
                 const ffmpegPath = _require('@ffmpeg-installer/ffmpeg').path;
@@ -2502,13 +2561,12 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                     'crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4'        // bottom-right
                 ];
                 await Promise.all(quadrantFilters.map((filter, i) =>
-                    execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${filter}" -q:v 2 "${quadrantFilePaths[i]}"`)
+                    execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${filter}" -frames:v 1 -c:v png -pix_fmt rgba "${quadrantFilePaths[i]}"`)
                 ));
                 if (quadrantFilePaths.every(p => fs.existsSync(p))) {
-                    const mime = fileType || 'image/jpeg';
                     const quadrantBase64s = quadrantFilePaths.map(p => {
                         const buf = fs.readFileSync(p);
-                        return `data:${mime};base64,${buf.toString('base64')}`;
+                        return `data:image/png;base64,${buf.toString('base64')}`;
                     });
                     imagesToSend = [imageBase64, ...quadrantBase64s];
                     console.log('Server check-image-quality: Successfully generated 4 native-resolution quadrant crops (top-left, top-right, bottom-left, bottom-right) via FFmpeg');
@@ -2529,6 +2587,17 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             const gateResult = evaluateAdobeTechnicalGate(ffmpegStats);
             const isIndonesianLang = !language || language === 'Bahasa' || language === 'id' || /indonesian/i.test(String(language));
 
+            // Warnings do not automatically reject the asset. They are surfaced to the user
+            // so a normal anti-aliased PNG edge or moderate noise is not misclassified as FAIL.
+            if (gateResult.warnings?.length) {
+                const warningNotes = gateResult.warnings.map(w => isIndonesianLang ? w.reason_id : w.reason_en);
+                aiVisionStats.technical_issues = [...(Array.isArray(aiVisionStats.technical_issues) ? aiVisionStats.technical_issues : []), ...warningNotes];
+                const warningHeader = isIndonesianLang
+                    ? '\n\n[PERINGATAN QC TEKNIS - TIDAK OTOMATIS REJECT]\n'
+                    : '\n\n[TECHNICAL QC WARNINGS - NOT AN AUTOMATIC REJECTION]\n';
+                aiVisionStats.detailed_feedback = `${aiVisionStats.detailed_feedback || ''}${warningHeader}${warningNotes.map(n => `- ${n}`).join('\n')}`;
+            }
+
             if (!gateResult.passed) {
                 console.warn('Server check-image-quality: Adobe technical gate FAILED:', gateResult.failures.map(f => f.key));
                 aiVisionStats.recommendation = 'FAIL';
@@ -2548,7 +2617,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                     if (f.key === 'sharpness') checksToFail.add('blur');
                     else if (f.key === 'noise') checksToFail.add('noise');
                     else if (f.key === 'exposure') { checksToFail.add('lighting'); checksToFail.add('exposure'); }
-                    else if (f.key === 'artifacts') checksToFail.add('artifacts');
+                    else if (f.key === 'artifacts' || f.key === 'alpha_edge') checksToFail.add('artifacts');
                     checksToFail.add('stock_acceptance');
                 }
                 for (const checkKey of checksToFail) {
@@ -2556,7 +2625,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                         .filter(f => (f.key === 'sharpness' && checkKey === 'blur') ||
                                      (f.key === 'noise' && checkKey === 'noise') ||
                                      (f.key === 'exposure' && (checkKey === 'lighting' || checkKey === 'exposure')) ||
-                                     (f.key === 'artifacts' && checkKey === 'artifacts') ||
+                                     ((f.key === 'artifacts' || f.key === 'alpha_edge') && checkKey === 'artifacts') ||
                                      checkKey === 'stock_acceptance')
                         .map(f => isIndonesianLang ? f.reason_id : f.reason_en);
                     aiVisionStats.ai_vision_checks[checkKey] = {
@@ -2587,7 +2656,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             }
             if (tempFilePath) {
                 for (const suffix of ['tl', 'tr', 'bl', 'br']) {
-                    const qPath = `${tempFilePath}_${suffix}.jpg`;
+                    const qPath = `${tempFilePath}_${suffix}.png`;
                     if (fs.existsSync(qPath)) {
                         try { fs.unlinkSync(qPath); } catch (err) {}
                     }
