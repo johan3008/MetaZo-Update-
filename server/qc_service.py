@@ -57,7 +57,7 @@ class Handler(BaseHTTPRequestHandler):
                 if result.get("error"):
                     return self._send(422, result)
                 result["engine"] = "Python 3 + OpenCV + Pillow"
-                result["evidence_policy"] = "pixel evidence only; resolution/file size are not quality gates"
+                result["evidence_policy"] = "pixel evidence only; resolution/megapixels/file size are informational metadata only and MUST NOT affect QC score, status, warnings, or rejection"
                 return self._send(200, result)
             finally:
                 try: os.unlink(temp_path)

@@ -57,63 +57,120 @@ def alpha_aware_arrays(img):
     return rgba, rgb, alpha, visible, gray
 
 
+def _nearest_solid_reference(rgb, alpha, edge_mask, radius=5):
+    """Return RGB reference pixels from the nearest opaque interior pixels."""
+    solid = (alpha >= 245).astype(np.uint8)
+    if not np.any(solid) or not np.any(edge_mask):
+        return None, None
+
+    # Distance transform gives, for each non-solid pixel, distance to the nearest solid pixel.
+    dist, labels = cv2.distanceTransformWithLabels(1 - solid, cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
+    ys, xs = np.where(edge_mask)
+    valid = dist[ys, xs] <= float(radius)
+    if not np.any(valid):
+        return None, None
+
+    ys = ys[valid]
+    xs = xs[valid]
+    labels_flat = labels[ys, xs].astype(np.int64) - 1
+    h, w = alpha.shape
+    ref_y = labels_flat // w
+    ref_x = labels_flat % w
+    good = (ref_x >= 0) & (ref_x < w) & (ref_y >= 0) & (ref_y < h)
+    if not np.any(good):
+        return None, None
+
+    return rgb[ys[good], xs[good]].astype(np.float32), rgb[ref_y[good], ref_x[good]].astype(np.float32)
+
+
 def detect_edge_halo(rgb, alpha):
+    """Detect spatially correlated matte/halo contamination on transparent edges.
+
+    The previous implementation compared all semi-transparent pixels against a global
+    population of opaque pixels. That produces false positives on metallic objects and
+    colorful assets. This version compares each edge pixel with its nearest opaque
+    interior reference and measures brightness + chroma deviation locally.
     """
-    Priority 1 & 5: Detect matte fringing/halos around semi-transparent edges.
-    Compares the brightness and chromatic difference of semi-transparent edge pixels (alpha 10-240)
-    with the adjacent fully opaque pixels.
-    """
-    if not np.any(alpha < 255):
-        return 0.0  # No alpha channel, no halo risk
-        
-    edge_mask = (alpha > 10) & (alpha < 240)
-    if np.sum(edge_mask) < 100:
-        return 0.0
-        
-    solid_mask = (alpha >= 240)
-    if np.sum(solid_mask) < 100:
-        return 0.0
-        
-    # Dilate solid mask to find opaque pixels adjacent to edge
-    solid_border = cv2.dilate(solid_mask.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & ~solid_mask
-    
-    gray_img = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)
-    edge_pixels = gray_img[edge_mask]
-    solid_border_pixels = gray_img[solid_border]
-    
-    if edge_pixels.size == 0 or solid_border_pixels.size == 0:
-        return 0.0
-        
-    mean_solid = np.mean(solid_border_pixels)
-    mean_edge = np.mean(edge_pixels)
-    
-    # Absolute brightness difference
-    diff = np.abs(mean_edge - mean_solid)
-    
-    # Check color spread/saturation in the edge zone
-    edge_rgb = rgb[edge_mask].astype(np.float32)
-    edge_std = np.mean(np.std(edge_rgb, axis=0))
-    
-    # Halo score is higher when there is a sharp halo offset or color fringe
-    halo_score = min(100.0, (diff * 3.0) + (edge_std * 0.8))
-    return float(halo_score)
+    partial = (alpha > 12) & (alpha < 245)
+    if np.sum(partial) < 30 or not np.any(alpha >= 245):
+        return {
+            "score": 0.0,
+            "chromatic_fringe_percent": 0.0,
+            "brightness_fringe_percent": 0.0,
+            "sample_count": 0,
+            "status": "No measurable alpha-edge contamination"
+        }
+
+    edge_rgb, ref_rgb = _nearest_solid_reference(rgb, alpha, partial, radius=5)
+    if edge_rgb is None or ref_rgb is None or len(edge_rgb) < 30:
+        return {
+            "score": 0.0,
+            "chromatic_fringe_percent": 0.0,
+            "brightness_fringe_percent": 0.0,
+            "sample_count": 0,
+            "status": "Insufficient edge samples"
+        }
+
+    # Normalize RGB distance so brightness differences are not treated as catastrophic.
+    rgb_delta = np.linalg.norm(edge_rgb - ref_rgb, axis=1) / 441.67295593
+    brightness_delta = np.abs(
+        (0.2126 * edge_rgb[:, 0] + 0.7152 * edge_rgb[:, 1] + 0.0722 * edge_rgb[:, 2]) -
+        (0.2126 * ref_rgb[:, 0] + 0.7152 * ref_rgb[:, 1] + 0.0722 * ref_rgb[:, 2])
+    ) / 255.0
+
+    edge_chroma = edge_rgb - np.mean(edge_rgb, axis=1, keepdims=True)
+    ref_chroma = ref_rgb - np.mean(ref_rgb, axis=1, keepdims=True)
+    chroma_delta = np.linalg.norm(edge_chroma - ref_chroma, axis=1) / 441.67295593
+
+    # Only strong, repeated deviations count as fringe. Normal anti-aliasing is expected.
+    chromatic = chroma_delta > 0.105
+    brightness = brightness_delta > 0.13
+    suspicious = (rgb_delta > 0.18) & (chromatic | brightness)
+
+    chromatic_pct = float(np.mean(chromatic) * 100.0)
+    brightness_pct = float(np.mean(brightness) * 100.0)
+    suspicious_pct = float(np.mean(suspicious) * 100.0)
+
+    # Weighted score: repeated chromatic/brightness contamination matters more than ordinary AA.
+    score = min(100.0, suspicious_pct * 0.25 + chromatic_pct * 4.0 + brightness_pct * 0.05)
+    if score >= 72:
+        status = "FAIL — likely matte/color fringe"
+    elif score >= 42:
+        status = "WARN — inspect edge at 100–200%"
+    else:
+        status = "PASS — normal anti-aliasing"
+
+    return {
+        "score": round(float(score), 3),
+        "chromatic_fringe_percent": round(chromatic_pct, 3),
+        "brightness_fringe_percent": round(brightness_pct, 3),
+        "suspicious_edge_percent": round(suspicious_pct, 3),
+        "sample_count": int(len(edge_rgb)),
+        "status": status
+    }
 
 
 def edge_metrics(rgb, alpha, visible):
     partial = (alpha > 8) & (alpha < 247)
     partial_pct = float(partial.mean() * 100.0)
     transparent_pct = float((alpha <= 8).mean() * 100.0)
-    
-    halo_risk = detect_edge_halo(rgb, alpha)
-    
+    opaque_pct = float((alpha >= 247).mean() * 100.0)
+
+    halo = detect_edge_halo(rgb, alpha)
+    halo_score = float(halo.get("score", 0.0))
+
     return {
         "has_alpha": bool(np.any(alpha < 255)),
         "transparent_percent": round(transparent_pct, 3),
+        "opaque_percent": round(opaque_pct, 3),
         "partial_alpha_percent": round(partial_pct, 3),
-        "edge_halo_risk_percent": round(halo_risk, 3),
-        "edge_status": "Review edge/matte" if halo_risk > 22 else "Alpha edge acceptable"
+        "edge_halo_risk_percent": round(halo_score, 3),
+        "chromatic_fringe_percent": halo.get("chromatic_fringe_percent", 0.0),
+        "brightness_fringe_percent": halo.get("brightness_fringe_percent", 0.0),
+        "suspicious_edge_percent": halo.get("suspicious_edge_percent", 0.0),
+        "edge_sample_count": halo.get("sample_count", 0),
+        "edge_status": halo.get("status", "No measurable alpha-edge contamination")
     }
-
 
 def banding_score(gray, visible_mask):
     """
@@ -150,60 +207,91 @@ def banding_score(gray, visible_mask):
 
 
 def jpeg_blocking_score(gray, visible_mask):
-    """
-    Priority 5: Mathematically rigorous JPEG blocking artifact detector.
-    Compares pixel differences at 8x8 boundaries to differences internal to the 8x8 blocks.
-    """
+    """Detect repeated 8x8 JPEG discontinuities without mistaking normal edges for blocking."""
     h, w = gray.shape
-    if h < 16 or w < 16:
+    if h < 32 or w < 32:
         return 0.0
-        
-    diff_block = []
-    diff_internal = []
-    
-    # Horizontal gradients
+    g = gray.astype(np.float32)
+    gx = np.abs(np.diff(g, axis=1)); gy = np.abs(np.diff(g, axis=0))
+    valid_x = visible_mask[:, :-1] & visible_mask[:, 1:]
+    valid_y = visible_mask[:-1, :] & visible_mask[1:, :]
+    # Strong scene edges are excluded; blocking is primarily visible across smooth regions.
+    smooth_x = valid_x & (gx < 8.0)
+    smooth_y = valid_y & (gy < 8.0)
+    block_x=[]; inner_x=[]; block_y=[]; inner_y=[]
     for x in range(1, w - 1):
-        left = gray[:, x - 1].astype(np.float32)
-        right = gray[:, x].astype(np.float32)
-        m = visible_mask[:, x - 1] & visible_mask[:, x]
-        if not np.any(m):
-            continue
-        diffs = np.abs(left[m] - right[m])
-        if x % 8 == 0:
-            diff_block.extend(diffs.tolist())
-        else:
-            diff_internal.extend(diffs.tolist())
-            
-    # Vertical gradients
+        vals=gx[:,x-1]; m=smooth_x[:,x-1]
+        if not np.any(m): continue
+        (block_x if x % 8 == 0 else inner_x).extend(vals[m].tolist())
     for y in range(1, h - 1):
-        top = gray[y - 1, :].astype(np.float32)
-        bottom = gray[y, :].astype(np.float32)
-        m = visible_mask[y - 1, :] & visible_mask[y, :]
-        if not np.any(m):
-            continue
-        diffs = np.abs(top[m] - bottom[m])
-        if y % 8 == 0:
-            diff_block.extend(diffs.tolist())
-        else:
-            diff_internal.extend(diffs.tolist())
-            
-    if len(diff_block) < 100 or len(diff_internal) < 100:
+        vals=gy[y-1,:]; m=smooth_y[y-1,:]
+        if not np.any(m): continue
+        (block_y if y % 8 == 0 else inner_y).extend(vals[m].tolist())
+    if min(len(block_x),len(inner_x),len(block_y),len(inner_y)) < 200:
         return 0.0
-        
-    med_block = np.median(diff_block)
-    med_internal = np.median(diff_internal)
-    
-    if med_internal < 0.1:
-        med_internal = 0.1
-        
-    ratio = med_block / med_internal
-    
-    # Ratio > 1.05 indicates blockiness (block boundary transitions are sharper than internal details)
-    if ratio > 1.05:
-        score = (ratio - 1.05) * 166.7  # mapping ratio 1.05-1.65 to 0-100
-        return float(min(100.0, max(0.0, score)))
-    return 0.0
+    def axis_score(block, inner):
+        b50=float(np.median(block)); i50=float(np.median(inner))
+        b90=safe_percentile(block,90,0.0); i90=safe_percentile(inner,90,0.0)
+        if b50 < 1.6 or b90 < 3.0: return 0.0
+        r50=b50/max(i50,0.25); r90=b90/max(i90,0.5)
+        evidence=max(0.0,(r50-1.20)/0.70)*0.55 + max(0.0,(r90-1.20)/0.70)*0.45
+        return float(np.clip(evidence*100.0,0.0,100.0))
+    sx=axis_score(block_x,inner_x); sy=axis_score(block_y,inner_y)
+    if sx < 15 or sy < 15:
+        return float(min(sx,sy)*0.35)
+    return float(np.clip((sx+sy)/2.0,0.0,100.0))
 
+
+def background_edge_analysis(gray, visible_mask):
+    """Evidence for uniform backgrounds and high-contrast perimeters; never a hard failure."""
+    h,w=gray.shape
+    border=np.concatenate([gray[0,:],gray[-1,:],gray[:,0],gray[:,-1]]).astype(np.float32)
+    if border.size==0: return {}
+    mean=float(np.mean(border)); std=float(np.std(border))
+    uniform=std < 8.0 and (mean < 20.0 or mean > 235.0)
+    edges=cv2.Canny(gray,40,120)
+    return {
+        "uniform_border": bool(uniform),
+        "border_luma_mean": round(mean,2),
+        "border_luma_std": round(std,2),
+        "high_contrast_edge_density_percent": round((int(np.sum(edges>0))/max(1,h*w))*100.0,3),
+        "note": "Uniform dark/light background detected; inspect isolated-subject perimeter for matte/halo, but do not equate high contrast with halo automatically." if uniform else "No strongly uniform border background detected."
+    }
+
+
+def ocr_analysis(img):
+    """Best-effort OCR evidence. OCR never decides legal status by itself."""
+    try:
+        import pytesseract
+        from pytesseract import Output
+        rgb=np.array(img.convert('RGB'))
+        scale=1.5 if max(rgb.shape[:2]) < 3000 else 1.0
+        if scale != 1.0:
+            rgb=cv2.resize(rgb,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
+        data=pytesseract.image_to_data(rgb,config='--psm 11',output_type=Output.DICT)
+        tokens=[]
+        for i,txt in enumerate(data.get('text',[])):
+            txt=str(txt).strip()
+            try: conf=float(data['conf'][i])
+            except Exception: conf=-1
+            cleaned=''.join(c for c in txt if c.isalnum() or c in '-_/:%')
+            alpha_num=sum(c.isalnum() for c in cleaned)
+            if cleaned and conf>=55 and len(cleaned)>=4 and alpha_num/max(1,len(cleaned))>=0.65:
+                tokens.append({"text":cleaned,"confidence":round(conf,1)})
+        seen=set(); unique=[]
+        for t in tokens:
+            k=t['text'].lower()
+            if k not in seen: seen.add(k); unique.append(t)
+        words=[t['text'] for t in unique]
+        def suspicious(w):
+            letters=''.join(c for c in w if c.isalpha())
+            if len(letters)<5: return False
+            vowels=sum(c.lower() in 'aeiou' for c in letters)
+            return vowels==0
+        bad=[w for w in words if suspicious(w)]
+        return {"text_detected":bool(unique),"tokens":unique[:30],"text":" ".join(words[:30]),"possible_gibberish_tokens":bad[:10],"ocr_status":"TEXT_DETECTED" if unique else "NO_RELIABLE_TEXT_DETECTED"}
+    except Exception as e:
+        return {"text_detected":False,"tokens":[],"text":"","possible_gibberish_tokens":[],"ocr_status":"UNAVAILABLE","error":str(e)}
 
 def local_region_analysis(gray, visible_mask):
     """
@@ -432,7 +520,7 @@ def main():
         # Noise estimation in solid areas (Priority 2)
         sigma = estimate_noise_cv2(gray, solid_mask)
         noise_val = min(100, int(round((sigma / 4.5) * 100)))
-        noise_status = "High Noise / Grain" if noise_val > 30 else ("Medium Noise" if noise_val > 12 else "Low Noise / Clean")
+        noise_status = "High Noise / Grain" if noise_val > 55 else ("Moderate Noise" if noise_val > 25 else "Low Noise / Clean")
         
         # Local-region grid analysis (Priority 3)
         local_grid = local_region_analysis(gray, solid_mask)
@@ -450,6 +538,8 @@ def main():
         banding = banding_score(gray, solid_mask)
         ext = Path(file_path).suffix.lower() if file_path else ""
         jpeg_blocking = jpeg_blocking_score(gray, solid_mask) if ext in {".jpg", ".jpeg"} else 0.0
+        bg_edges = background_edge_analysis(gray, solid_mask)
+        ocr = ocr_analysis(img)
         
         report = {
             "resolution": f"{width} x {height} ({mp:.2f} MP)",
@@ -495,8 +585,10 @@ def main():
             },
             "jpeg_blocking": {
                 "score": round(float(jpeg_blocking), 2),
-                "status": "Review compression" if jpeg_blocking > 65 else "No strong blocking signal"
+                "status": "Strong repeated 8x8 blocking signal" if jpeg_blocking > 65 else ("Moderate blocking signal" if jpeg_blocking > 40 else "No strong blocking signal")
             },
+            "background_edge_analysis": bg_edges,
+            "ocr": ocr,
             "local_analysis": local_grid,
             "visible_pixel_analysis": True,
             "file_validation": "Valid (Passed Alpha-Aware Pixel Analysis)",

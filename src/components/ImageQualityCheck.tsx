@@ -13,6 +13,11 @@ interface QualityReport {
   strengths: string[];
   detailed_feedback: string;
   heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
+  technical_gate?: {
+    passed?: boolean;
+    failures?: { key: string; reason_en?: string; reason_id?: string }[];
+    warnings?: { key: string; reason_en?: string; reason_id?: string }[];
+  };
   ffmpeg?: {
     resolution: string;
     color_space: string;
@@ -21,6 +26,21 @@ interface QualityReport {
     contrast: { value: number | null; status: string };
     sharpness: { value: number | null; status: string };
     noise: { value: number | null; status: string };
+    transparency?: {
+      has_alpha?: boolean;
+      transparent_percent?: number;
+      opaque_percent?: number;
+      partial_alpha_percent?: number;
+      edge_halo_risk_percent?: number;
+      chromatic_fringe_percent?: number;
+      brightness_fringe_percent?: number;
+      suspicious_edge_percent?: number;
+      edge_status?: string;
+    };
+    jpeg_blocking?: { score: number; status: string };
+    banding?: { score: number; status: string };
+    background_edge_analysis?: { uniform_border?: boolean; border_luma_mean?: number; border_luma_std?: number; high_contrast_edge_density_percent?: number; note?: string };
+    ocr?: { text_detected?: boolean; text?: string; possible_gibberish_tokens?: string[]; ocr_status?: string };
     file_validation: string;
     file_size_kb: number;
   };
@@ -380,43 +400,9 @@ export const ImageQualityCheck: React.FC<{
           return;
       }
 
-      // 3. Fallback for SVG, JPG, PNG, etc.
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const img = new Image();
-        img.onload = () => {
-          // FIX QC: resolusi analisis dinaikkan dari 1200 -> 2048 px.
-          // Downscale agresif ke 1200px menghilangkan artefak AI halus (jari meleleh,
-          // detail mekanis rusak) sehingga gambar cacat dinyatakan PASS padahal
-          // moderator Adobe Stock memeriksa pada zoom 100-200% resolusi penuh.
-          const MAX_WIDTH = 2048;
-          const MAX_HEIGHT = 2048;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-          } else {
-            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.92));
-          } else {
-            resolve(reader.result as string);
-          }
-        };
-        img.onerror = reject;
-        img.src = reader.result as string;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+      // 3. Raster images are intentionally NOT processed here.
+      // For forensic QC the caller must upload the original File object directly.
+      reject(new Error('Raster image preprocessing is disabled for forensic Quality Check. The original file must be sent unchanged.'));
   };
 
   // FIX QC: Buat crop detail RESOLUSI ASLI (100% pixel, tanpa upscale palsu) dari file asli.
@@ -540,12 +526,16 @@ export const ImageQualityCheck: React.FC<{
         // Increment internally a bit
         setProgress(startProgress + 5);
         
-        const base64Image = await resizeAndProcess(file);
+        // IMPORTANT QC: Never resize/re-encode a raster image before forensic analysis.
+        // The API must receive the exact bytes of the user's original file.
+        // resizeAndProcess() remains only for EPS/AI preview conversion and legacy video handling.
+        let base64Image = '';
         if (file.name.match(/\.(eps|ai)$/i)) {
+          base64Image = await resizeAndProcess(file);
           setPreviews(prev => ({ ...prev, [file.name]: base64Image }));
         }
-        // FIX QC: ambil crop detail resolusi asli dari file asli untuk inspeksi forensik AI
-        const detailCrops = await generateDetailCrops(file);
+        // Server creates native-resolution forensic crops from the original file.
+        // Avoid browser-side rasterization because it would destroy pixel evidence.
         setProgress(startProgress + 15);
 
         let uploadedUrl = null;
@@ -600,7 +590,7 @@ export const ImageQualityCheck: React.FC<{
             });
           } else {
             if (file.size > 4.5 * 1024 * 1024) {
-               throw new Error('File terlalu besar (> 4.5MB). Silakan konfigurasikan Cloudflare R2 dengan benar (termasuk CORS) untuk file besar.');
+               throw new Error('File asli terlalu besar untuk direct upload ke Vercel (>4.5MB). Quality Check tidak akan menurunkan resolusi atau mengompres file. Konfigurasikan Cloudflare R2 agar file asli dapat dianalisis.');
             }
             const formData = new FormData();
             formData.append('video', file);
@@ -623,22 +613,24 @@ export const ImageQualityCheck: React.FC<{
               tolerance, 
               language: t.language || 'English', 
               model: aiOptions?.model,
-              fileType: file.type || file.name.split('.').pop(),
-              detailCrops
+              fileType: file.type || file.name.split('.').pop()
             }),
           });
         } else {
+          // CRITICAL FORENSIC FALLBACK: if R2 is unavailable, send the ORIGINAL File
+          // as multipart/form-data. Never convert it to base64/JPEG or resize it first.
+          // This preserves the exact source bytes for Python/OpenCV + AI Vision.
+          const formData = new FormData();
+          formData.append('image', file, file.name);
+          formData.append('tolerance', String(tolerance));
+          formData.append('language', t.language || 'English');
+          if (aiOptions?.model) formData.append('model', aiOptions.model);
+          formData.append('fileType', file.type || file.name.split('.').pop() || '');
+
           response = await fetch('/api/check-image-quality', {
             method: 'POST',
             headers: getHeaders(aiOptions),
-            body: JSON.stringify({ 
-              image: base64Image, 
-              tolerance, 
-              language: t.language || 'English', 
-              model: aiOptions?.model,
-              fileType: file.type || file.name.split('.').pop(),
-              detailCrops
-            }),
+            body: formData
           });
         }
         if (!response.ok) {
@@ -864,6 +856,22 @@ export const ImageQualityCheck: React.FC<{
             </div>
             
             <label 
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.dataTransfer.files?.length) {
+                  void handleFilesSelected(e.dataTransfer.files);
+                }
+              }}
+              onClick={(e) => {
+                // Prevent an outer/global drop zone from hijacking this uploader.
+                e.stopPropagation();
+              }}
               className="group m-4 h-48 cursor-pointer border-2 border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4 transition-all duration-500 border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/50"
             >
               <div className="p-4 rounded-2xl bg-white dark:bg-white/5 shadow-xl transition-transform duration-500 group-hover:scale-110">
@@ -1271,11 +1279,13 @@ export const ImageQualityCheck: React.FC<{
                                       file_size_kb: 0
                                     };
 
+                                    const alphaEdgeScore = ffmpegData.transparency?.edge_halo_risk_percent;
                                     const technicalMetrics = [
                                       { label: t.language === 'Bahasa' ? "Kecerahan (Brightness)" : "Brightness", ...ffmpegData.brightness, color: "bg-amber-500" },
                                       { label: t.language === 'Bahasa' ? "Kontras (Contrast)" : "Contrast", ...ffmpegData.contrast, color: "bg-violet-500" },
                                       { label: t.language === 'Bahasa' ? "Ketajaman (Sharpness)" : "Sharpness (basic)", ...ffmpegData.sharpness, color: "bg-emerald-500" },
-                                      { label: t.language === 'Bahasa' ? "Estimasi Noise (Noise)" : "Noise estimation", ...ffmpegData.noise, color: "bg-rose-500" }
+                                      { label: t.language === 'Bahasa' ? "Estimasi Noise (Noise)" : "Noise estimation", ...ffmpegData.noise, color: "bg-rose-500" },
+                                      ...(alphaEdgeScore != null ? [{ label: t.language === 'Bahasa' ? "Tepi Alpha / Halo" : "Alpha Edge / Halo", value: alphaEdgeScore, status: ffmpegData.transparency?.edge_status || 'Measured', color: "bg-cyan-500" }] : [])
                                     ];
 
                                     return (
@@ -1377,6 +1387,27 @@ export const ImageQualityCheck: React.FC<{
                                                 </div>
                                               </div>
 
+                                              {(r.technical_gate?.warnings?.length || r.technical_gate?.failures?.length) ? (
+                                                <div className="space-y-2">
+                                                  {r.technical_gate?.warnings?.map((w, idx) => (
+                                                    <div key={`qc-warning-${idx}`} className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                                      <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                                                      <p className="text-[9px] font-semibold text-amber-700 dark:text-amber-300 leading-relaxed">
+                                                        {t.language === 'Bahasa' ? (w.reason_id || w.reason_en) : (w.reason_en || w.reason_id)}
+                                                      </p>
+                                                    </div>
+                                                  ))}
+                                                  {r.technical_gate?.failures?.map((f, idx) => (
+                                                    <div key={`qc-failure-${idx}`} className="flex items-start gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                                                      <XCircle size={14} className="text-rose-500 shrink-0 mt-0.5" />
+                                                      <p className="text-[9px] font-semibold text-rose-700 dark:text-rose-300 leading-relaxed">
+                                                        {t.language === 'Bahasa' ? (f.reason_id || f.reason_en) : (f.reason_en || f.reason_id)}
+                                                      </p>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              ) : null}
+
                                               {/* Progress Metrics & Histogram Grid */}
                                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {/* Sliders */}
@@ -1393,6 +1424,17 @@ export const ImageQualityCheck: React.FC<{
                                                       </div>
                                                     </div>
                                                   ))}
+                                                </div>
+
+                                                {/* Forensic Evidence */}
+                                                <div className="bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
+                                                  <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-3">Forensic Evidence</h5>
+                                                  <div className="space-y-2 text-[9px] font-semibold text-slate-500 dark:text-slate-400">
+                                                    {ffmpegData.jpeg_blocking && <div className="flex justify-between gap-3"><span>JPEG blocking</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.jpeg_blocking.score}/100 · {ffmpegData.jpeg_blocking.status}</span></div>}
+                                                    {ffmpegData.banding && <div className="flex justify-between gap-3"><span>Banding</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.banding.score}/100 · {ffmpegData.banding.status}</span></div>}
+                                                    {ffmpegData.ocr && <div className="flex justify-between gap-3"><span>OCR</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.ocr.ocr_status || 'UNKNOWN'}{ffmpegData.ocr.text ? ` · ${ffmpegData.ocr.text.slice(0, 100)}` : ''}</span></div>}
+                                                    {ffmpegData.background_edge_analysis && <div className="flex justify-between gap-3"><span>Background edge</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.background_edge_analysis.uniform_border ? 'Uniform background — inspect halo' : 'No uniform-background warning'}</span></div>}
+                                                  </div>
                                                 </div>
 
                                                 {/* Histogram representation */}

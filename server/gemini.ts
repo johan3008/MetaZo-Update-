@@ -5476,7 +5476,7 @@ export async function checkImageQuality(
 
   let metadataInstruction = "";
   if (imageMetadata) {
-    metadataInstruction = `\n\n---\n[DATA PENGUKURAN PIKSEL OBJEKTIF - WAJIB DIJADIKAN ACUAN UTAMA]\nBerikut adalah hasil pengukuran teknis NYATA dari piksel file gambar asli (dihitung menggunakan analisis Laplacian/statistik piksel, BUKAN estimasi visual):\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nATURAN PENTING TERKAIT DATA INI:\n1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI, sedangkan gambar yang Anda lihat secara visual mungkin telah di-downscale/dikompresi oleh sistem vision API sehingga cacat halus (blur ringan, noise, banding, blocking) BISA JADI TIDAK TERLIHAT JELAS secara visual oleh Anda. JANGAN mengabaikan indikasi cacat pada data pengukuran hanya karena gambar "terlihat baik-baik saja" secara visual — gabungkan kedua sumber bukti (visual + numerik).\n2. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus yang WAJIB memengaruhi status \`blur\`.\n3. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.\n4. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.\n5. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar (bukan seluruh gambar) terdeteksi jauh lebih blur dari area lain — ini adalah pola cacat AI generatif atau motion blur parsial yang sangat mudah TERLEWAT jika hanya melihat gambar secara sekilas. Periksa dan pertimbangkan dengan serius.\n6. Field \`megapixels\`, \`file_size_kb\`, dan \`color_space\` adalah data teknis mentah wajib Adobe Stock (resolusi 4-100MP, ukuran file maks 45MB, profil warna sRGB) — sebutkan secara eksplisit di \`detailed_feedback\` jika salah satu di luar batas ini.\nJadikan data teknis di atas sebagai BUKTI UTAMA yang menguatkan atau mengoreksi kesan visual Anda, bukan sekadar informasi tambahan.`;
+    metadataInstruction = `\n\n---\n[DATA PENGUKURAN PIKSEL OBJEKTIF - WAJIB DIJADIKAN ACUAN UTAMA]\nBerikut adalah hasil pengukuran teknis NYATA dari piksel file gambar asli (dihitung menggunakan analisis Laplacian/statistik piksel, BUKAN estimasi visual):\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nATURAN PENTING TERKAIT DATA INI:\n1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI, sedangkan gambar yang Anda lihat secara visual mungkin telah di-downscale/dikompresi oleh sistem vision API sehingga cacat halus (blur ringan, noise, banding, blocking) BISA JADI TIDAK TERLIHAT JELAS secara visual oleh Anda. JANGAN mengabaikan indikasi cacat pada data pengukuran hanya karena gambar "terlihat baik-baik saja" secara visual — gabungkan kedua sumber bukti (visual + numerik).\n2. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus yang WAJIB memengaruhi status \`blur\`.\n3. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.\n4. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.\n5. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar (bukan seluruh gambar) terdeteksi jauh lebih blur dari area lain — ini adalah pola cacat AI generatif atau motion blur parsial yang sangat mudah TERLEWAT jika hanya melihat gambar secara sekilas. Periksa dan pertimbangkan dengan serius.\n6. Field \`megapixels\` dan dimensi/resolusi FILE TIDAK BOLEH dipakai sebagai quality gate, penalty, FAIL, WARNING, atau alasan menurunkan overall_score. Resolusi hanya boleh dianggap metadata informasional bila muncul di data teknis. Jangan menyebut resolusi rendah sebagai masalah kualitas. \`file_size_kb\` juga bukan indikator kualitas visual. Fokuskan penilaian pada bukti visual dan forensic pixel evidence seperti sharpness, noise, exposure, banding, compression, alpha edge, OCR/text integrity, structural defects, AI artifacts, dan IP.\n7. Untuk PNG transparan, field \`transparency\` adalah pemeriksaan khusus cutout. Persentase transparan yang tinggi dan partial-alpha anti-aliasing yang normal BUKAN cacat. Jangan FAIL hanya karena gambar memiliki transparansi atau pixel semi-transparan. Perlakukan \`edge_halo_risk_percent\` sebagai cacat hanya bila bukti menunjukkan matte/fringe warna yang berulang dan benar-benar terlihat pada batas objek.\n8. Jika bukti alpha-edge hanya level WARN, laporkan sebagai rekomendasi pemeriksaan, bukan automatic rejection. Bedakan anti-aliasing normal dari kontaminasi matte hitam/putih/warna.\n9. Jangan menyimpulkan high noise, blur, atau AI artifact hanya dari preview yang telah di-downscale ketika pengukuran piksel objektif menunjukkan sebaliknya. Gunakan angka teknis dan crop resolusi asli bersama-sama.\nJadikan data teknis di atas sebagai BUKTI UTAMA yang menguatkan atau mengoreksi kesan visual Anda, bukan sekadar informasi tambahan.`;
   }
 
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
@@ -5609,6 +5609,15 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
         * Transamerica Pyramid (San Francisco), Taipei 101 (Taiwan), Petronas Twin Towers (Malaysia) dilarang keras.
         * Bagian Interior Kuil Sagrada Família (Barcelona) dilarang keras.
         * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
+
+PANDUAN FINAL DECISION ENGINE (CRITICAL):
+- Pisahkan HARD FAIL dari REVIEW WARNING. Warning bukan rejection.
+- HARD FAIL hanya untuk pelanggaran submission yang terkonfirmasi atau cacat yang jelas/severe: global out-of-focus, clipping parah, noise parah, compression/banding parah, strong alpha matte contamination, pelanggaran IP/brand yang terkonfirmasi, gibberish text yang terkonfirmasi, atau deformasi struktural/AI yang terkonfirmasi.
+- Jangan FAIL untuk transparent PNG normal, anti-aliasing normal, shallow depth of field, shadow yang disengaja, variasi tekstur moderat, atau satu kecurigaan AI yang tidak pasti.
+- Jika bukti ambigu, pilih PASS dan jelaskan warning pemeriksaan daripada mengarang cacat.
+- Jangan menyebut tekstur metal hammered, weave kain, bokeh, atau detail geometris berulang sebagai AI artifact kecuali ada inkonsistensi struktural, geometri mustahil, atau deformasi generatif yang jelas.
+- Untuk isolated asset, nilai subjeknya, bukan canvas transparan kosong. Jangan menganggap margin transparan sebagai underexposure, background hitam, atau komposisi buruk.
+- Keputusan akhir harus mempertimbangkan SEMUA crop yang diberikan, bukan hanya full-frame.
 
 PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
 Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:
@@ -5770,6 +5779,42 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     
     // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
+      // Resolve obvious AI false positives against objective pixel evidence before applying gates.
+      // The vision model sees a potentially downscaled copy; the local analyzer sees the original file.
+      const objective = imageMetadata || {};
+      const warningsFromReconciliation: string[] = [];
+      const noteIsSevere = (note: unknown) => /\b(severe|critical|heavy|extreme|parah|berat|kritis|sangat tinggi|sangat parah|obvious)\b/i.test(String(note || ''));
+      const downgrade = (key: string, reason: string) => {
+        const check = parsedResult.ai_vision_checks?.[key];
+        if (check && check.status === 'FAIL') {
+          check.status = 'PASS';
+          check.note = `${check.note || ''} [Objective QC reconciliation: ${reason}]`;
+          warningsFromReconciliation.push(`${key}: ${reason}`);
+        }
+      };
+
+      if (objective.sharpness?.value >= 26 && objective.sharpness?.has_local_blur_anomaly !== true && !noteIsSevere(parsedResult.ai_vision_checks.blur?.note)) {
+        downgrade('blur', `measured sharpness ${objective.sharpness.value}/100 does not support global blur`);
+      }
+      if (objective.noise?.value < 55 && !noteIsSevere(parsedResult.ai_vision_checks.noise?.note)) {
+        downgrade('noise', `measured noise ${objective.noise.value}/100 is below the severe-noise gate`);
+      }
+      const highClip = Number(objective.brightness?.clipped_high_percent || 0);
+      const lowClip = Number(objective.brightness?.clipped_low_percent || 0);
+      if (highClip <= 15 && lowClip <= 25 && !noteIsSevere(parsedResult.ai_vision_checks.exposure?.note)) {
+        downgrade('exposure', `measured clipping is ${highClip.toFixed(1)}% high / ${lowClip.toFixed(1)}% low`);
+      }
+      const blockScore = Number(objective.jpeg_blocking?.score || 0);
+      const bandScore = Number(objective.banding?.score || 0);
+      const edgeScore = Number(objective.transparency?.edge_halo_risk_percent || 0);
+      if (blockScore < 80 && bandScore < 80 && edgeScore < 72 && !noteIsSevere(parsedResult.ai_vision_checks.artifacts?.note)) {
+        downgrade('artifacts', 'objective compression/banding/alpha-edge measurements are below hard-fail thresholds');
+      }
+
+      if (warningsFromReconciliation.length) {
+        parsedResult.review_warnings = [...(Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : []), ...warningsFromReconciliation];
+      }
+
       let anyFail = false;
       let anyIpFail = false;
       let hasCriticalFail = false;
