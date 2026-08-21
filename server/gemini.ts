@@ -922,7 +922,7 @@ function calculateMarketOpportunity(signal: KeywordMarketSignal): number {
 // ============================================================================
 // V5.1 MARKET INTELLIGENCE: MASTER CANDIDATE POOL + SEMANTIC ROLE HIERARCHY + USER PERFORMANCE
 // ============================================================================
-// Market data is a discovery/ranking signal only. It NEVER overrides visual truth.
+// Market data is a discovery/ranking signal only. It supports semantic search ranking and never licenses nonsensical keywords.
 // The engine can combine built-in market corpus, imported contributor performance,
 // and AI-generated candidates into one dynamically ranked pool.
 
@@ -960,7 +960,7 @@ function isKeywordVisuallySupported(keyword: string, visualFacts: any): boolean 
   const direct = words.some(w => w.length > 2 && evidenceText.includes(w));
   const market = getKeywordMarketSignal(k);
   const marketSupported = hasUsableMarketSignal(market) && Number(market.confidence || 0) >= 80;
-  // A market term may enter discovery only if it has at least one visual anchor.
+  // A market term may enter discovery when it has a meaningful semantic relationship to the current metadata context.
   // Broad generic terms still need a visual anchor and are not allowed as filler.
   return direct || (words.length > 1 && words.some(w => evidenceText.includes(w)));
 }
@@ -1193,199 +1193,110 @@ function ensureKeywordCount(
   categoryId?: number,
   keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
-  const hashString = (str: string): number => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return hash;
+  const target = Math.max(0, Number.isFinite(Number(targetCount)) ? Number(targetCount) : 0);
+  if (!target) return [];
+
+  const normalize = (value: any): string => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\\s-]/g, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim();
+
+  const singularKey = (value: string): string => {
+    const v = normalize(value);
+    if (v.endsWith('ies') && v.length > 4) return `${v.slice(0, -3)}y`;
+    if (v.endsWith('es') && v.length > 4) return v.slice(0, -2);
+    if (v.endsWith('s') && v.length > 3) return v.slice(0, -1);
+    return v;
   };
 
-  // 1. Clean and deduplicate input keywords
-  let uniqueKeywords: string[] = [];
-  if (Array.isArray(keywords)) {
-    keywords.forEach(k => {
-      if (typeof k === 'string') {
-        const clean = k.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
-        if (clean.length > 1 && !isProhibitedKeyword(clean)) {
-          if (keywordMode === 'single' && clean.includes(' ')) {
-            // Split multi-words into individual single words
-            const pieces = clean.split(/\s+/);
-            pieces.forEach(p => {
-              if (p.length > 1 && !isProhibitedKeyword(p)) {
-                // Check for exact and near duplicates (plurals/singulars)
-                const isDuplicate = uniqueKeywords.some(existing => 
-                  existing === p || 
-                  existing === p + 's' || 
-                  p === existing + 's' || 
-                  existing === p + 'es' || 
-                  p === existing + 'es' ||
-                  existing.replace(/ies$/, 'y') === p ||
-                  p.replace(/ies$/, 'y') === existing
-                );
-                if (!isDuplicate) {
-                  uniqueKeywords.push(p);
-                }
-              }
-            });
-          } else {
-            let cleanVal = clean;
-            if (keywordMode === 'multi' && !clean.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
-              cleanVal = `${clean} ${mod}`;
-            }
-
-            // Check for exact and near duplicates (plurals/singulars)
-            const isDuplicate = uniqueKeywords.some(existing => 
-              existing === cleanVal || 
-              existing === cleanVal + 's' || 
-              cleanVal === existing + 's' || 
-              existing === cleanVal + 'es' || 
-              cleanVal === existing + 'es' ||
-              existing.replace(/ies$/, 'y') === cleanVal ||
-              cleanVal.replace(/ies$/, 'y') === existing
-            );
-            if (!isDuplicate) {
-              uniqueKeywords.push(cleanVal);
-            }
-          }
-        }
-      }
-    });
-  }
-
-  if (uniqueKeywords.length >= targetCount) {
-    return uniqueKeywords.slice(0, targetCount);
-  }
-
-  // Define lookup of category-based keywords
-  const categoryFallbackKeywords: Record<number, string[]> = {
-    1: ['animal', 'nature', 'wildlife', 'fauna', 'creature', 'outdoor', 'mammal', 'species', 'wilderness', 'natural', 'habitat', 'furry', 'adorable', 'portrait', 'close-up', 'environment', 'beast', 'pet', 'wild', 'zoology'],
-    2: ['architecture', 'building', 'structure', 'construction', 'city', 'urban', 'exterior', 'interior', 'design', 'modern', 'concrete', 'glass', 'steel', 'landmark', 'monument', 'facade', 'metropolis', 'tower', 'estate', 'house', 'contemporary'],
-    3: ['business', 'office', 'corporate', 'work', 'workplace', 'finance', 'company', 'management', 'team', 'meeting', 'strategy', 'success', 'professional', 'marketing', 'leadership', 'organization', 'colleague', 'career', 'investment', 'growth', 'concept'],
-    4: ['drink', 'beverage', 'glass', 'liquid', 'refreshing', 'cold', 'hot', 'cup', 'bottle', 'mug', 'bar', 'cafe', 'cocktail', 'juice', 'water', 'coffee', 'tea', 'alcohol', 'brew', 'ice'],
-    5: ['environment', 'nature', 'landscape', 'green', 'eco', 'ecology', 'sustainability', 'recycle', 'conservation', 'earth', 'planet', 'wild', 'scenery', 'outdoor', 'forest', 'climate', 'natural', 'environmental', 'organic'],
-    6: ['concept', 'mood', 'feeling', 'emotion', 'mental', 'mind', 'thought', 'isolated', 'abstract', 'idea', 'expression', 'psychology', 'imagination', 'sensation', 'attitude', 'behavior'],
-    7: ['food', 'delicious', 'tasty', 'dish', 'meal', 'gourmet', 'culinary', 'plate', 'eating', 'ingredient', 'fresh', 'vegetable', 'fruit', 'cooking', 'kitchen', 'recipe', 'diet', 'lunch', 'dinner', 'breakfast', 'cuisine'],
-    8: ['graphic', 'design', 'resource', 'vector', 'illustration', 'element', 'abstract', 'background', 'template', 'pattern', 'asset', 'layout', 'creative', 'art', 'flat', 'logo', 'icon', 'backdrop', 'seamless'],
-    9: ['hobby', 'leisure', 'recreation', 'activity', 'fun', 'game', 'play', 'relaxation', 'lifestyle', 'entertainment', 'pastime', 'craft', 'indoor', 'outdoor', 'enjoyment'],
-    10: ['industry', 'industrial', 'factory', 'manufacture', 'production', 'technology', 'engineering', 'machinery', 'worker', 'equipment', 'facility', 'metal', 'power', 'warehouse', 'technical', 'automated', 'construction'],
-    11: ['landscape', 'scenery', 'scenic', 'nature', 'view', 'outdoor', 'mountain', 'hill', 'valley', 'field', 'panorama', 'horizon', 'wilderness', 'beautiful', 'vista', 'natural', 'sky'],
-    12: ['lifestyle', 'life', 'daily', 'routine', 'modern', 'human', 'person', 'people', 'home', 'domestic', 'activity', 'casual', 'habits', 'style', 'comfort', 'leisure'],
-    13: ['people', 'person', 'human', 'individual', 'portrait', 'man', 'woman', 'adult', 'young', 'lifestyle', 'group', 'crowd', 'interaction', 'relationship', 'face', 'expressive', 'posing'],
-    14: ['plant', 'flower', 'flora', 'botany', 'botanical', 'leaf', 'nature', 'garden', 'green', 'blossom', 'petal', 'growth', 'stem', 'outdoor', 'natural', 'organic', 'vegetation', 'spring', 'summer'],
-    15: ['culture', 'religion', 'religious', 'spiritual', 'belief', 'faith', 'tradition', 'custom', 'heritage', 'sacred', 'ceremony', 'ritual', 'symbol', 'history', 'traditional', 'temple', 'church', 'holiday', 'celebration'],
-    16: ['science', 'scientific', 'research', 'laboratory', 'lab', 'technology', 'analysis', 'experiment', 'discovery', 'study', 'chemistry', 'biology', 'physics', 'tech', 'equipment', 'microscope', 'test', 'data', 'concept'],
-    17: ['social', 'issue', 'community', 'society', 'problem', 'awareness', 'support', 'help', 'advocacy', 'global', 'campaign', 'concept', 'message', 'public', 'humanity', 'care'],
-    18: ['sports', 'sport', 'athletic', 'athlete', 'exercise', 'fitness', 'training', 'game', 'competition', 'player', 'workout', 'active', 'healthy', 'stadium', 'court', 'field', 'gym', 'recreation', 'action'],
-    19: ['technology', 'tech', 'digital', 'device', 'modern', 'electronic', 'innovation', 'computer', 'network', 'connection', 'internet', 'future', 'futuristic', 'concept', 'data', 'communication', 'virtual', 'smart'],
-    20: ['transport', 'transportation', 'vehicle', 'car', 'automobile', 'traffic', 'road', 'street', 'travel', 'highway', 'drive', 'engine', 'movement', 'logistics', 'delivery', 'auto', 'transit'],
-    21: ['travel', 'tourism', 'destination', 'vacation', 'holiday', 'trip', 'journey', 'adventure', 'explore', 'tourist', 'sightseeing', 'scenic', 'landmark', 'outdoor', 'recreation', 'passport', 'luggage']
-  };
-
-  const STOP_WORDS = new Set([
-    'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'in', 'with', 'by', 'of', 'to', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'us', 'our', 'you', 'your', 'he', 'him', 'his', 'she', 'her', 'isolated', 'stock', 'photo', 'image', 'picture', 'vector', 'illustration', 'captured', 'professional', 'high', 'quality', 'resolution', 'super', 'ultra', 'beautiful', 'stunning', 'amazing', 'perfect', 'ideal'
+  const stopWords = new Set([
+    ...KEYWORD_CONNECTOR_WORDS,
+    'stock', 'photo', 'photography', 'image', 'picture', 'vector',
+    'illustration', 'captured', 'professional', 'high', 'quality',
+    'beautiful', 'stunning', 'amazing', 'perfect'
   ]);
 
-  // Helper helper to clean a string of words and append to list
-  const extractWords = (str: any) => {
-    if (!str || typeof str !== 'string') return [];
-    return str.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .split(/\s+/)
-      .map(w => w.trim())
-      .filter(w => w.length > 1 && !STOP_WORDS.has(w) && !isProhibitedKeyword(w));
+  const tokenize = (value: string): string[] => normalize(value)
+    .split(/\\s+/)
+    .filter(Boolean)
+    .filter(w => w.length > 1 && !stopWords.has(w) && !isProhibitedKeyword(w));
+
+  const context = new Set<string>();
+  const addContext = (value: any) => {
+    if (typeof value !== 'string') return;
+    const n = normalize(value);
+    if (!n || isProhibitedKeyword(n)) return;
+    context.add(n);
+    tokenize(n).forEach(t => context.add(t));
   };
 
-  // Build candidate sources in order of priority:
-  const sources: string[][] = [];
+  addContext(title);
+  addContext(description);
 
-  // 1. From visual facts primary subjects
-  if (visualFacts && visualFacts.primary_subjects && Array.isArray(visualFacts.primary_subjects)) {
-    const words: string[] = [];
-    visualFacts.primary_subjects.forEach((x: any) => {
-      if (x && typeof x === 'object' && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
+  const fields = [
+    'primary_subject','primary_subjects','secondary_subject','secondary_subjects',
+    'objects','attributes','scene','environment','setting','location',
+    'actions','action','states','style','visual_style','visualStyle',
+    'composition','layout','seasonal_context','seasonal','occasion','events',
+    'season','holiday','concepts','themes','commercial_concepts',
+    'commercial_use','use_cases','applications','colors','color'
+  ];
 
-  // 2. From visual facts secondary subjects
-  if (visualFacts && visualFacts.secondary_subjects && Array.isArray(visualFacts.secondary_subjects)) {
-    const words: string[] = [];
-    visualFacts.secondary_subjects.forEach((x: any) => {
-      if (x && typeof x === 'object' && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-
-  // 3. From visual facts colors & actions
-  if (visualFacts && visualFacts.colors && Array.isArray(visualFacts.colors)) {
-    sources.push(visualFacts.colors.flatMap((c: any) => {
-      if (typeof c === 'string') return extractWords(c);
-      return [];
-    }));
-  }
-  if (visualFacts && visualFacts.actions && Array.isArray(visualFacts.actions)) {
-    sources.push(visualFacts.actions.flatMap((a: any) => {
-      if (typeof a === 'string') return extractWords(a);
-      return [];
-    }));
-  }
-
-  // 4. From Title
-  if (title && typeof title === 'string') {
-    sources.push(extractWords(title));
-  }
-
-  // 5. From Description
-  if (description && typeof description === 'string') {
-    sources.push(extractWords(description));
-  }
-
-  // 6. From specific category keywords
-  if (categoryId) {
-    const catIdNum = Number(categoryId);
-    if (categoryFallbackKeywords[catIdNum]) {
-      sources.push(categoryFallbackKeywords[catIdNum]);
-    }
-  }
-
-  // 7. Generic high density stock keywords
-  const genericFallback = ['commercial', 'concept', 'modern', 'scene', 'design', 'art', 'graphic', 'simple', 'minimal', 'clean', 'detail', 'element', 'context', 'asset', 'lifestyle', 'organic', 'pattern', 'texture', 'background', 'composition', 'subject', 'focus', 'creative', 'fresh', 'bright', 'vibrant', 'backdrop', 'object', 'view', 'horizontal', 'outdoor', 'indoor', 'surface', 'material', 'style', 'trending', 'popular', 'industry', 'space', 'natural', 'lighting', 'atmosphere', 'inspiration'];
-  sources.push(genericFallback);
-
-  // Pad the uniqueKeywords checking each source
-  for (const source of sources) {
-    if (uniqueKeywords.length >= targetCount) break;
-    if (Array.isArray(source)) {
-      const cleanSource = Array.from(new Set(source));
-      for (const word of cleanSource) {
-        if (uniqueKeywords.length >= targetCount) break;
-        if (typeof word === 'string') {
-          let cleanWord = word.trim().toLowerCase();
-          if (cleanWord.length > 1 && !isProhibitedKeyword(cleanWord)) {
-            if (keywordMode === 'multi' && !cleanWord.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(cleanWord)) % modifiers.length];
-              cleanWord = `${cleanWord} ${mod}`;
-            }
-            if (!uniqueKeywords.includes(cleanWord)) {
-              uniqueKeywords.push(cleanWord);
-            }
-          }
+  for (const field of fields) {
+    const value = visualFacts?.[field];
+    if (Array.isArray(value)) {
+      value.forEach(item => {
+        if (typeof item === 'string') addContext(item);
+        else if (item && typeof item === 'object') {
+          addContext(item.name); addContext(item.label); addContext(item.value);
         }
-      }
+      });
+    } else if (typeof value === 'string') {
+      addContext(value);
     }
   }
 
-  return uniqueKeywords.slice(0, targetCount);
-}
+  const candidates = new Map<string, { value: string; score: number; order: number }>();
 
+  (Array.isArray(keywords) ? keywords : []).forEach((raw, index) => {
+    let value = normalize(raw);
+    if (!value || isProhibitedKeyword(value)) return;
+
+    if (keywordMode === 'single') value = tokenize(value)[0] || '';
+    if (!value) return;
+
+    const words = tokenize(value);
+    if (!words.length) return;
+
+    const exactContext = context.has(value);
+    const matchedWords = words.filter(w => context.has(w)).length;
+
+    // AI order is the primary signal. Context only helps distinguish candidates.
+    // No category quota, fixed percentage, SEO engine, market signal or expansion.
+    let score = 1000 - index;
+    score += exactContext ? 45 : 0;
+    score += matchedWords * 12;
+    score += words.length > 1 ? 8 : 0;
+
+    const generic = new Set([
+      'thing','object','item','design','element','content',
+      'creative','modern','simple','general','concept'
+    ]);
+    if (words.length === 1 && generic.has(words[0])) score -= 80;
+
+    const key = singularKey(value);
+    const previous = candidates.get(key);
+    if (!previous || score > previous.score) {
+      candidates.set(key, { value, score, order: index });
+    }
+  });
+
+  return Array.from(candidates.values())
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .slice(0, target)
+    .map(x => x.value);
+}
 function getAIClient(): any {
   return {
     models: {
@@ -2698,6 +2609,28 @@ Generate only NEW, evidence-backed candidates.`;
   return candidates;
 }
 
+const UNIVERSAL_KEYWORD_RULES = `
+UNIVERSAL KEYWORD RULES — APPLY TO EVERY PROVIDER AND EVERY MODEL
+
+Generate the best stock keywords for the asset using natural search-intent judgment.
+
+1. Understand the asset first: primary subject, secondary subjects, attributes, action/state, environment, composition, visual characteristics, concepts and other meaningful information.
+2. Search intent first: think like a real stock buyer searching for this exact asset.
+3. Start from the strongest Primary Subject terms, then consider Secondary Subjects and other relevant information naturally.
+4. NO FIXED PATTERN: never reserve a fixed number or percentage for any category. Primary Subject, Secondary Subject, Attributes, Environment, Concept, Style, Color and Commercial Use are candidate sources, not slots.
+5. Dynamically select the strongest candidates together. If a secondary subject is a stronger search term than a weak primary variation, it may rank higher.
+6. Prefer realistic buyer search terms and specific natural phrases when they are genuinely useful.
+7. Do not force synonyms, commercial terms, seasonal terms, concepts, context, style or colors.
+8. Avoid repetitive, near-duplicate and keyword-stuffed terms.
+9. Do not add generic filler merely to reach the requested count.
+10. Never include brands, trademarks, company names, product lines, celebrities, copyrighted characters or prohibited names.
+11. Keywords must be lowercase, single words or short natural phrases, never sentences.
+12. Order keywords by actual search value and relevance, not by a predefined category sequence.
+13. Return exactly the requested count whenever enough valid candidates exist. If more candidates are needed, continue with progressively weaker but still genuinely useful terms from the asset. Never use unrelated filler.
+14. Final test: would a real stock buyer plausibly use this term to find this exact asset?
+`;
+
+
 export const generateStockMetadata = async (
   frames: string[],
   keywordCount: number | string,
@@ -2735,92 +2668,13 @@ export const generateStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
-  const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
+  const aiRequestCount = Math.max(targetCount + 10, Math.ceil(targetCount * 1.25));
 
   const directives = getToolTypeDirectives(toolType);
 
-  // Rules for keywords depending on keywordMode
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
-   - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule}
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
-
-  if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is SINGLE-WORD mode, ensure any keyword phrase is split or shortened into a single word.
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
-  } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
-  }
+  // Dynamic keyword rules: no fixed slots, no category quotas.
+  let keywordRuleSchemaDesc = `Generate natural keywords according to UNIVERSAL_KEYWORD_RULES in ${getLanguageName(metadataLanguage)}. Return short words or short natural phrases, never full sentences.`;
+  let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
@@ -2990,10 +2844,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
 
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Start with concrete visual keywords (exact subjects, actions, settings, visual characteristics, colors, and elements). Add concepts, mood, events, and search-intent terms only when clearly supported by AI Vision and useful for a real buyer search.
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
@@ -3009,23 +2859,9 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-
 Rules for Keywords:
-1. Start with the strongest MAIN SUBJECT keyword identified by AI Vision, then continue by visual importance and search relevance.
-2. Ensure no IP, brands, or names are included.
-${keywordRulePromptText}
+${UNIVERSAL_KEYWORD_RULES}
 
-HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- These rules are provider/model invariant: the same keyword rules apply to Gemini and every OpenAI-compatible/provider model.
-- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
-- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
-- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
-- The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Prioritize the Main Subject and its strongest natural variations before secondary information.
-- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
-- Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
-- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3177,19 +3013,8 @@ Rules for Descriptions:
 4. Limit to 200 characters.
 
 Rules for Keywords:
-${keywordRulePromptText}
+${UNIVERSAL_KEYWORD_RULES}
 
-HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- These rules are provider/model invariant: the same keyword rules apply to Gemini and every OpenAI-compatible/provider model.
-- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
-- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
-- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
-- The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Prioritize the Main Subject and its strongest natural variations before secondary information.
-- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
-- Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
-- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -3441,86 +3266,9 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
-  const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
-   - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
-   - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
-
-  if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
-  } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing.
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. CRITICAL KEYWORD STRUCTURE & ORDER (proportionally scaled to the requested target count ${targetCount}):
-    - Keywords 1 to ${Math.max(1, Math.round(targetCount * 0.15))}: Primary Subject Synonyms & Core Concepts
-    - Keywords ${Math.max(1, Math.round(targetCount * 0.15)) + 1} to ${Math.max(2, Math.round(targetCount * 0.35))}: Technical Terms, Direct Subject SEO Variations, Popular Industry Synonyms
-    - Keywords ${Math.max(2, Math.round(targetCount * 0.35)) + 1} to ${Math.max(3, Math.round(targetCount * 0.55))}: Cultural or Atmospheric Associations, Ambient & Conceptual Descriptors, Contextual Backdrop Terms
-    - Keywords ${Math.max(3, Math.round(targetCount * 0.55)) + 1} to ${Math.max(4, Math.round(targetCount * 0.75))}: Action, Commercial Utility, Functional Business Applications
-    - Keywords ${Math.max(4, Math.round(targetCount * 0.75)) + 1} to ${targetCount}: Psychological Metaphors, Emotional/Conceptual Keywords, Symbolic Representations, Advanced Market Categories.
-    NOTE: DO NOT pad with irrelevant keywords just to reach the target count. All keywords must be highly relevant to the asset.`;
-  }
-
+  const aiRequestCount = targetCount   // Dynamic keyword rules: no fixed slots, no category quotas.
+  let keywordRuleSchemaDesc = `Generate natural keywords according to UNIVERSAL_KEYWORD_RULES in ${getLanguageName(metadataLanguage)}. Return short words or short natural phrases, never full sentences.`;
+  let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
@@ -3714,10 +3462,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
 
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Start with concrete visual keywords (exact subjects, actions, settings, visual characteristics, colors, and elements). Add concepts, mood, events, and search-intent terms only when clearly supported by AI Vision and useful for a real buyer search.
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
@@ -3733,23 +3477,9 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-
 Rules for Keywords:
-1. Start with the strongest MAIN SUBJECT keyword identified by AI Vision, then continue by visual importance and search relevance.
-2. Ensure no IP, brands, or names are included.
-${keywordRulePromptText}
+${UNIVERSAL_KEYWORD_RULES}
 
-HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- These rules are provider/model invariant: the same keyword rules apply to Gemini and every OpenAI-compatible/provider model.
-- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
-- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
-- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
-- The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Prioritize the Main Subject and its strongest natural variations before secondary information.
-- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
-- Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
-- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
@@ -3905,19 +3635,8 @@ Rules for Descriptions:
 4. Limit to 200 characters.
 
 Rules for Keywords:
-${keywordRulePromptText}
+${UNIVERSAL_KEYWORD_RULES}
 
-HARD VISUAL-GROUNDING RULES FOR KEYWORDS:
-- These rules are provider/model invariant: the same keyword rules apply to Gemini and every OpenAI-compatible/provider model.
-- Keywords should be grounded in the supplied VISUAL_FACTS. Use VISUAL_FACTS as the primary visual reference, while allowing natural SEO expansion and relevant semantic variations.
-- Describe only visible subjects, actions, background elements, visible text, composition, or concepts explicitly identified by VISUAL_FACTS.
-- Do NOT invent objects, people, locations, materials, professions, emotions, industries, uses, or concepts.
-- The requested keyword count is the final output target. Never use random filler; expand only from verified VISUAL_FACTS using natural synonyms, specific attributes, supported contexts, seasonal relevance, and genuine commercial search intent.
-- Prioritize the Main Subject and its strongest natural variations before secondary information.
-- Synonyms and search phrases are allowed only when they preserve the same visual meaning detected by Vision.
-- Concepts, mood, location, use/search intent, and seasonal events are optional enrichment layers, not mandatory fields.
-- Return the exact requested count by expanding from the same visual understanding when additional valid terms are needed.
-- Before returning the result, self-audit for hallucinations, IP, spam, redundancy, and irrelevance.
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
