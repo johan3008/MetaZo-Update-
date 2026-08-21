@@ -5765,6 +5765,16 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 - BATASAN PENGECUALIAN ARTISTIK (CRITICAL): Pengecualian estetika di atas (bokeh, noise halus, bayangan dramatis) HANYA berlaku untuk pilihan artistik murni. Pengecualian ini TIDAK PERNAH berlaku untuk cacat struktural AI, objek yang tidak logis secara mekanis, anatomi cacat, atau teks rusak — temuan tersebut WAJIB FAIL di semua mode toleransi tanpa kecuali.
 
 ---
+PROTOKOL FORENSIC REKONSILIASI (WAJIB):
+- Jangan menilai kualitas hanya dari thumbnail. Gabungkan gambar penuh, crop resolusi asli 100%, dan pengukuran piksel objektif.
+- Pengukuran objektif adalah bukti teknis, bukan vonis visual. Konfirmasi artifact dengan melihat pola yang benar-benar terlihat.
+- Skor JPEG blocking sedang TIDAK otomatis berarti artifact. Cari pola blok 8x8 yang berulang pada area halus; jangan salahkan tekstur PCB, kabel, rambut, bokeh, atau edge alami.
+- OCR adalah bukti bantu dan dapat salah membaca circuit traces, ikon, bokeh, dan micro-text. Jangan menyebut gibberish kecuali bentuk huruf/angka memang terlihat rusak secara visual.
+- Jika OCR mendeteksi teks, baca hanya teks yang benar-benar dapat dibaca. Jika tidak dapat dibaca, nyatakan bahwa teks terlalu kecil/tidak terbaca dan periksa apakah memang pseudo-text AI.
+- Untuk isolated subject dengan background hitam/putih, periksa perimeter 1–3 piksel untuk matte halo. Rambut tipis, renda, bulu, highlight kain, dan anti-aliasing alami TIDAK boleh otomatis disebut halo.
+- Untuk hardware/PCB/server-room: periksa pin chip, jalur PCB, solder/via, konektor, kabel, ventilasi rack, LED, panel UI, perspektif, dan hubungan mekanis. Cacat struktural yang benar-benar terlihat harus FAIL; jangan mengarang cacat hanya karena gambar terlihat AI-generated.
+- Pisahkan tiga kelas hasil: FAIL = cacat terkonfirmasi yang material; WARNING = sinyal objektif yang perlu inspeksi manusia; PASS = tidak ada bukti cacat material. Jangan mengubah WARNING menjadi FAIL hanya karena skor numerik moderat.
+
 PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
 Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil dari 4 wilayah KUADRAN ber-overlap 20% yang bersama-sama mencakup SELURUH permukaan gambar, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, lalu BAWAH-KANAN.
 - Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
@@ -5884,6 +5894,9 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
         * Transamerica Pyramid (San Francisco), Taipei 101 (Taiwan), Petronas Twin Towers (Malaysia) dilarang keras.
         * Bagian Interior Kuil Sagrada Família (Barcelona) dilarang keras.
         * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
+
+PENGGUNAAN DATA FORENSIK OBJEKTIF (WAJIB):
+Jika data teknis berisi field OCR, JPEG blocking, background edge analysis, transparency, local analysis, atau sharpness/noise metrics, gunakan field tersebut dalam penalaran. Field resolution/megapixels hanya metadata informasional dan WAJIB DIABAIKAN sebagai quality gate: jangan FAIL, WARNING, penalty, atau menurunkan skor hanya karena ukuran/resolusi gambar. Jangan menyatakan hasil yang bertentangan tanpa alasan visual yang jelas. Sebaliknya, skor noise/blok/edge moderat tidak otomatis menjadi FAIL.
 
 PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
 Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:

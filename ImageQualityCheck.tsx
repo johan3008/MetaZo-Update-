@@ -1325,7 +1325,7 @@ export const ImageQualityCheck: React.FC<{
                                         </div>
                                         <div>
                                           <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">{isIndo ? "Analisis FFmpeg" : "FFmpeg Analysis"}</p>
-                                          <p className="text-[8px] text-slate-400 font-bold uppercase">{isIndo ? "Resolusi, Warna, Histogram" : "Resolution, Color, Histogram"}</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">{isIndo ? "Warna, Histogram" : "Color, Histogram"}</p>
                                         </div>
                                       </div>
 
