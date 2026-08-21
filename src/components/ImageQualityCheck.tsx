@@ -403,6 +403,7 @@ export const ImageQualityCheck: React.FC<{
       // 3. Raster images are intentionally NOT processed here.
       // For forensic QC the caller must upload the original File object directly.
       reject(new Error('Raster image preprocessing is disabled for forensic Quality Check. The original file must be sent unchanged.'));
+    });
   };
 
   // FIX QC: Buat crop detail RESOLUSI ASLI (100% pixel, tanpa upscale palsu) dari file asli.
