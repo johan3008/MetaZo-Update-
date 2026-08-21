@@ -1,4 +1,218 @@
 import { GoogleGenAI, Type } from "@google/genai";
+
+const SHARED_KEYWORD_VISION_RULES = (targetCount: number, keywordMode?: 'mixed' | 'single' | 'multi') => {
+  const modeRule =
+    keywordMode === 'single'
+      ? 'KEYWORD MODE: SINGLE. Every keyword MUST be one single word. Never return multi-word phrases.'
+      : keywordMode === 'multi'
+        ? 'KEYWORD MODE: MULTI. Natural multi-word phrases are allowed when directly supported by the visual evidence.'
+        : 'KEYWORD MODE: MIXED. Preserve the application mixed mode: single words and natural multi-word phrases may both be used when directly supported by the visual evidence.';
+
+  return `KEYWORD RULES — SHARED ACROSS ALL PROVIDERS AND MODELS
+
+The supplied VISUAL_FACTS are the source of truth for keywords.
+Generate exactly ${targetCount} keywords when the model can support the requested count.
+Do not invent objects, locations, actions, events, brands, or concepts that are not visually supported.
+
+AI VISION GROUNDING:
+- Read the actual asset and VISUAL_FACTS before generating keywords.
+- Prefer direct visual facts: primary subjects, secondary objects, visible materials, environment, lighting, composition, colors, and clearly visible characteristics.
+- Use strong visual context only when it is unambiguous from the image.
+- Do NOT use a keyword merely because it is generally associated with the subject.
+- Do NOT infer hidden locations, events, brands, people, activities, or narratives that are not visible.
+- Do NOT add cemetery, grave, Halloween, occult, afterlife, haunted, or similar contextual terms unless the image clearly supports them.
+- Every keyword must be defensible from the image itself.
+
+PRIORITY:
+1. Main visible subjects
+2. Visible actions or states
+3. Visible objects and materials
+4. Visible setting/environment
+5. Visible composition/visual characteristics
+6. Clearly supported concepts
+
+FORMAT:
+- English.
+- Keep keywords concise.
+- ${modeRule}
+
+FORBIDDEN TERMS:
+- No brand names, trademarks, copyrighted figures, or other identifiable protected brand/IP terms.
+- No subjective quality or promotional filler such as: high quality, beautiful, stunning, best, amazing, premium, perfect, top, nice, vector of, illustration of.
+- Do not keyword-stuff irrelevant concepts.
+
+OUTPUT:
+- Return the keywords only through the JSON "keywords" array.
+- Preserve the relevance order chosen from the visual evidence.
+- Do not explain the keywords.`;
+};
+
+
+/**
+ * AI-only keyword generator.
+ * No application-side keyword rules, filtering, scoring, ranking,
+ * deduplication, SEO manipulation, market weighting, or count enforcement.
+ * The provider's keyword output is returned directly.
+ */
+export interface KeywordRulesConfig {
+  forbiddenBrandTerms: string[];
+  forbiddenSubjectiveTerms: string[];
+}
+
+export const DEFAULT_KEYWORD_RULES: KeywordRulesConfig = {
+  forbiddenBrandTerms: [
+    "apple", "iphone", "nike", "adidas", "bmw", "mercedes", "tesla",
+    "disney", "marvel", "lego", "vespa", "gopro", "barbie"
+  ],
+  forbiddenSubjectiveTerms: [
+    "high quality", "beautiful", "stunning", "best", "amazing",
+    "premium", "perfect", "top", "nice", "vector of", "illustration of"
+  ]
+};
+
+export interface KeywordValidationResult {
+  isValid: boolean;
+  sanitizedKeywords: string[];
+  removedDuplicates: number;
+  violations: string[];
+}
+
+/**
+ * Validates and cleans keyword output using the exact rules supplied by the user.
+ */
+export function validateAndCleanKeywords(
+  rawKeywords: string[] | string,
+  rules: KeywordRulesConfig = DEFAULT_KEYWORD_RULES
+): KeywordValidationResult {
+  const violations: string[] = [];
+
+  const rawList = Array.isArray(rawKeywords)
+    ? rawKeywords
+    : String(rawKeywords || "").split(",");
+
+  const cleanedSet = new Set<string>();
+  let duplicateCount = 0;
+
+  for (const rawKw of rawList) {
+    if (!rawKw) continue;
+
+    const kw = rawKw
+      .toLowerCase()
+      .replace(/[^a-z0-9\s\-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!kw) continue;
+
+    const hasBrandViolation = rules.forbiddenBrandTerms.some(brand =>
+      new RegExp(`\\b${brand}\\b`, "i").test(kw)
+    );
+
+    if (hasBrandViolation) {
+      violations.push(
+        `Keyword "${kw}" melanggar kebijakan hak cipta / merek dagang.`
+      );
+      continue;
+    }
+
+    const hasSubjectiveViolation = rules.forbiddenSubjectiveTerms.some(term =>
+      kw.includes(term)
+    );
+
+    if (hasSubjectiveViolation) {
+      violations.push(
+        `Keyword "${kw}" mengandung kata subjektif / spam pengisi.`
+      );
+      continue;
+    }
+
+    if (cleanedSet.has(kw)) {
+      duplicateCount++;
+    } else {
+      cleanedSet.add(kw);
+    }
+  }
+  const sanitizedKeywords = Array.from(cleanedSet);
+
+  return {
+    isValid: violations.length === 0,
+    sanitizedKeywords,
+    removedDuplicates: duplicateCount,
+    violations
+  };
+}
+
+/**
+ * Generates stock keywords using the app's target count and the configured content rules.
+ */
+export async function generateValidatedStockKeywords(options: {
+  title: string;
+  description: string;
+  targetCount: number;
+  apiKey?: string;
+  model?: string;
+}): Promise<KeywordValidationResult> {
+  const {
+    title,
+    description,
+    targetCount,
+    apiKey,
+    model = "gemini-3.5-flash"
+  } = options;
+
+  const keyToUse = apiKey || process.env.GEMINI_API_KEY || "";
+
+  if (!keyToUse) {
+    throw new Error(
+      "GEMINI_API_KEY tidak ditemukan untuk proses generasi metadata keywords."
+    );
+  }
+
+  const ai = new GoogleGenAI({ apiKey: keyToUse });
+
+  const systemInstruction = `You are a professional Microstock Keyword & Metadata Optimization Specialist.
+Your task is to generate exactly ${targetCount} high-demand, commercial, and highly searchable stock keywords for microstock platforms (Adobe Stock, Shutterstock).
+
+RULES FOR KEYWORDS:
+1. Return EXACTLY ${targetCount} unique keywords/phrases in English.
+2. Structure: Prioritize main subjects first, followed by actions, visible objects, setting/environment, composition, and conceptual themes.
+3. Length: Keep each keyword concise (single words or 2-3 word natural compound phrases).
+4. STRICT COMPLIANCE: Absolutely NO brand names, trademarks, copyrighted figures, or subjective quality words (e.g., "high quality", "beautiful").
+5. Output format: JSON array of strings under the property "keywords".`;
+
+  const prompt = `Generate metadata keywords based on this asset metadata:
+Title: "${title}"
+Description: "${description}"
+Target Count: ${targetCount}`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          keywords: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["keywords"]
+      },
+      temperature: 0.2
+    }
+  });
+
+  const parsed = JSON.parse(response.text || "{}");
+  const rawKeywords: string[] = Array.isArray(parsed.keywords)
+    ? parsed.keywords
+    : [];
+
+  return validateAndCleanKeywords(rawKeywords);
+}
+
 import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { HOLIDAYS_DATA } from "./holidaysData.ts";
@@ -969,6 +1183,8 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+${SHARED_KEYWORD_VISION_RULES(targetCount, keywordMode)}
+
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if they are a perfect fit.
@@ -1088,6 +1304,8 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+${SHARED_KEYWORD_VISION_RULES(targetCount, keywordMode)}
+
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if accurate.
@@ -1164,7 +1382,9 @@ OUTPUT FORMAT:
     // Ensure description is valid
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
     // AI/provider keyword output is passed through unchanged.
-    data.keywords = Array.isArray(data.keywords) ? data.keywords : [];
+    data.keywords = Array.isArray(data.keywords)
+      ? validateAndCleanKeywords(data.keywords).sanitizedKeywords
+      : [];
 
     // 1.5. Enforce professional title length strictly
     data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength);
@@ -1211,7 +1431,7 @@ OUTPUT FORMAT:
 
       recovery.title = String(recovery.title || recovery.name || recovery.headline || "Stock asset").trim();
       recovery.description = String(recovery.description || recovery.desc || recovery.caption || recovery.title || "Visual stock asset").trim();
-      recovery.keywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
+      recovery.keywords = Array.isArray(recovery.keywords) ? validateAndCleanKeywords(recovery.keywords).sanitizedKeywords : [];
 
       const parsedRecoveryCategory = parseInt(String(recovery.category_id), 10);
       if (!Number.isFinite(parsedRecoveryCategory) || parsedRecoveryCategory < 1 || parsedRecoveryCategory > 21) {
@@ -1460,6 +1680,7 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+${SHARED_KEYWORD_VISION_RULES(targetCount, keywordMode)}
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
@@ -1584,6 +1805,7 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
+${SHARED_KEYWORD_VISION_RULES(targetCount, keywordMode)}
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
@@ -1698,7 +1920,9 @@ OUTPUT FORMAT:
         // Ensure description is valid
         metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
         // AI/provider keyword output is passed through unchanged.
-        metadata.keywords = Array.isArray(metadata.keywords) ? metadata.keywords : [];
+        metadata.keywords = Array.isArray(metadata.keywords)
+          ? validateAndCleanKeywords(metadata.keywords).sanitizedKeywords
+          : [];
 
         // 1.5. Enforce professional title length strictly
         metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength);
