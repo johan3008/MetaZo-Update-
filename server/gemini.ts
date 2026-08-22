@@ -2630,61 +2630,55 @@ UNIVERSAL NATURAL MICROSTOCK KEYWORD RULES
 APPLY IDENTICALLY TO EVERY PROVIDER AND EVERY MODEL
 
 ROLE:
-You are an experienced Microstock Metadata Specialist.
+You are an experienced Microstock Metadata Specialist optimizing metadata for real buyer search behavior.
 
-TASK:
-Analyze the asset using multimodal visual understanding and generate natural,
-accurate, commercially useful microstock metadata.
-
-VISUAL UNDERSTANDING:
-Understand primary subject, secondary subjects, objects, attributes,
-action/state, environment, composition, lighting, mood, concept and context.
+CORE PRINCIPLE:
+ACCURACY > QUANTITY
+RELEVANCE > VIRALITY
+BUYER SEARCH INTENT > "COOL" WORDS
+LITERAL VISUAL FACTS > AI IMAGINATION
+KEYWORD ORDER > RANDOM ORDER
 
 KEYWORD GENERATION:
-1. Start by understanding the primary subject.
-2. Consider secondary subjects, attributes, actions, environment, composition,
-   concepts, mood, and other relevant visual information.
-3. These are information sources only. DO NOT use fixed keyword slots,
-   percentages, quotas, or category counts.
-4. Select keywords naturally according to usefulness for finding the exact asset.
-5. Think like an experienced microstock contributor, not like a thesaurus.
-6. Apply an IM Stocker-style keywording approach: put the most useful and
-   relevant search terms first.
-7. Give the first 10 positions the strongest priority because they should
-   contain the clearest and most commercially useful terms for the exact asset.
-   Never waste early positions on weak, generic, abstract, or filler terms.
-8. Use natural, everyday stock-search language.
-9. Prefer common nouns and short natural phrases.
-8. Use a phrase when it is a natural, meaningful search term.
-   Example: "fire damage" instead of "damage".
-   Example: "fire investigation" instead of "investigation".
-   Example: "protective gear" instead of "equipment".
-9. Never create sentences as keywords.
-10. Avoid unnecessary grammatical words.
-11. Do not force word variations or synonyms.
-12. Do not add keywords merely because they are semantically related.
-13. Do not force conceptual, emotional, seasonal, commercial,
-    environmental, or stylistic keywords.
-14. Avoid abstract or generic words when a more specific natural term exists.
-15. Avoid keyword stuffing and near-duplicate keywords.
-16. Never use brands, trademarks, names, copyrighted characters, celebrities,
-    or prohibited IP.
-17. Keep keywords lowercase.
-18. Order keywords from strongest to weakest by usefulness for finding the asset.
-19. Ordering must NOT follow a fixed category pattern.
-20. The requested keyword count is the final count.
-21. If the user requests 25, output 25. If 50, output 50.
-22. Never fill the requested count with unrelated or artificial keywords.
+1. Start with the most important, high-converting commercial descriptors. Sort all keywords in descending order of visual relevance, buyer search intent, commercial usefulness, and discoverability.
+2. Think like a real microstock buyer: "If I were the buyer, what would I type into the search box to find this exact asset?"
+3. The FIRST 10 KEYWORDS are critical. They must represent the strongest realistic searches for the asset: primary subject, strongest searchable situation/action, and strongest supported commercial concept or use case. Do not waste these positions on generic filler, decorative adjectives, weak details, colors, mood words, or abstract terms.
+4. Use literal, searchable language. Keywords must be directly visible in the asset or strongly and reasonably supported by the visual facts. Never invent objects, actions, locations, industries, emotions, use cases, or concepts.
+5. Prefer specific but broadly searchable terms. Do not over-niche the asset so that the search becomes too narrow, and do not become so generic that the keyword is buried in irrelevant competition.
+6. Use natural multi-word phrases when they represent a realistic buyer search query and accurately describe the asset. Prefer meaningful search phrases over arbitrary word combinations.
+7. Accuracy is more important than filling the requested count. Never add unrelated or artificial keywords merely to reach the requested count.
+8. Do not use words simply because they sound professional, creative, sophisticated, trendy, viral, or commercially attractive.
+9. Avoid weak generic filler such as "beautiful", "amazing", "creative", "modern", "professional", "concept", or "design" unless genuinely relevant and useful for finding the exact asset.
+10. Do not add trending or high-volume terms unless they are genuinely relevant to the asset.
+11. Avoid keyword spam. Do not generate multiple keywords that express essentially the same search intent.
+12. Apply semantic deduplication: remove exact duplicates, near-duplicates, redundant singular/plural variants, trivial morphological variations, and phrases whose meaning is already covered by a stronger keyword.
+13. Do not force synonyms or variations simply to increase keyword count. Every keyword must add meaningful search coverage.
+14. When supported by the visual, cover the most useful dimensions naturally: primary subject, secondary subject, visible action/state, setting/location, concept, commercial context, visual characteristics, and relevant seasonal/event context. Never force category quotas or fixed slots.
+15. Colors should only be included when they materially help identify or search for the asset. Normally use no more than 1–2 meaningful colors.
+16. Never include IP, brands, trademarks, company names, copyrighted characters, celebrity names, artist names, product model names, or other protected proper names unless explicitly allowed by the workflow.
+17. Keep keywords lowercase unless the workflow explicitly requires otherwise.
+18. Ordering must be based on buyer usefulness, relevance, search intent, and commercial value—not on a fixed category pattern or random generation order.
+19. If the user requests a specific keyword count, return that count when sufficient valid keywords exist. Never fill missing positions with irrelevant or spammy terms.
+20. Keep the existing MIXED keyword mode behavior unchanged.
 
-FINAL TEST:
-"Would an actual microstock buyer naturally use this word or phrase
-when searching for this exact asset?"
-If not, do not include it.
+BUYER TEST:
+Before accepting every keyword, ask:
+"Would a real microstock buyer reasonably type this word or phrase when searching for this exact asset?"
+If not, remove it.
+
+FINAL QUALITY CHECK:
+- Verify every keyword against VISUAL_FACTS.
+- Verify the first 10 keywords are the strongest buyer searches.
+- Remove spam and semantic duplicates.
+- Remove weak generic terms.
+- Remove imaginary concepts.
+- Remove irrelevant viral/trending terms.
+- Reorder keywords so the strongest search intent comes first.
+- Prefer discoverability through accurate relevance, not keyword stuffing.
 
 IMPORTANT:
 These rules override conflicting provider-specific and custom keyword rules.
 They apply identically to every provider and model.
-KEEP THE EXISTING MIXED KEYWORD MODE BEHAVIOR UNCHANGED.
 `;
 
 
@@ -2905,12 +2899,20 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 
 Rules for Titles:
-1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
-2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+1. Think like a buyer: "If I were searching for this asset, what would I call it?"
+2. State WHAT IS ACTUALLY IN THE ASSET first: identify the main subject literally and clearly.
+3. Include the visible ACTION, FLOW, interaction, or arrangement when applicable.
+4. Include the strongest supported CONCEPT only when it is clearly grounded in the visual.
+5. Use natural, searchable language. The title must help a buyer immediately understand what the asset contains.
+6. Do not invent objects, actions, locations, industries, emotions, use cases, or concepts.
+7. Do not turn the title into a keyword list. No comma-separated keyword stuffing.
+8. Do not use subjective marketing language or generic quality descriptors.
+9. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning".
+10. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
-3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
-4. Use easy-to-read phrases, NOT formal sentence structures.
-5. DO NOT treat the title like a list of keywords. No commas separating words.
+11. Use Sentence case.
+12. Use easy-to-read natural phrases, not formal or robotic sentence structures.
+13. Title structure should naturally follow: WHAT IS IN THE ASSET + ACTION/FLOW/ARRANGEMENT + SUPPORTED CONCEPT. Not every title requires all three when the visual does not support them.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
