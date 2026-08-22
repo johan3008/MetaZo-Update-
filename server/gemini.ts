@@ -3899,9 +3899,13 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyIpFail = false;
       let hasCriticalFail = false;
       const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues', 'noise', 'artifacts'];
+      const qualityIssueKeys = [
+        'blur', 'composition', 'lighting', 'exposure', 'color_balance', 'over_edited',
+        'sensor_issues', 'proportion_defects', 'illustration_issues', 'vector_issues',
+        'noise', 'artifacts'
+      ];
       const failedCheckKeys: string[] = [];
-      let anyTechnicalFail = false;
+      let anyQualityIssue = false;
       let acceptanceFail = false;
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
@@ -3910,7 +3914,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
           failedCheckKeys.push(key);
           if (['watermark', 'logo', 'ip_risk'].includes(key)) anyIpFail = true;
           if (criticalKeys.includes(key)) hasCriticalFail = true;
-          if (technicalKeys.includes(key)) anyTechnicalFail = true;
+          if (qualityIssueKeys.includes(key)) anyQualityIssue = true;
           if (key === 'stock_acceptance') acceptanceFail = true;
         }
       }
@@ -3925,21 +3929,19 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
 
-      if (tolerance === 'STRICT') {
-        if (anyFail) {
-          parsedResult.recommendation = 'FAIL';
-          if (parsedResult.overall_score >= 60) parsedResult.overall_score = 59;
-        }
-      } else if (tolerance === 'MEDIUM') {
-        if (hasCriticalFail || anyTechnicalFail || acceptanceFail) {
-          parsedResult.recommendation = 'FAIL';
-          if (parsedResult.overall_score >= 66) parsedResult.overall_score = 65;
-        }
+      // FINAL IMAGE QUALITY DECISION:
+      // Clean image = PASS. Any confirmed quality issue = FAIL.
+      // Tolerance controls diagnostic strictness, not whether a confirmed quality defect is accepted.
+      const confirmedQualityFailure = anyQualityIssue || hasCriticalFail || anyIpFail || acceptanceFail;
+
+      if (confirmedQualityFailure) {
+        parsedResult.recommendation = 'FAIL';
+        parsedResult.overall_score = Math.min(Number(parsedResult.overall_score) || 65, 65);
       } else {
-        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail || failedCheckKeys.some(k => ['blur', 'exposure', 'lighting', 'over_edited', 'proportion_defects', 'artifacts'].includes(k));
-        if (looseBlocking) {
-          parsedResult.recommendation = 'FAIL';
-          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
+        parsedResult.recommendation = 'PASS';
+        const currentScore = Number(parsedResult.overall_score);
+        if (!Number.isFinite(currentScore) || currentScore < 75) {
+          parsedResult.overall_score = 85;
         }
       }
 
@@ -3949,11 +3951,18 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       if (failedCheckKeys.length > 0) (parsedResult as any).failed_checks = failedCheckKeys;
       if (anyIpFail) parsedResult.legal_status = 'VIOLATION';
 
-      // Consistency guard: PASS cannot coexist with a hard technical/critical FAIL.
-      if (parsedResult.recommendation === 'PASS' && (hasCriticalFail || anyTechnicalFail || acceptanceFail)) {
+      // Final consistency guard. The UI must never show PASS while any quality issue is active.
+      if (parsedResult.recommendation === 'PASS' && (anyQualityIssue || hasCriticalFail || anyIpFail || acceptanceFail)) {
         parsedResult.recommendation = 'FAIL';
         parsedResult.overall_score = Math.min(Number(parsedResult.overall_score) || 65, 65);
-        parsedResult.review_warnings = [...(parsedResult.review_warnings || []), 'Consistency guard converted an internally contradictory PASS to FAIL because a hard-fail check remained active.'];
+      }
+
+      // A genuinely clean image must be reported as PASS, not RETOUCH/UNKNOWN.
+      if (!failedCheckKeys.length && parsedResult.recommendation !== 'FAIL') {
+        parsedResult.recommendation = 'PASS';
+        if (!Number.isFinite(Number(parsedResult.overall_score)) || Number(parsedResult.overall_score) < 75) {
+          parsedResult.overall_score = 85;
+        }
       }
     } else {
       parsedResult.review_warnings = [...(Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : []), 'AI response did not contain ai_vision_checks; deterministic rejection gates could not be applied.'];
