@@ -1212,37 +1212,191 @@ function removeMicrostockConnectorWords(keyword: string): string {
 }
 
 
-function orderKeywordsByAdobePriority(
-  keywords: string[],
-  visualFacts: any
+function buildCSVPlanetVisualSeedKeywords(
+  visualFacts: any,
+  keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
-  const primary = (visualFacts?.primary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
-  const actions = (visualFacts?.actions || []).map((x: any) => String(x || '').toLowerCase());
-  const secondary = (visualFacts?.secondary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
-  const settings = (visualFacts?.location_setting || []).map((x: any) => String(x || '').toLowerCase());
-  const attributes = (visualFacts?.visual_characteristics || []).map((x: any) => String(x || '').toLowerCase());
-  const colors = (visualFacts?.colors || []).map((x: any) => String(x || '').toLowerCase());
-  const concepts = (visualFacts?.concepts || []).concat(visualFacts?.atmosphere || []).map((x: any) => String(x || '').toLowerCase());
+  const sources = [
+    ...(visualFacts?.primary_subjects || []),
+    ...(visualFacts?.secondary_subjects || []),
+    ...(visualFacts?.actions || []),
+    ...(visualFacts?.location_setting || []),
+    ...(visualFacts?.environment || []),
+    ...(visualFacts?.visual_characteristics || []),
+    ...(visualFacts?.attributes || []),
+    ...(visualFacts?.materials || []),
+    ...(visualFacts?.colors || []),
+    ...(visualFacts?.concepts || []),
+    ...(visualFacts?.geography || []),
+    ...(visualFacts?.culture || []),
+    ...(visualFacts?.industry || []),
+    ...(visualFacts?.commercial_context || [])
+  ];
 
-  const scoreGroup = (keyword: string): number => {
+  const out: string[] = [];
+  for (const raw of sources) {
+    const value = String(raw?.name || raw || '').toLowerCase().trim();
+    if (!value) continue;
+
+    const words = value
+      .replace(/[-_/]+/g, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (!words.length) continue;
+
+    // CSVPlanet reference is predominantly single-word metadata.
+    // Mixed mode keeps those single words first, then preserves the
+    // original phrase as an optional candidate.
+    for (const word of words) {
+      if (word.length < 2) continue;
+      if (MICROSTOCK_CONNECTOR_WORDS.has(word)) continue;
+      if (isProhibitedKeyword(word)) continue;
+      if (keywordMode !== 'multi') out.push(word);
+    }
+
+    if (keywordMode !== 'single' && words.length >= 2 && words.length <= 3) {
+      const phrase = words.join(' ');
+      if (!isProhibitedKeyword(phrase)) out.push(phrase);
+    }
+  }
+
+  return Array.from(new Set(out));
+}
+
+function orderKeywordsByAdobePriority(keywords: string[], visualFacts: any): string[] {
+  /*
+   * CSVPlanet GOLDEN-REFERENCE ORDER
+   *
+   * The supplied CSV example shows a single-word-first semantic expansion:
+   * main subject -> core event/activity -> subject category/industry ->
+   * setting/environment -> work/object attributes -> cultural/geographic ->
+   * visual details -> broad relevant discovery -> action variants.
+   *
+   * This is intentionally NOT a numerical score and NOT a fixed quota.
+   * It is a deterministic semantic ladder used to preserve keyword intent.
+   */
+  const primary = (visualFacts?.primary_subjects || [])
+    .map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const secondary = (visualFacts?.secondary_subjects || [])
+    .map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const actions = (visualFacts?.actions || [])
+    .map((x: any) => String(x || '').toLowerCase()).filter(Boolean);
+
+  const settings = (visualFacts?.location_setting || visualFacts?.environment || [])
+    .map((x: any) => String(x || '').toLowerCase()).filter(Boolean);
+
+  const attributes = [
+    ...(visualFacts?.visual_characteristics || []),
+    ...(visualFacts?.attributes || []),
+    ...(visualFacts?.materials || []),
+    ...(visualFacts?.objects || [])
+  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const concepts = [
+    ...(visualFacts?.concepts || []),
+    ...(visualFacts?.atmosphere || [])
+  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const colors = (visualFacts?.colors || [])
+    .map((x: any) => String(x || '').toLowerCase()).filter(Boolean);
+
+  const style = [
+    ...(visualFacts?.style || []),
+    ...(visualFacts?.technique || [])
+  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const geographic = [
+    ...(visualFacts?.geography || []),
+    ...(visualFacts?.culture || []),
+    ...(visualFacts?.region || [])
+  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const commercial = [
+    ...(visualFacts?.industry || []),
+    ...(visualFacts?.commercial_context || []),
+    ...(visualFacts?.usage || [])
+  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
+
+  const tokenize = (value: string): string[] =>
+    value.toLowerCase().split(/\s+/).filter(Boolean);
+
+  const contains = (keyword: string, values: string[]) => {
+    const k = keyword.toLowerCase();
+    return values.some(v => v && (k === v || k.includes(v)));
+  };
+
+  const exactOrToken = (keyword: string, values: string[]) => {
+    const k = keyword.toLowerCase();
+    const kt = new Set(tokenize(k));
+    return values.some(v => {
+      if (!v) return false;
+      if (k === v || k.includes(v)) return true;
+      return tokenize(v).some(t => kt.has(t));
+    });
+  };
+
+  const wordCount = (keyword: string) => tokenize(keyword).length;
+
+  const group = (keyword: string): number => {
     const k = keyword.toLowerCase();
 
-    if (primary.some((x: string) => x && k === x || x && k.includes(x))) return 1;
-    if (actions.some((x: string) => x && k === x || x && k.includes(x))) return 2;
-    if (secondary.some((x: string) => x && k === x || x && k.includes(x))) return 3;
-    if (settings.some((x: string) => x && k === x || x && k.includes(x))) return 4;
-    if (attributes.some((x: string) => x && k.includes(x))) return 5;
-    if (colors.some((x: string) => x && k === x)) return 7;
-    if (concepts.some((x: string) => x && k.includes(x))) return 8;
+    // 1 — MAIN SUBJECT / CORE OBJECT
+    if (exactOrToken(k, primary)) return 1;
 
-    return 6;
+    // 2 — CORE EVENT / MAIN ACTIVITY
+    if (exactOrToken(k, actions)) return 2;
+
+    // 3 — CATEGORY / SECONDARY SUBJECT
+    if (exactOrToken(k, secondary)) return 3;
+    if (exactOrToken(k, commercial)) return 3;
+
+    // 4 — SETTING / ENVIRONMENT
+    if (exactOrToken(k, settings)) return 4;
+
+    // 5 — SPECIFIC OBJECT / WORK / MATERIAL / ATTRIBUTE
+    if (exactOrToken(k, attributes)) return 5;
+
+    // 6 — GEOGRAPHIC / CULTURAL CONTEXT
+    if (exactOrToken(k, geographic)) return 6;
+
+    // 7 — VISUAL CHARACTERISTICS
+    if (exactOrToken(k, style) || exactOrToken(k, colors)) return 7;
+
+    // 8 — CONCEPT / MOOD / STORY
+    if (exactOrToken(k, concepts)) return 8;
+
+    // 9 — BROADER RELEVANT DISCOVERY
+    return 9;
+  };
+
+  const specificity = (keyword: string): number => {
+    const words = wordCount(keyword);
+
+    // CSVPlanet sample is predominantly single-word metadata.
+    // Single words therefore win within the same semantic group.
+    if (words === 1) return 0;
+    if (words === 2) return 1;
+    if (words === 3) return 2;
+    return 3;
   };
 
   return [...keywords].sort((a, b) => {
-    const ga = scoreGroup(a);
-    const gb = scoreGroup(b);
+    const ga = group(a);
+    const gb = group(b);
     if (ga !== gb) return ga - gb;
-    return 0; // preserve provider/AI order within the same Adobe priority group
+
+    const sa = specificity(a);
+    const sb = specificity(b);
+    if (sa !== sb) return sa - sb;
+
+    // Stable ordering for candidates in the same semantic tier.
+    return 0;
   });
 }
 
@@ -2733,8 +2887,12 @@ async function applyMetadataGenKeywordLogic(options: {
     }
   }
 
+  // CSVPlanet-style candidate preparation:
+  // keep factual single-word tokens available before any AI expansion.
+  const visualSeedTokens = buildCSVPlanetVisualSeedKeywords(visualFacts, keywordMode);
+
   let masterPool = buildMasterKeywordCandidatePool(
-    semanticDeduplicate(cleaned),
+    semanticDeduplicate([...visualSeedTokens, ...cleaned]),
     visualFacts,
     targetCount
   );
@@ -2793,230 +2951,211 @@ async function applyMetadataGenKeywordLogic(options: {
 // Title and Description generation logic is left unchanged.
 
 const UNIVERSAL_KEYWORD_RULES = `
-ADOBE STOCK KEYWORD ENGINE — STRICT ORDERED MODE
+METAZO KEYWORD ENGINE — CSVPLANET GOLDEN REFERENCE + ADOBE STOCK COMPLIANCE
 
 ROLE:
-Act as a professional Adobe Stock metadata keyword specialist.
-Generate keywords for buyer discovery, following Adobe Stock's published keyword guidance.
+Act as a professional microstock keyword specialist.
+Use the supplied CSVPlanet metadata example as a behavioral reference for keyword structure.
+Do not copy its words blindly and do not imitate a hidden proprietary algorithm.
 
-CORE ADOBE RULES:
-- Keywords must be accurate, relevant, descriptive, and specific to the asset.
-- Keyword order is critical.
-- The FIRST 10 keywords must contain the most important and relevant search terms because Adobe gives the first 10 keywords the greatest search influence.
-- Include important title words/concepts among the top 10 when applicable.
-- Use one language consistently and match the selected metadata language.
-- Adobe allows up to 49 keywords per content submission. 15–25 is Adobe's recommended range, but if the application user explicitly requests another count, use that exact count while maintaining relevance.
-- Each keyword should normally be one word. A genuine compound term/search phrase may contain multiple words when the concept is naturally searched that way.
-- Do not use keyword spam or irrelevant terms.
-- Use each keyword only once.
+PRIMARY GOAL:
+Create a natural stock-search keyword list from what is actually visible.
+The result should look like professional stock metadata, not an AI tag dump.
 
-SOURCE OF TRUTH:
-VISUAL_FACTS is the source of truth.
-Only use:
-- primary subject
-- secondary subjects
-- visible actions
-- setting
-- important descriptive attributes
-- visible colors
-- mood/concepts when supported
-- technical/compositional characteristics when genuinely useful
-- supported commercial context
-- supported seasonal/event context
+GOLDEN REFERENCE PATTERN:
+The supplied CSVPlanet example for a farmer harvesting rice is predominantly single-word metadata and expands semantically in this direction:
 
-Do not hallucinate facts.
+MAIN SUBJECT
+→ CORE EVENT / SUBJECT
+→ CATEGORY / INDUSTRY
+→ SETTING
+→ WORK / OBJECT / ATTRIBUTE
+→ CULTURAL / GEOGRAPHIC CONTEXT
+→ VISUAL DETAILS
+→ BROADER RELEVANT DISCOVERY
+→ ACTION VARIANTS
 
-STRICT KEYWORD ORDER — DO NOT DYNAMICALLY RE-RANK:
-Build and preserve the following deterministic order of importance.
-
-GROUP 1 — PRIMARY SUBJECT / MAIN CONTENT
-Positions should begin with the exact main subject and strongest specific description of that subject.
-Examples:
-- woman
-- senior woman
-- arctic fox
-- father daughter
-Only use the compound form when it is a genuine searchable concept.
-
-GROUP 2 — PRIMARY ACTION / STATE
-Immediately after the primary subject, place the most important visible action or state.
-Examples:
-- working
-- carrying
-- running
-- smiling
-- cooking
-Use action terms only when visibly happening.
-
-GROUP 3 — SECONDARY SUBJECTS
-Next place important secondary people, objects, animals, or elements that materially contribute to the asset.
-Ignore insignificant background details.
-
-GROUP 4 — SETTING / ENVIRONMENT
-Then describe where the subject is shown:
-- home
-- office
-- kitchen
-- beach
-- suburban neighborhood
-- outdoors
-Use only visually supported setting terms.
-
-GROUP 5 — SPECIFIC DESCRIPTIVE ATTRIBUTES
-Then add useful factual descriptors:
-- age
-- gender
-- demographic attributes when visually appropriate and permitted
-- material
-- shape
-- appearance
-- quantity
-- distinctive characteristics
-
-GROUP 6 — VISUAL / TECHNICAL CHARACTERISTICS
-Then add genuinely useful visual information:
-- portrait
-- close up
-- aerial view
-- high angle
-- copy space
-- minimalist
-- realistic photography
-Only use characteristics actually represented.
-Do not use generic content-type terms as filler.
-
-GROUP 7 — COLOR / WEATHER / TIME / ENVIRONMENTAL DETAILS
-Then add useful visible attributes:
-- blue
-- green
-- sunny
-- daytime
-- cloudy
-Use only meaningful attributes.
-Do not create a long color list.
-
-GROUP 8 — CONCEPT / MOOD / THEME
-After concrete visual facts, add supported conceptual terms:
-- childhood
-- family
-- celebration
-- solitude
-- friendship
-- wellness
-Only when the concept is clearly represented.
-Do not invent abstract commercial concepts.
-
-GROUP 9 — COMMERCIAL / INDUSTRY / USE CONTEXT
-Only after the visual facts and concepts:
-- real estate
-- business
-- education
-- technology
-- healthcare
-- lifestyle
-Only if clearly supported by the asset.
-Never infer a commercial industry merely because an object could be used in that industry.
-
-GROUP 10 — BROADER RELEVANT TERMS
-Finally add broader but still accurate terms that expand discoverability without repeating earlier meaning.
-Examples:
-- animal
-- mammal
-- family
-- residential
-These must still be relevant.
+Example structure from the reference:
+farmer, harvest, rice, agriculture, farming, terraces, mountain, rural,
+manual, labor, stalks, field, crop, hat, work, cultivation, asia,
+scenery, landscape, traditional, worker, mud, golden, grain, nature,
+outdoor, people, person, sunlight, mist, harvesting, agrarian, crops,
+tying, harvested
 
 IMPORTANT:
-This is an ORDERED PATTERN, not a score-based ranking system.
-Do not dynamically move a keyword from a later group above a keyword from an earlier group merely because an AI score says it is stronger.
-The group order is authoritative.
+This is a semantic expansion pattern, NOT a fixed number of keywords per group.
 
-WITHIN EACH GROUP:
-Order terms from most specific/relevant to less specific/relevant.
-Do not randomly reorder across groups.
+SINGLE-WORD-FIRST:
+- Prefer single-word keywords when they accurately express the search concept.
+- Do not turn every keyword into a long-tail phrase.
+- Use a 2–3 word phrase only when it is a genuine, materially useful search concept or compound term.
+- Never create phrases just to appear SEO-friendly.
+- Never create sentence-like keyword phrases.
+- Do not split genuine compound concepts when the phrase is the natural searchable concept.
+
+BUYER SEARCH TEST:
+For every keyword:
+"Would a stock buyer realistically search for this term to find this asset?"
+If no, reject it.
 
 FIRST 10:
-The first 10 must come from the strongest available terms in Groups 1–4, followed by Group 5 only when necessary.
-Do not place colors, mood, abstract concepts, or generic broad terms in the first 10 if stronger subject/action/setting terms exist.
+The first 10 keywords must be the strongest discovery terms:
+- main subject
+- core activity/event
+- most important subject/category
+- most important setting
+- strongest specific object/attribute
 
-SEARCH INTENT:
-Think like a buyer, but follow the ordered structure above.
-The buyer-search principle determines which terms are selected inside each group; it does NOT override the Adobe group order.
+Do not waste the first 10 on:
+- weak colors
+- mood adjectives
+- generic words
+- tiny background details
+- abstract concepts
+- usage terms when stronger visual terms remain
 
-PHRASE INTEGRITY:
-- Preserve genuine compound concepts such as "ice cream", "real estate", "front yard", "office desk", "sign language", etc. when the phrase is naturally useful.
-- Do not split a genuine compound term into meaningless fragments.
-- Do not create long sentence-like keyword phrases.
-- Do not use phrases merely to manipulate SEO.
+SEMANTIC EXPANSION:
+After the strongest terms are covered, expand into distinct search coverage:
+1. Main subject
+2. Core event/activity
+3. Subject category or industry
+4. Setting/environment
+5. Objects/materials/work elements
+6. Attributes
+7. Geographic/cultural context when supported
+8. Visual characteristics
+9. Concept/theme
+10. Broader relevant category
+11. Action/state variants
 
-DESCRIPTIVE ELEMENTS:
-Follow Adobe's distinction between separate descriptive elements and genuine compound terms.
-For example, descriptive elements such as white, fluffy, young animal can remain separate keywords when appropriate.
-A true compound concept such as ice cream should remain a phrase.
+Do not repeat the same meaning simply to increase count.
 
-SEMANTIC DEDUPLICATION:
-- Exact duplicates are forbidden.
-- Do not repeat the same keyword.
-- Do not add multiple synonyms that describe the same search intent solely to fill the list.
-- Do not create:
-  happy, happiness, joy, cheerful, fun
-  if they are merely repetitive expressions of the same unsupported/general concept.
-- Keep broader and specific terms only when they provide genuinely different search coverage, e.g. arctic fox + mammal + animal.
+ANTI-SPAM:
+Never generate keyword lists such as:
+happy, happiness, joyful, joy, cheerful, fun
+when these are redundant.
 
-ANTI-TAGGING:
-Do not turn every detected visual word into a keyword.
-Important background objects that do not matter to a buyer should be excluded.
+Never generate:
+beautiful, amazing, stunning, awesome, premium
+unless such a term is genuinely relevant to a searchable stock concept; normally omit it.
 
-NO TITLE/DESCRIPTION FILLER:
-Do not copy words from title or description unless those words are independently relevant to the asset and belong in the correct Adobe order group.
+Do not add:
+viral, trending, popular, best, high quality, professional
+as generic SEO filler.
 
-IP / PROHIBITED CONTENT:
-Do not use:
-- trademarks
-- brand names
-- company names
-- artist names
-- names of real known people
-- fictional characters
-- copyrighted creative works
-- camera/file specifications
-- irrelevant file information
-Use generic descriptive language.
+VISUAL TRUTH:
+Use only evidence from VISUAL_FACTS.
+Do not invent:
+- exact country
+- ethnicity
+- occupation beyond what is visibly supported
+- business purpose
+- investment
+- market
+- financial meaning
+- medical meaning
+- political meaning
+- cultural identity
+unless clearly supported.
 
-NO UNNECESSARY CONNECTORS:
-Do not use standalone connector/filler keywords such as:
-and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
-Do not remove an internal word from a genuine compound concept merely because it is a connector.
+CATEGORY / INDUSTRY:
+Use terms such as agriculture, farming, business, healthcare, technology, education, real estate only when the image visibly supports that category.
+
+GEOGRAPHY / CULTURE:
+Use geographic or cultural terms only when supported by clear visual evidence or reliable metadata.
+Do not infer a country solely from appearance.
 
 COLOR:
-Normally use only 1–2 useful color terms.
-Color belongs after subject, action, secondary subject, and setting.
+Normally use no more than 1–2 useful colors.
+Color comes after core subject, activity, category, setting, and important objects.
+Do not make a color list.
 
-EXACT COUNT:
-- 10 requested = exactly 10.
-- 25 requested = exactly 25.
-- 40 requested = exactly 40.
-- 49 requested = exactly 49.
+STYLE:
+Use only visible styles:
+realistic, photography, watercolor, vector, 3d, flat design, etc.
+Do not inject style terms that are not actually represented.
+
+PEOPLE:
+Use people/person only when people are genuinely important to the image.
+Prefer the specific visible subject first, then broader people/person coverage later if useful.
+
+CONNECTORS:
+Do not output standalone connector words:
+and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
+
+Do not destroy a legitimate compound phrase because it contains an internal connector.
+
+IP / BRAND:
+Do not use:
+- brands
+- trademarks
+- company names
+- celebrity names
+- fictional characters
+- franchises
+- proprietary product names
+unless the application has an explicit separate editorial/IP workflow.
+For standard stock keyword generation, use generic descriptive terms.
+
+ADOBE STOCK:
+- Keep keywords relevant to the entire asset.
+- Order the strongest and most important terms first.
+- The first 10 are especially important.
+- Adobe Stock allows up to 49 keywords.
+- Adobe recommends 15–25 as an ideal range.
+- If the user explicitly requests a different count, return exactly that count if enough distinct relevant terms exist.
+- Never use irrelevant filler simply to reach 49.
 - Never exceed the requested count.
-- Never intentionally return fewer when additional relevant terms can be generated from the ordered groups.
-- If the requested count is above Adobe's recommended 15–25 range, expand through later ordered groups and additional genuinely relevant terms.
-- Never use spam to fill the remaining positions.
 
-FINAL VALIDATION:
-Before returning:
-1. Verify every keyword against VISUAL_FACTS.
-2. Verify Group 1–4 terms are above later groups.
-3. Verify first 10 contain the strongest subject/action/secondary/setting terms available.
-4. Verify title concepts that are important are represented in the top 10 when relevant.
-5. Remove duplicates.
-6. Remove irrelevant keywords.
-7. Remove unsupported concepts.
-8. Remove brands/IP/prohibited terms.
-9. Remove unnecessary connector/filler keywords.
-10. Keep genuine compound terms intact.
-11. Keep one language only.
-12. Return exactly the requested number.
+COUNT EXPANSION:
+If 49 keywords are requested, expand semantically:
+subject → activity → category → setting → objects → attributes → culture/geography → visual → concept → broader discovery → action variants.
+
+The additional keywords must open distinct search coverage.
+Do not manufacture 49 synonyms.
+
+KEYWORD MODE:
+- single: single-word output only
+- multi: meaningful multi-word phrases only
+- mixed: single-word-first, with phrases only when genuinely useful
+Do not alter the existing MIXED behavior.
+
+FINAL ORDER:
+Use the CSVPlanet golden-reference semantic ladder:
+1. main subject
+2. core event/activity
+3. category/industry
+4. setting/environment
+5. objects/work/attributes
+6. geographic/cultural
+7. visual details
+8. concept/theme
+9. broader relevant discovery
+10. action/state variants
+
+Within each tier, single-word keywords precede phrases unless a phrase is the actual stronger searchable concept.
+
+Do NOT use dynamic numerical scoring to reorder the final keyword list.
+Do NOT use fixed quotas per category.
+
+FINAL CHECK:
+- factual
+- buyer-searchable
+- single-word-first
+- semantic expansion
+- no spam
+- no redundant synonyms
+- no unsupported concepts
+- no brand/IP
+- no generic SEO filler
+- strongest terms first
+- exact requested count when supported
+- lowercase
+- selected language
+- return only the final keyword array
 `;
+
+
 
 
 
