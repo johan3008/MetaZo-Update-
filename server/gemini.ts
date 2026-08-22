@@ -2302,6 +2302,61 @@ function determineAccurateCategory(
   };
 }
 
+
+/**
+ * Remove connector/filler words from generated keyword phrases.
+ * Keeps keyword intent while preventing sentence-like keyword spam.
+ */
+function cleanMicrostockKeywordConnectors(keyword: string): string {
+  const CONNECTORS = new Set([
+    'and', 'with', 'of', 'for', 'in', 'on', 'at', 'to', 'from',
+    'by', 'as', 'or', 'the', 'a', 'an'
+  ]);
+
+  return String(keyword || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(word => !CONNECTORS.has(
+      word.toLowerCase().replace(/^[^a-z]+|[^a-z]+$/g, '')
+    ))
+    .join(' ')
+    .trim()
+    .replace(/\s{2,}/g, ' ');
+}
+
+
+/**
+ * Final keyword normalization for professional microstock SEO.
+ * The requested count remains mandatory; uniqueness is enforced before returning.
+ */
+function finalizeMicrostockKeywords(
+  keywords: unknown,
+  targetCount: number
+): string[] {
+  const raw = Array.isArray(keywords) ? keywords : [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of raw) {
+    const cleaned = cleanMicrostockKeywordConnectors(String(item || ''))
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleaned) continue;
+
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    result.push(cleaned);
+
+    if (result.length >= targetCount) break;
+  }
+
+  return result.slice(0, Math.max(0, targetCount));
+}
+
 // ---- LAPISAN 8: VALIDASI AKHIR ---------------------------------------------
 
 interface MetadataValidationReport {
@@ -2633,7 +2688,7 @@ ROLE:
 You are an experienced Microstock Metadata Specialist optimizing metadata for real buyer search behavior.
 
 CORE PRINCIPLE:
-ACCURACY > QUANTITY
+ACCURACY + REQUESTED COUNT
 RELEVANCE > VIRALITY
 BUYER SEARCH INTENT > "COOL" WORDS
 LITERAL VISUAL FACTS > AI IMAGINATION
@@ -2921,6 +2976,14 @@ Rules for Descriptions:
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
 Rules for Keywords:
+IMPORTANT KEYWORD FORMATTING:
+- Do NOT use connector/linking words as standalone keywords or as filler inside keyword phrases.
+- Never generate keywords containing unnecessary conjunctions or prepositions such as "and", "with", "of", "for", "in", "on", "at", "to", "from", "by", "as", "or", "the", "a", or "an".
+- Prefer compact search terms that directly describe the subject, action, concept, context, or commercial intent.
+- Do not create awkward keyword phrases just to join two concepts with connector words.
+- If a phrase can be expressed naturally without a connector word, use the shorter direct search phrase.
+- Keywords must remain natural buyer search terms, not sentence fragments.
+
 ${UNIVERSAL_KEYWORD_RULES}
 
 
