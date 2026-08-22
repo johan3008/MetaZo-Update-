@@ -3792,52 +3792,113 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
+    // FINAL QC DECISION ENGINE — EVIDENCE FIRST
+    // IMPORTANT: a model-detected FAIL is never silently downgraded to PASS.
+    // Objective measurements may CONFIRM a defect, add warnings, or explain a false-positive
+    // risk, but they do not erase a visual finding unless the finding is explicitly UNKNOWN.
     if (parsedResult.ai_vision_checks) {
-      // Resolve obvious AI false positives against objective pixel evidence before applying gates.
-      // The vision model sees a potentially downscaled copy; the local analyzer sees the original file.
       const objective = imageMetadata || {};
-      const warningsFromReconciliation: string[] = [];
-      const noteIsSevere = (note: unknown) => /\b(severe|critical|heavy|extreme|parah|berat|kritis|sangat tinggi|sangat parah|obvious)\b/i.test(String(note || ''));
-      const downgrade = (key: string, reason: string) => {
-        const check = parsedResult.ai_vision_checks?.[key];
-        if (check && check.status === 'FAIL') {
-          check.status = 'PASS';
-          check.note = `${check.note || ''} [Objective QC reconciliation: ${reason}]`;
-          warningsFromReconciliation.push(`${key}: ${reason}`);
-        }
+      const reviewWarnings: string[] = [];
+      const objectiveHardFails: string[] = [];
+      const objectiveEvidence: string[] = [];
+
+      const statusText = (...values: unknown[]) => values
+        .filter(Boolean)
+        .map(v => String(v).trim().toLowerCase())
+        .join(' | ');
+
+      const hasSevereStatus = (value: unknown) => /\b(extreme|severe|critical|heavy|blurred|out[ -]?of[ -]?focus|high noise|clipping|clipped|review required|fail|bad|poor)\b/i.test(String(value || ''));
+      const hasExplicitReviewStatus = (value: unknown) => /\b(review|warning|needs? review|check)\b/i.test(String(value || ''));
+      const finite = (value: unknown) => Number.isFinite(Number(value));
+      const addObjectiveWarning = (message: string) => {
+        reviewWarnings.push(message);
+        objectiveEvidence.push(message);
       };
 
-      if (objective.sharpness?.value >= 26 && objective.sharpness?.has_local_blur_anomaly !== true && !noteIsSevere(parsedResult.ai_vision_checks.blur?.note)) {
-        downgrade('blur', `measured sharpness ${objective.sharpness.value}/100 does not support global blur`);
-      }
-      if (objective.noise?.value < 55 && !noteIsSevere(parsedResult.ai_vision_checks.noise?.note)) {
-        downgrade('noise', `measured noise ${objective.noise.value}/100 is below the severe-noise gate`);
-      }
-      const highClip = Number(objective.brightness?.clipped_high_percent || 0);
-      const lowClip = Number(objective.brightness?.clipped_low_percent || 0);
-      if (highClip <= 15 && lowClip <= 25 && !noteIsSevere(parsedResult.ai_vision_checks.exposure?.note)) {
-        downgrade('exposure', `measured clipping is ${highClip.toFixed(1)}% high / ${lowClip.toFixed(1)}% low`);
-      }
-      const blockScore = Number(objective.jpeg_blocking?.score || 0);
-      const bandScore = Number(objective.banding?.score || 0);
-      const edgeScore = Number(objective.transparency?.edge_halo_risk_percent || 0);
-      if (blockScore < 80 && bandScore < 80 && edgeScore < 72 && !noteIsSevere(parsedResult.ai_vision_checks.artifacts?.note)) {
-        downgrade('artifacts', 'objective compression/banding/alpha-edge measurements are below hard-fail thresholds');
+      // 1) OBJECTIVE SHARPNESS — only hard-fail explicit severe/local anomaly evidence.
+      const sharpnessStatus = statusText(objective.sharpness?.status, objective.sharpness?.label);
+      const sharpnessValue = finite(objective.sharpness?.value) ? Number(objective.sharpness.value) : null;
+      const localBlur = objective.sharpness?.has_local_blur_anomaly === true || objective.local_analysis?.has_local_blur_anomaly === true;
+      if (localBlur || hasSevereStatus(sharpnessStatus)) {
+        objectiveHardFails.push('blur');
+        objectiveHardFails.push('out_of_focus');
+      } else if (sharpnessValue !== null) {
+        addObjectiveWarning(`Objective sharpness measured at ${sharpnessValue.toFixed(1)}/100; no automatic PASS override applied.`);
       }
 
-      if (warningsFromReconciliation.length) {
-        parsedResult.review_warnings = [...(Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : []), ...warningsFromReconciliation];
+      // 2) OBJECTIVE NOISE — only explicit high/severe evidence is a hard fail.
+      const noiseStatus = statusText(objective.noise?.status, objective.noise?.label);
+      const noiseValue = finite(objective.noise?.value) ? Number(objective.noise.value) : null;
+      if (hasSevereStatus(noiseStatus) || /high noise/i.test(noiseStatus)) {
+        objectiveHardFails.push('noise');
+      } else if (noiseValue !== null) {
+        addObjectiveWarning(`Objective noise metric ${noiseValue.toFixed(1)}/100; no automatic PASS override applied.`);
+      }
+
+      // 3) EXPOSURE — use explicit clipping evidence, not a generic score reversal.
+      const brightnessStatus = statusText(objective.brightness?.status, objective.brightness?.label);
+      const highClip = finite(objective.brightness?.clipped_high_percent) ? Number(objective.brightness.clipped_high_percent) : null;
+      const lowClip = finite(objective.brightness?.clipped_low_percent) ? Number(objective.brightness.clipped_low_percent) : null;
+      const severeClip = (highClip !== null && highClip > 15) || (lowClip !== null && lowClip > 25) || hasSevereStatus(brightnessStatus);
+      if (severeClip) {
+        objectiveHardFails.push('exposure');
+        objectiveHardFails.push('lighting');
+      } else if (highClip !== null || lowClip !== null) {
+        addObjectiveWarning(`Objective clipping measured at ${(highClip ?? 0).toFixed(1)}% high / ${(lowClip ?? 0).toFixed(1)}% low.`);
+      }
+
+      // 4) COMPRESSION / BANDING / ALPHA EDGE — hard fail only on explicit high-risk evidence.
+      const blockingStatus = statusText(objective.jpeg_blocking?.status, objective.jpeg_blocking?.label);
+      const bandingStatus = statusText(objective.banding?.status, objective.banding?.label);
+      const blockingScore = finite(objective.jpeg_blocking?.score) ? Number(objective.jpeg_blocking.score) : null;
+      const bandingScore = finite(objective.banding?.score) ? Number(objective.banding.score) : null;
+      const edgeHalo = finite(objective.transparency?.edge_halo_risk_percent) ? Number(objective.transparency.edge_halo_risk_percent) : null;
+      if (hasSevereStatus(blockingStatus) || hasSevereStatus(bandingStatus) || (blockingScore !== null && blockingScore >= 80) || (bandingScore !== null && bandingScore >= 80) || (edgeHalo !== null && edgeHalo >= 72)) {
+        objectiveHardFails.push('artifacts');
+      } else if (blockingScore !== null || bandingScore !== null || edgeHalo !== null) {
+        addObjectiveWarning(`Objective artifact evidence: JPEG blocking ${blockingScore ?? 'n/a'}, banding ${bandingScore ?? 'n/a'}, alpha-edge risk ${edgeHalo ?? 'n/a'}%.`);
+      }
+
+      // 5) Explicit technical status strings from the forensic analyzer can confirm a fail.
+      const technicalStatusMap: Record<string, string[]> = {
+        blur: ['blur', 'sharpness'],
+        noise: ['noise'],
+        exposure: ['brightness', 'exposure'],
+        artifacts: ['banding', 'jpeg_blocking', 'compression', 'artifacts']
+      };
+      for (const [checkKey, sourceKeys] of Object.entries(technicalStatusMap)) {
+        const combined = sourceKeys.map(key => statusText(objective?.[key]?.status, objective?.[key]?.label, objective?.[key]?.message)).join(' | ');
+        if (hasSevereStatus(combined) && !objectiveHardFails.includes(checkKey)) objectiveHardFails.push(checkKey);
+        else if (hasExplicitReviewStatus(combined)) addObjectiveWarning(`Objective analyzer requests review for ${checkKey}.`);
+      }
+
+      // Merge deterministic evidence with AI findings. NEVER downgrade an existing FAIL.
+      for (const key of new Set(objectiveHardFails)) {
+        const check = parsedResult.ai_vision_checks[key];
+        if (check && check.status !== 'FAIL') {
+          check.status = 'FAIL';
+          check.note = `${check.note ? `${check.note} ` : ''}[Objective forensic evidence confirms a hard-fail condition.]`;
+        }
+        if (!check) {
+          reviewWarnings.push(`Objective hard-fail evidence detected for ${key}, but the AI schema did not expose a matching check.`);
+        }
+      }
+
+      if (!imageMetadata) {
+        reviewWarnings.push('Objective pixel metadata was not supplied; this audit is Vision-only and cannot claim full forensic pixel verification.');
+      }
+
+      if (reviewWarnings.length) {
+        parsedResult.review_warnings = [...(Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : []), ...reviewWarnings];
+      }
+      if (objectiveEvidence.length) {
+        (parsedResult as any).objective_evidence = objectiveEvidence;
       }
 
       let anyFail = false;
       let anyIpFail = false;
       let hasCriticalFail = false;
-      
-      // Kunci kritis: masalah hukum, hak cipta, atau cacat AI/struktural parah
-      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
-      // Kunci kualitas teknis: persis kategori "quality issues" yang dipakai Adobe Stock untuk menolak konten
-      // (fokus/ketajaman, eksposur, pencahayaan, warna, editing berlebih, sensor/noise, proporsi, komposisi)
+      const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues', 'noise', 'artifacts'];
       const failedCheckKeys: string[] = [];
       let anyTechnicalFail = false;
@@ -3847,63 +3908,57 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
           failedCheckKeys.push(key);
-          if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
-            anyIpFail = true;
-          }
-          if (criticalKeys.includes(key)) {
-            hasCriticalFail = true;
-          }
-          if (technicalKeys.includes(key)) {
-            anyTechnicalFail = true;
-          }
-          if (key === 'stock_acceptance') {
-            acceptanceFail = true;
-          }
+          if (['watermark', 'logo', 'ip_risk'].includes(key)) anyIpFail = true;
+          if (criticalKeys.includes(key)) hasCriticalFail = true;
+          if (technicalKeys.includes(key)) anyTechnicalFail = true;
+          if (key === 'stock_acceptance') acceptanceFail = true;
         }
       }
 
-      // Terapkan penolakan atau kelulusan berdasarkan level toleransi.
-      // CATATAN PENTING: moderator Adobe Stock menolak gambar untuk SATU cacat teknis apa pun,
-      // sehingga MEDIUM (standar industri) kini wajib FAIL jika ada check teknis ATAU kritis yang FAIL.
+      // Visible gibberish/invalid text is critical; merely having normal readable text is NOT.
+      if (parsedResult.ai_vision_checks.text?.status === 'FAIL') {
+        const note = String(parsedResult.ai_vision_checks.text.note || '');
+        if (/gibberish|corrupt|broken|unreadable|distorted text|malformed/i.test(note)) {
+          hasCriticalFail = true;
+        } else {
+          parsedResult.review_warnings = [...(parsedResult.review_warnings || []), 'Text check failed, but the note does not establish gibberish/corrupted text; manual review is recommended.'];
+        }
+      }
+
       if (tolerance === 'STRICT') {
         if (anyFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 60) {
-            parsedResult.overall_score = 59;
-          }
+          parsedResult.recommendation = 'FAIL';
+          if (parsedResult.overall_score >= 60) parsedResult.overall_score = 59;
         }
       } else if (tolerance === 'MEDIUM') {
         if (hasCriticalFail || anyTechnicalFail || acceptanceFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 66) {
-            parsedResult.overall_score = 65;
-          }
+          parsedResult.recommendation = 'FAIL';
+          if (parsedResult.overall_score >= 66) parsedResult.overall_score = 65;
         }
-      } else if (tolerance === 'LOOSE') {
-        // LOOSE tetap menoleransi cacat teknis minor, tetapi TIDAK menoleransi cacat kritis,
-        // cacat teknis utama pada subjek, atau penolakan penerimaan stok.
-        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail ||
-          failedCheckKeys.some(k => ['blur', 'exposure', 'lighting', 'over_edited', 'proportion_defects'].includes(k));
+      } else {
+        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail || failedCheckKeys.some(k => ['blur', 'exposure', 'lighting', 'over_edited', 'proportion_defects', 'artifacts'].includes(k));
         if (looseBlocking) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
-          }
+          parsedResult.recommendation = 'FAIL';
+          if (parsedResult.overall_score >= 70) parsedResult.overall_score = 69;
         }
       }
 
-      // Sinkronkan stock_acceptance dengan keputusan akhir agar UI tidak menampilkan kontradiksi
-      if (parsedResult.recommendation === "FAIL" && parsedResult.ai_vision_checks.stock_acceptance) {
-        parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
+      if (parsedResult.recommendation === 'FAIL' && parsedResult.ai_vision_checks.stock_acceptance) {
+        parsedResult.ai_vision_checks.stock_acceptance.status = 'FAIL';
       }
-      // Lampirkan daftar check yang gagal agar frontend/debug mudah membaca alasan penolakan
-      if (failedCheckKeys.length > 0) {
-        (parsedResult as any).failed_checks = failedCheckKeys;
+      if (failedCheckKeys.length > 0) (parsedResult as any).failed_checks = failedCheckKeys;
+      if (anyIpFail) parsedResult.legal_status = 'VIOLATION';
+
+      // Consistency guard: PASS cannot coexist with a hard technical/critical FAIL.
+      if (parsedResult.recommendation === 'PASS' && (hasCriticalFail || anyTechnicalFail || acceptanceFail)) {
+        parsedResult.recommendation = 'FAIL';
+        parsedResult.overall_score = Math.min(Number(parsedResult.overall_score) || 65, 65);
+        parsedResult.review_warnings = [...(parsedResult.review_warnings || []), 'Consistency guard converted an internally contradictory PASS to FAIL because a hard-fail check remained active.'];
       }
-      
-      if (anyIpFail) {
-        parsedResult.legal_status = "VIOLATION";
-      }
+    } else {
+      parsedResult.review_warnings = [...(Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : []), 'AI response did not contain ai_vision_checks; deterministic rejection gates could not be applied.'];
+      parsedResult.recommendation = 'FAIL';
+      parsedResult.overall_score = Math.min(Number(parsedResult.overall_score) || 0, 65);
     }
 
     return parsedResult;
