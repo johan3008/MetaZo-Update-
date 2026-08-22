@@ -1184,6 +1184,25 @@ function buildStructuredKeywordCandidates(ctx: KeywordRoleContext): string[] {
   return Array.from(new Set(out));
 }
 
+
+const MICROSTOCK_CONNECTOR_WORDS = new Set([
+  'and', 'with', 'of', 'for', 'in', 'on', 'at', 'to', 'from',
+  'by', 'as', 'or', 'the', 'a', 'an'
+]);
+
+function removeMicrostockConnectorWords(keyword: string): string {
+  return String(keyword || '')
+    .toLowerCase()
+    .replace(/[-_/]+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(word => !MICROSTOCK_CONNECTOR_WORDS.has(word))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function ensureKeywordCount(
   keywords: string[],
   targetCount: number,
@@ -1196,47 +1215,39 @@ function ensureKeywordCount(
   const target = Math.max(0, Number.isFinite(Number(targetCount)) ? Number(targetCount) : 0);
   if (!target) return [];
 
-  const normalize = (value: any): string => String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\\s-]/g, ' ')
-    .replace(/\\s+/g, ' ')
-    .trim();
-
-  const singularKey = (value: string): string => {
-    const v = normalize(value);
-    if (v.endsWith('ies') && v.length > 4) return `${v.slice(0, -3)}y`;
-    if (v.endsWith('es') && v.length > 4) return v.slice(0, -2);
-    if (v.endsWith('s') && v.length > 3) return v.slice(0, -1);
-    return v;
-  };
-
   const seen = new Set<string>();
   const result: string[] = [];
 
   for (const raw of Array.isArray(keywords) ? keywords : []) {
-    let keyword = normalize(raw);
+    if (typeof raw !== 'string') continue;
+
+    let keyword = removeMicrostockConnectorWords(raw);
     if (!keyword || isProhibitedKeyword(keyword)) continue;
 
     if (keywordMode === 'single') {
-      keyword = keyword.split(/\\s+/)[0] || '';
+      // Single mode: preserve the first meaningful word only.
+      keyword = keyword.split(/\s+/)[0] || '';
     }
 
-    if (!keyword) continue;
+    if (keywordMode === 'multi') {
+      // Multi mode: reject phrases that collapse into one word.
+      if (!keyword.includes(' ')) continue;
+    }
 
-    const key = singularKey(keyword);
-    if (seen.has(key)) continue;
+    if (!keyword || keyword.length < 2) continue;
 
-    seen.add(key);
+    const signature = semanticKeySignature(keyword);
+    if (!signature || seen.has(signature)) continue;
+
+    seen.add(signature);
     result.push(keyword);
 
     if (result.length >= target) break;
   }
 
-  // No category quotas, semantic expansion, SEO engine, market ranking,
-  // visual-grounding gate, fallback keywords, or artificial modifiers.
-  // The AI-generated order is preserved after basic cleanup/deduplication.
   return result;
 }
+
 function getAIClient(): any {
   return {
     models: {
@@ -2304,25 +2315,10 @@ function determineAccurateCategory(
 
 
 /**
- * Remove connector/filler words from generated keyword phrases.
- * Keeps keyword intent while preventing sentence-like keyword spam.
+ * Backward-compatible wrapper for the canonical connector sanitizer.
  */
 function cleanMicrostockKeywordConnectors(keyword: string): string {
-  const CONNECTORS = new Set([
-    'and', 'with', 'of', 'for', 'in', 'on', 'at', 'to', 'from',
-    'by', 'as', 'or', 'the', 'a', 'an'
-  ]);
-
-  return String(keyword || '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .split(' ')
-    .filter(word => !CONNECTORS.has(
-      word.toLowerCase().replace(/^[^a-z]+|[^a-z]+$/g, '')
-    ))
-    .join(' ')
-    .trim()
-    .replace(/\s{2,}/g, ' ');
+  return removeMicrostockConnectorWords(keyword);
 }
 
 
@@ -2541,10 +2537,15 @@ async function expandKeywordsWithAI(
 EXPANSION PASS:
 The first keyword generation pass produced ${candidates.length} valid keywords but the target is ${targetCount}.
 Generate ${needed} ADDITIONAL candidate keywords that are genuinely supported by VISUAL_FACTS.
-Do not repeat existing keywords. Continue from the existing Main Subject hierarchy. First look for missing specific Main Subject
-terms or natural subject phrases, then missing important secondary/supporting subjects, then setting,
-action/state, visual attributes, seasonal context, supported concepts, and realistic buyer search intent.
+Think like a microstock buyer, not like a creative writer.
+Do not repeat existing keywords or repeat the same search intent.
+Continue from the strongest buyer searches already present.
+Expand only into missing primary subject details, secondary subjects, visible actions,
+setting/context, visual style, mood when supported, composition/visual characteristics,
+supported concepts, commercial context, seasonal/event context, and useful broader searches.
 Do not invent anything merely to reach the count.
+Do not use connector words such as and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
+Every added keyword must be a distinct, realistic buyer search term.
 ${modeRule}
 Output keywords in ${language}. Return JSON only in this form: {"keywords":["keyword 1","keyword 2"]}`;
 
@@ -2637,23 +2638,25 @@ async function applyMetadataGenKeywordLogic(options: {
 
   for (const raw of source) {
     if (typeof raw !== 'string') continue;
-    const phrase = raw
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, ' ');
-    if (phrase.length <= 1) continue;
+
+    const phrase = removeMicrostockConnectorWords(raw);
+    if (phrase.length <= 1 || isProhibitedKeyword(phrase)) continue;
 
     if (keywordMode === 'single') {
       for (const word of phrase.split(/\s+/)) {
         if (word.length > 1 && !isProhibitedKeyword(word)) cleaned.push(word);
       }
-    } else if (!isProhibitedKeyword(phrase)) {
+    } else {
       cleaned.push(phrase);
     }
   }
 
-  const masterPool = buildMasterKeywordCandidatePool(cleaned, visualFacts, targetCount);
+  let masterPool = buildMasterKeywordCandidatePool(
+    semanticDeduplicate(cleaned),
+    visualFacts,
+    targetCount
+  );
+
   let finalKeywords = ensureKeywordCount(
     masterPool,
     targetCount,
@@ -2676,65 +2679,225 @@ async function applyMetadataGenKeywordLogic(options: {
     );
   }
 
+  // Final semantic + connector sanitation without changing the established order.
+  finalKeywords = ensureKeywordCount(
+    finalKeywords,
+    targetCount,
+    visualFacts,
+    undefined,
+    undefined,
+    undefined,
+    keywordMode
+  );
+
+  if (finalKeywords.length < targetCount) {
+    console.warn(
+      `[Keyword Quality] Could not reach requested count ${targetCount}; provider returned only ${finalKeywords.length} unique evidence-backed keywords after sanitation.`
+    );
+  }
+
   return finalKeywords.slice(0, targetCount);
 }
 
 
+
+// PRD KEYWORD-ONLY IMPLEMENTATION:
+// The changes in this section intentionally affect only keyword generation,
+// ranking, expansion, deduplication, connector sanitation, and exact-count handling.
+// Title and Description generation logic is left unchanged.
+
 const UNIVERSAL_KEYWORD_RULES = `
-UNIVERSAL NATURAL MICROSTOCK KEYWORD RULES
+UNIVERSAL PROFESSIONAL MICROSTOCK KEYWORD RULES
+KEYWORD-ONLY PRD IMPLEMENTATION
 APPLY IDENTICALLY TO EVERY PROVIDER AND EVERY MODEL
 
 ROLE:
-You are an experienced Microstock Metadata Specialist optimizing metadata for real buyer search behavior.
+You are a professional microstock SEO keyword specialist and buyer-search analyst.
 
-CORE PRINCIPLE:
-ACCURACY + REQUESTED COUNT
-RELEVANCE > VIRALITY
+PRIMARY OBJECTIVE:
+Analyze the actual asset through VISUAL_FACTS first, then create keywords that help a real microstock buyer find that exact asset.
+Do NOT write keywords like an AI describing what sounds attractive.
+Think:
+"If I were the buyer, what would I type into the search box?"
+
+PRD VISUAL INPUT FOR KEYWORD GENERATION:
+Use only evidence available from the visual analysis:
+- primary and secondary objects
+- dominant and relevant colors
+- visual style
+- mood / atmosphere when visibly supported
+- context / setting / use case only when visually supported
+- visible actions
+- composition and visual characteristics
+- supported concepts
+- relevant seasonal/event context
+
+HARD PRINCIPLES:
+ACCURACY > KEYWORD COUNT QUALITY
+BUT REQUESTED COUNT = REQUIRED OUTPUT TARGET
 BUYER SEARCH INTENT > "COOL" WORDS
+RELEVANCE > VIRALITY
 LITERAL VISUAL FACTS > AI IMAGINATION
+UNIQUE SEARCH COVERAGE > SEMANTIC REPETITION
 KEYWORD ORDER > RANDOM ORDER
 
-KEYWORD GENERATION:
-1. Start with the most important, high-converting commercial descriptors. Sort all keywords in descending order of visual relevance, buyer search intent, commercial usefulness, and discoverability.
-2. Think like a real microstock buyer: "If I were the buyer, what would I type into the search box to find this exact asset?"
-3. The FIRST 10 KEYWORDS are critical. They must represent the strongest realistic searches for the asset: primary subject, strongest searchable situation/action, and strongest supported commercial concept or use case. Do not waste these positions on generic filler, decorative adjectives, weak details, colors, mood words, or abstract terms.
-4. Use literal, searchable language. Keywords must be directly visible in the asset or strongly and reasonably supported by the visual facts. Never invent objects, actions, locations, industries, emotions, use cases, or concepts.
-5. Prefer specific but broadly searchable terms. Do not over-niche the asset so that the search becomes too narrow, and do not become so generic that the keyword is buried in irrelevant competition.
-6. Use natural multi-word phrases when they represent a realistic buyer search query and accurately describe the asset. Prefer meaningful search phrases over arbitrary word combinations.
-7. Accuracy is more important than filling the requested count. Never add unrelated or artificial keywords merely to reach the requested count.
-8. Do not use words simply because they sound professional, creative, sophisticated, trendy, viral, or commercially attractive.
-9. Avoid weak generic filler such as "beautiful", "amazing", "creative", "modern", "professional", "concept", or "design" unless genuinely relevant and useful for finding the exact asset.
-10. Do not add trending or high-volume terms unless they are genuinely relevant to the asset.
-11. Avoid keyword spam. Do not generate multiple keywords that express essentially the same search intent.
-12. Apply semantic deduplication: remove exact duplicates, near-duplicates, redundant singular/plural variants, trivial morphological variations, and phrases whose meaning is already covered by a stronger keyword.
-13. Do not force synonyms or variations simply to increase keyword count. Every keyword must add meaningful search coverage.
-14. When supported by the visual, cover the most useful dimensions naturally: primary subject, secondary subject, visible action/state, setting/location, concept, commercial context, visual characteristics, and relevant seasonal/event context. Never force category quotas or fixed slots.
-15. Colors should only be included when they materially help identify or search for the asset. Normally use no more than 1–2 meaningful colors.
-16. Never include IP, brands, trademarks, company names, copyrighted characters, celebrity names, artist names, product model names, or other protected proper names unless explicitly allowed by the workflow.
-17. Keep keywords lowercase unless the workflow explicitly requires otherwise.
-18. Ordering must be based on buyer usefulness, relevance, search intent, and commercial value—not on a fixed category pattern or random generation order.
-19. If the user requests a specific keyword count, return that count when sufficient valid keywords exist. Never fill missing positions with irrelevant or spammy terms.
-20. Keep the existing MIXED keyword mode behavior unchanged.
+1. BUYER SEARCH INTENT
+- Every keyword must represent a realistic search a microstock buyer could use.
+- Ask what the buyer needs the asset for and what words they would actually type.
+- Do not use words merely because they sound commercial, sophisticated, trendy, or SEO-friendly.
 
-BUYER TEST:
-Before accepting every keyword, ask:
-"Would a real microstock buyer reasonably type this word or phrase when searching for this exact asset?"
+2. FIRST 10 KEYWORDS
+- The first 10 keywords are the highest-value search terms.
+- Prioritize the strongest combination of:
+  primary subject,
+  highly searchable subject phrase,
+  visible action or situation,
+  strongest supported context,
+  strongest supported commercial search intent.
+- Do not waste the first 10 positions on weak colors, mood adjectives, generic filler, minor details, or abstract ideas.
+- The first 10 must describe what buyers are most likely to search for, not what the AI thinks sounds impressive.
+
+3. VISUAL TRUTH
+- Every keyword must be directly visible or strongly supported by VISUAL_FACTS.
+- Never invent objects, actions, locations, professions, industries, audiences, emotions, events, concepts, materials, or commercial use cases.
+- AI interpretation must never override visual evidence.
+
+4. OBJECT AND ELEMENT COVERAGE
+- Identify the main subject first.
+- Then cover important secondary subjects and supporting elements.
+- Do not turn every tiny visible detail into a keyword.
+- A detail belongs only when it provides meaningful search coverage.
+
+5. STYLE
+- Use visual style keywords only when the style is genuinely evident.
+- Examples: realistic photography, flat design, watercolor, 3d render, hand drawn.
+- Do not infer style from the subject alone.
+
+6. MOOD / ATMOSPHERE
+- Mood keywords are allowed only when visually supported.
+- Do not convert an ordinary scene into unsupported concepts such as success, happiness, leadership, innovation, luxury, or productivity.
+
+7. CONTEXT / COMMERCIAL INTENT
+- Context and commercial intent are useful only when supported by the actual visual.
+- Business, technology, food, nature, education, healthcare, finance, lifestyle, etc. must come from evidence.
+- Do not manufacture a commercial use case just because it sounds high-converting.
+
+8. SPECIFIC BUT DISCOVERABLE
+- Avoid over-niche phrases that are unlikely to be searched.
+- Avoid overly generic terms that disappear in broad competition.
+- Prefer the most specific natural search term that still represents a realistic buyer query.
+
+9. LONG-TAIL SEARCH PHRASES
+- Use multi-word phrases when buyers would realistically search them and the phrase accurately represents the asset.
+- A phrase must add meaningful specificity.
+- Do not combine random words just to create a long-tail keyword.
+
+10. NO CONNECTOR / FILLER WORDS
+- Do not output connector or filler words such as:
+  and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
+- Do not output sentence-like keyword phrases.
+- Prefer direct search terms without unnecessary connectors.
+- Example:
+  "business meeting" is valid.
+  "business meeting with laptop" is NOT valid.
+  "business meeting laptop" is the preferred compact search form.
+- This rule applies to generated keywords AND final sanitized keywords.
+
+11. NO KEYWORD SPAM
+- Never create several keywords that express essentially the same search intent.
+- Do not pad the list with:
+  business, businessman, businessperson, business professional
+  when they do not provide distinct search intent.
+- Each keyword must contribute additional discoverability.
+
+12. SEMANTIC DEDUPLICATION
+- Remove exact duplicates.
+- Remove singular/plural duplicates when they represent the same search intent.
+- Remove morphological duplicates.
+- Remove near-identical phrases.
+- Remove a generic keyword when a stronger keyword already covers exactly the same intent.
+- Do not remove genuinely different buyer intents.
+
+13. SEARCH COVERAGE EXPANSION
+When more keywords are requested, expand coverage in this order of opportunity:
+- main subject
+- specific subject description
+- secondary subjects
+- visible action/state
+- setting/environment
+- visual style
+- composition / visual characteristic
+- supported concept
+- relevant commercial context
+- relevant seasonal/event context
+- useful broader search terms
+Do not use fixed quotas. The next keyword is simply the next-best unique buyer search.
+
+14. ACCURACY + REQUESTED COUNT
+- The user's requested keyword count is an exact target.
+- 10 requested = exactly 10.
+- 25 requested = exactly 25.
+- 40 requested = exactly 40.
+- 49 requested = exactly 49.
+- Do not intentionally return fewer because a shorter list feels cleaner.
+- Never fill missing positions with spam.
+- If the first pass is insufficient, run additional AI expansion passes grounded in the SAME VISUAL_FACTS and ask only for new, valid, unique buyer searches.
+- Continue expanding until the requested count is reached or the system encounters a hard provider failure.
+
+15. COLOR CONTROL
+- Colors are supporting search terms, not automatic filler.
+- Normally use no more than 1–2 meaningful colors.
+- Only include colors that materially help identify or search for the asset.
+
+16. IP / BRAND / NAME SAFETY
+- Never include brands, trademarks, company names, celebrity names, artist names, copyrighted characters, product model names, franchises, or other protected proper names.
+- Use generic visual equivalents.
+
+17. KEYWORD FORMAT
+- Output lowercase.
+- No punctuation.
+- No emojis.
+- No full sentences.
+- No unnecessary hyphens.
+- Single-word mode remains single-word.
+- Multi-word mode remains natural multi-word phrases.
+- Mixed mode remains mixed.
+- Do not change the existing MIXED behavior.
+
+18. ORDERING
+Rank the final list by:
+1) visual accuracy
+2) buyer search intent
+3) commercial relevance
+4) specificity
+5) broader discoverability
+The strongest search intent must appear first.
+
+19. FINAL BUYER TEST
+For every keyword ask:
+"Would a real buyer reasonably type this when looking for this exact asset?"
 If not, remove it.
 
-FINAL QUALITY CHECK:
-- Verify every keyword against VISUAL_FACTS.
-- Verify the first 10 keywords are the strongest buyer searches.
-- Remove spam and semantic duplicates.
-- Remove weak generic terms.
-- Remove imaginary concepts.
-- Remove irrelevant viral/trending terms.
-- Reorder keywords so the strongest search intent comes first.
-- Prefer discoverability through accurate relevance, not keyword stuffing.
+20. FINAL QUALITY AUDIT
+Before returning:
+- verify against VISUAL_FACTS
+- verify the first 10 are strongest buyer searches
+- remove connector/filler words
+- remove spam
+- remove semantic duplicates
+- remove weak generic terms
+- remove imaginary concepts
+- remove irrelevant viral/trending terms
+- keep 1–2 useful colors maximum
+- preserve the requested count
+- preserve the provider-independent keyword philosophy
 
-IMPORTANT:
-These rules override conflicting provider-specific and custom keyword rules.
-They apply identically to every provider and model.
+21. PROVIDER CONSISTENCY
+These rules are provider invariant.
+Gemini, OpenAI, Groq, Mistral, OpenRouter, NVIDIA, Claude, Llama, and other providers must follow the same keyword logic.
+Provider differences must never change the SEO philosophy, search intent ranking, visual grounding, deduplication, connector policy, or requested count.
 `;
+
 
 
 
@@ -3287,7 +3450,7 @@ OUTPUT FORMAT:
       const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
       const safeKeywords = rawKeywords
         .filter((k: any) => typeof k === 'string')
-        .map((k: string) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' '))
+        .map((k: string) => removeMicrostockConnectorWords(k))
         .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
 
       recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
