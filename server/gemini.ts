@@ -1,5 +1,45 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
+const SHARED_TITLE_DESCRIPTION_RULES = `
+TITLE / DESCRIPTION RULES — SHARED ACROSS ALL PROVIDERS AND MODELS
+
+VISUAL GROUNDING:
+- Analyze the actual visual evidence first.
+- Only describe subjects, actions, objects, environment, appearance, and concepts supported by the asset.
+- Do not invent an unseen location, event, person, brand, activity, or narrative.
+
+NATURAL LANGUAGE:
+- Use correct English grammar.
+- Write title and description as natural descriptive language, not as keyword lists.
+- Search terms should appear naturally inside the sentence rather than being stacked.
+- Avoid keyword stuffing, comma-separated keyword chains, and telegraphic metadata.
+- The title must read as one coherent descriptive phrase/sentence.
+- The description must read as natural prose describing the visible asset.
+
+TITLE STRUCTURE:
+- Lead with the main visible subject.
+- Naturally describe the visible action or state when applicable.
+- Add the relevant visible setting/context.
+- Include useful visual details only when they improve identification.
+- Do not force keywords that do not belong naturally in the sentence.
+
+DESCRIPTION STRUCTURE:
+- Describe the actual scene and its important visual details.
+- Use natural sentences.
+- Explain relevant subject, action/state, environment, lighting, composition, and visual context.
+- Do not repeat the title as a keyword list.
+- Do not add unsupported concepts merely for SEO.
+
+BAD TITLE:
+"Business man laptop coffee office happy work vector illustration"
+
+GOOD TITLE:
+"Happy young businessman drinking coffee while working on laptop in modern office"
+
+The good example is a model for natural grammar and sentence structure, not a requirement to copy its subject matter.
+`;
+
+
 const SHARED_KEYWORD_VISION_RULES = (targetCount: number, keywordMode?: 'mixed' | 'single' | 'multi') => {
   const modeRule =
     keywordMode === 'single'
@@ -9,6 +49,8 @@ const SHARED_KEYWORD_VISION_RULES = (targetCount: number, keywordMode?: 'mixed' 
         : 'KEYWORD MODE: MIXED. Preserve the application mixed mode: single words and natural multi-word phrases may both be used when directly supported by the visual evidence.';
 
   return `KEYWORD RULES — SHARED ACROSS ALL PROVIDERS AND MODELS
+
+Apply the following SEO-friendly microstock strategy consistently:
 
 The supplied VISUAL_FACTS are the source of truth for keywords.
 Generate exactly ${targetCount} keywords when the model can support the requested count.
@@ -23,6 +65,32 @@ AI VISION GROUNDING:
 - Do NOT add cemetery, grave, Halloween, occult, afterlife, haunted, or similar contextual terms unless the image clearly supports them.
 - Every keyword must be defensible from the image itself.
 
+
+
+SEO-FRIENDLY MICROSTOCK RULES:
+- Optimize for real microstock search intent, not generic keyword volume.
+- Rank keywords by a combination of visual relevance, commercial search intent, specificity, and likely buyer usefulness.
+- Put the strongest, most commercially useful keywords first.
+- Prefer precise terms that describe what buyers would actually search for when looking for this asset.
+- Use natural long-tail phrases when keywordMode permits them and when the phrase is directly supported by the image.
+- Avoid synonyms that add little search value, near-duplicate concepts, filler, and keyword stuffing.
+- Do not sacrifice visual accuracy for SEO.
+- Do not invent trends, demand, or seasonal relevance.
+- A high-value keyword must be both searchable and visually defensible.
+- Prioritize the primary subject before secondary details, then useful context, concept, and verified seasonal/event intent.
+- Seasonal/event keywords are high priority only when visually supported.
+- Generic color terms are not a keyword SEO strategy.
+- Preserve the requested keyword count from the application.
+
+SEASONAL / EVENT RELEVANCE:
+- Do NOT use color as a dedicated keyword-priority category.
+- Do not spend keyword slots on generic color terms.
+- After direct visual facts are covered, detect seasonal, holiday, cultural, or event relevance ONLY when clearly supported by the visual evidence.
+- Examples include Christmas, Valentine, Easter, Halloween, New Year, Thanksgiving, Ramadan, Eid, Mother's Day, Father's Day, wedding, graduation, back to school, summer, winter, spring, autumn, and other clearly recognizable seasonal/event contexts.
+- Never force a seasonal keyword merely because an object can be associated with an event.
+- If no seasonal/event context is visually supported, do not invent one.
+- Seasonal relevance is secondary to the actual visible subject and objects.
+
 PRIORITY:
 1. Main visible subjects
 2. Visible actions or states
@@ -35,15 +103,29 @@ FORMAT:
 - English.
 - Keep keywords concise.
 - ${modeRule}
+- Use nouns, descriptive adjectives, natural activities/gerunds, and common phrases when directly supported by the visual evidence.
+- Remove standalone function words, conjunctions, and articles such as: is, are, a, an, the, in, on, with, and.
+- Use natural base word forms or natural gerunds ending in -ing when appropriate, such as drinking, typing, running.
+- Do not force a base form when a natural gerund is the correct description of a visible activity.
+- Separate each keyword or phrase with a comma in the final keyword list.
+
+WORD-FORM RULE:
+- Use singular keyword forms whenever a noun has a plural form.
+- Do NOT output plural noun variants ending in common plural suffixes such as -s, -es, -ies, or -ves.
+- Prefer "skull" instead of "skulls", "candle" instead of "candles", "stone" instead of "stones", "arch" instead of "arches", and "bone" instead of "bones".
+- This rule concerns plural word forms; a naturally singular word that happens to contain or end with the letter "s" is allowed.
+- Do not invent a singular form when the word is already naturally singular.
 
 FORBIDDEN TERMS:
 - No brand names, trademarks, copyrighted figures, or other identifiable protected brand/IP terms.
 - No subjective quality or promotional filler such as: high quality, beautiful, stunning, best, amazing, premium, perfect, top, nice, vector of, illustration of.
 - Do not keyword-stuff irrelevant concepts.
+- When a keyword slot would otherwise be spent on generic color, prefer a clearly supported seasonal/event concept; if none exists, use another relevant visual fact.
 
 OUTPUT:
 - Return the keywords only through the JSON "keywords" array.
 - Preserve the relevance order chosen from the visual evidence.
+- Rank the final keywords from highest to lowest combination of visual relevance, microstock search intent, commercial usefulness, and specificity.
 - Do not explain the keywords.`;
 };
 
@@ -77,6 +159,95 @@ export interface KeywordValidationResult {
   violations: string[];
 }
 
+
+function isGenericColorKeyword(keyword: string): boolean {
+  const colors = new Set([
+    "red", "orange", "yellow", "green", "blue", "purple", "violet",
+    "pink", "brown", "black", "white", "gray", "grey", "beige",
+    "gold", "silver", "cyan", "magenta", "maroon", "navy", "teal",
+    "turquoise", "indigo", "cream", "ivory"
+  ]);
+  return colors.has(keyword.trim().toLowerCase());
+}
+
+function isStandaloneFunctionWord(keyword: string): boolean {
+  const functionWords = new Set([
+    "is", "are", "am", "be", "been", "being",
+    "a", "an", "the",
+    "in", "on", "at", "by", "for", "from", "to",
+    "with", "without", "and", "or", "but", "of"
+  ]);
+
+  return keyword
+    .split(" ")
+    .every(word => functionWords.has(word.toLowerCase()));
+}
+
+function normalizeKeywordToSingular(keyword: string): string {
+  const protectedSingulars = new Set([
+    "glass", "class", "business", "process", "analysis", "basis",
+    "crisis", "status", "focus", "canvas", "bonus", "gas", "lens",
+    "atlas", "species", "series", "news", "address"
+  ]);
+
+  const irregular: Record<string, string> = {
+    men: "man", women: "woman", children: "child", people: "person",
+    mice: "mouse", geese: "goose", teeth: "tooth", feet: "foot",
+    leaves: "leaf", knives: "knife", wolves: "wolf", lives: "life",
+    wives: "wife", halves: "half"
+  };
+
+  return keyword.split(" ").map((word) => {
+    const lower = word.toLowerCase();
+
+    if (protectedSingulars.has(lower)) return lower;
+    if (irregular[lower]) return irregular[lower];
+
+    if (lower.endsWith("ies") && lower.length > 4) {
+      return lower.slice(0, -3) + "y";
+    }
+
+    if (lower.endsWith("ves") && lower.length > 4) {
+      const base = lower.slice(0, -3);
+      if (["lea", "kni", "li", "wi", "hal"].includes(base)) {
+        return lower;
+      }
+      return base + "f";
+    }
+
+    if (
+      lower.endsWith("ches") || lower.endsWith("shes") ||
+      lower.endsWith("xes") || lower.endsWith("zes") ||
+      lower.endsWith("sses")
+    ) {
+      return lower.slice(0, -2);
+    }
+
+    if (lower.endsWith("es") && lower.length > 3) {
+      const stem = lower.slice(0, -2);
+      if (
+        stem.endsWith("s") || stem.endsWith("x") || stem.endsWith("z") ||
+        stem.endsWith("ch") || stem.endsWith("sh")
+      ) {
+        return stem;
+      }
+    }
+
+    if (
+      lower.endsWith("s") &&
+      !lower.endsWith("ss") &&
+      !lower.endsWith("us") &&
+      !lower.endsWith("is") &&
+      lower.length > 3
+    ) {
+      return lower.slice(0, -1);
+    }
+
+    return lower;
+  }).join(" ");
+}
+
+
 /**
  * Validates and cleans keyword output using the exact rules supplied by the user.
  */
@@ -96,13 +267,17 @@ export function validateAndCleanKeywords(
   for (const rawKw of rawList) {
     if (!rawKw) continue;
 
-    const kw = rawKw
-      .toLowerCase()
-      .replace(/[^a-z0-9\s\-]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    const kw = normalizeKeywordToSingular(
+      rawKw
+        .toLowerCase()
+        .replace(/[^a-z0-9\s\-]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+    );
 
     if (!kw) continue;
+    if (isStandaloneFunctionWord(kw)) continue;
+    if (isGenericColorKeyword(kw)) continue;
 
     const hasBrandViolation = rules.forbiddenBrandTerms.some(brand =>
       new RegExp(`\\b${brand}\\b`, "i").test(kw)
@@ -170,7 +345,8 @@ export async function generateValidatedStockKeywords(options: {
 
   const ai = new GoogleGenAI({ apiKey: keyToUse });
 
-  const systemInstruction = `You are a professional Microstock Keyword & Metadata Optimization Specialist.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a professional Microstock Keyword & Metadata Optimization Specialist.
 Your task is to generate exactly ${targetCount} high-demand, commercial, and highly searchable stock keywords for microstock platforms (Adobe Stock, Shutterstock).
 
 RULES FOR KEYWORDS:
@@ -406,8 +582,7 @@ const COLOR_KEYWORDS = new Set([
 function ensureTitleLength(title: string, keywords: string[], description: string, titleLength?: string): string {
   if (!title || title.trim() === "" || title.includes("Write a descriptive title here") || title.includes("<generate a") || title.includes("A highly descriptive") || title.includes("A detailed")) {
     if (description && description.trim().length > 10 && !description.includes("Write a detailed description here") && !description.includes("<generate a") && !description.includes("A highly descriptive") && !description.includes("A detailed")) title = description;
-    else if (keywords && keywords.length >= 3) title = keywords.slice(0, 5).join(' ');
-    else title = "Stock asset";
+    else if (!title || title.trim() === "") title = "Stock asset";
   } else {
     title = String(title);
   }
@@ -497,12 +672,7 @@ function ensureDescription(description: string, title: string, keywords: string[
       if (cleanTitle.length > 5) {
         return `Visual media showcasing ${cleanTitle.toLowerCase()}, designed for commercial, editorial, and creative projects.`;
       }
-    }
-    
-    if (keywords && keywords.length >= 3) {
-      return `Visual content featuring ${keywords.slice(0, 5).join(', ')}, suitable for advertising, marketing, and editorial purposes.`;
-    }
-    
+    }    
     return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
   
@@ -1164,7 +1334,8 @@ ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
 4. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset (do not hallucinate elements that aren't there, but frame the existing elements through the lens of the custom instruction).` : "";
 
   const mediaContext = mediaTypeContext;
-  const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
+  const genSystemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
 ${mediaContext}${customPromptCommand}${exifInstruction}
@@ -1276,7 +1447,8 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   console.log(`[JohMeta Pipeline] Stage 4, 5 & 6: Auditing, Ranking, and Final Validation...`);
   console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadata, null, 2));
 
-  const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
+  const validatorSystemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
@@ -1661,7 +1833,8 @@ ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
 2. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), you MUST act as an expert human graphic designer. Describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
 4. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset (do not hallucinate elements that aren't there, but frame the existing elements through the lens of the custom instruction).` : "";
 
-  const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
+  const genSystemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
@@ -1777,7 +1950,8 @@ OUTPUT FORMAT:
   console.log(`[JohMeta Pipeline - Batch] Stage 4, 5 & 6: Final Validation for ${items.length} items...`);
   console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadataArray, null, 2));
 
-  const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
+  const validatorSystemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
@@ -2294,7 +2468,8 @@ Make sure your generated prompts do not contain these elements or depict them in
     else if (vectorSubType === 'isometric_flat') effectiveStyleCategory = 'Vector Art - Isometric Flat Design';
   }
 
-  const systemInstruction = `You are an elite AI Image Prompt Designer specializing in text-to-image generators like Midjourney, DALL-E 3, Adobe Firefly, and Stable Diffusion.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are an elite AI Image Prompt Designer specializing in text-to-image generators like Midjourney, DALL-E 3, Adobe Firefly, and Stable Diffusion.
 Anda adalah AI Prompt Generator ahli yang bertugas membuat prompt gambar unik dan bervariasi.
 Your job is to translate a raw idea and specific style choices into exactly ${count} highly unique, descriptive, and professional-grade generation prompt variations in English.
 
@@ -2979,7 +3154,8 @@ export const analyzeImageToPrompt = async (
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are an expert AI visual analyst and prompt engineer.
 Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
 
 CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
@@ -3070,7 +3246,8 @@ export const analyzeBatchImageToPrompt = async (
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are an expert AI visual analyst and prompt engineer.
 Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
 
 CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
@@ -4009,7 +4186,8 @@ export async function generateCalendarEvents(month: string, model?: string) {
   const curatedHolidays = [...baseHolidays, ...extraHolidays];
   const curatedHolidaysStr = curatedHolidays.map((h, i) => `${i + 1}. ${h.name} (${h.date}) - Location: ${h.location}`).join('\n');
 
-  const systemInstruction = `You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a world-class Content Strategist and Niche Researcher for Stock Agencies (Adobe Stock, Shutterstock, Getty). 
 Your task is to identify ALL upcoming festivals, holidays, seasonal changes, and cultural events for the specified month.
 
 CRITICAL MONTH MATCHING & ALIGNMENT RULES (MUST FOLLOW STRICTLY):
@@ -4232,7 +4410,8 @@ export async function generateEventKeywords(eventName: string, eventDetails: str
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
-  const systemInstruction = `You are an expert AI Stock Photographer and Keyword Specialist. 
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are an expert AI Stock Photographer and Keyword Specialist. 
 Your job is to generate a list of highly commercial, descriptive, and specific keywords/subjects for a given event.
 These keywords should be optimized for AI Image Generation prompts.
 
@@ -4326,7 +4505,8 @@ export async function suggestKeywords(
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const systemInstruction = `You are a professional SEO and Adobe Stock Keyword Specialist.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a professional SEO and Adobe Stock Keyword Specialist.
 Your task is to analyze the existing title, description, and list of keywords of an asset, and suggest exactly ${requestCount} high-volume, generic, relevant keywords or short conceptual phrases that are currently missing from the user's list.
 These suggested keywords must be highly searchable, commercial, and directly related to the visual subject and context described in the title and description, while not repeating any existing keywords.
 
@@ -4465,7 +4645,8 @@ export async function searchAdobeStockWithBypass(keyword: string): Promise<any[]
   if (scrapingResults.length === 0) {
     console.log(`[AdobeResearch] Using Gemini Search Grounding for keyword "${keyword}"...`);
     try {
-      const systemInstruction = `You are an expert Adobe Stock indexing research assistant.
+      const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are an expert Adobe Stock indexing research assistant.
 Your task is to analyze real-time Google search grounding results of Adobe Stock for the keyword: "${keyword}".
 Find the top, most downloaded/most popular assets page images returned.
 Extract exactly 8 assets. Each asset MUST include:
@@ -4727,7 +4908,8 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
 
   // Build AI system instruction with ground truth
   // PERBAIKAN TIMEOUT: Prompt lebih ringkas untuk respons AI lebih cepat
-  const systemInstruction = `You are a strict Adobe Stock QA Curator. Make PASS/FAIL decision. FAIL for any artifact, defect, or inconsistency. Be concise.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are a strict Adobe Stock QA Curator. Make PASS/FAIL decision. FAIL for any artifact, defect, or inconsistency. Be concise.
 
 MANDATORY FAIL conditions from technical ground truth:
 - Black frames detected = FAIL
@@ -4861,7 +5043,8 @@ export async function generateMotionCode(userPrompt: string, options?: { current
   const provider = (store && store.provider) || 'gemini';
   const model = options?.model;
 
-  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
+  const systemInstruction = `${SHARED_TITLE_DESCRIPTION_RULES}
+You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
 RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
