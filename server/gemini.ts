@@ -67,6 +67,16 @@ AI VISION GROUNDING:
 
 
 
+
+ASSET PURPOSE / BUYER INTENT:
+- Determine what the asset is most likely intended to be used for by a real microstock buyer.
+- Add purpose/use-case keywords only when the visual composition and subject strongly support that use.
+- Think in terms of buyer search intent: what project, communication, campaign, editorial context, business need, or design purpose could this asset naturally serve?
+- Examples include background, banner, poster, advertising, marketing, business, education, healthcare, technology, finance, food, travel, lifestyle, celebration, seasonal campaign, social media, website, presentation, copy space, or concept illustration — ONLY when visually supported.
+- Never invent an industry or use case simply because the subject can theoretically be used there.
+- Prefer the most commercially useful and visually defensible purpose over generic abstract concepts.
+- Purpose keywords are secondary to actual visible subjects and must never replace stronger visual facts.
+
 SEO-FRIENDLY MICROSTOCK RULES:
 - Optimize for real microstock search intent, not generic keyword volume.
 - Rank keywords by a combination of visual relevance, commercial search intent, specificity, and likely buyer usefulness.
@@ -125,7 +135,7 @@ FORBIDDEN TERMS:
 OUTPUT:
 - Return the keywords only through the JSON "keywords" array.
 - Preserve the relevance order chosen from the visual evidence.
-- Rank the final keywords from highest to lowest combination of visual relevance, microstock search intent, commercial usefulness, and specificity.
+- Rank the final keywords from highest to lowest combination of visual relevance, microstock search intent, commercial usefulness, specificity, and supported asset purpose/buyer intent.
 - Do not explain the keywords.`;
 };
 
