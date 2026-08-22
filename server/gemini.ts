@@ -1184,220 +1184,15 @@ function buildStructuredKeywordCandidates(ctx: KeywordRoleContext): string[] {
   return Array.from(new Set(out));
 }
 
-
-const MICROSTOCK_CONNECTOR_WORDS = new Set([
-  'and', 'with', 'of', 'for', 'in', 'on', 'at', 'to', 'from',
-  'by', 'as', 'or', 'the', 'a', 'an'
+const BASIC_ENGLISH_FILLER_KEYWORDS = new Set([
+  'subject', 'focus', 'sharp', 'blurry', 'detail', 'quality', 'image', 'photo',
+  'picture', 'design', 'nice', 'beautiful', 'amazing', 'professional',
+  'visual', 'element', 'object', 'thing', 'composition'
 ]);
 
-function removeMicrostockConnectorWords(keyword: string): string {
-  const normalized = String(keyword || '')
-    .toLowerCase()
-    .replace(/[-_/]+/g, ' ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!normalized) return '';
-
-  const words = normalized.split(' ').filter(Boolean);
-  if (words.length === 1 && MICROSTOCK_CONNECTOR_WORDS.has(words[0])) return '';
-
-  // Preserve legitimate compound phrases. Only strip unnecessary
-  // leading/trailing connector words.
-  while (words.length > 1 && MICROSTOCK_CONNECTOR_WORDS.has(words[0])) words.shift();
-  while (words.length > 1 && MICROSTOCK_CONNECTOR_WORDS.has(words[words.length - 1])) words.pop();
-
-  return words.join(' ').trim();
-}
-
-
-function buildCSVPlanetVisualSeedKeywords(
-  visualFacts: any,
-  keywordMode?: 'mixed' | 'single' | 'multi'
-): string[] {
-  const sources = [
-    ...(visualFacts?.primary_subjects || []),
-    ...(visualFacts?.secondary_subjects || []),
-    ...(visualFacts?.actions || []),
-    ...(visualFacts?.location_setting || []),
-    ...(visualFacts?.environment || []),
-    ...(visualFacts?.visual_characteristics || []),
-    ...(visualFacts?.attributes || []),
-    ...(visualFacts?.materials || []),
-    ...(visualFacts?.colors || []),
-    ...(visualFacts?.concepts || []),
-    ...(visualFacts?.geography || []),
-    ...(visualFacts?.culture || []),
-    ...(visualFacts?.industry || []),
-    ...(visualFacts?.commercial_context || [])
-  ];
-
-  const out: string[] = [];
-  for (const raw of sources) {
-    const value = String(raw?.name || raw || '').toLowerCase().trim();
-    if (!value) continue;
-
-    const words = value
-      .replace(/[-_/]+/g, ' ')
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (!words.length) continue;
-
-    // CSVPlanet reference is predominantly single-word metadata.
-    // Mixed mode keeps those single words first, then preserves the
-    // original phrase as an optional candidate.
-    for (const word of words) {
-      if (word.length < 2) continue;
-      if (MICROSTOCK_CONNECTOR_WORDS.has(word)) continue;
-      if (isProhibitedKeyword(word)) continue;
-      if (keywordMode !== 'multi') out.push(word);
-    }
-
-    if (keywordMode !== 'single' && words.length >= 2 && words.length <= 3) {
-      const phrase = words.join(' ');
-      if (!isProhibitedKeyword(phrase)) out.push(phrase);
-    }
-  }
-
-  return Array.from(new Set(out));
-}
-
-function orderKeywordsByAdobePriority(keywords: string[], visualFacts: any): string[] {
-  /*
-   * CSVPlanet GOLDEN-REFERENCE ORDER
-   *
-   * The supplied CSV example shows a single-word-first semantic expansion:
-   * main subject -> core event/activity -> subject category/industry ->
-   * setting/environment -> work/object attributes -> cultural/geographic ->
-   * visual details -> broad relevant discovery -> action variants.
-   *
-   * This is intentionally NOT a numerical score and NOT a fixed quota.
-   * It is a deterministic semantic ladder used to preserve keyword intent.
-   */
-  const primary = (visualFacts?.primary_subjects || [])
-    .map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const secondary = (visualFacts?.secondary_subjects || [])
-    .map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const actions = (visualFacts?.actions || [])
-    .map((x: any) => String(x || '').toLowerCase()).filter(Boolean);
-
-  const settings = (visualFacts?.location_setting || visualFacts?.environment || [])
-    .map((x: any) => String(x || '').toLowerCase()).filter(Boolean);
-
-  const attributes = [
-    ...(visualFacts?.visual_characteristics || []),
-    ...(visualFacts?.attributes || []),
-    ...(visualFacts?.materials || []),
-    ...(visualFacts?.objects || [])
-  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const concepts = [
-    ...(visualFacts?.concepts || []),
-    ...(visualFacts?.atmosphere || [])
-  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const colors = (visualFacts?.colors || [])
-    .map((x: any) => String(x || '').toLowerCase()).filter(Boolean);
-
-  const style = [
-    ...(visualFacts?.style || []),
-    ...(visualFacts?.technique || [])
-  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const geographic = [
-    ...(visualFacts?.geography || []),
-    ...(visualFacts?.culture || []),
-    ...(visualFacts?.region || [])
-  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const commercial = [
-    ...(visualFacts?.industry || []),
-    ...(visualFacts?.commercial_context || []),
-    ...(visualFacts?.usage || [])
-  ].map((x: any) => String(x?.name || x || '').toLowerCase()).filter(Boolean);
-
-  const tokenize = (value: string): string[] =>
-    value.toLowerCase().split(/\s+/).filter(Boolean);
-
-  const contains = (keyword: string, values: string[]) => {
-    const k = keyword.toLowerCase();
-    return values.some(v => v && (k === v || k.includes(v)));
-  };
-
-  const exactOrToken = (keyword: string, values: string[]) => {
-    const k = keyword.toLowerCase();
-    const kt = new Set(tokenize(k));
-    return values.some(v => {
-      if (!v) return false;
-      if (k === v || k.includes(v)) return true;
-      return tokenize(v).some(t => kt.has(t));
-    });
-  };
-
-  const wordCount = (keyword: string) => tokenize(keyword).length;
-
-  const group = (keyword: string): number => {
-    const k = keyword.toLowerCase();
-
-    // 1 — MAIN SUBJECT / CORE OBJECT
-    if (exactOrToken(k, primary)) return 1;
-
-    // 2 — CORE EVENT / MAIN ACTIVITY
-    if (exactOrToken(k, actions)) return 2;
-
-    // 3 — CATEGORY / SECONDARY SUBJECT
-    if (exactOrToken(k, secondary)) return 3;
-    if (exactOrToken(k, commercial)) return 3;
-
-    // 4 — SETTING / ENVIRONMENT
-    if (exactOrToken(k, settings)) return 4;
-
-    // 5 — SPECIFIC OBJECT / WORK / MATERIAL / ATTRIBUTE
-    if (exactOrToken(k, attributes)) return 5;
-
-    // 6 — GEOGRAPHIC / CULTURAL CONTEXT
-    if (exactOrToken(k, geographic)) return 6;
-
-    // 7 — VISUAL CHARACTERISTICS
-    if (exactOrToken(k, style) || exactOrToken(k, colors)) return 7;
-
-    // 8 — CONCEPT / MOOD / STORY
-    if (exactOrToken(k, concepts)) return 8;
-
-    // 9 — BROADER RELEVANT DISCOVERY
-    return 9;
-  };
-
-  const specificity = (keyword: string): number => {
-    const words = wordCount(keyword);
-
-    // CSVPlanet sample is predominantly single-word metadata.
-    // Single words therefore win within the same semantic group.
-    if (words === 1) return 0;
-    if (words === 2) return 1;
-    if (words === 3) return 2;
-    return 3;
-  };
-
-  return [...keywords].sort((a, b) => {
-    const ga = group(a);
-    const gb = group(b);
-    if (ga !== gb) return ga - gb;
-
-    const sa = specificity(a);
-    const sb = specificity(b);
-    if (sa !== sb) return sa - sb;
-
-    // Stable ordering for candidates in the same semantic tier.
-    return 0;
-  });
+function isWeakGenericKeyword(keyword: string): boolean {
+  const k = String(keyword || '').toLowerCase().trim();
+  return BASIC_ENGLISH_FILLER_KEYWORDS.has(k);
 }
 
 function ensureKeywordCount(
@@ -1412,39 +1207,47 @@ function ensureKeywordCount(
   const target = Math.max(0, Number.isFinite(Number(targetCount)) ? Number(targetCount) : 0);
   if (!target) return [];
 
+  const normalize = (value: any): string => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\\s-]/g, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim();
+
+  const singularKey = (value: string): string => {
+    const v = normalize(value);
+    if (v.endsWith('ies') && v.length > 4) return `${v.slice(0, -3)}y`;
+    if (v.endsWith('es') && v.length > 4) return v.slice(0, -2);
+    if (v.endsWith('s') && v.length > 3) return v.slice(0, -1);
+    return v;
+  };
+
   const seen = new Set<string>();
   const result: string[] = [];
 
   for (const raw of Array.isArray(keywords) ? keywords : []) {
-    if (typeof raw !== 'string') continue;
-
-    let keyword = removeMicrostockConnectorWords(raw);
-    if (!keyword || isProhibitedKeyword(keyword)) continue;
+    let keyword = normalize(raw);
+    if (!keyword || isProhibitedKeyword(keyword) || isWeakGenericKeyword(keyword)) continue;
 
     if (keywordMode === 'single') {
-      // Single mode: preserve the first meaningful word only.
-      keyword = keyword.split(/\s+/)[0] || '';
+      keyword = keyword.split(/\\s+/)[0] || '';
     }
 
-    if (keywordMode === 'multi') {
-      // Multi mode: reject phrases that collapse into one word.
-      if (!keyword.includes(' ')) continue;
-    }
+    if (!keyword) continue;
 
-    if (!keyword || keyword.length < 2) continue;
+    const key = singularKey(keyword);
+    if (seen.has(key)) continue;
 
-    const signature = semanticKeySignature(keyword);
-    if (!signature || seen.has(signature)) continue;
-
-    seen.add(signature);
+    seen.add(key);
     result.push(keyword);
 
     if (result.length >= target) break;
   }
 
+  // No category quotas, semantic expansion, SEO engine, market ranking,
+  // visual-grounding gate, fallback keywords, or artificial modifiers.
+  // The AI-generated order is preserved after basic cleanup/deduplication.
   return result;
 }
-
 function getAIClient(): any {
   return {
     models: {
@@ -2457,51 +2260,12 @@ function semanticDeduplicate(keywords: string[]): string[] {
     return !multiWord.some(phrase => {
       const words = phrase.split(/\s+/);
       if (words.length < 2 || !words.includes(k)) return false;
-      // Suppress only a generic singleton when the phrase provides the same intent.
-      // Preserve useful standalone factual terms and genuine compound concepts.
+      // Only suppress generic singleton repetition; keep useful standalone
+      // color/material terms such as gold, white, ceramic.
       const preserve = new Set(['gold','white','black','blue','red','green','brown','silver','ceramic','porcelain','wood','metal']);
       return !preserve.has(k);
     });
   });
-}
-
-
-/**
- * Legacy scoring helper retained for compatibility.
- * FINAL ORDER MUST NOT use score-based dynamic re-ranking.
- * Adobe ordered groups are authoritative.
- */
-function scoreKeywordSearchIntent(
-  keyword: string,
-  visualFacts: any,
-  existingKeywords: string[] = []
-): number {
-  const k = String(keyword || '').toLowerCase().trim();
-  if (!k) return -Infinity;
-
-  let score = 0;
-  const primary = (visualFacts?.primary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
-  const secondary = (visualFacts?.secondary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
-  const actions = (visualFacts?.actions || []).map((x: any) => String(x || '').toLowerCase());
-  const settings = (visualFacts?.location_setting || []).map((x: any) => String(x || '').toLowerCase());
-  const concepts = (visualFacts?.concepts || []).map((x: any) => String(x || '').toLowerCase());
-
-  if (primary.some((x: string) => x && k.includes(x))) score += 55;
-  if (secondary.some((x: string) => x && k.includes(x))) score += 25;
-  if (actions.some((x: string) => x && k.includes(x))) score += 20;
-  if (settings.some((x: string) => x && k.includes(x))) score += 15;
-  if (concepts.some((x: string) => x && k.includes(x))) score += 10;
-
-  // Natural compound phrases get a search-intent bonus.
-  const wordCount = k.split(/\s+/).length;
-  if (wordCount === 2 || wordCount === 3) score += 12;
-  if (wordCount >= 5) score -= 10;
-
-  // Penalize exact semantic repetition of already selected terms.
-  const sig = semanticKeySignature(k);
-  if (existingKeywords.some(x => semanticKeySignature(x) === sig)) score -= 100;
-
-  return score;
 }
 
 // ---- LAPISAN 7: PENENTUAN KATEGORI YANG LEBIH AKURAT -----------------------
@@ -2547,46 +2311,6 @@ function determineAccurateCategory(
     confidence,
     reason
   };
-}
-
-
-/**
- * Backward-compatible wrapper for the canonical connector sanitizer.
- */
-function cleanMicrostockKeywordConnectors(keyword: string): string {
-  return removeMicrostockConnectorWords(keyword);
-}
-
-
-/**
- * Final keyword normalization for professional microstock SEO.
- * The requested count remains mandatory; uniqueness is enforced before returning.
- */
-function finalizeMicrostockKeywords(
-  keywords: unknown,
-  targetCount: number
-): string[] {
-  const raw = Array.isArray(keywords) ? keywords : [];
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const item of raw) {
-    const cleaned = cleanMicrostockKeywordConnectors(String(item || ''))
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (!cleaned) continue;
-
-    const key = cleaned.toLowerCase();
-    if (seen.has(key)) continue;
-
-    seen.add(key);
-    result.push(cleaned);
-
-    if (result.length >= targetCount) break;
-  }
-
-  return result.slice(0, Math.max(0, targetCount));
 }
 
 // ---- LAPISAN 8: VALIDASI AKHIR ---------------------------------------------
@@ -2773,15 +2497,10 @@ async function expandKeywordsWithAI(
 EXPANSION PASS:
 The first keyword generation pass produced ${candidates.length} valid keywords but the target is ${targetCount}.
 Generate ${needed} ADDITIONAL candidate keywords that are genuinely supported by VISUAL_FACTS.
-Think like a microstock buyer, not like a creative writer.
-Do not repeat existing keywords or repeat the same search intent.
-Continue from the strongest buyer searches already present.
-Expand only into missing primary subject details, secondary subjects, visible actions,
-setting/context, visual style, mood when supported, composition/visual characteristics,
-supported concepts, commercial context, seasonal/event context, and useful broader searches.
+Do not repeat existing keywords. Continue from the existing Main Subject hierarchy. First look for missing specific Main Subject
+terms or natural subject phrases, then missing important secondary/supporting subjects, then setting,
+action/state, visual attributes, seasonal context, supported concepts, and realistic buyer search intent.
 Do not invent anything merely to reach the count.
-Do not use connector words such as and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
-Every added keyword must be a distinct, realistic buyer search term.
 ${modeRule}
 Output keywords in ${language}. Return JSON only in this form: {"keywords":["keyword 1","keyword 2"]}`;
 
@@ -2874,31 +2593,23 @@ async function applyMetadataGenKeywordLogic(options: {
 
   for (const raw of source) {
     if (typeof raw !== 'string') continue;
-
-    const phrase = removeMicrostockConnectorWords(raw);
-    if (phrase.length <= 1 || isProhibitedKeyword(phrase)) continue;
+    const phrase = raw
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, ' ');
+    if (phrase.length <= 1) continue;
 
     if (keywordMode === 'single') {
       for (const word of phrase.split(/\s+/)) {
         if (word.length > 1 && !isProhibitedKeyword(word)) cleaned.push(word);
       }
-    } else {
+    } else if (!isProhibitedKeyword(phrase)) {
       cleaned.push(phrase);
     }
   }
 
-  // CSVPlanet-style candidate preparation:
-  // keep factual single-word tokens available before any AI expansion.
-  const visualSeedTokens = buildCSVPlanetVisualSeedKeywords(visualFacts, keywordMode);
-
-  let masterPool = buildMasterKeywordCandidatePool(
-    semanticDeduplicate([...visualSeedTokens, ...cleaned]),
-    visualFacts,
-    targetCount
-  );
-
-  masterPool = orderKeywordsByAdobePriority(masterPool, visualFacts);
-
+  const masterPool = buildMasterKeywordCandidatePool(cleaned, visualFacts, targetCount);
   let finalKeywords = ensureKeywordCount(
     masterPool,
     targetCount,
@@ -2921,243 +2632,126 @@ async function applyMetadataGenKeywordLogic(options: {
     );
   }
 
-  // Final semantic + connector sanitation without changing the established order.
-  finalKeywords = orderKeywordsByAdobePriority(finalKeywords, visualFacts);
-
-  finalKeywords = ensureKeywordCount(
-    finalKeywords,
-    targetCount,
-    visualFacts,
-    undefined,
-    undefined,
-    undefined,
-    keywordMode
-  );
-
-  if (finalKeywords.length < targetCount) {
-    console.warn(
-      `[Keyword Quality] Could not reach requested count ${targetCount}; provider returned only ${finalKeywords.length} unique evidence-backed keywords after sanitation.`
-    );
-  }
-
   return finalKeywords.slice(0, targetCount);
 }
 
 
-
-// PRD KEYWORD-ONLY IMPLEMENTATION:
-// The changes in this section intentionally affect only keyword generation,
-// ranking, expansion, deduplication, connector sanitation, and exact-count handling.
-// Title and Description generation logic is left unchanged.
-
 const UNIVERSAL_KEYWORD_RULES = `
-METAZO KEYWORD ENGINE — CSVPLANET GOLDEN REFERENCE + ADOBE STOCK COMPLIANCE
+UNIVERSAL NATURAL MICROSTOCK KEYWORD RULES
+BASIC ENGLISH / BUYER SEARCH LANGUAGE / VISUAL RELEVANCE
 
 ROLE:
-Act as a professional microstock keyword specialist.
-Use the supplied CSVPlanet metadata example as a behavioral reference for keyword structure.
-Do not copy its words blindly and do not imitate a hidden proprietary algorithm.
+You are an experienced microstock keyword specialist.
+Generate keywords that a real stock buyer would naturally type when
+searching for THIS EXACT ASSET.
 
-PRIMARY GOAL:
-Create a natural stock-search keyword list from what is actually visible.
-The result should look like professional stock metadata, not an AI tag dump.
+CORE PRINCIPLE:
+Use simple, common English vocabulary.
+Prefer clear nouns, verbs, adjectives, occupations, objects, actions,
+places, settings, materials, and concise concepts that are visibly supported.
 
-GOLDEN REFERENCE PATTERN:
-The supplied CSVPlanet example for a farmer harvesting rice is predominantly single-word metadata and expands semantically in this direction:
+KEYWORD STYLE:
+- Prefer basic English words such as:
+  farmer, harvest, rice, agriculture, terraces, mountain, farming,
+  rural, field, labor, worker, bundle, crop, golden, mist, manual,
+  traditional, cultivation, asia, landscape, people, hat, mud, grain,
+  harvesting, outdoors, scenic, work, nature, tying, harvested, stalks,
+  terraced.
+- These are STYLE EXAMPLES, not mandatory keywords.
+- Choose equivalent simple words when the asset contains different subjects.
+- Prefer one clear word when it works naturally.
+- Use a short 2-word phrase only when it is a real, useful stock-search term,
+  such as "rice field", "rice harvest", "mountain landscape", or
+  "traditional farming".
+- Never turn several descriptive words into an unnatural sentence-like keyword.
 
-MAIN SUBJECT
-→ CORE EVENT / SUBJECT
-→ CATEGORY / INDUSTRY
-→ SETTING
-→ WORK / OBJECT / ATTRIBUTE
-→ CULTURAL / GEOGRAPHIC CONTEXT
-→ VISUAL DETAILS
-→ BROADER RELEVANT DISCOVERY
-→ ACTION VARIANTS
+RELEVANCE GATE — STRICT:
+Every keyword must have a clear relationship to the actual visual asset.
+Ask:
+"Would a stock buyer use this word to find this exact image?"
+If the answer is no, reject it.
 
-Example structure from the reference:
-farmer, harvest, rice, agriculture, farming, terraces, mountain, rural,
-manual, labor, stalks, field, crop, hat, work, cultivation, asia,
-scenery, landscape, traditional, worker, mud, golden, grain, nature,
-outdoor, people, person, sunlight, mist, harvesting, agrarian, crops,
-tying, harvested
+NEVER OUTPUT WEAK/FILLER METADATA:
+Do NOT output isolated generic interface/quality words such as:
+subject, focus, sharp, blurry, detail, quality, image, photo, picture,
+design, nice, beautiful, amazing, professional, visual, element,
+object, thing, composition, grey, yellow, red, blue, green, etc.
+UNLESS that word is specifically and meaningfully relevant to the asset.
+A color is allowed only when it is a useful visual descriptor, not merely
+because the AI detected a pixel color.
 
-IMPORTANT:
-This is a semantic expansion pattern, NOT a fixed number of keywords per group.
+DO NOT KEYWORD BY TEMPLATE:
+- No fixed category slots.
+- No percentage allocation.
+- No forced subject/attribute/action/context quotas.
+- No artificial keyword expansion.
+- No keyword stuffing.
+- No thesaurus chains.
+- No synonyms added merely to increase count.
+- No SEO filler.
+- No invented buyer intent.
+- No unrelated commercial terms.
 
-SINGLE-WORD-FIRST:
-- Prefer single-word keywords when they accurately express the search concept.
-- Do not turn every keyword into a long-tail phrase.
-- Use a 2–3 word phrase only when it is a genuine, materially useful search concept or compound term.
-- Never create phrases just to appear SEO-friendly.
-- Never create sentence-like keyword phrases.
-- Do not split genuine compound concepts when the phrase is the natural searchable concept.
+VISUAL PRIORITY:
+Prioritize, when visibly supported:
+1. Main subject / occupation / species / object.
+2. Main action or state.
+3. Specific subject details.
+4. Important secondary subjects.
+5. Setting / environment / location.
+6. Distinctive visual details.
+7. Natural concept or context.
+8. Relevant season/event only when visually evident.
 
-BUYER SEARCH TEST:
-For every keyword:
-"Would a stock buyer realistically search for this term to find this asset?"
-If no, reject it.
+KEYWORD ORDER:
+Order from strongest and most searchable to weaker supporting terms.
+The first 10 keywords are the most important and must contain the clearest
+terms for the exact asset. Do not waste them on generic filler.
 
-FIRST 10:
-The first 10 keywords must be the strongest discovery terms:
-- main subject
-- core activity/event
-- most important subject/category
-- most important setting
-- strongest specific object/attribute
+SPECIFICITY:
+Prefer "rice" over "crop" when rice is visibly identifiable.
+Prefer "rice field" over "field" when the phrase is natural and useful.
+Prefer "farmer" over "person" when the person is visibly farming.
+Prefer "harvesting" over "work" when harvesting is visibly happening.
+Use both specific and broader terms only when both add genuine search value.
 
-Do not waste the first 10 on:
-- weak colors
-- mood adjectives
-- generic words
-- tiny background details
-- abstract concepts
-- usage terms when stronger visual terms remain
+BASIC ENGLISH:
+Do not use academic, technical, marketing-heavy, or overly sophisticated
+wording when a normal English stock-search word exists.
+Think:
+farmer, rice, field, harvest, worker, mountain, rural
+rather than:
+agricultural production ecosystem, rural cultivation infrastructure, etc.
 
-SEMANTIC EXPANSION:
-After the strongest terms are covered, expand into distinct search coverage:
-1. Main subject
-2. Core event/activity
-3. Subject category or industry
-4. Setting/environment
-5. Objects/materials/work elements
-6. Attributes
-7. Geographic/cultural context when supported
-8. Visual characteristics
-9. Concept/theme
-10. Broader relevant category
-11. Action/state variants
+LANGUAGE:
+Use one consistent metadata language.
+For English metadata, use natural everyday English spelling and vocabulary.
+Keep keywords lowercase.
 
-Do not repeat the same meaning simply to increase count.
+IP / COMPLIANCE:
+Never add brands, trademarks, artist names, celebrity names, copyrighted
+characters, or other prohibited IP.
+Never invent locations, occupations, demographics, events, or concepts.
 
-ANTI-SPAM:
-Never generate keyword lists such as:
-happy, happiness, joyful, joy, cheerful, fun
-when these are redundant.
+COUNT:
+The requested keyword count is the target maximum/output count.
+If the user requests 25, select the 25 strongest valid keywords.
+Never fill missing positions with unrelated words just to reach the number.
+If additional keywords are needed, ask the AI for additional VISUALLY SUPPORTED
+basic-English candidates only.
 
-Never generate:
-beautiful, amazing, stunning, awesome, premium
-unless such a term is genuinely relevant to a searchable stock concept; normally omit it.
+FINAL QUALITY TEST:
+Reject any keyword that is:
+- generic without useful context,
+- unrelated to the asset,
+- merely a color/pixel observation,
+- merely a quality descriptor,
+- merely a synonym of another keyword,
+- artificially generated to fill the count,
+- too technical or unnatural for a normal stock buyer.
 
-Do not add:
-viral, trending, popular, best, high quality, professional
-as generic SEO filler.
-
-VISUAL TRUTH:
-Use only evidence from VISUAL_FACTS.
-Do not invent:
-- exact country
-- ethnicity
-- occupation beyond what is visibly supported
-- business purpose
-- investment
-- market
-- financial meaning
-- medical meaning
-- political meaning
-- cultural identity
-unless clearly supported.
-
-CATEGORY / INDUSTRY:
-Use terms such as agriculture, farming, business, healthcare, technology, education, real estate only when the image visibly supports that category.
-
-GEOGRAPHY / CULTURE:
-Use geographic or cultural terms only when supported by clear visual evidence or reliable metadata.
-Do not infer a country solely from appearance.
-
-COLOR:
-Normally use no more than 1–2 useful colors.
-Color comes after core subject, activity, category, setting, and important objects.
-Do not make a color list.
-
-STYLE:
-Use only visible styles:
-realistic, photography, watercolor, vector, 3d, flat design, etc.
-Do not inject style terms that are not actually represented.
-
-PEOPLE:
-Use people/person only when people are genuinely important to the image.
-Prefer the specific visible subject first, then broader people/person coverage later if useful.
-
-CONNECTORS:
-Do not output standalone connector words:
-and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
-
-Do not destroy a legitimate compound phrase because it contains an internal connector.
-
-IP / BRAND:
-Do not use:
-- brands
-- trademarks
-- company names
-- celebrity names
-- fictional characters
-- franchises
-- proprietary product names
-unless the application has an explicit separate editorial/IP workflow.
-For standard stock keyword generation, use generic descriptive terms.
-
-ADOBE STOCK:
-- Keep keywords relevant to the entire asset.
-- Order the strongest and most important terms first.
-- The first 10 are especially important.
-- Adobe Stock allows up to 49 keywords.
-- Adobe recommends 15–25 as an ideal range.
-- If the user explicitly requests a different count, return exactly that count if enough distinct relevant terms exist.
-- Never use irrelevant filler simply to reach 49.
-- Never exceed the requested count.
-
-COUNT EXPANSION:
-If 49 keywords are requested, expand semantically:
-subject → activity → category → setting → objects → attributes → culture/geography → visual → concept → broader discovery → action variants.
-
-The additional keywords must open distinct search coverage.
-Do not manufacture 49 synonyms.
-
-KEYWORD MODE:
-- single: single-word output only
-- multi: meaningful multi-word phrases only
-- mixed: single-word-first, with phrases only when genuinely useful
-Do not alter the existing MIXED behavior.
-
-FINAL ORDER:
-Use the CSVPlanet golden-reference semantic ladder:
-1. main subject
-2. core event/activity
-3. category/industry
-4. setting/environment
-5. objects/work/attributes
-6. geographic/cultural
-7. visual details
-8. concept/theme
-9. broader relevant discovery
-10. action/state variants
-
-Within each tier, single-word keywords precede phrases unless a phrase is the actual stronger searchable concept.
-
-Do NOT use dynamic numerical scoring to reorder the final keyword list.
-Do NOT use fixed quotas per category.
-
-FINAL CHECK:
-- factual
-- buyer-searchable
-- single-word-first
-- semantic expansion
-- no spam
-- no redundant synonyms
-- no unsupported concepts
-- no brand/IP
-- no generic SEO filler
-- strongest terms first
-- exact requested count when supported
-- lowercase
-- selected language
-- return only the final keyword array
+KEEP THE EXISTING MIXED KEYWORD MODE BEHAVIOR UNCHANGED.
 `;
-
-
-
-
 
 
 
@@ -3205,7 +2799,7 @@ export const generateStockMetadata = async (
   const directives = getToolTypeDirectives(toolType);
 
   // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate natural keywords according to UNIVERSAL_KEYWORD_RULES in ${getLanguageName(metadataLanguage)}. Return short words or short natural phrases, never full sentences.`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -3378,20 +2972,12 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 
 
 Rules for Titles:
-1. Think like a buyer: "If I were searching for this asset, what would I call it?"
-2. State WHAT IS ACTUALLY IN THE ASSET first: identify the main subject literally and clearly.
-3. Include the visible ACTION, FLOW, interaction, or arrangement when applicable.
-4. Include the strongest supported CONCEPT only when it is clearly grounded in the visual.
-5. Use natural, searchable language. The title must help a buyer immediately understand what the asset contains.
-6. Do not invent objects, actions, locations, industries, emotions, use cases, or concepts.
-7. Do not turn the title into a keyword list. No comma-separated keyword stuffing.
-8. Do not use subjective marketing language or generic quality descriptors.
-9. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning".
-10. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
+2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
-11. Use Sentence case.
-12. Use easy-to-read natural phrases, not formal or robotic sentence structures.
-13. Title structure should naturally follow: WHAT IS IN THE ASSET + ACTION/FLOW/ARRANGEMENT + SUPPORTED CONCEPT. Not every title requires all three when the visual does not support them.
+3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+4. Use easy-to-read phrases, NOT formal sentence structures.
+5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -3400,14 +2986,6 @@ Rules for Descriptions:
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
 Rules for Keywords:
-IMPORTANT KEYWORD FORMATTING:
-- Do NOT use connector/linking words as standalone keywords or as filler inside keyword phrases.
-- Never generate keywords containing unnecessary conjunctions or prepositions such as "and", "with", "of", "for", "in", "on", "at", "to", "from", "by", "as", "or", "the", "a", or "an".
-- Prefer compact search terms that directly describe the subject, action, concept, context, or commercial intent.
-- Do not create awkward keyword phrases just to join two concepts with connector words.
-- If a phrase can be expressed naturally without a connector word, use the shorter direct search phrase.
-- Keywords must remain natural buyer search terms, not sentence fragments.
-
 ${UNIVERSAL_KEYWORD_RULES}
 
 
@@ -3711,7 +3289,7 @@ OUTPUT FORMAT:
       const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
       const safeKeywords = rawKeywords
         .filter((k: any) => typeof k === 'string')
-        .map((k: string) => removeMicrostockConnectorWords(k))
+        .map((k: string) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' '))
         .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
 
       recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
@@ -3775,7 +3353,7 @@ export const generateBatchStockMetadata = async (
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 60;
   const aiRequestCount = targetCount   // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate natural keywords according to UNIVERSAL_KEYWORD_RULES in ${getLanguageName(metadataLanguage)}. Return short words or short natural phrases, never full sentences.`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
