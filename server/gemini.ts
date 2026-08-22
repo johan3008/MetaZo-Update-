@@ -1191,16 +1191,59 @@ const MICROSTOCK_CONNECTOR_WORDS = new Set([
 ]);
 
 function removeMicrostockConnectorWords(keyword: string): string {
-  return String(keyword || '')
+  const normalized = String(keyword || '')
     .toLowerCase()
     .replace(/[-_/]+/g, ' ')
     .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter(word => !MICROSTOCK_CONNECTOR_WORDS.has(word))
-    .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  if (!normalized) return '';
+
+  const words = normalized.split(' ').filter(Boolean);
+  if (words.length === 1 && MICROSTOCK_CONNECTOR_WORDS.has(words[0])) return '';
+
+  // Preserve legitimate compound phrases. Only strip unnecessary
+  // leading/trailing connector words.
+  while (words.length > 1 && MICROSTOCK_CONNECTOR_WORDS.has(words[0])) words.shift();
+  while (words.length > 1 && MICROSTOCK_CONNECTOR_WORDS.has(words[words.length - 1])) words.pop();
+
+  return words.join(' ').trim();
+}
+
+
+function orderKeywordsByAdobePriority(
+  keywords: string[],
+  visualFacts: any
+): string[] {
+  const primary = (visualFacts?.primary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
+  const actions = (visualFacts?.actions || []).map((x: any) => String(x || '').toLowerCase());
+  const secondary = (visualFacts?.secondary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
+  const settings = (visualFacts?.location_setting || []).map((x: any) => String(x || '').toLowerCase());
+  const attributes = (visualFacts?.visual_characteristics || []).map((x: any) => String(x || '').toLowerCase());
+  const colors = (visualFacts?.colors || []).map((x: any) => String(x || '').toLowerCase());
+  const concepts = (visualFacts?.concepts || []).concat(visualFacts?.atmosphere || []).map((x: any) => String(x || '').toLowerCase());
+
+  const scoreGroup = (keyword: string): number => {
+    const k = keyword.toLowerCase();
+
+    if (primary.some((x: string) => x && k === x || x && k.includes(x))) return 1;
+    if (actions.some((x: string) => x && k === x || x && k.includes(x))) return 2;
+    if (secondary.some((x: string) => x && k === x || x && k.includes(x))) return 3;
+    if (settings.some((x: string) => x && k === x || x && k.includes(x))) return 4;
+    if (attributes.some((x: string) => x && k.includes(x))) return 5;
+    if (colors.some((x: string) => x && k === x)) return 7;
+    if (concepts.some((x: string) => x && k.includes(x))) return 8;
+
+    return 6;
+  };
+
+  return [...keywords].sort((a, b) => {
+    const ga = scoreGroup(a);
+    const gb = scoreGroup(b);
+    if (ga !== gb) return ga - gb;
+    return 0; // preserve provider/AI order within the same Adobe priority group
+  });
 }
 
 function ensureKeywordCount(
@@ -2260,12 +2303,51 @@ function semanticDeduplicate(keywords: string[]): string[] {
     return !multiWord.some(phrase => {
       const words = phrase.split(/\s+/);
       if (words.length < 2 || !words.includes(k)) return false;
-      // Only suppress generic singleton repetition; keep useful standalone
-      // color/material terms such as gold, white, ceramic.
+      // Suppress only a generic singleton when the phrase provides the same intent.
+      // Preserve useful standalone factual terms and genuine compound concepts.
       const preserve = new Set(['gold','white','black','blue','red','green','brown','silver','ceramic','porcelain','wood','metal']);
       return !preserve.has(k);
     });
   });
+}
+
+
+/**
+ * Legacy scoring helper retained for compatibility.
+ * FINAL ORDER MUST NOT use score-based dynamic re-ranking.
+ * Adobe ordered groups are authoritative.
+ */
+function scoreKeywordSearchIntent(
+  keyword: string,
+  visualFacts: any,
+  existingKeywords: string[] = []
+): number {
+  const k = String(keyword || '').toLowerCase().trim();
+  if (!k) return -Infinity;
+
+  let score = 0;
+  const primary = (visualFacts?.primary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
+  const secondary = (visualFacts?.secondary_subjects || []).map((x: any) => String(x?.name || '').toLowerCase());
+  const actions = (visualFacts?.actions || []).map((x: any) => String(x || '').toLowerCase());
+  const settings = (visualFacts?.location_setting || []).map((x: any) => String(x || '').toLowerCase());
+  const concepts = (visualFacts?.concepts || []).map((x: any) => String(x || '').toLowerCase());
+
+  if (primary.some((x: string) => x && k.includes(x))) score += 55;
+  if (secondary.some((x: string) => x && k.includes(x))) score += 25;
+  if (actions.some((x: string) => x && k.includes(x))) score += 20;
+  if (settings.some((x: string) => x && k.includes(x))) score += 15;
+  if (concepts.some((x: string) => x && k.includes(x))) score += 10;
+
+  // Natural compound phrases get a search-intent bonus.
+  const wordCount = k.split(/\s+/).length;
+  if (wordCount === 2 || wordCount === 3) score += 12;
+  if (wordCount >= 5) score -= 10;
+
+  // Penalize exact semantic repetition of already selected terms.
+  const sig = semanticKeySignature(k);
+  if (existingKeywords.some(x => semanticKeySignature(x) === sig)) score -= 100;
+
+  return score;
 }
 
 // ---- LAPISAN 7: PENENTUAN KATEGORI YANG LEBIH AKURAT -----------------------
@@ -2657,6 +2739,8 @@ async function applyMetadataGenKeywordLogic(options: {
     targetCount
   );
 
+  masterPool = orderKeywordsByAdobePriority(masterPool, visualFacts);
+
   let finalKeywords = ensureKeywordCount(
     masterPool,
     targetCount,
@@ -2680,6 +2764,8 @@ async function applyMetadataGenKeywordLogic(options: {
   }
 
   // Final semantic + connector sanitation without changing the established order.
+  finalKeywords = orderKeywordsByAdobePriority(finalKeywords, visualFacts);
+
   finalKeywords = ensureKeywordCount(
     finalKeywords,
     targetCount,
@@ -2707,196 +2793,232 @@ async function applyMetadataGenKeywordLogic(options: {
 // Title and Description generation logic is left unchanged.
 
 const UNIVERSAL_KEYWORD_RULES = `
-UNIVERSAL PROFESSIONAL MICROSTOCK KEYWORD RULES
-KEYWORD-ONLY PRD IMPLEMENTATION
-APPLY IDENTICALLY TO EVERY PROVIDER AND EVERY MODEL
+ADOBE STOCK KEYWORD ENGINE — STRICT ORDERED MODE
 
 ROLE:
-You are a professional microstock SEO keyword specialist and buyer-search analyst.
+Act as a professional Adobe Stock metadata keyword specialist.
+Generate keywords for buyer discovery, following Adobe Stock's published keyword guidance.
 
-PRIMARY OBJECTIVE:
-Analyze the actual asset through VISUAL_FACTS first, then create keywords that help a real microstock buyer find that exact asset.
-Do NOT write keywords like an AI describing what sounds attractive.
-Think:
-"If I were the buyer, what would I type into the search box?"
+CORE ADOBE RULES:
+- Keywords must be accurate, relevant, descriptive, and specific to the asset.
+- Keyword order is critical.
+- The FIRST 10 keywords must contain the most important and relevant search terms because Adobe gives the first 10 keywords the greatest search influence.
+- Include important title words/concepts among the top 10 when applicable.
+- Use one language consistently and match the selected metadata language.
+- Adobe allows up to 49 keywords per content submission. 15–25 is Adobe's recommended range, but if the application user explicitly requests another count, use that exact count while maintaining relevance.
+- Each keyword should normally be one word. A genuine compound term/search phrase may contain multiple words when the concept is naturally searched that way.
+- Do not use keyword spam or irrelevant terms.
+- Use each keyword only once.
 
-PRD VISUAL INPUT FOR KEYWORD GENERATION:
-Use only evidence available from the visual analysis:
-- primary and secondary objects
-- dominant and relevant colors
-- visual style
-- mood / atmosphere when visibly supported
-- context / setting / use case only when visually supported
-- visible actions
-- composition and visual characteristics
-- supported concepts
-- relevant seasonal/event context
-
-HARD PRINCIPLES:
-ACCURACY > KEYWORD COUNT QUALITY
-BUT REQUESTED COUNT = REQUIRED OUTPUT TARGET
-BUYER SEARCH INTENT > "COOL" WORDS
-RELEVANCE > VIRALITY
-LITERAL VISUAL FACTS > AI IMAGINATION
-UNIQUE SEARCH COVERAGE > SEMANTIC REPETITION
-KEYWORD ORDER > RANDOM ORDER
-
-1. BUYER SEARCH INTENT
-- Every keyword must represent a realistic search a microstock buyer could use.
-- Ask what the buyer needs the asset for and what words they would actually type.
-- Do not use words merely because they sound commercial, sophisticated, trendy, or SEO-friendly.
-
-2. FIRST 10 KEYWORDS
-- The first 10 keywords are the highest-value search terms.
-- Prioritize the strongest combination of:
-  primary subject,
-  highly searchable subject phrase,
-  visible action or situation,
-  strongest supported context,
-  strongest supported commercial search intent.
-- Do not waste the first 10 positions on weak colors, mood adjectives, generic filler, minor details, or abstract ideas.
-- The first 10 must describe what buyers are most likely to search for, not what the AI thinks sounds impressive.
-
-3. VISUAL TRUTH
-- Every keyword must be directly visible or strongly supported by VISUAL_FACTS.
-- Never invent objects, actions, locations, professions, industries, audiences, emotions, events, concepts, materials, or commercial use cases.
-- AI interpretation must never override visual evidence.
-
-4. OBJECT AND ELEMENT COVERAGE
-- Identify the main subject first.
-- Then cover important secondary subjects and supporting elements.
-- Do not turn every tiny visible detail into a keyword.
-- A detail belongs only when it provides meaningful search coverage.
-
-5. STYLE
-- Use visual style keywords only when the style is genuinely evident.
-- Examples: realistic photography, flat design, watercolor, 3d render, hand drawn.
-- Do not infer style from the subject alone.
-
-6. MOOD / ATMOSPHERE
-- Mood keywords are allowed only when visually supported.
-- Do not convert an ordinary scene into unsupported concepts such as success, happiness, leadership, innovation, luxury, or productivity.
-
-7. CONTEXT / COMMERCIAL INTENT
-- Context and commercial intent are useful only when supported by the actual visual.
-- Business, technology, food, nature, education, healthcare, finance, lifestyle, etc. must come from evidence.
-- Do not manufacture a commercial use case just because it sounds high-converting.
-
-8. SPECIFIC BUT DISCOVERABLE
-- Avoid over-niche phrases that are unlikely to be searched.
-- Avoid overly generic terms that disappear in broad competition.
-- Prefer the most specific natural search term that still represents a realistic buyer query.
-
-9. LONG-TAIL SEARCH PHRASES
-- Use multi-word phrases when buyers would realistically search them and the phrase accurately represents the asset.
-- A phrase must add meaningful specificity.
-- Do not combine random words just to create a long-tail keyword.
-
-10. NO CONNECTOR / FILLER WORDS
-- Do not output connector or filler words such as:
-  and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
-- Do not output sentence-like keyword phrases.
-- Prefer direct search terms without unnecessary connectors.
-- Example:
-  "business meeting" is valid.
-  "business meeting with laptop" is NOT valid.
-  "business meeting laptop" is the preferred compact search form.
-- This rule applies to generated keywords AND final sanitized keywords.
-
-11. NO KEYWORD SPAM
-- Never create several keywords that express essentially the same search intent.
-- Do not pad the list with:
-  business, businessman, businessperson, business professional
-  when they do not provide distinct search intent.
-- Each keyword must contribute additional discoverability.
-
-12. SEMANTIC DEDUPLICATION
-- Remove exact duplicates.
-- Remove singular/plural duplicates when they represent the same search intent.
-- Remove morphological duplicates.
-- Remove near-identical phrases.
-- Remove a generic keyword when a stronger keyword already covers exactly the same intent.
-- Do not remove genuinely different buyer intents.
-
-13. SEARCH COVERAGE EXPANSION
-When more keywords are requested, expand coverage in this order of opportunity:
-- main subject
-- specific subject description
+SOURCE OF TRUTH:
+VISUAL_FACTS is the source of truth.
+Only use:
+- primary subject
 - secondary subjects
-- visible action/state
-- setting/environment
-- visual style
-- composition / visual characteristic
-- supported concept
-- relevant commercial context
-- relevant seasonal/event context
-- useful broader search terms
-Do not use fixed quotas. The next keyword is simply the next-best unique buyer search.
+- visible actions
+- setting
+- important descriptive attributes
+- visible colors
+- mood/concepts when supported
+- technical/compositional characteristics when genuinely useful
+- supported commercial context
+- supported seasonal/event context
 
-14. ACCURACY + REQUESTED COUNT
-- The user's requested keyword count is an exact target.
+Do not hallucinate facts.
+
+STRICT KEYWORD ORDER — DO NOT DYNAMICALLY RE-RANK:
+Build and preserve the following deterministic order of importance.
+
+GROUP 1 — PRIMARY SUBJECT / MAIN CONTENT
+Positions should begin with the exact main subject and strongest specific description of that subject.
+Examples:
+- woman
+- senior woman
+- arctic fox
+- father daughter
+Only use the compound form when it is a genuine searchable concept.
+
+GROUP 2 — PRIMARY ACTION / STATE
+Immediately after the primary subject, place the most important visible action or state.
+Examples:
+- working
+- carrying
+- running
+- smiling
+- cooking
+Use action terms only when visibly happening.
+
+GROUP 3 — SECONDARY SUBJECTS
+Next place important secondary people, objects, animals, or elements that materially contribute to the asset.
+Ignore insignificant background details.
+
+GROUP 4 — SETTING / ENVIRONMENT
+Then describe where the subject is shown:
+- home
+- office
+- kitchen
+- beach
+- suburban neighborhood
+- outdoors
+Use only visually supported setting terms.
+
+GROUP 5 — SPECIFIC DESCRIPTIVE ATTRIBUTES
+Then add useful factual descriptors:
+- age
+- gender
+- demographic attributes when visually appropriate and permitted
+- material
+- shape
+- appearance
+- quantity
+- distinctive characteristics
+
+GROUP 6 — VISUAL / TECHNICAL CHARACTERISTICS
+Then add genuinely useful visual information:
+- portrait
+- close up
+- aerial view
+- high angle
+- copy space
+- minimalist
+- realistic photography
+Only use characteristics actually represented.
+Do not use generic content-type terms as filler.
+
+GROUP 7 — COLOR / WEATHER / TIME / ENVIRONMENTAL DETAILS
+Then add useful visible attributes:
+- blue
+- green
+- sunny
+- daytime
+- cloudy
+Use only meaningful attributes.
+Do not create a long color list.
+
+GROUP 8 — CONCEPT / MOOD / THEME
+After concrete visual facts, add supported conceptual terms:
+- childhood
+- family
+- celebration
+- solitude
+- friendship
+- wellness
+Only when the concept is clearly represented.
+Do not invent abstract commercial concepts.
+
+GROUP 9 — COMMERCIAL / INDUSTRY / USE CONTEXT
+Only after the visual facts and concepts:
+- real estate
+- business
+- education
+- technology
+- healthcare
+- lifestyle
+Only if clearly supported by the asset.
+Never infer a commercial industry merely because an object could be used in that industry.
+
+GROUP 10 — BROADER RELEVANT TERMS
+Finally add broader but still accurate terms that expand discoverability without repeating earlier meaning.
+Examples:
+- animal
+- mammal
+- family
+- residential
+These must still be relevant.
+
+IMPORTANT:
+This is an ORDERED PATTERN, not a score-based ranking system.
+Do not dynamically move a keyword from a later group above a keyword from an earlier group merely because an AI score says it is stronger.
+The group order is authoritative.
+
+WITHIN EACH GROUP:
+Order terms from most specific/relevant to less specific/relevant.
+Do not randomly reorder across groups.
+
+FIRST 10:
+The first 10 must come from the strongest available terms in Groups 1–4, followed by Group 5 only when necessary.
+Do not place colors, mood, abstract concepts, or generic broad terms in the first 10 if stronger subject/action/setting terms exist.
+
+SEARCH INTENT:
+Think like a buyer, but follow the ordered structure above.
+The buyer-search principle determines which terms are selected inside each group; it does NOT override the Adobe group order.
+
+PHRASE INTEGRITY:
+- Preserve genuine compound concepts such as "ice cream", "real estate", "front yard", "office desk", "sign language", etc. when the phrase is naturally useful.
+- Do not split a genuine compound term into meaningless fragments.
+- Do not create long sentence-like keyword phrases.
+- Do not use phrases merely to manipulate SEO.
+
+DESCRIPTIVE ELEMENTS:
+Follow Adobe's distinction between separate descriptive elements and genuine compound terms.
+For example, descriptive elements such as white, fluffy, young animal can remain separate keywords when appropriate.
+A true compound concept such as ice cream should remain a phrase.
+
+SEMANTIC DEDUPLICATION:
+- Exact duplicates are forbidden.
+- Do not repeat the same keyword.
+- Do not add multiple synonyms that describe the same search intent solely to fill the list.
+- Do not create:
+  happy, happiness, joy, cheerful, fun
+  if they are merely repetitive expressions of the same unsupported/general concept.
+- Keep broader and specific terms only when they provide genuinely different search coverage, e.g. arctic fox + mammal + animal.
+
+ANTI-TAGGING:
+Do not turn every detected visual word into a keyword.
+Important background objects that do not matter to a buyer should be excluded.
+
+NO TITLE/DESCRIPTION FILLER:
+Do not copy words from title or description unless those words are independently relevant to the asset and belong in the correct Adobe order group.
+
+IP / PROHIBITED CONTENT:
+Do not use:
+- trademarks
+- brand names
+- company names
+- artist names
+- names of real known people
+- fictional characters
+- copyrighted creative works
+- camera/file specifications
+- irrelevant file information
+Use generic descriptive language.
+
+NO UNNECESSARY CONNECTORS:
+Do not use standalone connector/filler keywords such as:
+and, with, of, for, in, on, at, to, from, by, as, or, the, a, an.
+Do not remove an internal word from a genuine compound concept merely because it is a connector.
+
+COLOR:
+Normally use only 1–2 useful color terms.
+Color belongs after subject, action, secondary subject, and setting.
+
+EXACT COUNT:
 - 10 requested = exactly 10.
 - 25 requested = exactly 25.
 - 40 requested = exactly 40.
 - 49 requested = exactly 49.
-- Do not intentionally return fewer because a shorter list feels cleaner.
-- Never fill missing positions with spam.
-- If the first pass is insufficient, run additional AI expansion passes grounded in the SAME VISUAL_FACTS and ask only for new, valid, unique buyer searches.
-- Continue expanding until the requested count is reached or the system encounters a hard provider failure.
+- Never exceed the requested count.
+- Never intentionally return fewer when additional relevant terms can be generated from the ordered groups.
+- If the requested count is above Adobe's recommended 15–25 range, expand through later ordered groups and additional genuinely relevant terms.
+- Never use spam to fill the remaining positions.
 
-15. COLOR CONTROL
-- Colors are supporting search terms, not automatic filler.
-- Normally use no more than 1–2 meaningful colors.
-- Only include colors that materially help identify or search for the asset.
-
-16. IP / BRAND / NAME SAFETY
-- Never include brands, trademarks, company names, celebrity names, artist names, copyrighted characters, product model names, franchises, or other protected proper names.
-- Use generic visual equivalents.
-
-17. KEYWORD FORMAT
-- Output lowercase.
-- No punctuation.
-- No emojis.
-- No full sentences.
-- No unnecessary hyphens.
-- Single-word mode remains single-word.
-- Multi-word mode remains natural multi-word phrases.
-- Mixed mode remains mixed.
-- Do not change the existing MIXED behavior.
-
-18. ORDERING
-Rank the final list by:
-1) visual accuracy
-2) buyer search intent
-3) commercial relevance
-4) specificity
-5) broader discoverability
-The strongest search intent must appear first.
-
-19. FINAL BUYER TEST
-For every keyword ask:
-"Would a real buyer reasonably type this when looking for this exact asset?"
-If not, remove it.
-
-20. FINAL QUALITY AUDIT
+FINAL VALIDATION:
 Before returning:
-- verify against VISUAL_FACTS
-- verify the first 10 are strongest buyer searches
-- remove connector/filler words
-- remove spam
-- remove semantic duplicates
-- remove weak generic terms
-- remove imaginary concepts
-- remove irrelevant viral/trending terms
-- keep 1–2 useful colors maximum
-- preserve the requested count
-- preserve the provider-independent keyword philosophy
-
-21. PROVIDER CONSISTENCY
-These rules are provider invariant.
-Gemini, OpenAI, Groq, Mistral, OpenRouter, NVIDIA, Claude, Llama, and other providers must follow the same keyword logic.
-Provider differences must never change the SEO philosophy, search intent ranking, visual grounding, deduplication, connector policy, or requested count.
+1. Verify every keyword against VISUAL_FACTS.
+2. Verify Group 1–4 terms are above later groups.
+3. Verify first 10 contain the strongest subject/action/secondary/setting terms available.
+4. Verify title concepts that are important are represented in the top 10 when relevant.
+5. Remove duplicates.
+6. Remove irrelevant keywords.
+7. Remove unsupported concepts.
+8. Remove brands/IP/prohibited terms.
+9. Remove unnecessary connector/filler keywords.
+10. Keep genuine compound terms intact.
+11. Keep one language only.
+12. Return exactly the requested number.
 `;
+
+
 
 
 
