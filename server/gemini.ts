@@ -228,7 +228,7 @@ function isProhibitedKeyword(word: string): boolean {
          PROHIBITED_KEYWORDS_SET.has(normalized);
 }
 
-function getHeuristicCategories(title: string, keywords: string[]): {
+export function getHeuristicCategories(title: string, keywords: string[]): {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
@@ -327,7 +327,7 @@ function getHeuristicCategories(title: string, keywords: string[]): {
   };
 }
 
-function ensureTitleLength(title: string, keywords: string[], description: string, titleLength?: string): string {
+export function ensureTitleLength(title: string, keywords: string[], description: string, titleLength?: string): string {
   if (!title || title.trim() === "" || title.includes("Write a descriptive title here") || title.includes("<generate a") || title.includes("A highly descriptive") || title.includes("A detailed")) {
     if (description && description.trim().length > 10 && !description.includes("Write a detailed description here") && !description.includes("<generate a") && !description.includes("A highly descriptive") && !description.includes("A detailed")) title = description;
     else if (keywords && keywords.length >= 3) title = keywords.slice(0, 5).join(' ');
@@ -394,7 +394,7 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
   return cleanedTitle;
 }
 
-function ensureDescription(description: string, title: string, keywords: string[]): string {
+export function ensureDescription(description: string, title: string, keywords: string[]): string {
   if (!description || typeof description !== 'string') {
     description = "";
   }
@@ -430,7 +430,12 @@ function ensureDescription(description: string, title: string, keywords: string[
     return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
   
-  return description.trim();
+  const cleaned = description.trim().replace(/\s+/g, ' ');
+  if (cleaned.length <= 200) return cleaned;
+
+  const truncated = cleaned.slice(0, 200);
+  const lastSpace = truncated.lastIndexOf(' ');
+  return (lastSpace > 100 ? truncated.slice(0, lastSpace) : truncated).trim();
 }
 
 const getTitleLengthRule = (titleLength?: string) => {
@@ -1198,63 +1203,536 @@ function isWeakGenericKeyword(keyword: string): boolean {
 function scoreKeywordForRanking(
   keyword: string,
   ctx: KeywordRoleContext,
-  originalIndex: number
+  originalIndex: number,
+  titleTerms: Set<string>
 ): number {
   const normalized = sanitizeForIndexing(keyword);
   const role = classifyKeywordSemanticRole(normalized, ctx);
+
+  const rolePriority: Record<KeywordSemanticRole, number> = {
+    main_subject: 1000,
+    subject_variation: 900,
+    action_state: 800,
+    environment: 700,
+    secondary_subject: 650,
+    concept: 580,
+    seasonal: 520,
+    visual_style: 450,
+    attribute: 400,
+    composition: 330,
+    commercial_use: 220,
+    color: 180,
+    generic: 0
+  };
+
+  let score = rolePriority[role];
+
   const evidenceGroups: Array<{ values: string[]; weight: number }> = [
-    { values: ctx.primary, weight: 120 },
-    { values: ctx.secondary, weight: 88 },
-    { values: ctx.environment, weight: 82 },
-    { values: ctx.actions, weight: 78 },
-    { values: ctx.style, weight: 66 },
-    { values: ctx.concepts, weight: 62 },
-    { values: ctx.seasonal, weight: 54 },
-    { values: ctx.attributes, weight: 48 },
-    { values: ctx.composition, weight: 42 },
-    { values: ctx.colors, weight: 20 },
-    { values: ctx.commercial, weight: 18 }
+    { values: ctx.primary, weight: 140 },
+    { values: ctx.actions, weight: 110 },
+    { values: ctx.environment, weight: 95 },
+    { values: ctx.secondary, weight: 80 },
+    { values: ctx.concepts, weight: 68 },
+    { values: ctx.seasonal, weight: 58 },
+    { values: ctx.style, weight: 48 },
+    { values: ctx.attributes, weight: 40 },
+    { values: ctx.composition, weight: 30 },
+    { values: ctx.colors, weight: 18 },
+    { values: ctx.commercial, weight: 12 }
   ];
 
-  let score = SEMANTIC_ROLE_PRIORITY[role];
-  const exactEvidence = evidenceGroups.some(group =>
-    group.values.some(value => value === normalized)
-  );
-  const partialEvidence = evidenceGroups.some(group =>
-    keywordMatchesEvidence(normalized, group.values)
-  );
+  for (const group of evidenceGroups) {
+    if (group.values.some(value => value === normalized)) {
+      score += group.weight;
+      break;
+    }
+    if (group.values.some(value => keywordMatchesEvidence(normalized, [value]))) {
+      score += Math.round(group.weight * 0.45);
+      break;
+    }
+  }
 
-  if (exactEvidence) score += 30;
-  else if (partialEvidence) score += 10;
-  else score -= 28;
+  const canonical = adobeKeywordCanonical(normalized);
+  const titleMatch = [...titleTerms].some(term =>
+    canonical === term || canonical.includes(term) || term.includes(canonical)
+  );
+  if (titleMatch) score += 160;
 
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  if (wordCount === 1) score += 3;
-  else if (wordCount === 2) score += 8;
-  else if (wordCount === 3) score += 4;
-  else score -= Math.min(18, (wordCount - 3) * 6);
+  if (wordCount === 1) score += 8;
+  else if (wordCount === 2) score += 16;
+  else if (wordCount === 3) score += 7;
+  else score -= 50;
 
-  if (containsKeywordConnector(normalized)) score -= 25;
-  if (role === 'generic') score -= 35;
-  if (role === 'color') score -= 12;
-  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 30;
+  if (containsKeywordConnector(normalized)) score -= 40;
+  if (role === 'generic') score -= 120;
+  if (role === 'color') score -= 18;
+  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 60;
 
-  // Preserve AI order for true ties so ranking remains deterministic.
   return score * 1000 - originalIndex;
 }
+
+
+
+
+export interface KeywordScoreBreakdown {
+  keyword: string;
+  score: number;
+  normalizedScore: number;
+  rank: number;
+  role: KeywordSemanticRole;
+  evidence: string;
+  titleRelevant: boolean;
+  buyerSearchability: number;
+  topTenPriority: "critical" | "high" | "supporting";
+}
+
+export function scoreMetadataGenKeywords(
+  keywords: string[],
+  visualFacts: any
+): KeywordScoreBreakdown[] {
+  const ctx = buildKeywordRoleContext(visualFacts || {});
+  const title = visualFacts?.title || visualFacts?.metadata_title || "";
+  const titleTerms = titleKeywordTerms(title);
+
+  return (Array.isArray(keywords) ? keywords : [])
+    .map((keyword, index) => {
+      const normalized = sanitizeForIndexing(keyword);
+      const role = classifyKeywordSemanticRole(normalized, ctx);
+      const score = scoreKeywordForRanking(keyword, ctx, index, titleTerms);
+      const titleRelevant = [...titleTerms].some(term => {
+        const canonical = adobeKeywordCanonical(normalized);
+        return canonical === term || canonical.includes(term) || term.includes(canonical);
+      });
+      const buyerSearchability = buyerSearchabilityScore(
+        keyword,
+        role,
+        visualFacts
+      );
+
+      let evidence = "Role-based relevance";
+      const groups: Array<[string, string[]]> = [
+        ["main subject", ctx.primary],
+        ["action/state", ctx.actions],
+        ["environment", ctx.environment],
+        ["secondary subject", ctx.secondary],
+        ["concept", ctx.concepts],
+        ["seasonal", ctx.seasonal],
+        ["visual style", ctx.style],
+        ["attribute", ctx.attributes],
+        ["composition", ctx.composition],
+        ["color", ctx.colors],
+        ["commercial use", ctx.commercial]
+      ];
+      for (const [label, values] of groups) {
+        if (values.some(value => keywordMatchesEvidence(normalized, [value]))) {
+          evidence = `Supported by ${label} evidence`;
+          break;
+        }
+      }
+
+      return {
+        keyword,
+        score,
+        normalizedScore: Math.max(0, Math.min(100, Math.round(score / 14))),
+        rank: 0,
+        role,
+        evidence,
+        titleRelevant,
+        buyerSearchability,
+        topTenPriority: "supporting" as const
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      topTenPriority:
+        index === 0
+          ? "critical"
+          : index < 10
+            ? "high"
+            : "supporting"
+    }));
+}
+
+export interface MetadataTitleSearchability {
+  score: number;
+  status: "PASS" | "REVIEW" | "FAIL";
+  wordCount: number;
+  concreteTermCount: number;
+  buyerIntentTerms: string[];
+  warnings: string[];
+}
+
+export function validateMetadataTitleSearchability(
+  title: string,
+  keywords: string[],
+  visualFacts: any = {}
+): MetadataTitleSearchability {
+  const normalized = normalizeAdobeKeyword(title);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const keywordSet = new Set(
+    (Array.isArray(keywords) ? keywords : []).map(keyword => adobeKeywordCanonical(keyword))
+  );
+  const titleTerms = [...titleKeywordTerms(title)];
+
+  const concreteTermCount = titleTerms.filter(term => {
+    const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+    return factsText.includes(term);
+  }).length;
+
+  const buyerIntentTerms = titleTerms.filter(term =>
+    keywordSet.has(term) ||
+    [...keywordSet].some(keyword => keyword.includes(term) || term.includes(keyword))
+  );
+
+  const warnings: string[] = [];
+  if (words.length < 3) warnings.push("Title is too vague for buyer search.");
+  if (words.length > 18) warnings.push("Title is too long and may read like keyword stuffing.");
+  if (concreteTermCount < Math.min(2, titleTerms.length)) {
+    warnings.push("Title lacks enough concrete visual terms supported by the asset.");
+  }
+  if (buyerIntentTerms.length < Math.min(2, titleTerms.length)) {
+    warnings.push("Title has weak overlap with the strongest searchable keywords.");
+  }
+
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        Math.min(1, concreteTermCount / Math.max(1, Math.min(4, titleTerms.length))) * 45 +
+        Math.min(1, buyerIntentTerms.length / Math.max(1, Math.min(4, titleTerms.length))) * 35 +
+        (words.length >= 3 && words.length <= 14 ? 20 : 8)
+      )
+    )
+  );
+
+  return {
+    score,
+    status: score >= 80 ? "PASS" : score >= 60 ? "REVIEW" : "FAIL",
+    wordCount: words.length,
+    concreteTermCount,
+    buyerIntentTerms,
+    warnings
+  };
+}
+
+export interface MetadataTitleKeywordConsistency {
+  score: number;
+  status: "PASS" | "REVIEW" | "FAIL";
+  titleTerms: string[];
+  coveredTitleTerms: string[];
+  missingImportantTitleTerms: string[];
+  unsupportedTitleTerms: string[];
+  topTenKeywordCoverage: number;
+  titleSearchability: MetadataTitleSearchability;
+  warnings: string[];
+}
+
+export function validateMetadataTitleKeywordConsistency(
+  title: string,
+  keywords: string[],
+  visualFacts: any = {}
+): MetadataTitleKeywordConsistency {
+  const normalizedTitle = normalizeAdobeKeyword(title);
+  const titleTerms = [...titleKeywordTerms(normalizedTitle)];
+  const keywordCanonicals = (Array.isArray(keywords) ? keywords : [])
+    .map(keyword => adobeKeywordCanonical(keyword));
+
+  const coveredTitleTerms = titleTerms.filter(term =>
+    keywordCanonicals.some(keyword =>
+      keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+
+  const topTen = keywordCanonicals.slice(0, 10);
+  const topTenCovered = titleTerms.filter(term =>
+    topTen.some(keyword =>
+      keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+
+  const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+  const unsupportedTitleTerms = titleTerms.filter(term => {
+    const words = term.split(/\s+/);
+    return words.length > 0 && !words.every(word => factsText.includes(word));
+  });
+
+  const missingImportantTitleTerms = titleTerms.filter(term =>
+    !topTen.some(keyword =>
+      keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+
+  const coverage = titleTerms.length
+    ? coveredTitleTerms.length / titleTerms.length
+    : 1;
+  const topTenCoverage = titleTerms.length
+    ? topTenCovered.length / titleTerms.length
+    : 1;
+
+  const warnings: string[] = [];
+  if (unsupportedTitleTerms.length) {
+    warnings.push("Title contains terms not supported by VISUAL_FACTS.");
+  }
+  if (missingImportantTitleTerms.length) {
+    warnings.push("Important title concepts are missing from the first 10 keywords.");
+  }
+  if (coverage < 0.5) {
+    warnings.push("Title and keyword set have weak semantic overlap.");
+  }
+
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        coverage * 55 +
+        topTenCoverage * 30 +
+        (unsupportedTitleTerms.length === 0 ? 15 : 0)
+      )
+    )
+  );
+
+  const titleSearchability = validateMetadataTitleSearchability(
+    title,
+    keywords,
+    visualFacts
+  );
+
+  return {
+    score: Math.round((score + titleSearchability.score) / 2),
+    status:
+      unsupportedTitleTerms.length > 0 ||
+      titleSearchability.status === "FAIL"
+        ? "FAIL"
+        : score < 80 ||
+            missingImportantTitleTerms.length > 0 ||
+            titleSearchability.status === "REVIEW"
+          ? "REVIEW"
+          : "PASS",
+    titleTerms,
+    coveredTitleTerms,
+    missingImportantTitleTerms,
+    unsupportedTitleTerms,
+    topTenKeywordCoverage: Math.round(topTenCoverage * 100),
+    titleSearchability,
+    warnings: [...warnings, ...titleSearchability.warnings]
+  };
+}
+
+
 
 export function rankMetadataGenKeywords(
   keywords: string[],
   visualFacts: any
 ): string[] {
   const ctx = buildKeywordRoleContext(visualFacts || {});
-  return keywords
+  const titleTerms = titleKeywordTerms(visualFacts?.title || visualFacts?.metadata_title);
+
+  const ranked = keywords
     .map((keyword, index) => ({
       keyword,
-      score: scoreKeywordForRanking(keyword, ctx, index)
+      score: scoreKeywordForRanking(keyword, ctx, index, titleTerms)
     }))
     .sort((a, b) => b.score - a.score)
     .map(item => item.keyword);
+
+  return ranked;
+}
+
+
+
+const BUYER_SEARCH_PRIORITY_TERMS = new Set([
+  "family", "business", "technology", "healthcare", "education", "finance",
+  "food", "travel", "nature", "lifestyle", "people", "portrait", "office",
+  "home", "work", "team", "meeting", "marketing", "construction", "industry",
+  "agriculture", "farming", "medical", "fitness", "wellness", "background",
+  "texture", "landscape", "city", "architecture", "transportation", "nature",
+  "sustainability", "environment", "celebration", "holiday", "festival"
+]);
+
+function buyerSearchabilityScore(
+  keyword: string,
+  role: KeywordSemanticRole,
+  visualFacts: any
+): number {
+  const normalized = normalizeAdobeKeyword(keyword);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  let score = 50;
+
+  if (BUYER_SEARCH_PRIORITY_TERMS.has(normalized)) score += 12;
+  if (words.length === 1) score += 8;
+  if (words.length === 2) score += 10;
+  if (words.length === 3) score += 4;
+  if (words.length > 3) score -= 20;
+
+  if (
+    role === "main_subject" ||
+    role === "subject_variation" ||
+    role === "action_state" ||
+    role === "environment"
+  ) {
+    score += 20;
+  }
+
+  const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+  if (words.every(word => factsText.includes(word))) score += 10;
+
+  if (ADOBE_KEYWORD_FILLER.has(normalized)) score -= 40;
+  if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) score -= 40;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+const ADOBE_STOCK_MAX_KEYWORDS = 49;
+const ADOBE_STOCK_IDEAL_MIN_KEYWORDS = 15;
+const ADOBE_STOCK_IDEAL_MAX_KEYWORDS = 35;
+
+const ADOBE_KEYWORD_FILLER = new Set([
+  "image", "photo", "picture", "photograph", "stock", "visual", "design",
+  "nice", "beautiful", "amazing", "professional", "quality", "focus",
+  "sharp", "blurry", "detail", "composition", "element", "object", "thing",
+  "subject", "generic", "background"
+]);
+
+const ADOBE_KEYWORD_IP_PATTERN =
+  /\b(google|apple|microsoft|amazon|facebook|instagram|youtube|nike|adidas|coca[\s-]?cola|pepsi|disney|netflix|openai|tesla)\b/i;
+
+const ADOBE_KEYWORD_TECHNICAL_PATTERN =
+  /\b(?:iso|f\/?\d+(?:\.\d+)?|1\/\d+s|\d+(?:\.\d+)?\s*mm|megapixel|megapixels|fps|4k|8k|hd|uhd|jpeg|jpg|png|raw|tiff|psd|ai|eps|svg|mb|gb)\b/i;
+
+const ADOBE_KEYWORD_NUMBER_PATTERN = /\b\d+(?:\.\d+)?\b/;
+
+function normalizeAdobeKeyword(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function adobeKeywordCanonical(value: string): string {
+  const normalized = normalizeAdobeKeyword(value);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return words
+    .map(word => {
+      if (word.endsWith("ies") && word.length > 4) return `${word.slice(0, -3)}y`;
+      if (word.endsWith("es") && word.length > 4) return word.slice(0, -2);
+      if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);
+      return word;
+    })
+    .join(" ");
+}
+
+const TITLE_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "into",
+  "is", "of", "on", "or", "the", "to", "with", "without", "near", "over",
+  "under", "during"
+]);
+
+function titleKeywordTerms(title?: string): Set<string> {
+  return new Set(
+    normalizeAdobeKeyword(title)
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !TITLE_STOP_WORDS.has(word))
+      .map(word => adobeKeywordCanonical(word))
+  );
+}
+
+function isAdobeKeywordCompliant(
+  keyword: string,
+  visualFacts: any,
+  title?: string
+): boolean {
+  const normalized = normalizeAdobeKeyword(keyword);
+  if (!normalized || normalized.length < 2) return false;
+  if (ADOBE_KEYWORD_FILLER.has(normalized)) return false;
+  if (isProhibitedKeyword(normalized) || ADOBE_KEYWORD_IP_PATTERN.test(normalized)) return false;
+  if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) return false;
+  if (ADOBE_KEYWORD_NUMBER_PATTERN.test(normalized)) return false;
+
+  const wordCount = normalized.split(/\s+/).length;
+  if (wordCount > 3) return false;
+
+  // Adobe favors concise concepts. Keep multi-word phrases only when they
+  // are explicitly supported by the visual facts rather than keyword stuffing.
+  if (wordCount > 1) {
+    const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+    const phraseWords = normalized.split(/\s+/);
+    const allWordsSupported = phraseWords.every(word => factsText.includes(word));
+    if (!allWordsSupported) return false;
+  }
+
+  return true;
+}
+
+export interface AdobeKeywordValidation {
+  valid: boolean;
+  keywords: string[];
+  removed: Array<{ keyword: string; reason: string }>;
+  warnings: string[];
+  maxKeywords: number;
+  idealRange: [number, number];
+}
+
+export function validateAdobeStockKeywords(
+  keywords: unknown,
+  visualFacts: any = {},
+  title?: string
+): AdobeKeywordValidation {
+  const source = Array.isArray(keywords) ? keywords : [];
+  const seen = new Set<string>();
+  const valid: string[] = [];
+  const removed: Array<{ keyword: string; reason: string }> = [];
+
+  for (const raw of source) {
+    const keyword = normalizeAdobeKeyword(raw);
+    if (!keyword) continue;
+
+    const canonical = adobeKeywordCanonical(keyword);
+    if (seen.has(canonical)) {
+      removed.push({ keyword, reason: "duplicate_or_singular_plural_duplicate" });
+      continue;
+    }
+
+    if (!isAdobeKeywordCompliant(keyword, visualFacts, title)) {
+      removed.push({ keyword, reason: "not_compliant_with_adobe_keyword_rules" });
+      continue;
+    }
+
+    seen.add(canonical);
+    valid.push(keyword);
+    if (valid.length >= ADOBE_STOCK_MAX_KEYWORDS) break;
+  }
+
+  const titleTerms = titleKeywordTerms(title);
+  const topTenTitleTerms = [...titleTerms].filter(term =>
+    valid.slice(0, 10).some(keyword => adobeKeywordCanonical(keyword).includes(term))
+  );
+
+  const warnings: string[] = [];
+  if (valid.length > ADOBE_STOCK_IDEAL_MAX_KEYWORDS) {
+    warnings.push("More than 35 keywords: review whether lower-ranked terms add real search value.");
+  }
+  if (valid.length < ADOBE_STOCK_IDEAL_MIN_KEYWORDS) {
+    warnings.push("Fewer than 15 keywords: add only additional visually supported terms; never use filler.");
+  }
+  if (titleTerms.size > 0 && topTenTitleTerms.length < Math.min(3, titleTerms.size)) {
+    warnings.push("Important title terms are missing from the first 10 keywords.");
+  }
+
+  return {
+    valid: removed.length === 0 && valid.length <= ADOBE_STOCK_MAX_KEYWORDS,
+    keywords: valid,
+    removed,
+    warnings,
+    maxKeywords: ADOBE_STOCK_MAX_KEYWORDS,
+    idealRange: [ADOBE_STOCK_IDEAL_MIN_KEYWORDS, ADOBE_STOCK_IDEAL_MAX_KEYWORDS]
+  };
 }
 
 export function ensureKeywordCount(
@@ -1266,49 +1744,53 @@ export function ensureKeywordCount(
   categoryId?: number,
   keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
-  const target = Math.max(0, Number.isFinite(Number(targetCount)) ? Number(targetCount) : 0);
+  const requested = Number(targetCount);
+  const target = Math.min(
+    ADOBE_STOCK_MAX_KEYWORDS,
+    Math.max(0, Number.isFinite(requested) ? Math.floor(requested) : 0)
+  );
   if (!target) return [];
 
-  const normalize = (value: any): string => String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\\s-]/g, ' ')
-    .replace(/\\s+/g, ' ')
-    .trim();
+  const normalizedCandidates = (Array.isArray(keywords) ? keywords : [])
+    .filter((value): value is string => typeof value === "string")
+    .map(normalizeAdobeKeyword)
+    .filter(Boolean)
+    .map(keyword => {
+      if (keywordMode === "single") return keyword.split(/\s+/)[0] || "";
+      return keyword;
+    })
+    .filter(keyword => isAdobeKeywordCompliant(keyword, visualFacts, title));
 
-  const singularKey = (value: string): string => {
-    const v = normalize(value);
-    if (v.endsWith('ies') && v.length > 4) return `${v.slice(0, -3)}y`;
-    if (v.endsWith('es') && v.length > 4) return v.slice(0, -2);
-    if (v.endsWith('s') && v.length > 3) return v.slice(0, -1);
-    return v;
+  const validation = validateAdobeStockKeywords(
+    normalizedCandidates,
+    visualFacts,
+    title
+  );
+
+  // Ranking happens after compliance cleanup so forbidden, duplicated, and
+  // spammy terms can never consume a high-priority position.
+  const rankingFacts = {
+    ...(visualFacts || {}),
+    title: title || visualFacts?.title || visualFacts?.metadata_title
   };
+  const ranked = rankMetadataGenKeywords(
+    validation.keywords.slice(0, target),
+    rankingFacts
+  );
 
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const raw of Array.isArray(keywords) ? keywords : []) {
-    let keyword = normalize(raw);
-    if (!keyword || isProhibitedKeyword(keyword) || isWeakGenericKeyword(keyword)) continue;
-
-    if (keywordMode === 'single') {
-      keyword = keyword.split(/\\s+/)[0] || '';
-    }
-
-    if (!keyword) continue;
-
-    const key = singularKey(keyword);
-    if (seen.has(key)) continue;
-
-    seen.add(key);
-    result.push(keyword);
-
-    if (result.length >= target) break;
+  const titleTerms = titleKeywordTerms(title);
+  if (titleTerms.size > 0) {
+    const titleMatched = ranked.filter(keyword =>
+      [...titleTerms].some(term => adobeKeywordCanonical(keyword).includes(term))
+    );
+    const remaining = ranked.filter(keyword => !titleMatched.includes(keyword));
+    return [...titleMatched, ...remaining].slice(0, target);
   }
 
-  // Rank only after cleanup so semantic relevance controls the final order.
-  // No synthetic keywords or quota-based terms are introduced here.
-  return rankMetadataGenKeywords(result, visualFacts);
+  return ranked.slice(0, target);
 }
+
+
 function getAIClient(): any {
   return {
     models: {
@@ -2509,14 +2991,53 @@ Before returning the list, check every keyword:
 - Does its position make sense compared with the Main Subject?
 Remove weak, unrelated, or spammy terms.
 
+11A. ADOBE STOCK COMPLIANCE
+- Maximum 49 keywords per asset.
+- 15–35 keywords is a practical target range when the asset genuinely supports that many.
+- Never add filler just to reach 15, 35, or any requested count.
+- The first 10 keywords must carry the strongest relevance.
+- Important words/concepts from the title should appear within the first 10 when relevant.
+- Use one metadata language consistently.
+- Use each keyword only once; singular/plural variants do not need separate entries.
+- Avoid trademarks, brands, product names, artist names, celebrities, private-person names,
+  government agency names, and third-party intellectual property.
+- Avoid camera specifications, file formats, file sizes, numbers, and technical capture data.
+- Prefer concise concepts. Do not create long descriptive sentences as keywords.
+- Do not keyword speculative uses, audiences, industries, locations, demographics, or concepts.
+- Do not use background details that are irrelevant to a buyer.
+- Do not use opposite concepts unless both are genuinely represented and meaningful.
+- Prefer specific visual terms over vague broader terms when both compete for a position.
+
 12. EXACT COUNT
 The requested count is mandatory.
 - If the user requests 10, return exactly the 10 strongest valid keywords.
 - If the user requests 25, return exactly the 25 strongest valid keywords.
 - If the user requests 40, return exactly the 40 strongest valid keywords.
+- If the user requests more than 49, cap the output at 49.
 - Never use filler merely to hit the number.
 - If the first generation is short, perform another AI generation pass using the same VISUAL_FACTS and ask only for additional valid keywords that have not already been represented.
 - Re-rank the complete candidate list after expansion.
+
+12B. BUYER SEARCH LANGUAGE / SEO
+- Write metadata in the natural vocabulary a stock buyer would type into search.
+- Prefer concrete nouns, observable actions, settings, subjects, and commercially recognizable concepts.
+- Prefer common searchable wording over literary, poetic, clever, or unnecessarily technical language.
+- Use the most specific common term supported by the visual asset; do not use obscure synonyms only for SEO.
+- Do not repeat the same concept through unnecessary synonyms or keyword stuffing.
+- Title should read naturally as a human search-relevant description, not as a keyword list.
+- Keyword order must reflect buyer search priority: what is shown first and what buyers are most likely to search for.
+- SEO must never override visual accuracy. A high-search-volume term that is not visibly supported must be rejected.
+- Avoid speculative buyer intent such as "copy space", "advertising", "banner", "website", "social media", "marketing" unless the visual composition or concept clearly supports it.
+- Use commercially useful concepts only when they are visually defensible.
+
+12A. TITLE ↔ KEYWORD CONSISTENCY
+- The title is the semantic anchor for the keyword set, not a separate SEO field.
+- Important title concepts should be represented in the first 10 keywords when visually supported.
+- Do not force every title word into keywords; grammatical filler words do not count.
+- A title term that is not visually supported must be removed or rewritten rather than compensated for with keywords.
+- Keywords must not introduce a major subject that contradicts or materially changes the title.
+- Title and keywords must describe the same asset, subject, action, setting, and visual context.
+- When title and keywords disagree, prefer VISUAL_FACTS and correct the metadata rather than inventing evidence.
 
 13. PROVIDER CONSISTENCY
 The same keyword philosophy applies to Gemini, GPT, Mistral, Claude, Llama, Groq, OpenRouter, NVIDIA, or any other provider. The provider may phrase a keyword differently, but Main Subject priority, visual accuracy, natural ordering, and exact count remain mandatory.
@@ -2670,12 +3191,16 @@ async function applyMetadataGenKeywordLogic(options: {
     }
   }
 
-  const masterPool = buildMasterKeywordCandidatePool(cleaned, visualFacts, targetCount);
+  const rankingFacts = {
+    ...(visualFacts || {}),
+    title: visualFacts?.title || visualFacts?.metadata_title || ""
+  };
+  const masterPool = buildMasterKeywordCandidatePool(cleaned, rankingFacts, targetCount);
   let finalKeywords = ensureKeywordCount(
     masterPool,
     targetCount,
-    visualFacts,
-    undefined,
+    rankingFacts,
+    rankingFacts.title,
     undefined,
     undefined,
     keywordMode
@@ -2799,7 +3324,7 @@ characters, or other prohibited IP.
 Never invent locations, occupations, demographics, events, or concepts.
 
 COUNT:
-The requested keyword count is the target maximum/output count.
+The requested keyword count is the target maximum/output count, capped at Adobe Stock's 49-keyword limit.
 If the user requests 25, select the 25 strongest valid keywords.
 Never fill missing positions with unrelated words just to reach the number.
 If additional keywords are needed, ask the AI for additional VISUALLY SUPPORTED
@@ -2858,7 +3383,8 @@ export const generateStockMetadata = async (
   }
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 50;
+  const requestedKeywordCount = parseInt(String(keywordCount), 10) || 25;
+  const targetCount = Math.min(ADOBE_STOCK_MAX_KEYWORDS, Math.max(0, requestedKeywordCount));
 
   const directives = getToolTypeDirectives(toolType);
 
@@ -3301,6 +3827,21 @@ OUTPUT FORMAT:
 
     // 1.5. Enforce professional title length strictly
     data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength);
+
+    const keywordQuality = scoreMetadataGenKeywords(data.keywords || [], {
+      ...(visualFacts || {}),
+      title: data.title
+    });
+    const titleKeywordConsistency = validateMetadataTitleKeywordConsistency(
+      data.title || "",
+      data.keywords || [],
+      visualFacts || {}
+    );
+    data.keyword_quality = {
+      scores: keywordQuality,
+      title_keyword_consistency: titleKeywordConsistency,
+      title_searchability: titleKeywordConsistency.titleSearchability
+    };
 
     // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
     const parsedCategoryId = parseInt(String(data.category_id), 10);
@@ -6714,6 +7255,17 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     if (report.stabilityStatus) {
       gt.stability = `${report.stabilityStatus} (index ${report.stabilityIndex})`;
     }
+    if (report.temporal) {
+      gt.temporal = {
+        compared_frames: report.temporal.comparedFrames,
+        mean_abs_diff: report.temporal.meanAbsDiff,
+        duplicate_rate: report.temporal.duplicateRate,
+        luminance_delta_mean: report.temporal.luminanceDeltaMean,
+        luminance_delta_max: report.temporal.luminanceDeltaMax,
+        flicker_score: report.temporal.flickerScore,
+        motion_consistency_score: report.temporal.motionConsistencyScore
+      };
+    }
     if (report.scene_detection?.scene_changes_detected) {
       gt.scene_changes = `${report.scene_detection.scene_changes?.length || 0} cuts detected`;
     }
@@ -6762,6 +7314,10 @@ IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolut
 - Resolution < 1920x1080 = FAIL mandatory
 - FPS < 23.976 = FAIL mandatory
 - Stability FLICKERING = FAIL mandatory
+- Deterministic duplicate-frame rate >= 20% = FAIL mandatory
+- Deterministic flicker score >= 70 = FAIL mandatory
+- Deterministic motion consistency score < 50 = FAIL mandatory
+- Temporal morphing and ghosting remain AI-vision checks; deterministic UNKNOWN must not be treated as PASS
 
 ======= YOUR SUBJECTIVE ASSESSMENT =======
 Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:

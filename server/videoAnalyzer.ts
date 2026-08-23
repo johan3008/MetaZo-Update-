@@ -65,6 +65,18 @@ export interface VideoTechnicalReport {
   }>;
   stabilityIndex: number;
   stabilityStatus: string;
+  temporal?: {
+    comparedFrames: number;
+    meanAbsDiff: number;
+    duplicatePairs: number;
+    duplicateRate: number;
+    luminanceDeltaMean: number;
+    luminanceDeltaMax: number;
+    flickerScore: number;
+    motionConsistencyScore: number;
+    ghostingStatus: "UNKNOWN";
+    temporalMorphingStatus: "UNKNOWN";
+  };
 }
 
 // ============================================================
@@ -325,6 +337,122 @@ function analyzeFramePixelData(jpegBuffer: Buffer, index: number): VideoTechnica
 }
 
 // ============================================================
+// 6B. Temporal frame-difference analysis
+// ============================================================
+function decodeTemporalSample(jpegBuffer: Buffer): {
+  width: number;
+  height: number;
+  luminance: number;
+  samples: Uint8Array;
+} | null {
+  try {
+    const raw = jpeg.decode(jpegBuffer, { useTarray: false });
+    const { width, height, data } = raw;
+    const targetWidth = Math.min(160, width);
+    const targetHeight = Math.max(1, Math.round((height / width) * targetWidth));
+    const samples = new Uint8Array(targetWidth * targetHeight);
+    let sum = 0;
+
+    for (let y = 0; y < targetHeight; y++) {
+      const sourceY = Math.min(height - 1, Math.floor((y / targetHeight) * height));
+      for (let x = 0; x < targetWidth; x++) {
+        const sourceX = Math.min(width - 1, Math.floor((x / targetWidth) * width));
+        const off = (sourceY * width + sourceX) * 4;
+        const lum = Math.round(
+          0.299 * data[off] +
+          0.587 * data[off + 1] +
+          0.114 * data[off + 2]
+        );
+        samples[y * targetWidth + x] = lum;
+        sum += lum;
+      }
+    }
+
+    return {
+      width: targetWidth,
+      height: targetHeight,
+      luminance: sum / samples.length,
+      samples
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function analyzeTemporalFrames(
+  frameBuffers: Buffer[],
+  expectedFullFrameCount?: number
+): VideoTechnicalReport["temporal"] {
+  const fullCount = Math.min(
+    frameBuffers.length,
+    Math.max(2, expectedFullFrameCount || frameBuffers.length)
+  );
+  const buffers = frameBuffers.slice(0, fullCount);
+  const decoded = buffers.map(decodeTemporalSample);
+  if (decoded.some(item => !item) || decoded.length < 2) return undefined;
+
+  const valid = decoded as Array<NonNullable<ReturnType<typeof decodeTemporalSample>>>;
+  const pairDiffs: number[] = [];
+  const luminanceDeltas: number[] = [];
+
+  for (let i = 1; i < valid.length; i++) {
+    const a = valid[i - 1];
+    const b = valid[i];
+    const count = Math.min(a.samples.length, b.samples.length);
+    let diff = 0;
+
+    for (let j = 0; j < count; j++) {
+      diff += Math.abs(a.samples[j] - b.samples[j]);
+    }
+
+    pairDiffs.push(diff / count);
+    luminanceDeltas.push(Math.abs(a.luminance - b.luminance));
+  }
+
+  const duplicatePairs = pairDiffs.filter(diff => diff < 1.5).length;
+  const duplicateRate = duplicatePairs / pairDiffs.length;
+  const meanAbsDiff = pairDiffs.reduce((sum, value) => sum + value, 0) / pairDiffs.length;
+  const luminanceDeltaMean =
+    luminanceDeltas.reduce((sum, value) => sum + value, 0) / luminanceDeltas.length;
+  const luminanceDeltaMax = Math.max(...luminanceDeltas);
+
+  const highDeltaPairs = pairDiffs.filter(diff => diff > 45).length;
+  const alternatingLuminance =
+    luminanceDeltas.length >= 3 &&
+    luminanceDeltas.slice(1).every((value, index) => {
+      const previous = luminanceDeltas[index];
+      return Math.abs(value - previous) < Math.max(8, previous * 0.6);
+    });
+
+  const flickerScore = Math.min(
+    100,
+    luminanceDeltaMean * 2 +
+      highDeltaPairs / pairDiffs.length * 35 +
+      (alternatingLuminance ? 20 : 0)
+  );
+
+  const motionConsistencyScore = Math.max(
+    0,
+    100 -
+      Math.abs(meanAbsDiff - 12) * 2 -
+      (duplicateRate > 0.2 ? 30 : 0)
+  );
+
+  return {
+    comparedFrames: valid.length,
+    meanAbsDiff: Math.round(meanAbsDiff * 100) / 100,
+    duplicatePairs,
+    duplicateRate: Math.round(duplicateRate * 1000) / 1000,
+    luminanceDeltaMean: Math.round(luminanceDeltaMean * 100) / 100,
+    luminanceDeltaMax: Math.round(luminanceDeltaMax * 100) / 100,
+    flickerScore: Math.round(flickerScore * 100) / 100,
+    motionConsistencyScore: Math.round(motionConsistencyScore * 100) / 100,
+    ghostingStatus: "UNKNOWN",
+    temporalMorphingStatus: "UNKNOWN"
+  };
+}
+
+// ============================================================
 // MAIN: Full pipeline analysis
 // ============================================================
 
@@ -399,18 +527,17 @@ export async function analyzeVideoTechnicallyLightweight(videoPath: string, fram
 
   const filterData = await filterPromise;
 
-  // Stability index (simple luminance diff)
-  let stabilityIndex = 0;
-  if (frameAnalysis.length > 1) {
-    let diffSum = 0;
-    for (let i = 1; i < frameAnalysis.length; i++) {
-      diffSum += Math.abs(frameAnalysis[i].averageLuminance - frameAnalysis[i - 1].averageLuminance);
-    }
-    stabilityIndex = diffSum / (frameAnalysis.length - 1);
-  }
+  const temporal = analyzeTemporalFrames(
+    framesBase64.map(frame => Buffer.from(
+      frame.replace(/^data:image\/jpeg;base64,/, '').replace(/^data:image\/png;base64,/, ''),
+      'base64'
+    )),
+    Math.min(6, framesBase64.length)
+  );
+  const stabilityIndex = temporal?.luminanceDeltaMean ?? 0;
   let stabilityStatus: string = 'STABLE';
-  if (stabilityIndex > 45) stabilityStatus = 'FLICKERING';
-  else if (stabilityIndex > 20) stabilityStatus = 'UNSTABLE';
+  if ((temporal?.flickerScore ?? 0) >= 70) stabilityStatus = 'FLICKERING';
+  else if ((temporal?.flickerScore ?? 0) >= 40) stabilityStatus = 'UNSTABLE';
 
   // AKURASI: Dapatkan hasil audio analysis
   const audioData = await audioPromise;
@@ -425,6 +552,7 @@ export async function analyzeVideoTechnicallyLightweight(videoPath: string, fram
     frameAnalysis,
     stabilityIndex: Math.round(stabilityIndex * 10) / 10,
     stabilityStatus,
+    temporal,
     audio: audioData
   };
 }
@@ -451,18 +579,17 @@ export async function analyzeVideoTechnically(videoPath: string, framesBase64: s
     frameAnalysis.push(analyzeFramePixelData(Buffer.from(clean, 'base64'), i + 1));
   }
 
-  // Stability index
-  let stabilityIndex = 0;
-  if (frameAnalysis.length > 1) {
-    let diffSum = 0;
-    for (let i = 1; i < frameAnalysis.length; i++) {
-      diffSum += Math.abs(frameAnalysis[i].averageLuminance - frameAnalysis[i - 1].averageLuminance);
-    }
-    stabilityIndex = diffSum / (frameAnalysis.length - 1);
-  }
+  const temporal = analyzeTemporalFrames(
+    framesBase64.map(frame => Buffer.from(
+      frame.replace(/^data:image\/jpeg;base64,/, '').replace(/^data:image\/png;base64,/, ''),
+      'base64'
+    )),
+    Math.min(6, framesBase64.length)
+  );
+  const stabilityIndex = temporal?.luminanceDeltaMean ?? 0;
   let stabilityStatus: string = 'STABLE';
-  if (stabilityIndex > 45) stabilityStatus = 'FLICKERING';
-  else if (stabilityIndex > 20) stabilityStatus = 'UNSTABLE';
+  if ((temporal?.flickerScore ?? 0) >= 70) stabilityStatus = 'FLICKERING';
+  else if ((temporal?.flickerScore ?? 0) >= 40) stabilityStatus = 'UNSTABLE';
 
   console.log('[videoAnalyzer] 6/6 — PySceneDetect: scene change analysis...');
   const sceneData = await runSceneDetection(videoPath, ffmpegPath, probeData.duration);
@@ -475,6 +602,7 @@ export async function analyzeVideoTechnically(videoPath: string, framesBase64: s
     scene_detection: sceneData,
     frameAnalysis,
     stabilityIndex: Math.round(stabilityIndex * 10) / 10,
-    stabilityStatus
+    stabilityStatus,
+    temporal
   };
 }

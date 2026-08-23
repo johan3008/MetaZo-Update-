@@ -53,16 +53,16 @@ interface QualityReport {
     strengths: string[];
     detailed_feedback: string;
     ai_vision_checks?: {
-      blur?: { status: "PASS" | "FAIL"; note: string };
-      composition?: { status: "PASS" | "FAIL"; note: string };
-      lighting?: { status: "PASS" | "FAIL"; note: string };
-      watermark?: { status: "PASS" | "FAIL"; note: string };
-      logo?: { status: "PASS" | "FAIL"; note: string };
-      text?: { status: "PASS" | "FAIL"; note: string };
-      anatomical_errors?: { status: "PASS" | "FAIL"; note: string };
-      ip_risk?: { status: "PASS" | "FAIL"; note: string };
-      proportion_defects?: { status: "PASS" | "FAIL"; note: string };
-      stock_acceptance?: { status: "PASS" | "FAIL"; note: string };
+      blur?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      composition?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      lighting?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      watermark?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      logo?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      text?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      anatomical_errors?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      ip_risk?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      proportion_defects?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
+      stock_acceptance?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
       metadata?: { title: string; keywords: string[] };
     };
   };
@@ -1237,15 +1237,15 @@ export const ImageQualityCheck: React.FC<{
                                     // dan catatan fallback selalu JUJUR bahwa data tidak dikembalikan AI.
                                     const failedKeys: string[] = (r as any).failed_checks || (r.ai_vision as any)?.failed_checks || [];
                                     const issueText = ((r.technical_issues || []) as string[]).join(' ').toLowerCase();
-                                    const fallbackCheck = (key: string, issueKeywords: string[] = []): { status: "PASS" | "FAIL"; note: string } => {
+                                    const fallbackCheck = (key: string, issueKeywords: string[] = []): { status: "PASS" | "FAIL" | "UNKNOWN"; note: string } => {
                                       const inferredFail = failedKeys.includes(key) || issueKeywords.some(kw => issueText.includes(kw));
-                                      const status: "PASS" | "FAIL" = (inferredFail || r.recommendation === "FAIL") ? "FAIL" : "PASS";
+                                      const status: "PASS" | "FAIL" | "UNKNOWN" = inferredFail ? "FAIL" : "UNKNOWN";
                                       const note = t.language === 'Bahasa'
                                         ? "Data pemeriksaan ini tidak dikembalikan AI — status mengikuti keputusan akhir laporan dan temuan teknis lainnya."
                                         : "This check was not returned by the AI — status follows the report's final decision and other technical findings.";
                                       return { status, note };
                                     };
-                                    const legalFallback = (key: string): { status: "PASS" | "FAIL"; note: string } =>
+                                    const legalFallback = (key: string): { status: "PASS" | "FAIL" | "UNKNOWN"; note: string } =>
                                       (r.legal_status || '').includes('VIOLATION')
                                         ? { status: "FAIL", note: t.language === 'Bahasa' ? "Terdeteksi pelanggaran legal/IP pada laporan akhir." : "Legal/IP violation detected in the final report." }
                                         : fallbackCheck(key);

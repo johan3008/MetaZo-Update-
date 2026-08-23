@@ -17,7 +17,7 @@ interface QualityReport {
   strengths: string[];
   detailed_feedback: string;
   quality_checks?: {
-    [key: string]: { status: "PASS" | "FAIL"; note: string } | undefined;
+    [key: string]: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string } | undefined;
   };
   metadata?: {
     title: string;
@@ -302,61 +302,33 @@ export const VideoQualityCheck: React.FC<{
   const analyzeVideo = async () => {
     if (!file) return;
     if (!isLicensed && dailyGenCount >= getDailyLimit()) {
-        if (setShowLimitModal) setShowLimitModal(true);
-        return;
+      if (setShowLimitModal) setShowLimitModal(true);
+      return;
     }
-    setLoading(true); setError(null); setReport(null);
+
+    setLoading(true);
+    setError(null);
+    setReport(null);
+
     try {
-      // PERBAIKAN TIMEOUT: Ekstrak frame di browser, server hanya AI
-      console.log('[Video Audit] Extracting frames client-side...');
-      const frames = await extractVideoFrames(file, 3);
-      const activeModel = aiOptions?.model || 'gemini-2.0-flash';
-      
+      const formData = new FormData();
+      formData.append('video', file);
+      formData.append('tolerance', tolerance);
+      formData.append('language', t.language || 'English');
+      if (aiOptions?.model) formData.append('model', aiOptions.model);
 
-      // ⚡ BYPASS VERCEL TIMEOUT: Panggil Gemini langsung dari browser
-      const apiKey = Array.isArray(aiOptions?.geminiKeys)
-        ? aiOptions.geminiKeys[0]
-        : String(aiOptions?.geminiKeys || '');
-      if (!apiKey) throw new Error('Gemini API key not configured in Settings.');
-
-      const imageParts = frames.map(f => ({
-        inlineData: { mimeType: 'image/jpeg', data: f.split(',')[1] }
-      }));
-
-      const systemPrompt = `You are a strict Adobe Stock QA Curator. Analyze ${frames.length} video frames.
-Check: blur, noise, overexposure, underexposure, black/frozen frames, flickering, camera shake, out of focus, motion consistency, temporal morphing, texture warping, ghosting, geometry consistency, AI artifacts, watermark, logo, text, deformed objects, bad anatomy, compression artifacts, blocking, banding, white balance, motion blur, duplicate/empty frames, cropped subjects, wrong perspective, low aesthetic quality, log profile, upscaled video, visible transitions, audio quality.
-FAIL for any defect. Return JSON with: visual_scan_analysis, legal_status, technical_issues[], strengths[], overall_score, technical_score, visual_score, recommendation (PASS/FAIL/RETOUCH), adobe_stock_readiness, detailed_feedback, quality_checks{}. Be concise, valid JSON only.`;
-
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`,
-        { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ parts: [...imageParts, { text: `Tolerance: ${tolerance}. Language: ${t.language || 'English'}. Return full JSON.` }] }],
-            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
-          })
-        }
-      );
-
-      if (!geminiRes.ok) {
-        const errText = await geminiRes.text();
-        throw new Error(`Gemini error (${geminiRes.status}): ${errText.substring(0, 200)}`);
-      }
-
-      const geminiJson = await geminiRes.json();
-      const raw = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      let data;
-      try { data = JSON.parse(raw); } catch(e) {
-        data = JSON.parse(raw.replace(/```json\s*/gi,'').replace(/```/g,'').trim());
-      }
-      console.log('[Video Audit] Result:', data.recommendation, 'score:', data.overall_score);
-      
-      // Ensure all quality_checks keys exist
-      if (!data.quality_checks) data.quality_checks = {};
-      ['blur','noise','overexposure','underexposure','black_frame','frozen_frame','flickering','camera_shake','out_of_focus','motion_consistency','visual_quality','temporal_morphing','texture_warping','ghosting','geometry_consistency','ai_artifact','watermark','logo','text','deformed_object','bad_anatomy','compression_artifacts','blocking','banding','white_balance','motion_blur','duplicate_frame','empty_frame','cropped_subject','cut_off_object','wrong_perspective','low_aesthetic_quality','log_profile','upscaled_video','visible_transitions'].forEach(k => {
-        if (!data.quality_checks[k]) data.quality_checks[k] = { status: 'UNKNOWN', note: 'Not assessed by AI' };
+      const response = await fetch('/api/check-video-quality', {
+        method: 'POST',
+        headers: getHeaders(aiOptions),
+        body: formData
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to analyze ${file.name}`);
+      }
+
+      const data = await response.json();
       setReport(data);
 
       if (incrementDailyCount) {
@@ -364,7 +336,7 @@ FAIL for any defect. Return JSON with: visual_scan_analysis, legal_status, techn
       }
     } catch (err: any) {
       console.error('[Video Audit] Error:', err);
-      setError(err.message || 'An unexpected error occurred while analyzing the video.');
+      setError(err?.message || 'An unexpected error occurred while analyzing the video.');
     } finally {
       setLoading(false);
     }
