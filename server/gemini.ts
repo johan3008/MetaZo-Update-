@@ -2110,7 +2110,7 @@ export const callOpenAICompatibleWithRetry = async (
          return data.choices[0].message.content;
       }
       
-      throw new Error(\`[\${provider.toUpperCase()}] Unexpected response format: \${JSON.stringify(data)}\`);
+      throw new Error(`[${provider.toUpperCase()}] Unexpected response format: ${JSON.stringify(data)}`);
       
     } catch (err: any) {
       lastErr = err;
@@ -2119,7 +2119,7 @@ export const callOpenAICompatibleWithRetry = async (
          continue;
       }
       if (attempt < maxAttempts - 1) {
-         console.warn(\`[\${provider.toUpperCase()}] Retry \${attempt + 1}/\${maxAttempts} due to error: \${err.message}\`);
+         console.warn(`[${provider.toUpperCase()}] Retry ${attempt + 1}/${maxAttempts} due to error: ${err.message}`);
          continue;
       }
       break;
@@ -3400,21 +3400,21 @@ async function applyMetadataGenKeywordLogic(options: {
 
 
 const UNIVERSAL_KEYWORD_RULES = `
-You are an elite microstock metadata expert specializing in SEO for commercial digital assets (Adobe Stock, Shutterstock). Generate highly discoverable, strictly formatted professional keywords for the analyzed visual asset.
+You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine. Generate highly discoverable, strictly formatted professional keywords for the analyzed visual asset.
 
-KEYWORD GENERATION RULES (CRITICAL):
-1. COUNT & VISUAL TRUTH (NO NGAWUR): Generate exactly 40-50 highly relevant professional keywords. Every single keyword MUST be traceable to the VISUAL_FACTS. STRICTLY FORBIDDEN to hallucinate, guess, or invent popular trends, industries, or concepts that are not visibly present.
-2. PROFESSIONAL PHRASING OVER SINGLE WORDS: Top microstock keywords are almost always 2-3 word phrases (e.g., "artificial intelligence", "working from home", "financial success", "young woman smiling", "macro photography"). Prioritize highly searched natural phrases instead of dumping single standalone words that lack context.
-3. THE TOP 10 RULE (STRICT ORDERING): The first 10 keywords are the absolute most critical. They MUST describe the core essence of the asset perfectly (exact main subject, critical action, distinctive detail, and exact buyer search intent). Order keywords from HIGHEST semantic relevance down to LOWEST relevance (background elements, abstract concepts).
-4. CONCEPTUAL LAYERING (THE PROFESSIONAL STRUCTURE):
-   - Layer 1 (Literal): Who, What, Where (e.g., "business people", "office building", "laptop computer").
-   - Layer 2 (Action/Detail): What is happening, lighting, style (e.g., "shaking hands", "lens flare", "isometric 3d render").
-   - Layer 3 (Conceptual/Thematic): The mood or meaning (e.g., "teamwork", "corporate success", "global communication").
-5. ABSOLUTELY NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "nice", "perfect", "high quality", "best", "image", "picture", "element", or "thing". Do not use stop words ("a", "an", "the", "and").
-6. NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or platform names (e.g. Apple, Nike, Adobe, Shutterstock). NO AI terms ("midjourney", "chatgpt", "dalle"). NO "copyright" or "logo".
-7. FORMAT: All keywords must be lowercase, singular (where grammatically appropriate), free of duplicates/near-duplicate synonyms, and each entry must be a strong noun/verb or 2-3 word phrase.
-8. RELEVANCE GATE: Every keyword must be something a real stock buyer would type to find THIS EXACT asset. Reject generic filler.
-9. NO KEYWORD STUFFING: Do not spam 15 synonyms of "business" (e.g., office, corporate, business, clerical, workspace). Pick the 2-3 strongest phrases and move on to other visual elements.
+KEYWORD GENERATION RULES FOR ADOBE SENSEI (CRITICAL):
+1. ADOBE SENSEI NODE RELATIONSHIPS: Adobe Sensei maps keywords based on relational visual nodes (Subject + Environment + Action). Your keywords must bridge these nodes seamlessly (e.g., instead of just "car" and "road", include "driving car", "road trip", "transportation concept").
+2. COUNT & VISUAL TRUTH (NO NGAWUR): Generate exactly 40-50 highly relevant professional keywords. Every single keyword MUST be traceable to the VISUAL_FACTS. STRICTLY FORBIDDEN to hallucinate, guess, or invent popular trends, industries, or concepts that are not visibly present.
+3. EXACT PHRASAL MATCHING OVER SINGLE WORDS: Top microstock algorithms reward 2-3 word natural phrases (e.g., "artificial intelligence", "working from home", "financial success", "young woman smiling", "macro photography"). Prioritize highly searched exact-match phrases instead of dumping single standalone words that lack context.
+4. THE SENSEI TOP 10 RULE (STRICT ORDERING): Adobe Stock places over 70% of search weight on the FIRST 10 keywords. They MUST describe the core essence of the asset perfectly (exact main subject, critical action, distinctive detail, and exact buyer search intent). Order keywords from HIGHEST semantic relevance down to LOWEST relevance (background elements, abstract concepts).
+5. CONCEPTUAL LAYERING (THE PROFESSIONAL STRUCTURE):
+   - Layer 1 (Literal Core): Who, What, Where (e.g., "business people", "office building", "laptop computer").
+   - Layer 2 (Action/Detail): What is happening, lighting, visual style (e.g., "shaking hands", "lens flare", "isometric 3d render").
+   - Layer 3 (Conceptual/Thematic Bridge): The mood, emotional trigger, or business meaning (e.g., "teamwork", "corporate success", "global communication").
+6. ABSOLUTELY NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "nice", "perfect", "high quality", "best", "image", "picture", "element", or "thing". Do not use stop words ("a", "an", "the", "and").
+7. NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or platform names (e.g. Apple, Nike, Adobe, Shutterstock). NO AI terms ("midjourney", "chatgpt", "dalle"). NO "copyright" or "logo".
+8. FORMAT: All keywords must be lowercase, singular (where grammatically appropriate), free of duplicates/near-duplicate synonyms, and each entry must be a strong noun/verb or 2-3 word phrase.
+9. NO KEYWORD STUFFING: Do not spam 15 synonyms of "business" (e.g., office, corporate, business, clerical, workspace). Pick the 2-3 strongest phrases and move on to other visual elements to maximize Sensei's semantic reach.
 10. KEEP THE EXISTING MIXED KEYWORD MODE BEHAVIOR UNCHANGED.
 `;
 
