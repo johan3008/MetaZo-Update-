@@ -1,3 +1,192 @@
+
+/**
+ * CSVPLANET-STYLE AI SEARCH RANKING
+ *
+ * Source-derived behavior: CSVPlanet publicly describes:
+ * - strongest keywords first
+ * - single-word keyword mode
+ * - niche and concept coverage
+ * - specific subject, location, action, concept and usage terms
+ * - commercial intent / buyer use cases
+ *
+ * Implementation principle:
+ * AI decides which terms actually apply to the asset.
+ * No hardcoded keyword vocabulary or category quotas.
+ */
+const CSVPLANET_STYLE_AI_RANKING_RULES = `
+CSVPLANET-STYLE STOCK SEARCH RANKING
+
+The keyword list must be relevance-ranked for stock-buyer search.
+
+1. PRIMARY VISUAL SUBJECT
+Start with the strongest, most specific visible subject.
+Examples are illustrative only, not a vocabulary whitelist.
+
+2. SPECIFIC VISUAL DETAILS
+Add important visible objects, setting, location type, activity,
+compositionally meaningful details, and other concrete search terms.
+
+3. ACTION / ACTIVITY
+Include actions only when visually supported.
+
+4. NICHE / CONCEPT
+Add supported niche or conceptual terms that explain why a buyer
+might search for the asset.
+
+5. COMMERCIAL / USAGE INTENT
+When visually and contextually justified, include realistic usage
+terms that connect the asset to projects such as education, healthcare,
+marketing, website, presentation, advertising, travel, agriculture,
+business, or other applicable uses.
+
+Do not invent commercial uses merely because they are possible.
+The AI must decide whether the asset genuinely supports them.
+
+RANKING:
+- strongest and most specific search terms first
+- important subject terms before weak supporting terms
+- specific phrases can outrank generic single words when they represent
+  a stronger real search intent
+- niche and concept terms should appear only when supported
+- usage terms should never displace a clearly stronger visual subject
+- first 10 keywords are the highest-priority search terms
+
+KEYWORD FORM:
+- use natural basic English
+- single-word terms are preferred when they carry the concept cleanly
+- natural multi-word phrases are allowed when they create meaningful
+  search intent
+- never create artificial keyword combinations
+- never repeat the same concept in multiple grammatical forms
+
+GENERIC FILTER:
+Reject generic/filler terms such as words equivalent to:
+image, photo, picture, visual, subject, focus, sharp, quality,
+design, beautiful, colorful, element — unless a word has a specific
+asset-supported meaning that is genuinely useful.
+
+COLOR:
+Do not add ordinary colors merely because pixels contain that color.
+Use color only when the AI determines it is a meaningful search attribute.
+
+SEMANTIC DEDUPLICATION:
+AI decides whether two terms express the same searchable concept.
+Keep distinct concepts even when related.
+
+SEARCH COVERAGE:
+Aim for a balanced set across:
+- visual object/subject
+- setting/location
+- action
+- niche/concept
+- legitimate usage/commercial intent
+
+Do not force all five groups.
+The asset determines which groups are valid.
+
+COUNT:
+Generate enough strong candidates for the requested count, then select
+only the strongest valid terms. Never pad the list with weak keywords.
+
+FINAL:
+The result should look like a clean stock keyword list written by an
+experienced contributor, not a raw computer-vision tag dump.
+`;
+
+
+/**
+ * AI-ONLY KEYWORD SEMANTICS
+ *
+ * AI decides keyword meaning, search intent, semantic equivalence and ranking.
+ * Code does not maintain a hardcoded noun/verb/adjective/concept vocabulary.
+ * Code only performs mechanical validation after AI generation.
+ */
+const AI_ONLY_KEYWORD_RULES = `
+${CSVPLANET_STYLE_AI_RANKING_RULES}
+
+AI IS THE AUTHORITY FOR KEYWORD SEMANTICS.
+
+Analyze the actual visual evidence and determine:
+- nouns / subjects / objects
+- verbs / actions / activities
+- adjectives / descriptive characteristics
+- natural specific search phrases
+- conceptual and contextual search intent
+- semantic equivalence between different word forms
+- keyword priority and ranking
+
+Do NOT use hardcoded vocabulary dictionaries.
+Do NOT force noun/verb/adjective/concept quotas.
+Do NOT invent keywords to fill the requested count.
+
+SEARCH INTENT COVERAGE:
+Use, when supported by the asset:
+1. exact subject searches
+2. subject + action searches
+3. subject + attribute searches
+4. natural specific phrases
+5. legitimate conceptual/contextual searches
+
+SEMANTIC DEDUPLICATION:
+AI must recognize equivalent forms such as:
+Asia / Asian / Asians
+terrace / terraces / terraced
+farmer / farmers
+
+Choose the strongest single representation.
+
+Do NOT merge genuinely different search concepts merely because they are related.
+For example, farmer, farming and harvesting may all remain if each contributes
+a distinct buyer search intent.
+
+QUALITY:
+- Use natural basic English.
+- Prefer real stock-buyer search terms.
+- No filler or generic photo/UI words.
+- No unsupported inference.
+- No artificial word concatenation.
+- No ordinary pixel-color inventory.
+- First 10 keywords have the strongest search value.
+- Never pad weak terms just to reach the requested count.
+
+FINAL PRINCIPLE:
+AI decides WHAT the keyword means and WHETHER it is useful.
+Code only validates the final output mechanically.
+`;
+
+function validateAIKeywordOutput(
+  keywords: unknown,
+  targetCount: number
+): string[] {
+  const limit = Math.max(1, Math.min(49, Number(targetCount) || 25));
+  if (!Array.isArray(keywords)) return [];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  // Preserve the AI's ranking order; validation must never re-rank semantically.
+  for (const value of keywords) {
+    const keyword = String(value ?? '')
+      .trim()
+      .replace(/\s+/g, ' ');
+
+    if (!keyword) continue;
+
+    const exactKey = keyword.toLowerCase();
+    if (seen.has(exactKey)) continue;
+
+    seen.add(exactKey);
+    result.push(keyword);
+
+    if (result.length >= limit) break;
+  }
+
+  return result;
+}
+
+
+const SEARCH_INTENT_KEYWORD_RULES = AI_ONLY_KEYWORD_RULES;
+
 import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -3013,7 +3202,7 @@ export const generateStockMetadata = async (
   }
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
+  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 50) : 25;
   const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
 
   const directives = getToolTypeDirectives(toolType);
@@ -3720,7 +3909,7 @@ export const generateBatchStockMetadata = async (
   const dreamstimeCategoriesText = DREAMSTIME_MAIN_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 25) : 25;
+  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 50) : 25;
   const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
   let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}.`;
   let keywordRulePromptText = `SEMANTIC STOCK SEARCH: think like a buyer searching for this exact asset. Generate only terms grounded in the supplied visual facts. Start with concrete subjects, then useful distinguishing attributes, setting, action, mood, style, season or concept when relevant. Do not force category quotas, 70/30 splits, viral buzzwords or filler. Trend terms are only a small boost when visually supported. Do not invent use cases, industries, locations, people, objects or events. Keep terms natural, searchable, lowercase and short. Colors are allowed when useful. No brands, trademarks, famous people, fictional characters or artist names.`;

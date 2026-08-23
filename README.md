@@ -18,3 +18,15 @@ View your app in AI Studio: https://ai.studio/apps/fbf59a1c-9fc6-4c20-897b-601c9
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## MetadataGen Search Intent Keywords
+
+MetadataGen keyword generation covers nouns, actions, descriptive terms, natural specific phrases, and supported conceptual/contextual search intent without fixed category quotas. Semantic canonicalization and relevance filtering remain deterministic.
+
+## MetadataGen AI-Only Keyword Semantics
+
+Keyword semantics, search-intent roles, semantic equivalence, phrase selection, and ranking are determined by the AI from visual evidence. The application does not use hardcoded noun/verb/adjective/concept vocabulary lists; code only performs mechanical output validation.
+
+## CSVPlanet-style AI Keyword Ranking
+
+MetadataGen now uses an AI-first ranking policy modeled on CSVPlanet's publicly described workflow: strongest keywords first, specific subject/location/action/concept/usage coverage, niche/concept coverage, natural phrases, and commercial-intent terms when supported. The vocabulary remains AI-generated rather than hardcoded.
