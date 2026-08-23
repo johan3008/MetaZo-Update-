@@ -1154,9 +1154,9 @@ function classifyKeywordSemanticRole(keyword: string, ctx: KeywordRoleContext): 
   if (keywordMatchesEvidence(k, ctx.secondary)) return 'secondary_subject';
   if (keywordMatchesEvidence(k, ctx.style)) return 'visual_style';
   if (keywordMatchesEvidence(k, ctx.composition)) return 'composition';
-  if (keywordMatchesEvidence(k, ctx.seasonal) || words.some(w => SEASONAL_TERMS.has(w))) return 'seasonal';
+  if (keywordMatchesEvidence(k, ctx.seasonal)) return 'seasonal';
   if (keywordMatchesEvidence(k, ctx.concepts)) return 'concept';
-  if (keywordMatchesEvidence(k, ctx.commercial) || COMMERCIAL_TERMS.has(k)) return 'commercial_use';
+  if (keywordMatchesEvidence(k, ctx.commercial)) return 'commercial_use';
   if (keywordMatchesEvidence(k, ctx.attributes)) return 'attribute';
   return 'generic';
 }
@@ -1195,7 +1195,69 @@ function isWeakGenericKeyword(keyword: string): boolean {
   return BASIC_ENGLISH_FILLER_KEYWORDS.has(k);
 }
 
-function ensureKeywordCount(
+function scoreKeywordForRanking(
+  keyword: string,
+  ctx: KeywordRoleContext,
+  originalIndex: number
+): number {
+  const normalized = sanitizeForIndexing(keyword);
+  const role = classifyKeywordSemanticRole(normalized, ctx);
+  const evidenceGroups: Array<{ values: string[]; weight: number }> = [
+    { values: ctx.primary, weight: 120 },
+    { values: ctx.secondary, weight: 88 },
+    { values: ctx.environment, weight: 82 },
+    { values: ctx.actions, weight: 78 },
+    { values: ctx.style, weight: 66 },
+    { values: ctx.concepts, weight: 62 },
+    { values: ctx.seasonal, weight: 54 },
+    { values: ctx.attributes, weight: 48 },
+    { values: ctx.composition, weight: 42 },
+    { values: ctx.colors, weight: 20 },
+    { values: ctx.commercial, weight: 18 }
+  ];
+
+  let score = SEMANTIC_ROLE_PRIORITY[role];
+  const exactEvidence = evidenceGroups.some(group =>
+    group.values.some(value => value === normalized)
+  );
+  const partialEvidence = evidenceGroups.some(group =>
+    keywordMatchesEvidence(normalized, group.values)
+  );
+
+  if (exactEvidence) score += 30;
+  else if (partialEvidence) score += 10;
+  else score -= 28;
+
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount === 1) score += 3;
+  else if (wordCount === 2) score += 8;
+  else if (wordCount === 3) score += 4;
+  else score -= Math.min(18, (wordCount - 3) * 6);
+
+  if (containsKeywordConnector(normalized)) score -= 25;
+  if (role === 'generic') score -= 35;
+  if (role === 'color') score -= 12;
+  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 30;
+
+  // Preserve AI order for true ties so ranking remains deterministic.
+  return score * 1000 - originalIndex;
+}
+
+export function rankMetadataGenKeywords(
+  keywords: string[],
+  visualFacts: any
+): string[] {
+  const ctx = buildKeywordRoleContext(visualFacts || {});
+  return keywords
+    .map((keyword, index) => ({
+      keyword,
+      score: scoreKeywordForRanking(keyword, ctx, index)
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.keyword);
+}
+
+export function ensureKeywordCount(
   keywords: string[],
   targetCount: number,
   visualFacts: any,
@@ -1243,10 +1305,9 @@ function ensureKeywordCount(
     if (result.length >= target) break;
   }
 
-  // No category quotas, semantic expansion, SEO engine, market ranking,
-  // visual-grounding gate, fallback keywords, or artificial modifiers.
-  // The AI-generated order is preserved after basic cleanup/deduplication.
-  return result;
+  // Rank only after cleanup so semantic relevance controls the final order.
+  // No synthetic keywords or quota-based terms are introduced here.
+  return rankMetadataGenKeywords(result, visualFacts);
 }
 function getAIClient(): any {
   return {
@@ -2564,9 +2625,9 @@ Generate only NEW, evidence-backed candidates.`;
  * CANONICAL METADATAGEN KEYWORD PIPELINE
  *
  * This is the single keyword path used by MetadataGen for both single and batch
- * generation. The AI is responsible for semantic keyword selection/order.
- * Application code only performs safe normalization, protected-term exclusion,
- * semantic deduplication, exact-count trimming, and AI expansion when needed.
+ * generation. The AI supplies semantic candidates. Application code then
+ * performs safe normalization, protected-term exclusion, semantic deduplication,
+ * evidence-based relevance ranking, exact-count trimming, and AI expansion when needed.
  * No fixed slots, category quotas, percentage quotas, or synthetic fillers.
  */
 async function applyMetadataGenKeywordLogic(options: {
@@ -2707,6 +2768,10 @@ KEYWORD ORDER:
 Order from strongest and most searchable to weaker supporting terms.
 The first 10 keywords are the most important and must contain the clearest
 terms for the exact asset. Do not waste them on generic filler.
+The application will re-rank candidates using VISUAL_FACTS, prioritizing exact
+main-subject evidence, then directly supported secondary subjects, environment,
+actions, concepts, and attributes. Do not assume that a keyword is strong merely
+because it is commercially popular.
 
 SPECIFICITY:
 Prefer "rice" over "crop" when rice is visibly identifiable.
@@ -2789,12 +2854,11 @@ export const generateStockMetadata = async (
 
   let exifInstruction = "";
   if (exifMetadata && Object.keys(exifMetadata).length > 0) {
-    exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+    exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(exifMetadata, null, 2)}\n\`\`\`\nGunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temuan visual. Jangan memasukkan GPS, tanggal, software, kamera, lensa, atau detail EXIF lain ke title, description, atau keywords kecuali detail tersebut terlihat jelas atau memang relevan secara editorial.`;
   }
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 60;
-  const aiRequestCount = Math.max(targetCount + 10, Math.ceil(targetCount * 1.25));
+  const targetCount = parseInt(String(keywordCount), 10) || 50;
 
   const directives = getToolTypeDirectives(toolType);
 
@@ -3126,7 +3190,7 @@ Rules for Titles:
   ${directives.titleRule}
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Include a commercial concept only when it is clearly supported by visible evidence (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
 - Do not include explanations, labels, quotation marks, or numbering.
@@ -3292,7 +3356,20 @@ OUTPUT FORMAT:
         .map((k: string) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' '))
         .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
 
-      recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
+      try {
+        recovery.keywords = await applyMetadataGenKeywordLogic({
+          rawKeywords: safeKeywords,
+          visualFacts,
+          targetCount,
+          provider,
+          model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-3.1-flash-lite-preview',
+          keywordMode,
+          metadataLanguage
+        });
+      } catch (keywordRecoveryError) {
+        console.warn("[JohMeta Pipeline] Keyword recovery normalization failed:", keywordRecoveryError);
+        recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
+      }
 
       const parsedRecoveryCategory = parseInt(String(recovery.category_id), 10);
       if (!Number.isFinite(parsedRecoveryCategory) || parsedRecoveryCategory < 1 || parsedRecoveryCategory > 21) {
@@ -3351,8 +3428,7 @@ export const generateBatchStockMetadata = async (
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = parseInt(String(keywordCount), 10) || 60;
-  const aiRequestCount = targetCount   // Dynamic keyword rules: no fixed slots, no category quotas.
+  const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
   let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
 
@@ -3477,7 +3553,7 @@ OUTPUT FORMAT:
       let itemVisionInstruction = visionSystemInstruction;
       let itemExifDesc = "";
       if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
-        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(items[i].exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(items[i].exifMetadata, null, 2)}\n\`\`\`\nGunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temuan visual. Jangan memasukkan GPS, tanggal, software, kamera, lensa, atau detail EXIF lain ke title, description, atau keywords kecuali detail tersebut terlihat jelas atau memang relevan secara editorial.`;
         itemVisionInstruction += exifInstruction;
         itemExifDesc = `\nASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:\n${JSON.stringify(items[i].exifMetadata, null, 2)}`;
       }
@@ -3708,7 +3784,7 @@ Rules for Titles:
   ${directives.titleRule}
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Include a commercial concept only when it is clearly supported by visible evidence (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
 - Do not include explanations, labels, quotation marks, or numbering.
