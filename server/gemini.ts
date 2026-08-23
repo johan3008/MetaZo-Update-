@@ -1756,7 +1756,13 @@ export function ensureKeywordCount(
     .map(normalizeAdobeKeyword)
     .filter(Boolean)
     .map(keyword => {
-      if (keywordMode === "single") return keyword.split(/\s+/)[0] || "";
+      if (keywordMode === "single") {
+        const words = keyword.split(/\s+/).filter(Boolean);
+        // Take the last (head noun) word instead of the first, so meaning is
+        // preserved (e.g. "rice field" -> "field", not the less specific "rice"
+        // being kept while "field" is dropped).
+        return words.length > 0 ? words[words.length - 1] : "";
+      }
       return keyword;
     })
     .filter(keyword => isAdobeKeywordCompliant(keyword, visualFacts, title));
@@ -3183,8 +3189,18 @@ async function applyMetadataGenKeywordLogic(options: {
     if (phrase.length <= 1) continue;
 
     if (keywordMode === 'single') {
-      for (const word of phrase.split(/\s+/)) {
-        if (word.length > 1 && !isProhibitedKeyword(word)) cleaned.push(word);
+      const words = phrase.split(/\s+/).filter(w => w.length > 1 && !isProhibitedKeyword(w));
+      if (words.length === 0) {
+        // fully stripped away, nothing usable
+      } else if (words.length === 1) {
+        cleaned.push(words[0]);
+      } else {
+        // Multi-word phrase in single-word mode: do NOT explode into every
+        // fragment (e.g. "shallow depth of field" -> shallow/depth/field is
+        // meaningless noise). Take the head noun — normally the LAST
+        // non-stopword token in an English noun phrase — as the single
+        // representative keyword, since it best preserves searchable meaning.
+        cleaned.push(words[words.length - 1]);
       }
     } else if (!isProhibitedKeyword(phrase)) {
       cleaned.push(phrase);
@@ -3366,6 +3382,13 @@ export const generateStockMetadata = async (
   // Dynamic keyword rules: no fixed slots, no category quotas.
   let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
+  if (keywordMode === 'single') {
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. EVERY keyword MUST be exactly ONE word — no phrases, no hyphenated compounds, no multi-word terms. If a concept is naturally a phrase (e.g. "depth of field", "natural light"), pick the single most searchable head word instead (e.g. "bokeh" or "field"; "daylight" or "light") rather than splitting the phrase into fragments. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ABSOLUTE):\nEvery keyword you output MUST be exactly one word. Do NOT output any 2+ word phrase.\nWhen a concept is naturally expressed as a phrase, do NOT split it into separate fragment words that lose meaning on their own (e.g. do NOT output "shallow" and "depth" as two entries for "shallow depth of field"). Instead, choose ONE single word that best represents that concept as a whole (e.g. "bokeh", "closeup", "daylight"). Never output stopword fragments like "of", "in", "with" as standalone keywords.`;
+  } else if (keywordMode === 'multi') {
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer natural short multi-word phrases (2-3 words) over single words whenever a real stock buyer would search that way (e.g. "rice field" rather than just "field"). Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
+  }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
@@ -3947,6 +3970,13 @@ export const generateBatchStockMetadata = async (
   const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
   let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
+  if (keywordMode === 'single') {
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. EVERY keyword MUST be exactly ONE word — no phrases, no hyphenated compounds, no multi-word terms. If a concept is naturally a phrase (e.g. "depth of field", "natural light"), pick the single most searchable head word instead (e.g. "bokeh" or "field"; "daylight" or "light") rather than splitting the phrase into fragments. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ABSOLUTE):\nEvery keyword you output MUST be exactly one word. Do NOT output any 2+ word phrase.\nWhen a concept is naturally expressed as a phrase, do NOT split it into separate fragment words that lose meaning on their own (e.g. do NOT output "shallow" and "depth" as two entries for "shallow depth of field"). Instead, choose ONE single word that best represents that concept as a whole (e.g. "bokeh", "closeup", "daylight"). Never output stopword fragments like "of", "in", "with" as standalone keywords.`;
+  } else if (keywordMode === 'multi') {
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer natural short multi-word phrases (2-3 words) over single words whenever a real stock buyer would search that way (e.g. "rice field" rather than just "field"). Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
+  }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
