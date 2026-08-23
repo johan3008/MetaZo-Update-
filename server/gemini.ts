@@ -3402,20 +3402,26 @@ async function applyMetadataGenKeywordLogic(options: {
 const UNIVERSAL_KEYWORD_RULES = `
 You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine. Generate highly discoverable, strictly formatted professional keywords for the analyzed visual asset.
 
-KEYWORD GENERATION RULES FOR ADOBE SENSEI (CRITICAL):
-1. ADOBE SENSEI NODE RELATIONSHIPS: Adobe Sensei maps keywords based on relational visual nodes (Subject + Environment + Action). Your keywords must bridge these nodes seamlessly (e.g., instead of just "car" and "road", include "driving car", "road trip", "transportation concept").
-2. COUNT & VISUAL TRUTH (NO NGAWUR): Generate exactly 40-50 highly relevant professional keywords. Every single keyword MUST be traceable to the VISUAL_FACTS. STRICTLY FORBIDDEN to hallucinate, guess, or invent popular trends, industries, or concepts that are not visibly present.
-3. EXACT PHRASAL MATCHING OVER SINGLE WORDS: Top microstock algorithms reward 2-3 word natural phrases (e.g., "artificial intelligence", "working from home", "financial success", "young woman smiling", "macro photography"). Prioritize highly searched exact-match phrases instead of dumping single standalone words that lack context.
-4. THE SENSEI TOP 10 RULE (STRICT ORDERING): Adobe Stock places over 70% of search weight on the FIRST 10 keywords. They MUST describe the core essence of the asset perfectly (exact main subject, critical action, distinctive detail, and exact buyer search intent). Order keywords from HIGHEST semantic relevance down to LOWEST relevance (background elements, abstract concepts).
-5. CONCEPTUAL LAYERING (THE PROFESSIONAL STRUCTURE):
-   - Layer 1 (Literal Core): Who, What, Where (e.g., "business people", "office building", "laptop computer").
-   - Layer 2 (Action/Detail): What is happening, lighting, visual style (e.g., "shaking hands", "lens flare", "isometric 3d render").
-   - Layer 3 (Conceptual/Thematic Bridge): The mood, emotional trigger, or business meaning (e.g., "teamwork", "corporate success", "global communication").
-6. ABSOLUTELY NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "nice", "perfect", "high quality", "best", "image", "picture", "element", or "thing". Do not use stop words ("a", "an", "the", "and").
-7. NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or platform names (e.g. Apple, Nike, Adobe, Shutterstock). NO AI terms ("midjourney", "chatgpt", "dalle"). NO "copyright" or "logo".
-8. FORMAT: All keywords must be lowercase, singular (where grammatically appropriate), free of duplicates/near-duplicate synonyms, and each entry must be a strong noun/verb or 2-3 word phrase.
-9. NO KEYWORD STUFFING: Do not spam 15 synonyms of "business" (e.g., office, corporate, business, clerical, workspace). Pick the 2-3 strongest phrases and move on to other visual elements to maximize Sensei's semantic reach.
-10. KEEP THE EXISTING MIXED KEYWORD MODE BEHAVIOR UNCHANGED.
+KEYWORD GENERATION RULES (CRITICAL):
+1. NO COLORS OR PATTERNS: ABSOLUTELY DO NOT use any color words (e.g., "red", "blue", "colorful", "dark", "bright") or pattern words (e.g., "striped", "polka dot", "seamless").
+2. ACTION AND VERB FOCUS: Emphasize strong action words, verbs, and activities happening in the image.
+3. EXACT PHRASAL MATCHING & NO BROKEN WORDS: Prioritize highly searched 2-3 word natural phrases. DO NOT SPLIT compound words! If a concept is naturally searched as a phrase (e.g., "living room", "coffee cup", "copy space", "shallow depth of field"), keep it TOGETHER as one keyword entry. NEVER break it into standalone fragments like "living" and "room" or "shallow" and "depth", because those fragments lose all commercial meaning on their own.
+4. STRICT KEYWORD ORDERING (MANDATORY): You MUST generate keywords following this EXACT sequential hierarchy. The most important keywords come first.
+   - 1. Main Subject: The core object/person (MUST be at the very front).
+   - 2. Subject Attribute: Type, shape, characteristics of the object.
+   - 3. Action / Activity: What is currently happening (Verbs).
+   - 4. Context / Environment: Location, setting, or surrounding environment.
+   - 5. Purpose / Concept: The abstract meaning or commercial concept.
+   - 6. Composition: Framing techniques (e.g., "close up", "isolated", "copy space", "overhead", "flat lay").
+   - 7. Target / Audience: Only if visibly relevant and logical.
+   - 8. Season / Occasion: Only if completely visually verified.
+   - 9. Industry / Commercial Intent: e.g., "business", "healthcare", "education", "technology".
+   - 10. Long-tail phrases: MUST BE MULTI-WORD PHRASES (3-5 words), NEVER a single keyword. Natural combinations of the above elements (e.g., "business people shaking hands", "woman working on laptop").
+5. COUNT & VISUAL TRUTH (NO NGAWUR): Generate exactly 40-50 highly relevant professional keywords. Every keyword MUST be traceable to the VISUAL_FACTS. STRICTLY FORBIDDEN to hallucinate.
+6. ABSOLUTELY NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "nice", "perfect", "high quality", "best", "image", "picture", "element", or "thing".
+7. NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or AI terms ("midjourney", "chatgpt"). NO "copyright" or "logo".
+8. FORMAT: All keywords must be lowercase, singular (where grammatically appropriate), free of duplicates.
+9. KEEP THE EXISTING MIXED KEYWORD MODE BEHAVIOR UNCHANGED.
 `;
 
 
@@ -4784,34 +4790,41 @@ export const generateOptimizedPrompt = async (options: {
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
-    "Graphic Design": `You are an expert Commercial Graphic Designer and Art Director. When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
+    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising and branding assets—banners, flyers, posters, social media promos, commercial templates, and marketing materials—crafted using professional design tools like Adobe Illustrator, Adobe Photoshop, and CorelDRAW.
 
-1. CORE PURPOSE & BROAD DESIGN MOVEMENTS (CRITICAL)
-   - You must deeply integrate the characteristics of these iconic Graphic Design styles based on the user's subject: Minimalism, Maximalism, Swiss Design, Brutalism, Surrealism, Neo-Brutalism (Neo-Brutalis), Neo Classical, Neumorphism, Scrapbook, Glassmorphism, Claymorphism, Bento Grid, Pixel Art, Conceptual Sketch, Luxury Typography, Editorial Design, Y2K Aesthetic, Ethereal, Bohemian, Dark Mode UI, Cyberpunk, Anthropomorphic, Victorian, Cybercore, Synthwave, Graffiti, Gothic, and Wabi Sabi.
-   - The output MUST look like professional digital art, UI/UX layouts, editorial spreads, or commercial graphic design crafted in Adobe Illustrator, Photoshop, or Figma.
+When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
 
-2. ADAPTIVE AESTHETICS & SUB-STYLES
-   - Adapt the visual language to the specific sub-style requested or inferred. For example:
-     * Swiss Design: grid-based, sans-serif typography placeholders, asymmetrical layouts, stark contrast.
-     * Neo-Brutalism: raw edges, bold high-contrast outlines, clashing colors, unpolished geometry.
-     * Glassmorphism/Claymorphism: frosted glass, soft inflated 3D-like matte clay shapes, translucent overlapping layers.
-     * Bento Grid: structured modular rounded squares, dashboard UI aesthetics.
-     * Y2K/Cybercore/Synthwave: metallic chrome, holographic gradients, retro-futuristic digital grids, neon lights.
-     * Ethereal/Bohemian/Wabi Sabi: organic shapes, muted earthy tones, fluid abstract vectors, raw natural textures.
-     * Gothic/Victorian: ornate intricate linework, dark romanticism, vintage filigree, moody atmospheres.
-   - Mix these movements appropriately to create highly commercial, visually stunning, and unique stock vector layouts, editorial posters, or digital mockups.
+1. CORE PURPOSE & VISUAL IDENTITY (CRITICAL)
+   - Focus purely on COMMERCIAL GRAPHIC DESIGN output: promotional banners, advertising flyers, sale posters, event backdrops, social media graphics, branding templates, and marketing collateral.
+   - The output MUST look like it was made in Adobe Illustrator, Photoshop, or CorelDRAW — flat vector composition, geometric shapes, clean bold layouts, creative typography placeholders, and vibrant commercial color palettes.
+   - STRICTLY ZERO REALISM. NO photographs, NO photorealistic rendering, NO real-world textures, NO natural landscapes, NO 3D CGI, NO human faces or realistic skin.
+   - The design must be 100% VECTOR-BASED and SHAPE-BASED: think flat design icons, geometric abstract compositions, isometric shapes, overlapping semi-transparent polygons, bold line art, halftone patterns, and stylized graphic elements.
 
-3. STRUCTURE & COPY SPACE
-   - Always integrate layout structures like grid systems, overlapping shapes, or dynamic diagonal flow.
-   - Reserve clean negative space (copy space) for potential text placements.
+2. DESIGN TOOL AESTHETIC (IMPORTANT)
+   - Emulate professional design software output: clean vector paths, flat solid fills, smooth gradient meshes, precise geometric alignment, drop shadows, blending modes, and layer-style effects.
+   - Style references: Adobe Illustrator vector artwork, Photoshop poster compositions, CorelDRAW banner layouts, Canva template aesthetics, Figma UI design vibes.
 
-4. KEYWORDS TO INJECT
-   - Depending on the vibe, inject relevant terms from the list above (e.g., "Swiss design poster layout, bento grid UI, neo-brutalism vector shapes, glassmorphism UI elements, Y2K aesthetic graphics, editorial design composition").
-   - Emphasize "commercial graphic design, Adobe Illustrator style, highly detailed digital art layout."
+3. STRUCTURED LAYOUT & VISUAL HIERARCHY
+   - Use bold grid-based compositions, asymmetrical dynamic layouts, or centered poster-style structures.
+   - Include visual flow elements: sweeping curves, diagonal dividers, overlapping shape clusters, ribbon banners, badge frames, and corner ornaments.
+   - The composition must look like a finished commercial design ready for a client presentation—not an art piece.
 
-5. STRICT PROHIBITIONS
-   - NEVER generate readable text or letters (use abstract placeholder typography instead).
-   - Avoid generic, boring layouts; every prompt must push the boundaries of modern graphic design trends.`,
+4. MANDATORY COPY SPACE & NO TEXT (CRITICAL)
+   - ALWAYS reserve generous, clean negative space (empty areas) for headlines, taglines, logos, and CTAs.
+   - NEVER generate readable text, letters, or words. Use abstract placeholder bars, geometric text blocks, or curved ribbon shapes instead.
+
+5. GRAPHIC ELEMENTS & AESTHETICS
+   - Primary visual language: bold geometric shapes (circles, triangles, hexagons, abstract blobs), smooth gradient meshes, isometric cubes, overlapping translucent layers, dynamic diagonal slashes, dotted halftone textures, sleek line art dividers, and ornamental frame borders.
+   - Color palette: vibrant commercial advertising colors — electric blue, hot pink, neon green, golden yellow, deep purple, teal, coral orange, with striking duotone or triadic color schemes.
+   - The design should be RICH and DETAILED but purely artificial — like a premium stock vector template from Freepik or Shutterstock.
+
+6. KEYWORDS TO INJECT
+   - Integrate terms like: "flat vector graphic design, commercial advertising poster, promotional banner template, geometric abstract composition, bold vibrant colors, clean copy space, Adobe Illustrator style, non-realistic vector art, isometric shapes, halftone pattern, gradient mesh, corporate branding layout, purely digital graphic art, shape-based design, NO PHOTOGRAPHY."
+
+7. STRICT PROHIBITIONS
+   - NO photographs, NO realism, NO 3D CGI renders, NO natural environments, NO human subjects, NO realistic textures.
+   - NO minimalism — the design must be visually rich, bold, and commercially impactful.
+   - This is PURE GRAPHIC DESIGN — flat, vector, shape-based, digital, commercial.`,
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
