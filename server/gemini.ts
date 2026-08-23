@@ -1758,13 +1758,6 @@ export function ensureKeywordCount(
     .map(normalizeAdobeKeyword)
     .filter(Boolean)
     .map(keyword => {
-      if (keywordMode === "single") {
-        const words = keyword.split(/\s+/).filter(Boolean);
-        // Take the last (head noun) word instead of the first, so meaning is
-        // preserved (e.g. "rice field" -> "field", not the less specific "rice"
-        // being kept while "field" is dropped).
-        return words.length > 0 ? words[words.length - 1] : "";
-      }
       return keyword;
     })
     .filter(keyword => isAdobeKeywordCompliant(keyword, visualFacts, title));
@@ -3231,10 +3224,10 @@ async function expandKeywordsWithAI(
 
   const modeRule =
     keywordMode === 'single'
-      ? 'Every keyword MUST be one word only.'
+      ? 'DO NOT split compound words! You may use single words for simple concepts, but NEVER break apart established natural phrases.'
       : keywordMode === 'multi'
-        ? 'Every keyword MUST be a natural 2-3 word phrase.'
-        : 'Use natural single words and/or natural 2-3 word search phrases.';
+        ? 'Every keyword MUST be a natural 2-5 word phrase. NO single words.'
+        : 'Use natural single words and natural 2-5 word search phrases. DO NOT split compound phrases.';
 
   const language = getLanguageName(metadataLanguage);
   let candidates = [...current];
@@ -3349,21 +3342,7 @@ async function applyMetadataGenKeywordLogic(options: {
       .replace(/\s+/g, ' ');
     if (phrase.length <= 1) continue;
 
-    if (keywordMode === 'single') {
-      const words = phrase.split(/\s+/).filter(w => w.length > 1 && !isProhibitedKeyword(w));
-      if (words.length === 0) {
-        // fully stripped away, nothing usable
-      } else if (words.length === 1) {
-        cleaned.push(words[0]);
-      } else {
-        // Multi-word phrase in single-word mode: do NOT explode into every
-        // fragment (e.g. "shallow depth of field" -> shallow/depth/field is
-        // meaningless noise). Take the head noun — normally the LAST
-        // non-stopword token in an English noun phrase — as the single
-        // representative keyword, since it best preserves searchable meaning.
-        cleaned.push(words[words.length - 1]);
-      }
-    } else if (!isProhibitedKeyword(phrase)) {
+    if (!isProhibitedKeyword(phrase)) {
       cleaned.push(phrase);
     }
   }
@@ -3470,14 +3449,14 @@ export const generateStockMetadata = async (
   const directives = getToolTypeDirectives(toolType);
 
   // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Never split compound phrases (e.g., keep "flat lay" together, never split it into "flat" and "lay").`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. EVERY keyword MUST be exactly ONE word — no phrases, no hyphenated compounds, no multi-word terms. If a concept is naturally a phrase (e.g. "depth of field", "natural light"), pick the single most searchable head word instead (e.g. "bokeh" or "field"; "daylight" or "light") rather than splitting the phrase into fragments. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
-    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ABSOLUTE):\nEvery keyword you output MUST be exactly one word. Do NOT output any 2+ word phrase.\nWhen a concept is naturally expressed as a phrase, do NOT split it into separate fragment words that lose meaning on their own (e.g. do NOT output "shallow" and "depth" as two entries for "shallow depth of field"). Instead, choose ONE single word that best represents that concept as a whole (e.g. "bokeh", "closeup", "daylight"). Never output stopword fragments like "of", "in", "with" as standalone keywords.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Even in single keyword mode, you MUST NOT split compound phrases (e.g. keep "copy space", "flat lay"). DO NOT split them.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ADJUSTED):\nYou may output single words for simple nouns/verbs, BUT you are STRICTLY FORBIDDEN from splitting compound phrases. E.g., if the concept is "flat lay", output "flat lay" as one string. NEVER split it into "flat" and "lay". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer natural short multi-word phrases (2-3 words) over single words whenever a real stock buyer would search that way (e.g. "rice field" rather than just "field"). Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
-    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -3664,7 +3643,7 @@ Rules for Descriptions:
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
 Rules for Keywords:
-${UNIVERSAL_KEYWORD_RULES}
+${keywordRulePromptText}
 
 
 Rules for Categories:
@@ -3817,7 +3796,7 @@ Rules for Descriptions:
 4. Limit to 200 characters.
 
 Rules for Keywords:
-${UNIVERSAL_KEYWORD_RULES}
+${keywordRulePromptText}
 
 
 Rules for Categories:
@@ -4058,14 +4037,14 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer common single words and short natural phrases. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Never split compound phrases (e.g., keep "flat lay" together, never split it into "flat" and "lay").`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. EVERY keyword MUST be exactly ONE word — no phrases, no hyphenated compounds, no multi-word terms. If a concept is naturally a phrase (e.g. "depth of field", "natural light"), pick the single most searchable head word instead (e.g. "bokeh" or "field"; "daylight" or "light") rather than splitting the phrase into fragments. Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
-    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ABSOLUTE):\nEvery keyword you output MUST be exactly one word. Do NOT output any 2+ word phrase.\nWhen a concept is naturally expressed as a phrase, do NOT split it into separate fragment words that lose meaning on their own (e.g. do NOT output "shallow" and "depth" as two entries for "shallow depth of field"). Instead, choose ONE single word that best represents that concept as a whole (e.g. "bokeh", "closeup", "daylight"). Never output stopword fragments like "of", "in", "with" as standalone keywords.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Even in single keyword mode, you MUST NOT split compound phrases (e.g. keep "copy space", "flat lay"). DO NOT split them.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ADJUSTED):\nYou may output single words for simple nouns/verbs, BUT you are STRICTLY FORBIDDEN from splitting compound phrases. E.g., if the concept is "flat lay", output "flat lay" as one string. NEVER split it into "flat" and "lay". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. Prefer natural short multi-word phrases (2-3 words) over single words whenever a real stock buyer would search that way (e.g. "rice field" rather than just "field"). Every keyword must be visually relevant; reject generic filler such as subject, focus, sharp, image, design, or arbitrary colors.`;
-    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
@@ -4276,7 +4255,7 @@ Rules for Descriptions:
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
 Rules for Keywords:
-${UNIVERSAL_KEYWORD_RULES}
+${keywordRulePromptText}
 
 
 Rules for Categories:
@@ -4433,7 +4412,7 @@ Rules for Descriptions:
 4. Limit to 200 characters.
 
 Rules for Keywords:
-${UNIVERSAL_KEYWORD_RULES}
+${keywordRulePromptText}
 
 
 Rules for Categories:
