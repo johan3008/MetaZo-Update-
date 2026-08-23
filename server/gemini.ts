@@ -3263,6 +3263,32 @@ KEYWORD GENERATION RULES (CRITICAL):
    allowed if it is a genuinely useful visual descriptor, not a pixel guess.
 10. NO KEYWORD STUFFING: No thesaurus chains, no synonym padding, no invented
     buyer intent, no unrelated commercial terms, no fixed category quotas.
+11. DO NOT SPLIT NATURAL COMPOUND PHRASES: If a concept is normally searched
+    as one phrase, keep it together as a single keyword entry — never break
+    it into separate standalone words that lose meaning on their own.
+    Examples of phrases that MUST stay combined: "shallow depth of field"
+    (never output "shallow" and "depth" as separate entries), "natural light"
+    (never output "natural" and "light" separately), "copy space",
+    "close up", "rice field", "golden hour". Test: if a word by itself would
+    not make sense as something a buyer types into a search bar, it must be
+    merged into its natural phrase instead of standing alone.
+12. LIMIT SYNONYM CLUSTERS: When several candidate keywords describe the same
+    underlying concept (e.g. office/business/corporate/administrative/
+    clerical/workspace/service/client/formal all describing "an office
+    setting"), keep ONLY the 2-3 strongest, most distinct, most commonly
+    searched terms from that cluster and drop the rest. Do not let one
+    concept consume many keyword slots — each kept term must add genuinely
+    different search value, not just reword the same idea.
+13. SUBJECT-FIRST ORDERING: The main visible subject (a person, an animal, a
+    primary object) must be ranked above secondary actions or details tied to
+    that subject. Example: "man" outranks "holding" or "hands" when the man
+    is the dominant subject and holding/hands are just part of what he is
+    doing.
+14. DROP LOW-VALUE ABSTRACT FILLER: Reject vague lifestyle/quality words that
+    do not describe anything specific in the frame, such as "lifestyle",
+    "adult", "formal", "professional" used alone — keep them only if no
+    stronger, more specific alternative exists and the word is clearly
+    visually supported.
 
 RELEVANCE PRIORITY (use to determine ordering):
 1. Main subject / occupation / species / object.
