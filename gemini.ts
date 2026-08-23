@@ -3209,21 +3209,21 @@ export const generateStockMetadata = async (
 
   // Human-curated keyword generation: candidates first, ranking later.
   let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-  let keywordRulePromptText = `HUMAN-CURATED MICROSTOCK KEYWORDS. Think like an experienced stock contributor manually tagging this exact asset.
+  let keywordRulePromptText = `HUMAN-CURATED MICROSTOCK KEYWORDS (CSVPLANET STYLE). Think like an experienced stock contributor manually tagging this exact asset for CSVPlanet.
 
-VISUAL TRUTH FIRST: every candidate must be traceable to something visible, happening, materially present, or an unmistakable concept directly represented by the asset. Do not invent popular industries, use cases, locations, emotions, demographics, or trends.
+VISUAL TRUTH FIRST (NO RANDOM KEYWORDS): Every single keyword MUST be traceable to something clearly visible, happening, materially present, or an unmistakable concept directly represented by the asset. STRICTLY PROHIBITED to invent or guess popular keywords, industries, or trends that are not in the visual.
 
-NATURAL KEYWORD MIX: create a useful human-looking mixture of the main subject, secondary objects, distinctive attributes, material, texture, color, lighting, action, environment, setting, mood, symbolism, and editorial/commercial context when genuinely supported. Do not force a category quota.
+STRUCTURED & NEAT: Group and select keywords in a highly structured, logical, and neat manner. Avoid chaotic or messy keyword dumping. 
 
-SEARCH INTENT: ask what a real buyer would type when trying to find this exact visual. Prefer specific useful words over vague words. Search intent changes priority; it does not create unsupported keywords.
+THE TOP 10 RULE: The first 10 keywords are the absolute most critical. They must describe the core essence of the asset perfectly (exact main subject, critical action, distinctive detail, and exact buyer search intent). 
 
-TREND: a trend can slightly raise the priority of a grounded keyword, but it must never create a keyword that the asset does not support.
+NATURAL KEYWORD MIX: Create a useful human-looking mixture of the main subject, secondary objects, distinctive attributes, material, texture, color, lighting, action, environment, setting, mood, symbolism, and editorial/commercial context when genuinely supported. Do not force a category quota.
 
-ORDER: manually curate the strongest terms first. The first 10 should be the most useful combination of exact subject, distinctive detail, and buyer intent. Do not arrange them into artificial subject/detail/concept buckets.
+SEARCH INTENT: Ask what a real buyer would type when trying to find this exact visual. Prefer specific useful words over vague words. 
 
-QUALITY: no filler, no keyword padding, no 70/30 split, no fixed taxonomy, no duplicate roots, no brands, no names of famous people or characters, no media-format labels, no connector words. Colors are allowed when they materially describe the asset. Descriptive forms such as textured, weathered, resting, showing, representing, glowing are allowed when genuinely supported.
+QUALITY: No filler, no keyword padding, no duplicate roots, no brands, no names of famous people or characters, no media-format labels, no connector words. Colors are allowed when they materially describe the asset.
 
-The final list should feel like a skilled human contributor looked at the asset and selected the words a buyer would actually search, not like an AI thesaurus expansion.`;
+The final list should feel like a highly structured, top-tier CSVPlanet contributor selected the words a buyer would actually search.`;
   if (keywordMode === 'single') {
     keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word English candidate keywords.`;
     keywordRulePromptText += `\nSINGLE-WORD MODE: every keyword item must contain exactly one word. Use natural words such as pendant, jewelry, faith, symbol, stone, religion, texture, culture, history, devotion, chain, light, surface, metallic, weathered, contrast, highlights, endurance, editorial, belief when the asset supports them. Do not create phrases and do not split artificial phrases into unrelated words.`;
@@ -3437,7 +3437,7 @@ MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING
 2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
 3. KEYWORD SHAPE: ${keywordMode === 'single' ? "Generate one-word keywords only. Never output compound phrases." : "Use short natural search terms appropriate to the selected keyword mode."}
 4. HUMAN CURATION OVER SLOT FILLING: Use only useful, grounded terms. Do not add keywords merely to reach the target count. A shorter list of strong terms is better than padded metadata.
-5. KEYWORD ORDER: Put the strongest buyer-facing terms first, but let the actual visual determine the order. There is no fixed subject/detail/concept quota.
+5. KEYWORD ORDER (CSVPLANET TOP 10 PRIORITY): The first 10 keywords MUST be the most critical, hyper-relevant words describing the core essence of the asset. Rank them systematically: [Main Subject] -> [Action/Interaction] -> [Distinctive detail/Texture] -> [Core Concept]. Ensure it is highly structured, neat, and zero random/hallucinated keywords are present.
 
 MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
 - GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION: Include a location or landmark only when clearly recognizable or explicitly verified by EXIF. Do not infer a place from generic visual characteristics.
