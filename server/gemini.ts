@@ -2089,7 +2089,7 @@ export const callOpenAICompatibleWithRetry = async (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": \`Bearer \${apiKey}\`,
+          "Authorization": `Bearer ${apiKey}`,
           ...(provider === "openrouter" ? {
             "HTTP-Referer": "http://localhost:3000",
             "X-Title": "MetaZo",
@@ -2103,7 +2103,7 @@ export const callOpenAICompatibleWithRetry = async (
       if (!response.ok) {
         const errObj = data.error || data;
         const errorMsg = errObj.message || JSON.stringify(errObj);
-        throw new Error(\`[\${provider.toUpperCase()}] API Error: \${errorMsg}\`);
+        throw new Error(`[${provider.toUpperCase()}] API Error: ${errorMsg}`);
       }
       
       if (data.choices && data.choices[0] && data.choices[0].message) {
