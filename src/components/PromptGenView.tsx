@@ -102,7 +102,9 @@ const PREMIUM_ONLY_STYLES = [
   'Lego Style',
   'Voxel Art',
   'Graphic Design',
-  'Line Art'
+  'Line Art',
+  'Corporate Technology Concept',
+  'Painterly Digital Art'
 ];
 
 const VECTOR_SUB_TYPES = {

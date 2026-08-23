@@ -2008,6 +2008,127 @@ function getAIClient(): any {
   };
 }
 
+// ============================================================================
+// OPENAI COMPATIBLE PROVIDERS ADAPTER
+// ============================================================================
+export const callOpenAICompatibleWithRetry = async (
+  params: {
+    systemInstruction?: string;
+    contents: string | any[] | any;
+    responseMimeType?: string;
+    responseSchema?: any;
+    config?: any;
+    model?: string;
+  },
+  maxAttempts: number = 3
+): Promise<string> => {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'openai';
+  let apiKey = (store && store.apiKey) || process.env[PROVIDER_ENV_KEYS[provider]] || '';
+  
+  if (!apiKey) {
+    throw new Error(`API key for provider ${provider} is missing. Please set ${PROVIDER_ENV_KEYS[provider]}.`);
+  }
+
+  const endpoint = PROVIDER_ENDPOINTS[provider];
+  const modelToUse = params.model || PROVIDER_DEFAULT_MODELS[provider];
+  
+  let messages: any[] = [];
+  if (params.systemInstruction) {
+    messages.push({ role: "system", content: params.systemInstruction });
+  }
+
+  if (typeof params.contents === 'string') {
+    messages.push({ role: "user", content: params.contents });
+  } else if (Array.isArray(params.contents)) {
+    let contentParts: any[] = [];
+    for (const part of params.contents) {
+      if (part.text) {
+        contentParts.push({ type: "text", text: part.text });
+      } else if (part.inlineData) {
+        contentParts.push({ 
+          type: "image_url", 
+          image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` } 
+        });
+      }
+    }
+    messages.push({ role: "user", content: contentParts.length > 0 ? contentParts : "" });
+  } else if (params.contents && params.contents.parts) {
+     let contentParts: any[] = [];
+     for (const part of params.contents.parts) {
+        if (part.text) {
+           contentParts.push({ type: "text", text: part.text });
+        } else if (part.inlineData) {
+           contentParts.push({ 
+              type: "image_url", 
+              image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` } 
+           });
+        }
+     }
+     messages.push({ role: "user", content: contentParts.length > 0 ? contentParts : "" });
+  }
+
+  const payload: any = {
+    model: modelToUse,
+    messages: messages,
+    temperature: params.config?.temperature ?? 0.8,
+  };
+
+  if (params.config?.seed !== undefined) {
+    payload.seed = params.config.seed;
+  }
+
+  if (params.responseMimeType === 'application/json' && SUPPORTS_JSON_MODE.has(provider)) {
+    payload.response_format = { type: "json_object" };
+  }
+
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": \`Bearer \${apiKey}\`,
+          ...(provider === "openrouter" ? {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "MetaZo",
+          } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const errObj = data.error || data;
+        const errorMsg = errObj.message || JSON.stringify(errObj);
+        throw new Error(\`[\${provider.toUpperCase()}] API Error: \${errorMsg}\`);
+      }
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+         return data.choices[0].message.content;
+      }
+      
+      throw new Error(\`[\${provider.toUpperCase()}] Unexpected response format: \${JSON.stringify(data)}\`);
+      
+    } catch (err: any) {
+      lastErr = err;
+      if (err.message && (err.message.includes("429") || err.message.includes("rate limit"))) {
+         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+         continue;
+      }
+      if (attempt < maxAttempts - 1) {
+         console.warn(\`[\${provider.toUpperCase()}] Retry \${attempt + 1}/\${maxAttempts} due to error: \${err.message}\`);
+         continue;
+      }
+      break;
+    }
+  }
+  
+  throw lastErr;
+};
+
 // Helper for robust API calls with retry
 const callGeminiWithRetry = async (
   modelName: string,
@@ -3284,17 +3405,9 @@ digital assets (Adobe Stock, Shutterstock). Generate highly discoverable,
 strictly formatted keywords for the analyzed visual asset.
 
 KEYWORD GENERATION RULES (CRITICAL):
-1. COUNT: Generate exactly 40-50 highly relevant keywords (never fewer than 40,
-   never more than 50, and never above Adobe Stock's 49-keyword hard limit).
-   Never pad the list with unrelated or generic words just to reach the count,
-   and never stop short of 40 valid, visually-supported keywords — keep
-   expanding with genuinely relevant, visually-grounded terms until the
-   40-50 range is met.
-2. STRICT ORDERING: Order keywords from HIGHEST semantic relevance (main
-   subject, core action, primary object) down to LOWEST relevance
-   (background elements, abstract concepts, colors, mood). Do not shuffle,
-   randomize, or alphabetize — the order itself communicates importance to
-   search algorithms.
+1. COUNT & VISUAL TRUTH (NO NGAWUR): Generate exactly 40-50 highly relevant keywords. Every single keyword MUST be traceable to the VISUAL_FACTS. STRICTLY FORBIDDEN to hallucinate, guess, or invent popular trends, industries, or concepts that are not visibly present. Do not wander off-topic (ngawur). 
+2. STRUCTURE & CSVPLANET STYLE: Group and select keywords in a highly structured, logical, and neat manner. Avoid chaotic or messy keyword dumping. 
+3. THE TOP 10 RULE (STRICT ORDERING): The first 10 keywords are the absolute most critical. They MUST describe the core essence of the asset perfectly (exact main subject, critical action, distinctive detail, and exact buyer search intent). Order keywords from HIGHEST semantic relevance down to LOWEST relevance (background elements, abstract concepts). Do not shuffle or randomize.
 3. NO CONNECTOR WORDS: Never output standalone connector/stop words such as
    "a", "an", "the", "and", "or", "with", "without", "in", "on", "of", "for",
    "to", "at", "from", "by".
@@ -4740,41 +4853,34 @@ export const generateOptimizedPrompt = async (options: {
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
-    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising and branding assets—banners, flyers, posters, social media promos, commercial templates, and marketing materials—crafted using professional design tools like Adobe Illustrator, Adobe Photoshop, and CorelDRAW.
+    "Graphic Design": `You are an expert Commercial Graphic Designer and Art Director. When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
 
-When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
+1. CORE PURPOSE & BROAD DESIGN MOVEMENTS (CRITICAL)
+   - You must deeply integrate the characteristics of these iconic Graphic Design styles based on the user's subject: Minimalism, Maximalism, Swiss Design, Brutalism, Surrealism, Neo-Brutalism (Neo-Brutalis), Neo Classical, Neumorphism, Scrapbook, Glassmorphism, Claymorphism, Bento Grid, Pixel Art, Conceptual Sketch, Luxury Typography, Editorial Design, Y2K Aesthetic, Ethereal, Bohemian, Dark Mode UI, Cyberpunk, Anthropomorphic, Victorian, Cybercore, Synthwave, Graffiti, Gothic, and Wabi Sabi.
+   - The output MUST look like professional digital art, UI/UX layouts, editorial spreads, or commercial graphic design crafted in Adobe Illustrator, Photoshop, or Figma.
 
-1. CORE PURPOSE & VISUAL IDENTITY (CRITICAL)
-   - Focus purely on COMMERCIAL GRAPHIC DESIGN output: promotional banners, advertising flyers, sale posters, event backdrops, social media graphics, branding templates, and marketing collateral.
-   - The output MUST look like it was made in Adobe Illustrator, Photoshop, or CorelDRAW — flat vector composition, geometric shapes, clean bold layouts, creative typography placeholders, and vibrant commercial color palettes.
-   - STRICTLY ZERO REALISM. NO photographs, NO photorealistic rendering, NO real-world textures, NO natural landscapes, NO 3D CGI, NO human faces or realistic skin.
-   - The design must be 100% VECTOR-BASED and SHAPE-BASED: think flat design icons, geometric abstract compositions, isometric shapes, overlapping semi-transparent polygons, bold line art, halftone patterns, and stylized graphic elements.
+2. ADAPTIVE AESTHETICS & SUB-STYLES
+   - Adapt the visual language to the specific sub-style requested or inferred. For example:
+     * Swiss Design: grid-based, sans-serif typography placeholders, asymmetrical layouts, stark contrast.
+     * Neo-Brutalism: raw edges, bold high-contrast outlines, clashing colors, unpolished geometry.
+     * Glassmorphism/Claymorphism: frosted glass, soft inflated 3D-like matte clay shapes, translucent overlapping layers.
+     * Bento Grid: structured modular rounded squares, dashboard UI aesthetics.
+     * Y2K/Cybercore/Synthwave: metallic chrome, holographic gradients, retro-futuristic digital grids, neon lights.
+     * Ethereal/Bohemian/Wabi Sabi: organic shapes, muted earthy tones, fluid abstract vectors, raw natural textures.
+     * Gothic/Victorian: ornate intricate linework, dark romanticism, vintage filigree, moody atmospheres.
+   - Mix these movements appropriately to create highly commercial, visually stunning, and unique stock vector layouts, editorial posters, or digital mockups.
 
-2. DESIGN TOOL AESTHETIC (IMPORTANT)
-   - Emulate professional design software output: clean vector paths, flat solid fills, smooth gradient meshes, precise geometric alignment, drop shadows, blending modes, and layer-style effects.
-   - Style references: Adobe Illustrator vector artwork, Photoshop poster compositions, CorelDRAW banner layouts, Canva template aesthetics, Figma UI design vibes.
+3. STRUCTURE & COPY SPACE
+   - Always integrate layout structures like grid systems, overlapping shapes, or dynamic diagonal flow.
+   - Reserve clean negative space (copy space) for potential text placements.
 
-3. STRUCTURED LAYOUT & VISUAL HIERARCHY
-   - Use bold grid-based compositions, asymmetrical dynamic layouts, or centered poster-style structures.
-   - Include visual flow elements: sweeping curves, diagonal dividers, overlapping shape clusters, ribbon banners, badge frames, and corner ornaments.
-   - The composition must look like a finished commercial design ready for a client presentation—not an art piece.
+4. KEYWORDS TO INJECT
+   - Depending on the vibe, inject relevant terms from the list above (e.g., "Swiss design poster layout, bento grid UI, neo-brutalism vector shapes, glassmorphism UI elements, Y2K aesthetic graphics, editorial design composition").
+   - Emphasize "commercial graphic design, Adobe Illustrator style, highly detailed digital art layout."
 
-4. MANDATORY COPY SPACE & NO TEXT (CRITICAL)
-   - ALWAYS reserve generous, clean negative space (empty areas) for headlines, taglines, logos, and CTAs.
-   - NEVER generate readable text, letters, or words. Use abstract placeholder bars, geometric text blocks, or curved ribbon shapes instead.
-
-5. GRAPHIC ELEMENTS & AESTHETICS
-   - Primary visual language: bold geometric shapes (circles, triangles, hexagons, abstract blobs), smooth gradient meshes, isometric cubes, overlapping translucent layers, dynamic diagonal slashes, dotted halftone textures, sleek line art dividers, and ornamental frame borders.
-   - Color palette: vibrant commercial advertising colors — electric blue, hot pink, neon green, golden yellow, deep purple, teal, coral orange, with striking duotone or triadic color schemes.
-   - The design should be RICH and DETAILED but purely artificial — like a premium stock vector template from Freepik or Shutterstock.
-
-6. KEYWORDS TO INJECT
-   - Integrate terms like: "flat vector graphic design, commercial advertising poster, promotional banner template, geometric abstract composition, bold vibrant colors, clean copy space, Adobe Illustrator style, non-realistic vector art, isometric shapes, halftone pattern, gradient mesh, corporate branding layout, purely digital graphic art, shape-based design, NO PHOTOGRAPHY."
-
-7. STRICT PROHIBITIONS
-   - NO photographs, NO realism, NO 3D CGI renders, NO natural environments, NO human subjects, NO realistic textures.
-   - NO minimalism — the design must be visually rich, bold, and commercially impactful.
-   - This is PURE GRAPHIC DESIGN — flat, vector, shape-based, digital, commercial.`,
+5. STRICT PROHIBITIONS
+   - NEVER generate readable text or letters (use abstract placeholder typography instead).
+   - Avoid generic, boring layouts; every prompt must push the boundaries of modern graphic design trends.`,
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
@@ -4908,7 +5014,7 @@ ${isPngMode ? `- Requested PNG Background color: ${pngBgColor}` : ""}
 ${modeConstraint}
 
 PROMPT GENERATION PRIORITY (STRICT ORDER):
-1. Theme subject: The core subject MUST remain the dominant focus of the prompt.
+1. ABSOLUTE SUBJECT ADHERENCE (CRITICAL FOR SMALL/LITE MODELS): The exact core subject "${subject}" MUST remain the central, dominant focus of every single prompt. You are STRICTLY FORBIDDEN from wandering off-topic (ngawur) or hallucinating entirely different topics. No matter how much you vary the environment or style, the original subject MUST be clearly visible and accurate to the user's request.
 2. Visual characteristics: Describe specific colors, shapes, and the overall aesthetic vibe.
 3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities (e.g., stacked paper layers for Paper Cut, hand-molded clay textures for Claymation, canvas grain/pigments for Oil/Watercolor paintings, clean vector geometry for Vector Art).
 4. Environment: Only introduce environmental details if they naturally fit the theme. Do not introduce unrelated environments.
@@ -4928,8 +5034,8 @@ Rules for the Generated Prompts:
       🎮 Stylized Domain (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style): cel-shading, brick toys, pixel grid, expressive features. FORBIDDEN: photorealism, 3D render jargon, vector flat design.
       ⚠️ BEFORE WRITING EACH PROMPT: check which domain the selected style belongs to, then filter your vocabulary to ONLY that domain. Cross-domain leakage = FAIL.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
-1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
-2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
+1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
+2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
 3. WORD COUNT CONSTRAINT: Each generated prompt SHOULD be between ${minWords} and ${maxWords} words long. Adjust the level of detail to strictly match this requested length profile.
 4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property (IP). Under any circumstances, NEVER include any brand names, trademarked names, manufacturer names, or proprietary product lines (e.g., Apple, Nike, Adidas, BMW, Vespa, LEGO, GoPro, iPhone). Use completely generic descriptions instead.
    Under Adobe Stock Content Policy for Artist Names, Real Known People, and Fictional Characters (https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
@@ -4948,13 +5054,13 @@ Rules for the Generated Prompts:
     - Moderators look for NOTICEABLE DIFFERENCES including variations in composition, color, expression, or scenario. You must be extremely selective and output only your most varied, premium, and distinct concepts.
 11. ADOBE STOCK SIMILARITY PROTECTION ACTIVE (CRITICAL CORE DIRECTIVE):
     - DO NOT generate prompts that sound like generic, common, or natural stock photos (e.g., "business people shaking hands", "happy family in park", "generic coffee cup on table").
-    - You must forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
+    - EXTREME DIVERSITY MANDATE: You MUST forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
     - Break the standard stock photography molds by using hyper-specific, unusual subject interactions, highly dramatic emotional states, or avant-garde conceptual presentations. Make the prompts incredibly creative, unpredictable, and highly varied.
-    - Inject extreme variation across:
-      * Composition & Camera Angle: Vary across wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, and overhead drone shots.
-      * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
-      * Subjects, Expressions & Poses: Vary characters' ages, genders, ethnicities, actions, emotional expressions (e.g., focused, joyful, contemplative, active, serene), and direct interactions with their surroundings.
-      * Scenario & Environment: Change environments completely (e.g., indoors vs. outdoors, modern minimalist spaces vs. raw nature, urban landscapes vs. intimate workspaces).
+    - FOR EACH OF THE ${count} VARIATIONS, YOU MUST CHANGE THE FOLLOWING (NO REPETITION ALLOWED):
+      * Composition & Camera Angle: Shift dramatically between wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, overhead drone shots, and macro shots.
+      * Color Palette & Lighting Setup: Cycle completely through different lighting setups (golden hour, bright overcast, neon cyberpunk, moody twilight, studio strobes, chiaroscuro, pastel, vibrant saturation).
+      * Subjects, Expressions & Poses: Radically alter ages, genders, ethnicities, fashion styles, micro-actions, emotional expressions (focused, joyful, contemplative, serene, aggressive), and dynamic poses.
+      * Scenario & Environment: Teleport the subject to entirely different backgrounds for each prompt (e.g., minimalist modern studio, lush jungle, gritty cyberpunk alley, serene beach at dawn, chaotic urban intersection).
     - ANTI-CLICHÉ & ANTI-FORCED-DRAMA RULE (CRITICAL):
       * DO NOT default to cliché dramatic weather tropes such as "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", or "ominous black clouds" unless the subject EXPLICITLY requires it (e.g., a storm-chaser documentary scene).
       * Creativity does NOT mean forced drama, darkness, or apocalyptic weather. A beautiful Cinematic scene can be a warm golden-hour field, a sleek modern interior, a serene misty forest, a vibrant cityscape at dusk, or an intimate candlelit room — not just dark skies and lightning.
@@ -6038,6 +6144,7 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
         * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
 
 PANDUAN FINAL DECISION ENGINE (CRITICAL):
+- STRICT ANTI-HALLUCINATION (NO NGAWUR): Do NOT hallucinate defects. You must base your findings ONLY on verifiable visual facts. Do NOT claim there is text/gibberish if there is no text. Do NOT claim the anatomy is broken if it is visually sound. Do not wander off-topic or guess (ngawur). 
 - Pisahkan HARD FAIL dari REVIEW WARNING. Warning bukan rejection.
 - HARD FAIL hanya untuk pelanggaran submission yang terkonfirmasi atau cacat yang jelas/severe: global out-of-focus, clipping parah, noise parah, compression/banding parah, strong alpha matte contamination, pelanggaran IP/brand yang terkonfirmasi, gibberish text yang terkonfirmasi, atau deformasi struktural/AI yang terkonfirmasi.
 - Jangan FAIL untuk transparent PNG normal, anti-aliasing normal, shallow depth of field, shadow yang disengaja, variasi tekstur moderat, atau satu kecurigaan AI yang tidak pasti.
@@ -6631,7 +6738,7 @@ CRITICAL MONTH MATCHING & ALIGNMENT RULES (MUST FOLLOW STRICTLY):
 
 2. Target Month: The user has selected the month of "${targetMonthEn}" (also known as "${targetMonthId}").
    - You MUST ONLY generate events, holidays, observances, and festivals that ACTUALLY and historically occur during this specific month (${targetMonthEn}) in the year 2026.
-   - You are STRICTLY FORBIDDEN from listing events that happen in other months.
+   - STRICT ANTI-HALLUCINATION (NO NGAWUR): You are STRICTLY FORBIDDEN from listing events that happen in other months, inventing fake holidays, or generating random unrelated topics. Only output verified real-world events. Do not wander off-topic (ngawur).
 
 3. PRE-SEEDED WORLD HOLIDAYS (UN, UNESCO, TimeAndDate):
    To ensure perfect alignment, you MUST include and enrich the following verified global and regional celebrations for this month:
