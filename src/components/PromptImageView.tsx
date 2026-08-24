@@ -23,7 +23,8 @@ interface ImageItem {
   name: string;
   loading: boolean;
   result?: {
-    prompt: string;
+    prompts?: string[];
+    prompt?: string;
     description: string;
   };
   error?: string | null;
@@ -95,6 +96,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
   const [styleCategory, setStyleCategory] = useState('Cinematic');
+  const [variation, setVariation] = useState<number>(5);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -235,6 +237,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         body: JSON.stringify({
           images: pendingImages,
           styleCategory,
+          variation,
           model: aiOptions?.model
         })
       });
@@ -384,6 +387,33 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                   multiple
                   className="hidden" 
                 />
+              </div>
+
+              {/* 🎚️ Variation Slider (5 - 15) */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-2xl space-y-3 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                    <Sliders size={13} className="text-emerald-500" />
+                    <span>Jumlah Variasi Prompt</span>
+                  </label>
+                  <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-black">
+                    {variation} Variasi
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={5}
+                  max={15}
+                  step={1}
+                  value={variation}
+                  onChange={(e) => setVariation(parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  <span>5 (Min)</span>
+                  <span>10 (Ideal)</span>
+                  <span>15 (Max)</span>
+                </div>
               </div>
             </div>
 
@@ -597,7 +627,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                     <span>Regen</span>
                                   </button>
                                   <button
-                                    onClick={() => copyToClipboard(item.result?.prompt || '', item.id)}
+                                    onClick={() => {
+                                      const pList = item.result?.prompts && item.result.prompts.length > 0 
+                                        ? item.result.prompts.join('
+
+')
+                                        : (item.result?.prompt || '');
+                                      copyToClipboard(pList, item.id);
+                                    }}
                                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                                       copiedId === item.id 
                                         ? 'bg-emerald-500 text-white' 
@@ -605,7 +642,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                     }`}
                                   >
                                     {copiedId === item.id ? <Check size={12} /> : <Copy size={12} />}
-                                    <span>{copiedId === item.id ? 'Copied' : 'Salin'}</span>
+                                    <span>{copiedId === item.id ? 'Tersalin' : `Salin Semua (${item.result?.prompts?.length || 1})`}</span>
                                   </button>
                                 </div>
                               )}
@@ -630,22 +667,46 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                     {item.result.description}
                                   </p>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   <div className="flex items-center justify-between">
-                                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">AI Prompt Optimized</label>
+                                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                      AI Prompt Variations ({item.result.prompts?.length || 1} Variasi)
+                                    </label>
                                   </div>
-                                  <div className="relative group/copy">
-                                    <div className="p-4 bg-slate-50 dark:bg-black/40 rounded-2xl border border-slate-200 dark:border-white/5 group-hover/copy:border-emerald-500/30 transition-colors">
-                                      <code className="text-[11px] font-mono font-medium text-slate-800 dark:text-slate-300 break-words leading-relaxed select-all">
-                                        {item.result.prompt}
-                                      </code>
-                                    </div>
-                                    <button
-                                      onClick={() => copyToClipboard(item.result?.prompt || '', item.id)}
-                                      className="absolute top-2 right-2 p-2.5 bg-white dark:bg-slate-800 rounded-xl hover:bg-emerald-500 hover:text-white text-slate-400 hover:border-emerald-500 shadow-sm opacity-0 group-hover/copy:opacity-100 transition-all border border-slate-100 dark:border-white/5"
-                                    >
-                                      {copiedId === item.id ? <Check size={14} className="text-white" /> : <Copy size={14} />}
-                                    </button>
+                                  
+                                  <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                                    {(item.result.prompts && item.result.prompts.length > 0 
+                                      ? item.result.prompts 
+                                      : [item.result.prompt || '']
+                                    ).map((promptText, pIdx) => {
+                                      const promptKey = `${item.id}-var-${pIdx}`;
+                                      const isCopied = copiedId === promptKey;
+                                      return (
+                                        <div key={pIdx} className="relative group/var p-3.5 bg-slate-50/80 dark:bg-black/40 rounded-xl border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 transition-all">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                                              <span className="shrink-0 w-5 h-5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black flex items-center justify-center mt-0.5">
+                                                {pIdx + 1}
+                                              </span>
+                                              <p className="text-[11px] font-mono font-medium text-slate-800 dark:text-slate-300 break-words leading-relaxed select-all">
+                                                {promptText}
+                                              </p>
+                                            </div>
+                                            <button
+                                              onClick={() => copyToClipboard(promptText, promptKey)}
+                                              className={`shrink-0 p-2 rounded-lg border transition-all ${
+                                                isCopied
+                                                  ? 'bg-emerald-500 text-white border-emerald-500'
+                                                  : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-emerald-500 border-slate-100 dark:border-white/5 shadow-sm'
+                                              }`}
+                                              title="Salin Variasi Ini"
+                                            >
+                                              {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </div>

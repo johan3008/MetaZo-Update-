@@ -501,7 +501,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           model: aiOptions?.model,
           seed,
           flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
-          vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined,
+          vectorSubType: styleCategory === 'Vector Art' ? vectorSubType : undefined,
           referenceImages: referenceImages && referenceImages.length > 0 ? referenceImages : undefined,
           cameraAngles: selectedCameraAngles.length > 0 ? selectedCameraAngles : undefined
         })
@@ -543,7 +543,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         promptMode,
         pngBgColor,
         flatIconType: (styleCategory === 'Flat Icon' || styleCategory === 'Line Art' || styleCategory === 'Silhouette') && promptMode === 'png' ? flatIconType : undefined,
-        vectorSubType: styleCategory === 'Vector Art' && promptMode === 'png' ? vectorSubType : undefined
+        vectorSubType: styleCategory === 'Vector Art' ? vectorSubType : undefined
       };
       saveToHistory(historyItem);
       
@@ -993,7 +993,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       if (promptMode === 'png' && val === 'Flat Icon') {
                         setShowFlatIconModal(true);
                       }
-                      if (promptMode === 'png' && val === 'Vector Art') {
+                      if (val === 'Vector Art') {
                         setShowVectorModal(true);
                       }
                     }}
@@ -1162,7 +1162,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     </div>
                   )}
 
-                  {styleCategory === 'Vector Art' && promptMode === 'png' && (
+                  {styleCategory === 'Vector Art' && (
                     <div className="p-4 bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/20 dark:border-violet-500/30 rounded-[1.5rem] space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">

@@ -4620,33 +4620,30 @@ OUTPUT FORMAT:
   }
 };
 
-function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
+function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string, styleCategory?: string) {
   let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
   
   if (validatedPrompts.length === 0) {
-    // If absolutely no prompts, at least returning something to avoid crash, but ideally shouldn't happen
-    validatedPrompts = [`${subject} professional stock photography`].map(p => p);
+    validatedPrompts = [`${styleCategory || ''} of ${subject}, high quality professional stock asset`].map(p => p.trim());
   }
 
   const originalLength = validatedPrompts.length;
   if (validatedPrompts.length < count) {
-    const modifiers = [
-      "cinematic macro photography, highly detailed",
-      "isometric 3D render, octane render, stylized lighting",
-      "vibrant watercolor ink illustration, splash art",
-      "futuristic cyberpunk city night life background, neon glow",
-      "classical oil painting, textured brush strokes, masterwork",
-      "minimalist flat graphic design icon",
-      "dramatic backlight, rim lighting, atmospheric depth",
-      "wide angle landscape composition, beautiful morning light",
-      "studio lighting portrait, bokeh depth of field",
-      "vintage retro concept art, detailed illustration"
+    const angleMods = [
+      "eye-level candid view, natural lighting",
+      "close-up detail focus, shallow depth of field",
+      "three-quarter perspective, balanced composition",
+      "overhead flat lay view, clean negative space",
+      "wide-angle scene, contextual environment",
+      "soft side lighting, gentle shadow depth",
+      "golden hour atmospheric glow, elegant framing",
+      "clean studio illumination, tack-sharp focus"
     ];
     let modIdx = 0;
     while (validatedPrompts.length < count) {
       const base = validatedPrompts[validatedPrompts.length % originalLength];
-      const mod = modifiers[modIdx % modifiers.length];
-      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
+      const mod = angleMods[modIdx % angleMods.length];
+      validatedPrompts.push(`${base}, ${mod}`);
       modIdx++;
     }
   } else if (validatedPrompts.length > count) {
@@ -4670,8 +4667,8 @@ function processPromptResults(parsed: any, count: number, subject: string, userN
     negativePrompt: appendNeg || parsed.negativePrompt || "",
     styleExplanation: parsed.styleExplanation || [
       `Berhasil mensintesis ${count} variasi prompt bertema ${subject}.`,
-      `Menggunakan spektrum gaya dan variabilitas komposisi visual.`,
-      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion.`
+      `Menggunakan variabilitas komposisi visual yang konsisten dengan subjek utama.`,
+      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion/Adobe Firefly.`
     ]
   };
 }
@@ -4745,7 +4742,7 @@ export const generateOptimizedPrompt = async (options: {
   // 🎲 [Backend Helper] — Dynamic Injection Engine
   const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
   const dynamicMood = selectRandom(creativeSurprise);
-  const randomTemp = 0.80 + Math.random() * 0.15;
+  const randomTemp = 0.70 + Math.random() * 0.10;
 
   // Camera angle directive — minimal & natural, especially for Photorealistic
   const cameraAngleDirective = userCameraAngle
@@ -4768,8 +4765,16 @@ export const generateOptimizedPrompt = async (options: {
 
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
-      ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines.'
-      : ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic, featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO shading, NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions.',
+      ? ' - Style Guide: STRICTLY 2D GRADIENT FLAT DESIGN. Focus on modern flat vector illustration utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes.'
+      : vectorSubType === 'flat_vector'
+      ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus purely on clean figurative 2D flat vector artwork, clean hand-crafted paths, smooth curves, organic line art, and harmonious solid color blocks typical of professional editorial illustrations. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly shapes, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative flat illustration.'
+      : vectorSubType === 'minimal_flat'
+      ? ' - Style Guide: STRICTLY MINIMAL FLAT DESIGN. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients.'
+      : vectorSubType === 'corporate_flat'
+      ? ' - Style Guide: STRICTLY CORPORATE FLAT ILLUSTRATION (Alegria / Tech Corporate Style). Stylized characters with fluid sweeping postures, oversized expressive limbs, clean flat colors, and modern tech business aesthetic.'
+      : vectorSubType === 'isometric_flat'
+      ? ' - Style Guide: STRICTLY ISOMETRIC FLAT DESIGN. Flat 2D isometric style using orthographic 30-degree parallel projection without camera perspective, rendered in clean, flat, shadow-free vector graphics with distinct solid color planes.'
+      : ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, and NO geometric fragmentation.',
     "3D Render": ' - MANDATORY RENDER ENGINE LOCK: This style MUST exclusively depict Unreal Engine 5 real-time 3D rendering aesthetics — Lumen dynamic global illumination, Nanite micro-detail geometry, physically-based rendering (PBR) materials, real-time ray-traced reflections, soft volumetric studio lighting, and smooth high-fidelity 3D surfaces (glossy or matte plastic, metal, or ceramic). Every prompt variation MUST explicitly include "Unreal Engine 5" or "Unreal Engine real-time render" phrasing. STRICTLY FORBIDDEN — under no circumstances mention or blend in: isometric/orthographic perspective, glassmorphism/frosted glass/translucent glass effects, voxel art, low-poly faceting, or any other render engine name (Octane, Cinema 4D, Blender Cycles, V-Ray, Redshift, KeyShot). Do NOT cross-contaminate this style with any other PNG style vocabulary. Keep every variation 100% authentic to a pure Unreal Engine 5 CGI render.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
@@ -4887,11 +4892,11 @@ When generating prompts for "Dark Horror Aesthetic", follow these core directive
   }
 
   let vectorSubTypeDirective = '';
-  if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
+  if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
     } else if (vectorSubType === 'flat_vector') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative 2D flat vector illustration.';
     } else if (vectorSubType === 'corporate_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Corporate Flat Illustration" aesthetic (Alegria style / tech corporate art). Characterized by stylized figures with oversized limbs, fluid sweeping postures, expressive dynamic organic poses, friendly tech character design, clean flat gradients or solid colors, and professional corporate vector elements.';
     } else if (vectorSubType === 'gradient_flat') {
@@ -4941,7 +4946,7 @@ Make sure your generated prompts do not contain these elements or depict them in
   const isPhotographic = ['Photorealistic', 'Cinematic', 'Vintage Photography'].includes(styleCategory);
 
   let effectiveStyleCategory = styleCategory;
-  if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
+  if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Vector Art - Minimal Flat Design';
     else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Vector Art - Flat Vector Illustration';
     else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Vector Art - Corporate Flat Illustration';
@@ -4973,17 +4978,38 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. ${isPhotographic ? `Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).${cameraAngleDirective}` : 'Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
-0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
-0.15 STYLE PURITY LOCK — ZERO CROSS-CONTAMINATION (CRITICAL — READ TWICE):
-      Each style has its OWN vocabulary domain. You MUST use ONLY the vocabulary belonging to the selected style. NEVER leak terms from other style domains.
-      ─ STYLE VOCABULARY DOMAINS ─
-      📸 Photographic Domain (Cinematic, Photorealistic, Vintage Photography, Dark Horror, Corporate Tech): camera lenses, apertures, DSLR, film grain, lighting setups, real-world environments, human subjects, candid moments. FORBIDDEN: "vector", "flat design", "outline", "stroke", "fill color", "isometric grid", "voxel", "polygon count", "render engine".
-      🎨 Vector/Illustration Domain (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): vector paths, solid fills, clean outlines, flat colors, geometric shapes, stroke weight, anchor points. FORBIDDEN: camera terms, 3D materials, photorealism, "shot on", "lens", real-world physics.
-      🧱 3D/CGI Domain (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric, Claymation): polygons, materials, textures, global illumination, ray tracing, subsurface scattering, voxel grids. FORBIDDEN: "photograph", "camera", "vector", "flat 2D".
-      🖌️ Traditional Art Domain (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): brushstrokes, pigments, paper grain, canvas, textile, folded paper. FORBIDDEN: digital 3D terms, camera terms, "vector".
-      🎮 Stylized Domain (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style): cel-shading, brick toys, pixel grid, expressive features. FORBIDDEN: photorealism, 3D render jargon, vector flat design.
-      ⚠️ BEFORE WRITING EACH PROMPT: check which domain the selected style belongs to, then filter your vocabulary to ONLY that domain. Cross-domain leakage = FAIL.
+0. MEDIUM-SPECIFIC DIVERSITY & LOGICAL SCENE FRAMEWORK (TAILORED PER STYLE DOMAIN):
+      Every generated prompt variation MUST represent a completely DIFFERENT, CREATIVE, and LOGICAL composition of the subject "${subject}", tailored specifically to the medium of "${effectiveStyleCategory}":
+
+      ─ FOR PHOTOGRAPHIC & CINEMATIC STYLES (Photorealistic, Cinematic, Vintage):
+        * Variasikan skenario kehidupan nyata: persiapan, aksi penggunaan, momen candid, interaksi, detail bahan baku.
+        * Variasikan framing & pencahayaan alami: macro close-up, eye-level portrait, overhead knolling flat lay, wide environmental landscape, golden hour, morning window light, clean softbox studio.
+
+      ─ FOR VECTOR & GRAPHIC DESIGN STYLES (Vector Art, Graphic Design, Flat Icon, Sticker, Line Art):
+        * Variasikan layout grafis & hierarki desain: layout banner promosi horizontal, kartu poster vertikal dengan negative space, komposisi emblem/lencana terpusat, tata letak infografis modular, susunan siluet dinamis.
+        * Variasikan palet warna & teknik vektor: palet warna duotone kontras tinggi, palet pastel kontemporer, kombinasi monokromatik elegan, ketebalan garis (stroke weight), dan bentuk lengkungan geometris/organik.
+
+      ─ FOR 3D & CGI STYLES (3D Render, 3D CGI, Isometric, Lowpoly, Voxel):
+        * Variasikan panggung & sudut 3D: diorama isometrik modular 30 derajat, panggung pedestal produk mengapung, studio clay render minimalis, pencahayaan tiga titik (three-point studio lighting), material matte vs glossy ceramic.
+
+      ─ FOR TRADITIONAL & CRAFT STYLES (Paper Cut, Watercolor, Oil Painting, Origami, Embroidery):
+        * Variasikan teknik medium fisik: tingkatan lapisan tumpukan kertas 3D dengan bayangan lembut, sapuan basah cat air (wet-on-wet wash), tekstur impasto goresan palet tebal, lipatan origami geometris rapi, pola tusukan benang bordir timbul.
+
+      - LOGIKA MANUSIA & RELEVANSI SUBJEK (Strict Human Logic):
+        * Setiap variasi harus tetap masuk akal, relevan dengan subjek "${subject}", dan bernilai komersial tinggi.
+        * DILARANG mengulang-ulang kalimat yang sama dengan hanya mengganti 1 kata.
+
+      0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
+0.15 UNIVERSAL STYLE PURITY & CONSISTENCY LOCK (CRITICAL — ZERO TOLERANCE FOR STYLE DRIFT):
+      You MUST maintain 100% pure consistency with the selected style "${effectiveStyleCategory}".
+      - Every single prompt variation MUST begin with "${effectiveStyleCategory}" as its stylistic prefix.
+      - NEVER contaminate or mix the vocabulary of the chosen style with another style.
+      - 📸 PHOTOGRAPHIC (Photorealistic, Cinematic, Vintage Photography): Use ONLY camera lenses (50mm, 85mm, 35mm), lighting setups, aperture (f/1.8, f/2.8), and natural textures. FORBIDDEN: "vector", "3D render", "illustration", "flat art", "drawing", "CGI".
+      - 🎨 VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
+      - 🧱 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
+      - 🖌️ TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
+      - 🎮 STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
+      - UNDER NO CIRCUMSTANCES should any prompt drift into abstract geometric patterns or unrelated styles unless explicitly requested.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
@@ -5092,7 +5118,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
-          config: { temperature: randomTemp, seed: seed, topP: 0.99 },
+          config: { temperature: randomTemp, seed: seed, topP: 0.85 },
           model
         });
         
@@ -5107,7 +5133,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         }
         
         if (promptArray.length > 0) {
-            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt);
+            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt, styleCategory);
         }
         throw new Error('Missing or empty prompts array in JSON response');
       } catch (err: any) {
@@ -5137,7 +5163,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             });
           }
 
-          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"" strictly featuring the exact core subject: \"\${subject}\"".\\n\\nCRITICAL SUBJECT ADHERENCE:\\n1. Every prompt variation MUST center around \"\${subject}\"". Do NOT replace, mutate, or drift away from this subject.\\n2. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph.\\n3. DO NOT use comma-separated keyword lists or tags.`;
           if (referenceImages && referenceImages.length > 0) {
             instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
           }
@@ -5151,15 +5177,15 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             responseSchema,
             temperature: randomTemp,
             seed: seed,
-            topP: 0.99,
-            topK: 100,
+            topP: 0.85,
+            topK: 40,
             safetySettings: safetySettings
           });
 
           const text = response.text || "{}";
           const parsed = JSON.parse(extractJSON(text));
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
-            return processPromptResults(parsed, count, subject, userNegativePrompt);
+            return processPromptResults(parsed, count, subject, userNegativePrompt, styleCategory);
           }
           throw new Error('Missing or empty prompts array in JSON response');
         } catch (err: any) {
@@ -5630,70 +5656,63 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 export const analyzeImageToPrompt = async (
   image: string,
   styleCategory: string = 'Cinematic',
+  variation: number = 5,
   model?: string
-): Promise<{ prompt: string; description: string }> => {
+): Promise<{ prompts: string[]; prompt: string; description: string }> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
+  const count = Math.min(Math.max(variation, 5), 15);
   
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
-Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
+  const systemInstruction = `You are a World-Class AI Visual Reverse-Engineering Analyst and Master Prompt Engineer.
+Analyze the provided image and generate EXACTLY ${count} unique, highly varied, professional text-to-image prompt variations in English, tailored to the target style "${styleCategory}".
 
-CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
-5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the image contains recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
+CRITICAL REVERSE-ENGINEERING & DIVERSITY RULES (MANDATORY):
+1. EXTRACT CORE NICHE & THEME:
+   - Identify the underlying subject matter, commercial intent, vibe, color tone, lighting, and composition of the uploaded image.
+2. GENERATE ${count} DIVERSE COMPANION / SISTER VARIATIONS (DO NOT CLONE):
+   - Every single prompt variation MUST be distinctly DIFFERENT from the original image and DIFFERENT from each other.
+   - Variasikan:
+     * Sudut Kamera & Framing: macro close-up, overhead flat lay knolling, wide environmental shot, eye-level candid, 3/4 dynamic perspective.
+     * Skenario & Aksi: Tampilkan subjek dalam aksi, interaksi, tahapan persiapan, atau konteks penggunaan yang berbeda di dunia nyata.
+     * Pencahayaan & Waktu: Golden hour, soft morning window light, clean studio lighting, moody atmospheric light.
+     * Komposisi: Letakkan subjek di kiri/kanan dengan clean copy space untuk kebutuhan komersial stok.
+   - All variations must be plausible, logical, and commercially viable.
+3. STYLE TRANSLATION TO "${styleCategory}":
+   - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).
+4. ZERO IP RISK:
+   - Replace any brand names/logos with generic descriptive terms (e.g. 'luxury modern coupe' instead of 'Porsche').
 
-STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
-- Subject (The main entity)
-- Action (What is happening)
-- Environment (Setting, location, context)
-- Mood (Emotional tone)
-- Lighting (Type, direction, intensity)
-- Camera angle (Position relative to subject)
-- Lens estimate (Focal length, aperture, depth of field)
-- Composition (Framing, rule of thirds, perspective)
-- Visual style (Current aesthetic baseline)
-
-STEP 2: GENERATE A DETAILED PROMPT MATCHING THE SELECTED STYLE: ${styleCategory}
-Adapt the prompt structure according to the chosen style:
-- If 'Photorealistic': focus on RAW photo quality, technical camera specs, hyper-real textures.
-- If 'Cinematic': focus on anamorphic lens effects, color grading, lighting scenarios, film stock.
-- If 'Adobe Stock': focus on clean backgrounds, commercial appeal, high contrast, studio lighting.
-- If 'Editorial': focus on fashion/magazine composition, avant-garde elements, professional retouching styles.
-- If 'Lifestyle': focus on natural motion, candid moments, warm/authentic lighting, everyday settings.
-- If 'Fine Art': focus on brushstrokes, medium textures, artistic theory, museum-quality lighting.
-- If 'Grimdark Gothic Horror Painterly': focus on macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy and gothic horror art.
-
-CRITICAL RULES:
-1. OUTPUT PROMPT MUST BE IN ENGLISH.
-2. The description should be a concise summary of the visual analysis and how this variation differs or complements the original asset.
-3. Return a JSON object with "prompt" and "description".`;
+CRITICAL OUTPUT FORMAT:
+- Return a JSON object with:
+  - "prompts": an array of EXACTLY ${count} distinct prompt strings in English.
+  - "description": a brief explanation in Indonesian summarizing the visual analysis and how these variations provide commercial companion diversity.`;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      prompt: { type: Type.STRING, description: 'The generated image-to-image prompt.' },
-      description: { type: Type.STRING, description: 'Brief description of the image content.' }
+      prompts: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: `Array of exactly ${count} unique prompt variations in English.`
+      },
+      description: { type: Type.STRING, description: 'Brief description of image analysis in Indonesian.' }
     },
-    required: ["prompt", "description"]
+    required: ["prompts", "description"]
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
   let lastError;
   let responseText = "";
 
-  // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+      const response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Reverse-engineer this image and generate ${count} unique, varied sister prompt variations matching style: "${styleCategory}".` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.0
+        temperature: 0.65
       });
       responseText = response.text || "{}";
       break;
@@ -5711,7 +5730,15 @@ CRITICAL RULES:
 
   try {
     const data = JSON.parse(extractJSON(responseText));
-    return data as { prompt: string; description: string };
+    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
+      ? data.prompts 
+      : (data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`]);
+      
+    return {
+      prompts: promptList,
+      prompt: promptList[0] || "",
+      description: data.description || "Analisis visual dan ekstraksi variasi prompt selesai."
+    };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
     throw new Error("Failed to parse AI response. Please try again.");
@@ -5721,91 +5748,32 @@ CRITICAL RULES:
 export const analyzeBatchImageToPrompt = async (
   images: string[],
   styleCategory: string = 'Cinematic',
+  variation: number = 5,
   model?: string
-): Promise<{ prompt: string; description: string }[]> => {
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
+): Promise<{ prompts: string[]; prompt: string; description: string }[]> => {
+  const concurrency = 4;
+  const results: { prompts: string[]; prompt: string; description: string }[] = new Array(images.length);
   
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
-Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
-
-CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
-5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the images contain recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
-
-FOR EACH IMAGE, EXTRACT AND ANALYZE:
-- Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
-
-GENERATE PROMPT MATCHING STYLE: ${styleCategory}
-Adapt the logic based on style:
-- Photorealistic/Cinematic: High technical detail, optics, and lighting.
-- Adobe Stock/Editorial: Commercial composition and polish.
-- Lifestyle/Fine Art: Emotional resonance and artistic medium.
-- Grimdark Gothic Horror Painterly: Macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy.
-
-CRITICAL BATCH RULES:
-1. You are receiving ${images.length} distinct images.
-2. You MUST return a JSON array containing EXACTLY ${images.length} objects.
-3. OUTPUT PROMPTS MUST BE IN ENGLISH.
-
-Return a JSON array of objects, each with "prompt" and "description".`;
-
-  const responseSchema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        prompt: { type: Type.STRING, description: 'The generated image-to-image prompt.' },
-        description: { type: Type.STRING, description: 'Brief description of the image content.' }
-      },
-      required: ["prompt", "description"]
-    }
-  };
-
-  const parts: any[] = [];
-  for (let i = 0; i < images.length; i++) {
-    parts.push({ text: `\n\n--- IMAGE ${i + 1} ---\n` });
-    parts.push(processFrameServer(images[i]));
-  }
-  parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
-
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
-  let lastError;
-
-  // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-  for (const modelName of modelsToTryList) {
-    try {
-      const res = await callGeminiWithRetry(modelName, { parts }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.0
-      });
-      responseText = res.text || "[]";
-      break;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
-    }
+  for (let i = 0; i < images.length; i += concurrency) {
+    const chunk = images.slice(i, i + concurrency);
+    const chunkPromises = chunk.map(async (img, offset) => {
+      const index = i + offset;
+      try {
+        const res = await analyzeImageToPrompt(img, styleCategory, variation, model);
+        results[index] = res;
+      } catch (err: any) {
+        console.warn(`[analyzeBatchImageToPrompt] Error on image index ${index}:`, err.message);
+        results[index] = {
+          prompts: [`${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`],
+          prompt: `${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`,
+          description: "Gagal mengekstrak analisis detail gambar, menggunakan prompt estimasi gaya."
+        };
+      }
+    });
+    await Promise.all(chunkPromises);
   }
 
-  if (!responseText) {
-    console.warn("analyzeBatchImageToPrompt bypassed:", lastError?.message);
-    throw lastError || new Error("Failed to analyze images in batch.");
-  }
-
-  try {
-    const data = JSON.parse(extractJSON(responseText));
-    return data as { prompt: string; description: string }[];
-  } catch (error) {
-    console.warn("Gemini Parse Error:", error, responseText);
-    throw new Error("Failed to parse AI response. Please try again.");
-  }
+  return results;
 };
 
 export const analyzeVideoKeyword = async (keyword: string, model?: string): Promise<VideoAnalysisResult> => {
