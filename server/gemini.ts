@@ -3224,10 +3224,10 @@ async function expandKeywordsWithAI(
 
   const modeRule =
     keywordMode === 'single'
-      ? 'DO NOT split compound words! You may use single words for simple concepts, but NEVER break apart established natural phrases.'
+      ? 'STRICTLY SINGLE WORDS ONLY (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. Separate concepts like "coffee cup" into "coffee" and "cup".'
       : keywordMode === 'multi'
         ? 'Every keyword MUST be a natural 2-5 word phrase. NO single words.'
-        : 'Use natural single words and natural 2-5 word search phrases. DO NOT split compound phrases.';
+        : 'Use a balanced mix of natural single words and 2-5 word search phrases. DO NOT unnecessarily split compound phrases that are naturally searched together.';
 
   const language = getLanguageName(metadataLanguage);
   let candidates = [...current];
@@ -3381,26 +3381,22 @@ async function applyMetadataGenKeywordLogic(options: {
 const UNIVERSAL_KEYWORD_RULES = `
 You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine. Generate highly discoverable, strictly formatted professional keywords for the analyzed visual asset.
 
-KEYWORD GENERATION RULES (CRITICAL):
-1. NO COLORS OR PATTERNS: ABSOLUTELY DO NOT use any color words (e.g., "red", "blue", "colorful", "dark", "bright") or pattern words (e.g., "striped", "polka dot", "seamless").
-2. ACTION AND VERB FOCUS: Emphasize strong action words, verbs, and activities happening in the image.
-3. EXACT PHRASAL MATCHING & NO BROKEN WORDS: Prioritize highly searched 2-3 word natural phrases. DO NOT SPLIT compound words! If a concept is naturally searched as a phrase (e.g., "living room", "coffee cup", "copy space", "shallow depth of field"), keep it TOGETHER as one keyword entry. NEVER break it into standalone fragments like "living" and "room" or "shallow" and "depth", because those fragments lose all commercial meaning on their own.
-4. STRICT KEYWORD ORDERING (MANDATORY): You MUST generate keywords following this EXACT sequential hierarchy. The most important keywords come first.
-   - 1. Main Subject: The core object/person (MUST be at the very front).
-   - 2. Subject Attribute: Type, shape, characteristics of the object.
-   - 3. Action / Activity: What is currently happening (Verbs).
-   - 4. Context / Environment: Location, setting, or surrounding environment.
-   - 5. Purpose / Concept: The abstract meaning or commercial concept.
-   - 6. Composition: Framing techniques (e.g., "close up", "isolated", "copy space", "overhead", "flat lay").
-   - 7. Target / Audience: Only if visibly relevant and logical.
-   - 8. Season / Occasion: Only if completely visually verified.
-   - 9. Industry / Commercial Intent: e.g., "business", "healthcare", "education", "technology".
-   - 10. Long-tail phrases: MUST BE MULTI-WORD PHRASES (3-5 words), NEVER a single keyword. Natural combinations of the above elements (e.g., "business people shaking hands", "woman working on laptop").
-5. COUNT & VISUAL TRUTH (NO NGAWUR): Generate exactly 40-50 highly relevant professional keywords. Every keyword MUST be traceable to the VISUAL_FACTS. STRICTLY FORBIDDEN to hallucinate.
-6. ABSOLUTELY NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "nice", "perfect", "high quality", "best", "image", "picture", "element", or "thing".
-7. NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or AI terms ("midjourney", "chatgpt"). NO "copyright" or "logo".
-8. FORMAT: All keywords must be lowercase, singular (where grammatically appropriate), free of duplicates.
-9. KEEP THE EXISTING MIXED KEYWORD MODE BEHAVIOR UNCHANGED.
+KEY CAPABILITIES (CRITICAL):
+1. Auto-detects subjects, scenes, and contexts: You MUST analyze and extract accurate, grounded keywords from the VISUAL_FACTS, covering the main subjects, setting, activities, and commercial context. NEVER hallucinate.
+2. Generates keyword sets optimized for search ranking: Prioritize highly searched 2-3 word natural phrases and concrete nouns/verbs. DO NOT SPLIT compound words! Order keywords by importance (Main Subject first, followed by context, concepts, and composition).
+3. Supports multiple languages and regional spelling: Output all keywords strictly in the requested metadata language, adapting seamlessly to regional spelling rules and natural local search phrasing.
+
+STRATEGIC RELEVANCE & NICHE TARGETING:
+- Review keywords for relevance before export: Every keyword must be strictly relevant to the core subject or commercial concept.
+- Use fewer, stronger keywords for tight niches: When the asset targets a highly specific niche, prioritize strong, high-value keywords over volume.
+- Leverage variations for larger marketplaces: Utilize smart semantic variations, natural synonyms, and local phrasing to capture broad search intent on macro-marketplaces, without sacrificing accuracy.
+
+ADDITIONAL RULES:
+- STYLE & NEATNESS: Generate highly descriptive, concrete, and neat terms. For example, a food scene should yield a clean list like: "chicken, fried, crispy, glaze, knife, steaming, cutting, board, food, savory, meat, meal". Do not generate messy, overly complex, or robotic phrasing.
+- NO COLORS OR PATTERNS: ABSOLUTELY DO NOT use any color words (e.g., "red", "blue") or pattern words (e.g., "striped").
+- NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "high quality", "image", "picture".
+- NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or AI terms ("midjourney", "chatgpt").
+- FORMAT: All keywords must be lowercase, free of duplicates, and match the exact requested count without filler.
 `;
 
 
@@ -3449,14 +3445,16 @@ export const generateStockMetadata = async (
   const directives = getToolTypeDirectives(toolType);
 
   // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Never split compound phrases (e.g., keep "flat lay" together, never split it into "flat" and "lay").`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Even in single keyword mode, you MUST NOT split compound phrases (e.g. keep "copy space", "flat lay"). DO NOT split them.`;
-    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ADJUSTED):\nYou may output single words for simple nouns/verbs, BUT you are STRICTLY FORBIDDEN from splitting compound phrases. E.g., if the concept is "flat lay", output "flat lay" as one string. NEVER split it into "flat" and "lay". NO colors. NO patterns.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE:\nGenerate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
+  } else {
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
@@ -3490,6 +3488,10 @@ VISUAL ACCURACY RULES:
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
 4. Never hallucinate brands, trademarked logos, or copyrighted characters.
 5. If uncertain, provide the closest accurate generic description.
+
+FORMATTING RULES FOR VISUAL FACTS:
+- Describe items, actions, and concepts using highly descriptive, concrete, and neat terms (e.g., "chicken", "fried", "crispy", "glaze", "knife", "cutting board", "cooking", "serving").
+- ABSOLUTELY AVOID using long sentences or robotic phrasing in the arrays. Extract the core nouns, verbs, and descriptive adjectives cleanly so they can directly feed the keyword engine.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
@@ -4037,14 +4039,16 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Never split compound phrases (e.g., keep "flat lay" together, never split it into "flat" and "lay").`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Even in single keyword mode, you MUST NOT split compound phrases (e.g. keep "copy space", "flat lay"). DO NOT split them.`;
-    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE (ADJUSTED):\nYou may output single words for simple nouns/verbs, BUT you are STRICTLY FORBIDDEN from splitting compound phrases. E.g., if the concept is "flat lay", output "flat lay" as one string. NEVER split it into "flat" and "lay". NO colors. NO patterns.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE:\nGenerate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
     keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
+  } else {
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
@@ -4080,6 +4084,10 @@ VISUAL ACCURACY RULES:
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
 4. Never hallucinate brands, trademarked logos, or copyrighted characters.
 5. If uncertain, provide the closest accurate generic description.
+
+FORMATTING RULES FOR VISUAL FACTS:
+- Describe items, actions, and concepts using highly descriptive, concrete, and neat terms (e.g., "chicken", "fried", "crispy", "glaze", "knife", "cutting board", "cooking", "serving").
+- ABSOLUTELY AVOID using long sentences or robotic phrasing in the arrays. Extract the core nouns, verbs, and descriptive adjectives cleanly so they can directly feed the keyword engine.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
@@ -6017,20 +6025,21 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
      * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
    - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
-   - Teks Tidak Terbaca & Gibberish (CRITICAL): Periksa apakah terdapat teks yang tidak terbaca, karakter rusak, kata-kata yang berantakan, atau ejaan aneh (gibberish text) pada papan tulis (whiteboard), catatan tempel (sticky notes), poster, buku, kemasan produk, atau bagian mana pun di dalam gambar. Ini adalah cacat visual generatif AI yang sangat umum dan fatal untuk komersial. Jika gambar mengandung teks berantakan (seperti karakter huruf yang hancur, kata yang tidak bermakna/gibberish, atau gabungan huruf acak), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
+   - Teks Tidak Terbaca, Berantakan, atau Ejaan Aneh (Gibberish Text) [CRITICAL]: Periksa dengan SANGAT KETAT teks pada kain (spanduk, pita, baju), papan tulis, poster, atau dinding. AI generatif sering kali merusak huruf atau membentuk kata asing yang cacat (contoh: huruf yang melebur, ejaan yang salah, tumpang tindih berantakan, atau font yang mendadak berubah bentuknya). Jika teks terlihat cacat bentuk, meleleh, atau tidak masuk akal dalam ejaan (seperti 'AIDS AWARENESS' yang hurufnya hancur/asimetris), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
 
 6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
    - Efek Cahaya & Lens Flare Merusak (Excessive/Artificial Lens Flare) [KRITIS]: Deteksi efek bias pelangi (rainbow lens flare), kebocoran cahaya (light leaks), atau flare heksagonal buatan AI yang melintasi subjek utama dan menutupi detail asli (seperti jaket, celana, ransel). Jika efek ini tampak tidak alami, mengganggu estetika komersial, atau menutupi detail tekstur penting, status "ai_artifacts" atau "over_edited" WAJIB di-set ke FAIL.
    - Figur Latar Belakang Cacat (Deformed/Malformed Background Figures) [SANGAT KRITIS]: Orang/subjek di latar belakang koridor/jalan yang memiliki tubuh terdistorsi, wajah meleleh/hancur, kaki/tangan menyatu secara tidak alami, meskipun latar belakang tersebut blur/bokeh. Cacat visual pada karakter sekunder atau figur latar belakang adalah alasan penolakan nomor satu di Adobe Stock. Jika ditemukan, status "ai_artifacts" dan "anatomical_errors" WAJIB di-set ke FAIL.
    - Perspektif & Geometri Loker/Benda Bengkok (Warped Locker & Physical Geometry) [SANGAT KRITIS]: Garis-garis lurus pada furnitur, loker, kabinet, garis pintu, tangga, celah pintu loker yang tidak konsisten ukurannya, nomor loker (seperti nomor pelat logam "148") yang penyok/asimetris, atau kunci besi yang bentuknya meleleh dan tidak logis secara mekanisme fisik dunia nyata. Jika ditemukan cacat geometris ini, status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL.
    - Wajah Terdistorsi (Distorted/Melted Faces) [SANGAT KRITIS]: Wajah pada subjek utama maupun orang-orang/kerumunan di latar belakang yang meleleh, asimetris parah, mata yang menyatu, atau tampak seperti gumpalan daging tak berbentuk. Sering terjadi pada gambar kerumunan AI. Jika ditemukan, WAJIB set "anatomical_errors" dan "ai_artifacts" ke FAIL.
-   - Fake UI/Tech Interfaces & Glowing Effects (SANGAT KRITIS): Elemen antarmuka masa depan (futuristic UI), pemindai sidik jari (fingerprint scanner), hologram, atau layar digital yang terbuat dari AI sering kali berisi teks omong kosong (gibberish), simbol tak bermakna, garis-garis yang meleleh atau menyatu tanpa tujuan, dan grafis acak. Perhatikan baik-baik teks, angka, dan bentuk geometrisnya. Jika tidak memiliki makna, asimetris, atau terlihat seperti gumpalan garis bersinar yang berantakan, WAJIB set "ai_artifacts" dan "structural_defects" ke FAIL dengan skor di bawah 65.
+   - Fake UI/Tech Interfaces & Glowing Effects (SANGAT KRITIS): Elemen antarmuka masa depan (futuristic UI), pemindai sidik jari (fingerprint scanner), dashboard melayang (floating holograms), atau layar digital yang terbuat dari AI sering kali berisi teks omong kosong (gibberish), grafik melayang tanpa sumber cahaya logis, garis-garis yang meleleh atau menyatu tanpa tujuan, dan pola sirkuit (circuit board) yang hancur/bercampur acak. Perhatikan baik-baik teks, angka, grafik batang, dan bentuk geometris yang bercahaya (glowing). Jika tidak memiliki makna teks yang valid, asimetris, atau terlihat seperti gumpalan garis bersinar yang berantakan dan meleleh ke dalam komponen lain (seperti kabel atau chip), WAJIB set "ai_artifacts" dan "structural_defects" ke FAIL dengan skor di bawah 65.
    - Benda yang Tidak Logis (Nonsensical Objects/Hallucinations): Objek yang bentuknya tidak masuk akal, terpotong secara ajaib, atau percampuran benda yang tidak logis (misal: tangan yang menyatu dengan bunga atau benda asing, benda yang melayang tanpa alasan, atau geometri mustahil). Jika ditemukan, set "ai_artifacts" ke FAIL.
-   - Masalah Anatomi (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, tangan/jari yang meleleh dan berbaur secara mustahil dengan objek lain, sendi terkilir aneh, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.
-   - Detail yang Meleleh (Melted details) & Pola Hancur (Pattern Degradation) [SANGAT KRITIS]: Tekstur rajutan/mesh (seperti pada sarung tangan atau pakaian) yang terlalu seragam lalu mendadak berubah menjadi pola digital acak, garis tipis berdekatan (seperti lingkaran holografik) yang melebur menjadi aliasing, jagged edges, atau muddy detail saat di-zoom, serta pinggiran objek (edge) yang bercampur ambigu dengan objek lain.
-   - High Contrast & Glow Artifacts [KRITIS]: Area dengan glow yang sangat terang (seperti warna oranye neon) terhadap latar belakang gelap sangat rentan mengalami clipping, color banding, loss of fine texture, dan compression artifacts (terutama jika telah di-upscale/sharpening agresif). Periksa transisi cahayanya, jika patah/kasar, status "overexposure" dan "ai_artifacts" WAJIB FAIL.
-   - Logika Mekanis Objek Buatan Manusia (Mechanical & Structural Coherence) [SANGAT KRITIS]: Periksa SETIAP objek buatan manusia pada crop detail apakah strukturnya masuk akal secara fisik dan bisa berfungsi di dunia nyata. Contoh wajib periksa: SEPEDA (apakah rantai ada dan tersambung ke gear? apakah pedal tersambung ke engkol/crank arm yang logis? apakah jari-jari/spokes tersambung konsisten dari hub ke rim? apakah rem, fork, dan rangka menyambung secara logis? apakah sadel tersambung ke seatpost yang benar?), kendaraan (roda, spion, wiper), furnitur (kaki kursi/meja), alat musik (senar, tuts), pakaian (kancing, resleting, jahitan), dan bangunan (jendela, tangga, railing). Jika ditemukan bagian yang meleleh, hilang, menyatu mustahil, atau tidak bisa berfungsi secara mekanis (contoh: sepeda tanpa rantai, pedal melayang tanpa engkol), status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL meskipun bagian tersebut kecil atau berada di tepi gambar.
-   - Tangan yang Berinteraksi dengan Objek (Hands Gripping Objects) [SANGAT KRITIS]: Saat tangan memegang/menyentuh objek (setang, sadel, gagang, gelas, alat), periksa pada crop detail apakah jari menggenggam secara logis atau malah menyatu/meleleh ke objek. Titik kontak tangan-objek adalah lokasi cacat AI paling umum. Jari yang menyatu dengan objek WAJIB mengeset "anatomical_errors" ke FAIL.
+   - Masalah Anatomi & Tubuh (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, PERUT, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, pusar perut yang hilang (missing belly button) pada perut telanjang, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.
+   - Pakaian & Kulit Menyatu (Clothing-Skin Fusion) [SANGAT KRITIS]: Periksa tepian bikini, celana dalam, tali bra, atau kerah baju. Jika kain bikini/pakaian terlihat menyatu, melebur, atau terbuat dari daging/kulit subjek itu sendiri (seperti yang sering terjadi pada celana AI), atau tali menyatu dengan punggung secara mustahil, status "anatomical_errors" dan "ai_artifacts" WAJIB di-set ke FAIL.
+   - Detail yang Meleleh (Melted details) & Pola Hancur (Pattern Degradation) [SANGAT KRITIS]: Tekstur rajutan/mesh (seperti pada sarung tangan atau pakaian) yang terlalu seragam lalu mendadak berubah menjadi pola digital acak, garis tipis berdekatan yang melebur menjadi aliasing, atau pinggiran objek (edge) yang bercampur ambigu dengan objek lain.
+   - High Contrast & Glow Artifacts [KRITIS]: Area dengan glow yang sangat terang (seperti warna oranye neon) terhadap latar belakang gelap sangat rentan mengalami clipping. Periksa transisi cahayanya, jika patah/kasar, status "overexposure" dan "ai_artifacts" WAJIB FAIL.
+   - Logika Mekanis Objek Buatan Manusia (Mechanical & Structural Coherence) [SANGAT KRITIS]: Periksa SETIAP objek buatan manusia (seperti TANGGA, sepeda, furnitur) pada crop detail apakah strukturnya masuk akal secara fisik. Periksa TANGGA (ladder): apakah pijakan kaki menembus tiang utamanya secara mustahil? Apakah subjek berdiri di pijakan yang melayang? Jika ditemukan bagian yang meleleh, hilang, menyatu mustahil, atau tidak logis, status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL.
+   - Tangan yang Berinteraksi dengan Objek (Hands Gripping Objects & Small Items) [SANGAT KRITIS]: Saat tangan memegang/menyentuh objek (benda kecil seperti tasbih/rosario/kalung, kain handuk/pita, tangga, gelas), periksa pada crop detail apakah jari menggenggam secara logis atau malah menyatu/meleleh ke objek tersebut. Cacat AI paling umum: Manik-manik tasbih/kalung yang meleleh dan membaur dengan jari tangan, tali handuk yang tidak terpisah jelas dari jari, atau jari yang menembus kain. Jika ditemukan, WAJIB mengeset "anatomical_errors" dan "ai_artifacts" ke FAIL.
    - Kedalaman Ruang Tidak Natural (Unnatural Depth of Field): Latar belakang yang kabur (blur) namun tidak terlihat seperti bokeh optik, melainkan tampak seperti coretan kasar (smudgy), berbercak, atau terhapus secara artifisial.
    - Teks & Karakter Rusak (Gibberish Text): Karakter huruf yang rusak/cacat/terdistorsi, kata-kata tak terbaca, teks hancur atau tidak bermakna di papan tulis (whiteboards), bagan diagram, catatan dinding, atau sticky notes.
    - Kecacatan Proporsi & Perspektif (Proportion & Perspective Defects) [CRITICAL]: Periksa distorsi proporsi objek fisik, furnitur, ruangan, atau elemen arsitektur. Periksa juga kemiringan garis bangunan, tangga yang tidak menuju ke mana-mana, atau distorsi proporsi tubuh manusia. Jika fatal, status "proportion_defects" dan "structural_defects" WAJIB FAIL.
@@ -6066,15 +6075,12 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
         * Bagian Interior Kuil Sagrada Família (Barcelona) dilarang keras.
         * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
 
-PANDUAN FINAL DECISION ENGINE (CRITICAL):
-- STRICT ANTI-HALLUCINATION (NO NGAWUR): Do NOT hallucinate defects. You must base your findings ONLY on verifiable visual facts. Do NOT claim there is text/gibberish if there is no text. Do NOT claim the anatomy is broken if it is visually sound. Do not wander off-topic or guess (ngawur). 
-- Pisahkan HARD FAIL dari REVIEW WARNING. Warning bukan rejection.
-- HARD FAIL hanya untuk pelanggaran submission yang terkonfirmasi atau cacat yang jelas/severe: global out-of-focus, clipping parah, noise parah, compression/banding parah, strong alpha matte contamination, pelanggaran IP/brand yang terkonfirmasi, gibberish text yang terkonfirmasi, atau deformasi struktural/AI yang terkonfirmasi.
-- Jangan FAIL untuk transparent PNG normal, anti-aliasing normal, shallow depth of field, shadow yang disengaja, variasi tekstur moderat, atau satu kecurigaan AI yang tidak pasti.
-- Jika bukti ambigu, pilih PASS dan jelaskan warning pemeriksaan daripada mengarang cacat.
-- Jangan menyebut tekstur metal hammered, weave kain, bokeh, atau detail geometris berulang sebagai AI artifact kecuali ada inkonsistensi struktural, geometri mustahil, atau deformasi generatif yang jelas.
-- Untuk isolated asset, nilai subjeknya, bukan canvas transparan kosong. Jangan menganggap margin transparan sebagai underexposure, background hitam, atau komposisi buruk.
-- Keputusan akhir harus mempertimbangkan SEMUA crop yang diberikan, bukan hanya full-frame.
+PANDUAN FINAL DECISION ENGINE (CRITICAL) - STRICT FAIL POLICY:
+- ZERO TOLERANCE FOR AI DEFECTS: Jika Anda mendeteksi cacat AI Generatif sekecil apa pun (gibberish text, jari menyatu, baju membaur dengan kulit, grafik melayang tak logis, tangga cacat), Anda DILARANG KERAS meloloskannya (PASS). Anda WAJIB memberikan status FAIL secara keseluruhan (overall recommendation = FAIL) dengan skor di bawah 65.
+- WAJIB BERIKAN BUKTI SPESIFIK (PROVIDE EVIDENCE): Jika Anda menggagalkan gambar (FAIL), Anda WAJIB menjabarkan bukti piksel yang persis dan lokasi spesifik cacat tersebut di dalam `visual_scan_analysis` dan `detailed_feedback` (misalnya: "Jari telunjuk pada tangan kanan melebur ke dalam kain handuk" atau "Teks di spanduk merah memiliki ejaan yang hancur menjadi huruf tak bermakna").
+- STRICT ANTI-HALLUCINATION (NO NGAWUR): Bukti cacat harus benar-benar terlihat di gambar. Dilarang mengarang cacat jika gambar sempurna. 
+- Pengecualian Seni Tetap Berlaku: Jangan mem-FAIL gambar hanya karena *shallow depth of field* (bokeh), *anti-aliasing* normal, atau bayangan yang sengaja dibuat gelap, asalkan BUKAN cacat struktur atau anatomi AI.
+- Jika terdapat pelanggaran IP/Brand atau Cacat AI Generatif, TIDAK ADA WARNING. Statusnya langsung HARD FAIL.
 
 PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
 Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:
@@ -6182,7 +6188,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: You MUST strictly enforce the ZERO TOLERANCE rules for Gibberish Text, Melted Anatomy, and Fake UI/Glowing Effects as detailed in your system instructions. Do NOT provide warnings for AI artifacts—you MUST FAIL them and provide pixel-level evidence. Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
         promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
