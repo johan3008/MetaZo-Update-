@@ -1612,7 +1612,7 @@ app.get('/api/debug-uploads', (req, res) => {
             // Fallback: direct download (no R2 configured)
             res.setHeader('Content-Type', contentType);
             res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(embeddedName)}"`);
-            res.sendFile(localOutputPath, { root: '/' }, (err) => {
+            res.sendFile(path.resolve(localOutputPath), (err) => {
                 cleanupLocal();
                 try { if (fs.existsSync(localOutputPath)) fs.unlinkSync(localOutputPath); } catch(e) {}
                 if (err) console.error('[Embed Metadata] Send error:', err);
