@@ -40,6 +40,7 @@
     "nodemailer": "^8.0.10",
     "pakasir-client": "^1.0.0",
     "pdfjs-dist": "^5.5.207",
+    "piexifjs": "^1.0.6",
     "playwright-chromium": "^1.61.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
