@@ -6257,7 +6257,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+        let promptText = `Anda adalah Senior Adobe Stock & Shutterstock Content Inspector. Lakukan audit mikro-forensik yang SANGAT KETAT.
+PERINGATAN KERAS: JANGAN PERNAH meloloskan (PASS) gambar yang memiliki cacat Generative AI, ketidaksesuaian mekanika/fisika (kabel melayang, sendok melayang, pin bengkok, ornamen tanpa tali, refleksi hantu, atau diagram kimia rusak), distorsi anatomi sekecil apa pun, teks cacat, atau overexposure glow. Jika ditemukan satu saja masalah di atas, Anda WAJIB memberikan rekomendasi: "FAIL", skor keseluruhan < 60, dan tandai check terkait sebagai FAIL. Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
         if (imageMetadata) {
           promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
         }
