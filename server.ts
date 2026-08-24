@@ -1675,11 +1675,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/analyze-image-to-prompt', async (req, res) => {
         try {
-            const { image, styleCategory, model } = req.body;
+            const { image, styleCategory, variation, model } = req.body;
             if (!image) {
                 return res.status(400).json({ error: 'Missing image data' });
             }
-            const data = await analyzeImageToPrompt(image, styleCategory, model);
+            const data = await analyzeImageToPrompt(image, styleCategory, typeof variation === 'number' ? variation : 5, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-image-to-prompt error:', e);
@@ -1689,11 +1689,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/analyze-batch-image-to-prompt', async (req, res) => {
         try {
-            const { images, styleCategory, model } = req.body;
+            const { images, styleCategory, variation, model } = req.body;
             if (!images || !Array.isArray(images)) {
                 return res.status(400).json({ error: 'Missing images data' });
             }
-            const data = await analyzeBatchImageToPrompt(images, styleCategory, model);
+            const data = await analyzeBatchImageToPrompt(images, styleCategory, typeof variation === 'number' ? variation : 5, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-batch-image-to-prompt error:', e);
