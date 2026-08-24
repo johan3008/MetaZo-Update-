@@ -1556,48 +1556,42 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2).' });
             }
 
-            // Step 2: AI Generate Metadata from the image
-            console.log(`[Embed Metadata] Generating AI metadata for: ${originalName}`);
-            const imageBase64 = fs.readFileSync(localInputPath, { encoding: 'base64' });
-            const dataUri = `data:image/jpeg;base64,${imageBase64}`;
-            const { keywordCount = 50, model, metadataLanguage, aiModelPerformance } = req.body;
-            const generatedMetadata = await generateStockMetadata(
-                [dataUri],
-                parseInt(String(keywordCount), 10) || 50,
-                '',
-                ToolType.IMAGE,
-                undefined,
-                model,
-                undefined,
-                undefined,
-                metadataLanguage || 'English',
-                aiModelPerformance || 'detail'
-            );
-            const { title = '', description = '', keywords = [] } = generatedMetadata;
-            console.log(`[Embed Metadata] AI generated title, ${keywords.length} keywords`);
+            // Step 2: Use provided metadata from client! (Do NOT regenerate using AI)
+            let title = req.body.title || '';
+            let description = req.body.description || '';
+            let keywords = [];
+            try {
+                if (req.body.keywords) keywords = JSON.parse(req.body.keywords);
+            } catch (e) {
+                console.error("[Embed Metadata] Failed to parse keywords:", e);
+            }
+            console.log(`[Embed Metadata] Embedding provided metadata: Title="${title}", ${keywords.length} keywords`);
 
-            // Step 3: ExifTool / ImageMagick — write metadata into file
-            const keywordStr = Array.isArray(keywords) ? keywords.join('; ') : String(keywords || '');
+            // Step 3: Write metadata into file using exiftool-vendored
             localOutputPath = localInputPath + '_embedded' + path.extname(originalName);
+            fs.copyFileSync(localInputPath, localOutputPath);
 
-            const magickArgs = [localInputPath];
-            if (title && title.trim()) {
-                magickArgs.push('-set', 'iptc:2:5', title.trim());
-                magickArgs.push('-set', 'exif:ImageDescription', title.trim());
-                magickArgs.push('-set', 'xmp:Title', title.trim());
+            try {
+                const tagsToUpdate = {};
+                if (title && title.trim()) {
+                    tagsToUpdate.Title = title.trim();
+                    tagsToUpdate.ObjectName = title.trim();
+                    tagsToUpdate.ImageDescription = title.trim();
+                }
+                if (description && description.trim()) {
+                    tagsToUpdate.Description = description.trim();
+                    tagsToUpdate.CaptionAbstract = description.trim();
+                }
+                if (keywords && keywords.length > 0) {
+                    tagsToUpdate.Keywords = keywords;
+                    tagsToUpdate.Subject = keywords;
+                }
+                
+                console.log(`[Embed Metadata] Writing EXIF/IPTC with ExifTool...`);
+                await exiftool.write(localOutputPath, tagsToUpdate, ['-overwrite_original']);
+            } catch (exifErr) {
+                console.error("[Embed Metadata] ExifTool error:", exifErr);
             }
-            if (description && description.trim()) {
-                magickArgs.push('-set', 'iptc:2:120', description.trim());
-                magickArgs.push('-set', 'xmp:Description', description.trim());
-            }
-            if (keywordStr) {
-                magickArgs.push('-set', 'iptc:2:25', keywordStr);
-                magickArgs.push('-set', 'xmp:Keywords', keywordStr);
-            }
-            magickArgs.push(localOutputPath);
-
-            console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
-            await spawnAsync('magick', magickArgs, { timeout: 30000 });
 
             // Step 4: Upload embedded file to Cloudflare R2 + return download URL
             const embeddedName = `embedded_${originalName}`;

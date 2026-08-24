@@ -50,6 +50,8 @@ export interface StockMetadata {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
+  dreamstime_category: string;
+  miricanvas_category: string;
   category_reason?: string;
 }
 
@@ -65,6 +67,8 @@ export interface FileItem {
   adobeCategoryId: number | '';
   shutterstockCategory1: string;
   shutterstockCategory2: string;
+  dreamstimeCategory: string;
+  miriCanvasCategory: string;
   categoryReason?: string;
   isGenerating: boolean;
   isExtracting?: boolean;
