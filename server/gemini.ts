@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { HOLIDAYS_DATA } from "./holidaysData.ts";
 import { EXTRA_HOLIDAYS_DATA } from "./extraHolidaysData.ts";
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from "../constants";
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, DREAMSTIME_CATEGORIES, MIRICANVAS_CATEGORIES } from "../constants";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -3553,7 +3553,9 @@ OUTPUT FORMAT:
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
@@ -3671,7 +3673,9 @@ OUTPUT FORMAT:
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
-  "shutterstock_category_2": "Backgrounds/Textures",
+  "shutterstock_category_2": "Backgrounds/Textures"
+      "dreamstime_category": "",
+      "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
 }
 If generation fails, return {"error": "metadata_generation_failed"}.`;
@@ -3825,7 +3829,9 @@ OUTPUT FORMAT:
   "keywords": [],
   "category_id": 0,
   "shutterstock_category_1": "",
-  "shutterstock_category_2": "",
+  "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
   "confidence_score": 0.95
 }`;
@@ -3857,7 +3863,9 @@ OUTPUT FORMAT:
       ...draftMetadata, 
       category_id: heur.category_id, 
       shutterstock_category_1: heur.shutterstock_category_1, 
-      shutterstock_category_2: heur.shutterstock_category_2 
+      shutterstock_category_2: heur.shutterstock_category_2,
+      dreamstime_category: "Abstract",
+      miricanvas_category: "Background" 
     };
   }
 
@@ -3987,6 +3995,8 @@ OUTPUT FORMAT:
         recovery.category_id = heur.category_id;
         recovery.shutterstock_category_1 = heur.shutterstock_category_1;
         recovery.shutterstock_category_2 = heur.shutterstock_category_2;
+        recovery.dreamstime_category = "Abstract";
+        recovery.miricanvas_category = "Background";
       }
 
       recovery.category_reason = recovery.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
@@ -4002,6 +4012,8 @@ OUTPUT FORMAT:
         category_id: 8,
         shutterstock_category_1: "Abstract",
         shutterstock_category_2: "Backgrounds/Textures",
+        dreamstime_category: "Abstract",
+        miricanvas_category: "Background",
         category_reason: "Fallback metadata generated after response normalization failure."
       } as StockMetadata;
     }
@@ -4163,7 +4175,9 @@ OUTPUT FORMAT:
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
@@ -4294,7 +4308,9 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 1,
       "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures",
+      "shutterstock_category_2": "Backgrounds/Textures"
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
     }
   ]
@@ -4449,7 +4465,9 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
       "confidence_score": 0.95
     }
@@ -4484,7 +4502,9 @@ OUTPUT FORMAT:
         ...d, 
         category_id: heur.category_id, 
         shutterstock_category_1: heur.shutterstock_category_1, 
-        shutterstock_category_2: heur.shutterstock_category_2 
+        shutterstock_category_2: heur.shutterstock_category_2,
+      dreamstime_category: "Abstract",
+      miricanvas_category: "Background" 
       };
     });
   }
@@ -6021,7 +6041,7 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
    - Hak Pribadi & Tubuh (Biometrics):
      * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk.
+     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk, NAMUN Anda WAJIB mengubah nilai `requires_model_release` menjadi true. Lakukan hal yang sama pada `requires_property_release` jika mendeteksi arsitektur modern/karya seni yang butuh rilis properti.
      * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
      * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
    - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
@@ -6110,6 +6130,8 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     properties: {
         visual_scan_analysis: { type: Type.STRING },
         legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
+        requires_model_release: { type: Type.BOOLEAN, description: "True if recognizable people are in the image" },
+        requires_property_release: { type: Type.BOOLEAN, description: "True if recognizable modern architecture, artwork, or private property is in the image" },
         technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
         strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
         overall_score: { type: Type.NUMBER },
@@ -6167,7 +6189,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             }
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
   };
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
@@ -6713,7 +6735,7 @@ Output strictly in JSON format.`;
     try {
       const res = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`,
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.8 },
@@ -6725,7 +6747,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6735,7 +6757,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err: any) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -6892,7 +6914,7 @@ Rules:
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`,
+      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`,
       responseMimeType: "application/json",
       responseSchema,
       config: { temperature: 0.8 },
@@ -6901,7 +6923,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6910,7 +6932,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,

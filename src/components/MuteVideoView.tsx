@@ -141,27 +141,30 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
   };
 
   const muteMp4MovClientSide = async (file: File): Promise<Blob> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const view = new DataView(arrayBuffer);
-    const uint8 = new Uint8Array(arrayBuffer);
-    
     let offset = 0;
-    const len = arrayBuffer.byteLength;
+    const len = file.size;
     const pieces: { start: number; end: number; data?: Uint8Array }[] = [];
     let foundMoov = false;
+
+    // Helper to read a small chunk of the file without loading everything into RAM
+    const readBytes = async (start: number, size: number) => {
+      const slice = file.slice(start, start + size);
+      const buf = await slice.arrayBuffer();
+      return new Uint8Array(buf);
+    };
 
     while (offset < len) {
       if (offset + 8 > len) {
         pieces.push({ start: offset, end: len });
         break;
       }
-      let size = view.getUint32(offset);
-      const type = String.fromCharCode(
-        uint8[offset + 4],
-        uint8[offset + 5],
-        uint8[offset + 6],
-        uint8[offset + 7]
-      );
+      
+      // Read just enough bytes for the atom header
+      const header = await readBytes(offset, 16);
+      const view = new DataView(header.buffer);
+      
+      let size = view.getUint32(0);
+      const type = String.fromCharCode(header[4], header[5], header[6], header[7]);
       
       let headerSize = 8;
       let actualSize = size;
@@ -170,8 +173,8 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
           pieces.push({ start: offset, end: len });
           break;
         }
-        const high = view.getUint32(offset + 8);
-        const low = view.getUint32(offset + 12);
+        const high = view.getUint32(8);
+        const low = view.getUint32(12);
         actualSize = high * 0x100000000 + low;
         headerSize = 16;
       } else if (size === 0) {
@@ -185,56 +188,49 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
 
       if (type === 'moov') {
         foundMoov = true;
-        const moovEnd = offset + actualSize;
-        let moovOffset = offset + headerSize;
+        
+        // ONLY load the 'moov' atom into memory (usually < 5MB). The heavy 'mdat' atom (often GBs) stays on disk!
+        const moovData = await readBytes(offset, actualSize);
+        const moovView = new DataView(moovData.buffer);
+        
+        const moovEnd = actualSize;
+        let moovOffset = headerSize;
         const keptChildren: Uint8Array[] = [];
         
         while (moovOffset < moovEnd) {
-          if (moovOffset + 8 > moovEnd) {
-            break;
-          }
-          let childSize = view.getUint32(moovOffset);
+          if (moovOffset + 8 > moovEnd) break;
+          let childSize = moovView.getUint32(moovOffset);
           const childType = String.fromCharCode(
-            uint8[moovOffset + 4],
-            uint8[moovOffset + 5],
-            uint8[moovOffset + 6],
-            uint8[moovOffset + 7]
+            moovData[moovOffset + 4],
+            moovData[moovOffset + 5],
+            moovData[moovOffset + 6],
+            moovData[moovOffset + 7]
           );
           
           let childHeaderSize = 8;
           let childActualSize = childSize;
           if (childSize === 1) {
             if (moovOffset + 16 > moovEnd) break;
-            const high = view.getUint32(moovOffset + 8);
-            const low = view.getUint32(moovOffset + 12);
+            const high = moovView.getUint32(moovOffset + 8);
+            const low = moovView.getUint32(moovOffset + 12);
             childActualSize = high * 0x100000000 + low;
             childHeaderSize = 16;
           } else if (childSize === 0) {
             childActualSize = moovEnd - moovOffset;
           }
           
-          if (childActualSize <= 0 || moovOffset + childActualSize > moovEnd) {
-            break;
-          }
+          if (childActualSize <= 0 || moovOffset + childActualSize > moovEnd) break;
 
           if (childType === 'trak') {
-            const trakData = uint8.subarray(moovOffset, moovOffset + childActualSize);
+            const trakData = moovData.subarray(moovOffset, moovOffset + childActualSize);
             let isAudio = false;
             
             for (let i = 0; i < trakData.length - 24; i++) {
               if (
-                trakData[i] === 104 &&     // 'h'
-                trakData[i+1] === 100 &&   // 'd'
-                trakData[i+2] === 108 &&   // 'l'
-                trakData[i+3] === 114      // 'r'
+                trakData[i] === 104 && trakData[i+1] === 100 && trakData[i+2] === 108 && trakData[i+3] === 114
               ) {
                 for (let j = i + 4; j < i + 24; j++) {
-                  if (
-                    trakData[j] === 115 &&   // 's'
-                    trakData[j+1] === 111 && // 'o'
-                    trakData[j+2] === 117 && // 'u'
-                    trakData[j+3] === 110    // 'n'
-                  ) {
+                  if (trakData[j] === 115 && trakData[j+1] === 111 && trakData[j+2] === 117 && trakData[j+3] === 110) {
                     isAudio = true;
                     break;
                   }
@@ -249,7 +245,7 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
               console.log(`[Client Mute] Skipped audio track of size ${childActualSize}`);
             }
           } else {
-            keptChildren.push(uint8.subarray(moovOffset, moovOffset + childActualSize));
+            keptChildren.push(moovData.subarray(moovOffset, moovOffset + childActualSize));
           }
           
           moovOffset += childActualSize;
@@ -260,11 +256,10 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
           totalChildrenSize += child.byteLength;
         }
         
-        const newMoovSize = totalChildrenSize + 8;
-        const newMoov = new Uint8Array(newMoovSize);
+        const newMoov = new Uint8Array(actualSize);
         const newMoovView = new DataView(newMoov.buffer);
         
-        newMoovView.setUint32(0, newMoovSize);
+        newMoovView.setUint32(0, actualSize);
         newMoov[4] = 109; // 'm'
         newMoov[5] = 111; // 'o'
         newMoov[6] = 111; // 'o'
@@ -274,6 +269,15 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
         for (const child of keptChildren) {
           newMoov.set(child, writeOffset);
           writeOffset += child.byteLength;
+        }
+
+        const remainingBytes = actualSize - writeOffset;
+        if (remainingBytes >= 8) {
+          newMoovView.setUint32(writeOffset, remainingBytes);
+          newMoov[writeOffset + 4] = 102; // 'f'
+          newMoov[writeOffset + 5] = 114; // 'r'
+          newMoov[writeOffset + 6] = 101; // 'e'
+          newMoov[writeOffset + 7] = 101; // 'e'
         }
         
         pieces.push({ start: offset, end: offset + actualSize, data: newMoov });
@@ -293,7 +297,8 @@ export const MuteVideoView: React.FC<MuteVideoViewProps> = ({
       if (piece.data) {
         finalBlobs.push(piece.data);
       } else {
-        finalBlobs.push(uint8.subarray(piece.start, piece.end));
+        // Feed the Blob slice directly, never loading mdat into RAM!
+        finalBlobs.push(file.slice(piece.start, piece.end));
       }
     }
     

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film } from 'lucide-react';
 import { ToolType, FileItem, ProgressInfo } from '../../types';
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from '../../constants';
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, DREAMSTIME_CATEGORIES, MIRICANVAS_CATEGORIES } from '../../constants';
 import { copyToClipboard } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { getHeaders } from '../../services/geminiService';
@@ -971,6 +971,36 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                             <option value="">{t.select_category}</option>
                             {(activeTool === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).map(cat => (
                               <option key={cat} value={cat} disabled={cat === file.shutterstockCategory1}>{cat}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      
+                      {/* Dreamstime & MiriCanvas */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 px-0.5 mt-3.5">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kategori Dreamstime</label>
+                          <select 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
+                            value={file.dreamstimeCategory || ''} 
+                            onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, dreamstimeCategory: e.target.value} : f))}
+                          >
+                            <option value="">{t.select_category}</option>
+                            {DREAMSTIME_CATEGORIES.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Kategori MiriCanvas</label>
+                          <select 
+                            className="w-full p-2.5 bg-white dark:bg-black/40 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-xs outline-none font-bold text-slate-700 dark:text-slate-200 focus:ring-1 focus:ring-violet-500 transition-all appearance-none" 
+                            value={file.miriCanvasCategory || ''} 
+                            onChange={(e) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, miriCanvasCategory: e.target.value} : f))}
+                          >
+                            <option value="">{t.select_category}</option>
+                            {MIRICANVAS_CATEGORIES.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
                             ))}
                           </select>
                         </div>
