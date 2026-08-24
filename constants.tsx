@@ -929,3 +929,6 @@ export const TRANSLATIONS = {
     mute_error_trial: "Batas Trial Terlampaui. Anda telah mencapai batas maksimal 25 video mute hari ini. Sila hubungi admin atau masukkan kode aktivasi untuk memproses tanpa batas.",
   }
 };
+
+export const DREAMSTIME_CATEGORIES = ['Abstract', 'Animals', 'Arts & Architecture', 'Business', 'Editorial', 'Holidays', 'IT & C', 'Illustrations & Clipart', 'Industries', 'Nature', 'Objects', 'People', 'Technology', 'Web Design'];
+export const MIRICANVAS_CATEGORIES = ['Background', 'Frame', 'Object', 'Icon', 'Line', 'Photo', 'Text', 'Template'];

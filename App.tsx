@@ -3361,6 +3361,8 @@ const App: React.FC = () => {
             adobeCategoryId: '',
             shutterstockCategory1: '',
             shutterstockCategory2: '',
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
             isGenerating: false,
             isExtracting: false,
             error: errorMsg,
@@ -3491,6 +3493,8 @@ const App: React.FC = () => {
                 adobeCategoryId: metadata.category_id,
                 shutterstockCategory1: metadata.shutterstock_category_1,
                 shutterstockCategory2: metadata.shutterstock_category_2,
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
                 categoryReason: metadata.category_reason,
                 isGenerating: false,
                 error: null
@@ -3675,6 +3679,8 @@ const App: React.FC = () => {
                             adobeCategoryId: result.metadata.category_id,
                             shutterstockCategory1: result.metadata.shutterstock_category_1,
                             shutterstockCategory2: result.metadata.shutterstock_category_2,
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
                             categoryReason: result.metadata.category_reason,
                             isGenerating: false,
                             error: null
@@ -3880,6 +3886,8 @@ const App: React.FC = () => {
       adobeCategoryId: f.adobeCategoryId,
       shutterstockCategory1: f.shutterstockCategory1,
       shutterstockCategory2: f.shutterstockCategory2,
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
       categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
@@ -3932,6 +3940,8 @@ const App: React.FC = () => {
             adobeCategoryId: backupItem.adobeCategoryId || newFiles[existingIdx].adobeCategoryId,
             shutterstockCategory1: backupItem.shutterstockCategory1 || newFiles[existingIdx].shutterstockCategory1,
             shutterstockCategory2: backupItem.shutterstockCategory2 || newFiles[existingIdx].shutterstockCategory2,
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
             categoryReason: backupItem.categoryReason || newFiles[existingIdx].categoryReason,
             isGenerating: false,
             error: null
@@ -3954,6 +3964,8 @@ const App: React.FC = () => {
             adobeCategoryId: backupItem.adobeCategoryId || '',
             shutterstockCategory1: backupItem.shutterstockCategory1 || '',
             shutterstockCategory2: backupItem.shutterstockCategory2 || '',
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
             categoryReason: backupItem.categoryReason || '',
             isGenerating: false,
             error: null
@@ -3979,6 +3991,8 @@ const App: React.FC = () => {
       adobeCategoryId: f.adobeCategoryId,
       shutterstockCategory1: f.shutterstockCategory1,
       shutterstockCategory2: f.shutterstockCategory2,
+                            dreamstimeCategory: '',
+                            miriCanvasCategory: '',
       categoryReason: f.categoryReason,
       timestamp: new Date().toISOString()
     }));
