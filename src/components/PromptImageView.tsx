@@ -629,9 +629,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                   <button
                                     onClick={() => {
                                       const pList = item.result?.prompts && item.result.prompts.length > 0 
-                                        ? item.result.prompts.join('
-
-')
+                                        ? item.result.prompts.join("\n\n")
                                         : (item.result?.prompt || '');
                                       copyToClipboard(pList, item.id);
                                     }}
