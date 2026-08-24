@@ -6077,7 +6077,7 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
 
 PANDUAN FINAL DECISION ENGINE (CRITICAL) - STRICT FAIL POLICY:
 - ZERO TOLERANCE FOR AI DEFECTS: Jika Anda mendeteksi cacat AI Generatif sekecil apa pun (gibberish text, jari menyatu, baju membaur dengan kulit, grafik melayang tak logis, tangga cacat), Anda DILARANG KERAS meloloskannya (PASS). Anda WAJIB memberikan status FAIL secara keseluruhan (overall recommendation = FAIL) dengan skor di bawah 65.
-- WAJIB BERIKAN BUKTI SPESIFIK (PROVIDE EVIDENCE): Jika Anda menggagalkan gambar (FAIL), Anda WAJIB menjabarkan bukti piksel yang persis dan lokasi spesifik cacat tersebut di dalam `visual_scan_analysis` dan `detailed_feedback` (misalnya: "Jari telunjuk pada tangan kanan melebur ke dalam kain handuk" atau "Teks di spanduk merah memiliki ejaan yang hancur menjadi huruf tak bermakna").
+- WAJIB BERIKAN BUKTI SPESIFIK (PROVIDE EVIDENCE): Jika Anda menggagalkan gambar (FAIL), Anda WAJIB menjabarkan bukti piksel yang persis dan lokasi spesifik cacat tersebut di dalam \`visual_scan_analysis\` dan \`detailed_feedback\` (misalnya: "Jari telunjuk pada tangan kanan melebur ke dalam kain handuk" atau "Teks di spanduk merah memiliki ejaan yang hancur menjadi huruf tak bermakna").
 - STRICT ANTI-HALLUCINATION (NO NGAWUR): Bukti cacat harus benar-benar terlihat di gambar. Dilarang mengarang cacat jika gambar sempurna. 
 - Pengecualian Seni Tetap Berlaku: Jangan mem-FAIL gambar hanya karena *shallow depth of field* (bokeh), *anti-aliasing* normal, atau bayangan yang sengaja dibuat gelap, asalkan BUKAN cacat struktur atau anatomi AI.
 - Jika terdapat pelanggaran IP/Brand atau Cacat AI Generatif, TIDAK ADA WARNING. Statusnya langsung HARD FAIL.
