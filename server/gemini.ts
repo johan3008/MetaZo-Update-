@@ -6293,12 +6293,9 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       const warningsFromReconciliation: string[] = [];
       const noteIsSevere = (note: unknown) => /\b(severe|critical|heavy|extreme|parah|berat|kritis|sangat tinggi|sangat parah|obvious)\b/i.test(String(note || ''));
       const downgrade = (key: string, reason: string) => {
-        const check = parsedResult.ai_vision_checks?.[key];
-        if (check && check.status === 'FAIL') {
-          check.status = 'PASS';
-          check.note = `${check.note || ''} [Objective QC reconciliation: ${reason}]`;
-          warningsFromReconciliation.push(`${key}: ${reason}`);
-        }
+        // STRICT REVIEWER POLICY: Do NOT automatically downgrade or forgive any FAIL flagged by AI Vision.
+        // If the AI vision detected a flaw, trust the visual inspection over raw pixel averages.
+        console.log(`[QC Reconciliation] Kept inspection verdict for ${key}: ${reason}`);
       };
 
       if (objective.sharpness?.value >= 26 && objective.sharpness?.has_local_blur_anomaly !== true && !noteIsSevere(parsedResult.ai_vision_checks.blur?.note)) {
@@ -6358,19 +6355,25 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       // Terapkan penolakan atau kelulusan berdasarkan level toleransi.
       // CATATAN PENTING: moderator Adobe Stock menolak gambar untuk SATU cacat teknis apa pun,
       // sehingga MEDIUM (standar industri) kini wajib FAIL jika ada check teknis ATAU kritis yang FAIL.
-      if (tolerance === 'STRICT') {
+      if (anyFail || hasCriticalFail || anyTechnicalFail || acceptanceFail || (parsedResult.overall_score && parsedResult.overall_score < 75)) {
+        parsedResult.recommendation = "FAIL";
+        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) {
+          parsedResult.overall_score = 58;
+        }
+      } else if (anyFail || hasCriticalFail || anyTechnicalFail || acceptanceFail || (parsedResult.overall_score && parsedResult.overall_score < 75)) {
+        parsedResult.recommendation = "FAIL";
+        if (!parsedResult.overall_score || parsedResult.overall_score >= 70) {
+          parsedResult.overall_score = 58;
+        }
+      } else if (tolerance === 'STRICT') {
         if (anyFail) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 60) {
-            parsedResult.overall_score = 59;
-          }
+          if (parsedResult.overall_score >= 60) parsedResult.overall_score = 59;
         }
       } else if (tolerance === 'MEDIUM') {
         if (hasCriticalFail || anyTechnicalFail || acceptanceFail) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 66) {
-            parsedResult.overall_score = 65;
-          }
+          if (parsedResult.overall_score >= 66) parsedResult.overall_score = 65;
         }
       } else if (tolerance === 'LOOSE') {
         // LOOSE tetap menoleransi cacat teknis minor, tetapi TIDAK menoleransi cacat kritis,
