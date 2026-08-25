@@ -3686,7 +3686,6 @@ var BUYER_SEARCH_PRIORITY_TERMS = /* @__PURE__ */ new Set([
   "food",
   "travel",
   "nature",
-  "lifestyle",
   "people",
   "portrait",
   "office",
@@ -3702,13 +3701,11 @@ var BUYER_SEARCH_PRIORITY_TERMS = /* @__PURE__ */ new Set([
   "medical",
   "fitness",
   "wellness",
-  "background",
   "texture",
   "landscape",
   "city",
   "architecture",
   "transportation",
-  "nature",
   "sustainability",
   "environment",
   "celebration",
@@ -4769,6 +4766,10 @@ async function applyMetadataGenKeywordLogic(options) {
 var UNIVERSAL_KEYWORD_RULES = `
 You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine.
 
+UNIVERSAL ENFORCEMENT ACROSS ALL AI MODELS & PROVIDERS (Gemini, OpenAI, Groq, OpenRouter, Mistral, DeepSeek, Claude, Llama, Local LLMs):
+- ABSOLUTELY NO LAZY OLD TEMPLATES OR HARDCODED FILLER LISTS: You are strictly forbidden from dumping predefined keyword lists, generic boilerplate arrays, or superficial tags.
+- DYNAMIC DEEP REVERSE-ENGINEERING: Every keyword must be intelligently derived through the 8-tier cognitive pipeline below, purely grounded in the asset's visual reality.
+
 CRITICAL ARCHITECTURE \u2014 8-TIER COGNITIVE KEYWORD PIPELINE:
 You MUST construct metadata through these 8 structured cognitive steps rather than generating a random list of words:
 
@@ -4798,10 +4799,10 @@ You MUST construct metadata through these 8 structured cognitive steps rather th
    - Front-load the most crucial keywords at the front:
      [Exact Main Subject] -> [Relationship/Action] -> [Visual Attributes/Materials] -> [Environment] -> [Grounded Concept] -> [Commercial Intent].
 
-STRICT NEGATIVE FILTERS:
-- NO OVERLY GENERIC FILLERS: Eliminate "image", "photo", "picture", "element", "object", "thing", "generic", "background".
-- NO STANDALONE COLORS AS PRIMARY: Do not use standalone color words (e.g. "red", "blue") as primary keywords.
-- ZERO TOLERANCE FOR SUBJECTIVE WORDS: Strictly forbid "beautiful", "amazing", "stunning", "gorgeous", "pretty", "nice", "awesome", "perfect", "high quality", "best".
+STRICT NEGATIVE FILTERS (MANDATORY & ENFORCED):
+- NO OVERLY GENERIC FILLERS: Eliminate "image", "photo", "picture", "element", "object", "thing", "generic", "background", "design", "stock", "visual", "detail".
+- NO STANDALONE COLORS AS PRIMARY: Do not use standalone color words (e.g. "red", "blue", "green", "white", "black") as primary keywords.
+- ZERO TOLERANCE FOR SUBJECTIVE WORDS: Strictly forbid "beautiful", "amazing", "stunning", "gorgeous", "pretty", "nice", "awesome", "perfect", "high quality", "best", "superb", "lovely", "incredible", "masterpiece".
 - ELIMINATE UNRELATED / SPAM KEYWORDS: Zero tolerance for keywords not directly tied to the visual evidence.
 - FORMAT: Lowercase, comma-separated, matching the requested count, output strictly in the requested language.
 `;
@@ -7135,14 +7136,15 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 ---
 PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL FORENSIC ENGINE):
 Ketika menerima lebih dari 1 gambar, urutan gambar yang masuk ke vision model adalah:
-1. Gambar 1: Tampilan Penuh (Full Frame Overview) - periksa komposisi, pencahayaan global, dan konteks subjek.
-2. Gambar 2-5: 4 Kuadran Overlap 20% (Atas-Kiri, Atas-Kanan, Bawah-Kiri, Bawah-Kanan) - periksa tepi objek, latar belakang, dan struktur arsitektur.
-3. Gambar 6: Macro Subject Focus Crop (Zoom 1:1 Resolusi Asli pada Pusat Interaksi) - ini adalah crop mikroskopis fokus tinggi pada titik interaksi paling kritis: tangan memegang objek (bunga, rosario, alat kerja), detail kuku, pori-pori kulit, telinga, kelopak bunga, atau perhiasan.
-- Gunakan crop ke-6 (Macro Focus) untuk membedakan secara mutlak antara:
-  a. Aset Bersih (PASS): Jari tangan terpisah jelas dengan ruas sendi dan kuku nyata (seperti tangan memegang tangkai mawar putih), tekstur kulit alami dengan pori-pori halus, telinga terstruktur sempurna.
-  b. Cacat AI (FAIL): Manik-manik melebur ke dalam daging jari, kuku hilang/rusak, mahkota bunga meleleh menjadi gumpalan lilin, atau kulit berminyak sintetis tanpa pori.
+1. Gambar 1: Tampilan Penuh (Full Frame Overview) \u2014 periksa komposisi, perspektif global, pencahayaan, dan konteks tema.
+2. Gambar 2-5: 4 Kuadran Overlap 20% (Atas-Kiri, Atas-Kanan, Bawah-Kiri, Bawah-Kanan) \u2014 periksa tepi objek, latar belakang, rak server, garis arsitektur, dan aliran data biner.
+3. Gambar 6: Center Main Focus Crop (Zoom 1:1 Resolusi Asli pada Pusat Hologram/Subjek Utama) \u2014 periksa simetri perisai/hologram, clipping highlight pada garis glow, dan kejelasan elemen HUD grafis (grafik fiktif/gibberish yang tidak bermakna WAJIB FAIL).
+4. Gambar 7: Bottom Subject/Pedestal Focus Crop (Zoom 1:1 Resolusi Asli pada Microchip, Komponen Hardware, Tangan/Jari, atau Dasar Pedestal) \u2014 periksa pin/kaki konektor chip emas/tembaga (apakah bengkok, melebur, atau jarak antar pin tidak rata?), bantalan solder, simetri dudukan, dan interaksi fisik tangan.
 - Cacat yang terkonfirmasi pada SALAH SATU crop saja sudah cukup untuk menyatakan FAIL pada check terkait \u2014 moderator Adobe Stock memeriksa gambar pada zoom 100-200% di SELURUH area, bukan hanya tampilan penuh.
-- PERMUKAAN BERTULISAN DI LATAR BELAKANG (WAJIB DIPERIKSA DI SETIAP CROP): Whiteboard, papan tulis, sticky notes, poster dinding, sampul buku, layar monitor/panel kontrol, label kemasan, dan colokan/soket listrik yang memiliki cetakan ikon/huruf SERING berada di pinggir atau sudut frame (bukan di tengah) sehingga mudah terlewat jika hanya melihat gambar penuh yang kecil. WAJIB periksa SETIAP permukaan bertulisan di SETIAP crop kuadran secara eksplisit satu per satu \u2014 coretan/diagram yang tidak membentuk simbol kimia atau tulisan yang benar-benar bermakna (huruf acak, bentuk molekul yang tidak logis, ikon soket listrik yang bukan bentuk lubang colokan standar) adalah cacat AI generatif yang WAJIB FAIL, walaupun ukurannya kecil dan berada di latar belakang yang blur/jauh.
+- PERMUKAAN BERTULISAN & ELEMEN TEKNIS (WAJIB DIPERIKSA DI SETIAP CROP):
+  * Whiteboard, spanduk, label kemasan, buku, dan plang toko: coretan acak/huruf rusak adalah cacat AI generatif yang WAJIB FAIL.
+  * Aliran Angka Biner (Floating 1s & 0s) & HUD Cyber: Angka biner yang melayang cacat/meleleh, grafik fiktif yang tidak bermakna, atau clipping cahaya putih mati pada hologram WAJIB dinyatakan FAIL pada 'ai_artifacts' dan 'structural_defects'.
+  * Pin & Komponen Microchip/Hardware: Kaki/pin chip yang jaraknya tidak seragam, meleleh, atau bengkok adalah anomali geometri AI fatal.
 
 ---
 Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Manfaatkan SEMUA crop detail resolusi asli yang diberikan!):
@@ -7300,14 +7302,14 @@ Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan sk
 - MEDIUM (Standar Industri): Cacat teknis yang sangat minor di luar fokus utama (seperti noise halus yang wajar atau soft focus pada latar belakang artistik) dapat ditoleransi. Namun, kesalahan fokus pada subjek utama, anomali AI yang terlihat jelas, atau pelanggaran IP/Kekayaan Intelektual apa pun wajib dinyatakan FAIL dengan skor maksimal 0-65.
 - LOOSE (Toleransi Longgar / Estetika Tinggi): Utamakan keindahan artistik dan nilai jual komersial secara keseluruhan. Cacat teknis sedang (seperti noise sedang, soft focus ringan pada subjek sekunder, anomali AI minor yang tersembunyi) diperbolehkan lolos (PASS) asalkan subjek utama terlihat luar biasa indah, memiliki komposisi menawan, dan daya tarik komersial yang tinggi. Hanya kegagalan teknis yang fatal atau pelanggaran IP yang sangat terang-terangan yang menyebabkan status FAIL (skor maksimal 0-69).
 
-STATUS & SKORING (KONSISTEN & KETAT):
-- PASS: Skor 75 - 100.
-- FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
+STATUS & SKORING (TERKALIBRASI & KONSISTEN):
+- PASS (Layak Komersial / Bersih): Skor 70 - 88 (Aset bersih alami, tack-sharp, bebas anomali AI).
+- FAIL (Cacat Teknis / AI Artifacts / IP Risk): Skor 40 - 62 (Jika terdeteksi pin bengkok, teks gibberish, anatomi cacat, atau clipping parah).
 
-ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS, ANALITIS, dan FAKTUAL layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi berdasarkan BUKTI VISUAL NYATA yang ada pada gambar.
-2. DILARANG KERAS MENEBAK, BERHALUSINASI, ATAU MEMBUAT ASUMSI (NO GUESSING OR HALLUCINATION). JANGAN melaporkan cacat anatomi, teks rusak, watermark, logo, cacat komposisi, atau masalah pencahayaan/warna jika masalah tersebut TIDAK BENAR-BENAR TERLIHAT dengan jelas di dalam gambar. Jika gambar terlihat bagus dan aman, nyatakan dengan jujur dan berikan status PASS. Kegagalan mematuhi aturan ini akan merusak kredibilitas sistem kurasi.
-3. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan BUKAN TEBAKAN, melainkan hasil pengamatan faktual terhadap piksel gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
+ATURAN OUTPUT TEKS (RINGKAS, TEPAT SASARAN & BERBOBOT):
+1. Tuliskan analisis pada field 'visual_scan_analysis' dan 'detailed_feedback' secara RINGKAS, PADAT, dan TEPAT SASARAN (fokus pada bukti visual nyata tanpa kalimat pengisi yang bertele-tele).
+2. DILARANG KERAS MENEBAK ATAU BERHALUSINASI (ZERO-HALLUCINATION). Laporkan HANYA apa yang benar-benar tampak pada data piksel asli dan crop detail.
+3. Untuk setiap item di dalam 'ai_vision_checks', berikan catatan ('note') yang spesifik, lugas, dan faktual terhadap temuan piksel.
 
 ATURAN BAHASA:
 Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
@@ -7406,13 +7408,25 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   if (selectedModel === "auto" || !selectedModel.startsWith("gemini")) {
     selectedModel = "gemini-3.1-pro-preview";
   }
-  const modelsToTry = ["gemini-3.1-pro-preview", "gemini-3.6-flash", "gemini-3.5-flash"];
+  const modelsToTry = ["gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
   let responseText = "";
   let lastError;
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o-mini";
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: You MUST strictly enforce the ZERO TOLERANCE rules for Gibberish Text, Melted Anatomy, and Fake UI/Glowing Effects as detailed in your system instructions. Do NOT provide warnings for AI artifacts\u2014you MUST FAIL them and provide pixel-level evidence. Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+      let promptText = `Act as an objective, elite Adobe Stock & Shutterstock QA curator with deep AI anomaly forensic inspection capabilities.
+Conduct a rigorous visual, technical, and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided.
+CRITICAL ENFORCEMENT RULES:
+1. MICRO-LEVEL ANATOMICAL & STRUCTURAL AUDIT:
+   - Inspect fingers, fingernails, knuckles, and gripping hands at 100% zoom. Flag any fused digits, missing joints, or claws.
+   - Inspect facial features (pupils, nostrils, teeth, ears) and background crowds for melted faces or distorted anatomy.
+2. OCR & TEXT INTEGRITY:
+   - Check all background text (storefronts, whiteboards, posters, packaging, screens). Flag unreadable pseudo-text, broken letterforms, or gibberish.
+3. MECHANICAL & PHYSICAL LOGIC:
+   - Check structural consistency: floating objects without supports, severed tools, phantom reflections in mirrors/glass, and warped straight lines on architectural elements.
+4. ARTISTIC BOKEH VS AI SMUDGE:
+   - True optical shallow depth-of-field with a tack-sharp subject is 100% PASS. Artificial patchy smudges or out-of-focus subjects are FAIL.
+Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName}.`;
       if (imageMetadata) {
         promptText += `
 
@@ -7435,12 +7449,12 @@ Technical Metadata: ${JSON.stringify(imageMetadata)}`;
     const modelsToTryList = activeModel && activeModel.startsWith("gemini") ? [activeModel, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Anda adalah Senior Adobe Stock & Shutterstock Content Inspector yang SANGAT CERDAS, OBJEKTIF, dan AKURAT.
-PRINSIP UTAMA AUDIT:
+        let promptText = `Anda adalah Senior Adobe Stock & Shutterstock Content Inspector yang SANGAT CERDAS, OBJEKTIF, ANALITIS, dan AKURAT.
+PRINSIP UTAMA AUDIT KUALITAS & DETEKSI AI:
 1. GAMBAR BERSIH & SEMPURNA = WAJIB PASS (Skor 85-98, Ready for Adobe Stock):
-   - Jika subjek utama tajam sempurna (tack-sharp), pencahayaan alami/seimbang, fisika realistis (alat pengukur/jangka sorong/caliper dipegang wajar oleh peneliti, serbet/sendok menempel rapi, pasir pantai & air laut alami, anatomi penyu & manusia normal dan utuh), latar belakang bokeh alami/kabur kabut yang bersih, dan tidak ada cacat anatomi/struktur, Anda WAJIB meloloskan aset ini dengan status "PASS", skor tinggi (88-96), dan legal_status "SAFE" (dengan requires_model_release: true jika ada orang yang dapat dikenali).
+   - Jika subjek utama tajam sempurna (tack-sharp), pencahayaan alami/seimbang, fisika realistis (alat kerja dipegang wajar, serbet/sendok menempel rapi, pasir pantai & air laut alami, anatomi manusia normal dan utuh), latar belakang bokeh alami/kabur kabut yang bersih, dan tidak ada cacat anatomi/struktur, Anda WAJIB meloloskan aset ini dengan status "PASS", skor tinggi (88-96), dan legal_status "SAFE".
 2. GAMBAR CACAT/HALUSINASI AI = WAJIB FAIL (Skor < 60, Reject Risk):
-   - Hanya tolak (FAIL) jika terdapat bukti cacat nyata: sendok melayang di udara, jari tangan cacat/lebih, pin microchip bengkok, kabel melayang dari plafon, teks hancur/gibberish, atau refleksi hantu tanpa objek fisik nyata.
+   - Hanya tolak (FAIL) jika terdapat bukti cacat nyata: sendok melayang di udara, jari tangan cacat/menyatu/lebih dari 5, pin microchip bengkok, kabel melayang dari plafon, teks latar belakang hancur/gibberish, wajah kerumunan melebur, atau refleksi hantu tanpa objek fisik nyata.
 Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
         if (imageMetadata) {
           promptText += `
@@ -10938,18 +10952,19 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
       }
     }
     console.log("Server check-image-quality: Running AI Vision Analysis...");
-    const cropSuffixes = ["tl", "tr", "bl", "br", "macro_center"];
+    const cropSuffixes = ["tl", "tr", "bl", "br", "macro_center", "macro_bottom"];
     const cropFilePaths = cropSuffixes.map((s) => `${tempFilePath}_${s}.png`);
     let imagesToSend = imageBase64;
     try {
       const ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
       const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
       const cropFilters = [
-        "crop=iw*0.6:ih*0.6:0:0",
-        "crop=iw*0.6:ih*0.6:iw*0.4:0",
-        "crop=iw*0.6:ih*0.6:0:ih*0.4",
-        "crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4",
-        "crop=min(iw\\,ih)*0.45:min(iw\\,ih)*0.45:(iw-min(iw\\,ih)*0.45)/2:(ih-min(iw\\,ih)*0.45)/2"
+        "crop=iw*0.55:ih*0.55:0:0",
+        "crop=iw*0.55:ih*0.55:iw*0.45:0",
+        "crop=iw*0.55:ih*0.55:0:ih*0.45",
+        "crop=iw*0.55:ih*0.55:iw*0.45:ih*0.45",
+        "crop=min(iw\\,ih)*0.5:min(iw\\,ih)*0.5:(iw-min(iw\\,ih)*0.5)/2:(ih-min(iw\\,ih)*0.5)/2",
+        "crop=iw*0.6:ih*0.45:iw*0.2:ih*0.55"
       ];
       await Promise.all(cropFilters.map(
         (filter, i) => execPromise2(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${filter}" -frames:v 1 -c:v png -pix_fmt rgba "${cropFilePaths[i]}"`)
@@ -10960,7 +10975,7 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
       });
       if (availableCrops.length > 0) {
         imagesToSend = [imageBase64, ...availableCrops];
-        console.log(`Server check-image-quality: Generated ${availableCrops.length} forensic crops (4 quadrants + 1 macro focus crop) via FFmpeg`);
+        console.log(`Server check-image-quality: Generated ${availableCrops.length} forensic crops (4 quadrants + 1 center macro crop + 1 bottom subject crop) via FFmpeg`);
       }
     } catch (zoomErr) {
       console.warn("Server check-image-quality: Failed to generate forensic crops:", zoomErr);
