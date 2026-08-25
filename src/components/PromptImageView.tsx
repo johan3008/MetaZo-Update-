@@ -80,16 +80,16 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   uiLanguage = 'en'
 }) => {
   const [images, setImages] = useState<ImageItem[]>([]);
-  const handleFilesRef = React.useRef(handleFiles);
-  React.useEffect(() => {
+  const handleFilesRef = useRef<(files: FileList | File[] | null) => Promise<void>>((_f) => Promise.resolve());
+  useEffect(() => {
     handleFilesRef.current = handleFiles;
-  }, [handleFiles]);
+  });
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleGlobalDrop = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail && customEvent.detail.files && customEvent.detail.files.length > 0) {
-        handleFilesRef.current(customEvent.detail.files);
+        handleFilesRef.current?.(customEvent.detail.files);
       }
     };
     window.addEventListener('globalFileDrop', handleGlobalDrop);
@@ -216,7 +216,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     return () => {
       window.removeEventListener('paste', handlePaste);
     };
-  }, [styleCategory, darkHorrorSubStyle, variation, noStyle, isLicensed, dailyGenCount]);
+  }, [styleCategory, variation, noStyle, isLicensed, dailyGenCount]);
 
   // 📋 Fungsi Tombol Salin Tempel Manual dari Clipboard
   const handlePasteFromClipboardButton = async (e?: React.MouseEvent) => {
