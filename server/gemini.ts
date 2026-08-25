@@ -3426,6 +3426,32 @@ STRICT NEGATIVE FILTERS (MANDATORY & ENFORCED):
 - ZERO TOLERANCE FOR SUBJECTIVE WORDS: Strictly forbid "beautiful", "amazing", "stunning", "gorgeous", "pretty", "nice", "awesome", "perfect", "high quality", "best", "superb", "lovely", "incredible", "masterpiece".
 - ELIMINATE UNRELATED / SPAM KEYWORDS: Zero tolerance for keywords not directly tied to the visual evidence.
 - FORMAT: Lowercase, comma-separated, matching the requested count, output strictly in the requested language.
+
+GOLDEN BENCHMARK REFERENCE EXAMPLES (FOLLOW THIS EXACT STRUCTURAL STANDARD):
+1. Example [Food / Ingredients]:
+   - Title: "Cacao beans and dark chocolate pieces on a textured fabric surface"
+   - Keywords: "chocolate, cacao, cocoa, beans, dark, rustic, ingredient, food, organic, natural, burlap, jute, fabric, texture, sweet, dessert, artisanal, brown, raw, roasted, chunks, pieces, cooking, confectionery, gourmet, healthy, snack, closeup, macro, agriculture, plant, seed, caffeine, culinary, wooden, interior, morning, breakfast, kitchen, harvest"
+   - Category: 7
+
+2. Example [Asian Dining / Culinary]:
+   - Title: "Fresh sushi rolls set on a wooden table with soy sauce and chopsticks"
+   - Keywords: "sushi, japanese, food, roll, maki, salmon, tuna, seafood, dining, restaurant, fresh, gourmet, appetizer, meal, asian, cuisine, chopsticks, soy, ginger, wasabi, wooden, table, lunch, dinner, healthy, delicious, rice, avocado, nori, sashimi, culinary, snack, tray, authentic, plate, raw, kitchen, traditional, fish, background"
+   - Category: 7
+
+3. Example [Travel / Wellness / Geothermal]:
+   - Title: "Woman in bikini walking into natural hot spring near basalt rocks"
+   - Keywords: "woman, bikini, thermal, spring, basalt, volcanic, wellness, travel, steam, geothermal, nature, pool, outdoor, relaxation, rocks, water, adventure, spa, fitness, lifestyle, swimming, vacation, mist, canyon, scenic, healthy, beauty, bathing, swimwear, exploring, nordic, environment, geology, recreation, tourism, journey, serenity, active, stone, cold"
+   - Category: 21
+
+4. Example [Holiday / Family Lifestyle]:
+   - Title: "Happy multi generational family decorating a gingerbread house together"
+   - Keywords: "christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade"
+   - Category: 12
+
+5. Example [3D Graphic / Render / Background]:
+   - Title: "Abstract 3d geometric frame with floating spheres and pastel glow"
+   - Keywords: "abstract, frame, 3d, sphere, background, geometric, pastel, futuristic, digital, border, technology, modern, purple, teal, pink, glow, light, glossy, floating, creative, graphic, illustration, tech, space, element, dynamic, composition, luxury, design, banner, copyspace, motion, energy, shiny, virtual, render, gradient, bubble, minimal, decoration"
+   - Category: 8
 `;
 
 
