@@ -35,6 +35,57 @@ CREATE TABLE IF NOT EXISTS public.promos (
     "endDate" text
 );
 
+CREATE TABLE IF NOT EXISTS public.chats (
+    id text PRIMARY KEY,
+    user1 text,
+    user2 text,
+    "user1Email" text,
+    "user2Email" text,
+    "user1Name" text,
+    "user2Name" text,
+    "lastMessage" text,
+    "lastUpdated" text
+);
+
+CREATE TABLE IF NOT EXISTS public.global_messages (
+    id text PRIMARY KEY,
+    "senderUid" text,
+    "senderEmail" text,
+    "senderName" text,
+    text text,
+    timestamp text
+);
+
+CREATE TABLE IF NOT EXISTS public.messages (
+    id text PRIMARY KEY,
+    "roomId" text,
+    "senderUid" text,
+    "senderEmail" text,
+    "senderName" text,
+    text text,
+    timestamp text
+);
+
+CREATE TABLE IF NOT EXISTS public.feedback (
+    id bigserial PRIMARY KEY,
+    message text,
+    timestamp text,
+    user_email text
+);
+
+CREATE TABLE IF NOT EXISTS public.backups (
+    id text PRIMARY KEY,
+    uid text,
+    name text,
+    data jsonb,
+    "createdAt" text
+);
+
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.keys DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promos DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chats DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.global_messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedback DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.backups DISABLE ROW LEVEL SECURITY;
