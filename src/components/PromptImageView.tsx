@@ -1,7 +1,7 @@
 import { getDailyLimit } from '../../constants';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  ImageIcon, Upload, Wand2, Copy, Check, AlertCircle, RefreshCw, X, Sliders, Sparkles, Trash2, Layers, Grid, Download, FileText
+  ImageIcon, Upload, Wand2, Copy, Check, AlertCircle, RefreshCw, X, Sliders, Sparkles, Trash2, Layers, Grid, Download, FileText, ClipboardPaste
 } from 'lucide-react';
 import { FeatureGuideButton } from './FeatureGuideModal';
 
@@ -147,14 +147,15 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     });
   };
 
-  async function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | File[] | null) {
     if (!files) return;
     
     setGlobalError(null);
     const newItems: ImageItem[] = [];
+    const fileArray = Array.isArray(files) ? files : Array.from(files);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
       if (!file.type.startsWith('image/')) continue;
       
       try {
@@ -162,7 +163,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         newItems.push({
           id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           data,
-          name: file.name,
+          name: file.name || `salin-tempel-${Date.now()}`,
           loading: false
         });
       } catch (err) {
@@ -176,6 +177,75 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
       
       // Auto trigger batch analysis for the newly added items automatically!
       await analyzeBatch(newItems);
+    }
+  };
+
+  // 📋 Listener Global Paste (Ctrl+V) dari Clipboard / Website lain
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      // Jangan cegat jika pengguna sedang mengetik di kotak input / textarea
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const ext = item.type.split('/')[1] || 'png';
+            const fileName = `salin-tempel-${Date.now()}-${i + 1}.${ext}`;
+            const file = new File([blob], fileName, { type: item.type });
+            pastedFiles.push(file);
+          }
+        }
+      }
+
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+        await handleFiles(pastedFiles);
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [styleCategory, darkHorrorSubStyle, variation, noStyle, isLicensed, dailyGenCount]);
+
+  // 📋 Fungsi Tombol Salin Tempel Manual dari Clipboard
+  const handlePasteFromClipboardButton = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const clipboardItems = await navigator.clipboard.read();
+        const pastedFiles: File[] = [];
+        for (let i = 0; i < clipboardItems.length; i++) {
+          const item = clipboardItems[i];
+          const imageType = item.types.find(type => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const ext = imageType.split('/')[1] || 'png';
+            const fileName = `salin-tempel-${Date.now()}-${i + 1}.${ext}`;
+            pastedFiles.push(new File([blob], fileName, { type: imageType }));
+          }
+        }
+        if (pastedFiles.length > 0) {
+          await handleFiles(pastedFiles);
+          return;
+        }
+      }
+      alert('Tidak ada gambar di clipboard. Silakan klik kanan "Salin Gambar" (Copy Image) di web lain atau gunakan Screenshot (Win + Shift + S), lalu tekan tombol ini atau tekan Ctrl+V.');
+    } catch (err) {
+      console.warn('Clipboard read error or not permitted:', err);
+      alert('Silakan langsung tekan tombol Ctrl+V pada keyboard untuk menempelkan (Paste) gambar yang sudah disalin!');
     }
   };
 
@@ -466,11 +536,22 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 <div className="p-4 rounded-full shadow-md flex items-center justify-center transform transition-transform bg-white dark:bg-slate-800">
                   <Upload size={20} className="text-emerald-500" />
                 </div>
-                <div className="text-center space-y-1">
+                <div className="text-center space-y-1.5">
                   <p className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
                     {t.image_studio_drag_drop}
                   </p>
                   <p className="text-[10px] text-slate-400 font-medium tracking-tight">{t.image_studio_support_multiple}</p>
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboardButton}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                      title="Tempel gambar langsung dari clipboard (salin dari web lain)"
+                    >
+                      <ClipboardPaste size={12} />
+                      <span>Salin Tempel (Ctrl+V)</span>
+                    </button>
+                  </div>
                 </div>
                 <input 
                   type="file" 
@@ -665,6 +746,16 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider hidden sm:inline">
                   {t.image_studio_status_label.replace('{finished}', images.filter(img => img.result).length.toString()).replace('{total}', images.length.toString())}
                 </span>
+
+                {/* 📋 Tombol Tempel Gambar (Ctrl+V) */}
+                <button
+                  onClick={handlePasteFromClipboardButton}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 shadow-sm"
+                  title="Tempel gambar dari clipboard (Ctrl+V)"
+                >
+                  <ClipboardPaste size={12} />
+                  <span>Tempel Gambar</span>
+                </button>
 
                 {/* 📂 Input & Tombol Unggah TXT */}
                 <input 
