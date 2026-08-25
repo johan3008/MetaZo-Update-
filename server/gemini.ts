@@ -3416,9 +3416,13 @@ You MUST construct metadata through these 8 structured cognitive steps rather th
 7. COMMERCIAL INTENT:
    - Identify how commercial buyers and designers will search for and use this asset (advertising, marketing, UI header, poster, banner template, editorial).
 
-8. SEO RANKING & FRONT-LOADING:
-   - Front-load the most crucial keywords at the front:
-     [Exact Main Subject] -> [Relationship/Action] -> [Visual Attributes/Materials] -> [Environment] -> [Grounded Concept] -> [Commercial Intent].
+8. SEO RANKING & FRONT-LOADING (FORMULA 10 KEYWORD TERATAS / TOP 10 TIER):
+   Strictly organize the first 10 keywords using this exact tier structure:
+   - Posisi 1–3: Subjek Utama & Lokasi Spesifik ([Subjek Utama] + [Lokasi/Nama Objek Spesifik] + [Tipe Visual]). Elemen inti yang langsung membedakan aset.
+   - Posisi 4–6: Konsep Utama & Setting Waktu/Tempat ([Waktu/Kondisi] + [Kategori Tempat] + [Struktur Utama]).
+   - Posisi 7–8: Aksi & Elemen Dinamis ([Aksi/Aktivitas] + [Efek Cahaya/Elemen Bergerak]).
+   - Posisi 9–10: Kategori Makro / Commercial Intent ([Kategori Arsitektur/Wisata/Industri/Tema Komersial bernilai jual tinggi]).
+   - Posisi 11+: Atribut pendukung, variasi semantik, material, tekstur, dan kata kunci penunjang yang relevan.
 
 STRICT NEGATIVE FILTERS (MANDATORY & ENFORCED):
 - NO OVERLY GENERIC FILLERS: Eliminate "image", "photo", "picture", "element", "object", "thing", "generic", "background", "design", "stock", "visual", "detail".
