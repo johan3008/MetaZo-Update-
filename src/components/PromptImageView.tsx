@@ -1,7 +1,7 @@
 import { getDailyLimit } from '../../constants';
 import React, { useState, useRef } from 'react';
 import { 
-  ImageIcon, Upload, Wand2, Copy, Check, AlertCircle, RefreshCw, X, Sliders, Sparkles, Trash2, Layers, Grid
+  ImageIcon, Upload, Wand2, Copy, Check, AlertCircle, RefreshCw, X, Sliders, Sparkles, Trash2, Layers, Grid, Download, FileText
 } from 'lucide-react';
 import { FeatureGuideButton } from './FeatureGuideModal';
 
@@ -52,6 +52,8 @@ const DARK_HORROR_SUB_STYLES = [
 ];
 
 const STYLE_OPTIONS = (t: any) => [
+  { id: 'Default', label: 'Default (Style Asli)', icon: '🎯', desc: 'Sesuai Style Gambar Asli' },
+  { id: 'Flat Illustration', label: 'Flat Illustration', icon: '🎨', desc: '2D Flat Vector Art' },
   { id: 'Photorealistic', label: t.style_photorealistic || 'Photorealistic', icon: '📷', desc: 'Realism' },
   { id: 'Cinematic', label: t.style_cinematic || 'Cinematic', icon: '🎬', desc: 'Movie light' },
   { id: 'Adobe Stock', label: t.style_adobe_stock || 'Adobe Stock', icon: '💎', desc: 'Commercial' },
@@ -95,11 +97,13 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   }, []);
   const [loadingBatch, setLoadingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
-  const [styleCategory, setStyleCategory] = useState('Cinematic');
+  const [styleCategory, setStyleCategory] = useState('Default');
+  const [noStyle, setNoStyle] = useState(false);
   const [variation, setVariation] = useState<number>(5);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const txtInputRef = useRef<HTMLInputElement>(null);
 
   const resizeAndProcess = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -179,7 +183,94 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     handleFiles(e.target.files);
   };
 
+  const handleTxtUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawText = event.target?.result as string;
+      if (!rawText || !rawText.trim()) return;
+
+      // Extract prompt lines/blocks
+      const rawBlocks = rawText
+        .split(/(?:={5,}|-{5,}|\[GAMBAR\s*\d+\])/i)
+        .map(b => b.trim())
+        .filter(b => b.length > 0 && !b.startsWith('METAZO') && !b.startsWith('Tanggal') && !b.startsWith('Total Gambar'));
+
+      const promptsExtracted: string[] = [];
+      if (rawBlocks.length > 0) {
+        rawBlocks.forEach(blk => {
+          // split variations
+          const varChunks = blk.split(/Variasi\s*\d+:/i).map(v => v.trim()).filter(Boolean);
+          if (varChunks.length > 0) {
+            promptsExtracted.push(...varChunks);
+          } else {
+            promptsExtracted.push(blk);
+          }
+        });
+      } else {
+        const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 15);
+        promptsExtracted.push(...(lines.length > 0 ? lines : [rawText.trim()]));
+      }
+
+      const importedItem: ImageItem = {
+        id: `txt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        data: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="%2310b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+        name: file.name,
+        loading: false,
+        result: {
+          prompts: promptsExtracted,
+          prompt: promptsExtracted[0] || "",
+          description: `Berhasil diimpor dari berkas teks: ${file.name} (${promptsExtracted.length} prompt termuat).`
+        }
+      };
+
+      setImages(prev => [importedItem, ...prev]);
+      if (txtInputRef.current) txtInputRef.current.value = '';
+    };
+
+    reader.readAsText(file);
+  };
+
+  const downloadAllPromptsAsTxt = () => {
+    const finishedImages = images.filter(img => img.result);
+    if (finishedImages.length === 0) return;
+
+    let content = `====================================================\n`;
+    content += `METAZO PROMPT STUDIO - BATCH PROMPT EXPORT\n`;
+    content += `Waktu Ekspor : ${new Date().toLocaleString('id-ID')}\n`;
+    content += `Total Item   : ${finishedImages.length}\n`;
+    content += `Target Style : ${noStyle ? 'Tanpa Style (Style Alami Gambar)' : styleCategory}\n`;
+    content += `====================================================\n\n`;
+
+    finishedImages.forEach((img, idx) => {
+      content += `====================================================\n`;
+      content += `[GAMBAR ${idx + 1}]: ${img.name}\n`;
+      if (img.result?.description) {
+        content += `Deskripsi Analisis: ${img.result.description}\n`;
+      }
+      content += `----------------------------------------------------\n`;
+      const pList = img.result?.prompts && img.result.prompts.length > 0
+        ? img.result.prompts
+        : [img.result?.prompt || ''];
+
+      pList.forEach((p, pIdx) => {
+        content += `Variasi ${pIdx + 1}:\n${p}\n\n`;
+      });
+      content += `\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `MetaZo_Prompts_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const removeImage = (id: string) => {
     setImages(prev => prev.filter(img => img.id !== id));
@@ -194,10 +285,12 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     const unanalyzed = itemsToAnalyze || (forceAll ? images : images.filter(img => !img.result && !img.loading));
     if (unanalyzed.length === 0) return;
 
-    if (!isLicensed && PREMIUM_ONLY_STYLES.includes(styleCategory)) {
+    const effectiveStyle = noStyle ? 'Default' : styleCategory;
+
+    if (!isLicensed && !noStyle && PREMIUM_ONLY_STYLES.includes(effectiveStyle)) {
       setGlobalError(uiLanguage === 'id' 
-        ? `Gaya "${styleCategory}" hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!` 
-        : `The style "${styleCategory}" is only available for Premium/Subscription users. Please upgrade your account!`);
+        ? `Gaya "${effectiveStyle}" hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!` 
+        : `The style "${effectiveStyle}" is only available for Premium/Subscription users. Please upgrade your account!`);
       return;
     }
 
@@ -236,7 +329,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         headers: getHeaders(aiOptions),
         body: JSON.stringify({
           images: pendingImages,
-          styleCategory,
+          styleCategory: effectiveStyle,
           variation,
           model: aiOptions?.model
         })
@@ -418,16 +511,63 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
             </div>
 
             <div className="space-y-4 border-t border-slate-100 dark:border-white/5 pt-5">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {t.image_studio_target_label}
-              </label>
-              <div className="grid grid-cols-2 gap-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t.image_studio_target_label}
+                </label>
+              </div>
+
+              {/* 🎯 Checkbox Tanpa Style */}
+              <div className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-300 ${
+                noStyle 
+                  ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm shadow-emerald-500/10 ring-1 ring-emerald-500/20' 
+                  : 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'
+              }`}>
+                <label className="flex items-center gap-3 cursor-pointer select-none flex-1">
+                  <input 
+                    type="checkbox"
+                    checked={noStyle}
+                    onChange={(e) => {
+                      setNoStyle(e.target.checked);
+                      setGlobalError(null);
+                    }}
+                    className="w-4 h-4 text-emerald-500 rounded border-slate-300 dark:border-slate-700 focus:ring-emerald-500 cursor-pointer accent-emerald-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black uppercase tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                      <span>🎯</span> Tanpa Style
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Hasil prompt otomatis mengikuti medium & style gambar asli
+                    </span>
+                  </div>
+                </label>
+                {noStyle && (
+                  <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full tracking-wider animate-pulse">
+                    AKTIF
+                  </span>
+                )}
+              </div>
+
+              {noStyle && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[10px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-2">
+                  <span>ℹ️</span>
+                  <span>Semua preset style di bawah dinonaktifkan karena opsi &quot;Tanpa Style&quot; aktif.</span>
+                </div>
+              )}
+
+              <div className={`grid grid-cols-2 gap-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar transition-all duration-300 ${
+                noStyle ? 'opacity-40 pointer-events-none filter grayscale cursor-not-allowed select-none' : ''
+              }`}>
                 {currentStyleOptions.map((opt: any) => {
                   const isLocked = PREMIUM_ONLY_STYLES.includes(opt.id) && !isLicensed;
+                  const isSelected = !noStyle && styleCategory === opt.id;
                   return (
                     <button
                       key={opt.id}
+                      disabled={noStyle}
                       onClick={() => {
+                        if (noStyle) return;
                         if (isLocked) {
                           setGlobalError(uiLanguage === 'id' 
                             ? `Gaya "${opt.label}" adalah fitur Premium. Silakan upgrade akun Anda!` 
@@ -438,19 +578,21 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                         setGlobalError(null);
                       }}
                       className={`flex flex-col items-start justify-center p-3 rounded-[1.2rem] text-left transition-all border relative ${
-                        isLocked
-                          ? 'bg-slate-100 dark:bg-black/10 text-slate-400 dark:text-slate-500 border-slate-200/40 dark:border-white/5 opacity-60 cursor-not-allowed'
-                          : styleCategory === opt.id
-                            ? 'bg-emerald-500/10 border-emerald-500 shadow-sm shadow-emerald-500/10'
-                            : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-emerald-500/30'
+                        noStyle
+                          ? 'bg-slate-100 dark:bg-black/10 text-slate-400 dark:text-slate-500 border-slate-200/40 dark:border-white/5 cursor-not-allowed'
+                          : isLocked
+                            ? 'bg-slate-100 dark:bg-black/10 text-slate-400 dark:text-slate-500 border-slate-200/40 dark:border-white/5 opacity-60 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-emerald-500/10 border-emerald-500 shadow-sm shadow-emerald-500/10'
+                              : 'bg-slate-50 dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/5 hover:bg-white dark:hover:bg-white/5 hover:border-emerald-500/30'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1.5 w-full">
                         <span className="text-sm">{opt.icon}</span>
-                        <span className={`text-[10px] font-black uppercase truncate flex-1 ${styleCategory === opt.id && !isLocked ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
+                        <span className={`text-[10px] font-black uppercase truncate flex-1 ${isSelected && !isLocked ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
                         {isLocked ? (
                           <span className="text-[10px] text-amber-500" title="Premium">🔒</span>
-                        ) : styleCategory === opt.id && (
+                        ) : isSelected && (
                           <Check size={12} className="text-emerald-500" />
                         )}
                       </div>
@@ -519,13 +661,42 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                   {t.image_studio_dashboard_title}
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider hidden sm:inline">
                   {t.image_studio_status_label.replace('{finished}', images.filter(img => img.result).length.toString()).replace('{total}', images.length.toString())}
                 </span>
+
+                {/* 📂 Input & Tombol Unggah TXT */}
+                <input 
+                  type="file" 
+                  ref={txtInputRef} 
+                  onChange={handleTxtUpload} 
+                  accept=".txt,text/plain" 
+                  className="hidden" 
+                />
+                <button
+                  onClick={() => txtInputRef.current?.click()}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-sm"
+                  title="Unggah / Impor prompt dari berkas .txt"
+                >
+                  <FileText size={12} className="text-emerald-500" />
+                  <span>Unggah TXT</span>
+                </button>
+
                 {images.some(img => img.result) && (
                   <>
-                    <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-2" />
+                    <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-1" />
+                    {/* 💾 Tombol Unduh Semua TXT */}
+                    <button 
+                      onClick={downloadAllPromptsAsTxt}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 shadow-sm"
+                      title="Unduh semua prompt hasil generate ke dalam berkas .txt"
+                    >
+                      <Download size={12} />
+                      <span>Unduh TXT ({images.filter(img => img.result).length})</span>
+                    </button>
+
+                    {/* 📋 Tombol Salin Semua */}
                     <button 
                       onClick={() => {
                         const allPrompts = images
@@ -534,10 +705,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                           .join('\n\n');
                         copyToClipboard(allPrompts, 'all-batch');
                       }}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                         copiedId === 'all-batch'
                           ? 'bg-emerald-500 text-white'
-                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 shadow-sm'
                       }`}
                     >
                       {copiedId === 'all-batch' ? <Check size={12} /> : <Layers size={12} />}

@@ -4,6 +4,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -26,7 +29,450 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// data/metazo/MetaZo-Update--main/server.ts
+// server/videoAnalyzer.ts
+var videoAnalyzer_exports = {};
+__export(videoAnalyzer_exports, {
+  analyzeTemporalFrames: () => analyzeTemporalFrames,
+  analyzeVideoTechnically: () => analyzeVideoTechnically,
+  analyzeVideoTechnicallyLightweight: () => analyzeVideoTechnicallyLightweight
+});
+async function runFfprobe(videoPath, ffprobePath) {
+  const cmd = `"${ffprobePath}" -v error -show_format -show_streams -show_frames -read_intervals "%+#1" -of json "${videoPath}"`;
+  const { stdout } = await execPromise(cmd);
+  const data = JSON.parse(stdout);
+  const videoStream = data.streams?.find((s) => s.codec_type === "video") || {};
+  const audioStream = data.streams?.find((s) => s.codec_type === "audio");
+  const format = data.format || {};
+  const firstFrame = data.frames?.find((f) => f.media_type === "video");
+  const hasBFrames = videoStream.has_b_frames !== void 0 ? videoStream.has_b_frames : -1;
+  const parseFps = (fpsStr) => {
+    if (!fpsStr || !fpsStr.includes("/")) return parseFloat(fpsStr) || 0;
+    const parts = fpsStr.split("/");
+    return parts[1] !== "0" ? parseFloat(parts[0]) / parseFloat(parts[1]) : 0;
+  };
+  return {
+    duration: parseFloat(format.duration) || parseFloat(videoStream.duration) || 0,
+    size: parseInt(format.size, 10) || 0,
+    bitrate: parseInt(format.bit_rate, 10) || parseInt(videoStream.bit_rate, 10) || 0,
+    video: {
+      codec: videoStream.codec_name || "unknown",
+      profile: videoStream.profile || "unknown",
+      width: parseInt(videoStream.width, 10) || 0,
+      height: parseInt(videoStream.height, 10) || 0,
+      fps: parseFps(videoStream.r_frame_rate),
+      avg_fps: parseFps(videoStream.avg_frame_rate),
+      color_range: videoStream.color_range || "unknown",
+      color_space: videoStream.color_space || "unknown",
+      color_transfer: videoStream.color_transfer || "unknown",
+      color_primaries: videoStream.color_primaries || "unknown",
+      pix_fmt: videoStream.pix_fmt || "unknown",
+      has_b_frames: hasBFrames
+    },
+    audio: audioStream ? {
+      codec: audioStream.codec_name || "unknown",
+      sample_rate: parseInt(audioStream.sample_rate, 10) || 0,
+      channels: parseInt(audioStream.channels, 10) || 0
+    } : void 0
+  };
+}
+async function runFfmpegFilters(videoPath, ffmpegPath) {
+  const black_frames = [];
+  const frozen_frames = [];
+  try {
+    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "blackdetect=d=0.1:pix_th=0.10,freezedetect=d=0.3:noise=0.005" -an -f null -`;
+    const { stderr } = await execPromise(cmd);
+    const blackRegex = /black_start:([\d.]+)\s+black_end:([\d.]+)\s+black_duration:([\d.]+)/g;
+    let match;
+    while ((match = blackRegex.exec(stderr)) !== null) {
+      black_frames.push({ start: parseFloat(match[1]), end: parseFloat(match[2]), duration: parseFloat(match[3]) });
+    }
+    const freezeRegex = /freeze_start:\s*([\d.]+)\s+freeze_duration:\s*([\d.]+)/g;
+    while ((match = freezeRegex.exec(stderr)) !== null) {
+      frozen_frames.push({ start: parseFloat(match[1]), duration: parseFloat(match[2]) });
+    }
+  } catch (err) {
+    console.warn("[videoAnalyzer] FFmpeg filter analysis had errors:", err);
+  }
+  return { black_frames_detected: black_frames.length > 0, black_frames, frozen_frames_detected: frozen_frames.length > 0, frozen_frames };
+}
+async function runSignalstats(videoPath, ffmpegPath) {
+  try {
+    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "signalstats" -an -f null -`;
+    const { stderr } = await execPromise(cmd);
+    const lumMinRegex = /YMIN=([\d.]+)/g;
+    const lumMaxRegex = /YMAX=([\d.]+)/g;
+    const lumAvgRegex = /YAVG=([\d.]+)/g;
+    const satMinRegex = /UMIN=([\d.]+)/;
+    const satMaxRegex = /UMAX=([\d.]+)/;
+    const satAvgRegex = /UAVG=([\d.]+)/;
+    let lumMin = Infinity, lumMax = -Infinity, lumSum = 0, lumCount = 0;
+    let satMin = Infinity, satMax = -Infinity, satSum = 0, satCount = 0;
+    let m;
+    while ((m = lumMinRegex.exec(stderr)) !== null) {
+      const v = parseFloat(m[1]);
+      if (v < lumMin) lumMin = v;
+    }
+    while ((m = lumMaxRegex.exec(stderr)) !== null) {
+      const v = parseFloat(m[1]);
+      if (v > lumMax) lumMax = v;
+    }
+    while ((m = lumAvgRegex.exec(stderr)) !== null) {
+      lumSum += parseFloat(m[1]);
+      lumCount++;
+    }
+    const satMinRegex2 = /UMIN=([\d.]+)/g;
+    const satMaxRegex2 = /UMAX=([\d.]+)/g;
+    const satAvgRegex2 = /UAVG=([\d.]+)/g;
+    while ((m = satMinRegex2.exec(stderr)) !== null) {
+      const v = parseFloat(m[1]);
+      if (v < satMin) satMin = v;
+    }
+    while ((m = satMaxRegex2.exec(stderr)) !== null) {
+      const v = parseFloat(m[1]);
+      if (v > satMax) satMax = v;
+    }
+    while ((m = satAvgRegex2.exec(stderr)) !== null) {
+      satSum += parseFloat(m[1]);
+      satCount++;
+    }
+    if (lumCount === 0) return null;
+    return {
+      luminance_min: Math.round(lumMin * 100) / 100,
+      luminance_max: Math.round(lumMax * 100) / 100,
+      luminance_avg: Math.round(lumSum / lumCount * 100) / 100,
+      saturation_min: Math.round(satMin * 100) / 100,
+      saturation_max: Math.round(satMax * 100) / 100,
+      saturation_avg: Math.round(satSum / satCount * 100) / 100
+    };
+  } catch (err) {
+    console.warn("[videoAnalyzer] signalstats failed:", err);
+    return null;
+  }
+}
+async function runVmafMotion(videoPath, ffmpegPath) {
+  try {
+    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "vmafmotion" -an -f null -`;
+    const { stderr } = await execPromise(cmd);
+    const motionRegex = /motion:\s*([\d.e+-]+)/gi;
+    let total = 0, count = 0, maxVal = 0;
+    let m;
+    while ((m = motionRegex.exec(stderr)) !== null) {
+      const v = parseFloat(m[1]);
+      if (!isNaN(v)) {
+        total += v;
+        count++;
+        if (v > maxVal) maxVal = v;
+      }
+    }
+    if (count === 0) return null;
+    const avg = total / count;
+    let interpretation = "UNKNOWN";
+    if (avg < 1.5) interpretation = "LOW";
+    else if (avg < 4) interpretation = "MEDIUM";
+    else interpretation = "HIGH";
+    return {
+      motion_score: Math.round(avg * 1e3) / 1e3,
+      motion_interpretation: interpretation
+    };
+  } catch (err) {
+    console.warn("[videoAnalyzer] vmafmotion failed (may not be supported in this FFmpeg build):", err);
+    return null;
+  }
+}
+async function runSceneDetection(videoPath, ffmpegPath, duration) {
+  const scene_changes = [];
+  const scenes = [];
+  try {
+    const cmd = `"${ffmpegPath}" -i "${videoPath}" -vf "select='gt(scene,0.35)',showinfo" -f null -`;
+    const { stderr } = await execPromise(cmd);
+    const ptsRegex = /pts_time:([\d.]+)/g;
+    let match;
+    const detectedTimestamps = [];
+    while ((match = ptsRegex.exec(stderr)) !== null) {
+      const ts = parseFloat(match[1]);
+      if (!detectedTimestamps.includes(ts)) detectedTimestamps.push(ts);
+    }
+    detectedTimestamps.sort((a, b) => a - b);
+    for (const ts of detectedTimestamps) scene_changes.push({ timestamp: ts });
+    let currentStart = 0, sceneCount = 1;
+    for (const ts of detectedTimestamps) {
+      if (ts - currentStart > 0.1) {
+        scenes.push({ scene_number: sceneCount++, start: currentStart, end: ts, duration: ts - currentStart });
+        currentStart = ts;
+      }
+    }
+    if (duration - currentStart > 0.1) {
+      scenes.push({ scene_number: sceneCount, start: currentStart, end: duration, duration: duration - currentStart });
+    }
+  } catch (err) {
+    console.warn("[videoAnalyzer] Scene detection failed:", err);
+  }
+  return { scene_changes_detected: scene_changes.length > 0, scene_changes, scenes };
+}
+function analyzeFramePixelData(jpegBuffer, index) {
+  try {
+    const rawData = import_jpeg_js.default.decode(jpegBuffer, { useTarray: false });
+    const { width, height, data } = rawData;
+    const gray = new Float32Array(width * height);
+    let rSum = 0, gSum = 0, bSum = 0;
+    let overCount = 0, underCount = 0;
+    const totalPixels = width * height;
+    for (let i = 0; i < totalPixels; i++) {
+      const off = i * 4;
+      const r = data[off], g = data[off + 1], b = data[off + 2];
+      rSum += r;
+      gSum += g;
+      bSum += b;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      gray[i] = lum;
+      if (lum > 245) overCount++;
+      if (lum < 10) underCount++;
+    }
+    const avgColor = { r: Math.round(rSum / totalPixels), g: Math.round(gSum / totalPixels), b: Math.round(bSum / totalPixels) };
+    const avgLum = 0.299 * avgColor.r + 0.587 * avgColor.g + 0.114 * avgColor.b;
+    const lapVals = [];
+    let lapSum = 0;
+    const step = 2;
+    for (let y = 1; y < height - 1; y += step) {
+      for (let x = 1; x < width - 1; x += step) {
+        const idx = y * width + x;
+        const lap = gray[(y - 1) * width + x] + gray[(y + 1) * width + x] + gray[idx - 1] + gray[idx + 1] - 4 * gray[idx];
+        lapVals.push(lap);
+        lapSum += lap;
+      }
+    }
+    const N = lapVals.length;
+    const mean = lapSum / N;
+    let varSum = 0;
+    for (let i = 0; i < N; i++) {
+      const d = lapVals[i] - mean;
+      varSum += d * d;
+    }
+    const variance = N > 0 ? varSum / N : 0;
+    let blurStatus = "SHARP";
+    if (variance < 15) blurStatus = "BLURRED";
+    else if (variance < 40) blurStatus = "SOFT";
+    return {
+      frameIndex: index,
+      sharpness: Math.round(variance * 100) / 100,
+      blurStatus,
+      overexposurePercent: Math.round(overCount / totalPixels * 1e3) / 10,
+      underexposurePercent: Math.round(underCount / totalPixels * 1e3) / 10,
+      averageLuminance: Math.round(avgLum * 10) / 10,
+      averageColor: avgColor
+    };
+  } catch (err) {
+    console.error(`[videoAnalyzer] Pixel analysis failed frame ${index}:`, err);
+    return { frameIndex: index, sharpness: 50, blurStatus: "SHARP", overexposurePercent: 0, underexposurePercent: 0, averageLuminance: 120, averageColor: { r: 120, g: 120, b: 120 } };
+  }
+}
+function decodeTemporalSample(jpegBuffer) {
+  try {
+    const raw = import_jpeg_js.default.decode(jpegBuffer, { useTarray: false });
+    const { width, height, data } = raw;
+    const targetWidth = Math.min(160, width);
+    const targetHeight = Math.max(1, Math.round(height / width * targetWidth));
+    const samples = new Uint8Array(targetWidth * targetHeight);
+    let sum = 0;
+    for (let y = 0; y < targetHeight; y++) {
+      const sourceY = Math.min(height - 1, Math.floor(y / targetHeight * height));
+      for (let x = 0; x < targetWidth; x++) {
+        const sourceX = Math.min(width - 1, Math.floor(x / targetWidth * width));
+        const off = (sourceY * width + sourceX) * 4;
+        const lum = Math.round(
+          0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2]
+        );
+        samples[y * targetWidth + x] = lum;
+        sum += lum;
+      }
+    }
+    return {
+      width: targetWidth,
+      height: targetHeight,
+      luminance: sum / samples.length,
+      samples
+    };
+  } catch {
+    return null;
+  }
+}
+function analyzeTemporalFrames(frameBuffers, expectedFullFrameCount) {
+  const fullCount = Math.min(
+    frameBuffers.length,
+    Math.max(2, expectedFullFrameCount || frameBuffers.length)
+  );
+  const buffers = frameBuffers.slice(0, fullCount);
+  const decoded = buffers.map(decodeTemporalSample);
+  if (decoded.some((item) => !item) || decoded.length < 2) return void 0;
+  const valid = decoded;
+  const pairDiffs = [];
+  const luminanceDeltas = [];
+  for (let i = 1; i < valid.length; i++) {
+    const a = valid[i - 1];
+    const b = valid[i];
+    const count = Math.min(a.samples.length, b.samples.length);
+    let diff = 0;
+    for (let j = 0; j < count; j++) {
+      diff += Math.abs(a.samples[j] - b.samples[j]);
+    }
+    pairDiffs.push(diff / count);
+    luminanceDeltas.push(Math.abs(a.luminance - b.luminance));
+  }
+  const duplicatePairs = pairDiffs.filter((diff) => diff < 1.5).length;
+  const duplicateRate = duplicatePairs / pairDiffs.length;
+  const meanAbsDiff = pairDiffs.reduce((sum, value) => sum + value, 0) / pairDiffs.length;
+  const luminanceDeltaMean = luminanceDeltas.reduce((sum, value) => sum + value, 0) / luminanceDeltas.length;
+  const luminanceDeltaMax = Math.max(...luminanceDeltas);
+  const highDeltaPairs = pairDiffs.filter((diff) => diff > 45).length;
+  const alternatingLuminance = luminanceDeltas.length >= 3 && luminanceDeltas.slice(1).every((value, index) => {
+    const previous = luminanceDeltas[index];
+    return Math.abs(value - previous) < Math.max(8, previous * 0.6);
+  });
+  const flickerScore = Math.min(
+    100,
+    luminanceDeltaMean * 2 + highDeltaPairs / pairDiffs.length * 35 + (alternatingLuminance ? 20 : 0)
+  );
+  const motionConsistencyScore = Math.max(
+    0,
+    100 - Math.abs(meanAbsDiff - 12) * 2 - (duplicateRate > 0.2 ? 30 : 0)
+  );
+  return {
+    comparedFrames: valid.length,
+    meanAbsDiff: Math.round(meanAbsDiff * 100) / 100,
+    duplicatePairs,
+    duplicateRate: Math.round(duplicateRate * 1e3) / 1e3,
+    luminanceDeltaMean: Math.round(luminanceDeltaMean * 100) / 100,
+    luminanceDeltaMax: Math.round(luminanceDeltaMax * 100) / 100,
+    flickerScore: Math.round(flickerScore * 100) / 100,
+    motionConsistencyScore: Math.round(motionConsistencyScore * 100) / 100,
+    ghostingStatus: "UNKNOWN",
+    temporalMorphingStatus: "UNKNOWN"
+  };
+}
+async function runAudioAnalysis(videoPath, ffprobePath) {
+  try {
+    const execPromise2 = import_util.default.promisify(import_child_process.exec);
+    const { stdout: audioInfo } = await execPromise2(`"${ffprobePath}" -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,channels,bit_rate -of json "${videoPath}"`);
+    const audioStream = JSON.parse(audioInfo).streams?.[0] || null;
+    if (!audioStream) return { has_audio: false };
+    let volumeStats = null;
+    try {
+      const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+      const { stderr } = await execPromise2(`"${ffmpegPath}" -i "${videoPath}" -af "volumedetect" -f null - 2>&1`);
+      const meanMatch = stderr.match(/mean_volume:s*(-?[\d.]+)s*dB/);
+      const maxMatch = stderr.match(/max_volume:s*(-?[\d.]+)s*dB/);
+      volumeStats = {
+        mean_volume_db: meanMatch ? parseFloat(meanMatch[1]) : null,
+        max_volume_db: maxMatch ? parseFloat(maxMatch[1]) : null
+      };
+    } catch (e) {
+      console.warn("[videoAnalyzer] volumedetect failed:", e);
+    }
+    return {
+      has_audio: true,
+      codec: audioStream.codec_name || "unknown",
+      sample_rate: parseInt(audioStream.sample_rate, 10) || 0,
+      channels: parseInt(audioStream.channels, 10) || 0,
+      bit_rate: parseInt(audioStream.bit_rate, 10) || 0,
+      volume: volumeStats,
+      issues: []
+    };
+  } catch (e) {
+    console.warn("[videoAnalyzer] Audio analysis failed:", e);
+    return { has_audio: false, error: String(e) };
+  }
+}
+async function analyzeVideoTechnicallyLightweight(videoPath, framesBase64) {
+  const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+  const ffprobePath = require("@ffprobe-installer/ffprobe").path;
+  console.log("[videoAnalyzer:LW] 1/4 \u2014 ffprobe: technical metadata...");
+  const audioPromise = runAudioAnalysis(videoPath, ffprobePath);
+  const probeData = await runFfprobe(videoPath, ffprobePath);
+  console.log("[videoAnalyzer:LW] 2/4 \u2014 FFmpeg filters (parallel)...");
+  const filterPromise = runFfmpegFilters(videoPath, ffmpegPath);
+  console.log("[videoAnalyzer:LW] 3/4 \u2014 Pixel analysis...");
+  const frameAnalysis = [];
+  for (let i = 0; i < framesBase64.length; i++) {
+    const clean = framesBase64[i].replace(/^data:image\/jpeg;base64,/, "").replace(/^data:image\/png;base64,/, "");
+    frameAnalysis.push(analyzeFramePixelData(Buffer.from(clean, "base64"), i + 1));
+  }
+  const filterData = await filterPromise;
+  const temporal = analyzeTemporalFrames(
+    framesBase64.map((frame) => Buffer.from(
+      frame.replace(/^data:image\/jpeg;base64,/, "").replace(/^data:image\/png;base64,/, ""),
+      "base64"
+    )),
+    Math.min(6, framesBase64.length)
+  );
+  const stabilityIndex = temporal?.luminanceDeltaMean ?? 0;
+  let stabilityStatus = "STABLE";
+  if ((temporal?.flickerScore ?? 0) >= 70) stabilityStatus = "FLICKERING";
+  else if ((temporal?.flickerScore ?? 0) >= 40) stabilityStatus = "UNSTABLE";
+  const audioData = await audioPromise;
+  console.log("[videoAnalyzer:LW] 4/4 \u2014 Audio analysis complete");
+  return {
+    ffprobe: probeData,
+    filters: filterData,
+    frameAnalysis,
+    stabilityIndex: Math.round(stabilityIndex * 10) / 10,
+    stabilityStatus,
+    temporal,
+    audio: audioData
+  };
+}
+async function analyzeVideoTechnically(videoPath, framesBase64) {
+  const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+  const ffprobePath = require("@ffprobe-installer/ffprobe").path;
+  console.log("[videoAnalyzer] 1/6 \u2014 ffprobe: technical metadata (MediaInfo)...");
+  const probeData = await runFfprobe(videoPath, ffprobePath);
+  console.log("[videoAnalyzer] 2/6 \u2014 FFmpeg filters: blackdetect + freezedetect...");
+  const filterData = await runFfmpegFilters(videoPath, ffmpegPath);
+  console.log("[videoAnalyzer] 3/6 \u2014 signalstats: luminance & saturation...");
+  const signalstats = await runSignalstats(videoPath, ffmpegPath);
+  console.log("[videoAnalyzer] 4/6 \u2014 vmafmotion: motion vector analysis...");
+  const vmafMotion = await runVmafMotion(videoPath, ffmpegPath);
+  console.log("[videoAnalyzer] 5/6 \u2014 OpenCV-style: pixel-level frame analysis...");
+  const frameAnalysis = [];
+  for (let i = 0; i < framesBase64.length; i++) {
+    const clean = framesBase64[i].replace(/^data:image\/jpeg;base64,/, "");
+    frameAnalysis.push(analyzeFramePixelData(Buffer.from(clean, "base64"), i + 1));
+  }
+  const temporal = analyzeTemporalFrames(
+    framesBase64.map((frame) => Buffer.from(
+      frame.replace(/^data:image\/jpeg;base64,/, "").replace(/^data:image\/png;base64,/, ""),
+      "base64"
+    )),
+    Math.min(6, framesBase64.length)
+  );
+  const stabilityIndex = temporal?.luminanceDeltaMean ?? 0;
+  let stabilityStatus = "STABLE";
+  if ((temporal?.flickerScore ?? 0) >= 70) stabilityStatus = "FLICKERING";
+  else if ((temporal?.flickerScore ?? 0) >= 40) stabilityStatus = "UNSTABLE";
+  console.log("[videoAnalyzer] 6/6 \u2014 PySceneDetect: scene change analysis...");
+  const sceneData = await runSceneDetection(videoPath, ffmpegPath, probeData.duration);
+  return {
+    ffprobe: probeData,
+    filters: filterData,
+    signalstats: signalstats || void 0,
+    vmaf_motion: vmafMotion || void 0,
+    scene_detection: sceneData,
+    frameAnalysis,
+    stabilityIndex: Math.round(stabilityIndex * 10) / 10,
+    stabilityStatus,
+    temporal
+  };
+}
+var import_child_process, import_util, import_jpeg_js, execPromise;
+var init_videoAnalyzer = __esm({
+  "server/videoAnalyzer.ts"() {
+    import_child_process = require("child_process");
+    import_util = __toESM(require("util"), 1);
+    import_jpeg_js = __toESM(require("jpeg-js"), 1);
+    execPromise = import_util.default.promisify(import_child_process.exec);
+  }
+});
+
+// server.ts
 var server_exports = {};
 __export(server_exports, {
   app: () => app
@@ -40,8 +486,8 @@ var import_package2 = require("@ffprobe-installer/linux-x64/package.json");
 var import_express = __toESM(require("express"), 1);
 var import_genai2 = require("@google/genai");
 var import_multer = __toESM(require("multer"), 1);
-var import_child_process = require("child_process");
-var import_util = __toESM(require("util"), 1);
+var import_child_process2 = require("child_process");
+var import_util2 = __toESM(require("util"), 1);
 var import_fs = __toESM(require("fs"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_client_s3 = require("@aws-sdk/client-s3");
@@ -51,11 +497,11 @@ var import_nodemailer = __toESM(require("nodemailer"), 1);
 var import_crypto = __toESM(require("crypto"), 1);
 var import_pakasir_client = require("pakasir-client");
 
-// data/metazo/MetaZo-Update--main/server/gemini.ts
+// server/gemini.ts
 var import_genai = require("@google/genai");
 var import_node_async_hooks = require("node:async_hooks");
 
-// data/metazo/MetaZo-Update--main/server/holidaysData.ts
+// server/holidaysData.ts
 var HOLIDAYS_DATA = {
   january: [
     {
@@ -965,7 +1411,7 @@ var HOLIDAYS_DATA = {
   ]
 };
 
-// data/metazo/MetaZo-Update--main/server/extraHolidaysData.ts
+// server/extraHolidaysData.ts
 var EXTRA_HOLIDAYS_DATA = {
   january: [
     {
@@ -1434,7 +1880,7 @@ var EXTRA_HOLIDAYS_DATA = {
   ]
 };
 
-// data/metazo/MetaZo-Update--main/constants.tsx
+// constants.tsx
 var ADOBE_CATEGORIES = [
   { id: 1, name: "Animals" },
   { id: 2, name: "Buildings and Architecture" },
@@ -2388,7 +2834,7 @@ var TRANSLATIONS = {
   }
 };
 
-// data/metazo/MetaZo-Update--main/server/gemini.ts
+// server/gemini.ts
 var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
 var apiKeyStorage = new import_node_async_hooks.AsyncLocalStorage();
@@ -2459,20 +2905,9 @@ var PROVIDER_DEFAULT_MODELS = {
   groq: "meta-llama/llama-4-scout-17b-16e-instruct",
   mistral: "pixtral-12b",
   openai: "gpt-4o-mini",
-  openrouter: "google/gemini-2.0-flash-001",
+  openrouter: "google/gemini-3.0-flash-001",
   blackbox: "blackboxai",
   nvidia: "meta/llama-3.3-70b-instruct",
-  bluesminds: "gpt-4o",
-  aivene: "gpt-4o-mini",
-  zai: "glm-5.2"
-};
-var PROVIDER_FALLBACK_MODELS = {
-  groq: "llama-3.3-70b-versatile",
-  mistral: "mistral-large-latest",
-  openai: "gpt-4o",
-  openrouter: "anthropic/claude-3.5-haiku",
-  blackbox: "blackboxai-pro",
-  nvidia: "meta/llama-3.1-70b-instruct",
   bluesminds: "gpt-4o",
   aivene: "gpt-4o-mini",
   zai: "glm-5.2"
@@ -2568,6 +3003,69 @@ var COLOR_KEYWORDS = /* @__PURE__ */ new Set([
   "mauve",
   "pastel"
 ]);
+var KEYWORD_CONNECTOR_WORDS = /* @__PURE__ */ new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "nor",
+  "yet",
+  "so",
+  "for",
+  "with",
+  "without",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "by",
+  "from",
+  "into",
+  "onto",
+  "over",
+  "under",
+  "between",
+  "through",
+  "during",
+  "within",
+  "against",
+  "among",
+  "around",
+  "before",
+  "after",
+  "behind",
+  "beside",
+  "near",
+  "than",
+  "via",
+  "as",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "da",
+  "dan",
+  "atau",
+  "dengan",
+  "serta",
+  "untuk",
+  "dari",
+  "di",
+  "ke",
+  "pada",
+  "dalam",
+  "oleh",
+  "yang",
+  "sebagai"
+]);
+function containsKeywordConnector(phrase) {
+  const words = String(phrase || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+  return words.some((word) => KEYWORD_CONNECTOR_WORDS.has(word));
+}
 var PROHIBITED_KEYWORDS_SET = /* @__PURE__ */ new Set([
   "apple",
   "iphone",
@@ -2623,14 +3121,10 @@ var PROHIBITED_KEYWORDS_SET = /* @__PURE__ */ new Set([
   "property"
 ]);
 function isProhibitedKeyword(word) {
-  if (!word) return true;
-  const lower = word.toLowerCase().trim();
-  if (PROHIBITED_KEYWORDS_SET.has(lower)) return true;
-  const parts = lower.split(/[\s-_]+/);
-  if (parts.some((part) => COLOR_KEYWORDS.has(part))) {
-    return true;
-  }
-  return false;
+  const normalized = String(word || "").trim().toLowerCase();
+  if (!normalized) return true;
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  return tokens.some((token) => PROHIBITED_KEYWORDS_SET.has(token)) || PROHIBITED_KEYWORDS_SET.has(normalized);
 }
 function getHeuristicCategories(title, keywords) {
   const t = String(title || "").toLowerCase();
@@ -2721,7 +3215,7 @@ function ensureTitleLength(title, keywords, description, titleLength) {
   } else {
     title = String(title);
   }
-  let cleanedTitle = title.replace(/,/g, " ").replace(/\s+/g, " ").trim();
+  let cleanedTitle = title.replace(/,/g, " ").replace(/[\-–—_]+/g, " ").replace(/\s+/g, " ").trim();
   if (cleanedTitle.endsWith(".")) {
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
@@ -2790,7 +3284,11 @@ function ensureDescription(description, title, keywords) {
     }
     return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
-  return description.trim();
+  const cleaned = description.trim().replace(/\s+/g, " ");
+  if (cleaned.length <= 200) return cleaned;
+  const truncated = cleaned.slice(0, 200);
+  const lastSpace = truncated.lastIndexOf(" ");
+  return (lastSpace > 100 ? truncated.slice(0, lastSpace) : truncated).trim();
 }
 var getTitleLengthRule = (titleLength) => {
   if (titleLength === "short") {
@@ -2819,466 +3317,626 @@ var getLanguageName = (code) => {
   };
   return map[code || "en"] || "ENGLISH";
 };
-function ensureKeywordCount(keywords, targetCount, visualFacts, title, description, categoryId, keywordMode) {
-  const hashString = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return hash;
-  };
-  let uniqueKeywords = [];
-  if (Array.isArray(keywords)) {
-    keywords.forEach((k) => {
-      if (typeof k === "string") {
-        const clean = sanitizeForIndexing(k);
-        if (clean.length > 1 && !isProhibitedKeyword(clean)) {
-          if (keywordMode === "single" && clean.includes(" ")) {
-            const pieces = clean.split(/\s+/);
-            pieces.forEach((p) => {
-              if (p.length > 1 && !isProhibitedKeyword(p)) {
-                const isDuplicate = uniqueKeywords.some(
-                  (existing) => existing === p || existing === p + "s" || p === existing + "s" || existing === p + "es" || p === existing + "es" || existing.replace(/ies$/, "y") === p || p.replace(/ies$/, "y") === existing
-                );
-                if (!isDuplicate) {
-                  uniqueKeywords.push(p);
-                }
-              }
-            });
-          } else {
-            let cleanVal = clean;
-            if (keywordMode === "multi" && !clean.includes(" ")) {
-              const modifiers = ["concept", "background", "scene", "design", "style", "detail", "asset", "element"];
-              const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
-              cleanVal = `${clean} ${mod}`;
-            }
-            const isDuplicate = uniqueKeywords.some(
-              (existing) => existing === cleanVal || existing === cleanVal + "s" || cleanVal === existing + "s" || existing === cleanVal + "es" || cleanVal === existing + "es" || existing.replace(/ies$/, "y") === cleanVal || cleanVal.replace(/ies$/, "y") === existing
-            );
-            if (!isDuplicate) {
-              uniqueKeywords.push(cleanVal);
-            }
-          }
-        }
-      }
-    });
-  }
-  if (uniqueKeywords.length >= targetCount) {
-    return uniqueKeywords.slice(0, targetCount);
-  }
-  const categoryFallbackKeywords = {
-    1: ["animal", "nature", "wildlife", "fauna", "creature", "outdoor", "mammal", "species", "wilderness", "natural", "habitat", "furry", "adorable", "portrait", "close-up", "environment", "beast", "pet", "wild", "zoology"],
-    2: ["architecture", "building", "structure", "construction", "city", "urban", "exterior", "interior", "design", "modern", "concrete", "glass", "steel", "landmark", "monument", "facade", "metropolis", "tower", "estate", "house", "contemporary"],
-    3: ["business", "office", "corporate", "work", "workplace", "finance", "company", "management", "team", "meeting", "strategy", "success", "professional", "marketing", "leadership", "organization", "colleague", "career", "investment", "growth", "concept"],
-    4: ["drink", "beverage", "glass", "liquid", "refreshing", "cold", "hot", "cup", "bottle", "mug", "bar", "cafe", "cocktail", "juice", "water", "coffee", "tea", "alcohol", "brew", "ice"],
-    5: ["environment", "nature", "landscape", "green", "eco", "ecology", "sustainability", "recycle", "conservation", "earth", "planet", "wild", "scenery", "outdoor", "forest", "climate", "natural", "environmental", "organic"],
-    6: ["concept", "mood", "feeling", "emotion", "mental", "mind", "thought", "isolated", "abstract", "idea", "expression", "psychology", "imagination", "sensation", "attitude", "behavior"],
-    7: ["food", "delicious", "tasty", "dish", "meal", "gourmet", "culinary", "plate", "eating", "ingredient", "fresh", "vegetable", "fruit", "cooking", "kitchen", "recipe", "diet", "lunch", "dinner", "breakfast", "cuisine"],
-    8: ["graphic", "design", "resource", "vector", "illustration", "element", "abstract", "background", "template", "pattern", "asset", "layout", "creative", "art", "flat", "logo", "icon", "backdrop", "seamless"],
-    9: ["hobby", "leisure", "recreation", "activity", "fun", "game", "play", "relaxation", "lifestyle", "entertainment", "pastime", "craft", "indoor", "outdoor", "enjoyment"],
-    10: ["industry", "industrial", "factory", "manufacture", "production", "technology", "engineering", "machinery", "worker", "equipment", "facility", "metal", "power", "warehouse", "technical", "automated", "construction"],
-    11: ["landscape", "scenery", "scenic", "nature", "view", "outdoor", "mountain", "hill", "valley", "field", "panorama", "horizon", "wilderness", "beautiful", "vista", "natural", "sky"],
-    12: ["lifestyle", "life", "daily", "routine", "modern", "human", "person", "people", "home", "domestic", "activity", "casual", "habits", "style", "comfort", "leisure"],
-    13: ["people", "person", "human", "individual", "portrait", "man", "woman", "adult", "young", "lifestyle", "group", "crowd", "interaction", "relationship", "face", "expressive", "posing"],
-    14: ["plant", "flower", "flora", "botany", "botanical", "leaf", "nature", "garden", "green", "blossom", "petal", "growth", "stem", "outdoor", "natural", "organic", "vegetation", "spring", "summer"],
-    15: ["culture", "religion", "religious", "spiritual", "belief", "faith", "tradition", "custom", "heritage", "sacred", "ceremony", "ritual", "symbol", "history", "traditional", "temple", "church", "holiday", "celebration"],
-    16: ["science", "scientific", "research", "laboratory", "lab", "technology", "analysis", "experiment", "discovery", "study", "chemistry", "biology", "physics", "tech", "equipment", "microscope", "test", "data", "concept"],
-    17: ["social", "issue", "community", "society", "problem", "awareness", "support", "help", "advocacy", "global", "campaign", "concept", "message", "public", "humanity", "care"],
-    18: ["sports", "sport", "athletic", "athlete", "exercise", "fitness", "training", "game", "competition", "player", "workout", "active", "healthy", "stadium", "court", "field", "gym", "recreation", "action"],
-    19: ["technology", "tech", "digital", "device", "modern", "electronic", "innovation", "computer", "network", "connection", "internet", "future", "futuristic", "concept", "data", "communication", "virtual", "smart"],
-    20: ["transport", "transportation", "vehicle", "car", "automobile", "traffic", "road", "street", "travel", "highway", "drive", "engine", "movement", "logistics", "delivery", "auto", "transit"],
-    21: ["travel", "tourism", "destination", "vacation", "holiday", "trip", "journey", "adventure", "explore", "tourist", "sightseeing", "scenic", "landmark", "outdoor", "recreation", "passport", "luggage"]
-  };
-  const STOP_WORDS = /* @__PURE__ */ new Set([
-    "a",
-    "an",
-    "the",
-    "and",
-    "but",
-    "or",
-    "for",
-    "nor",
-    "on",
-    "at",
-    "in",
-    "with",
-    "by",
-    "of",
-    "to",
-    "from",
-    "as",
-    "is",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "being",
-    "have",
-    "has",
-    "had",
-    "do",
-    "does",
-    "did",
-    "this",
-    "that",
-    "these",
-    "those",
-    "it",
-    "its",
-    "they",
-    "them",
-    "their",
-    "we",
-    "us",
-    "our",
-    "you",
-    "your",
-    "he",
-    "him",
-    "his",
-    "she",
-    "her",
-    "isolated",
-    "stock",
-    "photo",
-    "image",
-    "picture",
-    "vector",
-    "illustration",
-    "captured",
-    "professional",
-    "high",
-    "quality",
-    "resolution",
-    "super",
-    "ultra",
-    "beautiful",
-    "stunning",
-    "amazing",
-    "perfect",
-    "ideal"
-  ]);
-  const extractWords = (str) => {
-    if (!str || typeof str !== "string") return [];
-    return str.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).map((w) => w.trim()).filter((w) => w.length > 1 && !STOP_WORDS.has(w) && !isProhibitedKeyword(w));
-  };
-  const sources = [];
-  if (visualFacts && visualFacts.primary_subjects && Array.isArray(visualFacts.primary_subjects)) {
-    const words = [];
-    visualFacts.primary_subjects.forEach((x) => {
-      if (x && typeof x === "object" && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-  if (visualFacts && visualFacts.secondary_subjects && Array.isArray(visualFacts.secondary_subjects)) {
-    const words = [];
-    visualFacts.secondary_subjects.forEach((x) => {
-      if (x && typeof x === "object" && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-  if (visualFacts && visualFacts.colors && Array.isArray(visualFacts.colors)) {
-    sources.push(visualFacts.colors.flatMap((c) => {
-      if (typeof c === "string") return extractWords(c);
-      return [];
-    }));
-  }
-  if (visualFacts && visualFacts.actions && Array.isArray(visualFacts.actions)) {
-    sources.push(visualFacts.actions.flatMap((a) => {
-      if (typeof a === "string") return extractWords(a);
-      return [];
-    }));
-  }
-  if (title && typeof title === "string") {
-    sources.push(extractWords(title));
-  }
-  if (description && typeof description === "string") {
-    sources.push(extractWords(description));
-  }
-  if (categoryId) {
-    const catIdNum = Number(categoryId);
-    if (categoryFallbackKeywords[catIdNum]) {
-      sources.push(categoryFallbackKeywords[catIdNum]);
-    }
-  }
-  for (const source of sources) {
-    if (uniqueKeywords.length >= targetCount) break;
-    if (Array.isArray(source)) {
-      const cleanSource = Array.from(new Set(source));
-      for (const word of cleanSource) {
-        if (uniqueKeywords.length >= targetCount) break;
-        if (typeof word === "string") {
-          let cleanWord = word.trim().toLowerCase();
-          if (cleanWord.length > 1 && !isProhibitedKeyword(cleanWord)) {
-            if (keywordMode === "multi" && !cleanWord.includes(" ")) {
-              const modifiers = ["concept", "background", "scene", "design", "style", "detail", "asset", "element"];
-              const mod = modifiers[Math.abs(hashString(cleanWord)) % modifiers.length];
-              cleanWord = `${cleanWord} ${mod}`;
-            }
-            if (!uniqueKeywords.includes(cleanWord)) {
-              uniqueKeywords.push(cleanWord);
-            }
-          }
-        }
-      }
-    }
-  }
-  return uniqueKeywords.slice(0, targetCount);
+function buildMasterKeywordCandidatePool(aiCandidates, visualFacts, targetCount) {
+  const normalized = aiCandidates.map((k) => sanitizeForIndexing(k)).filter(Boolean).filter((k) => !isProhibitedKeyword(k));
+  return semanticDeduplicate(normalized);
 }
-async function callOpenAICompatibleWithRetry(params) {
-  const store = apiKeyStorage.getStore();
-  const provider = store && store.provider || "gemini";
-  if (!PROVIDER_ENDPOINTS[provider]) {
-    throw new Error(`Unsupported provider: ${provider}`);
+var SEASONAL_TERMS = /* @__PURE__ */ new Set([
+  "christmas",
+  "xmas",
+  "holiday",
+  "holidays",
+  "festive",
+  "seasonal",
+  "winter",
+  "summer",
+  "spring",
+  "autumn",
+  "fall",
+  "easter",
+  "halloween",
+  "valentines",
+  "valentine",
+  "thanksgiving",
+  "new year",
+  "newyear",
+  "ramadan",
+  "diwali",
+  "hanukkah",
+  "birthday"
+]);
+var COMMERCIAL_TERMS = /* @__PURE__ */ new Set([
+  "background",
+  "banner",
+  "poster",
+  "template",
+  "advertising",
+  "advertisement",
+  "marketing",
+  "social media",
+  "copy space",
+  "web banner",
+  "cover",
+  "flyer",
+  "brochure",
+  "presentation",
+  "branding",
+  "mockup",
+  "card",
+  "invitation"
+]);
+function uniqueCleanStrings(values) {
+  return Array.from(new Set((values || []).filter((x) => typeof x === "string").map((x) => sanitizeForIndexing(x)).filter(Boolean)));
+}
+function buildKeywordRoleContext(visualFacts) {
+  const tiers = buildTieredVisualAnalysis(visualFacts || {});
+  const primary = uniqueCleanStrings(tiers.objects.filter((o) => o.tier === "primary").map((o) => o.name));
+  const secondary = uniqueCleanStrings(tiers.objects.filter((o) => o.tier === "secondary").map((o) => o.name));
+  const environment = uniqueCleanStrings([
+    ...tiers.scene,
+    ...tiers.objects.filter((o) => o.tier === "background").map((o) => o.name),
+    ...Array.isArray(visualFacts?.environment) ? visualFacts.environment : [],
+    ...Array.isArray(visualFacts?.setting) ? visualFacts.setting : [],
+    ...Array.isArray(visualFacts?.location) ? visualFacts.location : []
+  ]);
+  const actions = uniqueCleanStrings([
+    ...Array.isArray(visualFacts?.actions) ? visualFacts.actions : [],
+    ...Array.isArray(visualFacts?.action) ? visualFacts.action : [],
+    ...Array.isArray(visualFacts?.states) ? visualFacts.states : []
+  ]);
+  const style = uniqueCleanStrings([
+    ...Array.isArray(visualFacts?.style) ? visualFacts.style : [],
+    ...Array.isArray(visualFacts?.visual_style) ? visualFacts.visual_style : [],
+    ...Array.isArray(visualFacts?.visualStyle) ? visualFacts.visualStyle : [],
+    ...Array.isArray(visualFacts?.attributes) ? visualFacts.attributes : []
+  ]);
+  const composition = uniqueCleanStrings([
+    ...Array.isArray(visualFacts?.composition) ? visualFacts.composition : [],
+    ...Array.isArray(visualFacts?.layout) ? visualFacts.layout : [],
+    ...Array.isArray(visualFacts?.camera_composition) ? visualFacts.camera_composition : []
+  ]);
+  const seasonal = uniqueCleanStrings([
+    ...Array.isArray(visualFacts?.seasonal_context) ? visualFacts.seasonal_context : [],
+    ...Array.isArray(visualFacts?.seasonal) ? visualFacts.seasonal : [],
+    ...Array.isArray(visualFacts?.occasion) ? visualFacts.occasion : [],
+    ...Array.isArray(visualFacts?.events) ? visualFacts.events : [],
+    ...visualFacts?.season ? [visualFacts.season] : [],
+    ...visualFacts?.holiday ? [visualFacts.holiday] : []
+  ]).filter((v) => [...SEASONAL_TERMS].some((t) => v === t || v.includes(t)));
+  const concepts = uniqueCleanStrings([
+    ...tiers.concepts,
+    ...Array.isArray(visualFacts?.concepts) ? visualFacts.concepts : [],
+    ...Array.isArray(visualFacts?.themes) ? visualFacts.themes : [],
+    ...Array.isArray(visualFacts?.commercial_concepts) ? visualFacts.commercial_concepts : []
+  ]);
+  const commercial = uniqueCleanStrings([
+    ...Array.isArray(visualFacts?.commercial_use) ? visualFacts.commercial_use : [],
+    ...Array.isArray(visualFacts?.use_cases) ? visualFacts.use_cases : [],
+    ...Array.isArray(visualFacts?.applications) ? visualFacts.applications : []
+  ]).filter((v) => [...COMMERCIAL_TERMS].some((t) => v === t || v.includes(t)));
+  const colors = uniqueCleanStrings([
+    ...Array.isArray(visualFacts?.colors) ? visualFacts.colors : [],
+    ...Array.isArray(visualFacts?.color) ? visualFacts.color : []
+  ]).filter((v) => v.split(/\s+/).some((w) => COLOR_KEYWORDS.has(w)));
+  const attributes = uniqueCleanStrings([
+    ...tiers.attributes,
+    ...Array.isArray(visualFacts?.technical_attributes) ? visualFacts.technical_attributes : [],
+    ...Array.isArray(visualFacts?.technicalAttributes) ? visualFacts.technicalAttributes : []
+  ]);
+  return { primary, secondary, environment, actions, style, composition, seasonal, concepts, commercial, colors, attributes };
+}
+function keywordMatchesEvidence(keyword, evidence) {
+  const k = sanitizeForIndexing(keyword);
+  if (!k || !evidence.length) return false;
+  return evidence.some((e) => e === k || e.includes(k) || k.includes(e) || k.split(/\s+/).some((w) => w.length > 2 && e.split(/\s+/).includes(w)));
+}
+function classifyKeywordSemanticRole(keyword, ctx) {
+  const k = sanitizeForIndexing(keyword);
+  if (!k) return "generic";
+  const words = k.split(/\s+/);
+  const isColor = words.some((w) => COLOR_KEYWORDS.has(w));
+  if (isColor && keywordMatchesEvidence(k, ctx.colors)) return "color";
+  if (keywordMatchesEvidence(k, ctx.primary)) {
+    const exactPrimary = ctx.primary.some((x) => x === k);
+    return exactPrimary ? "main_subject" : "subject_variation";
   }
-  const endpoint = PROVIDER_ENDPOINTS[provider];
-  const providerState = store?.[provider];
-  const keysList = providerState && providerState.keys || [];
-  const maxRotationAttempts = keysList.length > 0 ? keysList.length : 1;
-  let lastErr;
-  for (let rot = 0; rot < maxRotationAttempts; rot++) {
-    let apiKey = "";
-    if (keysList.length > 0) {
-      const activeIdx = providerState.activeIndex || 0;
-      apiKey = keysList[activeIdx];
-      if (provider === "nvidia") {
-        console.log(`[NVIDIA DEBUG] Using key index ${activeIdx}/${keysList.length} (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
-      }
-    } else {
-      apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || "";
-      if (provider === "nvidia") {
-        console.log(`[NVIDIA DEBUG] Using key from process.env (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
-      }
+  if (keywordMatchesEvidence(k, ctx.environment)) return "environment";
+  if (keywordMatchesEvidence(k, ctx.actions)) return "action_state";
+  if (keywordMatchesEvidence(k, ctx.secondary)) return "secondary_subject";
+  if (keywordMatchesEvidence(k, ctx.style)) return "visual_style";
+  if (keywordMatchesEvidence(k, ctx.composition)) return "composition";
+  if (keywordMatchesEvidence(k, ctx.seasonal)) return "seasonal";
+  if (keywordMatchesEvidence(k, ctx.concepts)) return "concept";
+  if (keywordMatchesEvidence(k, ctx.commercial)) return "commercial_use";
+  if (keywordMatchesEvidence(k, ctx.attributes)) return "attribute";
+  return "generic";
+}
+function scoreKeywordForRanking(keyword, ctx, originalIndex, titleTerms) {
+  const normalized = sanitizeForIndexing(keyword);
+  const role = classifyKeywordSemanticRole(normalized, ctx);
+  const rolePriority = {
+    main_subject: 1e3,
+    subject_variation: 900,
+    action_state: 800,
+    environment: 700,
+    secondary_subject: 650,
+    concept: 580,
+    seasonal: 520,
+    visual_style: 450,
+    attribute: 400,
+    composition: 330,
+    commercial_use: 220,
+    color: 180,
+    generic: 0
+  };
+  let score = rolePriority[role];
+  const evidenceGroups = [
+    { values: ctx.primary, weight: 140 },
+    { values: ctx.actions, weight: 110 },
+    { values: ctx.environment, weight: 95 },
+    { values: ctx.secondary, weight: 80 },
+    { values: ctx.concepts, weight: 68 },
+    { values: ctx.seasonal, weight: 58 },
+    { values: ctx.style, weight: 48 },
+    { values: ctx.attributes, weight: 40 },
+    { values: ctx.composition, weight: 30 },
+    { values: ctx.colors, weight: 18 },
+    { values: ctx.commercial, weight: 12 }
+  ];
+  for (const group of evidenceGroups) {
+    if (group.values.some((value) => value === normalized)) {
+      score += group.weight;
+      break;
     }
-    if (!apiKey && provider === "nvidia") {
-      console.warn("NVIDIA key missing. Fallback to Gemini.");
-      const fallbackResult = await getAIClient().models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: params.contents,
-        config: params.config
-      });
-      return typeof fallbackResult.text === "function" ? await fallbackResult.text() : fallbackResult.text || "";
+    if (group.values.some((value) => keywordMatchesEvidence(normalized, [value]))) {
+      score += Math.round(group.weight * 0.45);
+      break;
     }
-    if (!apiKey) {
-      throw new Error(`API Key untuk ${provider.toUpperCase()} belum dikonfigurasi. Silakan tambahkan Key Anda di pengaturan.`);
-    }
-    const messages = [];
-    let userSystemInstruction = "";
-    if (params.systemInstruction) {
-      if (provider === "aivene") {
-        userSystemInstruction = `[SYSTEM INSTRUCTION]
-${params.systemInstruction}
-
-[USER INPUT]
-`;
-      } else {
-        messages.push({ role: "system", content: params.systemInstruction });
-      }
-    }
-    let hasImages = false;
-    const contentParts = [];
-    if (userSystemInstruction) {
-      contentParts.push({ type: "text", text: userSystemInstruction });
-    }
-    const addPart = (part) => {
-      if (!part) return;
-      if (typeof part === "string") {
-        contentParts.push({ type: "text", text: part });
-      } else if (part.text) {
-        contentParts.push({ type: "text", text: part.text });
-      } else if (part.inlineData) {
-        hasImages = true;
-        contentParts.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    };
-    if (typeof params.contents === "string") {
-      contentParts.push({ type: "text", text: params.contents });
-    } else if (Array.isArray(params.contents)) {
-      params.contents.forEach(addPart);
-    } else if (params.contents && typeof params.contents === "object") {
-      if (Array.isArray(params.contents.parts)) {
-        params.contents.parts.forEach(addPart);
-      } else {
-        addPart(params.contents);
-      }
-    }
-    let finalContent;
-    if (!hasImages) {
-      finalContent = contentParts.map((p) => p.text).join("\n");
-    } else {
-      finalContent = contentParts.length === 1 && contentParts[0].type === "text" ? contentParts[0].text : contentParts;
-    }
-    messages.push({
-      role: "user",
-      content: finalContent
+  }
+  const canonical = adobeKeywordCanonical(normalized);
+  const titleMatch = [...titleTerms].some(
+    (term) => canonical === term || canonical.includes(term) || term.includes(canonical)
+  );
+  if (titleMatch) score += 160;
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount === 1) score += 8;
+  else if (wordCount === 2) score += 16;
+  else if (wordCount === 3) score += 7;
+  else score -= 50;
+  if (containsKeywordConnector(normalized)) score -= 40;
+  if (role === "generic") score -= 120;
+  if (role === "color") score -= 18;
+  if (role === "commercial_use" && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 60;
+  return score * 1e3 - originalIndex;
+}
+function scoreMetadataGenKeywords(keywords, visualFacts) {
+  const ctx = buildKeywordRoleContext(visualFacts || {});
+  const title = visualFacts?.title || visualFacts?.metadata_title || "";
+  const titleTerms = titleKeywordTerms(title);
+  return (Array.isArray(keywords) ? keywords : []).map((keyword, index) => {
+    const normalized = sanitizeForIndexing(keyword);
+    const role = classifyKeywordSemanticRole(normalized, ctx);
+    const score = scoreKeywordForRanking(keyword, ctx, index, titleTerms);
+    const titleRelevant = [...titleTerms].some((term) => {
+      const canonical = adobeKeywordCanonical(normalized);
+      return canonical === term || canonical.includes(term) || term.includes(canonical);
     });
-    let model = params.model || PROVIDER_DEFAULT_MODELS[provider];
-    if (provider === "nvidia") {
-      if (model === "stepfun_step35_flash") model = "stepfun-ai/step-3.5-flash";
-      if (model.startsWith("stepfun/")) model = model.replace("stepfun/", "stepfun-ai/");
-      if (model === "nemotron") model = "nvidia/llama-3.1-nemotron-70b-instruct";
-      if (!model.includes("/")) {
-        if (model.includes("llama-3.2")) model = `meta/${model}`;
-        else if (model.includes("nemotron")) model = `nvidia/${model}`;
-        else if (model.includes("paligemma")) model = `google/${model}`;
-        else if (model.includes("step")) model = `stepfun-ai/${model}`;
+    const buyerSearchability = buyerSearchabilityScore(
+      keyword,
+      role,
+      visualFacts
+    );
+    let evidence = "Role-based relevance";
+    const groups = [
+      ["main subject", ctx.primary],
+      ["action/state", ctx.actions],
+      ["environment", ctx.environment],
+      ["secondary subject", ctx.secondary],
+      ["concept", ctx.concepts],
+      ["seasonal", ctx.seasonal],
+      ["visual style", ctx.style],
+      ["attribute", ctx.attributes],
+      ["composition", ctx.composition],
+      ["color", ctx.colors],
+      ["commercial use", ctx.commercial]
+    ];
+    for (const [label, values] of groups) {
+      if (values.some((value) => keywordMatchesEvidence(normalized, [value]))) {
+        evidence = `Supported by ${label} evidence`;
+        break;
       }
-      model = model.trim();
-      if (model.startsWith("/")) model = model.substring(1);
     }
-    if (provider !== "aivene" && (model?.startsWith("gemini-") || model?.startsWith("gemma-"))) {
-      model = PROVIDER_DEFAULT_MODELS[provider];
-    }
-    if (provider === "groq" && model === "llama-4-scout-17b-16e-instruct") {
-      model = "meta-llama/llama-4-scout-17b-16e-instruct";
-    }
-    const payload = {
-      model,
-      messages,
-      temperature: params.config?.temperature ?? 0.85
+    return {
+      keyword,
+      score,
+      normalizedScore: Math.max(0, Math.min(100, Math.round(score / 14))),
+      rank: 0,
+      role,
+      evidence,
+      titleRelevant,
+      buyerSearchability,
+      topTenPriority: "supporting"
     };
-    if (params.config?.topP !== void 0) {
-      payload.top_p = params.config.topP;
-    }
-    if (params.config?.seed !== void 0) {
-      payload.seed = params.config.seed;
-    }
-    if (SUPPORTS_JSON_MODE.has(provider)) {
-      payload.response_format = { type: "json_object" };
-    }
-    if (provider === "groq" || provider === "openai" || provider === "openrouter" || provider === "nvidia" || provider === "aivene" || provider === "zai") {
-      payload.max_tokens = provider === "nvidia" ? 4096 : 8192;
-    } else if (provider === "bluesminds") {
-    }
-    payload.stream = false;
-    if (params.responseMimeType === "application/json") {
-      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested). DO NOT write any introductory or concluding text. DO NOT use markdown code blocks. The response MUST be a valid JSON object or array.';
-      if (provider === "nvidia") {
-        schemaInstruction = "\n\nOutput only a valid JSON. Do not include any explanation or markdown formatting. The JSON must directly start with { or [ and end with } or ].";
-      }
-      if (params.responseSchema) {
-        schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
-      }
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === "user") {
-        if (typeof lastMessage.content === "string") {
-          lastMessage.content += schemaInstruction;
-        } else if (Array.isArray(lastMessage.content)) {
-          lastMessage.content.push({ type: "text", text: schemaInstruction });
-        }
-      } else {
-        messages.push({ role: "user", content: schemaInstruction });
-      }
-    }
-    let tryCount = 0;
-    while (tryCount < 2) {
-      try {
-        console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
-        const headers = {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey.trim()}`
-        };
-        if (provider === "openrouter") {
-          headers["HTTP-Referer"] = process.env.APP_URL || "http://localhost";
-          headers["X-Title"] = "JohMeta";
-        }
-        if (provider === "zai") {
-          headers["Accept-Language"] = "en-US,en";
-          payload.do_sample = false;
-        }
-        if (provider === "nvidia") {
-          const sanPayload = { ...payload, messages: payload.messages.map((m) => ({ ...m, content: typeof m.content === "string" ? m.content : "[REDACTED CONTENT]" })) };
-          console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
-        }
-        const fetchTimeout = provider === "nvidia" || provider === "mistral" ? 3e4 : 25e3;
-        const response2 = await fetch(endpoint, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-          // @ts-ignore - undici/node-fetch support signal/timeout
-          signal: AbortSignal.timeout(fetchTimeout)
-        });
-        const responseDataRawForLogging = await response2.clone().text();
-        console.log(`[${provider.toUpperCase()} DEBUG] Status: ${response2.status}, Content-Type: ${response2.headers.get("content-type")}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
-        if (!response2.ok) {
-          const errText = await response2.text();
-          console.warn(`[${provider.toUpperCase()} API FAILURE] Status: ${response2.status}, Response: ${errText}`);
-          throw new Error(`HTTP ${response2.status}: ${errText}`);
-        }
-        const responseDataRaw = await response2.text();
-        let responseData;
-        try {
-          responseData = JSON.parse(responseDataRaw);
-        } catch (e) {
-          console.error(`[callOpenAICompatibleWithRetry] Failed to parse JSON. Status: ${response2.status}, Content-Type: ${response2.headers.get("content-type")}, RawResponse: ${responseDataRaw.substring(0, 500)}`);
-          throw new Error(`Failed to parse JSON from ${provider}. RawResponse Sample: ${responseDataRaw.substring(0, 200)}`);
-        }
-        let answer = responseData.choices?.[0]?.message?.content;
-        if (!answer && responseData.choices?.[0]?.message) {
-          answer = responseData.choices[0].message.reasoning || responseData.choices[0].message.reasoning_content;
-        }
-        if (!answer) {
-          console.warn(`[callOpenAICompatibleWithRetry] Empty answer received from ${provider}. Response payload:`, JSON.stringify(responseData));
-          if (responseData.error) {
-            throw new Error(`${provider.toUpperCase()} API Error: ${responseData.error.message || JSON.stringify(responseData.error)} (Code: ${responseData.error.code || "unknown"})`);
-          }
-          throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
-        }
-        if (params.responseMimeType === "application/json") {
-          answer = extractJSON(answer);
-          if (answer.replace(/\s/g, "") === "{}") {
-            console.warn(`[callOpenAICompatibleWithRetry] Model hallucinated empty JSON string. Retrying...`);
-            throw new Error(`Model returned empty json object string {}. Trigger quota rotation/retry.`);
-          }
-        }
-        return answer;
-      } catch (err) {
-        console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
-        const status = err.status || (err.message && err.message.includes("HTTP ") ? err.message.split(" ")[1].replace(":", "") : "unknown");
-        console.warn(`[${provider.toUpperCase()} ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
-        lastErr = err;
-        const errorMsg = String(err.message || "").toLowerCase();
-        const isRateLimit = errorMsg.includes("429") && (errorMsg.includes("try again") || errorMsg.includes("retry in") || errorMsg.includes("wait"));
-        const shouldRotate = errorMsg.includes("429") && !isRateLimit || errorMsg.includes("quota") || errorMsg.includes("exceeded") || errorMsg.includes("exhausted") || errorMsg.includes("403") || errorMsg.includes("401");
-        if (shouldRotate) {
-          console.warn(`[${provider.toUpperCase()}] Error requires rotation: ${errorMsg}. Trying next key.`);
-          if (providerState && providerState.keys && keysList.length > 1) {
-            providerState.activeIndex = (providerState.activeIndex + 1) % keysList.length;
-            break;
-          } else {
-            throw err;
-          }
-        }
-        tryCount++;
-        const fallback = PROVIDER_FALLBACK_MODELS[provider];
-        const isRetryableError = errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("limit") || errorMsg.includes("timeout") || errorMsg.includes("exceeded") || errorMsg.includes("fetch failed") || errorMsg.includes("400") || errorMsg.includes("404") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("500") || errorMsg.includes("502") || errorMsg.includes("503") || errorMsg.includes("504") || errorMsg.includes("524") || errorMsg.includes("upstream_error") || errorMsg.includes("extra data") || errorMsg.includes("empty response content") || errorMsg.includes("empty json object") || errorMsg.includes("bad_response_status_code");
-        if (tryCount === 1 && fallback && fallback !== model) {
-          model = fallback;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model}`);
-          payload.model = model;
-          continue;
-        }
-        if (tryCount < 2 && isRetryableError) {
-          const backoff = Math.pow(2, tryCount) * 1e3 + Math.random() * 1e3;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/2) after ${backoff / 1e3}s...`);
-          await new Promise((resolve) => setTimeout(resolve, backoff));
-          continue;
-        }
-        throw err;
-      }
-    }
+  }).sort((a, b) => b.score - a.score).map((item, index) => ({
+    ...item,
+    rank: index + 1,
+    topTenPriority: index === 0 ? "critical" : index < 10 ? "high" : "supporting"
+  }));
+}
+function validateMetadataTitleSearchability(title, keywords, visualFacts = {}) {
+  const normalized = normalizeAdobeKeyword(title);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const keywordSet = new Set(
+    (Array.isArray(keywords) ? keywords : []).map((keyword) => adobeKeywordCanonical(keyword))
+  );
+  const titleTerms = [...titleKeywordTerms(title)];
+  const concreteTermCount = titleTerms.filter((term) => {
+    const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+    return factsText.includes(term);
+  }).length;
+  const buyerIntentTerms = titleTerms.filter(
+    (term) => keywordSet.has(term) || [...keywordSet].some((keyword) => keyword.includes(term) || term.includes(keyword))
+  );
+  const warnings = [];
+  if (words.length < 3) warnings.push("Title is too vague for buyer search.");
+  if (words.length > 18) warnings.push("Title is too long and may read like keyword stuffing.");
+  if (concreteTermCount < Math.min(2, titleTerms.length)) {
+    warnings.push("Title lacks enough concrete visual terms supported by the asset.");
   }
-  throw lastErr;
+  if (buyerIntentTerms.length < Math.min(2, titleTerms.length)) {
+    warnings.push("Title has weak overlap with the strongest searchable keywords.");
+  }
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        Math.min(1, concreteTermCount / Math.max(1, Math.min(4, titleTerms.length))) * 45 + Math.min(1, buyerIntentTerms.length / Math.max(1, Math.min(4, titleTerms.length))) * 35 + (words.length >= 3 && words.length <= 14 ? 20 : 8)
+      )
+    )
+  );
+  return {
+    score,
+    status: score >= 80 ? "PASS" : score >= 60 ? "REVIEW" : "FAIL",
+    wordCount: words.length,
+    concreteTermCount,
+    buyerIntentTerms,
+    warnings
+  };
+}
+function validateMetadataTitleKeywordConsistency(title, keywords, visualFacts = {}) {
+  const normalizedTitle = normalizeAdobeKeyword(title);
+  const titleTerms = [...titleKeywordTerms(normalizedTitle)];
+  const keywordCanonicals = (Array.isArray(keywords) ? keywords : []).map((keyword) => adobeKeywordCanonical(keyword));
+  const coveredTitleTerms = titleTerms.filter(
+    (term) => keywordCanonicals.some(
+      (keyword) => keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+  const topTen = keywordCanonicals.slice(0, 10);
+  const topTenCovered = titleTerms.filter(
+    (term) => topTen.some(
+      (keyword) => keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+  const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+  const unsupportedTitleTerms = titleTerms.filter((term) => {
+    const words = term.split(/\s+/);
+    return words.length > 0 && !words.every((word) => factsText.includes(word));
+  });
+  const missingImportantTitleTerms = titleTerms.filter(
+    (term) => !topTen.some(
+      (keyword) => keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+  const coverage = titleTerms.length ? coveredTitleTerms.length / titleTerms.length : 1;
+  const topTenCoverage = titleTerms.length ? topTenCovered.length / titleTerms.length : 1;
+  const warnings = [];
+  if (unsupportedTitleTerms.length) {
+    warnings.push("Title contains terms not supported by VISUAL_FACTS.");
+  }
+  if (missingImportantTitleTerms.length) {
+    warnings.push("Important title concepts are missing from the first 10 keywords.");
+  }
+  if (coverage < 0.5) {
+    warnings.push("Title and keyword set have weak semantic overlap.");
+  }
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        coverage * 55 + topTenCoverage * 30 + (unsupportedTitleTerms.length === 0 ? 15 : 0)
+      )
+    )
+  );
+  const titleSearchability = validateMetadataTitleSearchability(
+    title,
+    keywords,
+    visualFacts
+  );
+  return {
+    score: Math.round((score + titleSearchability.score) / 2),
+    status: unsupportedTitleTerms.length > 0 || titleSearchability.status === "FAIL" ? "FAIL" : score < 80 || missingImportantTitleTerms.length > 0 || titleSearchability.status === "REVIEW" ? "REVIEW" : "PASS",
+    titleTerms,
+    coveredTitleTerms,
+    missingImportantTitleTerms,
+    unsupportedTitleTerms,
+    topTenKeywordCoverage: Math.round(topTenCoverage * 100),
+    titleSearchability,
+    warnings: [...warnings, ...titleSearchability.warnings]
+  };
+}
+function rankMetadataGenKeywords(keywords, visualFacts) {
+  const ctx = buildKeywordRoleContext(visualFacts || {});
+  const titleTerms = titleKeywordTerms(visualFacts?.title || visualFacts?.metadata_title);
+  const ranked = keywords.map((keyword, index) => ({
+    keyword,
+    score: scoreKeywordForRanking(keyword, ctx, index, titleTerms)
+  })).sort((a, b) => b.score - a.score).map((item) => item.keyword);
+  return ranked;
+}
+var BUYER_SEARCH_PRIORITY_TERMS = /* @__PURE__ */ new Set([
+  "family",
+  "business",
+  "technology",
+  "healthcare",
+  "education",
+  "finance",
+  "food",
+  "travel",
+  "nature",
+  "lifestyle",
+  "people",
+  "portrait",
+  "office",
+  "home",
+  "work",
+  "team",
+  "meeting",
+  "marketing",
+  "construction",
+  "industry",
+  "agriculture",
+  "farming",
+  "medical",
+  "fitness",
+  "wellness",
+  "background",
+  "texture",
+  "landscape",
+  "city",
+  "architecture",
+  "transportation",
+  "nature",
+  "sustainability",
+  "environment",
+  "celebration",
+  "holiday",
+  "festival"
+]);
+function buyerSearchabilityScore(keyword, role, visualFacts) {
+  const normalized = normalizeAdobeKeyword(keyword);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  let score = 50;
+  if (BUYER_SEARCH_PRIORITY_TERMS.has(normalized)) score += 12;
+  if (words.length === 1) score += 8;
+  if (words.length === 2) score += 10;
+  if (words.length === 3) score += 4;
+  if (words.length > 3) score -= 20;
+  if (role === "main_subject" || role === "subject_variation" || role === "action_state" || role === "environment") {
+    score += 20;
+  }
+  const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+  if (words.every((word) => factsText.includes(word))) score += 10;
+  if (ADOBE_KEYWORD_FILLER.has(normalized)) score -= 40;
+  if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) score -= 40;
+  return Math.max(0, Math.min(100, score));
+}
+var ADOBE_STOCK_MAX_KEYWORDS = 49;
+var ADOBE_STOCK_IDEAL_MIN_KEYWORDS = 15;
+var ADOBE_STOCK_IDEAL_MAX_KEYWORDS = 35;
+var ADOBE_KEYWORD_FILLER = /* @__PURE__ */ new Set([
+  "image",
+  "photo",
+  "picture",
+  "photograph",
+  "stock",
+  "visual",
+  "design",
+  "nice",
+  "beautiful",
+  "amazing",
+  "stunning",
+  "gorgeous",
+  "pretty",
+  "awesome",
+  "perfect",
+  "wonderful",
+  "incredible",
+  "masterpiece",
+  "best",
+  "top",
+  "quality",
+  "high quality",
+  "superb",
+  "fantastic",
+  "lovely",
+  "professional",
+  "focus",
+  "sharp",
+  "blurry",
+  "detail",
+  "composition",
+  "element",
+  "object",
+  "thing",
+  "subject",
+  "generic",
+  "background",
+  "color",
+  "colour",
+  "lifestyle",
+  "adult",
+  "formal",
+  "up",
+  "down",
+  "out",
+  "off",
+  "back",
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "white",
+  "black",
+  "orange",
+  "purple",
+  "pink",
+  "brown",
+  "gray",
+  "grey",
+  "colorful"
+]);
+var ADOBE_KEYWORD_IP_PATTERN = /\b(google|apple|microsoft|amazon|facebook|instagram|youtube|nike|adidas|coca[\s-]?cola|pepsi|disney|netflix|openai|tesla)\b/i;
+var ADOBE_KEYWORD_TECHNICAL_PATTERN = /\b(?:iso|f\/?\d+(?:\.\d+)?|1\/\d+s|\d+(?:\.\d+)?\s*mm|megapixel|megapixels|fps|4k|8k|hd|uhd|jpeg|jpg|png|raw|tiff|psd|ai|eps|svg|mb|gb)\b/i;
+var ADOBE_KEYWORD_NUMBER_PATTERN = /\b\d+(?:\.\d+)?\b/;
+function normalizeAdobeKeyword(value) {
+  return String(value ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+}
+function adobeKeywordCanonical(value) {
+  const normalized = normalizeAdobeKeyword(value);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return words.map((word) => {
+    if (word.endsWith("ies") && word.length > 4) return `${word.slice(0, -3)}y`;
+    if (word.endsWith("es") && word.length > 4) return word.slice(0, -2);
+    if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);
+    return word;
+  }).join(" ");
+}
+var TITLE_STOP_WORDS = /* @__PURE__ */ new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "by",
+  "for",
+  "from",
+  "in",
+  "into",
+  "is",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "with",
+  "without",
+  "near",
+  "over",
+  "under",
+  "during"
+]);
+function titleKeywordTerms(title) {
+  return new Set(
+    normalizeAdobeKeyword(title).split(/\s+/).filter((word) => word.length > 1 && !TITLE_STOP_WORDS.has(word)).map((word) => adobeKeywordCanonical(word))
+  );
+}
+function isAdobeKeywordCompliant(keyword, visualFacts, title) {
+  const normalized = normalizeAdobeKeyword(keyword);
+  if (!normalized || normalized.length < 2) return false;
+  if (ADOBE_KEYWORD_FILLER.has(normalized)) return false;
+  if (isProhibitedKeyword(normalized) || ADOBE_KEYWORD_IP_PATTERN.test(normalized)) return false;
+  if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) return false;
+  if (ADOBE_KEYWORD_NUMBER_PATTERN.test(normalized)) return false;
+  const wordCount = normalized.split(/\s+/).length;
+  if (wordCount > 3) return false;
+  if (wordCount > 1) {
+    const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+    const phraseWords = normalized.split(/\s+/);
+    const allWordsSupported = phraseWords.every((word) => factsText.includes(word));
+    if (!allWordsSupported) return false;
+  }
+  return true;
+}
+function validateAdobeStockKeywords(keywords, visualFacts = {}, title) {
+  const source = Array.isArray(keywords) ? keywords : [];
+  const seen = /* @__PURE__ */ new Set();
+  const valid = [];
+  const removed = [];
+  for (const raw of source) {
+    const keyword = normalizeAdobeKeyword(raw);
+    if (!keyword) continue;
+    const canonical = adobeKeywordCanonical(keyword);
+    if (seen.has(canonical)) {
+      removed.push({ keyword, reason: "duplicate_or_singular_plural_duplicate" });
+      continue;
+    }
+    if (!isAdobeKeywordCompliant(keyword, visualFacts, title)) {
+      removed.push({ keyword, reason: "not_compliant_with_adobe_keyword_rules" });
+      continue;
+    }
+    seen.add(canonical);
+    valid.push(keyword);
+    if (valid.length >= ADOBE_STOCK_MAX_KEYWORDS) break;
+  }
+  const titleTerms = titleKeywordTerms(title);
+  const topTenTitleTerms = [...titleTerms].filter(
+    (term) => valid.slice(0, 10).some((keyword) => adobeKeywordCanonical(keyword).includes(term))
+  );
+  const warnings = [];
+  if (valid.length > ADOBE_STOCK_IDEAL_MAX_KEYWORDS) {
+    warnings.push("More than 35 keywords: review whether lower-ranked terms add real search value.");
+  }
+  if (valid.length < ADOBE_STOCK_IDEAL_MIN_KEYWORDS) {
+    warnings.push("Fewer than 15 keywords: add only additional visually supported terms; never use filler.");
+  }
+  if (titleTerms.size > 0 && topTenTitleTerms.length < Math.min(3, titleTerms.size)) {
+    warnings.push("Important title terms are missing from the first 10 keywords.");
+  }
+  return {
+    valid: removed.length === 0 && valid.length <= ADOBE_STOCK_MAX_KEYWORDS,
+    keywords: valid,
+    removed,
+    warnings,
+    maxKeywords: ADOBE_STOCK_MAX_KEYWORDS,
+    idealRange: [ADOBE_STOCK_IDEAL_MIN_KEYWORDS, ADOBE_STOCK_IDEAL_MAX_KEYWORDS]
+  };
+}
+function ensureKeywordCount(keywords, targetCount, visualFacts, title, description, categoryId, keywordMode) {
+  const requested = Number(targetCount);
+  const target = Math.min(
+    ADOBE_STOCK_MAX_KEYWORDS,
+    Math.max(0, Number.isFinite(requested) ? Math.floor(requested) : 0)
+  );
+  if (!target) return [];
+  const normalizedCandidates = (Array.isArray(keywords) ? keywords : []).filter((value) => typeof value === "string").map(normalizeAdobeKeyword).filter(Boolean).map((keyword) => {
+    return keyword;
+  }).filter((keyword) => isAdobeKeywordCompliant(keyword, visualFacts, title));
+  const validation = validateAdobeStockKeywords(
+    normalizedCandidates,
+    visualFacts,
+    title
+  );
+  const rankingFacts = {
+    ...visualFacts || {},
+    title: title || visualFacts?.title || visualFacts?.metadata_title
+  };
+  const ranked = rankMetadataGenKeywords(
+    validation.keywords.slice(0, target),
+    rankingFacts
+  );
+  const titleTerms = titleKeywordTerms(title);
+  if (titleTerms.size > 0) {
+    const titleMatched = ranked.filter(
+      (keyword) => [...titleTerms].some((term) => adobeKeywordCanonical(keyword).includes(term))
+    );
+    const remaining = ranked.filter((keyword) => !titleMatched.includes(keyword));
+    return [...titleMatched, ...remaining].slice(0, target);
+  }
+  return ranked.slice(0, target);
 }
 function getAIClient() {
   return {
@@ -3374,18 +4032,18 @@ function getAIClient() {
             }
           }
           console.log(`[Gemini Direct Fetch] Calling REST API fallback for model: ${cleanModel}...`);
-          const response2 = await fetch(url, {
+          const response = await fetch(url, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
             },
             body: JSON.stringify(apiPayload)
           });
-          if (!response2.ok) {
-            const errText = await response2.text();
-            throw new Error(`Gemini Direct Fetch Failed (${response2.status}): ${errText}`);
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Gemini Direct Fetch Failed (${response.status}): ${errText}`);
           }
-          const resJson = await response2.json();
+          const resJson = await response.json();
           const text = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
           return {
             text,
@@ -3470,6 +4128,99 @@ function getAIClient() {
     }
   };
 }
+var callOpenAICompatibleWithRetry = async (params, maxAttempts = 3) => {
+  const store = apiKeyStorage.getStore();
+  const provider = store && store.provider || "openai";
+  let apiKey = store && store.apiKey || process.env[PROVIDER_ENV_KEYS[provider]] || "";
+  if (!apiKey) {
+    throw new Error(`API key for provider ${provider} is missing. Please set ${PROVIDER_ENV_KEYS[provider]}.`);
+  }
+  const endpoint = PROVIDER_ENDPOINTS[provider];
+  const modelToUse = params.model || PROVIDER_DEFAULT_MODELS[provider];
+  let messages = [];
+  if (params.systemInstruction) {
+    messages.push({ role: "system", content: params.systemInstruction });
+  }
+  if (typeof params.contents === "string") {
+    messages.push({ role: "user", content: params.contents });
+  } else if (Array.isArray(params.contents)) {
+    let contentParts = [];
+    for (const part of params.contents) {
+      if (part.text) {
+        contentParts.push({ type: "text", text: part.text });
+      } else if (part.inlineData) {
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+        });
+      }
+    }
+    messages.push({ role: "user", content: contentParts.length > 0 ? contentParts : "" });
+  } else if (params.contents && params.contents.parts) {
+    let contentParts = [];
+    for (const part of params.contents.parts) {
+      if (part.text) {
+        contentParts.push({ type: "text", text: part.text });
+      } else if (part.inlineData) {
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+        });
+      }
+    }
+    messages.push({ role: "user", content: contentParts.length > 0 ? contentParts : "" });
+  }
+  const payload = {
+    model: modelToUse,
+    messages,
+    temperature: params.config?.temperature ?? 0.8
+  };
+  if (params.config?.seed !== void 0) {
+    payload.seed = params.config.seed;
+  }
+  if (params.responseMimeType === "application/json" && SUPPORTS_JSON_MODE.has(provider)) {
+    payload.response_format = { type: "json_object" };
+  }
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          ...provider === "openrouter" ? {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "MetaZo"
+          } : {}
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const errObj = data.error || data;
+        const errorMsg = errObj.message || JSON.stringify(errObj);
+        throw new Error(`[${provider.toUpperCase()}] API Error: ${errorMsg}`);
+      }
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        return data.choices[0].message.content;
+      }
+      throw new Error(`[${provider.toUpperCase()}] Unexpected response format: ${JSON.stringify(data)}`);
+    } catch (err) {
+      lastErr = err;
+      if (err.message && (err.message.includes("429") || err.message.includes("rate limit"))) {
+        await new Promise((r) => setTimeout(r, 2e3 * (attempt + 1)));
+        continue;
+      }
+      if (attempt < maxAttempts - 1) {
+        console.warn(`[${provider.toUpperCase()}] Retry ${attempt + 1}/${maxAttempts} due to error: ${err.message}`);
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastErr;
+};
 var callGeminiWithRetry = async (modelName, contents, config, maxAttempts = 3) => {
   let lastError;
   let currentModel = modelName;
@@ -3618,7 +4369,7 @@ function getToolTypeDirectives(toolType) {
       descriptionRule: `- Detail physical realism, authentic human expressions, real-world textures, lighting qualities, and photographic depth of field.
 - MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning photography uses, e.g., "Ideal for commercial advertising, marketing campaigns, editorial web blogs, or social media banner graphics."`,
       risetKeywordRule: `- Conduct deep photographic and real-world concept research: identify visual subjects, authentic expressions, clothing textures, environment details, weather conditions, lighting attributes, and depth of field.
-- Map realistic physical synonyms, human-centric emotional adjectives, and situational contexts.`,
+- Map only natural visual synonyms and clearly supported contexts. Avoid speculative emotional, cultural, industry, or situational expansion.`,
       seoBoostRule: `- Heavily front-load high-converting keywords to capture exact search patterns of commercial buyers.
 - Focus keywords on the actual visual subjects, environments, clothing, emotional expressions, lighting styles (e.g. golden hour, soft studio light), and commercial contexts, while strictly avoiding terms like "photo", "photography", "realistic", "candid", "lifestyle shot", dsb.`,
       prohibitedExemptions: "Keep titles and keywords completely free of photography terms or camera styles, focusing exclusively on visual subject matter and actions."
@@ -3652,534 +4403,36 @@ function buildTieredVisualAnalysis(visualFacts) {
   ];
   return { scene, objects, attributes, concepts };
 }
-function detectAssetSubtype(toolType, visualFacts, customPrompt) {
-  if (toolType === "video" /* VIDEO */) return "video";
-  if (toolType === "vector" /* VECTOR */ || toolType === "vector_eps" /* VECTOR_EPS */) return "vector";
-  const textSignal = `${visualFacts?.understanding_and_context || ""} ${visualFacts?.deeper_meaning_and_symbolism || ""} ${customPrompt || ""}`.toLowerCase();
-  if (/\b(ai[- ]generated|midjourney|synthetic render|generative art|digital synthesis|ai art)\b/.test(textSignal)) return "ai_image";
-  if (/\b(illustration|digital painting|drawn art|cartoon|hand-drawn|painterly|artwork|sketch)\b/.test(textSignal)) return "illustration";
-  return "photo";
-}
-var TITLE_TEMPLATE_LEAD = {
-  photo: ["{subject} in {scene}", "{subject} {action} in {scene}", "Candid photo of {subject} {action} in {scene}"],
-  ai_image: ["AI-generated {subject} in {scene}", "Digital render of {subject} {action}", "Synthetic digital artwork of {subject} in {scene}"],
-  illustration: ["Illustration of {subject} in {scene}", "Hand-drawn {subject} {action}", "Digital illustration depicting {subject} in {scene}"],
-  vector: ["Flat design vector of {subject}", "Minimalist vector illustration of {subject}", "Isometric vector graphic of {subject} for {scene}"],
-  video: ["Cinematic footage of {subject} {action}", "Slow motion shot of {subject} in {scene}", "Aerial drone view of {subject} {action} in {scene}"]
+var MICROSTOCK_EVENT_CALENDAR = {
+  january: ["new year", "new year resolutions", "winter", "back to work"],
+  february: ["valentine's day", "valentine", "lunar new year", "chinese new year", "ramadan"],
+  march: ["international women's day", "st patrick's day", "holi", "ramadan", "eid al-fitr", "spring", "easter preparation"],
+  april: ["easter", "april fools", "earth day", "spring", "songkran"],
+  may: ["eid al-adha", "mothers day", "labor day", "spring", "graduation"],
+  june: ["fathers day", "summer", "pride month", "graduation", "eid al-adha"],
+  july: ["summer", "independence day", "back to school", "travel season"],
+  august: ["back to school", "summer", "independence day", "harvest season"],
+  september: ["back to school", "autumn", "fall", "labor day", "harvest"],
+  october: ["halloween", "autumn", "fall", "breast cancer awareness", "thanksgiving preparation"],
+  november: ["thanksgiving", "black friday", "cyber monday", "christmas preparation", "autumn"],
+  december: ["christmas", "christmas day", "new year", "new year's eve", "hanukkah", "winter", "holiday season"]
 };
-function applyTitleTemplate(subtype, tiers, titleLength) {
-  const subject = tiers.objects[0]?.name || "subject";
-  const scene = tiers.scene[0] || "a professional setting";
-  const action = tiers.attributes.find((a) => typeof a === "string") || "featured prominently";
-  const templates = TITLE_TEMPLATE_LEAD[subtype] || TITLE_TEMPLATE_LEAD.photo;
-  let templateIndex = 1;
-  if (titleLength === "short") templateIndex = 0;
-  else if (titleLength === "long") templateIndex = templates.length - 1;
-  let title = templates[templateIndex].replace("{subject}", subject).replace("{scene}", scene).replace("{action}", action);
-  if (titleLength === "long") {
-    const extraSubjects = tiers.objects.slice(1, 3).map((o) => o.name).filter(Boolean);
-    if (extraSubjects.length) title += ` with ${extraSubjects.join(" and ")}`;
-  }
-  return title;
-}
-function rankAndWeightKeywords(keywords, tiers, targetCount) {
-  if (keywords.length === 0) return keywords;
-  const lower = (s) => s.toLowerCase().trim();
-  const primarySubjects = tiers.objects.filter((o) => o.tier === "primary").map((o) => lower(o.name));
-  const allSubjects = tiers.objects.map((o) => lower(o.name));
-  const attributes = tiers.attributes.map((a) => lower(String(a)));
-  const scene = tiers.scene.map((s) => lower(String(s)));
-  const concepts = tiers.concepts.map((c) => lower(String(c)));
-  const matchesSubject = (kw) => allSubjects.some((s) => s.includes(kw) || kw.includes(s));
-  const matchesAttribute = (kw) => attributes.some((a) => kw.includes(a) || a.includes(kw));
-  const matchesScene = (kw) => scene.some((s) => kw.includes(s) || s.includes(kw));
-  const matchesConcept = (kw) => concepts.some((c) => kw.includes(c) || c.includes(kw));
-  const ACTION_TERMS = /* @__PURE__ */ new Set([
-    "running",
-    "walking",
-    "jumping",
-    "sitting",
-    "standing",
-    "flying",
-    "swimming",
-    "dancing",
-    "holding",
-    "reaching",
-    "lifting",
-    "working",
-    "typing",
-    "driving",
-    "reading",
-    "writing",
-    "cooking",
-    "eating",
-    "drinking",
-    "sleeping",
-    "talking",
-    "laughing",
-    "smiling",
-    "looking",
-    "watching",
-    "listening",
-    "thinking",
-    "playing",
-    "climbing",
-    "falling",
-    "floating",
-    "rising",
-    "flowing",
-    "moving",
-    "growing",
-    "blooming",
-    "shining",
-    "glowing",
-    "reflecting",
-    "spinning",
-    "exercise",
-    "workout",
-    "yoga",
-    "meditation",
-    "training",
-    "practice",
-    "traveling",
-    "exploring",
-    "hiking",
-    "surfing",
-    "cycling",
-    "commuting"
-  ]);
-  const isAction = (kw) => {
-    const w = lower(kw);
-    if (ACTION_TERMS.has(w)) return true;
-    return Array.from(ACTION_TERMS).some((a) => w.includes(a) || a.includes(w));
-  };
-  const TECHNIQUE_TERMS = /* @__PURE__ */ new Set([
-    "watercolor",
-    "oil painting",
-    "sketch",
-    "line art",
-    "vector",
-    "flat design",
-    "3d render",
-    "cinematic",
-    "macro",
-    "close-up",
-    "wide shot",
-    "aerial view",
-    "drone shot",
-    "long exposure",
-    "bokeh",
-    "depth of field",
-    "grainy",
-    "vintage",
-    "retro",
-    "minimalist",
-    "abstract",
-    "geometric",
-    "isometric",
-    "gradient",
-    "monochrome",
-    "black and white",
-    "sepia",
-    "duotone",
-    "vibrant",
-    "pastel",
-    "high contrast",
-    "soft focus",
-    "flat lay",
-    "top view",
-    "panoramic",
-    "portrait orientation",
-    "landscape orientation",
-    "square format",
-    "high key",
-    "low key",
-    "rim lighting",
-    "backlit",
-    "silhouette",
-    "shadow play",
-    "golden hour",
-    "blue hour",
-    "night",
-    "daylight",
-    "natural light",
-    "studio light"
-  ]);
-  const isTechnique = (kw) => {
-    const w = lower(kw);
-    if (TECHNIQUE_TERMS.has(w)) return true;
-    return Array.from(TECHNIQUE_TERMS).some((t) => w.includes(t) || t.includes(w));
-  };
-  const INDUSTRY_TERMS = /* @__PURE__ */ new Set([
-    "healthcare",
-    "medical",
-    "technology",
-    "fintech",
-    "finance",
-    "education",
-    "marketing",
-    "advertising",
-    "real estate",
-    "hospitality",
-    "food industry",
-    "fashion",
-    "beauty",
-    "fitness",
-    "wellness",
-    "automotive",
-    "construction",
-    "agriculture",
-    "manufacturing",
-    "retail",
-    "e-commerce",
-    "entertainment",
-    "media",
-    "publishing",
-    "legal",
-    "insurance",
-    "travel",
-    "tourism",
-    "sustainability",
-    "green energy",
-    "renewable",
-    "corporate",
-    "startup",
-    "nonprofit",
-    "government",
-    "transportation",
-    "logistics",
-    "science",
-    "research"
-  ]);
-  const isIndustry = (kw) => {
-    const w = lower(kw);
-    if (INDUSTRY_TERMS.has(w)) return true;
-    return Array.from(INDUSTRY_TERMS).some((ind) => w.includes(ind) || ind.includes(w));
-  };
-  const USECASE_TERMS = /* @__PURE__ */ new Set([
-    "banner",
-    "landing page",
-    "presentation",
-    "brochure",
-    "flyer",
-    "poster",
-    "social media",
-    "instagram",
-    "facebook",
-    "website",
-    "blog",
-    "magazine",
-    "newsletter",
-    "annual report",
-    "billboard",
-    "packaging",
-    "product label",
-    "app design",
-    "ui design",
-    "wallpaper",
-    "background",
-    "cover photo",
-    "header",
-    "thumbnail",
-    "icon",
-    "logo",
-    "infographic",
-    "editorial",
-    "commercial",
-    "advertisement",
-    "promo",
-    "catalog",
-    "menu",
-    "invitation",
-    "greeting card",
-    "calendar",
-    "textbook",
-    "wall art",
-    "canvas print",
-    "copy space",
-    "text space",
-    "isolated",
-    "template",
-    "mockup"
-  ]);
-  const isUseCase = (kw) => {
-    const w = lower(kw);
-    if (USECASE_TERMS.has(w)) return true;
-    return Array.from(USECASE_TERMS).some((u) => w.includes(u) || u.includes(w));
-  };
-  const COMPOSITION_TERMS = /* @__PURE__ */ new Set([
-    "rule of thirds",
-    "symmetry",
-    "asymmetry",
-    "leading lines",
-    "diagonal",
-    "framing",
-    "negative space",
-    "positive space",
-    "foreground",
-    "background",
-    "midground",
-    "layered",
-    "depth",
-    "perspective",
-    "vanishing point",
-    "balanced",
-    "unbalanced",
-    "centered",
-    "off-center",
-    "isolated subject",
-    "group composition",
-    "single object",
-    "pattern",
-    "texture",
-    "repetition",
-    "contrast",
-    "harmony",
-    "minimal",
-    "clean",
-    "uncluttered",
-    "cluttered",
-    "spacious",
-    "tight crop",
-    "full frame",
-    "environmental portrait"
-  ]);
-  const isComposition = (kw) => {
-    const w = lower(kw);
-    if (COMPOSITION_TERMS.has(w)) return true;
-    return Array.from(COMPOSITION_TERMS).some((c) => w.includes(c) || c.includes(w));
-  };
-  const stages = [
-    { stage: 1, label: "SUBJECT", items: [] },
-    { stage: 2, label: "ACTION", items: [] },
-    { stage: 3, label: "ATTRIBUTE", items: [] },
-    { stage: 4, label: "LOCATION/ENVIRONMENT", items: [] },
-    { stage: 5, label: "CONCEPT", items: [] },
-    { stage: 6, label: "EMOTION", items: [] },
-    { stage: 7, label: "COMMERCIAL USE", items: [] },
-    { stage: 8, label: "SEMANTIC/LONG-TAIL", items: [] }
-  ];
-  const seen = /* @__PURE__ */ new Set();
-  for (const kw of keywords) {
-    const k = lower(kw);
-    if (!k || k.length < 2 || seen.has(k)) continue;
-    seen.add(k);
-    const wordsCount = k.split(/\s+/).length;
-    if (wordsCount >= 2 && !primarySubjects.some((s) => s === k || k === s) && !matchesSubject(k)) {
-      stages[7].items.push(kw);
-      continue;
-    }
-    if (primarySubjects.some((s) => s === k || k === s) || matchesSubject(k) && allSubjects.length > 0) {
-      stages[0].items.push(kw);
-      continue;
-    }
-    if (isAction(k)) {
-      stages[1].items.push(kw);
-      continue;
-    }
-    if (matchesAttribute(k) || isTechnique(k) || isComposition(k)) {
-      stages[2].items.push(kw);
-      continue;
-    }
-    if (matchesScene(k)) {
-      stages[3].items.push(kw);
-      continue;
-    }
-    const EMOTION_TERMS = /* @__PURE__ */ new Set(["happy", "sad", "angry", "joy", "fear", "excited", "stress", "love", "cry", "smile", "laugh", "depressed", "anxious", "peaceful", "calm", "romantic"]);
-    const isEmotion = Array.from(EMOTION_TERMS).some((e) => k.includes(e));
-    if (isEmotion) {
-      stages[5].items.push(kw);
-      continue;
-    }
-    if (matchesConcept(k)) {
-      stages[4].items.push(kw);
-      continue;
-    }
-    if (isIndustry(k) || isUseCase(k)) {
-      stages[6].items.push(kw);
-      continue;
-    }
-    if (wordsCount === 1) {
-      stages[2].items.push(kw);
-    } else {
-      stages[7].items.push(kw);
-    }
-  }
-  const proportions = [
-    0.2,
-    // SUBJECT
-    0.15,
-    // ACTION
-    0.15,
-    // ATTRIBUTE
-    0.1,
-    // LOCATION
-    0.1,
-    // CONCEPT
-    0.1,
-    // EMOTION
-    0.1,
-    // COMMERCIAL
-    0.1
-    // LONG-TAIL
-  ];
-  let allocations = proportions.map((p) => Math.floor(p * targetCount));
-  let currentTotal = allocations.reduce((a, b) => a + b, 0);
-  let remainder = targetCount - currentTotal;
-  for (let i = 0; i < remainder; i++) {
-    allocations[i % allocations.length]++;
-  }
-  const finalResult = [];
-  const excess = [];
-  for (let i = 0; i < stages.length; i++) {
-    const bucket = stages[i].items;
-    const alloc = allocations[i];
-    if (bucket.length <= alloc) {
-      finalResult.push(...bucket);
-      allocations[i] -= bucket.length;
-    } else {
-      finalResult.push(...bucket.slice(0, alloc));
-      excess.push(...bucket.slice(alloc));
-      allocations[i] = 0;
-    }
-  }
-  let shortfall = targetCount - finalResult.length;
-  if (shortfall > 0 && excess.length > 0) {
-    const extraToTake = Math.min(shortfall, excess.length);
-    finalResult.push(...excess.slice(0, extraToTake));
-  }
-  shortfall = targetCount - finalResult.length;
-  if (shortfall > 0) {
-    const generatedPool = new Set(finalResult.map((k) => k.toLowerCase()));
-    const baseSubject = stages[0].items[0] || "element";
-    for (let i = 0; i < stages[2].items.length && shortfall > 0; i++) {
-      const combo = baseSubject + " " + stages[2].items[i];
-      if (!generatedPool.has(combo)) {
-        finalResult.push(combo);
-        generatedPool.add(combo);
-        shortfall--;
-      }
-    }
-    for (let i = 0; i < stages[1].items.length && shortfall > 0; i++) {
-      const combo = stages[1].items[i] + " " + baseSubject;
-      if (!generatedPool.has(combo)) {
-        finalResult.push(combo);
-        generatedPool.add(combo);
-        shortfall--;
-      }
-    }
-    const desperateFallback = ["digital", "visual", "composition", "image", "picture", "color", "detail", "focus", "format", "style"];
-    for (let i = 0; i < desperateFallback.length && shortfall > 0; i++) {
-      if (!generatedPool.has(desperateFallback[i])) {
-        finalResult.push(desperateFallback[i]);
-        generatedPool.add(desperateFallback[i]);
-        shortfall--;
-      }
-    }
-  }
-  if (primarySubjects.length > 0 && finalResult.length > 0) {
-    const mainSubj = primarySubjects[0];
-    const idx = finalResult.findIndex((k) => lower(k) === mainSubj || lower(k).includes(mainSubj) || mainSubj.includes(lower(k)));
-    if (idx > 0) {
-      const [main] = finalResult.splice(idx, 1);
-      finalResult.unshift(main);
-    } else if (idx === -1 && mainSubj.length > 1) {
-      finalResult.pop();
-      finalResult.unshift(mainSubj);
-    }
-  }
-  return finalResult;
-}
-var SYNONYM_MAP = {
-  "car": ["automobile", "vehicle", "automotive"],
-  "phone": ["smartphone", "mobile phone", "cellular phone", "mobile device"],
-  "lift": ["elevator"],
-  "sidewalk": ["pavement", "walkway"],
-  "doctor": ["physician", "healthcare worker", "medical professional"],
-  "shop": ["store", "retail outlet", "boutique"],
-  "computer": ["laptop", "pc", "workstation", "digital device"],
-  "big": ["large", "huge", "massive"],
-  "small": ["compact", "miniature", "tiny"],
-  "old": ["aged", "vintage", "retro", "antique"],
-  "new": ["modern", "contemporary", "futuristic"],
-  "work": ["job", "career", "employment", "business"],
-  "home": ["house", "residence", "residential"],
-  "city": ["urban", "metropolitan", "downtown"],
-  "nature": ["natural", "outdoors", "environment", "eco"],
-  "food": ["cuisine", "meal", "dish", "refreshment"],
-  "money": ["finance", "currency", "capital", "wealth", "cash"],
-  "idea": ["concept", "notion", "thought", "solution"],
-  "fast": ["quick", "rapid", "speedy", "express"],
-  "happy": ["joyful", "cheerful", "delighted", "smiling"],
-  "autumn": ["fall", "autumnal"],
-  "fall": ["autumn", "autumnal"],
-  "trolley": ["shopping cart", "cart"],
-  "subway": ["underground", "metro", "transit"],
-  "trash": ["garbage", "rubbish", "waste"],
-  "copyspace": ["copy space", "text space", "blank space"]
-};
-function expandSynonymsAndLongTail(keywords, tiers, maxNew) {
-  if (maxNew <= 0) return [];
-  const existing = new Set(keywords.map((k) => k.toLowerCase()));
-  const expansions = [];
-  keywords.forEach((k) => {
-    const syns = SYNONYM_MAP[k.toLowerCase()];
-    if (syns) {
-      syns.forEach((s) => {
-        if (!existing.has(s)) {
-          expansions.push(s);
-          existing.add(s);
-        }
-      });
-    }
-  });
-  const primarySubject = tiers.objects[0]?.name;
-  if (primarySubject) {
-    const modifiers = [...tiers.attributes.slice(0, 4), ...tiers.scene.slice(0, 3)];
-    modifiers.forEach((mod) => {
-      const phrase = `${primarySubject.toLowerCase()} ${String(mod).toLowerCase()}`.trim();
-      if (!existing.has(phrase) && phrase.split(/\s+/).length <= 4 && phrase.split(/\s+/).length >= 2) {
-        expansions.push(phrase);
-        existing.add(phrase);
-      }
-    });
-  }
-  return expansions.slice(0, maxNew);
-}
-var MARKETPLACE_BANNED_TERMS = /* @__PURE__ */ new Set([
-  // Klaim superlatif/marketing yang tidak dapat diverifikasi (ditolak kedua marketplace)
-  "best",
-  "no1",
-  "number one",
-  "cheapest",
-  "guaranteed",
-  "free download",
-  "miracle",
-  // Klaim medis/kesehatan yang tidak boleh diklaim aset stok
-  "cures",
-  "cure for",
-  "anti-aging miracle",
-  // Penanda konten eksplisit/dewasa (ditolak otomatis oleh moderasi Adobe/Shutterstock)
-  "nude",
-  "nsfw",
-  "explicit content",
-  // Spam call-to-action yang tidak relevan sebagai keyword visual
-  "download now",
-  "click here",
-  "subscribe now",
-  "like and share"
-]);
-function violatesMarketplaceGuidelines(keyword) {
-  const lower = keyword.toLowerCase().trim();
-  if (!lower) return true;
-  if (isProhibitedKeyword(lower)) return true;
-  if (MARKETPLACE_BANNED_TERMS.has(lower)) return true;
-  if (Array.from(MARKETPLACE_BANNED_TERMS).some((term) => lower.includes(term))) return true;
-  if (lower.split(/\s+/).length > 4) return true;
-  return false;
-}
-function filterBannedKeywords(keywords) {
-  return keywords.filter((k) => !violatesMarketplaceGuidelines(k));
+function getSeasonalEventKeywordContext(metadataLanguage) {
+  const now = /* @__PURE__ */ new Date();
+  const month = now.toLocaleString("en-US", { month: "long" }).toLowerCase();
+  const events = MICROSTOCK_EVENT_CALENDAR[month] || [];
+  const language = getLanguageName(metadataLanguage);
+  return `
+12. CONCEPT & EVENT CALENDAR (Seasonal Microstock Demand):
+   - Current calendar month: ${month}.
+   - Relevant seasonal/event themes for this period: ${events.join(", ")}.
+   - Use event/season keywords ONLY when the AI Vision detects clear visual evidence, symbols, decorations, colors, text, costumes, objects, or unmistakable thematic cues for that event/season.
+   - For explicit holiday/event assets, event names such as "christmas", "christmas decoration", "halloween", "valentine's day", etc. are valid high-value CONCEPT/EVENT keywords when visually supported.
+   - Do not infer an event merely because it is on the calendar. A generic winter scene is not automatically Christmas; a red/green object is not automatically Christmas.
+   - Distinguish EVENT from generic CONCEPT: event = a named calendar occasion; concept = the broader idea communicated by the asset.
+   - If an asset clearly represents a future seasonal event even outside the current month (for example a Christmas asset uploaded in August), the event may still be used because the asset itself is the evidence.
+   - Do not add country-specific holidays unless the visual evidence supports the specific cultural event.
+   - Output keywords in ${language}; preserve established English event names when they are the natural stock-search term.`;
 }
 function stemWord(word) {
   const w = word.toLowerCase();
@@ -4192,77 +4445,366 @@ function stemWord(word) {
 }
 function sanitizeForIndexing(kw) {
   if (!kw) return "";
-  let clean = kw.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ").trim();
-  const stopWords = /* @__PURE__ */ new Set(["a", "an", "the", "at", "in", "on", "of", "to", "by", "is", "it", "or", "and", "as", "for", "with"]);
-  const words = clean.split(" ").filter((w) => w.length >= 2 && !stopWords.has(w));
+  let clean = kw.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  const words = clean.split(" ").filter((w) => w.length >= 2);
   return words.join(" ");
 }
 function semanticKeySignature(phrase) {
   return phrase.toLowerCase().split(/\s+/).filter((w) => !["a", "an", "the", "at", "in", "on", "of"].includes(w)).map(stemWord).sort().join(" ");
 }
 function semanticDeduplicate(keywords) {
-  const seenSignatures = /* @__PURE__ */ new Set();
   const result = [];
-  for (const kw of keywords) {
-    const sig = semanticKeySignature(kw);
-    if (!sig || seenSignatures.has(sig)) continue;
-    seenSignatures.add(sig);
-    result.push(kw);
+  const seenSignatures = /* @__PURE__ */ new Set();
+  const familyCanonical = {
+    xmas: "christmas",
+    "newyear": "new year",
+    decor: "decoration",
+    decorative: "decoration",
+    golden: "gold",
+    elegance: "elegant",
+    glossy: "shiny",
+    seasonal: "holiday"
+  };
+  const canonicalize = (phrase) => {
+    const words = phrase.toLowerCase().split(/\s+/).map((w) => familyCanonical[w] || w);
+    return words.join(" ").replace(/\s+/g, " ").trim();
+  };
+  const familyKeys = /* @__PURE__ */ new Set();
+  for (const raw of keywords) {
+    const kw = sanitizeForIndexing(raw);
+    if (!kw) continue;
+    const canonical = canonicalize(kw);
+    const signature = semanticKeySignature(canonical);
+    if (!signature || seenSignatures.has(signature)) continue;
+    const familyKey = canonical.split(/\s+/).map((w) => familyCanonical[w] || w).join(" ");
+    if (familyKeys.has(familyKey)) continue;
+    seenSignatures.add(signature);
+    familyKeys.add(familyKey);
+    result.push(canonical);
   }
-  return result;
+  const multiWord = result.filter((k) => k.includes(" "));
+  const phraseFiltered = result.filter((k) => {
+    if (k.includes(" ")) return true;
+    return !multiWord.some((phrase) => {
+      const words = phrase.split(/\s+/);
+      if (words.length < 2 || !words.includes(k)) return false;
+      const preserve = /* @__PURE__ */ new Set(["gold", "white", "black", "blue", "red", "green", "brown", "silver", "ceramic", "porcelain", "wood", "metal"]);
+      return !preserve.has(k);
+    });
+  });
+  return capSynonymClusters(phraseFiltered);
 }
-function determineAccurateCategory(title, keywords, visualFacts, aiSuggestedCategoryId) {
-  const heuristic = getHeuristicCategories(title, keywords);
-  const aiSemantic = visualFacts?.semantic_category_analysis;
-  const aiCatId = Number(aiSemantic?.adobe_id) || Number(aiSuggestedCategoryId) || 0;
-  let finalCatId = heuristic.category_id;
-  let confidence = 0.6;
-  let reason = "Ditentukan melalui pencocokan pola judul/keyword berbobot (heuristik).";
-  if (aiCatId >= 1 && aiCatId <= 21) {
-    if (aiCatId === heuristic.category_id) {
-      finalCatId = aiCatId;
-      confidence = 0.95;
-      reason = "Analisis semantik visual AI dan heuristik keyword/judul sepakat.";
-    } else if (aiSemantic?.reason && String(aiSemantic.reason).trim().length > 10) {
-      finalCatId = aiCatId;
-      confidence = 0.75;
-      reason = String(aiSemantic.reason);
-    } else {
-      confidence = 0.55;
+var KEYWORD_SYNONYM_CLUSTERS = [
+  ["office", "business", "corporate", "workspace", "administrative", "clerical", "bureaucracy", "paperwork", "form", "application", "service", "client"],
+  ["reception", "lobby", "waiting room", "waiting", "foyer"],
+  ["interview", "consultation", "meeting", "appointment", "candidate"],
+  ["calm", "quiet", "peaceful", "serene", "tranquil"],
+  ["patience", "anticipation", "expectation"]
+];
+var MAX_KEEP_PER_CLUSTER = 3;
+function capSynonymClusters(keywords) {
+  const dropIndices = /* @__PURE__ */ new Set();
+  for (const cluster of KEYWORD_SYNONYM_CLUSTERS) {
+    const clusterSet = new Set(cluster);
+    const matches = [];
+    keywords.forEach((kw, idx) => {
+      if (clusterSet.has(kw)) matches.push(idx);
+    });
+    if (matches.length > MAX_KEEP_PER_CLUSTER) {
+      matches.slice(MAX_KEEP_PER_CLUSTER).forEach((idx) => dropIndices.add(idx));
     }
   }
-  return {
-    category_id: finalCatId,
-    shutterstock_category_1: aiSemantic?.shutterstock_category_1 && String(aiSemantic.shutterstock_category_1).trim() || heuristic.shutterstock_category_1,
-    shutterstock_category_2: aiSemantic?.shutterstock_category_2 && String(aiSemantic.shutterstock_category_2).trim() || heuristic.shutterstock_category_2,
-    confidence,
-    reason
-  };
+  if (dropIndices.size === 0) return keywords;
+  return keywords.filter((_, idx) => !dropIndices.has(idx));
 }
-function validateFinalMetadata(data, targetKeywordCount, titleLength, validShutterstockCats) {
-  const errors = [];
-  const warnings = [];
-  const titleLen = (data.title || "").length;
-  const maxLen = titleLength === "short" ? 65 : 200;
-  if (titleLen === 0) errors.push("Title kosong.");
-  if (titleLen > maxLen) errors.push(`Title melebihi batas ${maxLen} karakter (aktual: ${titleLen}).`);
-  if (titleLength === "long" && titleLen < 40) warnings.push('Title mode "long" namun cukup pendek (<40 karakter).');
-  const kwCount = Array.isArray(data.keywords) ? data.keywords.length : 0;
-  if (kwCount === 0) errors.push("Tidak ada keyword yang dihasilkan.");
-  if (kwCount !== targetKeywordCount) warnings.push(`Jumlah keyword (${kwCount}) tidak persis sama dengan target (${targetKeywordCount}).`);
-  if (Array.isArray(data.keywords) && data.keywords.length > 5) {
-    const uniqueRatio = new Set(data.keywords.map((k) => k.toLowerCase())).size / data.keywords.length;
-    if (uniqueRatio < 0.9) warnings.push("Terindikasi duplikasi keyword tersembunyi (uniqueRatio rendah).");
+var UNIVERSAL_KEYWORD_SPECIFICATION = `
+UNIVERSAL MICROSTOCK KEYWORD SPECIFICATION \u2014 APPLY IDENTICALLY TO EVERY PROVIDER AND MODEL
+
+ROLE:
+You are an expert AI Vision + Microstock Keyword Specialist.
+
+PRIMARY OBJECTIVE:
+Look at the actual asset first, understand it like a human stock contributor, then produce the most useful keywords for that exact asset. The keyword list must describe the asset naturally and help a real buyer find it.
+
+1. AI VISION IS THE SOURCE OF TRUTH
+- Carefully inspect the complete asset from edge to edge.
+- Understand the dominant visual subject before thinking about SEO.
+- Every keyword must be supported by the supplied visual evidence or by a directly supported, natural search phrase.
+- Never invent objects, people, places, materials, actions, professions, events, emotions, brands, names, industries, audiences, or use cases.
+
+2. MAIN SUBJECT FIRST \u2014 THIS IS THE CORE ORDER
+- Identify the MAIN SUBJECT that is visually dominant, central, distinctive, or most important to the asset.
+- The strongest Main Subject keyword MUST appear first whenever it is a valid keyword.
+- After the Main Subject, add useful specific descriptions of that subject, natural subject variations, and closely related visible details.
+- Then add important secondary subjects and supporting objects.
+- Only after the important subjects are covered should the list expand into setting, action/state, visual attributes, seasonal context, concepts, and genuinely useful search intent.
+- Never force this order when the image itself clearly makes another subject more important. AI Vision decides the hierarchy.
+
+3. NATURAL MICROSTOCK KEYWORD ORDER
+Use this hierarchy as a priority, NOT as fixed slots:
+MAIN SUBJECT \u2192 SPECIFIC MAIN SUBJECT \u2192 SECONDARY SUBJECTS \u2192 SUPPORTING OBJECTS \u2192 SETTING/CONTEXT \u2192 ACTION/STATE \u2192 VISUAL ATTRIBUTES \u2192 SEASON/EVENT \u2192 CONCEPT \u2192 USE/SEARCH INTENT.
+- The list must remain natural.
+- Do not reserve percentages or quotas for any category.
+- Do not deliberately spread keywords across categories.
+- The best relevant keyword wins the next position.
+
+4. SEARCH INTENT
+- Think like a real stock buyer searching for this exact visual.
+- Prefer normal buyer-facing words and natural short phrases.
+- Search intent may improve wording, but it can NEVER override visual truth.
+- Do not add generic SEO words such as marketing, business, website, advertising, lifestyle, or social media unless the visual genuinely supports that search intent.
+
+5. SINGLE WORDS AND PHRASES
+- Use single words when they are the strongest natural term.
+- Use 2-3 word phrases when the phrase is more specific and useful intact.
+- Prefer \u201Cramadan lanterns\u201D over splitting the meaning when that phrase is a natural description.
+- Never manufacture awkward keyword combinations.
+- Never use full sentences.
+
+6. SEMANTIC EXPANSION
+- Expand only from meanings already established by AI Vision.
+- Natural synonyms and specific variations are allowed when they provide real search value.
+- Do not create synonym spam such as multiple nearly identical variants simply to increase count.
+- A longer keyword is valid only when it adds meaningful specificity.
+
+7. COLOR CONTROL
+- Use a maximum of 1\u20132 color keywords in the final list.
+- Choose only the most visually important/useful colors.
+- Never fill the keyword list with many shades or redundant color variants.
+
+8. COMMERCIAL VALUE
+- Commercial usefulness is an enrichment signal, not a license to hallucinate.
+- Prefer concrete subject relevance over vague marketing language.
+- Do not manufacture buyer use cases.
+
+9. IP / NAMES
+- Never include brands, trademarks, company names, product names, celebrities, fictional characters, artists, protected creative works, or other identifying names.
+
+10. FORMAT
+- Follow the selected keyword mode.
+- Final keywords must be lowercase.
+- Remove duplicates and semantic duplicates.
+- Do not include media-type filler such as photo, image, picture, stock, vector, or illustration unless explicitly allowed by the asset/platform rules.
+
+11. FINAL SELF-AUDIT
+Before returning the list, check every keyword:
+- Is it supported by the asset?
+- Is it useful for finding this exact asset?
+- Is it more useful than a weaker generic alternative?
+- Is it redundant?
+- Is it speculative?
+- Does its position make sense compared with the Main Subject?
+Remove weak, unrelated, or spammy terms.
+
+11A. ADOBE STOCK COMPLIANCE
+- Maximum 49 keywords per asset.
+- 15\u201335 keywords is a practical target range when the asset genuinely supports that many.
+- Never add filler just to reach 15, 35, or any requested count.
+- The first 10 keywords must carry the strongest relevance.
+- Important words/concepts from the title should appear within the first 10 when relevant.
+- Use one metadata language consistently.
+- Use each keyword only once; singular/plural variants do not need separate entries.
+- Avoid trademarks, brands, product names, artist names, celebrities, private-person names,
+  government agency names, and third-party intellectual property.
+- Avoid camera specifications, file formats, file sizes, numbers, and technical capture data.
+- Prefer concise concepts. Do not create long descriptive sentences as keywords.
+- Do not keyword speculative uses, audiences, industries, locations, demographics, or concepts.
+- Do not use background details that are irrelevant to a buyer.
+- Do not use opposite concepts unless both are genuinely represented and meaningful.
+- Prefer specific visual terms over vague broader terms when both compete for a position.
+
+12. EXACT COUNT
+The requested count is mandatory.
+- If the user requests 10, return exactly the 10 strongest valid keywords.
+- If the user requests 25, return exactly the 25 strongest valid keywords.
+- If the user requests 40, return exactly the 40 strongest valid keywords.
+- If the user requests more than 49, cap the output at 49.
+- Never use filler merely to hit the number.
+- If the first generation is short, perform another AI generation pass using the same VISUAL_FACTS and ask only for additional valid keywords that have not already been represented.
+- Re-rank the complete candidate list after expansion.
+
+12B. BUYER SEARCH LANGUAGE / SEO
+- Write metadata in the natural vocabulary a stock buyer would type into search.
+- Prefer concrete nouns, observable actions, settings, subjects, and commercially recognizable concepts.
+- Prefer common searchable wording over literary, poetic, clever, or unnecessarily technical language.
+- Use the most specific common term supported by the visual asset; do not use obscure synonyms only for SEO.
+- Do not repeat the same concept through unnecessary synonyms or keyword stuffing.
+- Title should read naturally as a human search-relevant description, not as a keyword list.
+- Keyword order must reflect buyer search priority: what is shown first and what buyers are most likely to search for.
+- SEO must never override visual accuracy. A high-search-volume term that is not visibly supported must be rejected.
+- Avoid speculative buyer intent such as "copy space", "advertising", "banner", "website", "social media", "marketing" unless the visual composition or concept clearly supports it.
+- Use commercially useful concepts only when they are visually defensible.
+
+12A. TITLE \u2194 KEYWORD CONSISTENCY
+- The title is the semantic anchor for the keyword set, not a separate SEO field.
+- Important title concepts should be represented in the first 10 keywords when visually supported.
+- Do not force every title word into keywords; grammatical filler words do not count.
+- A title term that is not visually supported must be removed or rewritten rather than compensated for with keywords.
+- Keywords must not introduce a major subject that contradicts or materially changes the title.
+- Title and keywords must describe the same asset, subject, action, setting, and visual context.
+- When title and keywords disagree, prefer VISUAL_FACTS and correct the metadata rather than inventing evidence.
+
+13. PROVIDER CONSISTENCY
+The same keyword philosophy applies to Gemini, GPT, Mistral, Claude, Llama, Groq, OpenRouter, NVIDIA, or any other provider. The provider may phrase a keyword differently, but Main Subject priority, visual accuracy, natural ordering, and exact count remain mandatory.
+`;
+async function expandKeywordsWithAI(existingKeywords, visualFacts, targetCount, provider, model, keywordMode, metadataLanguage) {
+  const current = ensureKeywordCount(existingKeywords, targetCount, visualFacts, void 0, void 0, void 0, keywordMode);
+  if (current.length >= targetCount) return current;
+  const modeRule = keywordMode === "single" ? 'STRICTLY SINGLE WORDS ONLY (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. Separate concepts like "coffee cup" into "coffee" and "cup".' : keywordMode === "multi" ? "Every keyword MUST be a natural 2-5 word phrase. NO single words." : "Use a balanced mix of natural single words and 2-5 word search phrases. DO NOT unnecessarily split compound phrases that are naturally searched together.";
+  const language = getLanguageName(metadataLanguage);
+  let candidates = [...current];
+  for (let pass = 0; pass < 6 && candidates.length < targetCount; pass++) {
+    const needed = Math.min(30, Math.max(10, targetCount - candidates.length + 8));
+    const expansionSystem = `${UNIVERSAL_KEYWORD_SPECIFICATION}
+
+EXPANSION PASS:
+The first keyword generation pass produced ${candidates.length} valid keywords but the target is ${targetCount}.
+Generate ${needed} ADDITIONAL candidate keywords that are genuinely supported by VISUAL_FACTS.
+Do not repeat existing keywords. Continue from the existing Main Subject hierarchy. First look for missing specific Main Subject
+terms or natural subject phrases, then missing important secondary/supporting subjects, then setting,
+action/state, visual attributes, seasonal context, supported concepts, and realistic buyer search intent.
+Do not invent anything merely to reach the count.
+${modeRule}
+Output keywords in ${language}. Return JSON only in this form: {"keywords":["keyword 1","keyword 2"]}`;
+    const contentsText = `VISUAL_FACTS:
+${JSON.stringify(visualFacts, null, 2)}
+
+EXISTING KEYWORDS:
+${JSON.stringify(candidates)}
+
+Generate only NEW, evidence-backed candidates.`;
+    try {
+      let raw;
+      if (NON_GEMINI_PROVIDERS.has(provider)) {
+        raw = await callOpenAICompatibleWithRetry({
+          systemInstruction: expansionSystem,
+          contents: contentsText,
+          responseMimeType: "application/json",
+          config: { temperature: 0.15, topP: 0.8 },
+          model
+        });
+      } else {
+        raw = await callGeminiWithRetry(
+          model && model.startsWith("gemini-") ? model : "gemini-3.1-flash-lite-preview",
+          { parts: [{ text: contentsText }] },
+          {
+            systemInstruction: expansionSystem,
+            responseMimeType: "application/json",
+            temperature: 0.15,
+            topP: 0.8
+          }
+        );
+      }
+      const parsed = JSON.parse(extractJSON(typeof raw === "string" ? raw : raw?.text || "{}"));
+      const additions = Array.isArray(parsed?.keywords) ? parsed.keywords : [];
+      if (!additions.length) break;
+      const expandedPool = buildMasterKeywordCandidatePool(
+        [...candidates, ...additions],
+        visualFacts,
+        targetCount
+      );
+      candidates = ensureKeywordCount(
+        expandedPool,
+        targetCount,
+        visualFacts,
+        void 0,
+        void 0,
+        void 0,
+        keywordMode
+      );
+    } catch (err) {
+      console.warn(`[Keyword Expansion] Pass ${pass + 1} failed for ${provider}/${model}:`, err?.message || err);
+      break;
+    }
   }
-  const bannedFound = (Array.isArray(data.keywords) ? data.keywords : []).filter((k) => violatesMarketplaceGuidelines(k));
-  if (bannedFound.length > 0) errors.push(`Keyword melanggar pedoman marketplace: ${bannedFound.join(", ")}`);
-  const catId = Number(data.category_id);
-  if (isNaN(catId) || catId < 1 || catId > 21) errors.push("category_id di luar rentang valid (1-21).");
-  if (!validShutterstockCats.includes(data.shutterstock_category_1)) errors.push("shutterstock_category_1 tidak valid untuk platform ini.");
-  if (!validShutterstockCats.includes(data.shutterstock_category_2)) errors.push("shutterstock_category_2 tidak valid untuk platform ini.");
-  if (data.shutterstock_category_1 === data.shutterstock_category_2) warnings.push("shutterstock_category_1 dan shutterstock_category_2 identik.");
-  return { valid: errors.length === 0, errors, warnings };
+  return candidates;
 }
+async function applyMetadataGenKeywordLogic(options) {
+  const {
+    rawKeywords,
+    visualFacts,
+    targetCount,
+    provider,
+    model,
+    keywordMode,
+    metadataLanguage
+  } = options;
+  const cleaned = [];
+  const source = Array.isArray(rawKeywords) ? rawKeywords : [];
+  for (const raw of source) {
+    if (typeof raw !== "string") continue;
+    const phrase = raw.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ");
+    if (phrase.length <= 1) continue;
+    if (!isProhibitedKeyword(phrase)) {
+      cleaned.push(phrase);
+    }
+  }
+  const rankingFacts = {
+    ...visualFacts || {},
+    title: visualFacts?.title || visualFacts?.metadata_title || ""
+  };
+  const masterPool = buildMasterKeywordCandidatePool(cleaned, rankingFacts, targetCount);
+  let finalKeywords = ensureKeywordCount(
+    masterPool,
+    targetCount,
+    rankingFacts,
+    rankingFacts.title,
+    void 0,
+    void 0,
+    keywordMode
+  );
+  if (finalKeywords.length < targetCount) {
+    finalKeywords = await expandKeywordsWithAI(
+      finalKeywords,
+      visualFacts,
+      targetCount,
+      provider,
+      model,
+      keywordMode,
+      metadataLanguage
+    );
+  }
+  return finalKeywords.slice(0, targetCount);
+}
+var UNIVERSAL_KEYWORD_RULES = `
+You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine.
+
+CRITICAL ARCHITECTURE \u2014 8-TIER COGNITIVE KEYWORD PIPELINE:
+You MUST construct metadata through these 8 structured cognitive steps rather than generating a random list of words:
+
+1. VISUAL DETECTION:
+   - Identify the exact primary objects and core subject matter visibly present in the frame.
+
+2. SUBJECT RANKING:
+   - Rank detected subjects by visual dominance, focal sharpness, and hierarchy (Main Subject > Secondary Objects > Background Elements).
+   - Place the highest-ranked subjects at the very beginning of the keyword list.
+
+3. RELATIONSHIP & INTERACTION:
+   - Identify how subjects interact with each other and their props (actions, gestures, physical contact, poses, active verbs).
+
+4. ENVIRONMENT & SETTING:
+   - Identify the specific location, scene, or environment (indoor, outdoor, studio, office, nature, urban, workspace).
+
+5. VISUAL ATTRIBUTES & LIGHTING:
+   - Detail tangible attributes: material, texture, condition, shape, physical position, angle, and lighting atmosphere (soft light, studio lighting, golden hour).
+
+6. GROUNDED CONCEPTS:
+   - Extract only high-value conceptual themes that are GENUINELY and directly supported by visual evidence (e.g. teamwork, sustainability, wellness, innovation). Never hallucinate unsupported concepts.
+
+7. COMMERCIAL INTENT:
+   - Identify how commercial buyers and designers will search for and use this asset (advertising, marketing, UI header, poster, banner template, editorial).
+
+8. SEO RANKING & FRONT-LOADING:
+   - Front-load the most crucial keywords at the front:
+     [Exact Main Subject] -> [Relationship/Action] -> [Visual Attributes/Materials] -> [Environment] -> [Grounded Concept] -> [Commercial Intent].
+
+STRICT NEGATIVE FILTERS:
+- NO OVERLY GENERIC FILLERS: Eliminate "image", "photo", "picture", "element", "object", "thing", "generic", "background".
+- NO STANDALONE COLORS AS PRIMARY: Do not use standalone color words (e.g. "red", "blue") as primary keywords.
+- ZERO TOLERANCE FOR SUBJECTIVE WORDS: Strictly forbid "beautiful", "amazing", "stunning", "gorgeous", "pretty", "nice", "awesome", "perfect", "high quality", "best".
+- ELIMINATE UNRELATED / SPAM KEYWORDS: Zero tolerance for keywords not directly tied to the visual evidence.
+- FORMAT: Lowercase, comma-separated, matching the requested count, output strictly in the requested language.
+`;
 var generateStockMetadata = async (frames, keywordCount, customPrompt = "", toolType = "image" /* IMAGE */, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata) => {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
@@ -4286,175 +4828,31 @@ Berikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan Exif
 \`\`\`json
 ${JSON.stringify(exifMetadata, null, 2)}
 \`\`\`
-Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+Gunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temuan visual. Jangan memasukkan GPS, tanggal, software, kamera, lensa, atau detail EXIF lain ke title, description, atau keywords kecuali detail tersebut terlihat jelas atau memang relevan secara editorial.`;
   }
-  const targetCount = keywordCount ? parseInt(String(keywordCount), 10) || 25 : 25;
-  const aiRequestCount = targetCount + 10;
+  const requestedKeywordCount = parseInt(String(keywordCount), 10) || 25;
+  const targetCount = Math.min(ADOBE_STOCK_MAX_KEYWORDS, Math.max(0, requestedKeywordCount));
   const directives = getToolTypeDirectives(toolType);
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-KEYWORD #1 MUST BE THE EXACT MAIN SUBJECT (SUBJEK VISUAL UTAMA OF THE ASSET) \u2014 Keyword #1 MUST explicitly name the primary subject noun or compound phrase (e.g. 'cat', 'vintage car', 'borobudur temple', 'laptop', 'coffee cup'). NEVER put background elements, lighting, or generic terms as Keyword #1.
-MUST-1. Directly describe the visible subject \u2014 DO NOT generalize.
-MUST-2. Describe the main action \u2014 capture what the subject(s) are actively doing.
-MUST-3. Include specific objects \u2014 name every distinct, identifiable object visible.
-MUST-4. Include the strongest visual context \u2014 environment, setting, background, lighting.
-MUST-5. Represent the primary commercial concept \u2014 what would a buyer realistically search?
-MUST-6. Be 100% highly relevant to the actual asset \u2014 every keyword MUST have a direct visual connection.
-MUST-7. Avoid generic filler words AND avoid overloading the list with broad buzzwords ("object", "item", "thing", "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative") unless genuinely one of the strongest descriptors of THIS asset \u2014 keep such broad terms to a small minority; prioritize concrete, specific, literally-visible terms.
-MUST-8. Avoid duplicates and near-duplicates \u2014 NEVER repeat root concepts ("person" AND "people", "run" AND "running").
-MUST-9. Never invent unseen attributes \u2014 if it is NOT visible in the asset, DO NOT include it.
-MUST-10. Never prioritize a keyword merely because it sounds popular \u2014 relevance to actual visual content ALWAYS beats search volume.
-
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
-   - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule}
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance \u2014 WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms \u2014 only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last \u2014 all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP \u2014 MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset \u2014 e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" \u2014 unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short \u2014 a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === "single") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-1. Directly describe the visible subject.
-MUST-2. Describe the main action.
-MUST-3. Include specific objects.
-MUST-4. Include the strongest visual context (environment, setting, lighting).
-MUST-5. Represent the primary commercial concept.
-MUST-6. Be 100% relevant to the actual asset.
-MUST-7. Avoid generic filler words AND avoid overloading the list with broad buzzwords ("object", "item", "thing", "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative") unless genuinely one of the strongest descriptors of THIS asset \u2014 keep such broad terms to a small minority; prioritize concrete, specific, literally-visible terms.
-MUST-8. Avoid duplicates and near-duplicates.
-MUST-9. Never invent unseen attributes.
-MUST-10. Never prioritize popularity over relevance.
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is SINGLE-WORD mode, ensure any keyword phrase is split or shortened into a single word.
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance \u2014 WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms \u2014 only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last \u2014 all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP \u2014 MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset \u2014 e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" \u2014 unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short \u2014 a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+SINGLE-KEYWORD MODE OVERRIDE:
+Generate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === "multi") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `TOP 10 KEYWORDS MUST (PRIORITY OVER ALL OTHER RULES):
-MUST-0. 100% VISUAL RELEVANCE: Every single keyword MUST be visible in or directly derived from the actual visual asset. If a keyword is not literally visible or conceptually tied to the scene, DO NOT include it. Buyer trust and Adobe Stock curation depend on accurate, truthful keywords. NO HALLUCINATED TERMS.
-MUST-1. Directly describe the visible subject.
-MUST-2. Describe the main action.
-MUST-3. Include specific objects.
-MUST-4. Include the strongest visual context (environment, setting, lighting).
-MUST-5. Represent the primary commercial concept.
-MUST-6. Be 100% relevant to the actual asset.
-MUST-7. Avoid generic filler words AND avoid overloading the list with broad buzzwords ("object", "item", "thing", "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative") unless genuinely one of the strongest descriptors of THIS asset \u2014 keep such broad terms to a small minority; prioritize concrete, specific, literally-visible terms.
-MUST-8. Avoid duplicates and near-duplicates.
-MUST-9. Never invent unseen attributes.
-MUST-10. Never prioritize popularity over relevance.
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
-1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - ${directives.risetKeywordRule}
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - ${directives.seoBoostRule} Note: Since this is MULTI-WORD mode, ensure you generate multi-word compound terms or phrases (2-3 words).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance \u2014 WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms \u2014 only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
+MULTI-KEYWORD MODE OVERRIDE:
+Generate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
+  } else {
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last \u2014 all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP \u2014 MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset \u2014 e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" \u2014 unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short \u2014 a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+MIXED-KEYWORD MODE OVERRIDE:
+Generate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
-  const noMediaFormatRule = `
-12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
-The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
-- Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
-- Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
-- Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
-Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
-  keywordRulePromptText += noMediaFormatRule;
   let visualFactsJson = "";
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 \u2014 Gemini Vision (Visual Facts Detection)...`);
   const mediaTypeContext = directives.mediaTypeContext;
@@ -4467,26 +4865,42 @@ Analyze only what is visually verifiable in the image.
 ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
+MAIN SUBJECT PRIORITY:
+Before listing secondary details, determine the single strongest MAIN SUBJECT of the asset.
+Choose it by visual dominance, central importance, distinctive identity, size/prominence, and the role it plays in the overall composition.
+Do not choose a subject merely because it is culturally interesting or commercially popular.
+If multiple subjects exist, rank them by actual visual importance and assign importance scores.
+The first primary_subject should represent the strongest visual subject whenever one can be identified.
+The downstream keyword generator will use this order to place the Main Subject first in the final keyword list.
+
 VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
 2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. GEOGRAPHICAL LOCATION & LANDMARKS (MANDATORY DETECTION): You must actively detect, extract, and report any geographical location, city, country, or specific landmark details from BOTH the EXIF metadata (GPS Latitude, Longitude, City, Country, Location names, if available) and visual cues in the image (such as recognizable architectural styles, geological landmarks, city skylines, vegetation, or cultural landmarks like Borobudur, Eiffel Tower, Sydney Opera House, etc.). If a location is detected, explicitly specify the city, country, and landmark name in your analysis under background_elements, primary_subjects, or primary visual facts.
-5. Never hallucinate brands, trademarked logos, or copyrighted characters.
-6. If uncertain, provide the closest accurate generic description.
-7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
-8. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
-9. ASSET UNDERSTANDING AND CONTEXT: You must deeply understand the underlying narrative, intent, emotional tone, and commercial use-case of the asset. Connect the visual elements to their broader conceptual and practical meaning.
+4. Never hallucinate brands, trademarked logos, or copyrighted characters.
+5. If uncertain, provide the closest accurate generic description.
+
+FORMATTING RULES FOR VISUAL FACTS:
+- Describe items, actions, and concepts using highly descriptive, concrete, and neat terms (e.g., "chicken", "fried", "crispy", "glaze", "knife", "cutting board", "cooking", "serving").
+- ABSOLUTELY AVOID using long sentences or robotic phrasing in the arrays. Extract the core nouns, verbs, and descriptive adjectives cleanly so they can directly feed the keyword engine.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
-PRIMARY OBJECTIVE:
-Deeply and exhaustively detect every visible subject, action, color, visible text, material, texture, lighting, and composition detail. You must recognize the contents of assets deeply and in extraordinary detail.
-Also, deeply understand the asset's underlying narrative, intent, emotional tone, context, and potential commercial use-cases. You must act as an expert who fully comprehends the 'why' and 'how' of the asset, not just the 'what'.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
+PRIMARY OBJECTIVE \u2014 ANALYZE THE ACTUAL ASSET THROUGH 8 VISUAL DIMENSIONS:
+1. OBJECTS: Identify visible primary, secondary, and background objects.
+2. ACTIVITIES: Identify only actions that are visibly happening.
+3. CONCEPTS: Identify clear themes or concepts strongly supported by the visual scene.
+4. ATMOSPHERE: Identify visible mood/atmosphere such as professional, calm, festive, dramatic, minimal, etc. only when visually supported.
+5. LOCATION / SETTING: Identify the visible environment or setting; do not guess an exact place.
+6. VISUAL CHARACTERISTICS: Identify framing, orientation, camera angle, close-up, copy space, composition, perspective, texture, lighting, and other visible characteristics.
+7. COLORS / VISUAL ELEMENTS: Identify actual visible colors, materials, textures, lighting, and distinctive visual elements.
+8. EVENT / SEASONAL RELEVANCE: Identify named events or seasons only when unmistakable visual evidence supports them (for example Christmas decorations, Halloween costumes, Ramadan/Eid cues, Valentine's symbols). The calendar alone is never evidence.
+
+ANALYSIS PRINCIPLE: AI Vision is the source of truth for what the asset contains. Do not hallucinate or infer unsupported religion, culture, exact location, profession, audience, industry, tourism, emotion, event, or commercial use case. If a dimension is not supported, return an empty array.
+
+Also perform visual semantic analysis for the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
@@ -4521,17 +4935,23 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
-    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
-    "understanding_and_context": "Explain your deep understanding of the asset: its narrative, commercial intent, target audience, and overall context (pemahaman mendalam tentang narasi, konteks, dan tujuan penggunaan komersial aset ini).",
+    "concepts": [],
+    "atmosphere": [],
+    "location_setting": [],
+    "visual_characteristics": [],
+    "event_seasonal_relevance": [],
+    "deeper_meaning_and_symbolism": "Only describe a concept or meaning when it is strongly supported by visible evidence. Do not infer religion, culture, profession, location, emotion, event, or use case without clear visual support.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
 }${exifInstruction}`;
-  const promptText = toolType === "video" /* VIDEO */ ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+  const promptText = toolType === "video" /* VIDEO */ ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas: Analyze the actual asset across 8 dimensions: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, and Event/Seasonal Relevance. Use only visible evidence; leave unsupported dimensions empty. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, {
       parts: [...imageParts, { text: promptText }]
@@ -4546,35 +4966,24 @@ OUTPUT FORMAT:
       throw new Error("Vision Analysis produced empty results.");
     }
   } catch (err) {
-    console.warn("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
-    visualFactsJson = JSON.stringify({
-      VISUAL_FACTS: {
-        primary_subjects: [{ name: "main subject", importance: 100 }],
-        secondary_subjects: [],
-        background_elements: [],
-        visible_text: [],
-        colors: ["natural"],
-        actions: ["commercial poses"],
-        composition: ["professional"],
-        semantic_category_analysis: {
-          adobe_id: 0,
-          shutterstock_category_1: "",
-          shutterstock_category_2: "",
-          reason: "Fallback static categories used."
-        }
-      }
-    });
+    console.error("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
+    throw new Error(`AI Vision gagal menganalisis aset: ${err.message || "Vision analysis failed"}`);
   }
   let visualFacts = {};
   try {
-    visualFacts = JSON.parse(extractJSON(visualFactsJson)).VISUAL_FACTS || {};
+    const parsedVision = JSON.parse(extractJSON(visualFactsJson));
+    visualFacts = parsedVision?.VISUAL_FACTS;
+    if (!visualFacts || typeof visualFacts !== "object" || Array.isArray(visualFacts)) {
+      throw new Error("VISUAL_FACTS missing or invalid");
+    }
   } catch (e) {
-    visualFacts = { primary_subjects: [{ name: "subject", importance: 100 }], actions: ["posing"] };
+    console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
+    throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
   }
   const dominantSubjects = [
     ...Array.isArray(visualFacts.primary_subjects) ? visualFacts.primary_subjects : [],
     ...Array.isArray(visualFacts.secondary_subjects) ? visualFacts.secondary_subjects : []
-  ].filter((item2) => item2 && typeof item2 === "object" && typeof item2.importance === "number" && item2.importance >= 50).map((item2) => item2.name);
+  ].filter((item) => item && typeof item === "object" && typeof item.importance === "number" && item.importance >= 50).map((item) => item.name);
   console.log(`[JohMeta Pipeline] Stage 2 & 3: Generating Content (Title, Description, Keywords)...`);
   const customPromptCommand = customPrompt ? `
 CRITICAL CUSTOM INSTRUCTION / CONCEPT KEY (ABSOLUTE PRIORITY):
@@ -4604,21 +5013,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
    ${directives.prohibitedExemptions}
 
 
-MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
-1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
-2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
-3. HIGH-CONVERSION COMPOUND PHRASES: Generate 1-to-3 word compound terms (e.g. 'copy space', 'landing page', 'digital marketing', 'green energy', 'isolated background') which Adobe Stock indexes both as exact compound phrases and individual token words, doubling search visibility.
-4. FULL INDEX CAPACITY: Maximize unique search term coverage across all keyword slots up to the target count, blending core subject nouns, action verbs, environmental setting, commercial intent, regional synonyms, and target industry use-cases.
-5. KEYWORD #1 STRICT MAIN SUBJECT: Keyword #1 MUST strictly be the main visual subject (Subjek Utama).
-
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION (CRITICAL): If the visual analysis or EXIF technical metadata detects any geographical location, city, country, or specific landmark (such as Borobudur, Paris, Jakarta, Mt. Fuji, Bali, etc.), you MUST integrate this location and landmark details naturally and detailedly into BOTH the Title and the Description. For example, instead of "Old temple in a forest", write "Borobudur temple surrounded by lush tropical forest in Magelang, Indonesia".
-- NATURAL & DETAILED PHRASING (NO ROBOTIC CLICHES): Write titles and descriptions that are highly detailed, evocative, and sound completely natural, as if written by a professional native English stock curator. Avoid robotic, repetitive, or dry templates. Do not use cheap, subjective marketing adjectives like "beautiful", "stunning", "high-quality", but use highly descriptive and precise nouns, active verbs, and atmospheric adjectives (e.g., "warm golden hour lighting", "misty morning atmosphere", "lush tropical foliage"). Ensure descriptions flow like real, coherent human-written captions rather than disconnected visual details.
-- HUMAN-FRIENDLY SEARCH INTENT (LONG-TAIL SEO): Write metadata that sounds completely natural and conversational. Search engine algorithms and microstock indexers now heavily prioritize human-friendly, long-tail search queries over robotic keyword stuffing (e.g., use natural phrasing like "young business woman working on a laptop in a modern bright cafe" instead of disconnected terms).
-- SEMANTIC & CONTEXTUAL TAXONOMY: Blend high-weight concrete keywords with natural context. Answer the 5Ws (Who, What, Where, When, Why) to ensure the asset ranks across a broad spectrum of semantic search indexes.
-- HIGH-VALUE NICHE FRONT-LOADING: Place the most descriptive, highly specific visual keywords at the very beginning of the Title. Search algorithms weigh the first 3-5 words significantly higher than the rest!
-- SPECIAL ASSET TYPES (FLATLAY & GREEN SCREEN): If the visual facts indicate a "Flatlay" (top-down view) or "Green Screen" (chroma key background), you MUST include "Flatlay" or "Green Screen" (and their variations like "Top-down view", "Chroma Key") prominently in BOTH the Title and Keywords.
-
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
 2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
@@ -4626,7 +5020,6 @@ Rules for Titles:
 3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 4. Use easy-to-read phrases, NOT formal sentence structures.
 5. DO NOT treat the title like a list of keywords. No commas separating words.
-6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -4634,12 +5027,9 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
-
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
-2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -4651,8 +5041,10 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-VISUAL_FACTS:
+VISUAL_FACTS (SOURCE OF TRUTH):
 ${JSON.stringify(visualFacts, null, 2)}
+
+Use these 8 Vision dimensions when generating keywords: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, Event/Seasonal Relevance.
 
 CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
@@ -4662,7 +5054,9 @@ OUTPUT FORMAT:
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
-  "shutterstock_category_2": "Backgrounds/Textures",
+  "shutterstock_category_2": "Backgrounds/Textures"
+      "dreamstime_category": "",
+      "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
 }
 If generation fails, return {"error": "metadata_generation_failed"}.`;
@@ -4766,14 +5160,13 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
-- NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
 - SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
   ${directives.titleRule}
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Include a commercial concept only when it is clearly supported by visible evidence (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
 - Do not include explanations, labels, quotation marks, or numbering.
@@ -4784,10 +5177,10 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 ${keywordRulePromptText}
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
@@ -4813,7 +5206,9 @@ OUTPUT FORMAT:
   "keywords": [],
   "category_id": 0,
   "shutterstock_category_1": "",
-  "shutterstock_category_2": "",
+  "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
   "confidence_score": 0.95
 }`;
@@ -4841,7 +5236,9 @@ OUTPUT FORMAT:
       ...draftMetadata,
       category_id: heur.category_id,
       shutterstock_category_1: heur.shutterstock_category_1,
-      shutterstock_category_2: heur.shutterstock_category_2
+      shutterstock_category_2: heur.shutterstock_category_2,
+      dreamstime_category: "Abstract",
+      miricanvas_category: "Background"
     };
   }
   try {
@@ -4854,107 +5251,112 @@ OUTPUT FORMAT:
     if (data.headline && !data.title) data.title = data.headline;
     if (data.subject && !data.title) data.title = data.subject;
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
-    const tieredVisual = buildTieredVisualAnalysis(visualFacts);
-    const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
     if (!data.keywords || !Array.isArray(data.keywords)) {
       data.keywords = [];
     }
-    let cleanedKeywords = [];
-    data.keywords.forEach((k) => {
-      if (typeof k === "string") {
-        const cleanPhrase = k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ");
-        if (cleanPhrase.length > 1) {
-          if (keywordMode === "single") {
-            const pieces = cleanPhrase.split(/\s+/);
-            pieces.forEach((word) => {
-              if (word.length > 1 && !isProhibitedKeyword(word)) {
-                cleanedKeywords.push(word);
-              }
-            });
-          } else {
-            if (!isProhibitedKeyword(cleanPhrase)) {
-              cleanedKeywords.push(cleanPhrase);
-            }
-          }
-        }
-      }
-    });
-    const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-    const allowedTerms = [
-      ...(Array.isArray(visualFacts.primary_subjects) ? visualFacts.primary_subjects : []).map((x) => x?.name || ""),
-      ...(Array.isArray(visualFacts.secondary_subjects) ? visualFacts.secondary_subjects : []).map((x) => x?.name || ""),
-      ...Array.isArray(visualFacts.actions) ? visualFacts.actions : [],
-      ...Array.isArray(visualFacts.colors) ? visualFacts.colors : []
-    ].join(" ").toLowerCase();
-    const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword) => {
-      if (!allowedTerms || allowedTerms.length < 5) return true;
-      const words = keyword.split(/\s+/);
-      const hasMatchingWord = words.some((w) => allowedTerms.includes(w));
-      return hasMatchingWord && !isProhibitedKeyword(keyword);
-    });
-    const remainingKeywords = uniqueKeywords.filter((k) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-    let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-    finalKeywordList = filterBannedKeywords(finalKeywordList);
-    finalKeywordList = semanticDeduplicate(finalKeywordList);
-    if (finalKeywordList.length < targetCount) {
-      const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
-      finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
-    }
-    data.keywords = ensureKeywordCount(
-      finalKeywordList,
-      targetCount,
+    const finalKeywordList = await applyMetadataGenKeywordLogic({
+      rawKeywords: data.keywords,
       visualFacts,
-      data.title,
-      data.description,
-      data.category_id,
-      keywordMode
+      targetCount,
+      provider,
+      model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || "gemini-3.1-flash-lite-preview",
+      keywordMode,
+      metadataLanguage
+    });
+    data.keywords = finalKeywordList;
+    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength);
+    const keywordQuality = scoreMetadataGenKeywords(data.keywords || [], {
+      ...visualFacts || {},
+      title: data.title
+    });
+    const titleKeywordConsistency = validateMetadataTitleKeywordConsistency(
+      data.title || "",
+      data.keywords || [],
+      visualFacts || {}
     );
-    let safeKw1 = semanticDeduplicate(filterBannedKeywords(data.keywords));
-    data.keywords = safeKw1;
-    data.keywords = rankAndWeightKeywords(data.keywords, tieredVisual, targetCount);
-    let candidateTitle = String(data.title || "").trim();
-    const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
-    if (isGenericTitle) {
-      candidateTitle = applyTitleTemplate(assetSubtype, tieredVisual, titleLength);
-    }
-    data.title = ensureTitleLength(candidateTitle, data.keywords || [], data.description || "", titleLength);
-    const accurateCategory = determineAccurateCategory(data.title, data.keywords || [], visualFacts, data.category_id);
+    data.keyword_quality = {
+      scores: keywordQuality,
+      title_keyword_consistency: titleKeywordConsistency,
+      title_searchability: titleKeywordConsistency.titleSearchability
+    };
     const parsedCategoryId = parseInt(String(data.category_id), 10);
     if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
-      data.category_id = accurateCategory.category_id;
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.category_id = heur.category_id;
     } else {
-      data.category_id = accurateCategory.confidence >= 0.75 ? accurateCategory.category_id : parsedCategoryId;
+      data.category_id = parsedCategoryId;
     }
     const validShutterstockCats = toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
     if (!data.shutterstock_category_1 || !validShutterstockCats.includes(data.shutterstock_category_1)) {
-      data.shutterstock_category_1 = validShutterstockCats.includes(accurateCategory.shutterstock_category_1) ? accurateCategory.shutterstock_category_1 : validShutterstockCats[0] || "Abstract";
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : validShutterstockCats[0] || "Abstract";
     }
     if (!data.shutterstock_category_2 || !validShutterstockCats.includes(data.shutterstock_category_2) || data.shutterstock_category_2 === data.shutterstock_category_1) {
-      let secondFallback = accurateCategory.shutterstock_category_2;
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      let secondFallback = heur.shutterstock_category_2;
       if (secondFallback === data.shutterstock_category_1) {
         const possibleVal = toolType === "video" /* VIDEO */ ? "Backgrounds/Textures" : "Abstract";
         secondFallback = validShutterstockCats.find((cat) => cat !== data.shutterstock_category_1) || possibleVal;
       }
       data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : validShutterstockCats.find((cat) => cat !== data.shutterstock_category_1) || "Backgrounds/Textures";
     }
-    data.category_reason = data.category_reason || accurateCategory.reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
-    const qaReport = validateFinalMetadata(data, targetCount, titleLength, validShutterstockCats);
-    if (!qaReport.valid) {
-      console.warn("[MetadataGen Lapisan 8 - Validasi Akhir] Errors:", qaReport.errors);
-    }
-    if (qaReport.warnings.length > 0) {
-      console.log("[MetadataGen Lapisan 8 - Validasi Akhir] Warnings:", qaReport.warnings);
-    }
+    data.category_reason = data.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
     return data;
   } catch (error) {
-    console.warn("[JohMeta Parse Error] Failed to handle output format:", error);
-    throw new Error("Gagal memproses respons metadata AI ke dalam skema sistem. Silakan coba kembali.");
+    console.warn("[JohMeta Parse Recovery] Final metadata normalization recovered from:", error);
+    try {
+      const recovery = draftMetadata && typeof draftMetadata === "object" && !Array.isArray(draftMetadata) ? { ...draftMetadata } : {};
+      recovery.title = String(recovery.title || recovery.name || recovery.headline || "Stock asset").trim();
+      recovery.description = String(recovery.description || recovery.desc || recovery.caption || recovery.title || "Visual stock asset").trim();
+      const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
+      const safeKeywords = rawKeywords.filter((k) => typeof k === "string").map((k) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ")).filter((k) => k.length > 1 && !isProhibitedKeyword(k));
+      try {
+        recovery.keywords = await applyMetadataGenKeywordLogic({
+          rawKeywords: safeKeywords,
+          visualFacts,
+          targetCount,
+          provider,
+          model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || "gemini-3.1-flash-lite-preview",
+          keywordMode,
+          metadataLanguage
+        });
+      } catch (keywordRecoveryError) {
+        console.warn("[JohMeta Pipeline] Keyword recovery normalization failed:", keywordRecoveryError);
+        recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
+      }
+      const parsedRecoveryCategory = parseInt(String(recovery.category_id), 10);
+      if (!Number.isFinite(parsedRecoveryCategory) || parsedRecoveryCategory < 1 || parsedRecoveryCategory > 21) {
+        const heur = getHeuristicCategories(recovery.title, recovery.keywords);
+        recovery.category_id = heur.category_id;
+        recovery.shutterstock_category_1 = heur.shutterstock_category_1;
+        recovery.shutterstock_category_2 = heur.shutterstock_category_2;
+        recovery.dreamstime_category = "Abstract";
+        recovery.miricanvas_category = "Background";
+      }
+      recovery.category_reason = recovery.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+      recovery.confidence_score = Number.isFinite(Number(recovery.confidence_score)) ? Number(recovery.confidence_score) : 0.5;
+      return recovery;
+    } catch (recoveryError) {
+      console.error("[JohMeta Parse Recovery] Recovery failed:", recoveryError);
+      return {
+        title: "Stock asset",
+        description: "Visual stock asset",
+        keywords: [],
+        category_id: 8,
+        shutterstock_category_1: "Abstract",
+        shutterstock_category_2: "Backgrounds/Textures",
+        dreamstime_category: "Abstract",
+        miricanvas_category: "Background",
+        category_reason: "Fallback metadata generated after response normalization failure."
+      };
+    }
   }
 };
 var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", toolType = "image" /* IMAGE */, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance) => {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
   const directives = getToolTypeDirectives(toolType);
+  const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
   let activeModel = model;
   if (provider === "gemini" || !NON_GEMINI_PROVIDERS.has(provider)) {
     if (!activeModel || activeModel === "gemini-3.1-pro-preview" || activeModel === "gemini-3.1-flash-lite-preview") {
@@ -4965,129 +5367,27 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
   }
   const categoriesText = ADOBE_CATEGORIES.map((c) => `${c.id}: ${c.name}`).join(", ");
   const shutterstockCategoriesText = (toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(", ");
-  const targetCount = keywordCount ? parseInt(String(keywordCount), 10) || 25 : 25;
-  const aiRequestCount = targetCount;
-  let keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume keywords (including single-word and/or multi-word phrases) in ${getLanguageName(metadataLanguage)}. MUST be short words/phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-  let keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword or phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry-standard descriptors.
-   - Map a wide array of high-quality synonyms, technical terms, and semantic variations to maximize indexing capacity.
-   - Highlight the context (season, time of day, lighting atmosphere, emotional or conceptual theme).
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize and Boost Keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional/corporate search queries.
-   - Frame keywords to capture exact-match search habits of graphic designers, marketing agencies, and content publishers.
-   - Focus on high-converting concept metaphors, trending industry applications, business use cases, and targeted target audiences.
-4. Include both single-word and/or multi-word phrases (1-3 words) when relevant, prioritizing highly-effective compound terms.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words or short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance \u2014 WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms \u2014 only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
-
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last \u2014 all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP \u2014 MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset \u2014 e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" \u2014 unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short \u2014 a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+  const targetCount = parseInt(String(keywordCount), 10) || 50;
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === "single") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume SINGLE-WORD keywords in ${getLanguageName(metadataLanguage)}. Strictly avoid multi-word phrases or compound words with spaces. MUST be short words, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough single-word keyword research on the visual asset: extract deep, advanced concepts, hidden associations, and industry descriptors.
-   - Map single-word synonyms, technical terms, and semantic variations.
-   - Highlight single-word terms representing season, lighting, emotion, and abstract themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize single-word keywords for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize highly-searched commercial intent terms, buyer-targeted vocabulary, and professional search queries.
-   - Focus on high-converting concept metaphors, trending industry applications, and business use cases.
-4. Every keyword MUST be a SINGLE word only. Strictly forbidden from using multi-word phrases or compound words with spaces.
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short words. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance \u2014 WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms \u2014 only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
-
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last \u2014 all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP \u2014 MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset \u2014 e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" \u2014 unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short \u2014 a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+SINGLE-KEYWORD MODE OVERRIDE:
+Generate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === "multi") {
-    keywordRuleSchemaDesc = `List of UP TO ${aiRequestCount} highly-relevant high-volume MULTI-WORD phrase keywords in ${getLanguageName(metadataLanguage)}. Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).`;
-    keywordRulePromptText = `1. ABSOLUTE RULE: DO NOT include any color names (e.g., "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray", "grey", "gold", "silver", "bronze", "violet", "indigo", "cyan", "magenta", "teal", "navy", "beige", "charcoal", "cream", "peach", "lavender", "turquoise") as part of any keyword phrase.
-2. RISET KEYWORD (Keyword Research - Act as a Microstock Trend Researcher):
-   - Conduct extremely thorough keyword research on the visual asset: extract deep, advanced concepts, multi-word associations, and industry-standard phrases.
-   - Map a wide array of high-quality multi-word synonyms, compound technical terms, and semantic variations to maximize indexing.
-   - Highlight multi-word phrases representing season, lighting, emotions, and conceptual themes.
-3. SEO BOOST (Microstock SEO Boost - Act as a Microstock SEO Expert):
-   - Optimize multi-word phrases for Maximum Search Visibility and Click-Through Rate (CTR) on Microstock Platforms (Adobe Stock, Shutterstock).
-   - Prioritize high-volume commercial intent phrases, buyer-targeted vocabulary, and professional compound search queries.
-   - Frame compound terms to capture exact-match search habits of graphic designers, marketing agencies, and publishers.
-   - Focus on high-converting concept metaphors, business use cases, and targeted audiences.
-4. Every keyword MUST be a MULTI-WORD phrase (consisting of 2 or 3 words separated by spaces). Avoid single-word keywords. MUST be short phrases, NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-5. Avoid duplicates and keyword stuffing. NO SINGULAR/PLURAL REDUNDANCY: Do not unnecessarily duplicate root words in both singular and plural forms (e.g., avoid listing both "tree" and "trees") if they do not add unique SEO value.
-5.5 CROSS-SEARCH DISCOVERABILITY (MAXIMIZE SEARCH INTENT):
-   - SYNONYM & REGIONAL DIVERSITY: Include common regional variants (e.g., "lift" and "elevator", "sidewalk" and "pavement") and industry vs. casual terms (e.g., "physician" and "doctor").
-   - CONCEPTUAL & EMOTIONAL METAPHORS: Include abstract meanings and feelings represented in the image (e.g., "trust", "success", "growth", "innovation", "security").
-   - TARGET INDUSTRY & USE-CASES: Include keywords representing who would buy this asset and where it can be used (e.g., "marketing", "fintech", "presentation", "banner", "landing page").
-   - COMPOSITION & DESIGN INTENT: Include visual layout terms if applicable (e.g., "copy space", "minimal", "isolated", "panoramic", "vertical").
-6. STRICT ADOBE STOCK IP REFUSAL COMPLIANCE: NEVER include any company names, brand names, manufacturer names, trademarked names/product lines, patented designs, protected landmarks, or fictional characters (e.g., Apple, Nike, iPhone, LEGO, GoPro, Vespa, Jeep) under any circumstances. Ensure every keyword is 100% generic to fully comply with Adobe Stock's intellectual property refusal rules.
-7. Every keyword/phrase must be strictly in lowercase.
-8. No subjective or professional aesthetic-only terms ("beautiful", "stunning").
-9. CRITICAL: Keywords MUST be short phrases. NEVER FULL SENTENCES. Keywords DO NOT use sentences, MUST be short words/phrases (kata/frasa pendek, bukan kalimat).
-10. CRITICAL RULE FOR STOCK APPROVAL: Do NOT add unrelated keywords just to reach the target count. EVERY single keyword MUST literally be visible in the image or directly related to the clear visual concept. Any hallucinated, loosely related, or spammy keywords will cause the asset to be REJECTED.
-11. NATURAL SEO KEYWORD FLOW (Adobe Stock Buyer-Intent Order, NOT a rigid fixed-stage template):
-    Arrange keywords in a natural, human-readable priority order that mirrors how a real buyer searches and how Adobe Stock's algorithm weighs relevance \u2014 WITHOUT forcing keywords into fixed numbered slots or padding categories just to fill them:
-    - Start with the exact main subject and the most concrete, literally-visible nouns (what the buyer types first).
-    - Follow naturally with distinguishing attributes, the visible action, and the strongest environmental/contextual details.
-    - Then weave in commercially valuable terms as they genuinely apply to THIS asset: relevant concept/emotion words, industry and use-case terms, technique/style terms, and composition terms \u2014 only include a category if it is truly represented in the image.
-    - Order should read like a natural priority ranking (most visually obvious and highest buyer-intent first, more nuanced/supporting terms later), not a mechanical checklist. Do NOT force an even spread across categories, do NOT insert filler to complete a pattern, and do NOT sacrifice relevance for structural completeness.
-    - Every keyword must still earn its place purely on visual relevance and realistic buyer search intent.
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
-    STRICT RELEVANCE RULE: Every single keyword MUST be 100% visible in or directly related to the actual visual content. NEVER add keywords just to hit a count or complete a category. Quality and natural relevance ALWAYS beat rigid structure.
+MULTI-KEYWORD MODE OVERRIDE:
+Generate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
+  } else {
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
-    GOOD EXAMPLE OF NATURAL FLOW (tightrope walker crossing a misty canyon at sunrise): tightrope, wire, cable, walker, mountain, canyon, cliff, mist, person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking, risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom, nature, valley, high, sky, path, lonely
-    Notice how concrete visible nouns (tightrope, wire, cable, walker, mountain, canyon, cliff, mist) lead, then attributes/action/context (person, balance, steel, rope, anchor, rock, altitude, heights, fog, sunrise, outdoor, walking) follow naturally, and abstract concept/emotion/commercial terms (risk, danger, courage, challenge, concentration, focus, adventure, achievement, metaphor, success, extreme, brave, motivation, freedom) come last \u2014 all without being forced into even numbered slots.
-
-12. LIMIT GENERIC/BROAD KEYWORDS (STRICT CAP \u2014 MAX ~20% OF TOTAL KEYWORDS): Do NOT flood the keyword list with broad, low-specificity buzzwords that could apply to almost any stock asset \u2014 e.g. "background", "concept", "design", "modern", "abstract", "lifestyle", "business", "people", "success", "creative", "template", "banner" \u2014 unless the term is genuinely one of the strongest, most defining descriptors of THIS specific asset. These broad/conceptual terms must stay a SMALL MINORITY of the list (roughly 1 in 5 keywords at most), positioned near the end, and must never crowd out concrete, literally-visible, specific terms (exact subject, distinguishing attributes, specific action, specific setting/objects). If forced to choose between adding one more generic buzzword and stopping short of the keyword limit, ALWAYS stop short \u2014 a shorter list of precise, specific keywords is far more valuable to buyers and to Adobe Stock's search ranking than a long list padded with generic terms.`;
+MIXED-KEYWORD MODE OVERRIDE:
+Generate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
-  const noMediaFormatRule = `
-12. PROHIBITED TERMS RULE (CRITICAL): Under any circumstances, DO NOT include any photography, video, or digital format/media-specific jargon in BOTH the Title and the Keywords list.
-The following words are STRICTLY PROHIBITED and MUST NEVER appear in the generated Title or any Keyword:
-- Prohibited photo/camera terms: "photo", "photography", "photograph", "candid", "realistic", "real-world", "real-life", "lifestyle shot", "studio shot", "outdoor shot", "camera", "lens", "shutter", "aperture", "depth of field".
-- Prohibited video/cinematic terms: "video", "footage", "b-roll", "cinematic", "cinema", "motion", "slow motion", "time-lapse", "real-time", "panning", "tilting", "tracking shot", "orbiting", "drone", "camera movement".
-- Prohibited digital/art terms: "image", "picture", "render", "rendering", "graphic", "illustration", "vector", "artistic", "beautiful", "stunning".
-Ensure your title and keywords focus 100% on the core visual subject matter, actions, concepts, and literal objects, completely independent of the medium or capture format.`;
-  keywordRulePromptText += noMediaFormatRule;
   let visualDescriptions = [];
   let parsedVisualFactsList = [];
   const fallbackGeminiModel = aiModelPerformance === "speed" ? "gemini-3.1-flash-lite-preview" : "gemini-3.1-pro-preview";
@@ -5103,26 +5403,61 @@ Analyze only what is visually verifiable in the image.
 ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
+MAIN SUBJECT PRIORITY:
+Before listing secondary details, determine the single strongest MAIN SUBJECT of the asset.
+Choose it by visual dominance, central importance, distinctive identity, size/prominence, and the role it plays in the overall composition.
+Do not choose a subject merely because it is culturally interesting or commercially popular.
+If multiple subjects exist, rank them by actual visual importance and assign importance scores.
+The first primary_subject should represent the strongest visual subject whenever one can be identified.
+The downstream keyword generator will use this order to place the Main Subject first in the final keyword list.
+
 VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
 2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. GEOGRAPHICAL LOCATION & LANDMARKS (MANDATORY DETECTION): You must actively detect, extract, and report any geographical location, city, country, or specific landmark details from BOTH the EXIF metadata (GPS Latitude, Longitude, City, Country, Location names, if available) and visual cues in the image (such as recognizable architectural styles, geological landmarks, city skylines, vegetation, or cultural landmarks like Borobudur, Eiffel Tower, Sydney Opera House, etc.). If a location is detected, explicitly specify the city, country, and landmark name in your analysis under background_elements, primary_subjects, or primary visual facts.
-5. Never hallucinate brands, trademarked logos, or copyrighted characters.
-6. If uncertain, provide the closest accurate generic description.
-7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
-8. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
-9. ASSET UNDERSTANDING AND CONTEXT: You must deeply understand the underlying narrative, intent, emotional tone, and commercial use-case of the asset. Connect the visual elements to their broader conceptual and practical meaning.
+4. Never hallucinate brands, trademarked logos, or copyrighted characters.
+5. If uncertain, provide the closest accurate generic description.
+
+FORMATTING RULES FOR VISUAL FACTS:
+- Describe items, actions, and concepts using highly descriptive, concrete, and neat terms (e.g., "chicken", "fried", "crispy", "glaze", "knife", "cutting board", "cooking", "serving").
+- ABSOLUTELY AVOID using long sentences or robotic phrasing in the arrays. Extract the core nouns, verbs, and descriptive adjectives cleanly so they can directly feed the keyword engine.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
-PRIMARY OBJECTIVE:
-Deeply and exhaustively detect every visible subject, action, color, visible text, material, texture, lighting, and composition detail. You must recognize the contents of assets deeply and in extraordinary detail.
-Also, deeply understand the asset's underlying narrative, intent, emotional tone, context, and potential commercial use-cases. You must act as an expert who fully comprehends the 'why' and 'how' of the asset, not just the 'what'.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
+PRIMARY OBJECTIVE \u2014 BUILD GROUNDED VISUAL_FACTS:
+Analyze the actual asset as a structured evidence record for downstream metadata generation.
+Do not write a caption, title, description, or keywords here.
+Every fact must be traceable to visible evidence in the supplied frame(s).
+If a fact is uncertain or not visible, omit it or mark confidence low rather than guessing.
+
+VISUAL ANALYSIS DIMENSIONS:
+1. PRIMARY SUBJECTS \u2014 the main visually dominant objects/people/animals.
+2. SECONDARY SUBJECTS \u2014 supporting visible objects or subjects.
+3. BACKGROUND ELEMENTS \u2014 visible environmental/background details that can support keywords.
+4. ACTIONS \u2014 only actions that are visibly occurring.
+5. RELATIONSHIPS \u2014 visible spatial/interacting relationships between subjects.
+6. ATTRIBUTES \u2014 visible material, shape, texture, pattern, condition, size relationship, clothing, etc.
+7. COLORS \u2014 actual dominant and secondary visible colors.
+8. TEXT \u2014 exact visible text only; do not invent or repair unreadable text.
+9. SETTING \u2014 generic visible setting/environment; never guess exact location.
+10. COMPOSITION \u2014 orientation, framing, angle, perspective, close-up, copy space, symmetry, layout, foreground/midground/background.
+11. LIGHTING \u2014 visible light direction/quality, shadows, highlights, natural/artificial appearance.
+12. CONCEPTS \u2014 only concepts clearly communicated by the image; distinguish direct visual meaning from interpretation.
+13. EVENT/SEASON \u2014 only when unmistakably supported by visual cues.
+14. TECHNICAL/VISUAL CHARACTERISTICS \u2014 photo/illustration/render appearance, isolated/background treatment, transparency if actually evident, etc.
+
+EVIDENCE DISCIPLINE:
+- Visual evidence is the source of truth.
+- Do not infer profession, nationality, religion, culture, exact location, audience, industry, emotion, use case, or symbolism unless the visual evidence strongly supports it.
+- A color alone is not evidence of a holiday or cultural event.
+- A generic object is not evidence of a brand or product model.
+- Do not convert subjective aesthetic judgments into facts.
+- Do not use EXIF to invent visual content; EXIF is technical corroboration only.
+- Prefer precise generic descriptions when identification is uncertain.
+
+For important subjects, provide importance and confidence scores. Use 0\u2013100 scores.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
@@ -5158,11 +5493,12 @@ OUTPUT FORMAT:
     "actions": [],
     "composition": [],
     "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
-    "understanding_and_context": "Explain your deep understanding of the asset: its narrative, commercial intent, target audience, and overall context (pemahaman mendalam tentang narasi, konteks, dan tujuan penggunaan komersial aset ini).",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
@@ -5170,19 +5506,19 @@ OUTPUT FORMAT:
     const promptText = toolType === "video" /* VIDEO */ ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
     let itemVisionInstruction = visionSystemInstruction;
     let itemExifDesc = "";
-    if (item.exifMetadata && Object.keys(item.exifMetadata).length > 0) {
+    if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
       const exifInstruction = `
 
 [DATA EXIFTOOL - REFERENSI TEKNIS]
 Berikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:
 \`\`\`json
-${JSON.stringify(item.exifMetadata, null, 2)}
+${JSON.stringify(items[i].exifMetadata, null, 2)}
 \`\`\`
-Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+Gunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temuan visual. Jangan memasukkan GPS, tanggal, software, kamera, lensa, atau detail EXIF lain ke title, description, atau keywords kecuali detail tersebut terlihat jelas atau memang relevan secara editorial.`;
       itemVisionInstruction += exifInstruction;
       itemExifDesc = `
 ASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:
-${JSON.stringify(item.exifMetadata, null, 2)}`;
+${JSON.stringify(items[i].exifMetadata, null, 2)}`;
     }
     try {
       const visionResponse = await callGeminiWithRetry(visionModelToUse, {
@@ -5198,33 +5534,18 @@ ${JSON.stringify(item.exifMetadata, null, 2)}`;
 ${facts}${itemExifDesc}`);
       let parsedFacts = {};
       try {
-        parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
+        parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
+        if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
+          throw new Error("VISUAL_FACTS missing or invalid");
+        }
       } catch (e) {
-        parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [], semantic_category_analysis: { adobe_id: 0, shutterstock_category_1: "", shutterstock_category_2: "", reason: "Fallback default." } };
+        console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
+        throw new Error(`AI Vision mengembalikan hasil analisis yang tidak valid untuk aset #${i + 1}.`);
       }
       parsedVisualFactsList.push(parsedFacts);
     } catch (err) {
-      console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
-      const fallbackFacts = {
-        VISUAL_FACTS: {
-          primary_subjects: [{ name: "main subject", importance: 100 }],
-          secondary_subjects: [],
-          background_elements: [],
-          visible_text: [],
-          colors: ["natural"],
-          actions: ["commercial posing"],
-          composition: ["professional"],
-          semantic_category_analysis: {
-            adobe_id: 0,
-            shutterstock_category_1: "",
-            shutterstock_category_2: "",
-            reason: "Fallback static categories used."
-          }
-        }
-      };
-      visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:
-${JSON.stringify(fallbackFacts)}`);
-      parsedVisualFactsList.push(fallbackFacts.VISUAL_FACTS);
+      console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
+      throw new Error(`AI Vision gagal menganalisis aset #${i + 1}: ${err.message || "Vision analysis failed"}`);
     }
   }
   console.log(`[JohMeta Pipeline - Batch] Stage 2 & 3: Generating Draft Metadata for ${items.length} items...`);
@@ -5232,7 +5553,7 @@ ${JSON.stringify(fallbackFacts)}`);
     return [
       ...facts.primary_subjects || [],
       ...facts.secondary_subjects || []
-    ].filter((item2) => item2.importance >= 50).map((item2) => item2.name);
+    ].filter((item) => item.importance >= 50).map((item) => item.name);
   });
   const mediaContext = directives.mediaTypeContext;
   const customPromptCommand = customPrompt ? `
@@ -5262,20 +5583,6 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
    ${directives.prohibitedExemptions}
 
 
-MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
-1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
-2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
-3. HIGH-CONVERSION COMPOUND PHRASES: Generate 1-to-3 word compound terms (e.g. 'copy space', 'landing page', 'digital marketing', 'green energy', 'isolated background') which Adobe Stock indexes both as exact compound phrases and individual token words, doubling search visibility.
-4. FULL INDEX CAPACITY: Maximize unique search term coverage across all keyword slots up to the target count, blending core subject nouns, action verbs, environmental setting, commercial intent, regional synonyms, and target industry use-cases.
-5. KEYWORD #1 STRICT MAIN SUBJECT: Keyword #1 MUST strictly be the main visual subject (Subjek Utama).
-
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION (CRITICAL): If the visual analysis or EXIF technical metadata detects any geographical location, city, country, or specific landmark (such as Borobudur, Paris, Jakarta, Mt. Fuji, Bali, etc.), you MUST integrate this location and landmark details naturally and detailedly into BOTH the Title and the Description. For example, instead of "Old temple in a forest", write "Borobudur temple surrounded by lush tropical forest in Magelang, Indonesia".
-- NATURAL & DETAILED PHRASING (NO ROBOTIC CLICHES): Write titles and descriptions that are highly detailed, evocative, and sound completely natural, as if written by a professional native English stock curator. Avoid robotic, repetitive, or dry templates. Do not use cheap, subjective marketing adjectives like "beautiful", "stunning", "high-quality", but use highly descriptive and precise nouns, active verbs, and atmospheric adjectives (e.g., "warm golden hour lighting", "misty morning atmosphere", "lush tropical foliage"). Ensure descriptions flow like real, coherent human-written captions rather than disconnected visual details.
-- SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC TAXONOMY: Blend high-weight concrete keywords (exactly what is visible) with abstract conceptual terms (emotions, commercial uses, metaphorical concepts, themes, and demographic vibes).
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
-
 Rules for Titles:
 1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
 2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
@@ -5283,7 +5590,6 @@ Rules for Titles:
 3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
 4. Use easy-to-read phrases, NOT formal sentence structures.
 5. DO NOT treat the title like a list of keywords. No commas separating words.
-6. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -5291,12 +5597,9 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
-
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
-2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
@@ -5326,7 +5629,9 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 1,
       "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures",
+      "shutterstock_category_2": "Backgrounds/Textures"
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
     }
   ]
@@ -5431,14 +5736,13 @@ Rules for Titles:
 - Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
-- NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a descriptive title here"). Generate the actual descriptive text based entirely on the visual facts.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
 - Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
 - SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
   ${directives.titleRule}
 - Do not use articles unless necessary (a, an, the).
 - CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
-- Include one relevant commercial concept if visible (business, finance, technology, healthcare, education, sustainability, etc.).
+- Include a commercial concept only when it is clearly supported by visible evidence (business, finance, technology, healthcare, education, sustainability, etc.).
 - Use sentence case.
 - Output only one title.
 - Do not include explanations, labels, quotation marks, or numbering.
@@ -5449,10 +5753,10 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 ${keywordRulePromptText}
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
@@ -5480,7 +5784,9 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
       "confidence_score": 0.95
     }
@@ -5511,7 +5817,9 @@ OUTPUT FORMAT:
         ...d,
         category_id: heur.category_id,
         shutterstock_category_1: heur.shutterstock_category_1,
-        shutterstock_category_2: heur.shutterstock_category_2
+        shutterstock_category_2: heur.shutterstock_category_2,
+        dreamstime_category: "Abstract",
+        miricanvas_category: "Background"
       };
     });
   }
@@ -5545,7 +5853,7 @@ OUTPUT FORMAT:
       console.warn(`[JohMeta Pipeline - Batch] Model returned more items (${dataArray.length}) than expected (${items.length}). Truncating.`);
       dataArray = dataArray.slice(0, items.length);
     }
-    return dataArray.map((rawMetadata, index) => {
+    return Promise.all(dataArray.map(async (rawMetadata, index) => {
       let metadata = rawMetadata && typeof rawMetadata === "object" && !Array.isArray(rawMetadata) ? { ...rawMetadata } : {};
       if (metadata.desc && !metadata.description) metadata.description = metadata.desc;
       if (metadata.caption && !metadata.description) metadata.description = metadata.caption;
@@ -5555,130 +5863,73 @@ OUTPUT FORMAT:
       if (metadata.headline && !metadata.title) metadata.title = metadata.headline;
       if (metadata.subject && !metadata.title) metadata.title = metadata.subject;
       metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
-      const assetVisualFacts = parsedVisualFactsList[index] || {};
-      const tieredVisual = buildTieredVisualAnalysis(assetVisualFacts);
-      const assetSubtype = detectAssetSubtype(toolType, assetVisualFacts, customPrompt);
       if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
         metadata.keywords = [];
       }
-      let cleanedKeywords = [];
-      metadata.keywords.forEach((k) => {
-        if (typeof k === "string") {
-          const cleanPhrase = k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ");
-          if (cleanPhrase.length > 1) {
-            if (keywordMode === "single") {
-              const pieces = cleanPhrase.split(/\s+/);
-              pieces.forEach((word) => {
-                if (word.length > 1 && !isProhibitedKeyword(word)) {
-                  cleanedKeywords.push(word);
-                }
-              });
-            } else {
-              if (!isProhibitedKeyword(cleanPhrase)) {
-                cleanedKeywords.push(cleanPhrase);
-              }
-            }
-          }
-        }
-      });
-      const uniqueKeywords = Array.from(new Set(cleanedKeywords));
-      const allowedTerms = [
-        ...(Array.isArray(assetVisualFacts.primary_subjects) ? assetVisualFacts.primary_subjects : []).map((x) => x?.name || ""),
-        ...(Array.isArray(assetVisualFacts.secondary_subjects) ? assetVisualFacts.secondary_subjects : []).map((x) => x?.name || ""),
-        ...Array.isArray(assetVisualFacts.actions) ? assetVisualFacts.actions : [],
-        ...Array.isArray(assetVisualFacts.colors) ? assetVisualFacts.colors : []
-      ].join(" ").toLowerCase();
-      const rigorouslyFilteredKeywords = uniqueKeywords.filter((keyword) => {
-        if (!allowedTerms || allowedTerms.length < 5) return true;
-        const words = keyword.split(/\s+/);
-        const hasMatchingWord = words.some((w) => allowedTerms.includes(w));
-        return hasMatchingWord && !isProhibitedKeyword(keyword);
-      });
-      const remainingKeywords = uniqueKeywords.filter((k) => !rigorouslyFilteredKeywords.includes(k) && !isProhibitedKeyword(k));
-      let finalKeywordList = [...rigorouslyFilteredKeywords, ...remainingKeywords];
-      finalKeywordList = filterBannedKeywords(finalKeywordList);
-      finalKeywordList = semanticDeduplicate(finalKeywordList);
-      if (finalKeywordList.length < targetCount) {
-        const expansion = expandSynonymsAndLongTail(finalKeywordList, tieredVisual, targetCount - finalKeywordList.length);
-        finalKeywordList = semanticDeduplicate(filterBannedKeywords([...finalKeywordList, ...expansion]));
-      }
-      metadata.keywords = ensureKeywordCount(
-        finalKeywordList,
+      const assetVisualFacts = parsedVisualFactsList[index] || {};
+      const finalKeywordList = await applyMetadataGenKeywordLogic({
+        rawKeywords: metadata.keywords,
+        visualFacts: assetVisualFacts,
         targetCount,
-        assetVisualFacts,
-        metadata.title,
-        metadata.description,
-        metadata.category_id,
-        keywordMode
-      );
-      let safeKw2 = semanticDeduplicate(filterBannedKeywords(metadata.keywords));
-      metadata.keywords = safeKw2;
-      metadata.keywords = rankAndWeightKeywords(metadata.keywords, tieredVisual, targetCount);
-      let candidateTitle = String(metadata.title || "").trim();
-      const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
-      if (isGenericTitle) {
-        candidateTitle = applyTitleTemplate(assetSubtype, tieredVisual, titleLength);
-      }
-      metadata.title = ensureTitleLength(candidateTitle, metadata.keywords || [], metadata.description || "", titleLength);
-      const accurateCategory = determineAccurateCategory(metadata.title, metadata.keywords || [], assetVisualFacts, metadata.category_id);
+        provider,
+        model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || "gemini-3.1-flash-lite-preview",
+        keywordMode,
+        metadataLanguage
+      });
+      metadata.keywords = finalKeywordList;
+      metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength);
       const parsedCategoryId = parseInt(String(metadata.category_id), 10);
       if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
-        metadata.category_id = accurateCategory.category_id;
+        const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+        metadata.category_id = heur.category_id;
       } else {
-        metadata.category_id = accurateCategory.confidence >= 0.75 ? accurateCategory.category_id : parsedCategoryId;
+        metadata.category_id = parsedCategoryId;
       }
       const validShutterstockCats = toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
       if (!metadata.shutterstock_category_1 || !validShutterstockCats.includes(metadata.shutterstock_category_1)) {
-        metadata.shutterstock_category_1 = validShutterstockCats.includes(accurateCategory.shutterstock_category_1) ? accurateCategory.shutterstock_category_1 : validShutterstockCats[0] || "Abstract";
+        const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+        metadata.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : validShutterstockCats[0] || "Abstract";
       }
       if (!metadata.shutterstock_category_2 || !validShutterstockCats.includes(metadata.shutterstock_category_2) || metadata.shutterstock_category_2 === metadata.shutterstock_category_1) {
-        let secondFallback = accurateCategory.shutterstock_category_2;
+        const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+        let secondFallback = heur.shutterstock_category_2;
         if (secondFallback === metadata.shutterstock_category_1) {
           const possibleVal = toolType === "video" /* VIDEO */ ? "Backgrounds/Textures" : "Abstract";
           secondFallback = validShutterstockCats.find((cat) => cat !== metadata.shutterstock_category_1) || possibleVal;
         }
         metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : validShutterstockCats.find((cat) => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures";
       }
-      metadata.category_reason = metadata.category_reason || accurateCategory.reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
-      const qaReport = validateFinalMetadata(metadata, targetCount, titleLength, validShutterstockCats);
-      if (!qaReport.valid) {
-        console.warn(`[MetadataGen Lapisan 8 - Batch item ${index}] Errors:`, qaReport.errors);
-      }
-      if (qaReport.warnings.length > 0) {
-        console.log(`[MetadataGen Lapisan 8 - Batch item ${index}] Warnings:`, qaReport.warnings);
-      }
+      metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
       const targetId = items[index] ? items[index].id : items[0]?.id || "unknown";
       return { id: targetId, metadata };
-    });
+    }));
   } catch (error) {
     console.warn("[JohMeta Pipeline - Batch] Parse Error:", error);
     throw new Error("Gagal memproses respons batch metadata. Silakan coba kembali.");
   }
 };
-function processPromptResults(parsed, count, subject, userNegativePrompt) {
+function processPromptResults(parsed, count, subject, userNegativePrompt, styleCategory) {
   let validatedPrompts = (parsed.prompts || []).filter((p) => typeof p === "string" && p.trim().length > 0);
   if (validatedPrompts.length === 0) {
-    validatedPrompts = [`${subject} professional stock photography`].map((p) => p);
+    validatedPrompts = [`${styleCategory || ""} of ${subject}, high quality professional stock asset`].map((p) => p.trim());
   }
   const originalLength = validatedPrompts.length;
   if (validatedPrompts.length < count) {
-    const modifiers = [
-      "cinematic macro photography, highly detailed",
-      "isometric 3D render, octane render, stylized lighting",
-      "vibrant watercolor ink illustration, splash art",
-      "futuristic cyberpunk city night life background, neon glow",
-      "classical oil painting, textured brush strokes, masterwork",
-      "minimalist flat graphic design icon",
-      "dramatic backlight, rim lighting, atmospheric depth",
-      "wide angle landscape composition, beautiful morning light",
-      "studio lighting portrait, bokeh depth of field",
-      "vintage retro concept art, detailed illustration"
+    const angleMods = [
+      "eye-level candid view, natural lighting",
+      "close-up detail focus, shallow depth of field",
+      "three-quarter perspective, balanced composition",
+      "overhead flat lay view, clean negative space",
+      "wide-angle scene, contextual environment",
+      "soft side lighting, gentle shadow depth",
+      "golden hour atmospheric glow, elegant framing",
+      "clean studio illumination, tack-sharp focus"
     ];
     let modIdx = 0;
     while (validatedPrompts.length < count) {
       const base = validatedPrompts[validatedPrompts.length % originalLength];
-      const mod = modifiers[modIdx % modifiers.length];
-      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
+      const mod = angleMods[modIdx % angleMods.length];
+      validatedPrompts.push(`${base}, ${mod}`);
       modIdx++;
     }
   } else if (validatedPrompts.length > count) {
@@ -5697,8 +5948,8 @@ function processPromptResults(parsed, count, subject, userNegativePrompt) {
     negativePrompt: appendNeg || parsed.negativePrompt || "",
     styleExplanation: parsed.styleExplanation || [
       `Berhasil mensintesis ${count} variasi prompt bertema ${subject}.`,
-      `Menggunakan spektrum gaya dan variabilitas komposisi visual.`,
-      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion.`
+      `Menggunakan variabilitas komposisi visual yang konsisten dengan subjek utama.`,
+      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion/Adobe Firefly.`
     ]
   };
 }
@@ -5745,7 +5996,7 @@ var generateOptimizedPrompt = async (options) => {
   const randomColor = selectRandom(colorPalettes);
   const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
   const dynamicMood = selectRandom(creativeSurprise);
-  const randomTemp = 0.8 + Math.random() * 0.15;
+  const randomTemp = 0.7 + Math.random() * 0.1;
   const cameraAngleDirective = userCameraAngle ? styleCategory === "Photorealistic" ? ` Blend the "${userCameraAngle}" perspective naturally as a candid real-world photo angle \u2014 like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.` : styleCategory === "Cinematic" ? ` Use "${userCameraAngle}" with cinematic framing and movie-like composition.` : ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.` : "";
   const saltAngle = userCameraAngle ? "User-selected angle (see Camera details rule)" : randomAngle;
   const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
@@ -5754,7 +6005,7 @@ var generateOptimizedPrompt = async (options) => {
   const isPngMode = promptMode === "png";
   let modeConstraint = "";
   const styleSpecificDirectives = {
-    "Vector Art": vectorSubType === "gradient_flat" ? " - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines." : " - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic, featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO shading, NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions.",
+    "Vector Art": vectorSubType === "gradient_flat" ? " - Style Guide: STRICTLY 2D GRADIENT FLAT DESIGN. Focus on modern flat vector illustration utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes." : vectorSubType === "flat_vector" ? " - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus purely on clean figurative 2D flat vector artwork, clean hand-crafted paths, smooth curves, organic line art, and harmonious solid color blocks typical of professional editorial illustrations. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly shapes, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative flat illustration." : vectorSubType === "minimal_flat" ? " - Style Guide: STRICTLY MINIMAL FLAT DESIGN. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients." : vectorSubType === "corporate_flat" ? " - Style Guide: STRICTLY CORPORATE FLAT ILLUSTRATION (Alegria / Tech Corporate Style). Stylized characters with fluid sweeping postures, oversized expressive limbs, clean flat colors, and modern tech business aesthetic." : vectorSubType === "isometric_flat" ? " - Style Guide: STRICTLY ISOMETRIC FLAT DESIGN. Flat 2D isometric style using orthographic 30-degree parallel projection without camera perspective, rendered in clean, flat, shadow-free vector graphics with distinct solid color planes." : " - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, and NO geometric fragmentation.",
     "3D Render": ' - MANDATORY RENDER ENGINE LOCK: This style MUST exclusively depict Unreal Engine 5 real-time 3D rendering aesthetics \u2014 Lumen dynamic global illumination, Nanite micro-detail geometry, physically-based rendering (PBR) materials, real-time ray-traced reflections, soft volumetric studio lighting, and smooth high-fidelity 3D surfaces (glossy or matte plastic, metal, or ceramic). Every prompt variation MUST explicitly include "Unreal Engine 5" or "Unreal Engine real-time render" phrasing. STRICTLY FORBIDDEN \u2014 under no circumstances mention or blend in: isometric/orthographic perspective, glassmorphism/frosted glass/translucent glass effects, voxel art, low-poly faceting, or any other render engine name (Octane, Cinema 4D, Blender Cycles, V-Ray, Redshift, KeyShot). Do NOT cross-contaminate this style with any other PNG style vocabulary. Keep every variation 100% authentic to a pure Unreal Engine 5 CGI render.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": " - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.",
@@ -5766,7 +6017,6 @@ var generateOptimizedPrompt = async (options) => {
     "Glassmorphism": " - Focus on frosted glass effects, translucent layers, blurred background refraction, and sleek glossy reflections.",
     "Metal Emboss": " - Focus on metallic surfaces, raised 3D textures, engraved details, and realistic metal reflections like silver, gold, or steel.",
     "Line Art": " - Focus on clean, minimalist continuous single-line art, smooth elegant curves, and pure black-and-white ink strokes on a solid white background (or white line on black). Absolutely NO shading, NO colors, NO gradients, NO 3D rendering, and NO textures. CRITICAL: Maintain a pure, clean minimalist aesthetic. Do NOT mix with sketches, pencil coretan, hand-drawn sketch hatching, polygon structures, geometric low-poly/triangulated facets, or any other artistic style. Every path must be a continuous, single, perfectly smooth line with zero clutter.",
-    "Silhouette": " - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.",
     "Silhouette": " - Focus on clean, solid high-contrast black shapes on a solid white background (or white shape on black background) representing a perfect silhouette outline. Crisp vector edges, absolute zero inner details, zero textures, zero gradients, and zero shading. Focus on a beautiful, highly recognizable side-view, profile, or dynamic pose silhouette contour.",
     "Lowpoly": " - Focus on visible geometric triangular facets, faceted surfaces, and stylized abstract crystalline structures.",
     "3D CGI": " - Focus on clean computer-generated imagery with perfect geometry. Emphasize synthetic materials like smooth plastic, polished glass, sleek metal, or vibrant gel. Use highly controlled studio lighting or global illumination. The result should look like a high-end digital render from Blender or Cinema 4D, NOT a real-world photograph. AVOID: Photorealistic textures, natural imperfections, and real camera noise.",
@@ -5870,11 +6120,11 @@ ${subMod}`;
     }
   }
   let vectorSubTypeDirective = "";
-  if (styleCategory === "Vector Art" && isPngMode && vectorSubType) {
+  if (styleCategory === "Vector Art" && vectorSubType) {
     if (vectorSubType === "minimal_flat") {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
     } else if (vectorSubType === "flat_vector") {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative 2D flat vector illustration.';
     } else if (vectorSubType === "corporate_flat") {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Corporate Flat Illustration" aesthetic (Alegria style / tech corporate art). Characterized by stylized figures with oversized limbs, fluid sweeping postures, expressive dynamic organic poses, friendly tech character design, clean flat gradients or solid colors, and professional corporate vector elements.';
     } else if (vectorSubType === "gradient_flat") {
@@ -5917,7 +6167,7 @@ Make sure your generated prompts do not contain these elements or depict them in
   }
   const isPhotographic = ["Photorealistic", "Cinematic", "Vintage Photography"].includes(styleCategory);
   let effectiveStyleCategory = styleCategory;
-  if (styleCategory === "Vector Art" && isPngMode && vectorSubType) {
+  if (styleCategory === "Vector Art" && vectorSubType) {
     if (vectorSubType === "minimal_flat") effectiveStyleCategory = "Vector Art - Minimal Flat Design";
     else if (vectorSubType === "flat_vector") effectiveStyleCategory = "Vector Art - Flat Vector Illustration";
     else if (vectorSubType === "corporate_flat") effectiveStyleCategory = "Vector Art - Corporate Flat Illustration";
@@ -5941,7 +6191,7 @@ ${isPngMode ? `- Requested PNG Background color: ${pngBgColor}` : ""}
 ${modeConstraint}
 
 PROMPT GENERATION PRIORITY (STRICT ORDER):
-1. Theme subject: The core subject MUST remain the dominant focus of the prompt.
+1. ABSOLUTE SUBJECT ADHERENCE (CRITICAL FOR SMALL/LITE MODELS): The exact core subject "${subject}" MUST remain the central, dominant focus of every single prompt. You are STRICTLY FORBIDDEN from wandering off-topic (ngawur) or hallucinating entirely different topics. No matter how much you vary the environment or style, the original subject MUST be clearly visible and accurate to the user's request.
 2. Visual characteristics: Describe specific colors, shapes, and the overall aesthetic vibe.
 3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities (e.g., stacked paper layers for Paper Cut, hand-molded clay textures for Claymation, canvas grain/pigments for Oil/Watercolor paintings, clean vector geometry for Vector Art).
 4. Environment: Only introduce environmental details if they naturally fit the theme. Do not introduce unrelated environments.
@@ -5949,20 +6199,41 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. ${isPhotographic ? `Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).${cameraAngleDirective}` : "Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details."}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? " [Camera Details]" : ""} [Commercial Intent]. Combine these elements into a fluid, professional description.
-0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
-0.15 STYLE PURITY LOCK \u2014 ZERO CROSS-CONTAMINATION (CRITICAL \u2014 READ TWICE):
-      Each style has its OWN vocabulary domain. You MUST use ONLY the vocabulary belonging to the selected style. NEVER leak terms from other style domains.
-      \u2500 STYLE VOCABULARY DOMAINS \u2500
-      \u{1F4F8} Photographic Domain (Cinematic, Photorealistic, Vintage Photography, Dark Horror, Corporate Tech): camera lenses, apertures, DSLR, film grain, lighting setups, real-world environments, human subjects, candid moments. FORBIDDEN: "vector", "flat design", "outline", "stroke", "fill color", "isometric grid", "voxel", "polygon count", "render engine".
-      \u{1F3A8} Vector/Illustration Domain (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): vector paths, solid fills, clean outlines, flat colors, geometric shapes, stroke weight, anchor points. FORBIDDEN: camera terms, 3D materials, photorealism, "shot on", "lens", real-world physics.
-      \u{1F9F1} 3D/CGI Domain (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric, Claymation): polygons, materials, textures, global illumination, ray tracing, subsurface scattering, voxel grids. FORBIDDEN: "photograph", "camera", "vector", "flat 2D".
-      \u{1F58C}\uFE0F Traditional Art Domain (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): brushstrokes, pigments, paper grain, canvas, textile, folded paper. FORBIDDEN: digital 3D terms, camera terms, "vector".
-      \u{1F3AE} Stylized Domain (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style): cel-shading, brick toys, pixel grid, expressive features. FORBIDDEN: photorealism, 3D render jargon, vector flat design.
-      \u26A0\uFE0F BEFORE WRITING EACH PROMPT: check which domain the selected style belongs to, then filter your vocabulary to ONLY that domain. Cross-domain leakage = FAIL.
+0. MEDIUM-SPECIFIC DIVERSITY & LOGICAL SCENE FRAMEWORK (TAILORED PER STYLE DOMAIN):
+      Every generated prompt variation MUST represent a completely DIFFERENT, CREATIVE, and LOGICAL composition of the subject "${subject}", tailored specifically to the medium of "${effectiveStyleCategory}":
+
+      \u2500 FOR PHOTOGRAPHIC & CINEMATIC STYLES (Photorealistic, Cinematic, Vintage):
+        * Variasikan skenario kehidupan nyata: persiapan, aksi penggunaan, momen candid, interaksi, detail bahan baku.
+        * Variasikan framing & pencahayaan alami: macro close-up, eye-level portrait, overhead knolling flat lay, wide environmental landscape, golden hour, morning window light, clean softbox studio.
+
+      \u2500 FOR VECTOR & GRAPHIC DESIGN STYLES (Vector Art, Graphic Design, Flat Icon, Sticker, Line Art):
+        * Variasikan layout grafis & hierarki desain: layout banner promosi horizontal, kartu poster vertikal dengan negative space, komposisi emblem/lencana terpusat, tata letak infografis modular, susunan siluet dinamis.
+        * Variasikan palet warna & teknik vektor: palet warna duotone kontras tinggi, palet pastel kontemporer, kombinasi monokromatik elegan, ketebalan garis (stroke weight), dan bentuk lengkungan geometris/organik.
+
+      \u2500 FOR 3D & CGI STYLES (3D Render, 3D CGI, Isometric, Lowpoly, Voxel):
+        * Variasikan panggung & sudut 3D: diorama isometrik modular 30 derajat, panggung pedestal produk mengapung, studio clay render minimalis, pencahayaan tiga titik (three-point studio lighting), material matte vs glossy ceramic.
+
+      \u2500 FOR TRADITIONAL & CRAFT STYLES (Paper Cut, Watercolor, Oil Painting, Origami, Embroidery):
+        * Variasikan teknik medium fisik: tingkatan lapisan tumpukan kertas 3D dengan bayangan lembut, sapuan basah cat air (wet-on-wet wash), tekstur impasto goresan palet tebal, lipatan origami geometris rapi, pola tusukan benang bordir timbul.
+
+      - LOGIKA MANUSIA & RELEVANSI SUBJEK (Strict Human Logic):
+        * Setiap variasi harus tetap masuk akal, relevan dengan subjek "${subject}", dan bernilai komersial tinggi.
+        * DILARANG mengulang-ulang kalimat yang sama dengan hanya mengganti 1 kata.
+
+      0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
+0.15 UNIVERSAL STYLE PURITY & CONSISTENCY LOCK (CRITICAL \u2014 ZERO TOLERANCE FOR STYLE DRIFT):
+      You MUST maintain 100% pure consistency with the selected style "${effectiveStyleCategory}".
+      - Every single prompt variation MUST begin with "${effectiveStyleCategory}" as its stylistic prefix.
+      - NEVER contaminate or mix the vocabulary of the chosen style with another style.
+      - \u{1F4F8} PHOTOGRAPHIC (Photorealistic, Cinematic, Vintage Photography): Use ONLY camera lenses (50mm, 85mm, 35mm), lighting setups, aperture (f/1.8, f/2.8), and natural textures. FORBIDDEN: "vector", "3D render", "illustration", "flat art", "drawing", "CGI".
+      - \u{1F3A8} VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
+      - \u{1F9F1} 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
+      - \u{1F58C}\uFE0F TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
+      - \u{1F3AE} STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
+      - UNDER NO CIRCUMSTANCES should any prompt drift into abstract geometric patterns or unrelated styles unless explicitly requested.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
-1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
-2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
+1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
+2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
 3. WORD COUNT CONSTRAINT: Each generated prompt SHOULD be between ${minWords} and ${maxWords} words long. Adjust the level of detail to strictly match this requested length profile.
 4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property (IP). Under any circumstances, NEVER include any brand names, trademarked names, manufacturer names, or proprietary product lines (e.g., Apple, Nike, Adidas, BMW, Vespa, LEGO, GoPro, iPhone). Use completely generic descriptions instead.
    Under Adobe Stock Content Policy for Artist Names, Real Known People, and Fictional Characters (https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
@@ -5981,13 +6252,13 @@ Rules for the Generated Prompts:
     - Moderators look for NOTICEABLE DIFFERENCES including variations in composition, color, expression, or scenario. You must be extremely selective and output only your most varied, premium, and distinct concepts.
 11. ADOBE STOCK SIMILARITY PROTECTION ACTIVE (CRITICAL CORE DIRECTIVE):
     - DO NOT generate prompts that sound like generic, common, or natural stock photos (e.g., "business people shaking hands", "happy family in park", "generic coffee cup on table").
-    - You must forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
+    - EXTREME DIVERSITY MANDATE: You MUST forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
     - Break the standard stock photography molds by using hyper-specific, unusual subject interactions, highly dramatic emotional states, or avant-garde conceptual presentations. Make the prompts incredibly creative, unpredictable, and highly varied.
-    - Inject extreme variation across:
-      * Composition & Camera Angle: Vary across wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, and overhead drone shots.
-      * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
-      * Subjects, Expressions & Poses: Vary characters' ages, genders, ethnicities, actions, emotional expressions (e.g., focused, joyful, contemplative, active, serene), and direct interactions with their surroundings.
-      * Scenario & Environment: Change environments completely (e.g., indoors vs. outdoors, modern minimalist spaces vs. raw nature, urban landscapes vs. intimate workspaces).
+    - FOR EACH OF THE ${count} VARIATIONS, YOU MUST CHANGE THE FOLLOWING (NO REPETITION ALLOWED):
+      * Composition & Camera Angle: Shift dramatically between wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, overhead drone shots, and macro shots.
+      * Color Palette & Lighting Setup: Cycle completely through different lighting setups (golden hour, bright overcast, neon cyberpunk, moody twilight, studio strobes, chiaroscuro, pastel, vibrant saturation).
+      * Subjects, Expressions & Poses: Radically alter ages, genders, ethnicities, fashion styles, micro-actions, emotional expressions (focused, joyful, contemplative, serene, aggressive), and dynamic poses.
+      * Scenario & Environment: Teleport the subject to entirely different backgrounds for each prompt (e.g., minimalist modern studio, lush jungle, gritty cyberpunk alley, serene beach at dawn, chaotic urban intersection).
     - ANTI-CLICH\xC9 & ANTI-FORCED-DRAMA RULE (CRITICAL):
       * DO NOT default to clich\xE9 dramatic weather tropes such as "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", or "ominous black clouds" unless the subject EXPLICITLY requires it (e.g., a storm-chaser documentary scene).
       * Creativity does NOT mean forced drama, darkness, or apocalyptic weather. A beautiful Cinematic scene can be a warm golden-hour field, a sleek modern interior, a serene misty forest, a vibrant cityscape at dusk, or an intimate candlelit room \u2014 not just dark skies and lightning.
@@ -6063,7 +6334,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
           responseMimeType: "application/json",
           responseSchema,
-          config: { temperature: randomTemp, seed, topP: 0.99 },
+          config: { temperature: randomTemp, seed, topP: 0.85 },
           model
         });
         const parsed = JSON.parse(extractJSON(text));
@@ -6076,7 +6347,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
           promptArray = parsed.variations;
         }
         if (promptArray.length > 0) {
-          return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || "", styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt);
+          return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || "", styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt, styleCategory);
         }
         throw new Error("Missing or empty prompts array in JSON response");
       } catch (err) {
@@ -6104,12 +6375,12 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
               }
             });
           }
-          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type "\${styleCategory}"" based on: "\${subject}"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type "\${styleCategory}"" strictly featuring the exact core subject: "\${subject}"".\\n\\nCRITICAL SUBJECT ADHERENCE:\\n1. Every prompt variation MUST center around "\${subject}"". Do NOT replace, mutate, or drift away from this subject.\\n2. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph.\\n3. DO NOT use comma-separated keyword lists or tags.`;
           if (referenceImages && referenceImages.length > 0) {
             instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: "\${subject}"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type "\${styleCategory}"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of "\${subject}"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe "\${subject}"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
           }
           parts.push({ text: instructionText });
-          const response2 = await callGeminiWithRetry(modelName, {
+          const response = await callGeminiWithRetry(modelName, {
             parts
           }, {
             systemInstruction,
@@ -6117,14 +6388,14 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
             responseSchema,
             temperature: randomTemp,
             seed,
-            topP: 0.99,
-            topK: 100,
+            topP: 0.85,
+            topK: 40,
             safetySettings
           });
-          const text = response2.text || "{}";
+          const text = response.text || "{}";
           const parsed = JSON.parse(extractJSON(text));
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
-            return processPromptResults(parsed, count, subject, userNegativePrompt);
+            return processPromptResults(parsed, count, subject, userNegativePrompt, styleCategory);
           }
           throw new Error("Missing or empty prompts array in JSON response");
         } catch (err) {
@@ -6549,13 +6820,6 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       "modern solid shape profile silhouette illustration, sleek black shapes, high contrast minimalist art on solid white, no details",
       "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
       "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
-    ],
-    "Silhouette": [
-      "minimalist high-contrast black silhouette vector graphic, clean solid black outline shape on solid white background, elegant look",
-      "contemporary fine silhouette design asset, crisp solid black vector contours, minimalist aesthetic, graceful curves",
-      "modern solid shape profile silhouette illustration, sleek black shapes, high contrast minimalist art on solid white, no details",
-      "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
-      "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
     ]
   };
   const activeModifiers = styleFallbackMap[styleCategory] || styleFallbackMap["Cinematic"];
@@ -6583,66 +6847,78 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     ]
   };
 };
-var analyzeImageToPrompt = async (image, styleCategory = "Cinematic", model) => {
+var analyzeImageToPrompt = async (image, styleCategory = "Default", variation = 5, model) => {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
-Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
+  const count = Math.min(Math.max(variation, 5), 15);
+  let styleHandlingInstruction = "";
+  if (styleCategory === "Default" || styleCategory === "Original Style" || styleCategory === "Match Image") {
+    styleHandlingInstruction = `3. STYLE PRESERVATION (DEFAULT / MATCH ORIGINAL IMAGE STYLE):
+   - Deeply analyze the EXACT visual medium, art style, rendering technique, and aesthetic of the uploaded image (e.g. realistic photograph, 3D CGI render, flat 2D vector, watercolor painting, pixel art, cyberpunk illustration, vintage engraving, claymation, line art, etc.).
+   - STRICTLY PRESERVE and deeply emulate this exact same art style, rendering medium, texture, and visual fidelity across all generated prompt variations. Do NOT convert into an unrelated style.`;
+  } else if (styleCategory === "Flat Illustration" || styleCategory === "Flat Vector") {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO FLAT ILLUSTRATION:
+   - Convert the aesthetic completely into a clean, modern 2D Flat Vector Illustration style.
+   - Emphasize crisp vector outlines, flat harmonious color palettes, clean geometric and organic shapes, minimalist shading, generous clean copy space, and aesthetic editorial illustration qualities typical of professional flat vector art.`;
+  } else if (styleCategory === "Graphic Design") {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO COMMERCIAL GRAPHIC DESIGN (ZERO TYPOGRAPHY RULE):
+   - Convert the aesthetic completely into a professional commercial advertising layout, banner template, or poster composition crafted in Adobe Illustrator/Photoshop style with geometric shapes, flat vector elements, and vibrant commercial color palettes.
+   - STRICT BAN ON ALL TYPOGRAPHY & TEXT: You are STRICTLY FORBIDDEN from including any readable text, fake words, letters, gibberish characters, placeholder fonts, or printed typography in the prompt.
+   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST explicitly feature spacious, clean, uncluttered empty copy space / negative space (e.g., "spacious clean negative copy space on the right, blank layout area for text overlay, no typography, no letters, purely graphic background"). This makes the asset 100% editable and commercially sellable on microstock platforms.`;
+  } else {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO "${styleCategory}":
+   - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).`;
+  }
+  const systemInstruction = `You are a World-Class AI Visual Reverse-Engineering Analyst and Master Prompt Engineer.
+Analyze the provided image and generate EXACTLY ${count} unique, highly varied, professional text-to-image prompt variations in English, tailored to the target style "${styleCategory}".
 
-CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
-5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the image contains recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
+CRITICAL REVERSE-ENGINEERING & DIVERSITY RULES (MANDATORY):
+1. EXTRACT CORE NICHE & THEME:
+   - Identify the underlying subject matter, commercial intent, vibe, color tone, lighting, and composition of the uploaded image.
+2. GENERATE ${count} DIVERSE COMPANION / SISTER VARIATIONS (DO NOT CLONE):
+   - Every single prompt variation MUST be distinctly DIFFERENT from the original image and DIFFERENT from each other.
+   - Variasikan:
+     * Sudut Kamera & Framing: macro close-up, overhead flat lay knolling, wide environmental shot, eye-level candid, 3/4 dynamic perspective.
+     * Skenario & Aksi: Tampilkan subjek dalam aksi, interaksi, tahapan persiapan, atau konteks penggunaan yang berbeda di dunia nyata.
+     * Pencahayaan & Waktu: Golden hour, soft morning window light, clean studio lighting, moody atmospheric light.
+     * Komposisi & Copy Space: Letakkan subjek dengan komposisi seimbang (rule of thirds, off-center) dan sertakan clean copy space untuk kebutuhan komersial stok.
+   - All variations must be plausible, logical, and commercially viable.
+${styleHandlingInstruction}
+4. COMMERCIAL READINESS & COPY SPACE:
+   - All prompts must be formatted to produce high-demand commercial stock imagery with clean, usable negative space / copy space suitable for marketing, website headers, advertisements, and editorial overlays.
+5. ZERO IP RISK:
+   - Replace any brand names/logos with generic descriptive terms (e.g. 'luxury modern coupe' instead of 'Porsche').
 
-STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
-- Subject (The main entity)
-- Action (What is happening)
-- Environment (Setting, location, context)
-- Mood (Emotional tone)
-- Lighting (Type, direction, intensity)
-- Camera angle (Position relative to subject)
-- Lens estimate (Focal length, aperture, depth of field)
-- Composition (Framing, rule of thirds, perspective)
-- Visual style (Current aesthetic baseline)
-
-STEP 2: GENERATE A DETAILED PROMPT MATCHING THE SELECTED STYLE: ${styleCategory}
-Adapt the prompt structure according to the chosen style:
-- If 'Photorealistic': focus on RAW photo quality, technical camera specs, hyper-real textures.
-- If 'Cinematic': focus on anamorphic lens effects, color grading, lighting scenarios, film stock.
-- If 'Adobe Stock': focus on clean backgrounds, commercial appeal, high contrast, studio lighting.
-- If 'Editorial': focus on fashion/magazine composition, avant-garde elements, professional retouching styles.
-- If 'Lifestyle': focus on natural motion, candid moments, warm/authentic lighting, everyday settings.
-- If 'Fine Art': focus on brushstrokes, medium textures, artistic theory, museum-quality lighting.
-- If 'Grimdark Gothic Horror Painterly': focus on macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy and gothic horror art.
-
-CRITICAL RULES:
-1. OUTPUT PROMPT MUST BE IN ENGLISH.
-2. The description should be a concise summary of the visual analysis and how this variation differs or complements the original asset.
-3. Return a JSON object with "prompt" and "description".`;
+CRITICAL OUTPUT FORMAT:
+- Return a JSON object with:
+  - "prompts": an array of EXACTLY ${count} distinct prompt strings in English.
+  - "description": a brief explanation in Indonesian summarizing the visual analysis and how these variations provide commercial companion diversity.`;
   const responseSchema = {
     type: import_genai.Type.OBJECT,
     properties: {
-      prompt: { type: import_genai.Type.STRING, description: "The generated image-to-image prompt." },
-      description: { type: import_genai.Type.STRING, description: "Brief description of the image content." }
+      prompts: {
+        type: import_genai.Type.ARRAY,
+        items: { type: import_genai.Type.STRING },
+        description: `Array of exactly ${count} unique prompt variations in English.`
+      },
+      description: { type: import_genai.Type.STRING, description: "Brief description of image analysis in Indonesian." }
     },
-    required: ["prompt", "description"]
+    required: ["prompts", "description"]
   };
   const imagePart = processFrameServer(image);
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash"];
+  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"];
   let lastError;
-  let responseText2 = "";
+  let responseText = "";
   const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+      const response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Reverse-engineer this image and generate ${count} unique, varied sister prompt variations matching style: "${styleCategory}".` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0
+        temperature: 0.65
       });
-      responseText2 = response.text || "{}";
+      responseText = response.text || "{}";
       break;
     } catch (err) {
       lastError = err;
@@ -6650,98 +6926,45 @@ CRITICAL RULES:
       if (err.message && err.message.includes("API_KEY")) throw err;
     }
   }
-  if (!responseText2) {
+  if (!responseText) {
     console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
     throw lastError || new Error("Failed to analyze image. Please try again.");
   }
   try {
-    const data = JSON.parse(extractJSON(responseText2));
-    return data;
-  } catch (error) {
-    console.warn("Gemini Parse Error:", error, responseText2);
-    throw new Error("Failed to parse AI response. Please try again.");
-  }
-};
-var analyzeBatchImageToPrompt = async (images, styleCategory = "Cinematic", model) => {
-  const store = apiKeyStorage.getStore();
-  const provider = store && store.provider || "gemini";
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
-Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
-
-CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
-5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the images contain recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
-
-FOR EACH IMAGE, EXTRACT AND ANALYZE:
-- Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
-
-GENERATE PROMPT MATCHING STYLE: ${styleCategory}
-Adapt the logic based on style:
-- Photorealistic/Cinematic: High technical detail, optics, and lighting.
-- Adobe Stock/Editorial: Commercial composition and polish.
-- Lifestyle/Fine Art: Emotional resonance and artistic medium.
-- Grimdark Gothic Horror Painterly: Macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy.
-
-CRITICAL BATCH RULES:
-1. You are receiving ${images.length} distinct images.
-2. You MUST return a JSON array containing EXACTLY ${images.length} objects.
-3. OUTPUT PROMPTS MUST BE IN ENGLISH.
-
-Return a JSON array of objects, each with "prompt" and "description".`;
-  const responseSchema = {
-    type: import_genai.Type.ARRAY,
-    items: {
-      type: import_genai.Type.OBJECT,
-      properties: {
-        prompt: { type: import_genai.Type.STRING, description: "The generated image-to-image prompt." },
-        description: { type: import_genai.Type.STRING, description: "Brief description of the image content." }
-      },
-      required: ["prompt", "description"]
-    }
-  };
-  const parts = [];
-  for (let i = 0; i < images.length; i++) {
-    parts.push({ text: `
-
---- IMAGE ${i + 1} ---
-` });
-    parts.push(processFrameServer(images[i]));
-  }
-  parts.push({ text: `
-Analyze these ${images.length} images and return the JSON array.` });
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.6-flash"];
-  let lastError;
-  const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
-  for (const modelName of modelsToTryList) {
-    try {
-      const res = await callGeminiWithRetry(modelName, { parts }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0
-      });
-      responseText = res.text || "[]";
-      break;
-    } catch (err) {
-      lastError = err;
-      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes("API_KEY")) throw err;
-    }
-  }
-  if (!responseText) {
-    console.warn("analyzeBatchImageToPrompt bypassed:", lastError?.message);
-    throw lastError || new Error("Failed to analyze images in batch.");
-  }
-  try {
     const data = JSON.parse(extractJSON(responseText));
-    return data;
+    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 ? data.prompts : data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`];
+    return {
+      prompts: promptList,
+      prompt: promptList[0] || "",
+      description: data.description || "Analisis visual dan ekstraksi variasi prompt selesai."
+    };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
     throw new Error("Failed to parse AI response. Please try again.");
   }
+};
+var analyzeBatchImageToPrompt = async (images, styleCategory = "Cinematic", variation = 5, model) => {
+  const concurrency = 4;
+  const results = new Array(images.length);
+  for (let i = 0; i < images.length; i += concurrency) {
+    const chunk = images.slice(i, i + concurrency);
+    const chunkPromises = chunk.map(async (img, offset) => {
+      const index = i + offset;
+      try {
+        const res = await analyzeImageToPrompt(img, styleCategory, variation, model);
+        results[index] = res;
+      } catch (err) {
+        console.warn(`[analyzeBatchImageToPrompt] Error on image index ${index}:`, err.message);
+        results[index] = {
+          prompts: [`${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`],
+          prompt: `${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`,
+          description: "Gagal mengekstrak analisis detail gambar, menggunakan prompt estimasi gaya."
+        };
+      }
+    });
+    await Promise.all(chunkPromises);
+  }
+  return results;
 };
 var analyzeVideoKeyword = async (keyword, model) => {
   const store = apiKeyStorage.getStore();
@@ -6793,16 +7016,16 @@ var analyzeVideoKeyword = async (keyword, model) => {
     },
     required: ["keyword", "demandPotential", "demandType", "marketInsight", "targetBuyer", "useCase", "recommendedFormat", "formatReason", "competitionLevel", "competitionNotes", "cinematicPotential", "cinematicReason", "status", "conclusion", "solution"]
   };
-  let responseText2 = "";
-  const response2 = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", prompt, {
+  let responseText = "";
+  const response = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", prompt, {
     responseMimeType: "application/json",
     responseSchema,
     temperature: 0,
     topK: 1,
     topP: 0.1
   });
-  responseText2 = response2.text || "{}";
-  return JSON.parse(responseText2);
+  responseText = response.text || "{}";
+  return JSON.parse(responseText);
 };
 async function generateHollywoodPrompts(keyword, model) {
   const store = apiKeyStorage.getStore();
@@ -6838,9 +7061,9 @@ async function generateHollywoodPrompts(keyword, model) {
       required: ["subject", "movement", "environment", "lighting", "camera_angle", "camera_movement", "style"]
     }
   };
-  let responseText2 = "";
+  let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    responseText2 = await callOpenAICompatibleWithRetry({
+    responseText = await callOpenAICompatibleWithRetry({
       contents: prompt,
       responseMimeType: "application/json",
       responseSchema,
@@ -6848,15 +7071,15 @@ async function generateHollywoodPrompts(keyword, model) {
       model
     });
   } else {
-    const response2 = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", prompt, {
+    const response = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", prompt, {
       responseMimeType: "application/json",
       responseSchema
     });
-    responseText2 = response2.text || "[]";
+    responseText = response.text || "[]";
   }
   let parsed;
   try {
-    parsed = JSON.parse(extractJSON(responseText2));
+    parsed = JSON.parse(extractJSON(responseText));
   } catch (e) {
     console.warn("Parse error for hollywood prompts:", e);
     parsed = [];
@@ -6876,12 +7099,23 @@ async function checkImageQuality(image, tolerance = "MEDIUM", language = "Bahasa
   if (imageMetadata) {
     metadataInstruction = `
 
-[DATA EXIFTOOL - REFERENSI TEKNIS]
-Berikut adalah data Metadata EXIF asli dari file Gambar yang diekstrak menggunakan ExifTool:
+---
+[DATA PENGUKURAN PIKSEL OBJEKTIF - WAJIB DIJADIKAN ACUAN UTAMA]
+Berikut adalah hasil pengukuran teknis NYATA dari piksel file gambar asli (dihitung menggunakan analisis Laplacian/statistik piksel, BUKAN estimasi visual):
 \`\`\`json
 ${JSON.stringify(imageMetadata, null, 2)}
 \`\`\`
-Jadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda.`;
+ATURAN PENTING TERKAIT DATA INI:
+1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI, sedangkan gambar yang Anda lihat secara visual mungkin telah di-downscale/dikompresi oleh sistem vision API sehingga cacat halus (blur ringan, noise, banding, blocking) BISA JADI TIDAK TERLIHAT JELAS secara visual oleh Anda. JANGAN mengabaikan indikasi cacat pada data pengukuran hanya karena gambar "terlihat baik-baik saja" secara visual \u2014 gabungkan kedua sumber bukti (visual + numerik).
+2. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus yang WAJIB memengaruhi status \`blur\`.
+3. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.
+4. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.
+5. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar (bukan seluruh gambar) terdeteksi jauh lebih blur dari area lain \u2014 ini adalah pola cacat AI generatif atau motion blur parsial yang sangat mudah TERLEWAT jika hanya melihat gambar secara sekilas. Periksa dan pertimbangkan dengan serius.
+6. Field \`megapixels\` dan dimensi/resolusi FILE TIDAK BOLEH dipakai sebagai quality gate, penalty, FAIL, WARNING, atau alasan menurunkan overall_score. Resolusi hanya boleh dianggap metadata informasional bila muncul di data teknis. Jangan menyebut resolusi rendah sebagai masalah kualitas. \`file_size_kb\` juga bukan indikator kualitas visual. Fokuskan penilaian pada bukti visual dan forensic pixel evidence seperti sharpness, noise, exposure, banding, compression, alpha edge, OCR/text integrity, structural defects, AI artifacts, dan IP.
+7. Untuk PNG transparan, field \`transparency\` adalah pemeriksaan khusus cutout. Persentase transparan yang tinggi dan partial-alpha anti-aliasing yang normal BUKAN cacat. Jangan FAIL hanya karena gambar memiliki transparansi atau pixel semi-transparan. Perlakukan \`edge_halo_risk_percent\` sebagai cacat hanya bila bukti menunjukkan matte/fringe warna yang berulang dan benar-benar terlihat pada batas objek.
+8. Jika bukti alpha-edge hanya level WARN, laporkan sebagai rekomendasi pemeriksaan, bukan automatic rejection. Bedakan anti-aliasing normal dari kontaminasi matte hitam/putih/warna.
+9. Jangan menyimpulkan high noise, blur, atau AI artifact hanya dari preview yang telah di-downscale ketika pengukuran piksel objektif menunjukkan sebaliknya. Gunakan angka teknis dan crop resolusi asli bersama-sama.
+Jadikan data teknis di atas sebagai BUKTI UTAMA yang menguatkan atau mengoreksi kesan visual Anda, bukan sekadar informasi tambahan.`;
   }
   let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
 
@@ -6899,15 +7133,26 @@ Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis
 - BATASAN PENGECUALIAN ARTISTIK (CRITICAL): Pengecualian estetika di atas (bokeh, noise halus, bayangan dramatis) HANYA berlaku untuk pilihan artistik murni. Pengecualian ini TIDAK PERNAH berlaku untuk cacat struktural AI, objek yang tidak logis secara mekanis, anatomi cacat, atau teks rusak \u2014 temuan tersebut WAJIB FAIL di semua mode toleransi tanpa kecuali.
 
 ---
-PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
-Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil dari 4 wilayah KUADRAN ber-overlap 20% yang bersama-sama mencakup SELURUH permukaan gambar, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, lalu BAWAH-KANAN.
-- Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
-- ZONA RAWAN KRITIS (WAJIB DIPERIKSA EKSTRA TELITI): Pada foto orang memegang/menyentuh objek (produk, model, botol, alat, dsb.), titik kontak tangan-jari-objek PALING SERING berada di paruh BAWAH frame (kuadran BAWAH-KIRI/BAWAH-KANAN) \u2014 dekat dada, perut, atau pinggang subjek. Zona inilah yang paling sering mengandung cacat AI generatif (jari menyatu/meleleh ke objek, objek yang menembus pakaian, genggaman yang mustahil secara fisik) namun paling mudah terlewat jika hanya melihat gambar penuh yang telah diperkecil. Periksa kuadran bawah dengan tingkat kecurigaan setara atau lebih tinggi daripada kuadran atas.
-- Sebutkan di laporan visual_scan_analysis crop wilayah mana (atas-kiri/atas-kanan/bawah-kiri/bawah-kanan) tempat Anda menemukan cacat.
+PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL FORENSIC ENGINE):
+Ketika menerima lebih dari 1 gambar, urutan gambar yang masuk ke vision model adalah:
+1. Gambar 1: Tampilan Penuh (Full Frame Overview) - periksa komposisi, pencahayaan global, dan konteks subjek.
+2. Gambar 2-5: 4 Kuadran Overlap 20% (Atas-Kiri, Atas-Kanan, Bawah-Kiri, Bawah-Kanan) - periksa tepi objek, latar belakang, dan struktur arsitektur.
+3. Gambar 6: Macro Subject Focus Crop (Zoom 1:1 Resolusi Asli pada Pusat Interaksi) - ini adalah crop mikroskopis fokus tinggi pada titik interaksi paling kritis: tangan memegang objek (bunga, rosario, alat kerja), detail kuku, pori-pori kulit, telinga, kelopak bunga, atau perhiasan.
+- Gunakan crop ke-6 (Macro Focus) untuk membedakan secara mutlak antara:
+  a. Aset Bersih (PASS): Jari tangan terpisah jelas dengan ruas sendi dan kuku nyata (seperti tangan memegang tangkai mawar putih), tekstur kulit alami dengan pori-pori halus, telinga terstruktur sempurna.
+  b. Cacat AI (FAIL): Manik-manik melebur ke dalam daging jari, kuku hilang/rusak, mahkota bunga meleleh menjadi gumpalan lilin, atau kulit berminyak sintetis tanpa pori.
 - Cacat yang terkonfirmasi pada SALAH SATU crop saja sudah cukup untuk menyatakan FAIL pada check terkait \u2014 moderator Adobe Stock memeriksa gambar pada zoom 100-200% di SELURUH area, bukan hanya tampilan penuh.
+- PERMUKAAN BERTULISAN DI LATAR BELAKANG (WAJIB DIPERIKSA DI SETIAP CROP): Whiteboard, papan tulis, sticky notes, poster dinding, sampul buku, layar monitor/panel kontrol, label kemasan, dan colokan/soket listrik yang memiliki cetakan ikon/huruf SERING berada di pinggir atau sudut frame (bukan di tengah) sehingga mudah terlewat jika hanya melihat gambar penuh yang kecil. WAJIB periksa SETIAP permukaan bertulisan di SETIAP crop kuadran secara eksplisit satu per satu \u2014 coretan/diagram yang tidak membentuk simbol kimia atau tulisan yang benar-benar bermakna (huruf acak, bentuk molekul yang tidak logis, ikon soket listrik yang bukan bentuk lubang colokan standar) adalah cacat AI generatif yang WAJIB FAIL, walaupun ukurannya kecil dan berada di latar belakang yang blur/jauh.
 
 ---
 Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Manfaatkan SEMUA crop detail resolusi asli yang diberikan!):
+
+   - 4 PILAR UTAMA TEKNIS ADOBE STOCK (WAJIB DIPERIKSA SECARA KETAT):
+     1. Exposure Issues: Deteksi overexposure (blown highlights/area putih mati tanpa detail) dan underexposure parah (crushed shadows gelap pekat berlumpur).
+     2. Soft Focus / Miss-focus: Subjek utama wajib tack-sharp (tajam fokus sempurna). Tolak jika subjek tampak kabur, miss-focus, atau motion blur tak disengaja.
+     3. Excessive Filtering: Deteksi efek denoising/filter berlebihan yang membuat kulit/tekstur tampak seperti lilin/plastik (waxy plastic look) atau over-sharpening halo.
+     4. Artifacts & Noise: Deteksi pixelation kasar, color banding pada langit/latar belakang, chromatic aberration (fringe warna), dan noise bintik pasir pada area shadow.
+
 1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
    - Subjek utama wajib memiliki fokus yang tajam sempurna (pin-sharp atau tack-sharp).
    - Deteksi motion blur yang tidak disengaja akibat pergerakan kamera lambat (camera shake) atau shutter speed subjek yang tidak memadai.
@@ -6960,24 +7205,53 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
    - Hak Pribadi & Tubuh (Biometrics):
      * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk.
+     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk, NAMUN Anda WAJIB mengubah nilai 'requires_model_release' menjadi true. Lakukan hal yang sama pada 'requires_property_release' jika mendeteksi arsitektur modern/karya seni yang butuh rilis properti.
      * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
      * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
    - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
-   - Teks Tidak Terbaca & Gibberish (CRITICAL): Periksa apakah terdapat teks yang tidak terbaca, karakter rusak, kata-kata yang berantakan, atau ejaan aneh (gibberish text) pada papan tulis (whiteboard), catatan tempel (sticky notes), poster, buku, kemasan produk, atau bagian mana pun di dalam gambar. Ini adalah cacat visual generatif AI yang sangat umum dan fatal untuk komersial. Jika gambar mengandung teks berantakan (seperti karakter huruf yang hancur, kata yang tidak bermakna/gibberish, atau gabungan huruf acak), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
+   - Teks & Ejaan: Evaluasi ejaan teks secara objektif. Jika teks ejaannya valid dan rapi, luluskan dari segi ejaan. Namun, periksa integrasi 3D teks tersebut: apakah teks pada kain/permukaan melengkung mengikuti lipatan dan deformasi permukaan fisik secara realistis, atau tampak seperti proyeksi stiker 2D yang ditempel datar tanpa distorsi lipatan kain (Texture Projection Artifact)? Jika tampak datar/tidak realistis mengikuti lekukan kain, wajib tandai cacat integrasi visual.
+   - Refleksi Kaca & Anomali Cahaya/Fisika [SANGAT KRITIS]: Periksa pantulan pada kaca, cermin, atau lantai basah. Pastikan setiap teks pantulan (misalnya teks terbalik di kaca) memiliki sumber objek fisik nyata di depannya. Refleksi 'hantu' yang tidak memiliki sumber objek fisik nyata adalah halusinasi AI fatal dan WAJIB FAIL.
+   - Logika Fisik, Keselamatan & Mekanikal: Periksa alat kerja, harness/sabuk pengaman, tali gantungan, dan tumpuan tangga. Tali pengaman yang melayang tanpa anchor point atau tangga bersandar langsung pada kaca licin tanpa pengaman adalah anomali logika generatif.
+   - Figur Sekunder & Kerumunan Latar Belakang (Background Crowd Distortion): Lakukan audit zoom 100% pada orang-orang di latar belakang. Jika kaki menyatu dengan trotoar, wajah melebur, atau siluet anatomi hancur, status "ai_artifacts" dan "anatomical_errors" WAJIB di-set ke FAIL dan gambar dinyatakan REJECT/FAIL.
 
 6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
    - Efek Cahaya & Lens Flare Merusak (Excessive/Artificial Lens Flare) [KRITIS]: Deteksi efek bias pelangi (rainbow lens flare), kebocoran cahaya (light leaks), atau flare heksagonal buatan AI yang melintasi subjek utama dan menutupi detail asli (seperti jaket, celana, ransel). Jika efek ini tampak tidak alami, mengganggu estetika komersial, atau menutupi detail tekstur penting, status "ai_artifacts" atau "over_edited" WAJIB di-set ke FAIL.
    - Figur Latar Belakang Cacat (Deformed/Malformed Background Figures) [SANGAT KRITIS]: Orang/subjek di latar belakang koridor/jalan yang memiliki tubuh terdistorsi, wajah meleleh/hancur, kaki/tangan menyatu secara tidak alami, meskipun latar belakang tersebut blur/bokeh. Cacat visual pada karakter sekunder atau figur latar belakang adalah alasan penolakan nomor satu di Adobe Stock. Jika ditemukan, status "ai_artifacts" dan "anatomical_errors" WAJIB di-set ke FAIL.
    - Perspektif & Geometri Loker/Benda Bengkok (Warped Locker & Physical Geometry) [SANGAT KRITIS]: Garis-garis lurus pada furnitur, loker, kabinet, garis pintu, tangga, celah pintu loker yang tidak konsisten ukurannya, nomor loker (seperti nomor pelat logam "148") yang penyok/asimetris, atau kunci besi yang bentuknya meleleh dan tidak logis secara mekanisme fisik dunia nyata. Jika ditemukan cacat geometris ini, status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL.
    - Wajah Terdistorsi (Distorted/Melted Faces) [SANGAT KRITIS]: Wajah pada subjek utama maupun orang-orang/kerumunan di latar belakang yang meleleh, asimetris parah, mata yang menyatu, atau tampak seperti gumpalan daging tak berbentuk. Sering terjadi pada gambar kerumunan AI. Jika ditemukan, WAJIB set "anatomical_errors" dan "ai_artifacts" ke FAIL.
-   - Fake UI/Tech Interfaces & Glowing Effects (SANGAT KRITIS): Elemen antarmuka masa depan (futuristic UI), pemindai sidik jari (fingerprint scanner), hologram, atau layar digital yang terbuat dari AI sering kali berisi teks omong kosong (gibberish), simbol tak bermakna, garis-garis yang meleleh atau menyatu tanpa tujuan, dan grafis acak. Perhatikan baik-baik teks, angka, dan bentuk geometrisnya. Jika tidak memiliki makna, asimetris, atau terlihat seperti gumpalan garis bersinar yang berantakan, WAJIB set "ai_artifacts" dan "structural_defects" ke FAIL dengan skor di bawah 65.
+   - Fake UI/Tech Interfaces & Glowing Effects (SANGAT KRITIS): Elemen antarmuka masa depan (futuristic UI), pemindai sidik jari (fingerprint scanner), dashboard melayang (floating holograms), atau layar digital yang terbuat dari AI sering kali berisi teks omong kosong (gibberish), grafik melayang tanpa sumber cahaya logis, garis-garis yang meleleh atau menyatu tanpa tujuan, dan pola sirkuit (circuit board) yang hancur/bercampur acak. Perhatikan baik-baik teks, angka, grafik batang, dan bentuk geometris yang bercahaya (glowing). Jika tidak memiliki makna teks yang valid, asimetris, atau terlihat seperti gumpalan garis bersinar yang berantakan dan meleleh ke dalam komponen lain (seperti kabel atau chip), WAJIB set "ai_artifacts" dan "structural_defects" ke FAIL dengan skor di bawah 65.
+   - Hardware Komputer, Server Racks & Microchips AI (Tech Asset Quality Issues) [SANGAT KRITIS]:
+     * Pin & Kaki Chipset/Motherboard: Periksa pin emas/tembaga di sekeliling mikrochip/prosesor. Pin yang bengkok, jarak antar pin tidak seragam (jarak renggang-rapat acak), pin yang melebur menjadi satu bilah padat, atau konektor yang tidak simetris adalah cacat fatal geometri AI.
+     * Server Rack & LED Indicator: Periksa panel server di latar belakang. Garis rak server yang bergelombang/bengkok, lampu LED indikator yang meleleh atau membentuk pola bercak acak tanpa struktur chassis nyata, dan sirkuit kabel yang tidak logis WAJIB dinyatakan FAIL pada "structural_defects" dan "ai_artifacts".
+     * Hologram & Glowing Shield Artifacts: Periksa efek perisai hologram/cyber security. Efek glow yang menyebabkan 'blown-out highlights / clipping' parah (putih menyala tanpa detail kisi di dalamnya), garis mesh perisai yang terputus-putus atau asimetris, serta angka biner (0 dan 1) yang mengambang dengan bentuk cacat/meleleh adalah alasan penolakan nomor 1 kategori teknologi di Adobe Stock. Jika ditemukan, WAJIB set "overexposure", "ai_artifacts", dan "structural_defects" ke FAIL, skor keseluruhan di bawah 60, dan status REJECT RISK.
+   - Ornamen Musiman, Dekorasi Natal & Fisika Gantungan (Holiday/Christmas Decor Issues) [SANGAT KRITIS]:
+     * Fisika Pita & Gantungan Bola (Suspension Mechanics): Periksa pengait dan pita yang menggantung ornamen/bola dekorasi. Jika pita tidak terikat pada ranting mana pun (pita melayang di udara), ranting menembus logam tutup bola (cap) secara mustahil tanpa tali pengikat, atau ada ornamen melayang tanpa cabang penopang yang jelas, WAJIB tandai sebagai anomali fisika AI fatal (FAIL pada "structural_defects").
+     * Simetri & Tekstur Bola Ornamen: Periksa motif salju (snowflake) atau ukiran pada bola dekorasi. Pola yang pecah, garis salju yang asimetris/meleleh, atau refleksi cermin pada bola yang tidak mencerminkan lingkungan sekitar adalah cacat visual AI.
+     * Kerumunan Orang di Mall/Pusat Perbelanjaan (Indoor Bokeh Crowds): Periksa figur pengunjung di lorong latar belakang. Walaupun bokeh/blur, jika wajah orang tampak seperti gumpalan daging tanpa mata/hidung, tubuh menyatu dengan orang di sebelahnya, atau kaki melayang di lantai mall, status "anatomical_errors" dan "ai_artifacts" WAJIB di-set ke FAIL.
+     * Teks Papan Toko di Latar Belakang (Storefront Signage): Periksa tulisan di atas etalase toko mall. Huruf yang hancur (gibberish/unreadable font) atau teks meleleh adalah tanda cacat AI generatif yang wajib menurunkan skor kelayakan stok.
+   - Kuliner, Makanan Penutup & Peralatan Makan (Food & Beverage AI Defects) [SANGAT KRITIS]:
+     * Posisi Sendok & Garpu (Cutlery Alignment): Periksa sendok/garpu pada mangkuk atau piring. Gagang sendok yang melayang di udara tanpa penopang fisik di dalam makanan, kepala sendok yang hilang/terpotong, atau sendok yang menyatu dengan es krim/kaca piring adalah anomali fatal ("structural_defects" & "ai_artifacts" WAJIB FAIL).
+     * Buah & Batang Ceri (Fruit Geometry & Stems): Periksa buah ceri di atas es krim/kue. Batang ceri yang melengkung aneh, tidak menancap pada buah, atau terbelah tidak wajar adalah cacat AI.
+     * Potongan Pisang & Bahan Makanan: Periksa potongan pisang pada banana split atau kue. Tekstur pisang yang tidak konsisten, ujung pisang yang melayang keluar mangkuk secara tidak seimbang tanpa gravitasi nyata, atau tekstur daging buah yang tampak seperti lilin/plastik padat adalah cacat mutu ("ai_artifacts" WAJIB FAIL).
+     * Papan Menu Kapur di Latar Belakang (Chalkboard Menu Text): Tulisan pada papan menu kafe/restoran di latar belakang yang berantakan, huruf acak/gibberish, atau garis asimetris wajib menurunkan skor estetika dan komersial.
+   - Manik-Manik Kalung, Rosario & Perhiasan Keagamaan (Rosary, Beads & Jewelry AI Defects) [SANGAT KRITIS]:
+     * Manik-manik Melebur & Hilang di Antara Jari: Periksa butiran manik-manik rosario atau kalung tasbih yang dipegang tangan. Cacat fatal AI: rantai manik-manik terputus di tengah, butiran manik melebur langsung menjadi daging jari tangan, butiran lonjong tidak beraturan atau ukurannya berubah drastis tanpa simetri, dan salib/pendant yang menyatu dengan kain pakaian tanpa tali pengait yang jelas. Jika ditemukan, status "anatomical_errors" dan "ai_artifacts" WAJIB di-set ke FAIL.
+     * Jari Tangan Menggenggam Benda Kecil (Small Objects Gripping Anatomy): Periksa sambungan kuku dan ruas buku jari saat tangan mengepal/menggenggam. Jari yang tampak bengkak seperti sosis tanpa ruas sendi yang jelas, kuku yang hilang atau melebur ke kulit jari sebelahnya, serta tangan kiri dan kanan yang menyatu menjadi satu gumpalan adalah alasan penolakan mutlak ("anatomical_errors" WAJIB FAIL).
+     * Bando Bunga & Mahkota Rambut (Floral Headband Artifacts): Bunga putih atau renda di kepala yang melebur langsung ke rambut tanpa struktur jepit/tali bando, kelopak bunga yang membentuk gumpalan tak beraturan khas AI.
+
+   - Laboratorium, Peralatan Medis & Sains (Laboratory & Science Asset Defects) [SANGAT KRITIS]:
+     * Mikroskop & Alat Optik (Microscope Mechanics): Periksa lensa okuler, tabung optik, pemutar fokus (knobs), dan revolver lensa objektif. Bagian mikroskop yang terpotong, lensa miring tanpa sumbu optik yang sejajar, atau kenop pengatur yang menyatu dengan bodi logam adalah cacat fatal ("structural_defects" & "ai_artifacts" WAJIB FAIL).
+     * Tabung Reaksi & Rak Kaca (Test Tubes & Glassware): Periksa tabung reaksi di rak. Tabung kaca yang melayang, tutup tabung yang menyatu atau tidak seragam bentuknya, dan erlenmeyer/gelas ukur yang tidak simetris bentuk corongnya adalah anomali AI.
+     * Diagram Kimia & Rumus di Papan Tulis (Whiteboard Chemical Formulas): Periksa struktur molekul/cincin benzena di papan tulis belakang. Rumus kimia cacat, cincin aromatik yang rusak/terbuka, atau tulisan kapur gibberish wajib menurunkan skor akurasi ilmiah dan komersial.
+     * Kabel/Tali Menggantung Misterius (Phantom Wires & Cables): Deteksi kabel atau kawat tipis yang menjuntai dari plafon/langit-langit ruangan tanpa terhubung ke lampu, sensor, atau alat apa pun (kabel siluman khas halusinasi AI).
+     * Rangka Bangku & Kaki Meja Laboratorium (Stool & Table Strut Alignment): Periksa ring pijakan kaki (footrest ring) pada kursi putar laboratorium. Ring yang bengkok, tiang penyangga yang menembus lantai secara mustahil, atau palang kaki meja stainless steel yang tidak sejajar adalah cacat geometri AI fatal.
    - Benda yang Tidak Logis (Nonsensical Objects/Hallucinations): Objek yang bentuknya tidak masuk akal, terpotong secara ajaib, atau percampuran benda yang tidak logis (misal: tangan yang menyatu dengan bunga atau benda asing, benda yang melayang tanpa alasan, atau geometri mustahil). Jika ditemukan, set "ai_artifacts" ke FAIL.
-   - Masalah Anatomi (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, tangan/jari yang meleleh dan berbaur secara mustahil dengan objek lain, sendi terkilir aneh, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.
-   - Detail yang Meleleh (Melted details) & Pola Hancur (Pattern Degradation) [SANGAT KRITIS]: Tekstur rajutan/mesh (seperti pada sarung tangan atau pakaian) yang terlalu seragam lalu mendadak berubah menjadi pola digital acak, garis tipis berdekatan (seperti lingkaran holografik) yang melebur menjadi aliasing, jagged edges, atau muddy detail saat di-zoom, serta pinggiran objek (edge) yang bercampur ambigu dengan objek lain.
-   - High Contrast & Glow Artifacts [KRITIS]: Area dengan glow yang sangat terang (seperti warna oranye neon) terhadap latar belakang gelap sangat rentan mengalami clipping, color banding, loss of fine texture, dan compression artifacts (terutama jika telah di-upscale/sharpening agresif). Periksa transisi cahayanya, jika patah/kasar, status "overexposure" dan "ai_artifacts" WAJIB FAIL.
-   - Logika Mekanis Objek Buatan Manusia (Mechanical & Structural Coherence) [SANGAT KRITIS]: Periksa SETIAP objek buatan manusia pada crop detail apakah strukturnya masuk akal secara fisik dan bisa berfungsi di dunia nyata. Contoh wajib periksa: SEPEDA (apakah rantai ada dan tersambung ke gear? apakah pedal tersambung ke engkol/crank arm yang logis? apakah jari-jari/spokes tersambung konsisten dari hub ke rim? apakah rem, fork, dan rangka menyambung secara logis? apakah sadel tersambung ke seatpost yang benar?), kendaraan (roda, spion, wiper), furnitur (kaki kursi/meja), alat musik (senar, tuts), pakaian (kancing, resleting, jahitan), dan bangunan (jendela, tangga, railing). Jika ditemukan bagian yang meleleh, hilang, menyatu mustahil, atau tidak bisa berfungsi secara mekanis (contoh: sepeda tanpa rantai, pedal melayang tanpa engkol), status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL meskipun bagian tersebut kecil atau berada di tepi gambar.
-   - Tangan yang Berinteraksi dengan Objek (Hands Gripping Objects) [SANGAT KRITIS]: Saat tangan memegang/menyentuh objek (setang, sadel, gagang, gelas, alat), periksa pada crop detail apakah jari menggenggam secara logis atau malah menyatu/meleleh ke objek. Titik kontak tangan-objek adalah lokasi cacat AI paling umum. Jari yang menyatu dengan objek WAJIB mengeset "anatomical_errors" ke FAIL.
+   - Masalah Anatomi & Tubuh (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, PERUT, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, pusar perut yang hilang (missing belly button) pada perut telanjang, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.
+   - Pakaian & Kulit Menyatu (Clothing-Skin Fusion) [SANGAT KRITIS]: Periksa tepian bikini, celana dalam, tali bra, atau kerah baju. Jika kain bikini/pakaian terlihat menyatu, melebur, atau terbuat dari daging/kulit subjek itu sendiri (seperti yang sering terjadi pada celana AI), atau tali menyatu dengan punggung secara mustahil, status "anatomical_errors" dan "ai_artifacts" WAJIB di-set ke FAIL.
+   - Detail yang Meleleh (Melted details) & Pola Hancur (Pattern Degradation) [SANGAT KRITIS]: Tekstur rajutan/mesh (seperti pada sarung tangan atau pakaian) yang terlalu seragam lalu mendadak berubah menjadi pola digital acak, garis tipis berdekatan yang melebur menjadi aliasing, atau pinggiran objek (edge) yang bercampur ambigu dengan objek lain.
+   - High Contrast & Glow Artifacts [KRITIS]: Area dengan glow yang sangat terang (seperti warna oranye neon) terhadap latar belakang gelap sangat rentan mengalami clipping. Periksa transisi cahayanya, jika patah/kasar, status "overexposure" dan "ai_artifacts" WAJIB FAIL.
+   - Logika Mekanis Objek Buatan Manusia (Mechanical & Structural Coherence) [SANGAT KRITIS]: Periksa SETIAP objek buatan manusia (seperti TANGGA, sepeda, furnitur) pada crop detail apakah strukturnya masuk akal secara fisik. Periksa TANGGA (ladder): apakah pijakan kaki menembus tiang utamanya secara mustahil? Apakah subjek berdiri di pijakan yang melayang? Jika ditemukan bagian yang meleleh, hilang, menyatu mustahil, atau tidak logis, status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL.
+   - Tangan yang Berinteraksi dengan Objek (Hands Gripping Objects & Small Items) [SANGAT KRITIS]: Saat tangan memegang/menyentuh objek (benda kecil seperti tasbih/rosario/kalung, kain handuk/pita, tangga, gelas), periksa pada crop detail apakah jari menggenggam secara logis atau malah menyatu/meleleh ke objek tersebut. Cacat AI paling umum: Manik-manik tasbih/kalung yang meleleh dan membaur dengan jari tangan, tali handuk yang tidak terpisah jelas dari jari, atau jari yang menembus kain. Jika ditemukan, WAJIB mengeset "anatomical_errors" dan "ai_artifacts" ke FAIL.
    - Kedalaman Ruang Tidak Natural (Unnatural Depth of Field): Latar belakang yang kabur (blur) namun tidak terlihat seperti bokeh optik, melainkan tampak seperti coretan kasar (smudgy), berbercak, atau terhapus secara artifisial.
    - Teks & Karakter Rusak (Gibberish Text): Karakter huruf yang rusak/cacat/terdistorsi, kata-kata tak terbaca, teks hancur atau tidak bermakna di papan tulis (whiteboards), bagan diagram, catatan dinding, atau sticky notes.
    - Kecacatan Proporsi & Perspektif (Proportion & Perspective Defects) [CRITICAL]: Periksa distorsi proporsi objek fisik, furnitur, ruangan, atau elemen arsitektur. Periksa juga kemiringan garis bangunan, tangga yang tidak menuju ke mana-mana, atau distorsi proporsi tubuh manusia. Jika fatal, status "proportion_defects" dan "structural_defects" WAJIB FAIL.
@@ -7013,6 +7287,13 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
         * Bagian Interior Kuil Sagrada Fam\xEDlia (Barcelona) dilarang keras.
         * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
 
+PANDUAN FINAL DECISION ENGINE (CRITICAL) - STRICT FAIL POLICY:
+- ZERO TOLERANCE FOR AI DEFECTS: Jika Anda mendeteksi cacat AI Generatif sekecil apa pun (gibberish text, jari menyatu, baju membaur dengan kulit, grafik melayang tak logis, tangga cacat), Anda DILARANG KERAS meloloskannya (PASS). Anda WAJIB memberikan status FAIL secara keseluruhan (overall recommendation = FAIL) dengan skor di bawah 65.
+- WAJIB BERIKAN BUKTI SPESIFIK (PROVIDE EVIDENCE): Jika Anda menggagalkan gambar (FAIL), Anda WAJIB menjabarkan bukti piksel yang persis dan lokasi spesifik cacat tersebut di dalam \`visual_scan_analysis\` dan \`detailed_feedback\` (misalnya: "Jari telunjuk pada tangan kanan melebur ke dalam kain handuk" atau "Teks di spanduk merah memiliki ejaan yang hancur menjadi huruf tak bermakna").
+- STRICT ANTI-HALLUCINATION (NO NGAWUR): Bukti cacat harus benar-benar terlihat di gambar. Dilarang mengarang cacat jika gambar sempurna. 
+- Pengecualian Seni Tetap Berlaku: Jangan mem-FAIL gambar hanya karena *shallow depth of field* (bokeh), *anti-aliasing* normal, atau bayangan yang sengaja dibuat gelap, asalkan BUKAN cacat struktur atau anatomi AI.
+- Jika terdapat pelanggaran IP/Brand atau Cacat AI Generatif, TIDAK ADA WARNING. Statusnya langsung HARD FAIL.
+
 PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
 Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:
 - STRICT (Toleransi Nol / Zero Tolerance): Anda harus menerapkan standar tertinggi tanpa toleransi terhadap cacat sekecil apa pun. Jika terdapat sedikit saja soft focus, sedikit noise pada shadow, anomali AI mikro di latar belakang, atau potensi pelanggaran IP/Kekayaan Intelektual sekecil apa pun, aset wajib dinyatakan FAIL dengan skor maksimal 0-59.
@@ -7034,12 +7315,14 @@ Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}
 ATURAN HEATMAPS:
 Untuk bagian heatmaps, petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
 
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
+Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.` + metadataInstruction;
   const responseSchema = {
     type: import_genai.Type.OBJECT,
     properties: {
       visual_scan_analysis: { type: import_genai.Type.STRING },
       legal_status: { type: import_genai.Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
+      requires_model_release: { type: import_genai.Type.BOOLEAN, description: "True if recognizable people are in the image" },
+      requires_property_release: { type: import_genai.Type.BOOLEAN, description: "True if recognizable modern architecture, artwork, or private property is in the image" },
       technical_issues: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.STRING } },
       strengths: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.STRING } },
       overall_score: { type: import_genai.Type.NUMBER },
@@ -7116,7 +7399,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
   };
   const imageParts = Array.isArray(image) ? image.map((img) => processFrameServer(img)) : [processFrameServer(image)];
   let selectedModel = model || "gemini-3.1-pro-preview";
@@ -7124,18 +7407,18 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     selectedModel = "gemini-3.1-pro-preview";
   }
   const modelsToTry = ["gemini-3.1-pro-preview", "gemini-3.6-flash", "gemini-3.5-flash"];
-  let responseText2 = "";
+  let responseText = "";
   let lastError;
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o-mini";
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: You MUST strictly enforce the ZERO TOLERANCE rules for Gibberish Text, Melted Anatomy, and Fake UI/Glowing Effects as detailed in your system instructions. Do NOT provide warnings for AI artifacts\u2014you MUST FAIL them and provide pixel-level evidence. Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
       if (imageMetadata) {
         promptText += `
 
 Technical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
-      responseText2 = await callOpenAICompatibleWithRetry({
+      responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
         contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
@@ -7152,7 +7435,13 @@ Technical Metadata: ${JSON.stringify(imageMetadata)}`;
     const modelsToTryList = activeModel && activeModel.startsWith("gemini") ? [activeModel, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
+        let promptText = `Anda adalah Senior Adobe Stock & Shutterstock Content Inspector yang SANGAT CERDAS, OBJEKTIF, dan AKURAT.
+PRINSIP UTAMA AUDIT:
+1. GAMBAR BERSIH & SEMPURNA = WAJIB PASS (Skor 85-98, Ready for Adobe Stock):
+   - Jika subjek utama tajam sempurna (tack-sharp), pencahayaan alami/seimbang, fisika realistis (alat pengukur/jangka sorong/caliper dipegang wajar oleh peneliti, serbet/sendok menempel rapi, pasir pantai & air laut alami, anatomi penyu & manusia normal dan utuh), latar belakang bokeh alami/kabur kabut yang bersih, dan tidak ada cacat anatomi/struktur, Anda WAJIB meloloskan aset ini dengan status "PASS", skor tinggi (88-96), dan legal_status "SAFE" (dengan requires_model_release: true jika ada orang yang dapat dikenali).
+2. GAMBAR CACAT/HALUSINASI AI = WAJIB FAIL (Skor < 60, Reject Risk):
+   - Hanya tolak (FAIL) jika terdapat bukti cacat nyata: sendok melayang di udara, jari tangan cacat/lebih, pin microchip bengkok, kabel melayang dari plafon, teks hancur/gibberish, atau refleksi hantu tanpa objek fisik nyata.
+Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
         if (imageMetadata) {
           promptText += `
 
@@ -7163,7 +7452,7 @@ Technical Metadata: ${JSON.stringify(imageMetadata)}`;
           responseMimeType: "application/json",
           responseSchema
         });
-        responseText2 = res.text || "{}";
+        responseText = res.text || "{}";
         break;
       } catch (err) {
         lastError = err;
@@ -7172,10 +7461,36 @@ Technical Metadata: ${JSON.stringify(imageMetadata)}`;
       }
     }
   }
-  if (!responseText2) throw lastError;
+  if (!responseText) throw lastError;
   try {
-    const parsedResult = JSON.parse(extractJSON(responseText2));
+    const parsedResult = JSON.parse(extractJSON(responseText));
     if (parsedResult.ai_vision_checks) {
+      const objective = imageMetadata || {};
+      const warningsFromReconciliation = [];
+      const noteIsSevere = (note) => /\b(severe|critical|heavy|extreme|parah|berat|kritis|sangat tinggi|sangat parah|obvious)\b/i.test(String(note || ""));
+      const downgrade = (key, reason) => {
+        console.log(`[QC Reconciliation] Kept inspection verdict for ${key}: ${reason}`);
+      };
+      if (objective.sharpness?.value >= 26 && objective.sharpness?.has_local_blur_anomaly !== true && !noteIsSevere(parsedResult.ai_vision_checks.blur?.note)) {
+        downgrade("blur", `measured sharpness ${objective.sharpness.value}/100 does not support global blur`);
+      }
+      if (objective.noise?.value < 55 && !noteIsSevere(parsedResult.ai_vision_checks.noise?.note)) {
+        downgrade("noise", `measured noise ${objective.noise.value}/100 is below the severe-noise gate`);
+      }
+      const highClip = Number(objective.brightness?.clipped_high_percent || 0);
+      const lowClip = Number(objective.brightness?.clipped_low_percent || 0);
+      if (highClip <= 15 && lowClip <= 25 && !noteIsSevere(parsedResult.ai_vision_checks.exposure?.note)) {
+        downgrade("exposure", `measured clipping is ${highClip.toFixed(1)}% high / ${lowClip.toFixed(1)}% low`);
+      }
+      const blockScore = Number(objective.jpeg_blocking?.score || 0);
+      const bandScore = Number(objective.banding?.score || 0);
+      const edgeScore = Number(objective.transparency?.edge_halo_risk_percent || 0);
+      if (blockScore < 80 && bandScore < 80 && edgeScore < 72 && !noteIsSevere(parsedResult.ai_vision_checks.artifacts?.note)) {
+        downgrade("artifacts", "objective compression/banding/alpha-edge measurements are below hard-fail thresholds");
+      }
+      if (warningsFromReconciliation.length) {
+        parsedResult.review_warnings = [...Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : [], ...warningsFromReconciliation];
+      }
       let anyFail = false;
       let anyIpFail = false;
       let hasCriticalFail = false;
@@ -7202,21 +7517,36 @@ Technical Metadata: ${JSON.stringify(imageMetadata)}`;
           }
         }
       }
+      const severeFailKeys = ["watermark", "logo", "ip_risk", "anatomical_errors", "ai_artifacts", "structural_defects"];
+      const hasSevereFail = Object.entries(parsedResult.ai_vision_checks || {}).some(
+        ([k, v]) => severeFailKeys.includes(k) && v?.status === "FAIL"
+      );
       if (tolerance === "STRICT") {
-        if (anyFail) {
+        if (anyFail || hasSevereFail) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 60) {
-            parsedResult.overall_score = 59;
-          }
-        }
-      } else if (tolerance === "MEDIUM") {
-        if (hasCriticalFail || anyTechnicalFail || acceptanceFail) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 66) {
-            parsedResult.overall_score = 65;
-          }
+          if (!parsedResult.overall_score || parsedResult.overall_score >= 65) parsedResult.overall_score = 59;
+        } else {
+          parsedResult.recommendation = "PASS";
+          if (!parsedResult.overall_score || parsedResult.overall_score < 80) parsedResult.overall_score = 88;
         }
       } else if (tolerance === "LOOSE") {
+        if (hasSevereFail || anyIpFail) {
+          parsedResult.recommendation = "FAIL";
+          if (!parsedResult.overall_score || parsedResult.overall_score >= 65) parsedResult.overall_score = 58;
+        } else {
+          parsedResult.recommendation = "PASS";
+          if (!parsedResult.overall_score || parsedResult.overall_score < 80) parsedResult.overall_score = 90;
+        }
+      } else {
+        if (hasSevereFail || anyIpFail || parsedResult.recommendation === "FAIL" || parsedResult.overall_score && parsedResult.overall_score < 65) {
+          parsedResult.recommendation = "FAIL";
+          if (!parsedResult.overall_score || parsedResult.overall_score >= 65) parsedResult.overall_score = 60;
+        } else {
+          parsedResult.recommendation = "PASS";
+          if (!parsedResult.overall_score || parsedResult.overall_score < 75) parsedResult.overall_score = 86;
+        }
+      }
+      if (false) {
         const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail || failedCheckKeys.some((k) => ["blur", "exposure", "lighting", "over_edited", "proportion_defects"].includes(k));
         if (looseBlocking) {
           parsedResult.recommendation = "FAIL";
@@ -7237,7 +7567,7 @@ Technical Metadata: ${JSON.stringify(imageMetadata)}`;
     }
     return parsedResult;
   } catch (e) {
-    console.warn("Parse Error on QA response:", responseText2);
+    console.warn("Parse Error on QA response:", responseText);
     throw e;
   }
 }
@@ -7541,7 +7871,7 @@ CRITICAL MONTH MATCHING & ALIGNMENT RULES (MUST FOLLOW STRICTLY):
 
 2. Target Month: The user has selected the month of "${targetMonthEn}" (also known as "${targetMonthId}").
    - You MUST ONLY generate events, holidays, observances, and festivals that ACTUALLY and historically occur during this specific month (${targetMonthEn}) in the year 2026.
-   - You are STRICTLY FORBIDDEN from listing events that happen in other months.
+   - STRICT ANTI-HALLUCINATION (NO NGAWUR): You are STRICTLY FORBIDDEN from listing events that happen in other months, inventing fake holidays, or generating random unrelated topics. Only output verified real-world events. Do not wander off-topic (ngawur).
 
 3. PRE-SEEDED WORLD HOLIDAYS (UN, UNESCO, TimeAndDate):
    To ensure perfect alignment, you MUST include and enrich the following verified global and regional celebrations for this month:
@@ -7579,51 +7909,51 @@ Output strictly in JSON format.`;
     },
     required: ["events"]
   };
-  let responseText2 = "";
+  let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     try {
       const res = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`,
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.8 },
         model
       });
-      responseText2 = res;
+      responseText = res;
     } catch (err) {
       console.warn("LLM generation failed, falling back to local curated database:", err);
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.8
       }, 1);
-      responseText2 = res.text || "{}";
+      responseText = res.text || "{}";
     } catch (err) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
           temperature: 0.8
         });
-        responseText2 = res.text || "{}";
+        responseText = res.text || "{}";
       } catch (err2) {
         console.warn("LLM generation failed, falling back to local curated database:", err2);
       }
     }
   }
   let parsed = { events: [] };
-  if (responseText2) {
+  if (responseText) {
     try {
-      parsed = JSON.parse(extractJSON(responseText2));
+      parsed = JSON.parse(extractJSON(responseText));
     } catch (err) {
-      console.error("Failed to parse calendar events JSON:", err, responseText2);
+      console.error("Failed to parse calendar events JSON:", err, responseText);
     }
   }
   if (!parsed || !Array.isArray(parsed.events)) {
@@ -7719,38 +8049,38 @@ Rules:
     },
     required: ["keywords"]
   };
-  let responseText2 = "";
+  let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`,
+      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`,
       responseMimeType: "application/json",
       responseSchema,
       config: { temperature: 0.8 },
       model
     });
-    responseText2 = res;
+    responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.8
       }, 1);
-      responseText2 = res.text || "{}";
+      responseText = res.text || "{}";
     } catch (err) {
-      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.8
       });
-      responseText2 = res.text || "{}";
+      responseText = res.text || "{}";
     }
   }
-  let parsedData = JSON.parse(extractJSON(responseText2));
+  let parsedData = JSON.parse(extractJSON(responseText));
   if (parsedData && parsedData.ai_vision_checks) {
     const checks = parsedData.ai_vision_checks;
     const criticalFails = ["ai_artifacts", "structural_defects", "anatomical_errors", "text", "ip_risk", "over_edited", "proportion_defects"];
@@ -7799,9 +8129,9 @@ Rules:
 Title: "${title}"
 Description: "${description}"
 Existing Keywords: ${existingKeywords.join(", ")}`;
-  let responseText2 = "";
+  let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    responseText2 = await callOpenAICompatibleWithRetry({
+    responseText = await callOpenAICompatibleWithRetry({
       systemInstruction,
       contents: promptContents,
       responseMimeType: "application/json",
@@ -7816,10 +8146,10 @@ Existing Keywords: ${existingKeywords.join(", ")}`;
       responseSchema,
       temperature: 0.3
     });
-    responseText2 = res.text || "{}";
+    responseText = res.text || "{}";
   }
   try {
-    const parsed = JSON.parse(extractJSON(responseText2));
+    const parsed = JSON.parse(extractJSON(responseText));
     return parsed.keywords || [];
   } catch (err) {
     console.warn("Failed to parse suggested keywords:", err);
@@ -7867,7 +8197,7 @@ async function searchAdobeStockWithBypass(keyword) {
                 category: "photo",
                 downloads: "Tinggi"
               };
-            }).filter((item2) => item2.id && item2.imageUrl);
+            }).filter((item) => item.id && item.imageUrl);
           }
           const imgs = Array.from(document.querySelectorAll("img"));
           return imgs.map((img) => {
@@ -7884,7 +8214,7 @@ async function searchAdobeStockWithBypass(keyword) {
               category: "photo",
               downloads: "Tinggi"
             };
-          }).filter((item2) => item2.id && item2.imageUrl && (item2.imageUrl.includes("ftcdn.net") || item2.imageUrl.includes("adobe-stock")));
+          }).filter((item) => item.id && item.imageUrl && (item.imageUrl.includes("ftcdn.net") || item.imageUrl.includes("adobe-stock")));
         });
         console.log(`[AdobeResearch] Playwright scraped ${scrapingResults.length} real-time page assets.`);
       } else {
@@ -7928,14 +8258,14 @@ Strictly return your answer as a JSON array matching the schema.`;
           required: ["id", "title", "imageUrl", "detailUrl", "category", "downloads"]
         }
       };
-      const response2 = await callGeminiWithRetry("gemini-3.1-pro-preview", `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
+      const response = await callGeminiWithRetry("gemini-3.1-pro-preview", `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema,
         temperature: 0.2
       }, 1);
-      const parsed = JSON.parse(response2.text);
+      const parsed = JSON.parse(response.text);
       if (Array.isArray(parsed) && parsed.length > 0) {
         console.log(`[AdobeResearch] Gemini Grounding successfully retrieved ${parsed.length} assets.`);
         return parsed;
@@ -8060,6 +8390,17 @@ async function checkVideoQuality(frames, tolerance = "MEDIUM", language = "Bahas
     if (report.stabilityStatus) {
       gt.stability = `${report.stabilityStatus} (index ${report.stabilityIndex})`;
     }
+    if (report.temporal) {
+      gt.temporal = {
+        compared_frames: report.temporal.comparedFrames,
+        mean_abs_diff: report.temporal.meanAbsDiff,
+        duplicate_rate: report.temporal.duplicateRate,
+        luminance_delta_mean: report.temporal.luminanceDeltaMean,
+        luminance_delta_max: report.temporal.luminanceDeltaMax,
+        flicker_score: report.temporal.flickerScore,
+        motion_consistency_score: report.temporal.motionConsistencyScore
+      };
+    }
     if (report.scene_detection?.scene_changes_detected) {
       gt.scene_changes = `${report.scene_detection.scene_changes?.length || 0} cuts detected`;
     }
@@ -8103,6 +8444,10 @@ IMPORTANT: The technical data above is OBJECTIVE and MEASURED. Use it as absolut
 - Resolution < 1920x1080 = FAIL mandatory
 - FPS < 23.976 = FAIL mandatory
 - Stability FLICKERING = FAIL mandatory
+- Deterministic duplicate-frame rate >= 20% = FAIL mandatory
+- Deterministic flicker score >= 70 = FAIL mandatory
+- Deterministic motion consistency score < 50 = FAIL mandatory
+- Temporal morphing and ghosting remain AI-vision checks; deterministic UNKNOWN must not be treated as PASS
 
 ======= YOUR SUBJECTIVE ASSESSMENT =======
 Analyze the ${frameCount} video keyframes for these AI-VISION-ONLY criteria:
@@ -8188,7 +8533,7 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
     },
     required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "quality_checks", "heatmaps"]
   };
-  let responseText2 = "";
+  let responseText = "";
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider) ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess ${frameCount} frames. Technical ground truth: ${JSON.stringify(gt)}. Return full JSON with PASS/FAIL.` }] }, responseMimeType: "application/json", responseSchema, config: { temperature: 0.2 }, model }) : callGeminiWithRetry(
       model && model.startsWith("gemini") ? model : "gemini-3.1-flash-lite",
@@ -8197,11 +8542,11 @@ ZERO TOLERANCE POLICY: If ANY mandatory technical failure is detected OR if ANY 
       1
     ).then((r) => r.text || "{}");
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3e4));
-    responseText2 = await Promise.race([aiPromise, timeout]);
+    responseText = await Promise.race([aiPromise, timeout]);
   } catch (e) {
-    responseText2 = JSON.stringify({ visual_scan_analysis: "AI unavailable", legal_status: "SAFE", technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: "FAIL", adobe_stock_readiness: "Reject Risk", detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
+    responseText = JSON.stringify({ visual_scan_analysis: "AI unavailable", legal_status: "SAFE", technical_issues: [], strengths: [], overall_score: 0, technical_score: 0, visual_score: 0, recommendation: "FAIL", adobe_stock_readiness: "Reject Risk", detailed_feedback: e.message, quality_checks: {}, heatmaps: [] });
   }
-  return JSON.parse(extractJSON(responseText2));
+  return JSON.parse(extractJSON(responseText));
 }
 async function generateMotionCode(userPrompt, options) {
   const store = apiKeyStorage.getStore();
@@ -8225,20 +8570,20 @@ ${h.map((m) => `${m.role}: ${m.content}`).join("\n")}`);
   contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join("\n\n");
   const responseSchema = { type: import_genai.Type.OBJECT, properties: { title: { type: import_genai.Type.STRING }, summary: { type: import_genai.Type.STRING }, code: { type: import_genai.Type.STRING } }, required: ["title", "summary", "code"] };
-  let responseText2 = "";
+  let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
-    responseText2 = res;
+    responseText = res;
   } else {
     try {
       const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-3.1-pro-preview", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
-      responseText2 = res.text || "{}";
+      responseText = res.text || "{}";
     } catch (err) {
       const res = await callGeminiWithRetry("gemini-3.5-flash", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
-      responseText2 = res.text || "{}";
+      responseText = res.text || "{}";
     }
   }
-  const parsed = JSON.parse(extractJSON(responseText2));
+  const parsed = JSON.parse(extractJSON(responseText));
   if (typeof parsed.code === "string") {
     parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, "").replace(/```\s*$/i, "").trim();
     if (!/MotionComposition/.test(parsed.code)) throw new Error("AI response did not include a MotionComposition export.");
@@ -8277,9 +8622,9 @@ async function removeWatermark(imageBase64, maskBase64, preset) {
     }
   }
   try {
-    const jpeg = await import("jpeg-js");
+    const jpeg2 = await import("jpeg-js");
     const imgBuffer = Buffer.from(imageData, "base64");
-    const raw = jpeg.default.decode(imgBuffer, { useTArray: true });
+    const raw = jpeg2.default.decode(imgBuffer, { useTArray: true });
     const { width, height, data: pixels } = raw;
     const maskPixels = new Uint8Array(width * height);
     const mw = Math.floor(width * 0.3), mh = Math.floor(height * 0.18);
@@ -8330,7 +8675,7 @@ async function removeWatermark(imageBase64, maskBase64, preset) {
           }
         }
       }
-      const enc = jpeg.default.encode({ data: pixels, width, height }, 92);
+      const enc = jpeg2.default.encode({ data: pixels, width, height }, 92);
       return { processedImage: `data:image/jpeg;base64,${enc.data.toString("base64")}`, status: "success" };
     }
   } catch (e) {
@@ -8389,7 +8734,7 @@ CRITICAL RULES:
     promptText = `Generate a creative subject idea for style: "${styleCategory || "General"}". To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
   }
   const activeModel = model || "gemini-3.5-flash";
-  const response2 = await callGeminiWithRetry(activeModel, {
+  const response = await callGeminiWithRetry(activeModel, {
     parts: [{ text: promptText }]
   }, {
     systemInstruction,
@@ -8397,10 +8742,10 @@ CRITICAL RULES:
     // Higher temperature for maximized creative variation
     maxOutputTokens: 120
   });
-  return (response2.text || "").trim().replace(/^"|"$/g, "");
+  return (response.text || "").trim().replace(/^"|"$/g, "");
 }
 
-// data/metazo/MetaZo-Update--main/server.ts
+// server.ts
 var import_module = require("module");
 var import_meta = {};
 var _require = typeof require !== "undefined" ? require : (0, import_module.createRequire)(import_meta.url);
@@ -8455,7 +8800,7 @@ var __dirname_safe = typeof __dirname !== "undefined" ? __dirname : __filename_s
 var spawnAsync = (command, args, options) => {
   return new Promise((resolve, reject) => {
     let isDone = false;
-    const child = (0, import_child_process.spawn)(command, args, { ...options, stdio: "ignore" });
+    const child = (0, import_child_process2.spawn)(command, args, { ...options, stdio: "ignore" });
     let timeoutId;
     if (options.timeout) {
       timeoutId = setTimeout(() => {
@@ -8867,7 +9212,7 @@ async function queryD1(sql, params = []) {
     throw new Error("Cloudflare API Token is missing. Please set CLOUDFLARE_API_TOKEN in environment variables.");
   }
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
-  const response2 = await fetch(url, {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiToken}`,
@@ -8875,11 +9220,11 @@ async function queryD1(sql, params = []) {
     },
     body: JSON.stringify({ sql, params })
   });
-  if (!response2.ok) {
-    const errText = await response2.text();
-    throw new Error(`Cloudflare D1 HTTP API Error ${response2.status}: ${errText}`);
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Cloudflare D1 HTTP API Error ${response.status}: ${errText}`);
   }
-  const json = await response2.json();
+  const json = await response.json();
   if (!json.success) {
     throw new Error(`Cloudflare D1 Query Failed: ${JSON.stringify(json.errors)}`);
   }
@@ -9048,14 +9393,14 @@ app.post("/api/test-gemini-key", async (req, res) => {
     });
     const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-flash-latest"];
     let lastError = null;
-    let response2 = null;
+    let response = null;
     for (const testModel of modelsToTry) {
       try {
-        response2 = await testClient.models.generateContent({
+        response = await testClient.models.generateContent({
           model: testModel,
           contents: 'Respond with exactly the word "VALID"'
         });
-        if (response2 && response2.text) {
+        if (response && response.text) {
           break;
         }
       } catch (err) {
@@ -9071,7 +9416,7 @@ app.post("/api/test-gemini-key", async (req, res) => {
         console.log(`[test-gemini-key] Failed testing model ${testModel}, trying next model if available. Error: ${err.message}`);
       }
     }
-    if (response2 && response2.text) {
+    if (response && response.text) {
       return res.json({ success: true, message: "API Key valid!" });
     } else if (lastError) {
       throw lastError;
@@ -9181,16 +9526,16 @@ app.post("/api/test-mistral-key", async (req, res) => {
     if (!apiKey) {
       return res.status(400).json({ error: "API Key tidak boleh kosong" });
     }
-    const response2 = await fetch("https://api.mistral.ai/v1/models", {
+    const response = await fetch("https://api.mistral.ai/v1/models", {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${apiKey.trim()}`
       }
     });
-    if (response2.ok) {
+    if (response.ok) {
       return res.json({ success: true, message: "API Key Mistral valid!" });
     }
-    const errText = await response2.text();
+    const errText = await response.text();
     let errorMsg = errText;
     try {
       const parsed = JSON.parse(errText);
@@ -9199,10 +9544,10 @@ app.post("/api/test-mistral-key", async (req, res) => {
       }
     } catch (_) {
     }
-    if (response2.status === 401 || response2.status === 403 || errorMsg.toLowerCase().includes("invalid") || errorMsg.toLowerCase().includes("unauthorized")) {
+    if (response.status === 401 || response.status === 403 || errorMsg.toLowerCase().includes("invalid") || errorMsg.toLowerCase().includes("unauthorized")) {
       return res.status(400).json({ error: "API Key Mistral tidak valid atau salah. Silakan periksa kembali." });
     }
-    if (response2.status === 429 || errorMsg.toLowerCase().includes("quota") || errorMsg.toLowerCase().includes("rate_limit") || errorMsg.toLowerCase().includes("exceeded")) {
+    if (response.status === 429 || errorMsg.toLowerCase().includes("quota") || errorMsg.toLowerCase().includes("rate_limit") || errorMsg.toLowerCase().includes("exceeded")) {
       return res.json({
         success: true,
         quotaExceeded: true,
@@ -9743,43 +10088,37 @@ app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
     } else {
       return res.status(400).json({ error: "File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2)." });
     }
-    console.log(`[Embed Metadata] Generating AI metadata for: ${originalName}`);
-    const imageBase64 = import_fs.default.readFileSync(localInputPath, { encoding: "base64" });
-    const dataUri = `data:image/jpeg;base64,${imageBase64}`;
-    const { keywordCount = 50, model, metadataLanguage, aiModelPerformance } = req.body;
-    const generatedMetadata = await generateStockMetadata(
-      [dataUri],
-      parseInt(String(keywordCount), 10) || 50,
-      "",
-      ToolType.IMAGE,
-      void 0,
-      model,
-      void 0,
-      void 0,
-      metadataLanguage || "English",
-      aiModelPerformance || "detail"
-    );
-    const { title = "", description = "", keywords = [] } = generatedMetadata;
-    console.log(`[Embed Metadata] AI generated title, ${keywords.length} keywords`);
-    const keywordStr = Array.isArray(keywords) ? keywords.join("; ") : String(keywords || "");
+    let title = req.body.title || "";
+    let description = req.body.description || "";
+    let keywords = [];
+    try {
+      if (req.body.keywords) keywords = JSON.parse(req.body.keywords);
+    } catch (e) {
+      console.error("[Embed Metadata] Failed to parse keywords:", e);
+    }
+    console.log(`[Embed Metadata] Embedding provided metadata: Title="${title}", ${keywords.length} keywords`);
     localOutputPath = localInputPath + "_embedded" + import_path.default.extname(originalName);
-    const magickArgs = [localInputPath];
-    if (title && title.trim()) {
-      magickArgs.push("-set", "iptc:2:5", title.trim());
-      magickArgs.push("-set", "exif:ImageDescription", title.trim());
-      magickArgs.push("-set", "xmp:Title", title.trim());
+    import_fs.default.copyFileSync(localInputPath, localOutputPath);
+    try {
+      const tagsToUpdate = {};
+      if (title && title.trim()) {
+        tagsToUpdate.Title = title.trim();
+        tagsToUpdate.ObjectName = title.trim();
+        tagsToUpdate.ImageDescription = title.trim();
+      }
+      if (description && description.trim()) {
+        tagsToUpdate.Description = description.trim();
+        tagsToUpdate.CaptionAbstract = description.trim();
+      }
+      if (keywords && keywords.length > 0) {
+        tagsToUpdate.Keywords = keywords;
+        tagsToUpdate.Subject = keywords;
+      }
+      console.log(`[Embed Metadata] Writing EXIF/IPTC with ExifTool...`);
+      await exiftool.write(localOutputPath, tagsToUpdate, ["-overwrite_original"]);
+    } catch (exifErr) {
+      console.error("[Embed Metadata] ExifTool error:", exifErr);
     }
-    if (description && description.trim()) {
-      magickArgs.push("-set", "iptc:2:120", description.trim());
-      magickArgs.push("-set", "xmp:Description", description.trim());
-    }
-    if (keywordStr) {
-      magickArgs.push("-set", "iptc:2:25", keywordStr);
-      magickArgs.push("-set", "xmp:Keywords", keywordStr);
-    }
-    magickArgs.push(localOutputPath);
-    console.log(`[Embed Metadata] Writing IPTC/EXIF/XMP with ImageMagick...`);
-    await spawnAsync("magick", magickArgs, { timeout: 3e4 });
     const embeddedName = `embedded_${originalName}`;
     if (isR2Configured()) {
       console.log(`[Embed Metadata] Uploading embedded file to R2...`);
@@ -9799,7 +10138,7 @@ app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
     }
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(embeddedName)}"`);
-    res.sendFile(localOutputPath, { root: "/" }, (err) => {
+    res.sendFile(import_path.default.resolve(localOutputPath), (err) => {
       cleanupLocal();
       try {
         if (import_fs.default.existsSync(localOutputPath)) import_fs.default.unlinkSync(localOutputPath);
@@ -9863,11 +10202,11 @@ app.post("/api/auto-subject", async (req, res) => {
 });
 app.post("/api/analyze-image-to-prompt", async (req, res) => {
   try {
-    const { image, styleCategory, model } = req.body;
+    const { image, styleCategory, variation, model } = req.body;
     if (!image) {
       return res.status(400).json({ error: "Missing image data" });
     }
-    const data = await analyzeImageToPrompt(image, styleCategory, model);
+    const data = await analyzeImageToPrompt(image, styleCategory, typeof variation === "number" ? variation : 5, model);
     res.json(data);
   } catch (e) {
     console.warn("Server analyze-image-to-prompt error:", e);
@@ -9876,11 +10215,11 @@ app.post("/api/analyze-image-to-prompt", async (req, res) => {
 });
 app.post("/api/analyze-batch-image-to-prompt", async (req, res) => {
   try {
-    const { images, styleCategory, model } = req.body;
+    const { images, styleCategory, variation, model } = req.body;
     if (!images || !Array.isArray(images)) {
       return res.status(400).json({ error: "Missing images data" });
     }
-    const data = await analyzeBatchImageToPrompt(images, styleCategory, model);
+    const data = await analyzeBatchImageToPrompt(images, styleCategory, typeof variation === "number" ? variation : 5, model);
     res.json(data);
   } catch (e) {
     console.warn("Server analyze-batch-image-to-prompt error:", e);
@@ -9945,12 +10284,12 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
           Key: pathKey
         });
         const s3Client2 = getS3Client();
-        const response2 = await s3Client2.send(command);
+        const response = await s3Client2.send(command);
         const tempFilePath = import_path.default.join(uploadDir, `dl_${Date.now()}_${import_path.default.basename(pathKey)}`);
         const writeStream = import_fs.default.createWriteStream(tempFilePath);
         const { finished } = await import("stream/promises");
-        if (response2.Body) {
-          response2.Body.pipe(writeStream);
+        if (response.Body) {
+          response.Body.pipe(writeStream);
           await finished(writeStream);
         } else {
           throw new Error("R2 Download body is empty");
@@ -9972,8 +10311,70 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
     }
     let videoFile = null;
     if (videoPath) {
-      console.log("Server check-video-quality: Uploading video to Gemini...");
+      if (ffmpeg && (!frames || frames.length === 0)) {
+        try {
+          console.log("Server check-video-quality: Extracting keyframes with FFmpeg...");
+          const outDir = import_path.default.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+          import_fs.default.mkdirSync(outDir, { recursive: true });
+          frames = await new Promise((resolve, reject) => {
+            let isDone = false;
+            const timeout = setTimeout(() => {
+              if (!isDone) {
+                isDone = true;
+                reject(new Error("Video extraction timed out."));
+              }
+            }, 9e4);
+            const extractFast = async () => {
+              try {
+                const ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
+                const ffprobePath = _require("@ffprobe-installer/ffprobe").path;
+                const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
+                const { stdout: probeOut } = await execPromise2(`"${ffprobePath}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
+                const duration = parseFloat(probeOut.trim());
+                if (isNaN(duration) || duration <= 0) {
+                  throw new Error("Could not determine video duration");
+                }
+                const timestamps = [
+                  duration * 0.1,
+                  duration * 0.25,
+                  duration * 0.4,
+                  duration * 0.55,
+                  duration * 0.7,
+                  duration * 0.85
+                ];
+                const framePaths = [];
+                for (let i = 0; i < timestamps.length; i++) {
+                  const fPathFull = import_path.default.join(outDir, `frame-full-${i + 1}.jpg`);
+                  const fPathZoom = import_path.default.join(outDir, `frame-zoom-${i + 1}.jpg`);
+                  await execPromise2(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -s 1280x720 "${fPathFull}" -y`);
+                  await execPromise2(`"${ffmpegPath}" -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 -vf "crop=min(800,iw):min(800,ih)" "${fPathZoom}" -y`);
+                  framePaths.push(fPathFull);
+                  framePaths.push(fPathZoom);
+                }
+                const frameData = framePaths.map((fPath) => import_fs.default.readFileSync(fPath, "base64"));
+                import_fs.default.rmSync(outDir, { recursive: true, force: true });
+                if (!isDone) {
+                  isDone = true;
+                  clearTimeout(timeout);
+                  resolve(frameData.map((f) => `data:image/jpeg;base64,${f}`));
+                }
+              } catch (e) {
+                if (!isDone) {
+                  isDone = true;
+                  clearTimeout(timeout);
+                  reject(e);
+                }
+              }
+            };
+            extractFast();
+          });
+          extractionSuccess = true;
+        } catch (extractionErr) {
+          console.warn("[Video Audit] FFmpeg frame extraction failed:", extractionErr);
+        }
+      }
       try {
+        console.log("Server check-video-quality: Getting video reference for Gemini...");
         const videoMime = req.file ? req.file.mimetype : "video/mp4";
         if (req.body.pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
           const presignCmd = new import_client_s3.GetObjectCommand({
@@ -9982,27 +10383,49 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
           });
           const presignedUrl = await (0, import_s3_request_presigner.getSignedUrl)(getS3Client(), presignCmd, { expiresIn: 3600 });
           videoFile = { fileUri: presignedUrl, mimeType: videoMime };
+          console.log("[Video Audit] Using R2 presigned URL for Gemini direct fetch");
         } else {
           videoFile = await uploadVideoToGemini(videoPath, videoMime);
         }
-        if (videoFile) console.log("[Video Audit] Video uploaded to Gemini successfully");
+        extractionSuccess = true;
       } catch (uploadErr) {
-        console.warn("[Video Audit] Video upload failed:", uploadErr.message);
+        console.warn("[Video Audit] Video reference failed:", uploadErr.message);
       }
     }
-    if (frames && frames.length > 0 || videoFile) {
-      console.log("Server check-video-quality: " + frames.length + " frames from client, AI-only mode...");
+    if (extractionSuccess && (videoFile || frames && frames.length > 0)) {
+      console.log("Server check-video-quality: Analyzing frames with Gemini...");
       const withTimeout = (promise, ms, label) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms / 1e3}s`)), ms))]);
-      const data = await withTimeout(
-        checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, null, videoFile || null, null),
-        35e3,
-        "checkVideoQuality"
-      );
+      let videoMetadata = null;
+      if (videoPath) {
+        try {
+          console.log("Server check-video-quality: Extracting video metadata...");
+          const { stdout } = await require("util").promisify(require("child_process").exec)(
+            `magick identify -verbose "${videoPath}" 2>/dev/null || ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
+            { timeout: 15e3, maxBuffer: 1024 * 1024 }
+          );
+          videoMetadata = { raw: stdout.substring(0, 5e3) };
+        } catch (exifErr) {
+          console.warn("[Video Audit] Metadata extraction failed:", exifErr.message);
+        }
+      }
+      let technicalReport = null;
+      if (videoPath && frames && frames.length > 0) {
+        try {
+          console.log("Server check-video-quality: Running videoAnalyzer...");
+          const { analyzeVideoTechnically: analyzeVideoTechnically2 } = await Promise.resolve().then(() => (init_videoAnalyzer(), videoAnalyzer_exports));
+          technicalReport = await withTimeout(analyzeVideoTechnically2(videoPath, frames), 9e4, "videoAnalyzer");
+          console.log("Server check-video-quality: videoAnalyzer completed successfully");
+        } catch (techErr) {
+          console.warn("[Video Audit] Technical analysis failed, proceeding without it:", techErr.message);
+        }
+      }
+      const data = await withTimeout(checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model, videoMetadata, videoFile, technicalReport), 9e4, "checkVideoQuality");
       console.log("Server check-video-quality: Analysis successful");
-      const enrichedData = { ...data };
+      cleanupFn();
+      res.json({ ...data, technical_details: technicalReport });
     } else {
       cleanupFn();
-      return res.status(500).json({ error: "Upload video gagal. Pastikan: 1) File < 25MB, atau 2) Cloudflare R2 sudah dikonfigurasi, atau 3) Rebuild frontend dengan npm run build." });
+      return res.status(500).json({ error: "Gagal mengekstrak frame video menggunakan FFmpeg. Pastikan aplikasi berjalan di lingkungan yang mendukung FFmpeg (bukan Vercel Serverless tanpa konfigurasi tambahan). Kami tidak lagi melakukan tebakan otomatis (simulasi)." });
     }
   } catch (e) {
     console.warn("Server check-video-quality error:", e);
@@ -10132,7 +10555,7 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
 function analyzeImageWithPython(tempFilePath) {
   return new Promise((resolve, reject) => {
     const pythonScriptPath = import_path.default.join(__dirname_safe, "server/image_analyzer.py");
-    const pythonProcess = (0, import_child_process.spawn)("python3", [pythonScriptPath, tempFilePath]);
+    const pythonProcess = (0, import_child_process2.spawn)("python3", [pythonScriptPath, tempFilePath]);
     let stdoutData = "";
     let stderrData = "";
     pythonProcess.on("error", (err) => {
@@ -10181,19 +10604,24 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   } catch (e) {
     throw new Error("FFmpeg/FFprobe binaries not found on the server.");
   }
-  const execPromise = import_util.default.promisify(import_child_process.exec);
+  const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
   let resolution = "Unknown";
   let color_space = "sRGB (Standard)";
   let fileSizeKb = 0;
+  let megapixels = 0;
+  let probedWidth = 0;
+  let probedHeight = 0;
   try {
-    const { stdout: probeOut } = await execPromise(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
+    const { stdout: probeOut } = await execPromise2(`"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt,color_space,color_range -of json "${tempFilePath}"`);
     const probeData = JSON.parse(probeOut);
     const stream = probeData.streams?.[0] || {};
     const width = stream.width || 0;
     const height = stream.height || 0;
+    probedWidth = width;
+    probedHeight = height;
     if (width && height) {
-      const mp = (width * height / 1e6).toFixed(2);
-      resolution = `${width} x ${height} (${mp} MP)`;
+      megapixels = width * height / 1e6;
+      resolution = `${width} x ${height} (${megapixels.toFixed(2)} MP)`;
     }
     if (stream.pix_fmt) {
       color_space = `${stream.pix_fmt} (${stream.color_space || "sRGB"} range ${stream.color_range || "N/A"})`;
@@ -10218,7 +10646,7 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   const histogram = new Array(32).fill(0);
   let fileValidation = "Valid (Passed FFmpeg Integrity Check)";
   try {
-    await execPromise(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
+    await execPromise2(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
     if (import_fs.default.existsSync(rawOutputPath)) {
       const bytes = import_fs.default.readFileSync(rawOutputPath);
       let sum = 0;
@@ -10298,6 +10726,9 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   }
   return {
     resolution,
+    width: probedWidth,
+    height: probedHeight,
+    megapixels: Math.round(megapixels * 1e3) / 1e3,
     color_space,
     histogram,
     brightness: { value: brightnessVal, status: brightnessStatus },
@@ -10308,14 +10739,156 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
     file_size_kb: fileSizeKb
   };
 }
-app.post("/api/check-image-quality", async (req, res) => {
+function evaluateAdobeTechnicalGate(stats) {
+  const failures = [];
+  const warnings = [];
+  if (!stats || stats.estimated) {
+    return { passed: true, failures: [], warnings: [] };
+  }
+  if (typeof stats.file_size_kb === "number" && stats.file_size_kb > 45 * 1024) {
+    const mb = (stats.file_size_kb / 1024).toFixed(1);
+    failures.push({
+      key: "file_size",
+      reason_en: `File size is ${mb}MB, above Adobe Stock's 45MB limit.`,
+      reason_id: `Ukuran file ${mb}MB, melebihi batas maksimum Adobe Stock yaitu 45MB.`
+    });
+  }
+  const colorSpace = String(stats.color_space || "");
+  if (/CMYK/i.test(colorSpace)) {
+    failures.push({
+      key: "color_profile",
+      reason_en: `Image uses CMYK color mode. Adobe Stock requires JPEG files in sRGB color profile.`,
+      reason_id: `Gambar menggunakan mode warna CMYK. Adobe Stock mewajibkan file JPEG dengan profil warna sRGB.`
+    });
+  } else if (/^P\b|\(P\)/.test(colorSpace)) {
+    failures.push({
+      key: "color_profile",
+      reason_en: `Image uses an indexed/palette color mode instead of standard RGB, which is not accepted for photo submissions.`,
+      reason_id: `Gambar menggunakan mode warna indexed/palette, bukan RGB standar, yang tidak diterima untuk foto.`
+    });
+  }
+  const sharpnessVal = stats.sharpness?.value;
+  if (typeof sharpnessVal === "number" && sharpnessVal < 12) {
+    failures.push({
+      key: "sharpness",
+      reason_en: `Measured sharpness score is critically low (${sharpnessVal}/100), indicating the image is globally out of focus.`,
+      reason_id: `Skor ketajaman terukur sangat rendah (${sharpnessVal}/100), menandakan gambar secara keseluruhan tidak fokus/blur.`
+    });
+  }
+  const noiseVal = stats.noise?.value;
+  if (typeof noiseVal === "number" && noiseVal > 55) {
+    failures.push({
+      key: "noise",
+      reason_en: `Measured noise level is severe (${noiseVal}/100), well beyond acceptable grain for commercial licensing.`,
+      reason_id: `Tingkat noise terukur sangat parah (${noiseVal}/100), jauh melebihi batas wajar untuk lisensi komersial.`
+    });
+  }
+  const clipHigh = stats.brightness?.clipped_high_percent;
+  const clipLow = stats.brightness?.clipped_low_percent;
+  if (typeof clipHigh === "number" && clipHigh > 15 && !stats.brightness?.is_studio_white_bg) {
+    failures.push({
+      key: "exposure",
+      reason_en: `${clipHigh.toFixed(1)}% of the frame is blown-out highlights (overexposed), exceeding an acceptable range.`,
+      reason_id: `${clipHigh.toFixed(1)}% area gambar mengalami highlight terbakar (overexposed), melebihi batas wajar.`
+    });
+  }
+  if (typeof clipLow === "number" && clipLow > 25 && !stats.brightness?.is_studio_black_bg) {
+    failures.push({
+      key: "exposure",
+      reason_en: `${clipLow.toFixed(1)}% of the frame is crushed shadow (underexposed), exceeding an acceptable range.`,
+      reason_id: `${clipLow.toFixed(1)}% area gambar mengalami shadow gelap total (underexposed), melebihi batas wajar.`
+    });
+  }
+  if (typeof stats.jpeg_blocking?.score === "number" && stats.jpeg_blocking.score > 80) {
+    failures.push({
+      key: "artifacts",
+      reason_en: `Severe JPEG compression blocking detected (score ${stats.jpeg_blocking.score}/100).`,
+      reason_id: `Terdeteksi artefak blocking kompresi JPEG yang parah (skor ${stats.jpeg_blocking.score}/100).`
+    });
+  }
+  if (typeof stats.banding?.score === "number" && stats.banding.score > 80) {
+    failures.push({
+      key: "artifacts",
+      reason_en: `Severe color banding/posterization detected in gradient areas (score ${stats.banding.score}/100).`,
+      reason_id: `Terdeteksi color banding/posterisasi parah pada area gradasi (skor ${stats.banding.score}/100).`
+    });
+  } else if (typeof stats.banding?.score === "number" && stats.banding.score > 45) {
+    warnings.push({
+      key: "artifacts",
+      reason_en: `Moderate banding signal detected (score ${stats.banding.score}/100); inspect gradients at 100%.`,
+      reason_id: `Ada indikasi banding sedang (skor ${stats.banding.score}/100); periksa gradasi pada zoom 100%.`
+    });
+  }
+  const jpegBlockScore = stats.jpeg_blocking?.score;
+  if (typeof jpegBlockScore === "number" && jpegBlockScore > 80) {
+    failures.push({
+      key: "artifacts",
+      reason_en: `Strong repeated JPEG 8x8 blocking detected (score ${jpegBlockScore.toFixed(1)}/100).`,
+      reason_id: `Terdeteksi blocking JPEG 8x8 berulang yang kuat (skor ${jpegBlockScore.toFixed(1)}/100).`
+    });
+  } else if (typeof jpegBlockScore === "number" && jpegBlockScore > 40) {
+    warnings.push({
+      key: "artifacts",
+      reason_en: `Moderate JPEG blocking signal (${jpegBlockScore.toFixed(1)}/100). Confirm visually at 100%; this is not an automatic rejection.`,
+      reason_id: `Ada indikasi blocking JPEG sedang (${jpegBlockScore.toFixed(1)}/100). Konfirmasi visual pada zoom 100%; ini bukan auto-reject.`
+    });
+  }
+  if (stats.ocr?.text_detected) {
+    const ocrText = String(stats.ocr?.text || "").trim();
+    warnings.push({
+      key: "ocr",
+      reason_en: `OCR detected text-like elements${ocrText ? `: ${ocrText.slice(0, 180)}` : ""}. AI Vision must confirm whether the text is real, legible, decorative, or gibberish.`,
+      reason_id: `OCR mendeteksi elemen mirip teks${ocrText ? `: ${ocrText.slice(0, 180)}` : ""}. AI Vision wajib mengonfirmasi apakah teks benar-benar ada, terbaca, dekoratif, atau gibberish.`
+    });
+  }
+  if (stats.background_edge_analysis?.uniform_border) {
+    warnings.push({
+      key: "background_edge",
+      reason_en: "Uniform dark/light background detected. Inspect isolated-subject edges for matte contamination or halos at 100\u2013200%; natural high-contrast edges are not automatically defects.",
+      reason_id: "Background gelap/terang seragam terdeteksi. Periksa tepi subjek untuk matte contamination/halo pada zoom 100\u2013200%; edge kontras alami bukan otomatis cacat."
+    });
+  }
+  const edgeScore = stats.transparency?.edge_halo_risk_percent;
+  if (typeof edgeScore === "number") {
+    if (edgeScore >= 72) {
+      failures.push({
+        key: "alpha_edge",
+        reason_en: `Strong alpha-edge matte/chromatic fringe detected (score ${edgeScore.toFixed(1)}/100). Inspect the cutout on white and mid-gray backgrounds.`,
+        reason_id: `Terdeteksi fringe/matte warna yang kuat pada tepi alpha (skor ${edgeScore.toFixed(1)}/100). Periksa cutout pada background putih dan abu-abu.`
+      });
+    } else if (edgeScore >= 42) {
+      warnings.push({
+        key: "alpha_edge",
+        reason_en: `Possible alpha-edge contamination detected (score ${edgeScore.toFixed(1)}/100). Inspect edges at 100\u2013200%; normal anti-aliasing is not a rejection by itself.`,
+        reason_id: `Ada indikasi kontaminasi tepi alpha (skor ${edgeScore.toFixed(1)}/100). Periksa tepi pada 100\u2013200%; anti-aliasing normal bukan alasan reject.`
+      });
+    }
+  }
+  if (stats.sharpness?.has_local_blur_anomaly === true) {
+    warnings.push({
+      key: "localized_blur",
+      reason_en: "Localized sharpness variation detected. Inspect the softest region at 100% before submission.",
+      reason_id: "Terdeteksi variasi ketajaman lokal. Periksa area paling lembut pada zoom 100% sebelum upload."
+    });
+  }
+  return { passed: failures.length === 0, failures, warnings };
+}
+app.post("/api/check-image-quality", upload.single("image"), async (req, res) => {
   let tempFilePath = "";
   let cleanupFn = () => {
   };
   try {
-    const { image, fileUrl, pathKey, tolerance, language, model, fileType, detailCrops } = req.body;
+    const { image, fileUrl, pathKey, tolerance, language, model, fileType } = req.body;
     let imageBase64 = "";
-    if (fileUrl) {
+    if (req.file) {
+      tempFilePath = req.file.path;
+      cleanupFn = () => {
+      };
+      const fileBuffer = import_fs.default.readFileSync(tempFilePath);
+      const mime = req.file.mimetype || fileType || "application/octet-stream";
+      imageBase64 = `data:${mime};base64,${fileBuffer.toString("base64")}`;
+      console.log(`Server check-image-quality: Using ORIGINAL multipart file: ${req.file.originalname} (${req.file.size} bytes)`);
+    } else if (fileUrl) {
       console.log(`Server check-image-quality: Downloading file from storage: ${fileUrl}`);
       const ext = fileType?.includes("png") ? ".png" : fileType?.includes("gif") ? ".gif" : ".jpg";
       const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
@@ -10350,6 +10923,8 @@ app.post("/api/check-image-quality", async (req, res) => {
       } catch (ffErr) {
         console.warn("[Image Audit Fallback] FFmpeg analysis failed, using AI Vision fallback stats:", ffErr);
         ffmpegStats = {
+          estimated: true,
+          // guessed stats — never used for hard technical gating, see evaluateAdobeTechnicalGate()
           resolution: "Estimated from file structure",
           color_space: "sRGB (Standard)",
           histogram: new Array(32).fill(0).map((_, i) => Math.round(Math.sin(i / 10) * 50 + 50)),
@@ -10363,117 +10938,76 @@ app.post("/api/check-image-quality", async (req, res) => {
       }
     }
     console.log("Server check-image-quality: Running AI Vision Analysis...");
-    const cropFilePaths = [];
+    const cropSuffixes = ["tl", "tr", "bl", "br", "macro_center"];
+    const cropFilePaths = cropSuffixes.map((s) => `${tempFilePath}_${s}.png`);
     let imagesToSend = imageBase64;
     try {
-      const validClientCrops = Array.isArray(detailCrops) ? detailCrops.filter((c) => typeof c === "string" && c.startsWith("data:image/")).slice(0, 4) : [];
-      if (validClientCrops.length > 0) {
-        imagesToSend = [imageBase64, ...validClientCrops];
-        console.log(`Server check-image-quality: Using ${validClientCrops.length} native-resolution detail crops from client`);
-      } else {
-        const ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
-        const execPromise = import_util.default.promisify(import_child_process.exec);
-        const cropRegions = [
-          { name: "top-left", filter: "crop=iw*0.6:ih*0.6:0:0" },
-          { name: "top-right", filter: "crop=iw*0.6:ih*0.6:iw*0.4:0" },
-          { name: "bottom-left", filter: "crop=iw*0.6:ih*0.6:0:ih*0.4" },
-          { name: "bottom-right", filter: "crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4" }
-        ];
-        const cropBase64s = [];
-        for (const region of cropRegions) {
-          try {
-            const cropPath = `${tempFilePath}_crop_${region.name}.jpg`;
-            await execPromise(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${region.filter}" -q:v 2 "${cropPath}"`);
-            if (import_fs.default.existsSync(cropPath)) {
-              cropFilePaths.push(cropPath);
-              const cropBuffer = import_fs.default.readFileSync(cropPath);
-              cropBase64s.push(`data:image/jpeg;base64,${cropBuffer.toString("base64")}`);
-            }
-          } catch (oneCropErr) {
-            console.warn(`Server check-image-quality: Failed to generate ${region.name} crop:`, oneCropErr);
-          }
-        }
-        if (cropBase64s.length > 0) {
-          imagesToSend = [imageBase64, ...cropBase64s];
-          console.log(`Server check-image-quality: Successfully generated ${cropBase64s.length} native-resolution detail crops via FFmpeg`);
-        }
+      const ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
+      const execPromise2 = import_util2.default.promisify(import_child_process2.exec);
+      const cropFilters = [
+        "crop=iw*0.6:ih*0.6:0:0",
+        "crop=iw*0.6:ih*0.6:iw*0.4:0",
+        "crop=iw*0.6:ih*0.6:0:ih*0.4",
+        "crop=iw*0.6:ih*0.6:iw*0.4:ih*0.4",
+        "crop=min(iw\\,ih)*0.45:min(iw\\,ih)*0.45:(iw-min(iw\\,ih)*0.45)/2:(ih-min(iw\\,ih)*0.45)/2"
+      ];
+      await Promise.all(cropFilters.map(
+        (filter, i) => execPromise2(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${filter}" -frames:v 1 -c:v png -pix_fmt rgba "${cropFilePaths[i]}"`)
+      ));
+      const availableCrops = cropFilePaths.filter((p) => import_fs.default.existsSync(p)).map((p) => {
+        const buf = import_fs.default.readFileSync(p);
+        return `data:image/png;base64,${buf.toString("base64")}`;
+      });
+      if (availableCrops.length > 0) {
+        imagesToSend = [imageBase64, ...availableCrops];
+        console.log(`Server check-image-quality: Generated ${availableCrops.length} forensic crops (4 quadrants + 1 macro focus crop) via FFmpeg`);
       }
     } catch (zoomErr) {
-      console.warn("Server check-image-quality: Failed to prepare detail crops:", zoomErr);
+      console.warn("Server check-image-quality: Failed to generate forensic crops:", zoomErr);
     }
-    const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType);
-    try {
-      const techGateReasons = [];
-      const sharpVal = ffmpegStats?.sharpness?.value;
-      const noiseVal = ffmpegStats?.noise?.value;
-      const brightVal = ffmpegStats?.brightness?.value;
-      if (typeof sharpVal === "number" && sharpVal < 15) {
-        techGateReasons.push(`Ketajaman sangat rendah (sharpness ${sharpVal}/100) \u2014 indikasi kuat soft focus / motion blur parah di seluruh gambar`);
+    const aiVisionStats = await checkImageQuality(imagesToSend, tolerance, language, model, fileType, ffmpegStats);
+    const gateResult = evaluateAdobeTechnicalGate(ffmpegStats);
+    const isIndonesianLang = !language || language === "Bahasa" || language === "id" || /indonesian/i.test(String(language));
+    if (gateResult.warnings?.length) {
+      const warningNotes = gateResult.warnings.map((w) => isIndonesianLang ? w.reason_id : w.reason_en);
+      aiVisionStats.technical_issues = [...Array.isArray(aiVisionStats.technical_issues) ? aiVisionStats.technical_issues : [], ...warningNotes];
+      const warningHeader = isIndonesianLang ? "\n\n[PERINGATAN QC TEKNIS - TIDAK OTOMATIS REJECT]\n" : "\n\n[TECHNICAL QC WARNINGS - NOT AN AUTOMATIC REJECTION]\n";
+      aiVisionStats.detailed_feedback = `${aiVisionStats.detailed_feedback || ""}${warningHeader}${warningNotes.map((n) => `- ${n}`).join("\n")}`;
+    }
+    if (!gateResult.passed) {
+      console.warn("Server check-image-quality: Adobe technical gate FAILED:", gateResult.failures.map((f) => f.key));
+      aiVisionStats.recommendation = "FAIL";
+      aiVisionStats.overall_score = Math.min(typeof aiVisionStats.overall_score === "number" ? aiVisionStats.overall_score : 69, 55);
+      const gateNotes = gateResult.failures.map((f) => isIndonesianLang ? f.reason_id : f.reason_en);
+      aiVisionStats.technical_issues = [...Array.isArray(aiVisionStats.technical_issues) ? aiVisionStats.technical_issues : [], ...gateNotes];
+      const gateHeader = isIndonesianLang ? "\n\n[GERBANG TEKNIS ADOBE STOCK - OTOMATIS, BERDASARKAN PENGUKURAN PIKSEL NYATA]\n" : "\n\n[ADOBE STOCK TECHNICAL GATE - AUTOMATIC, BASED ON REAL PIXEL MEASUREMENTS]\n";
+      aiVisionStats.detailed_feedback = `${aiVisionStats.detailed_feedback || ""}${gateHeader}${gateNotes.map((n) => `- ${n}`).join("\n")}`;
+      if (!aiVisionStats.ai_vision_checks) aiVisionStats.ai_vision_checks = {};
+      const checksToFail = /* @__PURE__ */ new Set();
+      for (const f of gateResult.failures) {
+        if (f.key === "sharpness") checksToFail.add("blur");
+        else if (f.key === "noise") checksToFail.add("noise");
+        else if (f.key === "exposure") {
+          checksToFail.add("lighting");
+          checksToFail.add("exposure");
+        } else if (f.key === "artifacts" || f.key === "alpha_edge") checksToFail.add("artifacts");
+        checksToFail.add("stock_acceptance");
       }
-      if (ffmpegStats?.sharpness?.has_local_blur_anomaly) {
-        techGateReasons.push(`Ketajaman lokal tidak seragam (has_local_blur_anomaly) \u2014 terdeteksi area soft focus atau blur lokal yang parah (sharpness regional minimum: ${ffmpegStats?.local_analysis?.min_local_sharpness})`);
+      for (const checkKey of checksToFail) {
+        const relevantReasons = gateResult.failures.filter((f) => f.key === "sharpness" && checkKey === "blur" || f.key === "noise" && checkKey === "noise" || f.key === "exposure" && (checkKey === "lighting" || checkKey === "exposure") || (f.key === "artifacts" || f.key === "alpha_edge") && checkKey === "artifacts" || checkKey === "stock_acceptance").map((f) => isIndonesianLang ? f.reason_id : f.reason_en);
+        aiVisionStats.ai_vision_checks[checkKey] = {
+          status: "FAIL",
+          note: relevantReasons.length ? relevantReasons.join(" ") : isIndonesianLang ? "Gagal pada gerbang teknis otomatis Adobe Stock." : "Failed the automatic Adobe Stock technical gate."
+        };
       }
-      if (typeof noiseVal === "number" && noiseVal > 60) {
-        techGateReasons.push(`Noise sangat tinggi (noise ${noiseVal}/100) \u2014 melebihi batas wajar Adobe Stock`);
-      }
-      if (ffmpegStats?.local_analysis?.max_local_noise > 45) {
-        techGateReasons.push(`Noise lokal sangat tinggi (max_local_noise ${ffmpegStats?.local_analysis?.max_local_noise}/100) di area bayangan tertentu`);
-      }
-      if (typeof brightVal === "number" && (brightVal > 92 || brightVal < 8)) {
-        techGateReasons.push(`Eksposur ekstrem (brightness ${brightVal}/100) \u2014 indikasi over/under exposure parah`);
-      }
-      if (ffmpegStats?.transparency?.has_alpha) {
-        const partialAlpha = Number(ffmpegStats.transparency.partial_alpha_percent || 0);
-        const haloRisk = Number(ffmpegStats.transparency.edge_halo_risk_percent || 0);
-        if (haloRisk > 30 && partialAlpha > 0.05) {
-          techGateReasons.push(`Risiko matte/halo pada alpha edge tinggi (${haloRisk.toFixed(1)}%) \u2014 periksa rambut/kain/tepi objek pada background kontras`);
-        }
-      }
-      if (Number(ffmpegStats?.banding?.score || 0) > 65) {
-        techGateReasons.push(`Sinyal banding/posterization tinggi (${ffmpegStats.banding.score}/100) \u2014 periksa area gradasi halus pada 100%`);
-      }
-      if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) {
-        techGateReasons.push(`Sinyal JPEG blocking tinggi (${ffmpegStats.jpeg_blocking.score}/100) \u2014 periksa kompresi pada 100%`);
-      }
-      if (techGateReasons.length > 0) {
-        console.warn("Server check-image-quality: Deterministic technical gate triggered:", techGateReasons);
-        aiVisionStats.technical_issues = [...aiVisionStats.technical_issues || [], ...techGateReasons];
-        const deterministicKeys = [];
-        if (typeof sharpVal === "number" && sharpVal < 15) deterministicKeys.push("blur");
-        if (ffmpegStats?.sharpness?.has_local_blur_anomaly) deterministicKeys.push("blur");
-        if (typeof noiseVal === "number" && noiseVal > 60) deterministicKeys.push("noise");
-        if (ffmpegStats?.local_analysis?.max_local_noise > 45) deterministicKeys.push("noise");
-        if (typeof brightVal === "number" && (brightVal > 92 || brightVal < 8)) deterministicKeys.push("exposure");
-        if (Number(ffmpegStats?.transparency?.edge_halo_risk_percent || 0) > 30) deterministicKeys.push("artifacts");
-        if (Number(ffmpegStats?.banding?.score || 0) > 65) deterministicKeys.push("artifacts");
-        if (Number(ffmpegStats?.jpeg_blocking?.score || 0) > 65) deterministicKeys.push("artifacts");
-        aiVisionStats.failed_checks = Array.from(/* @__PURE__ */ new Set([...aiVisionStats.failed_checks || [], ...deterministicKeys]));
-        if (aiVisionStats.recommendation !== "FAIL") {
-          aiVisionStats.recommendation = "FAIL";
-          if (typeof aiVisionStats.overall_score !== "number" || aiVisionStats.overall_score >= 66) {
-            aiVisionStats.overall_score = 65;
-          }
-          if (aiVisionStats.ai_vision_checks?.stock_acceptance) {
-            aiVisionStats.ai_vision_checks.stock_acceptance.status = "FAIL";
-            aiVisionStats.ai_vision_checks.stock_acceptance.note = (aiVisionStats.ai_vision_checks.stock_acceptance.note || "") + " [Sistem] Ditolak otomatis oleh gerbang teknis: " + techGateReasons.join("; ");
-          }
-        }
-      }
-    } catch (gateErr) {
-      console.warn("Server check-image-quality: Technical gate evaluation failed (non-blocking):", gateErr);
     }
     console.log("Server check-image-quality: Integration successful");
     const combinedReport = {
       ...aiVisionStats,
       ffmpeg: ffmpegStats,
-      ai_vision: aiVisionStats
+      ai_vision: aiVisionStats,
+      technical_gate: gateResult
     };
-    for (const cp of cropFilePaths) {
-      try {
-        if (import_fs.default.existsSync(cp)) import_fs.default.unlinkSync(cp);
-      } catch (e) {
-      }
-    }
     res.json(combinedReport);
   } catch (e) {
     console.warn("Server check-image-quality error:", e);
@@ -10487,11 +11021,13 @@ app.post("/api/check-image-quality", async (req, res) => {
       }
     }
     if (tempFilePath) {
-      const zoomFilePath = tempFilePath + "_zoom.jpg";
-      if (import_fs.default.existsSync(zoomFilePath)) {
-        try {
-          import_fs.default.unlinkSync(zoomFilePath);
-        } catch (err) {
+      for (const suffix of ["tl", "tr", "bl", "br", "macro_center"]) {
+        const qPath = `${tempFilePath}_${suffix}.png`;
+        if (import_fs.default.existsSync(qPath)) {
+          try {
+            import_fs.default.unlinkSync(qPath);
+          } catch (err) {
+          }
         }
       }
     }
@@ -10775,15 +11311,15 @@ async function downloadFileFromStorage(fileUrl, pathKey, extension = ".mp4") {
       Bucket: process.env.S3_BUCKET_NAME,
       Key: pathKey
     });
-    const response2 = await getS3Client().send(command);
-    const stream = response2.Body;
+    const response = await getS3Client().send(command);
+    const stream = response.Body;
     stream.pipe(fileStream);
     await finished(fileStream);
   } else {
     console.log(`[Storage] Downloading from public URL ${fileUrl}...`);
-    const response2 = await fetch(fileUrl);
-    if (!response2.ok) throw new Error(`Failed to fetch file from URL: ${response2.statusText}`);
-    const arrayBuffer = await response2.arrayBuffer();
+    const response = await fetch(fileUrl);
+    if (!response.ok) throw new Error(`Failed to fetch file from URL: ${response.statusText}`);
+    const arrayBuffer = await response.arrayBuffer();
     import_fs.default.writeFileSync(localPath, Buffer.from(arrayBuffer));
   }
   const cleanup = () => {

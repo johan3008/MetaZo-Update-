@@ -38,6 +38,7 @@ interface PromptHistoryItem {
 }
 
 const BACKGROUND_STYLE_OPTIONS = [
+  { id: 'Flat Illustration', label: 'Flat Illustration (Ilustrasi Vektor 2D)', icon: '🎨' },
   { id: '3D CGI', label: '3D CGI Style (Gaya 3D CGI)', icon: '🧊' },
   { id: 'Cinematic', label: 'Cinematic (Sinematik)', icon: '🎬' },
   { id: 'Vector Art', label: 'Vector Art (Seni Vektor)', icon: '🎨' },
@@ -75,6 +76,7 @@ const DARK_HORROR_SUB_STYLES = [
 ];
 
 const PNG_STYLE_OPTIONS = [
+  { id: 'Flat Illustration', label: 'Flat Illustration (Ilustrasi Vektor 2D)', icon: '🎨' },
   { id: 'Photorealistic', label: 'Photorealistic (Foto Realistis)', icon: '📷' },
   { id: '3D Render', label: '3D Render (Unreal Engine)', icon: '🎮' },
   { id: 'Isometric', label: 'Isometric (Isometrik 3D)', icon: '📦' },

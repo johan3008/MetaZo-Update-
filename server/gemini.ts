@@ -1191,9 +1191,12 @@ function buildStructuredKeywordCandidates(ctx: KeywordRoleContext): string[] {
 
 const BASIC_ENGLISH_FILLER_KEYWORDS = new Set([
   'subject', 'focus', 'sharp', 'blurry', 'detail', 'quality', 'image', 'photo',
-  'picture', 'design', 'nice', 'beautiful', 'amazing', 'professional',
+  'picture', 'design', 'nice', 'beautiful', 'amazing', 'stunning', 'gorgeous',
+  'pretty', 'awesome', 'perfect', 'wonderful', 'incredible', 'masterpiece', 'best',
+  'top', 'high quality', 'superb', 'fantastic', 'lovely', 'professional',
   'visual', 'element', 'object', 'thing', 'composition', 'color', 'colour',
-  'lifestyle', 'adult', 'formal', 'up', 'down', 'out', 'off', 'back'
+  'lifestyle', 'adult', 'formal', 'up', 'down', 'out', 'off', 'back',
+  'red', 'blue', 'green', 'yellow', 'white', 'black', 'orange', 'purple', 'pink', 'brown', 'gray', 'grey', 'colorful'
 ]);
 
 function isWeakGenericKeyword(keyword: string): boolean {
@@ -1594,10 +1597,13 @@ const ADOBE_STOCK_IDEAL_MAX_KEYWORDS = 35;
 
 const ADOBE_KEYWORD_FILLER = new Set([
   "image", "photo", "picture", "photograph", "stock", "visual", "design",
-  "nice", "beautiful", "amazing", "professional", "quality", "focus",
+  "nice", "beautiful", "amazing", "stunning", "gorgeous", "pretty", "awesome",
+  "perfect", "wonderful", "incredible", "masterpiece", "best", "top", "quality",
+  "high quality", "superb", "fantastic", "lovely", "professional", "focus",
   "sharp", "blurry", "detail", "composition", "element", "object", "thing",
   "subject", "generic", "background", "color", "colour", "lifestyle",
-  "adult", "formal", "up", "down", "out", "off", "back"
+  "adult", "formal", "up", "down", "out", "off", "back",
+  "red", "blue", "green", "yellow", "white", "black", "orange", "purple", "pink", "brown", "gray", "grey", "colorful"
 ]);
 
 const ADOBE_KEYWORD_IP_PATTERN =
@@ -3379,24 +3385,43 @@ async function applyMetadataGenKeywordLogic(options: {
 
 
 const UNIVERSAL_KEYWORD_RULES = `
-You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine. Generate highly discoverable, strictly formatted professional keywords for the analyzed visual asset.
+You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine.
 
-KEY CAPABILITIES (CRITICAL):
-1. Auto-detects subjects, scenes, and contexts: You MUST analyze and extract accurate, grounded keywords from the VISUAL_FACTS, covering the main subjects, setting, activities, and commercial context. NEVER hallucinate.
-2. Generates keyword sets optimized for search ranking: Prioritize highly searched 2-3 word natural phrases and concrete nouns/verbs. DO NOT SPLIT compound words! Order keywords by importance (Main Subject first, followed by context, concepts, and composition).
-3. Supports multiple languages and regional spelling: Output all keywords strictly in the requested metadata language, adapting seamlessly to regional spelling rules and natural local search phrasing.
+CRITICAL ARCHITECTURE — 8-TIER COGNITIVE KEYWORD PIPELINE:
+You MUST construct metadata through these 8 structured cognitive steps rather than generating a random list of words:
 
-STRATEGIC RELEVANCE & NICHE TARGETING:
-- Review keywords for relevance before export: Every keyword must be strictly relevant to the core subject or commercial concept.
-- Use fewer, stronger keywords for tight niches: When the asset targets a highly specific niche, prioritize strong, high-value keywords over volume.
-- Leverage variations for larger marketplaces: Utilize smart semantic variations, natural synonyms, and local phrasing to capture broad search intent on macro-marketplaces, without sacrificing accuracy.
+1. VISUAL DETECTION:
+   - Identify the exact primary objects and core subject matter visibly present in the frame.
 
-ADDITIONAL RULES:
-- STYLE & NEATNESS: Generate highly descriptive, concrete, and neat terms. For example, a food scene should yield a clean list like: "chicken, fried, crispy, glaze, knife, steaming, cutting, board, food, savory, meat, meal". Do not generate messy, overly complex, or robotic phrasing.
-- NO COLORS OR PATTERNS: ABSOLUTELY DO NOT use any color words (e.g., "red", "blue") or pattern words (e.g., "striped").
-- NO SPAM OR SUBJECTIVITY: Never use words like "beautiful", "high quality", "image", "picture".
-- NO PROHIBITED TERMS: Absolutely NO brand names, trademarks, or AI terms ("midjourney", "chatgpt").
-- FORMAT: All keywords must be lowercase, free of duplicates, and match the exact requested count without filler.
+2. SUBJECT RANKING:
+   - Rank detected subjects by visual dominance, focal sharpness, and hierarchy (Main Subject > Secondary Objects > Background Elements).
+   - Place the highest-ranked subjects at the very beginning of the keyword list.
+
+3. RELATIONSHIP & INTERACTION:
+   - Identify how subjects interact with each other and their props (actions, gestures, physical contact, poses, active verbs).
+
+4. ENVIRONMENT & SETTING:
+   - Identify the specific location, scene, or environment (indoor, outdoor, studio, office, nature, urban, workspace).
+
+5. VISUAL ATTRIBUTES & LIGHTING:
+   - Detail tangible attributes: material, texture, condition, shape, physical position, angle, and lighting atmosphere (soft light, studio lighting, golden hour).
+
+6. GROUNDED CONCEPTS:
+   - Extract only high-value conceptual themes that are GENUINELY and directly supported by visual evidence (e.g. teamwork, sustainability, wellness, innovation). Never hallucinate unsupported concepts.
+
+7. COMMERCIAL INTENT:
+   - Identify how commercial buyers and designers will search for and use this asset (advertising, marketing, UI header, poster, banner template, editorial).
+
+8. SEO RANKING & FRONT-LOADING:
+   - Front-load the most crucial keywords at the front:
+     [Exact Main Subject] -> [Relationship/Action] -> [Visual Attributes/Materials] -> [Environment] -> [Grounded Concept] -> [Commercial Intent].
+
+STRICT NEGATIVE FILTERS:
+- NO OVERLY GENERIC FILLERS: Eliminate "image", "photo", "picture", "element", "object", "thing", "generic", "background".
+- NO STANDALONE COLORS AS PRIMARY: Do not use standalone color words (e.g. "red", "blue") as primary keywords.
+- ZERO TOLERANCE FOR SUBJECTIVE WORDS: Strictly forbid "beautiful", "amazing", "stunning", "gorgeous", "pretty", "nice", "awesome", "perfect", "high quality", "best".
+- ELIMINATE UNRELATED / SPAM KEYWORDS: Zero tolerance for keywords not directly tied to the visual evidence.
+- FORMAT: Lowercase, comma-separated, matching the requested count, output strictly in the requested language.
 `;
 
 
@@ -5655,7 +5680,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 
 export const analyzeImageToPrompt = async (
   image: string,
-  styleCategory: string = 'Cinematic',
+  styleCategory: string = 'Default',
   variation: number = 5,
   model?: string
 ): Promise<{ prompts: string[]; prompt: string; description: string }> => {
@@ -5663,6 +5688,25 @@ export const analyzeImageToPrompt = async (
   const provider = (store && store.provider) || 'gemini';
   const count = Math.min(Math.max(variation, 5), 15);
   
+  let styleHandlingInstruction = "";
+  if (styleCategory === 'Default' || styleCategory === 'Original Style' || styleCategory === 'Match Image') {
+    styleHandlingInstruction = `3. STYLE PRESERVATION (DEFAULT / MATCH ORIGINAL IMAGE STYLE):
+   - Deeply analyze the EXACT visual medium, art style, rendering technique, and aesthetic of the uploaded image (e.g. realistic photograph, 3D CGI render, flat 2D vector, watercolor painting, pixel art, cyberpunk illustration, vintage engraving, claymation, line art, etc.).
+   - STRICTLY PRESERVE and deeply emulate this exact same art style, rendering medium, texture, and visual fidelity across all generated prompt variations. Do NOT convert into an unrelated style.`;
+  } else if (styleCategory === 'Flat Illustration' || styleCategory === 'Flat Vector') {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO FLAT ILLUSTRATION:
+   - Convert the aesthetic completely into a clean, modern 2D Flat Vector Illustration style.
+   - Emphasize crisp vector outlines, flat harmonious color palettes, clean geometric and organic shapes, minimalist shading, generous clean copy space, and aesthetic editorial illustration qualities typical of professional flat vector art.`;
+  } else if (styleCategory === 'Graphic Design') {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO COMMERCIAL GRAPHIC DESIGN (ZERO TYPOGRAPHY RULE):
+   - Convert the aesthetic completely into a professional commercial advertising layout, banner template, or poster composition crafted in Adobe Illustrator/Photoshop style with geometric shapes, flat vector elements, and vibrant commercial color palettes.
+   - STRICT BAN ON ALL TYPOGRAPHY & TEXT: You are STRICTLY FORBIDDEN from including any readable text, fake words, letters, gibberish characters, placeholder fonts, or printed typography in the prompt.
+   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST explicitly feature spacious, clean, uncluttered empty copy space / negative space (e.g., "spacious clean negative copy space on the right, blank layout area for text overlay, no typography, no letters, purely graphic background"). This makes the asset 100% editable and commercially sellable on microstock platforms.`;
+  } else {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO "${styleCategory}":
+   - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).`;
+  }
+
   const systemInstruction = `You are a World-Class AI Visual Reverse-Engineering Analyst and Master Prompt Engineer.
 Analyze the provided image and generate EXACTLY ${count} unique, highly varied, professional text-to-image prompt variations in English, tailored to the target style "${styleCategory}".
 
@@ -5675,11 +5719,12 @@ CRITICAL REVERSE-ENGINEERING & DIVERSITY RULES (MANDATORY):
      * Sudut Kamera & Framing: macro close-up, overhead flat lay knolling, wide environmental shot, eye-level candid, 3/4 dynamic perspective.
      * Skenario & Aksi: Tampilkan subjek dalam aksi, interaksi, tahapan persiapan, atau konteks penggunaan yang berbeda di dunia nyata.
      * Pencahayaan & Waktu: Golden hour, soft morning window light, clean studio lighting, moody atmospheric light.
-     * Komposisi: Letakkan subjek di kiri/kanan dengan clean copy space untuk kebutuhan komersial stok.
+     * Komposisi & Copy Space: Letakkan subjek dengan komposisi seimbang (rule of thirds, off-center) dan sertakan clean copy space untuk kebutuhan komersial stok.
    - All variations must be plausible, logical, and commercially viable.
-3. STYLE TRANSLATION TO "${styleCategory}":
-   - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).
-4. ZERO IP RISK:
+${styleHandlingInstruction}
+4. COMMERCIAL READINESS & COPY SPACE:
+   - All prompts must be formatted to produce high-demand commercial stock imagery with clean, usable negative space / copy space suitable for marketing, website headers, advertisements, and editorial overlays.
+5. ZERO IP RISK:
    - Replace any brand names/logos with generic descriptive terms (e.g. 'luxury modern coupe' instead of 'Porsche').
 
 CRITICAL OUTPUT FORMAT:
