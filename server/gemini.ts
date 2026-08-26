@@ -8013,9 +8013,90 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
 }
 
 
-export async function generateAutoSubject(styleCategory: string, model?: string, currentSubject?: string): Promise<string> {
-  // A vast, highly diverse creative seed list to guarantee complete randomness and prevent repetitive ideas on multiple clicks
-  const creativeSeeds = [
+export async function generateAutoSubject(styleCategory: string, model?: string, currentSubject?: string, promptMode?: 'background' | 'png'): Promise<string> {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
+  const creativeSeedsByStyle: Record<string, string[]> = {
+    'Cinematic': [
+      "solitary cyberpunk detective standing in neon-lit rain reflections near a noodle bar",
+      "cinematic golden hour drone shot of a futuristic solar energy farm in Iceland",
+      "dramatic chiaroscuro portrait of a seasoned female astronaut overlooking Martian sunrise",
+      "epic atmospheric cinematic shot of an ancient Scandinavian fishing village surrounded by morning fog",
+      "wide anamorphic cinematic scene of a sleek hypercar charging at a glowing forest waypoint at dusk",
+      "moody cinematic street photography of Tokyo alleyways during a heavy monsoon rain with neon reflections",
+      "cinematic aerial shot of a luxury mountain lodge surrounded by snow-covered pines with warm glowing interior lights"
+    ],
+    '3D CGI': [
+      "floating translucent glass orbs with glistening internal golden liquid and soft studio caustics",
+      "futuristic biometric smartwatch with holographic interface hovering over a matte ceramic podium",
+      "intricate 3D cross-section of a glowing crystalline cybernetic heart with glowing fiber optic arteries",
+      "claymorphic pastel cute 3D coffee machine with pillowy steam clouds and glossy finish",
+      "ultra-detailed 3D isometric laboratory room with glowing specimen tubes and sleek synthetic panels",
+      "smooth matte 3D geometric abstract composition with floating chrome spheres and velvet textures"
+    ],
+    'Photorealistic': [
+      "macro close-up photography of a dewdrop reflecting a blooming cherry blossom at sunrise",
+      "authentic editorial portrait of a diverse modern pottery artisan working on a clay wheel in sunlit studio",
+      "high-end culinary flat lay of artisanal sourdough bread, fresh rosemary, and organic olive oil on dark slate",
+      "crisp architectural photography of a minimalist Scandinavian concrete villa with floor-to-ceiling glass windows",
+      "candid street lifestyle photography of remote digital nomads working in a bright Bali garden cafe",
+      "hyper-detailed macro photography of a colorful chameleon perched on an exotic tropical monstera leaf"
+    ],
+    'Flat Illustration': [
+      "vibrant modern flat vector illustration of an eco-friendly smart city with wind turbines and electric transit",
+      "minimalist flat corporate illustration of team collaboration around floating analytics dashboard with Alegria style",
+      "charming 2D flat botanical greenhouse illustration with lush potted plants and sunny window grid",
+      "isometric flat vector scene of a cozy home office setup with dual monitors and indoor greenery",
+      "retro-modern 2D flat travel poster of Mount Fuji with cherry blossoms and clean geometric lines",
+      "colorful flat vector collection of organic gardening tools, seed packets, and fresh harvest vegetables"
+    ],
+    'Vector Art': [
+      "clean minimalist linear vector landscape of mountain ranges with geometric rising sun",
+      "high-contrast continuous line art portrait of a woman surrounded by blooming floral elements",
+      "corporate flat vector illustration of cloud data synchronization with dynamic gradient accents",
+      "retro vintage badge vector design featuring a camping campfire and pine forest silhouette",
+      "modern isometric flat vector infographic depicting renewable energy grid network"
+    ],
+    'Dark Horror Aesthetic': [
+      "grimdark ancient gothic cathedral sanctuary overgrown with thorned black roses and eerie green mist",
+      "atmospheric macabre scene of a cloaked entity holding an ethereal glowing lantern in an enchanted dead forest",
+      "Lovecraftian cosmic entity submerged beneath abyssal ocean trenches surrounded by bioluminescent runes",
+      "haunting biomechanical skeletal throne fused with industrial machinery and dim candlelight",
+      "cinematic chiaroscuro dark fantasy ritual chamber with floating arcane symbols and swirling shadows"
+    ],
+    'Anime/Manga': [
+      "vibrant anime style illustration of a high school rooftop overlooking sunset cityscape with fluffy clouds",
+      "cyberpunk anime warrior standing on a skyscraper ledge gazing at massive holographic billboards in Neo-Tokyo",
+      "whimsical Ghibli-inspired countryside train ride passing through endless golden rice fields under summer sky",
+      "magical anime alchemist apprentice brewing glowing starlight potions in a cozy rustic workshop"
+    ],
+    'Watercolor Painting': [
+      "loose dreamy watercolor painting of wildflowers blooming along a coastal cliff edge overlooking azure ocean",
+      "delicate transparent watercolor wash of a steaming matcha latte surrounded by botanical eucalyptus leaves",
+      "soft wet-on-wet watercolor landscape of misty autumn pine mountains with subtle golden splatter accents",
+      "expressive splash watercolor illustration of a hummingbird sipping nectar from a vibrant hibiscus flower"
+    ]
+  };
+
+  const pngSeeds: string[] = [
+    "cute 3D isometric coffee cup icon with fluffy foam heart, isolated on white background",
+    "glossy golden shield security badge icon with glowing checkmark, isolated on white background",
+    "delicate watercolor botanical monstera leaf branch element, isolated on transparent background",
+    "futuristic holographic AI brain processor chip with glowing circuits, isolated on black background",
+    "playful cartoon Shiba Inu astronaut character floating with small rocket, isolated on white background",
+    "hand-drawn vintage bakery logo emblem with wheat stalks and rolling pin, isolated on white background",
+    "sleek flat vector analytics bar chart icon with upward growth arrow, isolated on transparent background",
+    "detailed 3D render of a sparkling emerald gemstone with facet refractions, isolated on white background",
+    "minimalist continuous line art icon of a human hand holding a seedling, isolated on transparent background",
+    "glossy ceramic 3D cloud with golden lightning bolt weather icon, isolated on white background"
+  ];
+
+  const isPng = promptMode === 'png';
+  const categorySeeds = (!isPng && creativeSeedsByStyle[styleCategory]) ? creativeSeedsByStyle[styleCategory] : (!isPng ? creativeSeedsByStyle['Photorealistic'] : pngSeeds);
+  const randomFallback = categorySeeds[Math.floor(Math.random() * categorySeeds.length)];
+
+  const creativeSeedsGeneral = [
     "cyberpunk coffee shop", "organic biotechnology", "whimsical woodland creatures", "cosmic ocean nebula", 
     "minimalist brutalist concrete villa", "ancient steampunk mechanical workshop", "vibrant neon desert oasis", 
     "surreal levitating glass islands", "cozy Scandinavian hygge attic", "retro-futuristic astronaut exploring mossy ruins", 
@@ -8028,36 +8109,56 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
     "surreal clockwork solar system globe", "vibrant pop-art stylized fruit display", "cozy winter cabin library with crackling fireplace", 
     "majestic phoenix rising from colorful smoke", "futuristic luxury yacht sailing on liquid silver", "magical floating lantern festival"
   ];
-  
-  // Pick a random seed keyword to inject unpredictable creative inspiration into the LLM
-  const randomSeed = creativeSeeds[Math.floor(Math.random() * creativeSeeds.length)];
-  
-  let systemInstruction = `You are a creative director for a global stock agency. Generate a highly unique, modern, and extremely creative commercial subject idea (ide subject) for a text-to-image prompt. It should NOT be a generic idea, but a rich, highly descriptive concept with vivid adjectives, specific actions, or unique subject combinations. Return ONLY the plain text subject idea, in 1-2 descriptive sentences, without quotes, formatting, or prefixes. If the style category is provided (like "Photographic", "Vector", "3D Render"), tailor the idea to fit that style beautifully.`;
-  let promptText = "";
+  const randomSeedKeyword = isPng ? "isolated commercial stock asset icon or character" : creativeSeedsGeneral[Math.floor(Math.random() * creativeSeedsGeneral.length)];
 
+  let systemInstruction = isPng
+    ? `You are an elite commercial microstock art director specializing in isolated PNG assets, icons, stickers, and standalone design elements. Generate a highly unique, modern, high-demand commercial subject idea for an isolated element. Return ONLY the plain text subject idea in 1 concise, vivid sentence describing the object, materials, and isolated composition. Do NOT use prefixes, quotes, or markdown formatting.`
+    : `You are an elite creative director for a global microstock agency (Adobe Stock, Shutterstock). Generate a highly unique, modern, and high-demand commercial subject idea for a text-to-image generator. Return ONLY the plain text subject idea in 1-2 vivid, descriptive sentences, without quotes, prefixes, or formatting.`;
+
+  let promptText = "";
   if (currentSubject && currentSubject.trim()) {
-    systemInstruction = `You are an elite microstock SEO director and keyword expansion specialist. Take the user's basic input concept: "${currentSubject.trim()}". 
-Your goal is to expand this into a highly commercial, high-demand visual subject title/description packed with powerful 2-to-4 word compound key phrases (long-tail keywords) that stock buyers actually search for in commercial agencies (e.g. instead of simple "pumpkin", use "spooky Halloween jack-o'-lantern element"; instead of "ghost", use "cute watercolor ghost character").
-CRITICAL RULES:
-1. NO SINGLE WORDS: Do NOT use fragmented or single-word terms ("sepenggal kata"). Every visual descriptor must be a rich, compound, high-conversion keyword phrase (long-tail keyword).
-2. HIGH COMMERCIAL VALUE: Use terms that imply high commercial usability (e.g., "seamless watercolor pattern", "flat vector illustration collection", "continuous line art design element", "minimalist outline icon set", "high-contrast solid silhouette vector").
-3. SYNTHESIS: Blend these compound key phrases into 1-2 smooth, natural-sounding, descriptive sentences that present a cohesive visual scene ready for text-to-image AI generators.
-4. Return ONLY the plain text descriptive concept in English, without lists, formatting, quotes, or prefixes.`;
-    
-    promptText = `Create a highly commercial microstock-optimized subject concept based on the theme "${currentSubject.trim()}" for the style Category: ${styleCategory || 'General'}. Incorporate rich, highly-searched 2-4 word long-tail keyword descriptors.`;
+    promptText = isPng
+      ? `Transform and enhance the concept "${currentSubject.trim()}" into a high-demand isolated commercial asset/icon/sticker idea tailored for style: "${styleCategory || 'General'}". Return ONLY 1 descriptive sentence.`
+      : `Expand and enhance the concept "${currentSubject.trim()}" into a rich, commercial microstock visual scene for style: "${styleCategory || 'General'}". Use rich, compound long-tail keyword descriptors. Return ONLY 1-2 descriptive sentences.`;
   } else {
-    promptText = `Generate a creative subject idea for style: "${styleCategory || "General"}". To ensure absolute randomness and prevent any repetition across consecutive runs, you MUST center your creative concept around this randomly selected inspiration seed keyword: "${randomSeed}". Make the concept extremely vivid, detailed, visually evocative, and microstock-ready.`;
+    promptText = isPng
+      ? `Generate a fresh, highly creative standalone isolated asset idea for style: "${styleCategory || 'General'}". Ensure it is distinct and commercial. Inspiration angle: "${randomSeedKeyword}". Return ONLY 1 descriptive sentence.`
+      : `Generate a fresh, highly creative commercial subject idea for style: "${styleCategory || 'General'}". Ensure absolute uniqueness across repeated clicks using this seed angle: "${randomSeedKeyword}". Return ONLY 1-2 descriptive sentences.`;
   }
-  
+
   const activeModel = model || 'gemini-3.5-flash';
-  
-  const response = await callGeminiWithRetry(activeModel, {
-    parts: [{ text: promptText }]
-  }, {
-    systemInstruction,
-    temperature: 0.98, // Higher temperature for maximized creative variation
-    maxOutputTokens: 120
-  });
-  
-  return (response.text || "").trim().replace(/^"|"$/g, '');
+
+  try {
+    let rawText = '';
+    if (NON_GEMINI_PROVIDERS.has(provider)) {
+      rawText = await callOpenAICompatibleWithRetry({
+        systemInstruction,
+        contents: { parts: [{ text: promptText }] },
+        config: { temperature: 0.95, maxOutputTokens: 150 },
+        model: activeModel
+      });
+    } else {
+      const response = await callGeminiWithRetry(activeModel, {
+        parts: [{ text: promptText }]
+      }, {
+        systemInstruction,
+        temperature: 0.98,
+        maxOutputTokens: 150
+      });
+      rawText = response.text || '';
+    }
+
+    let cleaned = (rawText || '').trim()
+      .replace(/^["']|["']$/g, '')
+      .replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject):\s*/i, '')
+      .trim();
+
+    if (cleaned && cleaned.length > 5) {
+      return cleaned;
+    }
+    return randomFallback;
+  } catch (err: any) {
+    console.warn('[AutoSubject] AI generation failed, using rich procedural fallback:', err?.message);
+    return randomFallback;
+  }
 }

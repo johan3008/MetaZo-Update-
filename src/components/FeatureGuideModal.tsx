@@ -37,14 +37,14 @@ export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-[#111827] rounded-3xl w-full max-w-sm shadow-2xl border border-slate-200/50 dark:border-white/10 overflow-hidden relative animate-in slide-in-from-bottom-4 duration-300 zoom-in-95"
+        className="bg-white dark:bg-[#111827] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl border border-slate-200/50 dark:border-white/10 overflow-hidden relative animate-in slide-in-from-bottom-4 duration-300 zoom-in-95"
         onClick={e => e.stopPropagation()}
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500" />
         
-        <div className="p-5 sm:p-6 pb-4 flex items-start justify-between">
+        <div className="p-5 sm:p-6 pb-4 flex items-start justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 shadow-inner">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 shadow-inner shrink-0">
               <Sparkles className="text-indigo-500 dark:text-indigo-400" size={20} />
             </div>
             <div>
@@ -60,16 +60,16 @@ export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
           </button>
         </div>
 
-        <div className="px-5 sm:px-6 pb-6 space-y-5">
+        <div className="px-5 sm:px-6 pb-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-white/5">
-            <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed text-center">
+            <div className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line text-left">
               {description}
-            </p>
+            </div>
           </div>
           
           <button
             onClick={onClose}
-            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-500/20 active:scale-95"
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-500/20 active:scale-95 shrink-0"
           >
             <span>{t.qc_close || 'Got It'}</span>
             <CheckCircle2 size={16} />

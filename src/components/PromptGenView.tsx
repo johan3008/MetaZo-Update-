@@ -197,17 +197,43 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
       const response = await fetch('/api/auto-subject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-        body: JSON.stringify({ styleCategory, currentSubject: subject })
+        body: JSON.stringify({ 
+          styleCategory, 
+          currentSubject: subject,
+          promptMode,
+          model: aiOptions?.model
+        })
       });
       if (response.ok) {
         const data = await response.json();
         if (data.subject) {
           setSubject(data.subject);
           setError(null);
+          return;
         }
       }
+      // Fallback if backend returned empty
+      const localFallbacks = [
+        "minimalist Scandinavian concrete villa with floor-to-ceiling glass windows and lush garden",
+        "cyberpunk coffee shop barista robot pouring glowing neon latte in rain-slicked alley",
+        "authentic editorial portrait of a ceramic artisan crafting pottery in sun-dappled studio",
+        "floating translucent glass orbs with internal golden liquid and soft studio caustics",
+        "whimsical watercolor magical treehouse village inside a giant ancient oak tree",
+        "cute 3D isometric coffee cup icon with fluffy foam heart, isolated on white background"
+      ];
+      const fallback = localFallbacks[Math.floor(Math.random() * localFallbacks.length)];
+      setSubject(fallback);
     } catch (err) {
-      console.warn("Auto subject generation failed:", err);
+      console.warn("Auto subject generation network error, using instant creative fallback:", err);
+      const localFallbacks = [
+        "minimalist Scandinavian concrete villa with floor-to-ceiling glass windows and lush garden",
+        "cyberpunk coffee shop barista robot pouring glowing neon latte in rain-slicked alley",
+        "authentic editorial portrait of a ceramic artisan crafting pottery in sun-dappled studio",
+        "floating translucent glass orbs with internal golden liquid and soft studio caustics",
+        "whimsical watercolor magical treehouse village inside a giant ancient oak tree",
+        "cute 3D isometric coffee cup icon with fluffy foam heart, isolated on white background"
+      ];
+      setSubject(localFallbacks[Math.floor(Math.random() * localFallbacks.length)]);
     } finally {
       setIsAutoGeneratingSubject(false);
     }
@@ -756,10 +782,11 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                       type="button"
                       onClick={triggerAutoSubject}
                       disabled={isAutoGeneratingSubject}
-                      className="p-1.5 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer group"
-                      title="AI Auto Ide Subject"
+                      className="px-2.5 py-1 bg-gradient-to-r from-purple-500/15 via-indigo-500/15 to-purple-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-sm text-[11px] font-bold"
+                      title="Generate fresh commercial subject idea"
                     >
-                      <Wand2 size={13} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'group-hover:rotate-12 transition-transform'}`} />
+                      <Wand2 size={12} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'text-purple-600 dark:text-purple-400'}`} />
+                      <span>{isAutoGeneratingSubject ? 'Meracik Ide...' : '✨ Ide Subjek AI'}</span>
                     </button>
                   </div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">Bilingual Support</span>

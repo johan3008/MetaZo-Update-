@@ -311,21 +311,64 @@ export const VideoQualityCheck: React.FC<{
     setReport(null);
 
     try {
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('tolerance', tolerance);
-      formData.append('language', t.language || 'English');
-      if (aiOptions?.model) formData.append('model', aiOptions.model);
+      let uploadedUrl: string | null = null;
+      let pathKey: string | null = null;
 
-      const response = await fetch('/api/check-video-quality', {
-        method: 'POST',
-        headers: getHeaders(aiOptions),
-        body: formData
-      });
+      // 1. Try uploading to Cloudflare R2 if configured
+      try {
+        const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'video/mp4')}`);
+        if (getUrlRes.ok) {
+          const getUrlData = await getUrlRes.json().catch(() => ({}));
+          if (getUrlData.uploadUrl && getUrlData.fileUrl) {
+            const putRes = await fetch(getUrlData.uploadUrl, {
+              method: 'PUT',
+              body: file,
+              headers: { 'Content-Type': file.type || 'video/mp4' }
+            });
+            if (putRes.ok) {
+              uploadedUrl = getUrlData.fileUrl;
+              pathKey = getUrlData.pathKey;
+            }
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('[Video Audit] R2 direct upload skipped/failed, falling back to direct upload:', uploadErr);
+      }
+
+      let response: Response;
+
+      if (uploadedUrl) {
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+          body: JSON.stringify({
+            fileUrl: uploadedUrl,
+            pathKey,
+            tolerance,
+            language: t.language || 'English',
+            model: aiOptions?.model || 'gemini-3.5-flash'
+          })
+        });
+      } else {
+        if (file.size > 4.5 * 1024 * 1024) {
+          throw new Error('Ukuran file video terlalu besar untuk server langsung (>4.5MB). Harap konfigurasikan Cloudflare R2 di menu Settings agar dapat mengaudit video ukuran besar tanpa batasan.');
+        }
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('tolerance', tolerance);
+        formData.append('language', t.language || 'English');
+        if (aiOptions?.model) formData.append('model', aiOptions.model);
+
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: getHeaders(aiOptions),
+          body: formData
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to analyze ${file.name}`);
+        throw new Error(errorData.error || `Gagal menganalisis ${file.name} (Status: ${response.status})`);
       }
 
       const data = await response.json();
@@ -336,7 +379,7 @@ export const VideoQualityCheck: React.FC<{
       }
     } catch (err: any) {
       console.error('[Video Audit] Error:', err);
-      setError(err?.message || 'An unexpected error occurred while analyzing the video.');
+      setError(err?.message || 'Terjadi kesalahan tak terduga saat menganalisis video.');
     } finally {
       setLoading(false);
     }
