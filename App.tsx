@@ -4325,10 +4325,18 @@ const App: React.FC = () => {
     try {
       for (let i = 0; i < completedFiles.length; i++) {
         const item = completedFiles[i];
-        const exportName = getExportFilename(item.customFileName || item.file.name, item.file);
-        const title = item.title || '';
-        const description = item.description || item.title || '';
+        const title = item.title?.trim() || item.description?.trim() || '';
+        const description = item.description?.trim() || title;
         const keywords = item.keywords || [];
+
+        // Build file export name directly from Metadata Title
+        const origExt = (item.file.name.split('.').pop() || 'jpg').toLowerCase();
+        const baseNameRaw = title || item.customFileName?.trim() || item.file.name.replace(/\.[^/.]+$/, '');
+        const cleanName = baseNameRaw
+          .replace(/[\\/:*?"<>|]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim() || 'asset';
+        const exportName = `${cleanName}.${origExt}`;
 
         let downloaded = false;
 
@@ -4410,7 +4418,7 @@ const App: React.FC = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `embedded_${fileName}`;
+            a.download = exportName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -4451,7 +4459,7 @@ const App: React.FC = () => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `embedded_${fileName}`;
+              a.download = exportName;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);

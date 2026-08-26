@@ -1751,55 +1751,40 @@ app.get('/api/debug-uploads', (req, res) => {
                 const { exiftool } = await import('exiftool-vendored');
                 
                 const metadataTags: any = {
-                    // EXIF Standard
-                    'EXIF:ImageDescription': title || description,
-                    'EXIF:XPTitle': title,
-                    'EXIF:XPComment': description || title,
-                    'EXIF:XPKeywords': uniqueKeywords.join('; '),
-                    'EXIF:Software': 'MetaZo AI Assistant',
+                    // Title tags
+                    Title: title,
+                    Headline: title,
+                    ObjectName: title,
+                    XPTitle: title,
 
-                    // IPTC Core (Adobe Stock / Shutterstock / Getty Images primary parser)
-                    'IPTC:ObjectName': title,
-                    'IPTC:Headline': title,
-                    'IPTC:Caption-Abstract': description || title,
-                    'IPTC:Keywords': uniqueKeywords,
-                    'IPTC:CodedCharacterSet': 'UTF8',
+                    // Description tags
+                    Description: description,
+                    ImageDescription: description,
+                    Caption: description,
+                    'Caption-Abstract': description,
+                    XPComment: description,
 
-                    // XMP Dublin Core (Adobe Bridge, Lightroom, Adobe Stock ingestion)
-                    'XMP-dc:Title': title,
-                    'XMP-dc:Description': description || title,
-                    'XMP-dc:Subject': uniqueKeywords,
+                    // Keywords tags (Array for IPTC & XMP dc:subject)
+                    Keywords: uniqueKeywords,
+                    Subject: uniqueKeywords,
+                    XPKeywords: uniqueKeywords.join('; '),
 
-                    // XMP Photoshop & IPTC Extension
-                    'XMP-photoshop:Headline': title,
-                    'XMP-photoshop:Caption': description || title,
-                    'XMP-iptcCore:SubjectCode': uniqueKeywords,
-                    'XMP-xmp:CreatorTool': 'MetaZo AI Assistant',
-                    
-                    // QuickTime / MP4 / MOV Video Metadata Atoms
-                    'ItemList:Title': title,
-                    'ItemList:Description': description || title,
-                    'ItemList:Keyword': uniqueKeywords,
-                    'Keys:DisplayName': title,
-                    'Keys:Description': description || title,
-                    'Keys:Keywords': uniqueKeywords,
-                    'QuickTime:Title': title,
-                    'QuickTime:Description': description || title,
-                    'QuickTime:Comment': description || title,
-                    'QuickTime:Keywords': uniqueKeywords
+                    // Software
+                    Software: 'MetaZo AI Assistant'
                 };
 
-                await exiftool.write(
-                    tempFilePath,
-                    metadataTags,
-                    ['-overwrite_original', '-ignoreMinorErrors', '-charset iptc=utf8', '-codedcharacterset=utf8']
-                );
+                // Add timeout protection (15 seconds max)
+                await Promise.race([
+                    exiftool.write(tempFilePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors']),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('ExifTool write timeout')), 15000))
+                ]);
+
                 console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Keywords: ${uniqueKeywords.length})`);
             } catch (exifErr: any) {
-                console.warn(`[Embed Metadata] ExifTool warning on ${originalName}:`, exifErr.message || exifErr);
+                console.warn(`[Embed Metadata] ExifTool note on ${originalName}:`, exifErr.message || exifErr);
             }
 
-            res.download(tempFilePath, `embedded_${originalName}`, (err) => {
+            res.download(tempFilePath, originalName, (err) => {
                 cleanupFn();
                 if (err) {
                     console.error('Error sending embedded file:', err);
