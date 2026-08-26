@@ -4671,6 +4671,11 @@ const App: React.FC = () => {
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE_CHECK, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
+              onSendToMetadataGen={(passedFiles) => {
+                if (passedFiles && passedFiles.length > 0) {
+                  handleFileChange({ target: { files: passedFiles } });
+                }
+              }}
               aiOptions={commonAiOptions}
               user={user}
               db={db}
