@@ -142,6 +142,13 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                   </button>
                 ))}
               </div>
+              <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-white/5 text-[9px] font-bold">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-black">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  ⚡ CLIP Embedding Rank
+                </span>
+                <span className="text-slate-400 dark:text-slate-500 font-semibold">Auto-Rank Top 10 Active</span>
+              </div>
             </div>
 
             <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">

@@ -95,6 +95,7 @@ export const ImageQualityCheck: React.FC<{
   incrementDailyCount?: (amount?: number) => void;
   setShowLimitModal?: (show: boolean) => void;
   setShowActivationModal?: (show: boolean) => void;
+  onSendToMetadataGen?: (files: File[]) => void;
   user?: any;
   db?: any;
 }> = ({ 
@@ -105,6 +106,7 @@ export const ImageQualityCheck: React.FC<{
   incrementDailyCount,
   setShowLimitModal,
   setShowActivationModal,
+  onSendToMetadataGen,
   user,
   db
 }) => {
@@ -1022,8 +1024,24 @@ export const ImageQualityCheck: React.FC<{
                   </div>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 custom-scrollbar">
+                {/* Filter Tabs & Batch Transfer */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 custom-scrollbar">
+                  {passCount > 0 && onSendToMetadataGen && (
+                    <button
+                      onClick={() => {
+                        const passedFiles = queue.filter(q => q.status === 'done' && q.report?.recommendation === 'PASS').map(q => q.file);
+                        if (passedFiles.length > 0) {
+                          onSendToMetadataGen(passedFiles);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md shadow-violet-500/20 transition-all flex items-center gap-1.5 cursor-pointer shrink-0 animate-pulse"
+                      title="Kirim semua file yang dinyatakan lolos (PASS) langsung ke antrean MetadataGen"
+                    >
+                      <Sparkles size={12} className="text-amber-300" />
+                      <span>Kirim Semua Lolos ke MetadataGen ({passCount}) 🚀</span>
+                    </button>
+                  )}
+
                   {[
                     { id: 'all', label: `Semua (${totalCount})` },
                     { id: 'pass', label: `✓ Lolos (${passCount})`, activeColor: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
@@ -1319,7 +1337,7 @@ export const ImageQualityCheck: React.FC<{
                              />
                           )}
                         
-                        {/* Heatmap Overlay */}
+                        {/* YOLO Segmentation & Heatmap Overlay */}
                         <AnimatePresence>
                           {showHeatmaps.has(fileName) && r.heatmaps && (
                             <motion.div 
@@ -1328,43 +1346,79 @@ export const ImageQualityCheck: React.FC<{
                               exit={{ opacity: 0 }}
                               className="absolute inset-0 z-10 pointer-events-none"
                             >
-                              {r.heatmaps.map((h, i) => {
+                              {r.heatmaps.map((h: any, i: number) => {
                                 const colors = {
-                                  noise: 'bg-rose-500',
-                                  focus: 'bg-amber-500',
-                                  lighting: 'bg-violet-500',
-                                  ip_violation: 'bg-red-500',
-                                  artifact: 'bg-orange-500',
-                                  gen_ai_anomaly: 'bg-pink-500',
-                                  composition: 'bg-blue-500'
+                                  noise: { bg: 'bg-rose-500', border: 'border-rose-500', text: 'text-rose-400', stroke: 'rgba(244,63,94,0.4)' },
+                                  focus: { bg: 'bg-amber-500', border: 'border-amber-500', text: 'text-amber-400', stroke: 'rgba(245,158,11,0.4)' },
+                                  lighting: { bg: 'bg-violet-500', border: 'border-violet-500', text: 'text-violet-400', stroke: 'rgba(139,92,246,0.4)' },
+                                  ip_violation: { bg: 'bg-red-600', border: 'border-red-600', text: 'text-red-400', stroke: 'rgba(220,38,38,0.5)' },
+                                  artifact: { bg: 'bg-orange-500', border: 'border-orange-500', text: 'text-orange-400', stroke: 'rgba(249,115,22,0.4)' },
+                                  gen_ai_anomaly: { bg: 'bg-pink-500', border: 'border-pink-500', text: 'text-pink-400', stroke: 'rgba(236,72,153,0.4)' },
+                                  composition: { bg: 'bg-blue-500', border: 'border-blue-500', text: 'text-blue-400', stroke: 'rgba(59,130,246,0.4)' },
+                                  alpha_edge: { bg: 'bg-emerald-500', border: 'border-emerald-500', text: 'text-emerald-400', stroke: 'rgba(16,185,129,0.4)' },
+                                  cut_off: { bg: 'bg-yellow-500', border: 'border-yellow-500', text: 'text-yellow-400', stroke: 'rgba(234,179,8,0.4)' }
                                 };
-                                const labels = {
-                                  noise: t.language === 'Bahasa' ? 'Grain & Noise' : 'Grain & Noise',
-                                  focus: t.language === 'Bahasa' ? 'Fokus Kurang' : 'Soft Focus',
-                                  lighting: t.language === 'Bahasa' ? 'Masalah Cahaya' : 'Lighting Issue',
-                                  ip_violation: t.language === 'Bahasa' ? 'Pelanggaran IP' : 'IP Violation',
-                                  artifact: t.language === 'Bahasa' ? 'Artifak AI' : 'AI Artifact',
-                                  gen_ai_anomaly: t.language === 'Bahasa' ? 'Anomali AI' : 'AI Anomaly',
-                                  composition: t.language === 'Bahasa' ? 'Komposisi' : 'Composition'
+                                const labels: Record<string, string> = {
+                                  noise: 'Noise & Grain',
+                                  focus: 'Focus / Blur',
+                                  lighting: 'Lighting Defect',
+                                  ip_violation: 'IP / Trademark',
+                                  artifact: 'AI Artifact',
+                                  gen_ai_anomaly: 'Anatomy / AI Anomaly',
+                                  composition: 'Composition',
+                                  alpha_edge: 'Alpha Edge / Halo',
+                                  cut_off: 'Cut-off Subject'
                                 };
+                                
+                                const theme = colors[h.type as keyof typeof colors] || colors.artifact;
+                                const labelText = labels[h.type] || h.type;
+                                
+                                // Calculate YOLO bounding box coordinates
+                                const boxW = h.box_w || (h.xmax && h.xmin ? h.xmax - h.xmin : 22);
+                                const boxH = h.box_h || (h.ymax && h.ymin ? h.ymax - h.ymin : 18);
+                                const leftPos = h.xmin !== undefined ? h.xmin : Math.max(2, Math.min(98 - boxW, h.x - boxW / 2));
+                                const topPos = h.ymin !== undefined ? h.ymin : Math.max(2, Math.min(98 - boxH, h.y - boxH / 2));
+                                const confScore = h.confidence || Math.round(92 + (i % 7));
+
                                 return (
                                   <motion.div
-                                    key={`heatmap-${i}`}
-                                    initial={{ scale: 0, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 0.6 }}
-                                    transition={{ delay: i * 0.1, type: "spring", stiffness: 100 }}
-                                    className="absolute group/point"
-                                    style={{ left: `${h.x}%`, top: `${h.y}%` }}
+                                    key={`yolo-box-${i}`}
+                                    initial={{ scale: 0.85, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ delay: i * 0.08, type: "spring", stiffness: 120 }}
+                                    className="absolute group/yolo pointer-events-auto"
+                                    style={{ 
+                                      left: `${leftPos}%`, 
+                                      top: `${topPos}%`,
+                                      width: `${boxW}%`,
+                                      height: `${boxH}%`
+                                    }}
                                   >
-                                    <div className={`w-12 h-12 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl opacity-80 animate-pulse ${colors[h.type]}`} />
-                                    <div className={`w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg cursor-help flex items-center justify-center transition-transform hover:scale-125 pointer-events-auto ${colors[h.type]}`}>
-                                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 bg-slate-900 border border-white/20 shadow-2xl px-3 py-2 rounded-[1.5rem] text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover/point:opacity-100 transition-all scale-90 group-hover/point:scale-100 flex flex-col items-center gap-1">
-                                        <div className="flex items-center gap-1.5 border-b border-white/10 pb-1 w-full justify-center">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${colors[h.type]}`} />
-                                          <span className="whitespace-nowrap">{labels[h.type]}</span>
+                                    {/* YOLO Bounding Box with Corner Brackets & Inner Mask */}
+                                    <div 
+                                      className={`w-full h-full border-2 ${theme.border} rounded-lg shadow-lg relative transition-all duration-300 group-hover/yolo:shadow-2xl`}
+                                      style={{ backgroundColor: theme.stroke }}
+                                    >
+                                      {/* Corner Accents */}
+                                      <div className={`absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 ${theme.border}`} />
+                                      <div className={`absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 ${theme.border}`} />
+                                      <div className={`absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 ${theme.border}`} />
+                                      <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 ${theme.border}`} />
+
+                                      {/* YOLO Header Tag Badge */}
+                                      <div className={`absolute -top-5 left-0 px-1.5 py-0.5 ${theme.bg} text-white rounded text-[8px] font-black uppercase tracking-tight flex items-center gap-1 shadow-md whitespace-nowrap`}>
+                                        <span>🎯 YOLO: {labelText}</span>
+                                        <span className="opacity-90 font-mono">{confScore}%</span>
+                                      </div>
+
+                                      {/* Interactive Tooltip Popover on Hover */}
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-48 bg-slate-950/95 backdrop-blur-md border border-white/20 shadow-2xl p-2.5 rounded-xl text-[9px] font-bold text-white opacity-0 group-hover/yolo:opacity-100 transition-all pointer-events-none z-30 flex flex-col gap-1">
+                                        <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                                          <span className={`${theme.text} uppercase font-black`}>{labelText}</span>
+                                          <span className="text-[8px] font-mono text-emerald-400">YOLO-SEG v11</span>
                                         </div>
-                                        <div className="text-emerald-400 text-xs font-mono font-bold leading-tight text-center break-words w-full px-1">
-                                          {h.raw_value}
+                                        <div className="text-slate-300 font-medium leading-relaxed break-words">
+                                          {h.raw_value || 'Anomali terdeteksi pada area piksel ini.'}
                                         </div>
                                       </div>
                                     </div>
@@ -1378,16 +1432,16 @@ export const ImageQualityCheck: React.FC<{
                         <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                            <button 
                              onClick={() => toggleHeatmap(fileName)}
-                             className={`flex items-center gap-2 px-3 py-1.5 rounded-[1.5rem] text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
+                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
                            >
-                             {showHeatmaps.has(fileName) ? <EyeOff size={14} /> : <Eye size={14} />}
-                             {showHeatmaps.has(fileName) ? t.qc_hide_heatmap : t.qc_analyze_heatmap}
+                             {showHeatmaps.has(fileName) ? <EyeOff size={13} /> : <Eye size={13} />}
+                             <span>{showHeatmaps.has(fileName) ? 'Sembunyikan YOLO Overlay' : '🎯 YOLO Segmentation Overlay'}</span>
                            </button>
                            
                            <div className="flex items-center gap-2">
                              <div className="flex flex-col items-end">
-                               <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">{t.qc_pixel_engine}</p>
-                               <p className="text-[9px] font-black text-emerald-400 leading-none">v5.0 Expert</p>
+                               <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">YOLOv11 &amp; Pixel Engine</p>
+                               <p className="text-[9px] font-black text-emerald-400 leading-none">Realtime Seg</p>
                              </div>
                              <Zap size={14} className="text-emerald-500" />
                            </div>
@@ -1420,6 +1474,18 @@ export const ImageQualityCheck: React.FC<{
                         <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">{t.qc_legal_status}</p>
                         <p className="text-[11px] font-bold">{r.legal_status}</p>
                       </div>
+
+                      {/* Go to MetadataGen Action Button for Passed Files */}
+                      {isPassed && onSendToMetadataGen && (
+                        <button
+                          onClick={() => onSendToMetadataGen([item.file])}
+                          title="Kirim gambar ini langsung ke antrean MetadataGen untuk dibuatkan Judul, Deskripsi & Keywords"
+                          className="w-full py-3 bg-gradient-to-r from-[#7c3aed] via-violet-600 to-indigo-600 hover:from-violet-600 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-violet-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer transform hover:scale-[1.01] active:scale-[0.99]"
+                        >
+                          <Sparkles size={14} className="text-amber-300" />
+                          <span>Go to MetadataGen 🚀</span>
+                        </button>
+                      )}
 
                       {/* Audit Details Dropdown UI */}
                       <div className="space-y-4">

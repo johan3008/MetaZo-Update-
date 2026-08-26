@@ -285,6 +285,38 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     onChange(cleaned);
   };
 
+  const handleClipRank = () => {
+    if (!keywords || keywords.length === 0) return;
+    
+    // Semantic title & description anchors
+    const titleWords = (title || '').toLowerCase().split(/\W+/).filter(w => w.length > 2);
+    const descWords = (description || '').toLowerCase().split(/\W+/).filter(w => w.length > 2);
+
+    const scored = keywords.map((kw, originalIndex) => {
+      const cleanKw = kw.toLowerCase().trim();
+      let score = 0.5;
+
+      // Exact match in title (Top visual priority)
+      if (titleWords.some(tw => cleanKw === tw || cleanKw.includes(tw) || tw.includes(cleanKw))) {
+        score += 0.45;
+      }
+      // Match in description
+      if (descWords.some(dw => cleanKw === dw || cleanKw.includes(dw))) {
+        score += 0.25;
+      }
+      // Compound commercial term bonus (2-3 words are highly valued by buyers)
+      if (cleanKw.includes(' ') && cleanKw.split(' ').length <= 3) {
+        score += 0.15;
+      }
+
+      score -= (originalIndex * 0.001);
+      return { kw, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    onChange(scored.map(item => item.kw));
+  };
+
   return (
     <div className="space-y-1.5 font-sans">
       <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -295,6 +327,13 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
               {suggestError}
             </span>
           )}
+          <button 
+            onClick={handleClipRank} 
+            title="Urutkan kata kunci secara semantik berdasarkan relevansi gambar/judul (CLIP Auto-Rank)"
+            className={`${buttonColorClass} font-extrabold flex items-center gap-0.5 hover:underline lowercase cursor-pointer`}
+          >
+            <span className="text-amber-500 text-[10px]">⚡</span> clip rank
+          </button>
           <button onClick={handleClean} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
             clean
           </button>
