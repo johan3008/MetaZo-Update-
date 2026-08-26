@@ -5049,6 +5049,32 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
   ];
 
+  // Prepare multimodal parts for both Gemini and OpenAI-compatible vision providers
+  const visualParts: any[] = [];
+  if (referenceImages && referenceImages.length > 0) {
+    referenceImages.forEach((img) => {
+      try {
+        visualParts.push(processFrameServer(img));
+      } catch (e) {
+        console.warn('[generateOptimizedPrompt] Failed processing reference image:', e);
+      }
+    });
+  }
+
+  let instructionText = `Expand the concept into ${effectiveCount} unique immersive prompt variations of type "${styleCategory}" strictly based on the subject: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+  if (referenceImages && referenceImages.length > 0) {
+    instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, lighting, texture, and composition. Combine/mix this visual style with the base subject concept: "${subject}".
+
+Expand the concept into ${effectiveCount} unique immersive prompt variations of type "${styleCategory}".
+
+CRITICAL DIRECTIVES:
+1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of "${subject}".
+2. EXTRACT AESTHETIC: Do not just literally copy the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to vividly describe "${subject}".
+3. HIGH QUALITY: Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
+  }
+
+  const parts = [...visualParts, { text: instructionText }];
+
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     let attempts = 0;
     const maxAttempts = 2;
@@ -5057,7 +5083,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${effectiveCount} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
+          contents: parts,
           responseMimeType: "application/json",
           responseSchema,
           config: { temperature: randomTemp, seed: seed, topP: 0.99 },
@@ -5094,22 +5120,6 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       for (let attemptIdx = 0; attemptIdx < maxAttempts; attemptIdx++) {
         try {
           console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attemptIdx + 1}/${maxAttempts})...`);
-          const parts = [];
-          if (referenceImages && referenceImages.length > 0) {
-            referenceImages.forEach((img) => {
-              try {
-                parts.push(processFrameServer(img));
-              } catch (e) {
-                console.warn('[generateOptimizedPrompt] Failed processing reference image:', e);
-              }
-            });
-          }
-
-          let instructionText = `Expand the concept into ${effectiveCount} unique immersive prompt variations of type \"\${styleCategory}\"" based on: \"\${subject}\"".\\n\\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
-          if (referenceImages && referenceImages.length > 0) {
-            instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: \"\${subject}\"".\\n\\nExpand the concept into ${effectiveCount} unique immersive prompt variations of type \"\${styleCategory}\"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of \"\${subject}\"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe \"\${subject}\"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
-          }
-          parts.push({ text: instructionText });
 
           const response = await callGeminiWithRetry(modelName, {
             parts

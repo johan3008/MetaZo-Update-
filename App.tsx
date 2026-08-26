@@ -34,6 +34,7 @@ import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOC
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
 import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
+import piexif from 'piexifjs';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { 
@@ -4314,41 +4315,157 @@ const App: React.FC = () => {
 
   const handleDownloadEmbedded = async () => {
     const toolFiles = getFilesForTool(files, activeTool);
-    const completedFile = toolFiles.find(f => f.title && f.file);
-    if (!completedFile) return;
+    const completedFiles = toolFiles.filter(f => (f.title || f.description) && f.file);
+    if (completedFiles.length === 0) {
+      alert(uiLanguage === 'id' ? 'Belum ada file dengan metadata selesai untuk diunduh.' : 'No completed files with metadata to embed.');
+      return;
+    }
 
     setEmbedDownloading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', completedFile.file);
-      formData.append('title', completedFile.title || '');
-      formData.append('description', completedFile.description || '');
-      formData.append('keywords', JSON.stringify(completedFile.keywords || []));
-      if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
+      for (let i = 0; i < completedFiles.length; i++) {
+        const item = completedFiles[i];
+        const fileName = item.customFileName || item.file.name;
+        const title = item.title || item.description || '';
+        const description = item.description || title;
+        const keywords = item.keywords || [];
 
-      const resp = await fetch('/api/embed-metadata', {
-        method: 'POST',
-        headers: getHeaders(commonAiOptions),
-        body: formData
-      });
+        let downloaded = false;
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || 'Gagal menanamkan metadata');
-      }
+        try {
+          const formData = new FormData();
+          formData.append('file', item.file);
+          formData.append('title', title);
+          formData.append('description', description);
+          formData.append('keywords', JSON.stringify(keywords));
+          if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
 
-      const contentType = resp.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await resp.json();
-        if (data.downloadUrl) window.open(data.downloadUrl, '_blank');
-      } else {
-        const blob = await resp.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `embedded_${completedFile.file.name}`;
-        a.click();
-        URL.revokeObjectURL(url);
+          const resp = await fetch('/api/embed-metadata', {
+            method: 'POST',
+            headers: getHeaders(commonAiOptions),
+            body: formData
+          });
+
+          if (resp.ok) {
+            const contentType = resp.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              const data = await resp.json();
+              if (data.downloadUrl) {
+                window.open(data.downloadUrl, '_blank');
+                downloaded = true;
+              }
+            } else {
+              const blob = await resp.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `embedded_${fileName}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 2000);
+              downloaded = true;
+            }
+          }
+        } catch (serverErr) {
+          console.warn('[Download Embedded] Server embed failed, trying client fallback:', serverErr);
+        }
+
+        // Client-side fallback for JPEG files using piexifjs
+        if (!downloaded && (item.file.type === 'image/jpeg' || item.file.name.toLowerCase().endsWith('.jpg') || item.file.name.toLowerCase().endsWith('.jpeg'))) {
+          try {
+            const dataUri = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(item.file);
+            });
+
+            let zeroth: any = {};
+            let exif: any = {};
+            let gps: any = {};
+            try {
+              const existing = piexif.load(dataUri);
+              zeroth = existing['0th'] || {};
+              exif = existing['Exif'] || {};
+              gps = existing['GPS'] || {};
+            } catch (_) {}
+
+            zeroth[piexif.ImageIFD.ImageDescription] = description;
+            zeroth[piexif.ImageIFD.XPTitle] = title.split('').map((c: string) => c.charCodeAt(0));
+            zeroth[piexif.ImageIFD.XPComment] = description.split('').map((c: string) => c.charCodeAt(0));
+            zeroth[piexif.ImageIFD.XPKeywords] = keywords.join('; ').split('').map((c: string) => c.charCodeAt(0));
+            zeroth[piexif.ImageIFD.Software] = "MetaZo AI Assistant";
+
+            const exifBytes = piexif.dump({ "0th": zeroth, "Exif": exif, "GPS": gps });
+            const newImageDataUri = piexif.insert(exifBytes, dataUri);
+
+            const byteString = atob(newImageDataUri.split(',')[1]);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let b = 0; b < byteString.length; b++) {
+              ia[b] = byteString.charCodeAt(b);
+            }
+            const blob = new Blob([ab], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `embedded_${fileName}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            downloaded = true;
+          } catch (clientErr) {
+            console.error('[Download Embedded] Client fallback error:', clientErr);
+          }
+        }
+
+        // Client-side fallback for SVG files
+        if (!downloaded && (item.file.type === 'image/svg+xml' || item.file.name.toLowerCase().endsWith('.svg'))) {
+          try {
+            let svgText = await item.file.text();
+            const escapeXml = (unsafe: string) => unsafe.replace(/[<>&'"]/g, (c) => {
+              switch (c) {
+                case '<': return '&lt;';
+                case '>': return '&gt;';
+                case '&': return '&amp;';
+                case '\'': return '&apos;';
+                case '"': return '&quot;';
+                default: return c;
+              }
+            });
+            const titleTag = `<title>${escapeXml(title)}</title>`;
+            const descTag = `<desc>${escapeXml(description)}</desc>`;
+            const keywordsXml = keywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
+            const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
+
+            svgText = svgText
+              .replace(/<title[\s\S]*?<\/title>/gi, '')
+              .replace(/<desc[\s\S]*?<\/desc>/gi, '')
+              .replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
+
+            if (/<svg[^>]*>/i.test(svgText)) {
+              svgText = svgText.replace(/(<svg[^>]*>)/i, `$1\n  ${titleTag}\n  ${descTag}\n  ${metadataTag}`);
+              const blob = new Blob([svgText], { type: 'image/svg+xml' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `embedded_${fileName}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 2000);
+              downloaded = true;
+            }
+          } catch (svgErr) {
+            console.error('[Download Embedded] SVG client fallback error:', svgErr);
+          }
+        }
+
+        if (completedFiles.length > 1) {
+          await new Promise(r => setTimeout(r, 400));
+        }
       }
     } catch (e) {
       console.error('[Download Embedded] Error:', e);
