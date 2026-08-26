@@ -4348,9 +4348,12 @@ const App: React.FC = () => {
           formData.append('keywords', JSON.stringify(keywords));
           if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
 
+          const reqHeaders = { ...getHeaders(commonAiOptions) };
+          delete reqHeaders['Content-Type']; // CRITICAL: Allow browser to set boundary for multipart/form-data
+
           const resp = await fetch('/api/embed-metadata', {
             method: 'POST',
-            headers: getHeaders(commonAiOptions),
+            headers: reqHeaders,
             body: formData
           });
 
@@ -4374,6 +4377,10 @@ const App: React.FC = () => {
               setTimeout(() => URL.revokeObjectURL(url), 2000);
               downloaded = true;
             }
+          } else {
+            const errData = await resp.json().catch(() => ({}));
+            console.error('[Download Embedded] Server error:', errData);
+            throw new Error(errData.error || `Server status ${resp.status}`);
           }
         } catch (serverErr) {
           console.warn('[Download Embedded] Server embed failed, trying client fallback:', serverErr);

@@ -1751,26 +1751,46 @@ app.get('/api/debug-uploads', (req, res) => {
                 const { exiftool } = await import('exiftool-vendored');
                 
                 const metadataTags: any = {
-                    // Title tags
+                    // Standard Tags (Auto-mapped)
                     Title: title,
                     Headline: title,
                     ObjectName: title,
                     XPTitle: title,
-
-                    // Description tags
                     Description: description,
                     ImageDescription: description,
                     Caption: description,
                     'Caption-Abstract': description,
                     XPComment: description,
-
-                    // Keywords tags (Array for IPTC & XMP dc:subject)
                     Keywords: uniqueKeywords,
                     Subject: uniqueKeywords,
                     XPKeywords: uniqueKeywords.join('; '),
+                    Software: 'MetaZo AI Assistant',
 
-                    // Software
-                    Software: 'MetaZo AI Assistant'
+                    // Explicit IPTC Core (Adobe Stock / Shutterstock)
+                    'IPTC:ObjectName': title,
+                    'IPTC:Headline': title,
+                    'IPTC:Caption-Abstract': description,
+                    'IPTC:Keywords': uniqueKeywords,
+
+                    // Explicit XMP Dublin Core (Adobe Bridge / Lightroom / Stock)
+                    'XMP-dc:Title': title,
+                    'XMP-dc:Description': description,
+                    'XMP-dc:Subject': uniqueKeywords,
+                    'XMP-photoshop:Headline': title,
+                    'XMP-photoshop:Caption': description,
+                    'XMP-iptcCore:SubjectCode': uniqueKeywords,
+
+                    // Video / QuickTime Tags
+                    'ItemList:Title': title,
+                    'ItemList:Description': description,
+                    'ItemList:Keyword': uniqueKeywords,
+                    'Keys:DisplayName': title,
+                    'Keys:Description': description,
+                    'Keys:Keywords': uniqueKeywords,
+                    'QuickTime:Title': title,
+                    'QuickTime:Description': description,
+                    'QuickTime:Comment': description,
+                    'QuickTime:Keywords': uniqueKeywords
                 };
 
                 // Add timeout protection (15 seconds max)
@@ -1779,7 +1799,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     new Promise((_, reject) => setTimeout(() => reject(new Error('ExifTool write timeout')), 15000))
                 ]);
 
-                console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Keywords: ${uniqueKeywords.length})`);
+                console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Description: "${description.substring(0, 30)}...", Keywords: ${uniqueKeywords.length})`);
             } catch (exifErr: any) {
                 console.warn(`[Embed Metadata] ExifTool note on ${originalName}:`, exifErr.message || exifErr);
             }
