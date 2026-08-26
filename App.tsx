@@ -4325,16 +4325,16 @@ const App: React.FC = () => {
     try {
       for (let i = 0; i < completedFiles.length; i++) {
         const item = completedFiles[i];
-        const fileName = item.customFileName || item.file.name;
-        const title = item.title || item.description || '';
-        const description = item.description || title;
+        const exportName = getExportFilename(item.customFileName || item.file.name, item.file);
+        const title = item.title || '';
+        const description = item.description || item.title || '';
         const keywords = item.keywords || [];
 
         let downloaded = false;
 
         try {
           const formData = new FormData();
-          formData.append('file', item.file);
+          formData.append('file', item.file, exportName);
           formData.append('title', title);
           formData.append('description', description);
           formData.append('keywords', JSON.stringify(keywords));
@@ -4359,7 +4359,7 @@ const App: React.FC = () => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `embedded_${fileName}`;
+              a.download = exportName;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);

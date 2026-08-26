@@ -1685,15 +1685,24 @@ app.get('/api/debug-uploads', (req, res) => {
 
             if (req.body.keywords) {
                 try {
-                    keywords = typeof req.body.keywords === 'string'
-                        ? (req.body.keywords.startsWith('[') ? JSON.parse(req.body.keywords) : req.body.keywords.split(',').map((s: string) => s.trim()))
+                    const raw = typeof req.body.keywords === 'string' && req.body.keywords.startsWith('[')
+                        ? JSON.parse(req.body.keywords)
                         : req.body.keywords;
+                    if (Array.isArray(raw)) {
+                        keywords = raw.flatMap((k: any) => String(k).split(','));
+                    } else if (typeof raw === 'string') {
+                        keywords = raw.split(',');
+                    }
                 } catch (_) {
-                    keywords = String(req.body.keywords).split(',').map((s: string) => s.trim());
+                    keywords = String(req.body.keywords).split(',');
                 }
             }
 
-            keywords = (keywords || []).filter(Boolean);
+            // Clean, trim, and deduplicate keywords
+            keywords = (keywords || [])
+                .map((k: string) => String(k).trim().replace(/^["']|["']$/g, ''))
+                .filter((k: string) => k.length > 0);
+            const uniqueKeywords = Array.from(new Set(keywords));
 
             cleanupFn = () => {
                 try { if (fs.existsSync(rawTempPath)) fs.unlinkSync(rawTempPath); } catch (e) {}
@@ -1718,7 +1727,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
                     const titleTag = `<title>${escapeXml(title)}</title>`;
                     const descTag = `<desc>${escapeXml(description)}</desc>`;
-                    const keywordsXml = keywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
+                    const keywordsXml = uniqueKeywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
                     const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
 
                     // Remove pre-existing top-level <title>, <desc>, <metadata> if present
@@ -1737,48 +1746,55 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             }
 
-            // 2. Comprehensive ExifTool Metadata Embedding for PNG, EPS, JPG, WebP, TIFF, MP4, MOV
+            // 2. Comprehensive ExifTool Metadata Embedding (Adobe Stock / Shutterstock / IPTC / XMP compliant)
             try {
                 const { exiftool } = await import('exiftool-vendored');
                 
                 const metadataTags: any = {
-                    // Standard EXIF / IPTC Tags
-                    Title: title,
-                    Headline: title,
-                    ObjectName: title,
-                    XPTitle: title,
-                    Description: description,
-                    ImageDescription: description,
-                    Caption: description,
-                    'Caption-Abstract': description,
-                    XPComment: description,
-                    Subject: keywords,
-                    Keywords: keywords,
-                    XPKeywords: keywords.join('; '),
-                    Software: 'MetaZo AI Assistant',
+                    // EXIF Standard
+                    'EXIF:ImageDescription': title || description,
+                    'EXIF:XPTitle': title,
+                    'EXIF:XPComment': description || title,
+                    'EXIF:XPKeywords': uniqueKeywords.join('; '),
+                    'EXIF:Software': 'MetaZo AI Assistant',
 
-                    // Dublin Core & XMP (Standard for Adobe Stock, EPS, PNG, Vector, PSD)
+                    // IPTC Core (Adobe Stock / Shutterstock / Getty Images primary parser)
+                    'IPTC:ObjectName': title,
+                    'IPTC:Headline': title,
+                    'IPTC:Caption-Abstract': description || title,
+                    'IPTC:Keywords': uniqueKeywords,
+                    'IPTC:CodedCharacterSet': 'UTF8',
+
+                    // XMP Dublin Core (Adobe Bridge, Lightroom, Adobe Stock ingestion)
                     'XMP-dc:Title': title,
-                    'XMP-dc:Description': description,
-                    'XMP-dc:Subject': keywords,
+                    'XMP-dc:Description': description || title,
+                    'XMP-dc:Subject': uniqueKeywords,
+
+                    // XMP Photoshop & IPTC Extension
                     'XMP-photoshop:Headline': title,
-                    'XMP-photoshop:Caption': description,
+                    'XMP-photoshop:Caption': description || title,
+                    'XMP-iptcCore:SubjectCode': uniqueKeywords,
+                    'XMP-xmp:CreatorTool': 'MetaZo AI Assistant',
                     
-                    // QuickTime / MP4 / MOV Video Metadata Tags
+                    // QuickTime / MP4 / MOV Video Metadata Atoms
                     'ItemList:Title': title,
-                    'ItemList:Description': description,
-                    'ItemList:Keyword': keywords.join(', '),
+                    'ItemList:Description': description || title,
+                    'ItemList:Keyword': uniqueKeywords,
                     'Keys:DisplayName': title,
-                    'Keys:Description': description,
-                    'Keys:Keywords': keywords.join(', '),
+                    'Keys:Description': description || title,
+                    'Keys:Keywords': uniqueKeywords,
                     'QuickTime:Title': title,
-                    'QuickTime:Description': description,
-                    'QuickTime:Comment': description,
-                    'QuickTime:Keywords': keywords.join(', ')
+                    'QuickTime:Description': description || title,
+                    'QuickTime:Comment': description || title,
+                    'QuickTime:Keywords': uniqueKeywords
                 };
 
-                await exiftool.write(tempFilePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors', '-codedcharacterset=utf8']);
-                console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Keywords: ${keywords.length})`);
+                await exiftool.write(
+                    tempFilePath,
+                    metadataTags,
+                    ['-overwrite_original', '-ignoreMinorErrors', '-charset iptc=utf8', '-codedcharacterset=utf8']
+                );
+                console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Keywords: ${uniqueKeywords.length})`);
             } catch (exifErr: any) {
                 console.warn(`[Embed Metadata] ExifTool warning on ${originalName}:`, exifErr.message || exifErr);
             }
