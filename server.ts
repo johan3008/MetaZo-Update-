@@ -1659,6 +1659,61 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    // Fungsi untuk menanamkan metadata ke file Microstock (IPTC & XMP)
+    function embedMetadata(filePath: string, metadata: { title: string; description: string; keywords: string[] | string }) {
+        return new Promise<string>(async (resolve, reject) => {
+            const rawKeywords = Array.isArray(metadata.keywords)
+                ? metadata.keywords
+                : (typeof metadata.keywords === 'string' ? metadata.keywords.split(',').map(s => s.trim()) : []);
+            
+            const cleanKeywords = (rawKeywords || []).map(k => String(k).trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+            const keywordString = cleanKeywords.join(', ');
+            const title = String(metadata.title || '').trim().replace(/"/g, '\\"');
+            const description = String(metadata.description || metadata.title || '').trim().replace(/"/g, '\\"');
+
+            // Command ExifTool untuk Microstock (IPTC & XMP)
+            // -overwrite_original memastikan ExifTool tidak membuat file backup (.file_original)
+            const command = `exiftool -overwrite_original -XMP:Title="${title}" -XMP:Description="${description}" -XMP:Subject="${keywordString}" -IPTC:ObjectName="${title}" -IPTC:Caption-Abstract="${description}" -IPTC:Keywords="${keywordString}" -Title="${title}" -Description="${description}" -Subject="${keywordString}" -Keywords="${keywordString}" "${filePath}"`;
+
+            exec(command, async (error, stdout, stderr) => {
+                if (error) {
+                    console.warn(`[embedMetadata exec note]: ${error.message}. Mencoba fallback ke library exiftool internal...`);
+                    try {
+                        const { exiftool } = await import('exiftool-vendored');
+                        const metadataTags: any = {
+                            Title: metadata.title,
+                            Headline: metadata.title,
+                            ObjectName: metadata.title,
+                            XPTitle: metadata.title,
+                            Description: metadata.description,
+                            ImageDescription: metadata.description,
+                            Caption: metadata.description,
+                            'Caption-Abstract': metadata.description,
+                            XPComment: metadata.description,
+                            Keywords: cleanKeywords,
+                            Subject: cleanKeywords,
+                            XPKeywords: keywordString,
+                            'XMP-dc:Title': metadata.title,
+                            'XMP-dc:Description': metadata.description,
+                            'XMP-dc:Subject': cleanKeywords,
+                            'IPTC:ObjectName': metadata.title,
+                            'IPTC:Caption-Abstract': metadata.description,
+                            'IPTC:Keywords': cleanKeywords
+                        };
+                        await exiftool.write(filePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors']);
+                        console.log(`[embedMetadata] Berhasil ditanam via internal exiftool: ${filePath}`);
+                        return resolve(filePath);
+                    } catch (fallbackErr: any) {
+                        console.error(`Gagal menanamkan metadata: ${fallbackErr.message}`);
+                        return reject(fallbackErr);
+                    }
+                }
+                console.log(`Metadata berhasil ditanam: ${stdout}`);
+                resolve(filePath);
+            });
+        });
+    }
+
     app.post('/api/embed-metadata', upload.single('file'), async (req, res) => {
         let tempFilePath = '';
         let cleanupFn = () => {};
@@ -1671,7 +1726,7 @@ app.get('/api/debug-uploads', (req, res) => {
             const originalName = req.file.originalname || 'image.jpg';
             const ext = (path.extname(originalName) || '.jpg').toLowerCase();
             
-            // Preserve the original extension so ExifTool and parsers know the exact binary format (PNG, EPS, SVG, MP4, MOV, JPG)
+            // Preserve the original extension so ExifTool knows the exact binary format
             tempFilePath = `${rawTempPath}${ext}`;
             try {
                 fs.renameSync(rawTempPath, tempFilePath);
@@ -1698,7 +1753,6 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             }
 
-            // Clean, trim, and deduplicate keywords
             keywords = (keywords || [])
                 .map((k: string) => String(k).trim().replace(/^["']|["']$/g, ''))
                 .filter((k: string) => k.length > 0);
@@ -1730,13 +1784,11 @@ app.get('/api/debug-uploads', (req, res) => {
                     const keywordsXml = uniqueKeywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
                     const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
 
-                    // Remove pre-existing top-level <title>, <desc>, <metadata> if present
                     svgContent = svgContent
                         .replace(/<title[\s\S]*?<\/title>/gi, '')
                         .replace(/<desc[\s\S]*?<\/desc>/gi, '')
                         .replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
 
-                    // Inject right after opening <svg ...>
                     if (/<svg[^>]*>/i.test(svgContent)) {
                         svgContent = svgContent.replace(/(<svg[^>]*>)/i, `$1\n  ${titleTag}\n  ${descTag}\n  ${metadataTag}`);
                         fs.writeFileSync(tempFilePath, svgContent, 'utf8');
@@ -1746,62 +1798,16 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             }
 
-            // 2. Comprehensive ExifTool Metadata Embedding (Adobe Stock / Shutterstock / IPTC / XMP compliant)
+            // 2. Jalankan embedMetadata ExifTool untuk Microstock (IPTC & XMP)
             try {
-                const { exiftool } = await import('exiftool-vendored');
-                
-                const metadataTags: any = {
-                    // Standard Tags (Auto-mapped)
-                    Title: title,
-                    Headline: title,
-                    ObjectName: title,
-                    XPTitle: title,
-                    Description: description,
-                    ImageDescription: description,
-                    Caption: description,
-                    'Caption-Abstract': description,
-                    XPComment: description,
-                    Keywords: uniqueKeywords,
-                    Subject: uniqueKeywords,
-                    XPKeywords: uniqueKeywords.join('; '),
-                    Software: 'MetaZo AI Assistant',
-
-                    // Explicit IPTC Core (Adobe Stock / Shutterstock)
-                    'IPTC:ObjectName': title,
-                    'IPTC:Headline': title,
-                    'IPTC:Caption-Abstract': description,
-                    'IPTC:Keywords': uniqueKeywords,
-
-                    // Explicit XMP Dublin Core (Adobe Bridge / Lightroom / Stock)
-                    'XMP-dc:Title': title,
-                    'XMP-dc:Description': description,
-                    'XMP-dc:Subject': uniqueKeywords,
-                    'XMP-photoshop:Headline': title,
-                    'XMP-photoshop:Caption': description,
-                    'XMP-iptcCore:SubjectCode': uniqueKeywords,
-
-                    // Video / QuickTime Tags
-                    'ItemList:Title': title,
-                    'ItemList:Description': description,
-                    'ItemList:Keyword': uniqueKeywords,
-                    'Keys:DisplayName': title,
-                    'Keys:Description': description,
-                    'Keys:Keywords': uniqueKeywords,
-                    'QuickTime:Title': title,
-                    'QuickTime:Description': description,
-                    'QuickTime:Comment': description,
-                    'QuickTime:Keywords': uniqueKeywords
-                };
-
-                // Add timeout protection (15 seconds max)
-                await Promise.race([
-                    exiftool.write(tempFilePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors']),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('ExifTool write timeout')), 15000))
-                ]);
-
-                console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Description: "${description.substring(0, 30)}...", Keywords: ${uniqueKeywords.length})`);
-            } catch (exifErr: any) {
-                console.warn(`[Embed Metadata] ExifTool note on ${originalName}:`, exifErr.message || exifErr);
+                await embedMetadata(tempFilePath, {
+                    title,
+                    description,
+                    keywords: uniqueKeywords
+                });
+                console.log(`[Embed Metadata] Selesai menanam metadata ke ${originalName}`);
+            } catch (err: any) {
+                console.warn(`[Embed Metadata] Warning:`, err?.message || err);
             }
 
             res.download(tempFilePath, originalName, (err) => {
