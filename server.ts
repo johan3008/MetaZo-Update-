@@ -1659,6 +1659,143 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/embed-metadata', upload.single('file'), async (req, res) => {
+        let tempFilePath = '';
+        let cleanupFn = () => {};
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: 'Tidak ada file yang diunggah.' });
+            }
+
+            const rawTempPath = req.file.path;
+            const originalName = req.file.originalname || 'image.jpg';
+            const ext = (path.extname(originalName) || '.jpg').toLowerCase();
+            
+            // Preserve the original extension so ExifTool and parsers know the exact binary format (PNG, EPS, SVG, MP4, MOV, JPG)
+            tempFilePath = `${rawTempPath}${ext}`;
+            try {
+                fs.renameSync(rawTempPath, tempFilePath);
+            } catch (_) {
+                tempFilePath = rawTempPath;
+            }
+
+            const title = String(req.body.title || '').trim();
+            const description = String(req.body.description || title || '').trim();
+            let keywords: string[] = [];
+
+            if (req.body.keywords) {
+                try {
+                    keywords = typeof req.body.keywords === 'string'
+                        ? (req.body.keywords.startsWith('[') ? JSON.parse(req.body.keywords) : req.body.keywords.split(',').map((s: string) => s.trim()))
+                        : req.body.keywords;
+                } catch (_) {
+                    keywords = String(req.body.keywords).split(',').map((s: string) => s.trim());
+                }
+            }
+
+            keywords = (keywords || []).filter(Boolean);
+
+            cleanupFn = () => {
+                try { if (fs.existsSync(rawTempPath)) fs.unlinkSync(rawTempPath); } catch (e) {}
+                try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) {}
+                try { if (fs.existsSync(`${tempFilePath}_original`)) fs.unlinkSync(`${tempFilePath}_original`); } catch (e) {}
+            };
+
+            // 1. Native SVG Dublin Core Injection for SVG files
+            if (ext === '.svg') {
+                try {
+                    let svgContent = fs.readFileSync(tempFilePath, 'utf8');
+                    const escapeXml = (unsafe: string) => unsafe.replace(/[<>&'"]/g, (c) => {
+                        switch (c) {
+                            case '<': return '&lt;';
+                            case '>': return '&gt;';
+                            case '&': return '&amp;';
+                            case '\'': return '&apos;';
+                            case '"': return '&quot;';
+                            default: return c;
+                        }
+                    });
+
+                    const titleTag = `<title>${escapeXml(title)}</title>`;
+                    const descTag = `<desc>${escapeXml(description)}</desc>`;
+                    const keywordsXml = keywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
+                    const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
+
+                    // Remove pre-existing top-level <title>, <desc>, <metadata> if present
+                    svgContent = svgContent
+                        .replace(/<title[\s\S]*?<\/title>/gi, '')
+                        .replace(/<desc[\s\S]*?<\/desc>/gi, '')
+                        .replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
+
+                    // Inject right after opening <svg ...>
+                    if (/<svg[^>]*>/i.test(svgContent)) {
+                        svgContent = svgContent.replace(/(<svg[^>]*>)/i, `$1\n  ${titleTag}\n  ${descTag}\n  ${metadataTag}`);
+                        fs.writeFileSync(tempFilePath, svgContent, 'utf8');
+                    }
+                } catch (svgErr) {
+                    console.warn('[Embed Metadata] SVG direct injection note:', svgErr);
+                }
+            }
+
+            // 2. Comprehensive ExifTool Metadata Embedding for PNG, EPS, JPG, WebP, TIFF, MP4, MOV
+            try {
+                const { exiftool } = await import('exiftool-vendored');
+                
+                const metadataTags: any = {
+                    // Standard EXIF / IPTC Tags
+                    Title: title,
+                    Headline: title,
+                    ObjectName: title,
+                    XPTitle: title,
+                    Description: description,
+                    ImageDescription: description,
+                    Caption: description,
+                    'Caption-Abstract': description,
+                    XPComment: description,
+                    Subject: keywords,
+                    Keywords: keywords,
+                    XPKeywords: keywords.join('; '),
+                    Software: 'MetaZo AI Assistant',
+
+                    // Dublin Core & XMP (Standard for Adobe Stock, EPS, PNG, Vector, PSD)
+                    'XMP-dc:Title': title,
+                    'XMP-dc:Description': description,
+                    'XMP-dc:Subject': keywords,
+                    'XMP-photoshop:Headline': title,
+                    'XMP-photoshop:Caption': description,
+                    
+                    // QuickTime / MP4 / MOV Video Metadata Tags
+                    'ItemList:Title': title,
+                    'ItemList:Description': description,
+                    'ItemList:Keyword': keywords.join(', '),
+                    'Keys:DisplayName': title,
+                    'Keys:Description': description,
+                    'Keys:Keywords': keywords.join(', '),
+                    'QuickTime:Title': title,
+                    'QuickTime:Description': description,
+                    'QuickTime:Comment': description,
+                    'QuickTime:Keywords': keywords.join(', ')
+                };
+
+                await exiftool.write(tempFilePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors', '-codedcharacterset=utf8']);
+                console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Keywords: ${keywords.length})`);
+            } catch (exifErr: any) {
+                console.warn(`[Embed Metadata] ExifTool warning on ${originalName}:`, exifErr.message || exifErr);
+            }
+
+            res.download(tempFilePath, `embedded_${originalName}`, (err) => {
+                cleanupFn();
+                if (err) {
+                    console.error('Error sending embedded file:', err);
+                }
+            });
+        } catch (error: any) {
+            console.error('[Embed Metadata API Error]', error);
+            cleanupFn();
+            res.status(500).json({ error: error.message || 'Gagal menanamkan metadata ke dalam file.' });
+        }
+    });
+
     app.post('/api/auto-subject', async (req, res) => {
         try {
             const { styleCategory, currentSubject, model, promptMode } = req.body;
