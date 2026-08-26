@@ -6354,6 +6354,33 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
     { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
   ];
+  const visualParts = [];
+  if (referenceImages && referenceImages.length > 0) {
+    referenceImages.forEach((img) => {
+      try {
+        visualParts.push(processFrameServer(img));
+      } catch (e) {
+        console.warn("[generateOptimizedPrompt] Failed processing reference image:", e);
+      }
+    });
+  }
+  let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" strictly featuring the exact core subject: "${subject}".
+
+CRITICAL SUBJECT ADHERENCE:
+1. Every prompt variation MUST center around "${subject}". Do NOT replace, mutate, or drift away from this subject.
+2. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph.
+3. DO NOT use comma-separated keyword lists or tags.`;
+  if (referenceImages && referenceImages.length > 0) {
+    instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, lighting, texture, and composition. Combine/mix this visual style with the base subject concept: "${subject}".
+
+Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}".
+
+CRITICAL DIRECTIVES:
+1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of "${subject}".
+2. EXTRACT AESTHETIC: Do not just literally copy the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe "${subject}".
+3. HIGH QUALITY: Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
+  }
+  const parts = [...visualParts, { text: instructionText }];
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     let attempts = 0;
     const maxAttempts = 2;
@@ -6362,7 +6389,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
         console.log(`[generateOptimizedPrompt] Attempting with ${provider.toUpperCase()} (attempt ${attempts + 1}/${maxAttempts})...`);
         const text = await callOpenAICompatibleWithRetry({
           systemInstruction,
-          contents: `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" based on: "${subject}". Write fully formed, vivid natural language sentences.`,
+          contents: parts,
           responseMimeType: "application/json",
           responseSchema,
           config: { temperature: randomTemp, seed, topP: 0.85 },
@@ -6396,21 +6423,6 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       for (let attemptIdx = 0; attemptIdx < maxAttempts; attemptIdx++) {
         try {
           console.log(`[generateOptimizedPrompt] Attempting with model ${modelName} (attempt ${attemptIdx + 1}/${maxAttempts})...`);
-          const parts = [];
-          if (referenceImages && referenceImages.length > 0) {
-            referenceImages.forEach((img) => {
-              try {
-                parts.push(processFrameServer(img));
-              } catch (e) {
-                console.warn("[generateOptimizedPrompt] Failed processing reference image:", e);
-              }
-            });
-          }
-          let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type "\${styleCategory}"" strictly featuring the exact core subject: "\${subject}"".\\n\\nCRITICAL SUBJECT ADHERENCE:\\n1. Every prompt variation MUST center around "\${subject}"". Do NOT replace, mutate, or drift away from this subject.\\n2. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph.\\n3. DO NOT use comma-separated keyword lists or tags.`;
-          if (referenceImages && referenceImages.length > 0) {
-            instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, or subject. Combine/mix this visual style and composition with the user's typed base subject concept: "\${subject}"".\\n\\nExpand the concept into ${count} unique immersive prompt variations of type "\${styleCategory}"".\\n\\nCRITICAL DIRECTIVES:\\n1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of "\${subject}"".\\n2. DO NOT literally describe the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe "\${subject}"".\\n3. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
-          }
-          parts.push({ text: instructionText });
           const response = await callGeminiWithRetry(modelName, {
             parts
           }, {
@@ -10321,6 +10333,135 @@ app.post("/api/generate-prompt", async (req, res) => {
     } else {
       res.status(500).json({ error: e.message || "Error generating optimized prompt" });
     }
+  }
+});
+app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
+  let tempFilePath = "";
+  let cleanupFn = () => {
+  };
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Tidak ada file yang diunggah." });
+    }
+    const rawTempPath = req.file.path;
+    const originalName = req.file.originalname || "image.jpg";
+    const ext = (import_path.default.extname(originalName) || ".jpg").toLowerCase();
+    tempFilePath = `${rawTempPath}${ext}`;
+    try {
+      import_fs.default.renameSync(rawTempPath, tempFilePath);
+    } catch (_) {
+      tempFilePath = rawTempPath;
+    }
+    const title = String(req.body.title || "").trim();
+    const description = String(req.body.description || title || "").trim();
+    let keywords = [];
+    if (req.body.keywords) {
+      try {
+        keywords = typeof req.body.keywords === "string" ? req.body.keywords.startsWith("[") ? JSON.parse(req.body.keywords) : req.body.keywords.split(",").map((s) => s.trim()) : req.body.keywords;
+      } catch (_) {
+        keywords = String(req.body.keywords).split(",").map((s) => s.trim());
+      }
+    }
+    keywords = (keywords || []).filter(Boolean);
+    cleanupFn = () => {
+      try {
+        if (import_fs.default.existsSync(rawTempPath)) import_fs.default.unlinkSync(rawTempPath);
+      } catch (e) {
+      }
+      try {
+        if (import_fs.default.existsSync(tempFilePath)) import_fs.default.unlinkSync(tempFilePath);
+      } catch (e) {
+      }
+      try {
+        if (import_fs.default.existsSync(`${tempFilePath}_original`)) import_fs.default.unlinkSync(`${tempFilePath}_original`);
+      } catch (e) {
+      }
+    };
+    if (ext === ".svg") {
+      try {
+        let svgContent = import_fs.default.readFileSync(tempFilePath, "utf8");
+        const escapeXml = (unsafe) => unsafe.replace(/[<>&'"]/g, (c) => {
+          switch (c) {
+            case "<":
+              return "&lt;";
+            case ">":
+              return "&gt;";
+            case "&":
+              return "&amp;";
+            case "'":
+              return "&apos;";
+            case '"':
+              return "&quot;";
+            default:
+              return c;
+          }
+        });
+        const titleTag = `<title>${escapeXml(title)}</title>`;
+        const descTag = `<desc>${escapeXml(description)}</desc>`;
+        const keywordsXml = keywords.map((k) => `<rdf:li>${escapeXml(k)}</rdf:li>`).join("");
+        const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
+        svgContent = svgContent.replace(/<title[\s\S]*?<\/title>/gi, "").replace(/<desc[\s\S]*?<\/desc>/gi, "").replace(/<metadata[\s\S]*?<\/metadata>/gi, "");
+        if (/<svg[^>]*>/i.test(svgContent)) {
+          svgContent = svgContent.replace(/(<svg[^>]*>)/i, `$1
+  ${titleTag}
+  ${descTag}
+  ${metadataTag}`);
+          import_fs.default.writeFileSync(tempFilePath, svgContent, "utf8");
+        }
+      } catch (svgErr) {
+        console.warn("[Embed Metadata] SVG direct injection note:", svgErr);
+      }
+    }
+    try {
+      const { exiftool: exiftool2 } = await import("exiftool-vendored");
+      const metadataTags = {
+        // Standard EXIF / IPTC Tags
+        Title: title,
+        Headline: title,
+        ObjectName: title,
+        XPTitle: title,
+        Description: description,
+        ImageDescription: description,
+        Caption: description,
+        "Caption-Abstract": description,
+        XPComment: description,
+        Subject: keywords,
+        Keywords: keywords,
+        XPKeywords: keywords.join("; "),
+        Software: "MetaZo AI Assistant",
+        // Dublin Core & XMP (Standard for Adobe Stock, EPS, PNG, Vector, PSD)
+        "XMP-dc:Title": title,
+        "XMP-dc:Description": description,
+        "XMP-dc:Subject": keywords,
+        "XMP-photoshop:Headline": title,
+        "XMP-photoshop:Caption": description,
+        // QuickTime / MP4 / MOV Video Metadata Tags
+        "ItemList:Title": title,
+        "ItemList:Description": description,
+        "ItemList:Keyword": keywords.join(", "),
+        "Keys:DisplayName": title,
+        "Keys:Description": description,
+        "Keys:Keywords": keywords.join(", "),
+        "QuickTime:Title": title,
+        "QuickTime:Description": description,
+        "QuickTime:Comment": description,
+        "QuickTime:Keywords": keywords.join(", ")
+      };
+      await exiftool2.write(tempFilePath, metadataTags, ["-overwrite_original", "-ignoreMinorErrors", "-codedcharacterset=utf8"]);
+      console.log(`[Embed Metadata] Successfully embedded metadata into ${originalName} [${ext.toUpperCase()}] (Title: "${title}", Keywords: ${keywords.length})`);
+    } catch (exifErr) {
+      console.warn(`[Embed Metadata] ExifTool warning on ${originalName}:`, exifErr.message || exifErr);
+    }
+    res.download(tempFilePath, `embedded_${originalName}`, (err) => {
+      cleanupFn();
+      if (err) {
+        console.error("Error sending embedded file:", err);
+      }
+    });
+  } catch (error) {
+    console.error("[Embed Metadata API Error]", error);
+    cleanupFn();
+    res.status(500).json({ error: error.message || "Gagal menanamkan metadata ke dalam file." });
   }
 });
 app.post("/api/auto-subject", async (req, res) => {
