@@ -4386,7 +4386,7 @@ const App: React.FC = () => {
           console.warn('[Download Embedded] Server embed failed, trying client fallback:', serverErr);
         }
 
-        // Client-side fallback for JPEG files using piexifjs
+        // Client-side fallback for JPEG files using piexifjs (with true UCS-2LE encoding for Windows Explorer)
         if (!downloaded && (item.file.type === 'image/jpeg' || item.file.name.toLowerCase().endsWith('.jpg') || item.file.name.toLowerCase().endsWith('.jpeg'))) {
           try {
             const dataUri = await new Promise<string>((resolve, reject) => {
@@ -4406,10 +4406,21 @@ const App: React.FC = () => {
               gps = existing['GPS'] || {};
             } catch (_) {}
 
+            // Helper to encode string as 2-byte UCS-2LE (UTF-16LE with null terminator) to prevent Chinese/Japanese mojibake in Windows
+            const toUcs2Bytes = (str: string) => {
+              const bytes: number[] = [];
+              for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i);
+                bytes.push(code & 0xFF, (code >> 8) & 0xFF);
+              }
+              bytes.push(0, 0);
+              return bytes;
+            };
+
             zeroth[piexif.ImageIFD.ImageDescription] = description;
-            zeroth[piexif.ImageIFD.XPTitle] = title.split('').map((c: string) => c.charCodeAt(0));
-            zeroth[piexif.ImageIFD.XPComment] = description.split('').map((c: string) => c.charCodeAt(0));
-            zeroth[piexif.ImageIFD.XPKeywords] = keywords.join('; ').split('').map((c: string) => c.charCodeAt(0));
+            zeroth[piexif.ImageIFD.XPTitle] = toUcs2Bytes(title);
+            zeroth[piexif.ImageIFD.XPComment] = toUcs2Bytes(description);
+            zeroth[piexif.ImageIFD.XPKeywords] = toUcs2Bytes(keywords.join('; '));
             zeroth[piexif.ImageIFD.Software] = "MetaZo AI Assistant";
 
             const exifBytes = piexif.dump({ "0th": zeroth, "Exif": exif, "GPS": gps });
