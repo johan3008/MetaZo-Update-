@@ -3606,19 +3606,130 @@ const App: React.FC = () => {
 
             if (frames && frames.length > 0) {
                 itemsToProcess.push({ id: fileItem.id, frames, exifMetadata });
+                            miriCanvasCategory: '',
+                categoryReason: metadata.category_reason,
+                isGenerating: false,
+                error: null
+              } : f));
+              
+              if (!isMzLicensed) {
+                incrementDailyCount(activeTool, 1);
+              }
+
+              return true; // Success
+            } catch (err: any) {
+              const errorMessage = err.message || "Failed to contact AI";
+              
+              // Check for rate limit error (429)
+              if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('quota')) {
+                  setIsPaused(true);
+                  updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
+                    ...f, 
+                    error: "API Limit reached. Waiting to try again..." 
+                  } : f));
+                  
+                  // Wait for 30 seconds before retrying
+                  await backgroundSafeTimeout(30000);
+                  setIsPaused(false);
+                  retryCount++;
+                  continue; // Try again
+              }
+
+              throw new Error(errorMessage);
+            }
+        }
+        
+        throw new Error("Processing failed after multiple attempts due to API limit.");
+    } catch (err: any) {
+        const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to process file.");
+        updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
+            ...f, 
+            isGenerating: false, 
+            isExtracting: false,
+            error: errMsg 
+        } : f));
+        return true;
+    }
+  };
+
+  const processBatchFiles = async (chunk: FileItem[]): Promise<boolean> => {
+    if (stopGenerationRef.current) return false;
+
+    try {
+        if (!isMzLicensed) {
+            const totalToday = getTotalDailyCount();
+            if (totalToday >= getDailyLimit()) {
+                setShowLimitModal(true);
+                throw new Error("Limit harian telah habis.");
+            }
+        }
+
+        // 1. Mark as extracting/generating
+        updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: true } : f));
+
+        // Auto scroll to the first active card in the batch smoothly
+        setTimeout(() => {
+          if (chunk && chunk.length > 0) {
+            const el = document.getElementById(`file-card-${chunk[0].id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }, 120);
+
+        // 2. Extract frames and EXIF for those that need it
+        const itemsToProcess: { id: string, frames: string[], exifMetadata?: any }[] = [];
+        for (const fileItem of chunk) {
+            let frames = fileItem.analysisFrames;
+            if (!frames || frames.length === 0) {
+                updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: true } : f));
+                const ext = fileItem.file.name.split('.').pop()?.toLowerCase() || '';
+                try {
+                    frames = await extractFramesForFile(fileItem.file, ext);
+                    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, analysisFrames: frames } : f));
+                } catch (err: any) {
+                    const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to extract file.");
+                    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, isGenerating: false, error: errMsg } : f));
+                    continue;
+                }
+            }
+
+            let exifMetadata = fileItem.exifMetadata;
+            if (!exifMetadata && fileItem.file && fileItem.file.size > 0) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', fileItem.file);
+                    const exifRes = await fetch('/api/extract-exif', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (exifRes.ok) {
+                        const exifJson = await exifRes.json();
+                        if (exifJson.success && exifJson.metadata) {
+                            exifMetadata = exifJson.metadata;
+                            updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, exifMetadata } : f));
+                        }
+                    }
+                } catch (exifErr) {
+                    console.warn("Failed to extract EXIF in batch:", exifErr);
+                }
+            }
+
+            if (frames && frames.length > 0) {
+                itemsToProcess.push({ id: fileItem.id, frames, exifMetadata });
             }
         }
 
         let finalItemsToProcess = itemsToProcess;
         if (!isMzLicensed) {
             const totalToday = getTotalDailyCount();
-            const remaining = Math.max(0, 30 - totalToday);
+            const remaining = Math.max(0, getDailyLimit() - totalToday);
             if (finalItemsToProcess.length > remaining) {
                 const allowed = finalItemsToProcess.slice(0, remaining);
                 const excluded = finalItemsToProcess.slice(remaining);
                 updateFiles(prev => prev.map(f => {
                     if (excluded.some(ex => ex.id === f.id)) {
-                        return { ...f, isGenerating: false, isExtracting: false, error: "Limit harian telah habis." };
+                        return { ...f, isGenerating: false, isExtracting: false, error: "Limit harian telah habis (25/hari)." };
                     }
                     return f;
                 }));
@@ -3665,8 +3776,7 @@ const App: React.FC = () => {
                   bluesmindsKeys: bluesmindsKeysList,
                   aiveneKeys: aiveneKeysList,
                   zaiKeys: zaiKeysList
-                };
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
+                          const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -3687,7 +3797,6 @@ const App: React.FC = () => {
                             error: null
                         };
                     } else if (finalItemsToProcess.some(fi => fi.id === f.id)) {
-                        // Mark as failed if it was part of batch but no result was returned
                         return { ...f, isGenerating: false, error: "Model did not return result for this asset in batch" };
                     }
                     return f;
@@ -3724,6 +3833,25 @@ const App: React.FC = () => {
       const totalToday = getTotalDailyCount();
       if (totalToday >= getDailyLimit()) {
         setShowLimitModal(true);
+        return;
+      }
+
+      // Check if Free tier user has supplied their own manual API Key:
+      const hasAnyManualKey = geminiKeysList.length > 0 || 
+                              groqKeysList.length > 0 || 
+                              mistralKeysList.length > 0 || 
+                              openaiKeysList.length > 0 || 
+                              openrouterKeysList.length > 0 || 
+                              blackboxKeysList.length > 0 || 
+                              nvidiaKeysList.length > 0 || 
+                              bluesmindsKeysList.length > 0 || 
+                              aiveneKeysList.length > 0 || 
+                              zaiKeysList.length > 0;
+      if (!hasAnyManualKey) {
+        alert(uiLanguage === 'id' 
+          ? "Pengguna Akun Free (Kuota 25 Gambar/Hari) wajib memasukkan API Key Gemini gratis Anda sendiri di Pengaturan (⚙️). Dapatkan API Key gratis di Google AI Studio (1.500 gambar/hari).\n\nIngin generate otomatis tanpa repot memasukkan API Key & Unlimited? Silakan upgrade ke Akun Pro/Lisensi!"
+          : "Free Tier users (25 Daily Limit) must provide your own free Gemini API Key in Settings (⚙️). Get a free API key at Google AI Studio (1,500 images/day).\n\nWant to generate without entering any API keys & with Unlimited access? Please upgrade to Pro/Licensed account!");
+        setShowSettingsModal(true);
         return;
       }
     }
@@ -5428,9 +5556,31 @@ const App: React.FC = () => {
                     </select>
                   </div>
                   
-                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] leading-relaxed">
-                    {t.settings_gemini_desc}
-                  </p>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        {uiLanguage === 'id' ? 'Status Mode API Key' : 'API Key Mode Status'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                        geminiKeysList.length === 0
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                          : 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20'
+                      }`}>
+                        {geminiKeysList.length === 0
+                          ? (uiLanguage === 'id' ? '🟢 KUNCI SERVER BAWAAN (BEBAS API KEY)' : '🟢 SERVER DEFAULT KEY (NO KEY NEEDED)')
+                          : (uiLanguage === 'id' ? `🔑 KUNCI PRIBADI (${geminiKeysList.length} KEY POOL)` : `🔑 CUSTOM POOL (${geminiKeysList.length} KEYS)`)}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {geminiKeysList.length === 0
+                        ? (uiLanguage === 'id'
+                            ? '✨ Anda saat ini menggunakan Master Key bawaan server. Anda bisa langsung generate metadata tanpa perlu memasukkan API Key pribadi apa pun.'
+                            : '✨ You are currently using the built-in server master key. You can generate metadata directly without entering any personal API key.')
+                        : (uiLanguage === 'id'
+                            ? '⚡ Sistem aktif menggunakan koleksi API Key pribadi Anda dengan fitur rotasi otomatis (Auto-Rotation & Multi-Account Failover).'
+                            : '⚡ System is actively using your personal API key pool with automatic multi-account rotation and failover.')}
+                    </p>
+                  </div>
 
                   <div className="flex items-center space-x-2 p-2.5 bg-[#7c3aed]/5 dark:bg-[#7c3aed]/10 rounded-xl border border-[#7c3aed]/20">
                     <HelpCircle size={14} className="text-[#7c3aed] shrink-0" />
@@ -5445,16 +5595,31 @@ const App: React.FC = () => {
                         Google AI Studio
                         <ExternalLink size={10} />
                       </a>
+                      <span className="text-[9.5px] text-slate-400 ml-1.5 block sm:inline">
+                        ({uiLanguage === 'id' ? '100% Gratis 1.500 gambar/hari per akun' : '100% Free 1,500 images/day per account'})
+                      </span>
                     </span>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">{t.settings_gemini_key_list} ({geminiKeysList.length})</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block">
+                        {t.settings_gemini_key_list} ({geminiKeysList.length})
+                      </label>
+                      {geminiKeysList.length > 1 && (
+                        <span className="text-[8.5px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                          🔄 Auto-Rotation Active
+                        </span>
+                      )}
+                    </div>
                     
                     {geminiKeysList.length === 0 ? (
                       <div className="p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
                         <Key className="mx-auto text-slate-300 dark:text-slate-700 mb-2" size={20} />
                         <p className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">{t.settings_use_default_key}</p>
+                        <p className="text-[9.5px] text-slate-400/80 mt-1 italic">
+                          {uiLanguage === 'id' ? 'Tambahkan API Key di bawah jika ingin menggunakan kuota pribadi.' : 'Add your API key below if you prefer using personal quota.'}
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-32 overflow-y-auto pr-1 select-none">
@@ -5512,7 +5677,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Gemini</label>
+                    <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">Tambah Key Gemini (Mendukung Multi-Akun Gratis)</label>
                     <div className="flex gap-2">
                       <input
                         type="password"

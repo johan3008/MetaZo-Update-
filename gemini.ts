@@ -1896,25 +1896,24 @@ function getAIClient(): any {
           return { text };
         }
 
-        let key = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        const envKeysRaw = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+        const envKeysList = envKeysRaw.split(/[,;\n]+/).map(k => k.trim()).filter(Boolean);
+        let key = envKeysList[0] || '';
         let activeIndex = 0;
-        let keysList: string[] = [];
+        let keysList: string[] = envKeysList.length > 0 ? envKeysList : [];
 
         if (store) {
-          if (store.gemini && Array.isArray(store.gemini.keys)) {
+          if (store.gemini && Array.isArray(store.gemini.keys) && store.gemini.keys.length > 0) {
             keysList = store.gemini.keys;
             activeIndex = store.gemini.activeIndex || 0;
-            if (keysList.length > 0) {
-              key = keysList[activeIndex];
-            }
-          } else if (typeof store === 'string') {
-            key = store;
+            key = keysList[activeIndex] || keysList[0];
+          } else if (typeof store === 'string' && store.trim()) {
+            key = store.trim();
+            keysList = [key];
           } else if (store && Array.isArray(store.keys) && store.keys.length > 0) {
             keysList = store.keys;
             activeIndex = store.activeIndex || 0;
-            if (keysList.length > 0) {
-              key = keysList[activeIndex];
-            }
+            key = keysList[activeIndex] || keysList[0];
           }
         }
 
