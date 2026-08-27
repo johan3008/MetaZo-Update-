@@ -1659,8 +1659,8 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
-    // Fungsi untuk menanamkan metadata ke file Microstock (Adobe Stock, Shutterstock, IPTC & XMP)
-    function embedMetadata(filePath: string, metadata: { title: string; description: string; keywords: string[] | string }) {
+    // Fungsi untuk menanamkan metadata ke file Microstock (Standar Adobe Stock XMP-dc & IPTC)
+    function embedMetadataForAdobe(filePath: string, metadata: { title: string; description: string; keywords: string[] | string }) {
         return new Promise<string>(async (resolve, reject) => {
             const rawKeywords = Array.isArray(metadata.keywords)
                 ? metadata.keywords
@@ -1675,63 +1675,59 @@ app.get('/api/debug-uploads', (req, res) => {
             const title = String(metadata.title || '').trim();
             const description = String(metadata.description || metadata.title || '').trim();
 
-            // 1. Primary: Use exiftool-vendored for guaranteed binary IPTC / XMP tags & arrays
+            // 1. Primary: Use exiftool-vendored for high-fidelity binary IPTC / XMP tags
             try {
                 const { exiftool } = await import('exiftool-vendored');
                 const metadataTags: any = {
-                    // Title tags (Adobe Stock & Shutterstock)
+                    // Dublin Core (XMP-dc) - Adobe Stock Standard
+                    'XMP-dc:Title': title,
+                    'XMP-dc:Description': description,
+                    'XMP-dc:Subject': uniqueKeywords,
                     Title: title,
-                    Headline: title,
-                    ObjectName: title,
-                    XPTitle: title,
+                    Description: description,
+                    Subject: uniqueKeywords,
+
+                    // IPTC Core
                     'IPTC:ObjectName': title,
                     'IPTC:Headline': title,
-                    'XMP-dc:Title': title,
-                    'XMP-photoshop:Headline': title,
-
-                    // Description / Caption tags
-                    Description: description,
-                    ImageDescription: description,
-                    Caption: description,
-                    'Caption-Abstract': description,
-                    XPComment: description,
                     'IPTC:Caption-Abstract': description,
-                    'XMP-dc:Description': description,
-                    'XMP-photoshop:Caption': description,
-
-                    // Keywords tags (Real Array for repeatable IPTC 2:25 & XMP dc:subject Bag)
-                    Keywords: uniqueKeywords,
-                    Subject: uniqueKeywords,
                     'IPTC:Keywords': uniqueKeywords,
-                    'XMP-dc:Subject': uniqueKeywords,
-                    'XMP-iptcCore:SubjectCode': uniqueKeywords,
-                    XPKeywords: uniqueKeywords.join('; '),
+                    ObjectName: title,
+                    Headline: title,
+                    'Caption-Abstract': description,
+                    Keywords: uniqueKeywords,
 
-                    // Encoding & Software
+                    // Photoshop & Windows Tags
+                    'XMP-photoshop:Headline': title,
+                    'XMP-photoshop:Caption': description,
+                    ImageDescription: description,
+                    XPTitle: title,
+                    XPComment: description,
+                    XPKeywords: keywordString,
                     'IPTC:CodedCharacterSet': 'UTF8',
                     Software: 'MetaZo AI Assistant'
                 };
 
                 await Promise.race([
-                    exiftool.write(filePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors', '-codedcharacterset=utf8']),
+                    exiftool.write(filePath, metadataTags, ['-overwrite_original', '-ignoreMinorErrors', '-charset iptc=utf8', '-codedcharacterset=utf8']),
                     new Promise((_, rej) => setTimeout(() => rej(new Error('Write timeout')), 15000))
                 ]);
 
-                console.log(`[embedMetadata] Sukses menanam metadata Adobe Stock (${uniqueKeywords.length} keywords): ${filePath}`);
+                console.log(`[embedMetadataForAdobe] Sukses menanam metadata Adobe (${uniqueKeywords.length} keywords): ${filePath}`);
                 return resolve(filePath);
             } catch (vendoredErr: any) {
-                console.warn(`[embedMetadata vendored note]: ${vendoredErr?.message}. Mencoba CLI fallback...`);
+                console.warn(`[embedMetadataForAdobe] Vendored note: ${vendoredErr?.message}. Trying CLI fallback...`);
             }
 
-            // 2. CLI ExifTool Fallback (with -sep ", " so Adobe Stock parses individual keywords)
+            // 2. CLI ExifTool Fallback (Exact user command with -charset utf8 and -sep ", ")
             const escapedTitle = title.replace(/"/g, '\\"');
             const escapedDesc = description.replace(/"/g, '\\"');
-            const command = `exiftool -overwrite_original -sep ", " -codedcharacterset=utf8 -XMP:Title="${escapedTitle}" -XMP:Description="${escapedDesc}" -XMP:Subject="${keywordString}" -IPTC:ObjectName="${escapedTitle}" -IPTC:Headline="${escapedTitle}" -IPTC:Caption-Abstract="${escapedDesc}" -IPTC:Keywords="${keywordString}" -Title="${escapedTitle}" -Description="${escapedDesc}" -Subject="${keywordString}" -Keywords="${keywordString}" "${filePath}"`;
+            const command = `exiftool -overwrite_original -charset utf8 -sep ", " -XMP-dc:Title="${escapedTitle}" -XMP-dc:Description="${escapedDesc}" -XMP-dc:Subject="${keywordString}" -IPTC:ObjectName="${escapedTitle}" -IPTC:Headline="${escapedTitle}" -IPTC:Caption-Abstract="${escapedDesc}" -IPTC:Keywords="${keywordString}" -Title="${escapedTitle}" -Description="${escapedDesc}" -Subject="${keywordString}" -Keywords="${keywordString}" "${filePath}"`;
 
             exec(command, (error, stdout) => {
                 if (error) {
-                    console.error(`Gagal menanamkan metadata CLI: ${error.message}`);
-                    return resolve(filePath); // resolve to not break download
+                    console.error(`Gagal CLI: ${error.message}`);
+                    return resolve(filePath);
                 }
                 console.log(`Metadata berhasil ditanam via CLI: ${stdout}`);
                 resolve(filePath);
@@ -1823,9 +1819,9 @@ app.get('/api/debug-uploads', (req, res) => {
                 }
             }
 
-            // 2. Jalankan embedMetadata ExifTool untuk Microstock (IPTC & XMP)
+            // 2. Jalankan embedMetadataForAdobe ExifTool untuk Adobe Stock (IPTC & XMP-dc)
             try {
-                await embedMetadata(tempFilePath, {
+                await embedMetadataForAdobe(tempFilePath, {
                     title,
                     description,
                     keywords: uniqueKeywords
@@ -2991,7 +2987,7 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 try { fs.unlinkSync(tempFilePath); } catch (err) {}
             }
             if (tempFilePath) {
-                for (const suffix of ['tl', 'tr', 'bl', 'br', 'macro_center']) {
+                for (const suffix of ['tl', 'tr', 'bl', 'br', 'macro_center', 'macro_bottom']) {
                     const qPath = `${tempFilePath}_${suffix}.png`;
                     if (fs.existsSync(qPath)) {
                         try { fs.unlinkSync(qPath); } catch (err) {}
