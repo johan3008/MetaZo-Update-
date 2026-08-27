@@ -3606,117 +3606,6 @@ const App: React.FC = () => {
 
             if (frames && frames.length > 0) {
                 itemsToProcess.push({ id: fileItem.id, frames, exifMetadata });
-                            miriCanvasCategory: '',
-                categoryReason: metadata.category_reason,
-                isGenerating: false,
-                error: null
-              } : f));
-              
-              if (!isMzLicensed) {
-                incrementDailyCount(activeTool, 1);
-              }
-
-              return true; // Success
-            } catch (err: any) {
-              const errorMessage = err.message || "Failed to contact AI";
-              
-              // Check for rate limit error (429)
-              if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('quota')) {
-                  setIsPaused(true);
-                  updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
-                    ...f, 
-                    error: "API Limit reached. Waiting to try again..." 
-                  } : f));
-                  
-                  // Wait for 30 seconds before retrying
-                  await backgroundSafeTimeout(30000);
-                  setIsPaused(false);
-                  retryCount++;
-                  continue; // Try again
-              }
-
-              throw new Error(errorMessage);
-            }
-        }
-        
-        throw new Error("Processing failed after multiple attempts due to API limit.");
-    } catch (err: any) {
-        const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to process file.");
-        updateFiles(prev => prev.map(f => f.id === fileItem.id ? { 
-            ...f, 
-            isGenerating: false, 
-            isExtracting: false,
-            error: errMsg 
-        } : f));
-        return true;
-    }
-  };
-
-  const processBatchFiles = async (chunk: FileItem[]): Promise<boolean> => {
-    if (stopGenerationRef.current) return false;
-
-    try {
-        if (!isMzLicensed) {
-            const totalToday = getTotalDailyCount();
-            if (totalToday >= getDailyLimit()) {
-                setShowLimitModal(true);
-                throw new Error("Limit harian telah habis.");
-            }
-        }
-
-        // 1. Mark as extracting/generating
-        updateFiles(prev => prev.map(f => chunk.find(c => c.id === f.id) ? { ...f, isGenerating: true } : f));
-
-        // Auto scroll to the first active card in the batch smoothly
-        setTimeout(() => {
-          if (chunk && chunk.length > 0) {
-            const el = document.getElementById(`file-card-${chunk[0].id}`);
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }
-        }, 120);
-
-        // 2. Extract frames and EXIF for those that need it
-        const itemsToProcess: { id: string, frames: string[], exifMetadata?: any }[] = [];
-        for (const fileItem of chunk) {
-            let frames = fileItem.analysisFrames;
-            if (!frames || frames.length === 0) {
-                updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: true } : f));
-                const ext = fileItem.file.name.split('.').pop()?.toLowerCase() || '';
-                try {
-                    frames = await extractFramesForFile(fileItem.file, ext);
-                    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, analysisFrames: frames } : f));
-                } catch (err: any) {
-                    const errMsg = err?.message || (typeof err === 'string' ? err : "Failed to extract file.");
-                    updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, isExtracting: false, isGenerating: false, error: errMsg } : f));
-                    continue;
-                }
-            }
-
-            let exifMetadata = fileItem.exifMetadata;
-            if (!exifMetadata && fileItem.file && fileItem.file.size > 0) {
-                try {
-                    const formData = new FormData();
-                    formData.append('file', fileItem.file);
-                    const exifRes = await fetch('/api/extract-exif', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (exifRes.ok) {
-                        const exifJson = await exifRes.json();
-                        if (exifJson.success && exifJson.metadata) {
-                            exifMetadata = exifJson.metadata;
-                            updateFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, exifMetadata } : f));
-                        }
-                    }
-                } catch (exifErr) {
-                    console.warn("Failed to extract EXIF in batch:", exifErr);
-                }
-            }
-
-            if (frames && frames.length > 0) {
-                itemsToProcess.push({ id: fileItem.id, frames, exifMetadata });
             }
         }
 
@@ -3776,7 +3665,8 @@ const App: React.FC = () => {
                   bluesmindsKeys: bluesmindsKeysList,
                   aiveneKeys: aiveneKeysList,
                   zaiKeys: zaiKeysList
-                          const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
+                };
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
