@@ -381,7 +381,11 @@ function saveEmulatedTable(table: string, list: any[]) {
 
 // --- DATABASE FUNCTIONS ---
 export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> {
-  if (!supabase) throw new Error("Supabase is not initialized. Check your environment variables.");
+  if (!supabase) {
+    const list = getEmulatedTable(docRef.table);
+    const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
+    return new DocumentSnapshot(docRef.id, found || null);
+  }
   const { data, error } = await supabase
     .from(docRef.table)
     .select('*')
@@ -395,12 +399,24 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
 }
 
 export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merge?: boolean }): Promise<void> {
-  if (!supabase) throw new Error("Supabase is not initialized.");
   const processedData = { ...(data || {}) };
   if (docRef.table === 'keys') {
     processedData.key = docRef.id;
   } else {
     processedData.id = docRef.id;
+  }
+
+  if (!supabase) {
+    const list = getEmulatedTable(docRef.table);
+    const keyField = docRef.table === 'keys' ? 'key' : 'id';
+    const idx = list.findIndex(item => item[keyField] === docRef.id);
+    if (idx >= 0) {
+      list[idx] = options?.merge ? { ...list[idx], ...processedData } : processedData;
+    } else {
+      list.push(processedData);
+    }
+    saveEmulatedTable(docRef.table, list);
+    return;
   }
   
   const { error } = await supabase.from(docRef.table).upsert(processedData);
@@ -408,17 +424,14 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
 }
 
 export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void> {
-  if (!supabase) throw new Error("Supabase is not initialized.");
   let topLevelUpdates: any = {};
   
   // Flatten dotted keys
   const hasDottedKeys = Object.keys(data).some(k => k.includes('.'));
   if (hasDottedKeys) {
-    const { data: currentData } = await supabase
-      .from(docRef.table)
-      .select('*')
-      .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-      .single();
+    const currentData = !supabase 
+      ? (getEmulatedTable(docRef.table).find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id) || null)
+      : (await supabase.from(docRef.table).select('*').eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id).single()).data;
       
     if (currentData) {
       let mergedData = { ...currentData };
@@ -451,6 +464,17 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
     }
   }
 
+  if (!supabase) {
+    const list = getEmulatedTable(docRef.table);
+    const keyField = docRef.table === 'keys' ? 'key' : 'id';
+    const idx = list.findIndex(item => item[keyField] === docRef.id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...topLevelUpdates };
+      saveEmulatedTable(docRef.table, list);
+    }
+    return;
+  }
+
   const { error } = await supabase
     .from(docRef.table)
     .update(topLevelUpdates)
@@ -460,7 +484,13 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
 }
 
 export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
-  if (!supabase) throw new Error("Supabase is not initialized.");
+  if (!supabase) {
+    const list = getEmulatedTable(docRef.table);
+    const keyField = docRef.table === 'keys' ? 'key' : 'id';
+    const filtered = list.filter(item => item[keyField] !== docRef.id);
+    saveEmulatedTable(docRef.table, filtered);
+    return;
+  }
   const { error } = await supabase
     .from(docRef.table)
     .delete()
@@ -469,23 +499,38 @@ export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
 }
 
 export async function addDoc(collectionRef: SupabaseCollectionRef, data: any): Promise<SupabaseDocRef> {
-  if (!supabase) throw new Error("Supabase is not initialized.");
   const generatedId = 'gen-' + Math.random().toString(36).substring(2, 9);
   const processedData = { ...data, id: generatedId };
   if (collectionRef.parentId) {
     processedData.uid = collectionRef.parentId;
   }
+
+  if (!supabase) {
+    const list = getEmulatedTable(collectionRef.table);
+    list.push(processedData);
+    saveEmulatedTable(collectionRef.table, list);
+    return new SupabaseDocRef(collectionRef.table, generatedId);
+  }
+
   const { error } = await supabase.from(collectionRef.table).insert(processedData);
   if (error) throw error;
   return new SupabaseDocRef(collectionRef.table, generatedId);
 }
 
 export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
-  if (!supabase) throw new Error("Supabase is not initialized.");
   const table = refOrQuery.table;
   const parentId = refOrQuery.parentId;
   const constraints = refOrQuery instanceof SupabaseQuery ? refOrQuery.constraints : [];
   
+  if (!supabase) {
+    let list = getEmulatedTable(table);
+    if (parentId) {
+      list = list.filter(item => item.uid === parentId);
+    }
+    const docs = list.map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
+    return new QuerySnapshot(docs);
+  }
+
   let q: any = supabase.from(table).select('*');
   if (parentId) q = q.eq('uid', parentId);
   for (const c of constraints) {

@@ -934,6 +934,7 @@ def main():
             # High local sharpness variance indicates a partially blurry image
             # Let's check if the min local sharpness is extremely low
             if local_grid.get("min_local_sharpness", 0.0) < 3.0:
+                local_sharpness_alert = True
         # Additional forensics (Priority 5 + Advanced Quality Assessment)
         edges = edge_metrics(rgb, alpha, visible)
         banding = banding_score(gray, solid_mask)

@@ -1818,30 +1818,29 @@ function getAIClient(): any {
           return { text };
         }
 
-        let key = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        const envKeysRaw = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+        const envKeysList = envKeysRaw.split(/[,;\n]+/).map(k => k.trim()).filter(Boolean);
+        let key = envKeysList[0] || '';
         let activeIndex = 0;
-        let keysList: string[] = [];
+        let keysList: string[] = envKeysList.length > 0 ? envKeysList : [];
 
         if (store) {
-          if (store.gemini && Array.isArray(store.gemini.keys)) {
+          if (store.gemini && Array.isArray(store.gemini.keys) && store.gemini.keys.length > 0) {
             keysList = store.gemini.keys;
             activeIndex = store.gemini.activeIndex || 0;
-            if (keysList.length > 0) {
-              key = keysList[activeIndex];
-            }
-          } else if (typeof store === 'string') {
-            key = store;
+            key = keysList[activeIndex] || keysList[0];
+          } else if (typeof store === 'string' && store.trim()) {
+            key = store.trim();
+            keysList = [key];
           } else if (store && Array.isArray(store.keys) && store.keys.length > 0) {
             keysList = store.keys;
             activeIndex = store.activeIndex || 0;
-            if (keysList.length > 0) {
-              key = keysList[activeIndex];
-            }
+            key = keysList[activeIndex] || keysList[0];
           }
         }
 
         const runGeminiDirectFetch = async (keyToUse: string, params: any) => {
-          const model = params.model || 'gemini-3.5-flash';
+          const model = params.model || 'gemini-2.5-flash';
           const cleanModel = model.startsWith('models/') ? model : `models/${model}`;
           const url = `https://generativelanguage.googleapis.com/v1beta/${cleanModel}:generateContent?key=${keyToUse}`;
 
@@ -3272,7 +3271,7 @@ Generate only NEW, evidence-backed candidates.`;
         });
       } else {
         raw = await callGeminiWithRetry(
-          model && model.startsWith('gemini-') ? model : 'gemini-3.1-flash-lite-preview',
+          model && model.startsWith('gemini-') ? model : 'gemini-2.5-flash',
           { parts: [{ text: contentsText }] },
           {
             systemInstruction: expansionSystem,
@@ -3480,8 +3479,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    if (!activeModel || activeModel === 'gemini-2.5-pro' || activeModel === 'gemini-2.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -3523,7 +3522,7 @@ export const generateStockMetadata = async (
   
   const mediaTypeContext = directives.mediaTypeContext;
 
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   
   const visionSystemInstruction = `ROLE:
@@ -3954,7 +3953,7 @@ OUTPUT FORMAT:
         visualFacts,
         targetCount,
         provider,
-        model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-3.1-flash-lite-preview',
+        model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
         keywordMode,
         metadataLanguage
       });
@@ -4039,7 +4038,7 @@ OUTPUT FORMAT:
           visualFacts,
           targetCount,
           provider,
-          model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-3.1-flash-lite-preview',
+          model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
           keywordMode,
           metadataLanguage
         });
@@ -4098,8 +4097,8 @@ export const generateBatchStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-3.1-flash-lite-preview') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+    if (!activeModel || activeModel === 'gemini-2.5-pro' || activeModel === 'gemini-2.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -4125,7 +4124,7 @@ export const generateBatchStockMetadata = async (
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-pro-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -4627,7 +4626,7 @@ OUTPUT FORMAT:
               visualFacts: assetVisualFacts,
               targetCount,
               provider,
-              model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-3.1-flash-lite-preview',
+              model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
               keywordMode,
               metadataLanguage
             });
@@ -5155,7 +5154,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-latest'];
   let lastError: any = null;
 
   const safetySettings = [
@@ -5790,7 +5789,7 @@ CRITICAL OUTPUT FORMAT:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
   let lastError;
   let responseText = "";
 
@@ -5920,7 +5919,7 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
 
   let responseText = "";
   // Forcing Gemini for Video Analysis to ensure consistency and prevent variations across providers
-  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
     responseMimeType: "application/json",
     responseSchema,
     temperature: 0.0,
@@ -5979,7 +5978,7 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
       model
     });
   } else {
-    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', prompt, {
+    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
       responseMimeType: "application/json",
       responseSchema
     });
@@ -6017,152 +6016,61 @@ export async function checkImageQuality(
 
   let metadataInstruction = "";
   if (imageMetadata) {
-    metadataInstruction = `\n\n---\n[DATA PENGUKURAN PIKSEL OBJEKTIF & FLORENCE-2 SPATIAL GROUNDING - WAJIB DIJADIKAN ACUAN UTAMA]\nBerikut adalah hasil pengukuran teknis NYATA (OpenCV + BRISQUE + NIQE + Segmentation + Florence-2 Visual Grounding) dari file gambar asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nATURAN PENTING TERKAIT DATA INI:\n1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI. Gabungkan kedua sumber bukti (visual + numerik) secara objektif.\n2. Field \`brisque\` dan \`niqe\`: Skor BRISQUE > 45 atau NIQE > 6.0 mengindikasikan degradasi spasial/penghalusan sintetis AI.\n3. Field \`florence_grounding\` (Florence Dense Visual Grounding): Menyediakan koordinat kotak spasial presisi \`[ymin, xmin, ymax, xmax]\` (skala 0-1000) untuk setiap tangan/jari, layar monitor, dan alat peraga. Gunakan koordinat ini untuk memverifikasi detail mikro pada crop 100% resolusi asli tanpa tebakan.\n4. Field \`segmentation\` (\`intentional_bokeh_detected\` = true): Membuktikan bahwa blur latar belakang adalah kedalaman optik bokeh yang disengaja (100% PASS).\n5. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus subjek utama yang WAJIB memengaruhi status \`blur\`.\n6. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.\n7. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.\n8. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar terdeteksi jauh lebih blur dari area lain — periksa pada koordinat yang dilaporkan.\n9. Field \`megapixels\` dan dimensi file BUKAN alasan penolakan kualitas. Fokuskan penilaian pada bukti forensik piksel dan integritas semantik visual.\n10. Jadikan data teknis dan Florence spatial anchors di atas sebagai BUKTI UTAMA yang memandu inspeksi forensik Anda.`;
+    metadataInstruction = `\n\n---\n[DATA PENGUKURAN TEKNIS OBJEKTIF & PIXEL FORENSIK]\nHasil analisis OpenCV / BRISQUE / NIQE pada file asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nPETUNJUK ANALISIS PIKSEL:\n1. Skor BRISQUE > 45 atau NIQE > 6.0: Indikasi kuat degradasi spasial / blur / over-smoothing AI.\n2. Sharpness bernilai rendah atau has_local_blur_anomaly = true: Indikasi kuat subjek utama tidak fokus / blur.\n3. Noise / Clipping tinggi: Indikasi masalah pencahayaan dan grain.\n4. Gunakan data numerik di atas bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat.`;
   }
 
-  
-// ============================================================================
-// MATRIKS BENCHMARK PEMBEDA MUTLAK: STANDAR KURASI ADOBE STOCK (PASS VS FAIL)
-// ============================================================================
-// STANDAR KURASI KOMERSIAL RESMI ADOBE STOCK & SHUTTERSTOCK:
-// 1. ASET KOMERSIAL BERSIH (PASS - Skor 85-98):
-//    - Subjek utama tack-sharp (fokus tajam sempurna), tekstur kulit/benda alami (bukan plastik/lilin).
-//    - Latar belakang bokeh optik yang bersih (shallow depth of field yang disengaja pada background/latar adalah fitur artistik bernilai komersial tinggi, 100% PASS).
-//    - Fotografi Industri, Konstruksi & Pertukangan (Masonry, Concrete, Construction Site, Tools):
-//      * Tekstur fisik adukan semen/beton basah, agregat kerikil kasar, butiran pasir, kilau air/slurry, dan garis batas perataan cetok/roskam (troweled smooth finish vs rough aggregate) adalah tekstur material asli yang bernilai komersial tinggi (100% PASS pada noise, sensor_issues, ai_artifacts).
-//      * Sarung tangan proyek/industri tebal berdebu semen (construction work gloves) dengan genggaman kuat pada gagang alat adalah perlengkapan kerja nyata (PASS pada anatomical_errors & over_edited).
-//      * Latar belakang proyek konstruksi (tiang beton, anyaman besi rebar, alat berat, pekerja berompi K3) yang berada dalam defokus optik/kabut atmosferik lembut adalah komposisi fotografi profesional standar emas (100% PASS pada blur, composition, lighting).
-//    - Seni Digital 3D, Ilustrasi Konsep Sci-Fi & Isometric (Datacenter, Server Room, AI Supercomputer Core, Hologram HUD, Circuit Traces, Glowing Pipes): Seluruh elemen fiksi ilmiah, diagram HUD holografik, grafik data futuristik, dan logo teknologi generik ("AI", "CORE", dll.) adalah elemen artistik komersial bernilai tinggi (100% PASS).
-//    - Pencahayaan Emissive/Neon Glow pada interior gelap (cyberpunk/high-tech aesthetic) adalah gaya visual 3D yang sah (PASS).
-//    - Figur Siluet Skala Arsitektur (orang kecil di catwalk/jembatan layang untuk pembanding skala ruangan) tidak memerlukan detail mikro (PASS).
-//    - Anatomi manusia normal pada subjek utama (tangan dengan 5 jari, sarung tangan medis/lapangan wajar, genggaman alat logis).
-//    - Teks/tulisan timbul pada produk plastik (seperti tanda S, C, T pada kaset tes, angka kaliber/skala ukur) adalah fitur fisik produk asli yang valid (PASS).
-//    - Tekstur alami hewan liar (cangkang penyu, pasir, bebatuan, cipratan air) adalah tekstur organik otentik (PASS).
-//    - Struktur benda buatan manusia utuh, kokoh, dan logis (sambungan paku/baut jelas).
-//
-// 2. CACAT KUALITAS & HALUSINASI GENERATIF NYATA (FAIL - Skor < 65, REJECT QUALITY ISSUES):
-//    - Citra Medis AI / Scan DEXA & Workstation Dokter (Medical AI Hallucinations & Clinical Workspace Defects):
-//      * Cacat Anatomi Tangan & Genggaman Alat Medis/Stylus: Sendi jempol bengkok tidak anatomis saat memegang stylus tablet, jari kelingking/manis menyatu/kaku, jari bersarung tangan lateks yang menempel/melebur tidak wajar ke layar monitor, atau tangan kedua dekat keyboard yang terdistorsi (FAIL pada anatomical_errors & ai_artifacts).
-//      * Halusinasi Antarmuka Medis (Medical UI & Chart Hallucinations): Monitor scan klinis (DEXA bone scan, CT, X-Ray) yang mencampur scan tulang dengan jaring-jaring kosmik/nebula fantasi yang tidak realistis untuk stok medis klinis, grafik bar/kurva dengan teks piksel semu (unreadable UI gibberish) di bawah judul scan (FAIL pada ai_artifacts & text).
-//      * Bordir Nama & Label Pakaian Scrub Cacat (Scrub Embroidery & Brand Tag Impersonation): Bordir nama dokter ("Dr. S. Chen") dengan font bergelombang/rusak, atau label badge tiruan brand pakaian medis (seperti patch scrub FIGS) yang terdistorsi (FAIL pada text, ip_risk, ai_artifacts).
-//      * Deformasi Model Tulang Plastik: Model peraga tulang meja (seperti femur) yang memiliki persendian asimetris, cacat bentuk, atau melebur (FAIL pada structural_defects).
-//      * Bingkai Kacamata & Telinga Melebur: Bingkai kacamata menyatu ke dalam kulit pelipis atau tulang rawan telinga dengan artefak peleburan AI (FAIL pada ai_artifacts).
-//    - Papan Tanda Melayang / Tanpa Pengencang (Floating Signboard / Missing Fasteners): Papan petunjuk atau plang kayu yang menempel pada tiang tanpa paku, baut, sekrup, atau klem penyangga yang nyata (menempel seperti stiker melayang tanpa gravitasi/konstruksi logis).
-//    - Clipping Vegetasi / Rumput Menembus Kayu Padat: Helai rumput, ilalang, atau tanaman yang menembus langsung ke dalam tiang kayu solid/batu tanpa tumpuan tanah yang logis.
-//    - Peleburan Dedaunan / Grass Mush: Vegetasi pada bidang fokus depan yang sebagian tajam tetapi sebagian meleleh/smudged menjadi gumpalan piksel tanpa detail helai daun individual.
-//    - Tipografi AI Terdistorsi / Wobbly Lettering: Teks plang/tanda (seperti rambu larangan, nama tempat) dengan garis huruf bergelombang, ketebalan batang huruf tidak rata, baseline bergelombang, atau artefak distorsi tipografi AI.
-//    - Serat Kayu Melebur / Swirling Grain: Pola serat kayu yang berputar seperti cairan atau terputus secara tidak alami.
-//    - Anatomi Tangan & Genggaman Cacat: Jari menyatu/melebur ke dalam objek tanpa batas fisik, jumlah jari != 5, sendi terkilir mustahil.
-//    - Figur Latar Belakang Cacat AI: Pada area yang selevel fokus, wajah terdistorsi parah/meleleh atau anggota tubuh cacat tak beraturan. (Defokus optik/bokeh wajar pada latar belakang BUKAN cacat).
-//    - Teks Gibberish Semu: Teks tiruan acak yang menyerupai karakter alien pada objek dunia nyata yang seharusnya memiliki tulisan terbaca (seperti surat kabar, plang nama jalan nyata, kemasan produk bermerek). Diagram HUD sci-fi atau simbol sirkuit dekoratif BUKAN gibberish.
-//    - Anomali Struktur Fisik: Tiang melayang tanpa tumpuan, moncong bengkok asimetris parah, struktur mekanis mustahil.
-//    - Cacat Teknis Fatal: Subjek utama soft focus/blur menyeluruh, overexposure/clipping parah, atau noise ekstrem.
-// ============================================================================
+  const systemInstruction = `Anda adalah "AI Quality Inspector & Stock Curator" profesional tingkat tinggi yang bertugas mengaudit aset visual (Foto, AI Generation, 3D Render, Ilustrasi) sesuai standar penolakan & penerimaan resmi Adobe Stock, Shutterstock, dan Getty Images ("Quality Issues", "Technical Issues", "IP / Legal").
 
-// ============================================================================
-// MANDAT INSPEKSI FORENSIK PIKSEL MURNI (ANTI-TEBAKAN & ZERO-HALLUCINATION)
-// ============================================================================
-// 1. SETIAP KLAIM CACAT WAJIB MEMILIKI BUKTI KOORDINAT PIKSEL NYATA:
-//    - Periksa setiap kuadran crop pada resolusi 100% piksel asli.
-//    - Laporkan secara spesifik lokasi, jenis cacat, dan anomali visual yang ditemukan.
-// 2. DETEKSI DINI CACAT GENERATIF HALUS (PENYEBAB UTAMA REJEKSI ADOBE STOCK):
-//    - Periksa sambungan fisik: Apakah plang/papan tanda terpasang dengan paku/baut nyata, atau melayang tanpa pengencang? (FAIL jika floating tanpa pengencang).
-//    - Periksa tabrakan objek (clipping): Apakah rumput/daun menembus objek padat (seperti tiang kayu atau batu)? (FAIL jika clipping).
-//    - Periksa teks cetak: Apakah huruf-huruf pada plang memiliki garis yang lurus dan rata, atau bergelombang/cacat bentuk khas AI? (FAIL jika wobbly AI text).
-// 3. DILARANG MENGANGGAP FITUR FOTOGRAFI, SENI 3D & PRODUK NYATA SEBAGAI CACAT AI:
-//    - Tekstur adukan semen/beton basah, batu kerikil agregat, dan sarung tangan proyek adalah tekstur fisik asli konstruksi yang 100% PASS.
-//    - Render 3D / Isometric sci-fi datacenter, server rack, tabung glowing, diagram HUD holografik, dan core AI adalah karya 3D komersial premium yang 100% PASS.
-//    - Latar belakang bokeh/blur karena depth of field sempit adalah KUALITAS PREMIUM FOTO, bukan blur cacat.
-//    - Huruf cetakan timbul plastik (seperti S, C, T pada alat tes kesehatan atau angka pada jangka sorong) adalah fitur produk asli, bukan AI gibberish.
-//    - Sarung tangan medis/lapangan/konstruksi yang menutupi tekstur kulit adalah alat pelindung kerja wajar, bukan lilin/waxy.
-//    - Cangkang hewan, pasir pantai, dan permukaan organik alami adalah tekstur nyata, bukan noise/artefak.
-// ============================================================================
+TUGAS UTAMA:
+Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF. Temukan segala jenis cacat kualitas gambar, keburaman (blur), artefak generatif AI, cacat anatomi, kerusakan mekanis, noise, dan pelanggaran IP.
 
-let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi penolakan resmi Adobe Stock & Shutterstock ("Quality Issues", "Technical Issues", "IP / Legal").
+PANDUAN PEMERIKSAAN SETIAP KATEGORI:
 
-Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi profesional yang sangat objektif dan akurat:
-1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang komersial, logo pada produk/pakaian, plat nomor, serta watermark ilegal. Teks fiksi ilmiah generik (seperti "AI", "DATA", "CPU", "SERVER", diagram HUD, atau rumus skematis) adalah 100% SAFE (ip_risk: PASS, legal_status: SAFE). Foto orang/subjek manusia nyata tanpa logo komersial adalah SAFE (requires_model_release: true, ip_risk: PASS, legal_status: SAFE).
-2. Modul AI Anomaly & Anatomi (Generative Defects & Structural Physics): Memeriksa ada/tidaknya cacat AI generatif nyata seperti:
-   * Plang / Papan Tanda Tanpa Pengencang (Floating Signboard): Papan kayu yang menempel di tiang tanpa paku/sekrup/baut yang logis.
-   * Clipping Vegetasi: Rumput/tanaman yang menembus kayu padat atau batu.
-   * Tipografi AI Cacat: Huruf bergelombang (wobbly strokes), baseline melengkung, atau distorsi font AI pada rambu/papan.
-   * Peleburan Tekstur (Generative Smearing): Rumput atau serat kayu yang meleleh tanpa kontinuitas fisik.
-   * Anatomi cacat: Jari ekstra/kurang, anggota tubuh melebur ke objek padat, teks pseudo-gibberish pada dokumen/poster nyata, atau struktur fisik yang tidak logis.
-3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus subjek utama (tack-sharp), pencahayaan seimbang, dan ketiadaan artefak kompresi yang merusak.
+1. KETAJAMAN & FOKUS (blur):
+   - WAJIB PASS: Subjek utama tajam sempurna (tack-sharp). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera) adalah NORMAL dan bernilai artistik tinggi.
+   - WAJIB FAIL: Subjek utama tidak fokus, soft focus, motion blur kamera, atau detail penting subjek kabur/meleleh.
 
----
-PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
-Bedakan antara pilihan artistik/estetika profesional (fotografi & seni 3D) yang disengaja dan cacat teknis murni:
-- Fotografi Konstruksi & Makro Industri (Concrete Finishing, Masonry Trowels, Construction Sites):
-  * Tekstur Semen Basah & Agregat Kerikil: Kerikil kasar, butiran pasir, air semen yang mengkilap, dan garis perbedaan antara permukaan yang diratakan roskam dan yang belum diratakan adalah fitur fisik nyata pekerjaan beton (**100% PASS** pada noise, artifacts, sensor_issues).
-  * Sarung Tangan Kerja Proyek (Construction Work Gloves): Sarung tangan kerja yang kotor berdebu semen yang memegang gagang kayu cetok adalah APD standar (**PASS** pada anatomical_errors & over_edited).
-  * DoF Sempit & Kabut Proyek (Atmospheric Construction Fog): Fokus makro tajam pada bilah cetok semen dengan latar belakang tiang jembatan, besi beton, dan ekskavator yang kabur lembut dalam kabut adalah karya bernilai komersial sangat tinggi (**PASS** pada blur, composition, lighting).
-- Render 3D & Konsep Sci-Fi/Teknologi (3D Datacenters, Server Racks, AI Cores & Holograms): Karya 3D digital isometric dengan server racks, core komputer futuristik bercahaya biru/cyan, pipa pendingin, lantai industri berkilau, dan pemandangan badai/langit dramatis di luar jendela kaca adalah genre seni 3D bernilai komersial tinggi di Adobe Stock.
-  * Overlay HUD & Diagram Holografik: Grafik matriks, jalur sirkuit glowing, visualisasi gelombang data, rumus fiksi ilmiah, dan logo akronim generik ("AI", "TECH") adalah elemen dekoratif sci-fi yang valid dan WAJIB "PASS" pada "text", "ai_artifacts", "structural_defects", dan "stock_acceptance".
-  * Emissive Lighting & Neon Glow: Kontras tinggi antara lampu neon/glow biru dengan interior ruang server gelap adalah gaya seni sci-fi yang sah, BUKAN overexposure/clipping (**PASS** pada lighting & exposure).
-  * Figur Siluet Skala (Catwalk Figures): Siluet kecil orang di kejauhan/jembatan layang berfungsi murni sebagai pembanding skala arsitektur 3D dan TIDAK memerlukan detail mikro (**PASS** pada anatomical_errors).
-- Depth of Field (DoF) dangkal / Bokeh Optik: Latar belakang atau latar depan buram yang lembut (optical bokeh / shallow depth of field) adalah kualitas bernilai jual sangat tinggi dan standar emas di Adobe Stock, BUKAN cacat blur. Selama bagian utama subjek tetap fokus tajam sempurna (tack-sharp), status "blur", "out_of_focus", dan "composition" WAJIB "PASS". Defokus optik pada elemen latar belakang (tabung lab, orang lain, pemandangan jauh) adalah fenomena lensa kamera alami, BUKAN cacat AI.
-- Teks Timbul & Fitur Produk Fisik (Embossed Text & Product Markings): Huruf timbul relief pada bahan plastik (seperti indikator "S", "C", "T", "T1", "T2", tanda panah arah pada kaset rapid test medis, atau angka ukur pada mistar/jangka sorong) dan garis reagen lateral flow adalah fitur fisik asli produk medis/industri. Ini BUKAN teks gibberish dan WAJIB dinyatakan "PASS" pada "text" dan "ai_artifacts".
-- Sarung Tangan & Alat Pelindung Diri (Gloves & PPE): Tangan yang mengenakan sarung tangan lateks/nitrile medis atau sarung tangan kerja lapangan tebal secara alami menutupi tekstur pori kulit dan lipatan sendi. Ini adalah perlengkapan kerja nyata, BUKAN efek waxy/lilin dan BUKAN cacat anatomi. Status "anatomical_errors" dan "over_edited" WAJIB "PASS".
-- Tekstur Alami Hewan & Lingkungan (Wildlife & Environmental Textures): Tekstur cangkang kura-kura/penyu dengan teritip (barnacles), butiran pasir pantai, genangan air pasang, dan pencahayaan alami mendung adalah tekstur dunia nyata yang otentik, BUKAN noise, BUKAN artefak, dan BUKAN over-editing.
-- Low-light & Shadow Noise Wajar: Foto dengan bayangan alami atau kondisi cuaca mendung/low-light wajar memiliki gradasi bayangan lembut. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
+2. ARTEFAK AI GENERATIF (ai_artifacts):
+   - WAJIB PASS: Render 3D / seni digital / foto yang bersih, terdefinisi rapi, dan konsisten secara visual.
+   - WAJIB FAIL: Tekstur meleleh (melted textures), bagian objek yang menyatu tanpa batas fisik, gumpalan piksel yang smudged/mushy, elemen melayang yang tidak logis, atau halusinasi sintetis AI.
 
----
-PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI:
-Ketika menerima lebih dari 1 gambar (tampilan penuh dan crop kuadran/makro):
-- Gunakan crop detail untuk memverifikasi ketajaman piksel asli pada subjek utama dan memastikan tidak ada cacat struktural fatal.
-- Ingat bahwa area di luar bidang fokus (luar depth of field) pada crop kuadran memang secara optik tidak setajam titik fokus utama — itu adalah hal normal dalam fotografi profesional.
-- Cacat fatal yang membatalkan (FAIL) adalah cacat nyata pada subjek atau anomali bentuk yang tidak logis di dunia nyata.
+3. ANATOMI & FISIK MANUSIA (anatomical_errors):
+   - WAJIB PASS: Anatomi normal (tangan 5 jari wajar, sarung tangan pelindung kerja/medis yang logis, pose wajar).
+   - WAJIB FAIL: Jari cacat (jumlah jari != 5, jari menyatu/melebur, sendi patah/terkilir), tangan/jari melebur ke dalam gagang alat/layar/benda, mata asimetris/rusak, gigi bertumpuk aneh, atau wajah terdistorsi.
 
----
-Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock berikut:
+4. CACAT STRUKTURAL & MEKANIS (structural_defects):
+   - WAJIB PASS: Benda buatan manusia yang utuh dan logis (kendaraan, furnitur, alat pertukangan, gedung).
+   - WAJIB FAIL: Struktur rusak atau tidak masuk akal (contoh: sepeda tanpa rantai, pedal meleleh, roda terdistorsi, tiang melayang tanpa penyangga, garis arsitektur bergelombang).
 
-1. OUT OF FOCUS / SHARPNESS ISSUES:
-   - Subjek utama wajib memiliki fokus yang tajam sempurna (tack-sharp).
-   - Latar belakang/depan yang blur karena depth of field sempit adalah NORMAL & PASS.
+5. PROPORSI & PERSPEKTIF (proportion_defects):
+   - WAJIB FAIL jika terjadi distorsi perspektif yang janggal, skala objek yang salah parah, atau sudut sendi tubuh yang mustahil.
 
-2. EXPOSURE & LIGHTING:
-   - Pencahayaan seimbang dan terdefinisi dengan baik. Gradasi bayangan alami dan highlight wajar adalah PASS.
-   - Emissive glow neon pada seni sci-fi / 3D adalah PASS.
-   - Hanya tolak jika terjadi blown-out highlights ekstrem atau crushed shadows yang menghilangkan detail subjek secara fatal.
+6. TEKSTUR LILIN / OVER-EDITED (over_edited):
+   - WAJIB FAIL jika kulit manusia tampak seperti lilin/plastik (waxy plastic skin) akibat denoiser/AI smoothing berlebihan yang menghilangkan pori-pori dan tekstur alami.
 
-3. NOISE & GRAIN:
-   - Tekstur pasir, kerikil beton basah, dan noise halus fotografi normal adalah PASS.
-   - Tolak hanya jika noise bintik warna parah merusak gambar atau jika AI denoiser meratakan subjek manusia tanpa tekstur sama sekali.
+7. NOISE, GRAIN & SENSOR (noise, sensor_issues):
+   - WAJIB PASS jika grain halus alami fotografi.
+   - WAJIB FAIL jika chromatic noise parah, bintik warna digital mengotori gambar, atau debu sensor yang jelas.
 
-4. IMAGE ARTIFACTS:
-   - Bebas dari pixelation kompresi JPEG berat, color banding kasar, atau noda sensor kotor.
+8. ARTEFAK KOMPRESI & TEPI (artifacts):
+   - WAJIB FAIL jika terdapat artefak kompresi JPEG kotak-kotak (8x8 blocking), color banding/posterisasi kasar pada langit/gradasi, atau halo putih/hitam di sekeliling subjek.
 
-5. INTELLECTUAL PROPERTY & BRAND SAFETY:
-   - Teks fiksi ilmiah generik ("AI", "CPU", "SERVER") atau diagram HUD adalah 100% SAFE (ip_risk: PASS, legal_status: SAFE).
-   - Foto orang/manusia tanpa logo komersial adalah SAFE (requires_model_release: true, ip_risk: PASS, legal_status: SAFE).
-   - Jangan pernah menggagalkan foto/karya hanya karena menampilkan manusia atau profesi nyata.
-   - Tolak (FAIL) hanya jika terdapat logo merek dagang komersial terkenal (Nike, Apple, Starbucks, dll.) atau desain berhak cipta yang dilindungi.
+9. PENCAHAYAAN & EKSPOSUR (lighting, exposure):
+   - WAJIB FAIL jika terjadi blown-out highlights parah (detail putih hilang total) atau crushed shadows (area hitam pekat tanpa detail).
 
-6. GENERATIVE AI & STRUCTURAL INTEGRITY:
-   - Gambar bersih dengan anatomi wajar, peralatan konstruksi logis, render 3D rapi, dan tekstur material asli = PASS (Skor 85-98).
-   - Tolak (FAIL) jika terdapat:
-     * Papan tanda mengambang tanpa paku/baut pengikat.
-     * Batang rumput/tanaman menembus tiang kayu padat (clipping).
-     * Teks tipografi plang bergelombang (wobbly letters) atau deformasi huruf AI.
-     * Jari bermutasi/menyatu mustahil ke benda, teks acak tak bermakna (gibberish) pada poster/buku dunia nyata, atau arsitektur melayang yang mustahil secara gravitasi.
+10. TEKS & TIPOGRAFI (text):
+    - WAJIB PASS: Teks fiksi ilmiah / HUD futuristik generik, atau huruf timbul produk asli (misal: S, C, T pada alat tes).
+    - WAJIB FAIL: Teks tiruan acak yang bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada poster, buku, plang nama jalan, atau pakaian di dunia nyata.
 
-PANDUAN EVALUASI TOLERANSI KUALITAS:
-Tingkat Toleransi Saat Ini: ${tolerance}.
-- STRICT: Standar tertinggi tanpa kompromi cacat nyata. Jika ada cacat fokus subjek utama, cacat anatomi, struktur melayang/clipping, atau IP violation, nyatakan FAIL (skor 40-59). Gambar bersih sempurna tetap PASS (skor 88-96).
-- MEDIUM (Standar Resmi Adobe Stock): Standar kurasi komersial. Gambar bersih alami / foto konstruksi makro profesional dengan fokus tajam dan anatomi/alat normal WAJIB PASS (skor 86-96). Jika ada cacat kritis fatal nyata (papan melayang tanpa paku, rumput menembus kayu, teks wobbly cacat, jari bermutasi, IP pelanggaran jelas, subjek utama blur total), nyatakan FAIL (skor 45-64).
-- LOOSE: Menoleransi ketidaksempurnaan minor selama gambar bernilai komersial tinggi.
+11. HAK CIPTA & MEREK DAGANG (ip_risk, logo, watermark):
+    - WAJIB FAIL jika terlihat logo merek komersial terkenal (Nike, Apple, Starbucks, dll.), watermark agensi foto, atau karakter berhak cipta.
 
-STATUS & SKORING:
-- PASS (Layak Komersial / Bersih): Skor 85 - 98 (Aset bersih alami, tack-sharp, bebas anomali AI).
-- FAIL (Cacat Kualitas Nyata / Reject Risk): Skor 40 - 64.
+PANDUAN TOLERANSI:
+- STRICT: Ada cacat apa pun pada subjek atau teknis -> FAIL (Skor 35-55).
+- MEDIUM (Standar Adobe Stock): Cacat AI, anatomi, blur subjek utama, noise berat, over-editing, atau struktur cacat -> FAIL (Skor 40-62). Gambar bersih & tajam -> PASS (Skor 86-98).
+- LOOSE: Cacat minor ditoleransi, tetapi cacat kritis AI / anatomi / blur parah / IP tetap -> FAIL.
 
-ATURAN OUTPUT TEKS:
-1. Berikan evaluasi faktual dan objektif pada 'visual_scan_analysis' dan 'detailed_feedback'.
-2. DILARANG KERAS MENEBAK ATAU BERHALUSINASI CACAT (ZERO-HALLUCINATION). Jika gambar bersih, nyatakan PASS secara jujur.
-3. Tuliskan teks respon dalam bahasa: ${targetLanguageName}.
-
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.` + metadataInstruction;
+Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -6233,36 +6141,31 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC routing: use high visual acuity model
+  // QC routing: use original model configuration
   let selectedModel = model || 'gemini-3.1-pro-preview';
   if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
     selectedModel = 'gemini-3.1-pro-preview';
   }
 
-  // Keep a robust strong-vision fallback chain.
   const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   let responseText = "";
   let lastError;
 
+  const promptText = `Lakukan audit kualitas kurasi mendalam untuk gambar ini (termasuk crop resolusi 100% yang disertakan).
+PERIKSA DENGAN TELITI:
+1. Ketajaman fokus subjek utama (apakah ada blur/soft focus?).
+2. Detail mikro pada crop: apakah jari tangan/kaki lengkap dan normal? Apakah ada anatomi yang rusak atau melebur?
+3. Apakah ada cacat mekanis/struktural pada objek atau halusinasi generatif AI?
+4. Apakah ada teks cacat/wobbly/gibberish pada rambu, poster, buku, atau baju?
+5. Apakah ada noise parah, JPEG blocking, atau kulit lilin (waxy skin)?
+6. Apakah ada logo merek terkenal atau watermark?
+
+Tingkat toleransi yang diminta: ${tolerance}.
+Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
+
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+    const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
     try {
-      let promptText = `Act as an objective, elite Adobe Stock & Shutterstock QA curator with deep AI anomaly forensic inspection capabilities.
-Conduct a balanced visual, technical, and legal audit.
-CRITICAL EVALUATION GUIDELINES:
-1. CLEAN PROFESSIONAL ASSETS = PASS (Score 85-98):
-   - Natural optical bokeh (blurred background due to shallow depth of field) is an aesthetic photography strength and MUST PASS.
-   - Molded product relief letters (e.g. S, C, T on test cassettes, measurement scales on calipers) and lateral flow dyed test lines are authentic physical product markings, NOT gibberish text.
-   - Medical/outdoor gloves masking skin texture are legitimate protective workwear, NOT waxy AI skin.
-   - Wildlife & natural environment textures (turtle shells, barnacles, wet beach sand) are authentic nature, NOT noise/artifacts.
-   - Recognizable people with no commercial brand logos are SAFE (requires_model_release: true, ip_risk: PASS).
-2. GENUINE AI DEFECTS = FAIL (Score < 65):
-   - Flag mutated/missing fingers, limbs melting into solid objects, unreadable alien pseudo-text on signage/documents, or broken physical gravity.
-Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName}.`;
-      if (imageMetadata) {
-        promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-      }
-      
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
         contents: [...imageParts, { text: promptText }],
@@ -6281,21 +6184,6 @@ Ensure your ENTIRE JSON response is written in the requested language: ${targetL
     
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Anda adalah Senior Adobe Stock & Shutterstock Content Quality Inspector yang SANGAT CERDAS, OBJEKTIF, ANALITIS, dan AKURAT.
-PRINSIP UTAMA AUDIT KUALITAS KURASI ADOBE STOCK:
-1. GAMBAR BERSIH & FOTOGRAFI PROFESIONAL = PASS (Skor 85-98, Ready for Adobe Stock):
-   - Jika subjek utama tajam (tack-sharp), pencahayaan seimbang, dan tidak ada cacat AI nyata, nyatakan status "PASS" dengan skor tinggi (88-96) dan legal_status "SAFE".
-   - Latar belakang bokeh (shallow depth of field) adalah kualitas fotografi bernilai komersial tinggi (PASS).
-   - Huruf timbul pada produk plastik (seperti S, C, T pada kaset tes medis) dan garis lateral flow adalah fitur produk asli yang valid (PASS).
-   - Sarung tangan medis/lapangan adalah perlengkapan kerja nyata (PASS pada anatomi & editing).
-   - Tekstur cangkang penyu/hewan, pasir pantai, dan permukaan organik adalah tekstur alami otentik (PASS).
-2. GAMBAR CACAT / GENERATIVE AI QUALITY ISSUES NYATA = WAJIB FAIL (Skor < 65, Reject Risk):
-   - Tolak (FAIL) jika terdapat cacat nyata: jari bermutasi/ekstra/hilang, anggota tubuh melebur ke objek tanpa batas, teks pseudo-gibberish pada dokumen/poster, tiang melayang tanpa tumpuan, atau subjek utama blur total.
-Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
-        if (imageMetadata) {
-          promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-        }
-        
         const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
@@ -6316,37 +6204,7 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
-      const objective = imageMetadata || {};
-      const warningsFromReconciliation: string[] = [];
-      const noteIsSevere = (note: unknown) => /\b(severe|critical|heavy|extreme|parah|berat|kritis|sangat tinggi|sangat parah|obvious)\b/i.test(String(note || ''));
-      const downgrade = (key: string, reason: string) => {
-        console.log(`[QC Reconciliation] Kept inspection verdict for ${key}: ${reason}`);
-      };
-
-      if (objective.sharpness?.value >= 26 && objective.sharpness?.has_local_blur_anomaly !== true && !noteIsSevere(parsedResult.ai_vision_checks.blur?.note)) {
-        downgrade('blur', `measured sharpness ${objective.sharpness.value}/100 does not support global blur`);
-      }
-      if (objective.noise?.value < 55 && !noteIsSevere(parsedResult.ai_vision_checks.noise?.note)) {
-        downgrade('noise', `measured noise ${objective.noise.value}/100 is below the severe-noise gate`);
-      }
-      const highClip = Number(objective.brightness?.clipped_high_percent || 0);
-      const lowClip = Number(objective.brightness?.clipped_low_percent || 0);
-      if (highClip <= 15 && lowClip <= 25 && !noteIsSevere(parsedResult.ai_vision_checks.exposure?.note)) {
-        downgrade('exposure', `measured clipping is ${highClip.toFixed(1)}% high / ${lowClip.toFixed(1)}% low`);
-      }
-      const blockScore = Number(objective.jpeg_blocking?.score || 0);
-      const bandScore = Number(objective.banding?.score || 0);
-      const edgeScore = Number(objective.transparency?.edge_halo_risk_percent || 0);
-      if (blockScore < 80 && bandScore < 80 && edgeScore < 72 && !noteIsSevere(parsedResult.ai_vision_checks.artifacts?.note)) {
-        downgrade('artifacts', 'objective compression/banding/alpha-edge measurements are below hard-fail thresholds');
-      }
-
-      if (warningsFromReconciliation.length) {
-        parsedResult.review_warnings = [...(Array.isArray(parsedResult.review_warnings) ? parsedResult.review_warnings : []), ...warningsFromReconciliation];
-      }
-
       // Ignore media-mismatched checks for standard photos (e.g. vector/illustration checks)
       const isVectorAsset = fileType?.includes('eps') || fileType?.includes('svg') || fileType?.includes('ai') || fileType?.includes('vector');
       if (!isVectorAsset) {
@@ -6367,7 +6225,7 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
       // Kunci kritis: masalah hukum, hak cipta, atau cacat AI/struktural fatal nyata
       const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       // Kunci kualitas teknis utama
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts'];
+      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts', 'text'];
       const failedCheckKeys: string[] = [];
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
@@ -6389,8 +6247,7 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
         }
       }
 
-      // Terapkan penolakan atau kelulusan terkalibrasi berdasarkan level toleransi (STRICT, MEDIUM, LOOSE):
-      // ZERO-OVERRIDE BUG FIX: Jangan pernah memaksa gambar cacat menjadi PASS jika AI atau kriteria QC menemukan kegagalan!
+      // Evaluasi toleransi penolakan
       const isFailing = parsedResult.recommendation === 'FAIL' || 
                         (typeof parsedResult.overall_score === 'number' && parsedResult.overall_score < 70) ||
                         anyFail || 
@@ -6401,7 +6258,7 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
       if (tolerance === 'STRICT') {
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 50, 58);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 48, 55);
         } else {
           parsedResult.recommendation = "PASS";
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
@@ -6417,7 +6274,6 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
         }
       } else {
         // Default MEDIUM (Standar Resmi Adobe Stock):
-        // Jika ditemukan cacat AI, anatomi, teks cacat, blur subjek utama, atau AI menyatakan FAIL -> Status WAJIB FAIL
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
           parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 52, 60);
@@ -6427,14 +6283,14 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
         }
       }
 
-      // Sinkronkan stock_acceptance dengan keputusan akhir agar UI tidak menampilkan kontradiksi
+      // Sinkronkan stock_acceptance dengan keputusan akhir
       if (parsedResult.recommendation === "FAIL" && parsedResult.ai_vision_checks.stock_acceptance) {
         parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
       } else if (parsedResult.recommendation === "PASS" && parsedResult.ai_vision_checks.stock_acceptance) {
         parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
       }
 
-      // Lampirkan daftar check yang gagal agar frontend/debug mudah membaca alasan penolakan
+      // Lampirkan daftar check yang gagal
       if (failedCheckKeys.length > 0) {
         (parsedResult as any).failed_checks = failedCheckKeys;
       }
@@ -6815,7 +6671,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6825,7 +6681,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err: any) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -6991,7 +6847,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7000,7 +6856,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -7088,7 +6944,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`;
       model
     });
   } else {
-    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', promptContents, {
+    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', promptContents, {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
@@ -7219,7 +7075,7 @@ Strictly return your answer as a JSON array matching the schema.`;
         }
       };
 
-      const response = await callGeminiWithRetry('gemini-3.1-pro-preview', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
+      const response = await callGeminiWithRetry('gemini-2.5-pro', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7262,7 +7118,7 @@ Return exactly 8 items matching the schema in JSON array format.`;
           }
         };
 
-        const responseNoGrounding = await callGeminiWithRetry('gemini-3.1-pro-preview', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
+        const responseNoGrounding = await callGeminiWithRetry('gemini-2.5-pro', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
           systemInstruction: systemInstructionNoGrounding,
           responseMimeType: "application/json",
           responseSchema,
@@ -7488,7 +7344,7 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   };
 
   let responseText = '';
-  const selectedModel = model && model.startsWith('gemini') ? model : 'gemini-3.5-flash';
+  const selectedModel = model && model.startsWith('gemini') ? model : 'gemini-2.5-flash';
 
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
@@ -7609,10 +7465,10 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-3.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -7660,7 +7516,7 @@ export async function removeWatermark(imageBase64: string, maskBase64: string, p
   let analysis: any = null;
   if (!NON_GEMINI_PROVIDERS.has(provider)) {
     try {
-      const res = await callGeminiWithRetry('gemini-3.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
       analysis = JSON.parse(extractJSON(res.text || '{}'));
     } catch {}
   }
@@ -7748,7 +7604,7 @@ export async function generate3DCGIPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: THREE_D_CGI_STYLE_INSTRUCTION,
@@ -7797,7 +7653,7 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: CINEMATIC_STYLE_INSTRUCTION,
@@ -7848,7 +7704,7 @@ export async function generateAbstractPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: ABSTRACT_STYLE_INSTRUCTION,
@@ -7895,7 +7751,7 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: PAINTERLY_DIGITAL_ART_STYLE_INSTRUCTION,
@@ -8023,7 +7879,7 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
       : `Generate a fresh, highly creative commercial subject idea for style: "${styleCategory || 'General'}". Ensure absolute uniqueness across repeated clicks using this seed angle: "${randomSeedKeyword}". Return ONLY 1-2 descriptive sentences.`;
   }
 
-  const activeModel = model || 'gemini-3.5-flash';
+  const activeModel = model || 'gemini-2.5-flash';
 
   try {
     let rawText = '';
