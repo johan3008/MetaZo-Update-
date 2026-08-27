@@ -6362,41 +6362,41 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
 
-      // Terapkan penolakan atau kelulusan terkalibrasi berdasarkan level toleransi
+      // Terapkan penolakan atau kelulusan terkalibrasi berdasarkan level toleransi (STRICT, MEDIUM, LOOSE):
+      // ZERO-OVERRIDE BUG FIX: Jangan pernah memaksa gambar cacat menjadi PASS jika AI atau kriteria QC menemukan kegagalan!
+      const isFailing = parsedResult.recommendation === 'FAIL' || 
+                        (typeof parsedResult.overall_score === 'number' && parsedResult.overall_score < 70) ||
+                        anyFail || 
+                        hasCriticalFail || 
+                        anyIpFail || 
+                        acceptanceFail;
+
       if (tolerance === 'STRICT') {
-        if (hasCriticalFail || anyIpFail || (anyTechnicalFail && parsedResult.overall_score < 75) || parsedResult.recommendation === 'FAIL' || (parsedResult.overall_score && parsedResult.overall_score < 75)) {
+        if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 60) {
-            parsedResult.overall_score = 59;
-          }
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 50, 58);
         } else {
           parsedResult.recommendation = "PASS";
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
-        }
-      } else if (tolerance === 'MEDIUM') {
-        // Default MEDIUM (Standar Resmi Adobe Stock):
-        // PASS jika aset bersih dan tidak ada cacat kritis/IP.
-        // Hanya FAIL jika terdapat cacat kritis nyata (anatomi/AI artifacts/struktur rusak/IP) ATAU cacat teknis berat yang dikonfirmasi oleh skor rendah (< 70).
-        if (hasCriticalFail || anyIpFail || (anyTechnicalFail && parsedResult.recommendation === 'FAIL' && parsedResult.overall_score < 70)) {
-          parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 66) {
-            parsedResult.overall_score = 64;
-          }
-        } else {
-          parsedResult.recommendation = "PASS";
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
         }
       } else if (tolerance === 'LOOSE') {
-        // LOOSE tetap menoleransi cacat teknis minor, tetapi TIDAK menoleransi cacat kritis atau IP
-        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail || (parsedResult.overall_score && parsedResult.overall_score < 60);
+        const looseBlocking = hasCriticalFail || anyIpFail || acceptanceFail || (parsedResult.overall_score && parsedResult.overall_score < 60);
         if (looseBlocking) {
           parsedResult.recommendation = "FAIL";
-          if (parsedResult.overall_score >= 70) {
-            parsedResult.overall_score = 69;
-          }
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 55, 62);
         } else {
           parsedResult.recommendation = "PASS";
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
+        }
+      } else {
+        // Default MEDIUM (Standar Resmi Adobe Stock):
+        // Jika ditemukan cacat AI, anatomi, teks cacat, blur subjek utama, atau AI menyatakan FAIL -> Status WAJIB FAIL
+        if (isFailing) {
+          parsedResult.recommendation = "FAIL";
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 52, 60);
+        } else {
+          parsedResult.recommendation = "PASS";
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
         }
       }
 
@@ -6417,16 +6417,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       }
     }
 
-    (parsedResult as any).model_used = usedModel || selectedModel;
-    (parsedResult as any).model_requested = selectedModel;
-    (parsedResult as any).model_fallback_occurred = !!usedModel && usedModel !== selectedModel;
-
-    return parsedResult;
-  } catch(e) {
-    console.warn("Parse Error on QA response:", responseText);
-    throw e;
-  }
-}ps the report from hiding which model actually looked at the image.
     (parsedResult as any).model_used = usedModel || selectedModel;
     (parsedResult as any).model_requested = selectedModel;
     (parsedResult as any).model_fallback_occurred = !!usedModel && usedModel !== selectedModel;

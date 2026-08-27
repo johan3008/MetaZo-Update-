@@ -1690,8 +1690,35 @@ export const ImageQualityCheck: React.FC<{
                                               </div>
 
                                               <div className="bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
-                                                <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-3">Forensic Evidence</h5>
+                                                <div className="flex items-center justify-between mb-3">
+                                                  <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Forensic &amp; No-Reference Quality</h5>
+                                                  <span className="text-[8px] font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">OpenCV · BRISQUE · NIQE</span>
+                                                </div>
                                                 <div className="space-y-2 text-[9px] font-semibold text-slate-500 dark:text-slate-400">
+                                                  {ffmpegData.brisque && (
+                                                    <div className="flex justify-between gap-3 p-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/40">
+                                                      <span className="font-bold text-slate-700 dark:text-slate-200">BRISQUE Score:</span>
+                                                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{ffmpegData.brisque.score} · {ffmpegData.brisque.status}</span>
+                                                    </div>
+                                                  )}
+                                                  {ffmpegData.niqe && (
+                                                    <div className="flex justify-between gap-3 p-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/40">
+                                                      <span className="font-bold text-slate-700 dark:text-slate-200">NIQE Naturalness:</span>
+                                                      <span className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">{ffmpegData.niqe.score} · {ffmpegData.niqe.status}</span>
+                                                    </div>
+                                                  )}
+                                                  {ffmpegData.segmentation && (
+                                                    <div className="flex justify-between gap-3">
+                                                      <span>Segmentation (Subject vs Bokeh)</span>
+                                                      <span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.segmentation.status} (Depth: {ffmpegData.segmentation.bokeh_depth_ratio}x)</span>
+                                                    </div>
+                                                  )}
+                                                  {ffmpegData.florence_grounding && (
+                                                    <div className="flex justify-between gap-3">
+                                                      <span>Florence-2 Grounding</span>
+                                                      <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{ffmpegData.florence_grounding.status} ({ffmpegData.florence_grounding.grounded_regions_count} anchors)</span>
+                                                    </div>
+                                                  )}
                                                   {ffmpegData.jpeg_blocking && <div className="flex justify-between gap-3"><span>JPEG blocking</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.jpeg_blocking.score}/100 · {ffmpegData.jpeg_blocking.status}</span></div>}
                                                   {ffmpegData.banding && <div className="flex justify-between gap-3"><span>Banding</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.banding.score}/100 · {ffmpegData.banding.status}</span></div>}
                                                   {ffmpegData.ocr && <div className="flex justify-between gap-3"><span>OCR</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.ocr.ocr_status || 'UNKNOWN'}{ffmpegData.ocr.text ? ` · ${ffmpegData.ocr.text.slice(0, 100)}` : ''}</span></div>}

@@ -2278,36 +2278,51 @@ app.get('/api/debug-uploads', (req, res) => {
     function analyzeImageWithPython(tempFilePath: string): Promise<any> {
         return new Promise((resolve, reject) => {
             const pythonScriptPath = path.join(__dirname_safe, 'server/image_analyzer.py');
-            const pythonProcess = spawn('python3', [pythonScriptPath, tempFilePath]);
-            let stdoutData = '';
-            let stderrData = '';
+            const pythonCommands = process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
 
-            pythonProcess.on('error', (err) => {
-                reject(new Error(`Failed to spawn Python process: ${err.message}`));
-            });
-
-            pythonProcess.stdout.on('data', (data) => {
-                stdoutData += data.toString();
-            });
-
-            pythonProcess.stderr.on('data', (data) => {
-                stderrData += data.toString();
-            });
-
-            pythonProcess.on('close', (code) => {
-                if (code !== 0) {
-                    return reject(new Error(`Python process exited with code ${code}. Stderr: ${stderrData}`));
+            function trySpawn(cmdIndex: number) {
+                if (cmdIndex >= pythonCommands.length) {
+                    return reject(new Error('Python runtime not found. Checked: ' + pythonCommands.join(', ')));
                 }
-                try {
-                    const parsed = JSON.parse(stdoutData.trim());
-                    if (parsed.error) {
-                        return reject(new Error(parsed.error));
+
+                const cmd = pythonCommands[cmdIndex];
+                const pythonProcess = spawn(cmd, [pythonScriptPath, tempFilePath]);
+                let stdoutData = '';
+                let stderrData = '';
+                let hasErrored = false;
+
+                pythonProcess.on('error', (err) => {
+                    hasErrored = true;
+                    console.warn(`[analyzeImageWithPython] Failed with ${cmd}: ${err.message}. Trying next command...`);
+                    trySpawn(cmdIndex + 1);
+                });
+
+                pythonProcess.stdout.on('data', (data) => {
+                    stdoutData += data.toString();
+                });
+
+                pythonProcess.stderr.on('data', (data) => {
+                    stderrData += data.toString();
+                });
+
+                pythonProcess.on('close', (code) => {
+                    if (hasErrored) return;
+                    if (code !== 0) {
+                        return reject(new Error(`Python process (${cmd}) exited with code ${code}. Stderr: ${stderrData}`));
                     }
-                    resolve(parsed);
-                } catch (err: any) {
-                    reject(new Error(`Failed to parse Python output: ${err.message}. Raw output: ${stdoutData}`));
-                }
-            });
+                    try {
+                        const parsed = JSON.parse(stdoutData.trim());
+                        if (parsed.error) {
+                            return reject(new Error(parsed.error));
+                        }
+                        resolve(parsed);
+                    } catch (err: any) {
+                        reject(new Error(`Failed to parse Python output: ${err.message}. Raw output: ${stdoutData}`));
+                    }
+                });
+            }
+
+            trySpawn(0);
         });
     }
 
@@ -2773,26 +2788,32 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             });
         }
 
-        // Alpha-edge QC: transparent PNGs are allowed to have anti-aliased edges.
-        // Only a strong, spatially correlated chromatic/matte fringe is a hard failure.
-        const edgeScore = stats.transparency?.edge_halo_risk_percent;
-        if (typeof edgeScore === 'number') {
-            if (edgeScore >= 72) {
-                failures.push({
-                    key: 'alpha_edge',
-                    reason_en: `Strong alpha-edge matte/chromatic fringe detected (score ${edgeScore.toFixed(1)}/100). Inspect the cutout on white and mid-gray backgrounds.`,
-                    reason_id: `Terdeteksi fringe/matte warna yang kuat pada tepi alpha (skor ${edgeScore.toFixed(1)}/100). Periksa cutout pada background putih dan abu-abu.`
-                });
-            } else if (edgeScore >= 42) {
-                warnings.push({
-                    key: 'alpha_edge',
-                    reason_en: `Possible alpha-edge contamination detected (score ${edgeScore.toFixed(1)}/100). Inspect edges at 100–200%; normal anti-aliasing is not a rejection by itself.`,
-                    reason_id: `Ada indikasi kontaminasi tepi alpha (skor ${edgeScore.toFixed(1)}/100). Periksa tepi pada 100–200%; anti-aliasing normal bukan alasan reject.`
-                });
-            }
+        // 8. BRISQUE & NIQE Spatial Quality & Naturalness Gate
+        const brisqueScore = stats.brisque?.score;
+        if (typeof brisqueScore === 'number' && brisqueScore > 65) {
+            failures.push({
+                key: 'artifacts',
+                reason_en: `High BRISQUE spatial degradation detected (${brisqueScore}/100); image exhibits severe blur or compression artifacts.`,
+                reason_id: `Terdeteksi degradasi spasial BRISQUE tinggi (${brisqueScore}/100); gambar mengalami blur parah atau artefak kompresi.`
+            });
+        } else if (typeof brisqueScore === 'number' && brisqueScore > 48) {
+            warnings.push({
+                key: 'artifacts',
+                reason_en: `Moderate BRISQUE score (${brisqueScore}/100); verify fine textural details at 100% zoom.`,
+                reason_id: `Skor BRISQUE sedang (${brisqueScore}/100); verifikasi detail tekstur halus pada zoom 100%.`
+            });
         }
 
-        if (stats.sharpness?.has_local_blur_anomaly === true) {
+        const niqeScore = stats.niqe?.score;
+        if (typeof niqeScore === 'number' && niqeScore > 8.0) {
+            warnings.push({
+                key: 'artifacts',
+                reason_en: `Elevated NIQE score (${niqeScore}); natural scene statistics indicate potential artificial over-smoothing or synthetic texture smearing.`,
+                reason_id: `Skor NIQE tinggi (${niqeScore}); statistik pemandangan alami mengindikasikan kemungkinan penghalusan berlebih atau tekstur sintetis AI.`
+            });
+        }
+
+        if (stats.sharpness?.has_local_blur_anomaly === true && !stats.segmentation?.intentional_bokeh_detected) {
             warnings.push({
                 key: 'localized_blur',
                 reason_en: 'Localized sharpness variation detected. Inspect the softest region at 100% before submission.',
