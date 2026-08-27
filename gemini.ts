@@ -6031,100 +6031,150 @@ Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk
      * Nama Orang Nyata Terkenal (Real Known People): Kemiripan visual dengan selebritas, politisi, atlet, tokoh sejarah terkenal, atau figur publik lainnya = FAIL secara instan.
      * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
    - Dokumen Negara, Uang & Identitas: PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN. PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN.
-     * Uang kertas atau koin modern dari negara mana pun (terutama jika difoto datar/persis tegak lurus yang berisiko disalahgunakan untuk pemalsuan).
-     * Prangko, paspor, surat izin mengemudi (SIM), kartu identitas (KTP/ID), kartu kredit/debit, buku tabungan bank.
-   - Hak Pribadi & Tubuh (Biometrics):
-     * Tato unik pada subjek manusia (memerlukan rilis properti dari seniman tato dan model).
-     * Wajah Manusia & Anak-Anak (CRITICAL): JANGAN nyatakan FAIL atau VIOLATION pada ip_risk atau stock_acceptance hanya karena mendeteksi wajah manusia, anak-anak, atau sekelompok orang (misalnya anak kecil bermain air di taman). Foto orang/gaya hidup adalah kategori paling laku di microstock. Anggap Model Release dapat diunggah kemudian oleh kontributor. Jika tidak ada logo merek dagang yang melanggar di pakaian mereka, status wajib dianggap SAFE dan harus dinyatakan PASS untuk ip_risk.
-     * Properti Mainan & Pakaian Unbranded: Pistol air plastik biasa (water gun), pelampung, ember mainan, pakaian anak biasa tanpa logo adalah properti generik yang 100% aman. JANGAN nyatakan FAIL atau VIOLATION hanya karena adanya benda-benda bermain anak ini.
-     * Mainan Anak & Pistol Air (Water Gun): Pistol air mainan anak-anak (biasanya berwarna-warni cerah, terbuat dari plastik) adalah mainan rekreasi keluarga yang menyenangkan dan komersial, BUKAN senjata api atau objek kekerasan. JANGAN pernah melabeli mainan ini sebagai senjata berbahaya, kekerasan, atau ancaman keamanan. Wajib loloskan PASS untuk kategori keamanan dan penerimaan stok.
-   - WAJIB: Jika ada tulisan/teks apa pun di dalam gambar, Anda HARUS menuliskan teks tersebut secara eksplisit (Lakukan OCR) ke dalam laporan!
-   - Teks Tidak Terbaca & Gibberish (CRITICAL): Periksa apakah terdapat teks yang tidak terbaca, karakter rusak, kata-kata yang berantakan, atau ejaan aneh (gibberish text) pada papan tulis (whiteboard), catatan tempel (sticky notes), poster, buku, kemasan produk, atau bagian mana pun di dalam gambar. Ini adalah cacat visual generatif AI yang sangat umum dan fatal untuk komersial. Jika gambar mengandung teks berantakan (seperti karakter huruf yang hancur, kata yang tidak bermakna/gibberish, atau gabungan huruf acak), status pemeriksaan untuk "text", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL, skor keseluruhan di bawah 70, dan hasil audit dinyatakan FAIL.
+// ============================================================================
+// MATRIKS BENCHMARK PEMBEDA MUTLAK: STANDAR KURASI ADOBE STOCK (PASS VS FAIL)
+// ============================================================================
+// STANDAR KURASI KOMERSIAL RESMI ADOBE STOCK & SHUTTERSTOCK:
+// 1. ASET KOMERSIAL BERSIH (PASS - Skor 85-98):
+//    - Subjek utama tack-sharp (fokus tajam sempurna), tekstur kulit/benda alami (bukan plastik/lilin).
+//    - Latar belakang bokeh optik yang bersih (shallow depth of field yang disengaja pada background/latar adalah fitur artistik bernilai komersial tinggi, 100% PASS).
+//    - Fotografi Industri, Konstruksi & Pertukangan (Masonry, Concrete, Construction Site, Tools):
+//      * Tekstur fisik adukan semen/beton basah, agregat kerikil kasar, butiran pasir, kilau air/slurry, dan garis batas perataan cetok/roskam (troweled smooth finish vs rough aggregate) adalah tekstur material asli yang bernilai komersial tinggi (100% PASS pada noise, sensor_issues, ai_artifacts).
+//      * Sarung tangan proyek/industri tebal berdebu semen (construction work gloves) dengan genggaman kuat pada gagang alat adalah perlengkapan kerja nyata (PASS pada anatomical_errors & over_edited).
+//      * Latar belakang proyek konstruksi (tiang beton, anyaman besi rebar, alat berat, pekerja berompi K3) yang berada dalam defokus optik/kabut atmosferik lembut adalah komposisi fotografi profesional standar emas (100% PASS pada blur, composition, lighting).
+//    - Seni Digital 3D, Ilustrasi Konsep Sci-Fi & Isometric (Datacenter, Server Room, AI Supercomputer Core, Hologram HUD, Circuit Traces, Glowing Pipes): Seluruh elemen fiksi ilmiah, diagram HUD holografik, grafik data futuristik, dan logo teknologi generik ("AI", "CORE", dll.) adalah elemen artistik komersial bernilai tinggi (100% PASS).
+//    - Pencahayaan Emissive/Neon Glow pada interior gelap (cyberpunk/high-tech aesthetic) adalah gaya visual 3D yang sah (PASS).
+//    - Figur Siluet Skala Arsitektur (orang kecil di catwalk/jembatan layang untuk pembanding skala ruangan) tidak memerlukan detail mikro (PASS).
+//    - Anatomi manusia normal pada subjek utama (tangan dengan 5 jari, sarung tangan medis/lapangan wajar, genggaman alat logis).
+//    - Teks/tulisan timbul pada produk plastik (seperti tanda S, C, T pada kaset tes, angka kaliber/skala ukur) adalah fitur fisik produk asli yang valid (PASS).
+//    - Tekstur alami hewan liar (cangkang penyu, pasir, bebatuan, cipratan air) adalah tekstur organik otentik (PASS).
+//    - Struktur benda buatan manusia utuh, kokoh, dan logis (sambungan paku/baut jelas).
+//
+// 2. CACAT KUALITAS & HALUSINASI GENERATIF NYATA (FAIL - Skor < 65, REJECT QUALITY ISSUES):
+//    - Papan Tanda Melayang / Tanpa Pengencang (Floating Signboard / Missing Fasteners): Papan petunjuk atau plang kayu yang menempel pada tiang tanpa paku, baut, sekrup, atau klem penyangga yang nyata (menempel seperti stiker melayang tanpa gravitasi/konstruksi logis).
+//    - Clipping Vegetasi / Rumput Menembus Kayu Padat: Helai rumput, ilalang, atau tanaman yang menembus langsung ke dalam tiang kayu solid/batu tanpa tumpuan tanah yang logis.
+//    - Peleburan Dedaunan / Grass Mush: Vegetasi pada bidang fokus depan yang sebagian tajam tetapi sebagian meleleh/smudged menjadi gumpalan piksel tanpa detail helai daun individual.
+//    - Tipografi AI Terdistorsi / Wobbly Lettering: Teks plang/tanda (seperti rambu larangan, nama tempat) dengan garis huruf bergelombang, ketebalan batang huruf tidak rata, baseline bergelombang, atau artefak distorsi tipografi AI.
+//    - Serat Kayu Melebur / Swirling Grain: Pola serat kayu yang berputar seperti cairan atau terputus secara tidak alami.
+//    - Anatomi Tangan & Genggaman Cacat: Jari menyatu/melebur ke dalam objek tanpa batas fisik, jumlah jari != 5, sendi terkilir mustahil.
+//    - Figur Latar Belakang Cacat AI: Pada area yang selevel fokus, wajah terdistorsi parah/meleleh atau anggota tubuh cacat tak beraturan. (Defokus optik/bokeh wajar pada latar belakang BUKAN cacat).
+//    - Teks Gibberish Semu: Teks tiruan acak yang menyerupai karakter alien pada objek dunia nyata yang seharusnya memiliki tulisan terbaca (seperti surat kabar, plang nama jalan nyata, kemasan produk bermerek). Diagram HUD sci-fi atau simbol sirkuit dekoratif BUKAN gibberish.
+//    - Anomali Struktur Fisik: Tiang melayang tanpa tumpuan, moncong bengkok asimetris parah, struktur mekanis mustahil.
+//    - Cacat Teknis Fatal: Subjek utama soft focus/blur menyeluruh, overexposure/clipping parah, atau noise ekstrem.
+// ============================================================================
 
-6. GENERATIVE AI QUALITY & ANOMALIES (Kualitas & Cacat AI):
-   - Efek Cahaya & Lens Flare Merusak (Excessive/Artificial Lens Flare) [KRITIS]: Deteksi efek bias pelangi (rainbow lens flare), kebocoran cahaya (light leaks), atau flare heksagonal buatan AI yang melintasi subjek utama dan menutupi detail asli (seperti jaket, celana, ransel). Jika efek ini tampak tidak alami, mengganggu estetika komersial, atau menutupi detail tekstur penting, status "ai_artifacts" atau "over_edited" WAJIB di-set ke FAIL.
-   - Figur Latar Belakang Cacat (Deformed/Malformed Background Figures) [SANGAT KRITIS]: Orang/subjek di latar belakang koridor/jalan yang memiliki tubuh terdistorsi, wajah meleleh/hancur, kaki/tangan menyatu secara tidak alami, meskipun latar belakang tersebut blur/bokeh. Cacat visual pada karakter sekunder atau figur latar belakang adalah alasan penolakan nomor satu di Adobe Stock. Jika ditemukan, status "ai_artifacts" dan "anatomical_errors" WAJIB di-set ke FAIL.
-   - Perspektif & Geometri Loker/Benda Bengkok (Warped Locker & Physical Geometry) [SANGAT KRITIS]: Garis-garis lurus pada furnitur, loker, kabinet, garis pintu, tangga, celah pintu loker yang tidak konsisten ukurannya, nomor loker (seperti nomor pelat logam "148") yang penyok/asimetris, atau kunci besi yang bentuknya meleleh dan tidak logis secara mekanisme fisik dunia nyata. Jika ditemukan cacat geometris ini, status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL.
-   - Wajah Terdistorsi (Distorted/Melted Faces) [SANGAT KRITIS]: Wajah pada subjek utama maupun orang-orang/kerumunan di latar belakang yang meleleh, asimetris parah, mata yang menyatu, atau tampak seperti gumpalan daging tak berbentuk. Sering terjadi pada gambar kerumunan AI. Jika ditemukan, WAJIB set "anatomical_errors" dan "ai_artifacts" ke FAIL.
-   - Fake UI/Tech Interfaces, Cyber Shields, Holograms & Binary Streams (SANGAT KRITIS — WAJIB isi field "synthetic_ui_coherence"):
-     * ATURAN WAJIB ANTI-LOLOS DIAM-DIAM: Untuk SETIAP gambar yang mengandung hologram, perisai/shield digital, dashboard/panel UI futuristik, peta jaringan, atau aliran angka biner, Anda WAJIB mengisi field "synthetic_ui_coherence" dengan deskripsi FAKTUAL tentang APA yang tertulis/tergambar di setiap elemen tersebut (baca satu per satu seolah OCR paksa) SEBELUM menentukan status PASS/FAIL-nya. DILARANG menandai field ini PASS hanya dengan alasan "terlihat estetis/artistik" — elemen dekoratif futuristik TIDAK mendapat pengecualian artistik seperti bokeh; ia tetap wajib diperiksa literal keterbacaannya sama seperti tulisan di papan tulis.
-     * Teks Semu / Pseudo-Text / Gibberish pada Layar, Peta Dunia & Hologram: Pada gambar bertema AI/Cyber/Server Room/Tech, periksa setiap panel layar monitor, peta jaringan global, layar samping, dan hologram perisai. Jika terdapat teks tiruan yang tidak terbaca, susunan huruf acak (contoh: "BSN.GUL... SUCIOEES NETHICONS...", "GLLTOSCA NETMICORS", "SECURE ERFE ITE"), grafik batang/dashboard yang tidak merepresentasikan data nyata (angka sumbu tidak konsisten, bar chart acak tanpa label logis), atau garis-garis micro-text coretan tak bermakna, ini adalah cacat fatal Adobe Stock! Status "text", "synthetic_ui_coherence", "ai_artifacts", dan "stock_acceptance" WAJIB di-set ke FAIL.
-     * Aliran Biner Melayang (Wavy Binary Ribbons): Aliran data biner ("010110...") yang meliuk-liuk di udara dengan bentuk angka cacat, meleleh, terpotong, digit ganda/menyatu, lebar goresan tidak konsisten antar digit, atau tidak konsisten adalah artefak AI generatif yang WAJIB digagalkan (FAIL pada "synthetic_ui_coherence" dan "ai_artifacts").
-     * Sirkuit PCB, Microchip & Hardware (Hardware Coherence): Periksa jalur sirkuit (traces) pada papan sirkuit/motherboard di bawah chip. Jika jalur sirkuit terputus ke ruang kosong, meleleh tanpa tujuan, lubang via/solder melayang, pin konektor emas/kaki chip jumlahnya tidak simetris kiri-kanan, bengkok, atau tidak sejajar secara mekanis, status "structural_defects", "synthetic_ui_coherence", dan "ai_artifacts" WAJIB di-set ke FAIL.
-     * Rak Server & Lampu Indikator (Server Room Racks): Cek kisi-kisi ventilasi rak server, panel tombol, dan lampu LED. Jika kisi-kisi miring, tombol asimetris meleleh, atau kabel melayang tanpa koneksi logis, tandai sebagai "structural_defects" dan "synthetic_ui_coherence".
-     * Kelembutan AI Upscale 100% Zoom (Upscaling Softness): Gambar beresolusi raksasa (>10MP / 4K / 8K / 11K) hasil upscale AI sering kali tampak tajam dari kejauhan namun sangat lembek/halus seperti lilin (waxy/plastic) saat diperbesar 100%. Jika tidak ada tekstur mikro optik nyata, WAJIB tandai FAIL pada "blur" dan "over_edited".
-   - Benda yang Tidak Logis (Nonsensical Objects/Hallucinations): Objek yang bentuknya tidak masuk akal, terpotong secara ajaib, atau percampuran benda yang tidak logis (misal: tangan yang menyatu dengan bunga atau benda asing, benda yang melayang tanpa alasan, atau geometri mustahil). Jika ditemukan, set "ai_artifacts" ke FAIL.
-   - Masalah Anatomi (Anatomy errors) [SANGAT KRITIS]: Perhatikan dengan sangat cermat TANGAN, JARI, KAKI, dan PERSENDIAN. Jika terdapat jari tangan melengkung tidak wajar, jumlah jari lebih/kurang dari 5 per tangan, tangan/jari yang meleleh dan berbaur secara mustahil dengan objek lain, sendi terkilir aneh, atau anggota tubuh ganda, status "anatomical_errors" WAJIB di-set ke FAIL.
-   - Detail yang Meleleh (Melted details) & Pola Hancur (Pattern Degradation) [SANGAT KRITIS]: Tekstur rajutan/mesh (seperti pada sarung tangan atau pakaian) yang terlalu seragam lalu mendadak berubah menjadi pola digital acak, garis tipis berdekatan (seperti lingkaran holografik) yang melebur menjadi aliasing, jagged edges, atau muddy detail saat di-zoom, serta pinggiran objek (edge) yang bercampur ambigu dengan objek lain.
-   - High Contrast & Glow Artifacts [KRITIS]: Area dengan glow yang sangat terang (seperti warna oranye neon) terhadap latar belakang gelap sangat rentan mengalami clipping, color banding, loss of fine texture, dan compression artifacts (terutama jika telah di-upscale/sharpening agresif). Periksa transisi cahayanya, jika patah/kasar, status "overexposure" dan "ai_artifacts" WAJIB FAIL.
-   - Logika Mekanis Objek Buatan Manusia (Mechanical & Structural Coherence) [SANGAT KRITIS]: Periksa SETIAP objek buatan manusia pada crop detail apakah strukturnya masuk akal secara fisik dan bisa berfungsi di dunia nyata. Contoh wajib periksa: SEPEDA (apakah rantai ada dan tersambung ke gear? apakah pedal tersambung ke engkol/crank arm yang logis? apakah jari-jari/spokes tersambung konsisten dari hub ke rim? apakah rem, fork, dan rangka menyambung secara logis? apakah sadel tersambung ke seatpost yang benar?), kendaraan (roda, spion, wiper), furnitur (kaki kursi/meja), alat musik (senar, tuts), pakaian (kancing, resleting, jahitan), dan bangunan (jendela, tangga, railing). Jika ditemukan bagian yang meleleh, hilang, menyatu mustahil, atau tidak bisa berfungsi secara mekanis (contoh: sepeda tanpa rantai, pedal melayang tanpa engkol), status "structural_defects" dan "ai_artifacts" WAJIB di-set ke FAIL meskipun bagian tersebut kecil atau berada di tepi gambar.
-   - Tangan yang Berinteraksi dengan Objek (Hands Gripping Objects) [SANGAT KRITIS]: Saat tangan memegang/menyentuh objek (setang, sadel, gagang, gelas, alat), periksa pada crop detail apakah jari menggenggam secara logis atau malah menyatu/meleleh ke objek. Titik kontak tangan-objek adalah lokasi cacat AI paling umum. Jari yang menyatu dengan objek WAJIB mengeset "anatomical_errors" ke FAIL.
-   - Kedalaman Ruang Tidak Natural (Unnatural Depth of Field): Latar belakang yang kabur (blur) namun tidak terlihat seperti bokeh optik, melainkan tampak seperti coretan kasar (smudgy), berbercak, atau terhapus secara artifisial.
-   - Teks & Karakter Rusak (Gibberish Text): Karakter huruf yang rusak/cacat/terdistorsi, kata-kata tak terbaca, teks hancur atau tidak bermakna di papan tulis (whiteboards), bagan diagram, catatan dinding, atau sticky notes.
-   - Kecacatan Proporsi & Perspektif (Proportion & Perspective Defects) [CRITICAL]: Periksa distorsi proporsi objek fisik, furnitur, ruangan, atau elemen arsitektur. Periksa juga kemiringan garis bangunan, tangga yang tidak menuju ke mana-mana, atau distorsi proporsi tubuh manusia. Jika fatal, status "proportion_defects" dan "structural_defects" WAJIB FAIL.
-   - Kehilangan detail komersial: Tekstur datar yang terlihat terlalu sintetis.
+// ============================================================================
+// MANDAT INSPEKSI FORENSIK PIKSEL MURNI (ANTI-TEBAKAN & ZERO-HALLUCINATION)
+// ============================================================================
+// 1. SETIAP KLAIM CACAT WAJIB MEMILIKI BUKTI KOORDINAT PIKSEL NYATA:
+//    - Periksa setiap kuadran crop pada resolusi 100% piksel asli.
+//    - Laporkan secara spesifik lokasi, jenis cacat, dan anomali visual yang ditemukan.
+// 2. DETEKSI DINI CACAT GENERATIF HALUS (PENYEBAB UTAMA REJEKSI ADOBE STOCK):
+//    - Periksa sambungan fisik: Apakah plang/papan tanda terpasang dengan paku/baut nyata, atau melayang tanpa pengencang? (FAIL jika floating tanpa pengencang).
+//    - Periksa tabrakan objek (clipping): Apakah rumput/daun menembus objek padat (seperti tiang kayu atau batu)? (FAIL jika clipping).
+//    - Periksa teks cetak: Apakah huruf-huruf pada plang memiliki garis yang lurus dan rata, atau bergelombang/cacat bentuk khas AI? (FAIL jika wobbly AI text).
+// 3. DILARANG MENGANGGAP FITUR FOTOGRAFI, SENI 3D & PRODUK NYATA SEBAGAI CACAT AI:
+//    - Tekstur adukan semen/beton basah, batu kerikil agregat, dan sarung tangan proyek adalah tekstur fisik asli konstruksi yang 100% PASS.
+//    - Render 3D / Isometric sci-fi datacenter, server rack, tabung glowing, diagram HUD holografik, dan core AI adalah karya 3D komersial premium yang 100% PASS.
+//    - Latar belakang bokeh/blur karena depth of field sempit adalah KUALITAS PREMIUM FOTO, bukan blur cacat.
+//    - Huruf cetakan timbul plastik (seperti S, C, T pada alat tes kesehatan atau angka pada jangka sorong) adalah fitur produk asli, bukan AI gibberish.
+//    - Sarung tangan medis/lapangan/konstruksi yang menutupi tekstur kulit adalah alat pelindung kerja wajar, bukan lilin/waxy.
+//    - Cangkang hewan, pasir pantai, dan permukaan organik alami adalah tekstur nyata, bukan noise/artefak.
+// ============================================================================
 
-7. INTEGRASI PENUH PANDUAN STANDAR & KEBIJAKAN ADOBE STOCK (CRITICAL):
-   Anda wajib menyelaraskan keputusan kurasi secara ketat dengan tiga dokumen panduan kontributor Adobe Stock resmi berikut:
-   
-   A. Standar Teknis & Kualitas Penolakan Konten (Ref: https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
-      - Out of Focus & Sharpness: Subjek utama wajib in-focus tajam sempurna. Tolak (FAIL) jika terdapat soft focus menyeluruh, camera shake/motion blur tak sengaja, atau kesalahan titik fokus (miss-focus) yang mengaburkan detail subjek.
-      - Exposure & Lighting: Tolak jika terjadi overexposure parah (blown-out highlights/detail putih hilang) atau underexposure parah (crushed shadows/area gelap berlumpur tanpa detail visual). Hindari kontras yang terlampau keras (harsh/extreme contrast) atau flat lighting yang membosankan.
-      - Noise & Grain: Tolak bintik derau yang mengganggu pada area shadow, langit rata, atau permukaan datar akibat pengaturan ISO tinggi. Reduksi noise yang berlebihan hingga subjek tampak mulus tidak alami seperti lilin/plastik (plastic/waxy look) juga WAJIB ditolak.
-      - Image Artifacts & Aberration: Deteksi kompresi JPEG kasar (pixelation, macro-blocks), color banding (gradasi warna terpotong/patah pada langit), aberasi kromatik (magenta/green color fringing pada tepian kontras tinggi), bintik kotoran sensor (sensor dust spots), dan over-sharpening halos.
-      - Masalah Scan & Analog (Jika relevan): Garis Newton rings, goresan fisik, debu pemindaian slide/klise, atau pola gelombang moire.
-      
-   B. Alasan Umum Penolakan Konten (Ref: https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
-      - Intellectual Property & Brand Safety: Logo komersial, nama merek dagang, desain produk yang khas (seperti iPhone camera bumps, Adidas stripes, LEGO studs, bodi kamera Polaroid klasik beserta bingkai putihnya, jahitan kuning Dr. Martens, red soles Christian Louboutin, logo Beats "b", Converse rubber toes).
-      - Desain Otomotif Terlindungi: Kisi radiator (grille) BMW, Rolls-Royce, Jeep 7-slot, ornamen kap mesin ikonik, bentuk motor Vespa/Lambretta yang sangat khas.
-      - Karya Seni Berhak Cipta: Mural, grafiti, patung kontemporer (seperti Charging Bull Wall Street, Cloud Gate Chicago), lukisan museum modern, karakter fiksi Disney, Hello Kitty, Pokémon, Marvel, DC, ilustrasi karya orang lain, elemen grafis buatan pihak ketiga, atau font berhak cipta (TETAPI tulisan tangan kaligrafi sejarah yang bersifat publik domain adalah AMAN).
-      - Dokumen & Mata Uang: Mata uang kertas/logam modern dari negara mana pun (terutama jika difoto datar), prangko, SIM, paspor, kartu identitas nasional, kartu kredit/debit, buku tabungan. CATATAN: Dokumen sejarah seperti Bill of Rights atau Konstitusi adalah AMAN dan bukan pelanggaran.
-      - Unusable/Lack of Utility: Gambar yang tidak memiliki subjek jelas, kabur berlebih, berantakan tanpa arah komposisi, atau tidak memiliki potensi komersial.
-      - Judul & Kata Kunci Tidak Patuh: Metadata berisi nama model kamera, merek dagang, URL, kata berulang-ulang yang tidak relevan (keyword stuffing), atau kata kunci yang menyesatkan.
-      
-   C. Kebijakan & Batasan Hak Cipta Terkenal Resmi (Ref: https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-      - Batasan Landmark & Bangunan Ikonik yang SANGAT KETAT:
-        * Menara Eiffel di malam hari (tata cahaya berhak cipta) dilarang keras (FAIL). Siang hari diperbolehkan (PASS).
-        * Burj Al Arab, Burj Khalifa (Dubai) dilarang keras.
-        * Sydney Opera House (Australia) dilarang keras.
-        * Atomium (Brussels), Louvre Pyramid (Paris), Space Needle (Seattle) dilarang keras.
-        * Hollywood Sign & Hollywood Walk of Fame (Los Angeles) dilarang keras.
-        * Istana Neuschwanstein (Jerman), CN Tower (Toronto), London Eye, Tower Bridge, The Shard (London) dilarang keras.
-        * Transamerica Pyramid (San Francisco), Taipei 101 (Taiwan), Petronas Twin Towers (Malaysia) dilarang keras.
-        * Bagian Interior Kuil Sagrada Família (Barcelona) dilarang keras.
-        * Empire State Building, Chrysler Building, Flatiron Building, Rockefeller Center, One World Trade Center, Guggenheim Museum, Getty Museum, Graceland, Machu Picchu, Stonehenge, Chichen Itza, dan situs warisan bersejarah lainnya yang terlindungi secara hukum properti setempat dilarang keras untuk lisensi komersial tanpa rilis properti resmi.
+let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi penolakan resmi Adobe Stock & Shutterstock ("Quality Issues", "Technical Issues", "IP / Legal").
 
-PENGGUNAAN DATA FORENSIK OBJEKTIF (WAJIB):
-Jika data teknis berisi field OCR, JPEG blocking, background edge analysis, transparency, local analysis, atau sharpness/noise metrics, gunakan field tersebut dalam penalaran. Field resolution/megapixels hanya metadata informasional dan WAJIB DIABAIKAN sebagai quality gate: jangan FAIL, WARNING, penalty, atau menurunkan skor hanya karena ukuran/resolusi gambar. Jangan menyatakan hasil yang bertentangan tanpa alasan visual yang jelas. Sebaliknya, skor noise/blok/edge moderat tidak otomatis menjadi FAIL.
+Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi profesional yang sangat objektif dan akurat:
+1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang komersial, logo pada produk/pakaian, plat nomor, serta watermark ilegal. Teks fiksi ilmiah generik (seperti "AI", "DATA", "CPU", "SERVER", diagram HUD, atau rumus skematis) adalah 100% SAFE (ip_risk: PASS, legal_status: SAFE). Foto orang/subjek manusia nyata tanpa logo komersial adalah SAFE (requires_model_release: true, ip_risk: PASS, legal_status: SAFE).
+2. Modul AI Anomaly & Anatomi (Generative Defects & Structural Physics): Memeriksa ada/tidaknya cacat AI generatif nyata seperti:
+   * Plang / Papan Tanda Tanpa Pengencang (Floating Signboard): Papan kayu yang menempel di tiang tanpa paku/sekrup/baut yang logis.
+   * Clipping Vegetasi: Rumput/tanaman yang menembus kayu padat atau batu.
+   * Tipografi AI Cacat: Huruf bergelombang (wobbly strokes), baseline melengkung, atau distorsi font AI pada rambu/papan.
+   * Peleburan Tekstur (Generative Smearing): Rumput atau serat kayu yang meleleh tanpa kontinuitas fisik.
+   * Anatomi cacat: Jari ekstra/kurang, anggota tubuh melebur ke objek padat, teks pseudo-gibberish pada dokumen/poster nyata, atau struktur fisik yang tidak logis.
+3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus subjek utama (tack-sharp), pencahayaan seimbang, dan ketiadaan artefak kompresi yang merusak.
 
-PANDUAN EVALUASI TOLERANSI KUALITAS (CRITICAL):
-Tingkat Toleransi Saat Ini: ${tolerance}. Evaluasi keputusan akhir kurasi dan skor dengan aturan berikut:
-- STRICT (Toleransi Nol / Zero Tolerance): Anda harus menerapkan standar tertinggi tanpa toleransi terhadap cacat sekecil apa pun. Jika terdapat sedikit saja soft focus, sedikit noise pada shadow, anomali AI mikro di latar belakang, atau potensi pelanggaran IP/Kekayaan Intelektual sekecil apa pun, aset wajib dinyatakan FAIL dengan skor maksimal 0-59.
-- MEDIUM (Standar Industri): Cacat teknis yang sangat minor di luar fokus utama (seperti noise halus yang wajar atau soft focus pada latar belakang artistik) dapat ditoleransi. Namun, kesalahan fokus pada subjek utama, anomali AI yang terlihat jelas, atau pelanggaran IP/Kekayaan Intelektual apa pun wajib dinyatakan FAIL dengan skor maksimal 0-65.
-- LOOSE (Toleransi Longgar / Estetika Tinggi): Utamakan keindahan artistik dan nilai jual komersial secara keseluruhan. Cacat teknis sedang (seperti noise sedang, soft focus ringan pada subjek sekunder, anomali AI minor yang tersembunyi) diperbolehkan lolos (PASS) asalkan subjek utama terlihat luar biasa indah, memiliki komposisi menawan, dan daya tarik komersial yang tinggi. Hanya kegagalan teknis yang fatal atau pelanggaran IP yang sangat terang-terangan yang menyebabkan status FAIL (skor maksimal 0-69).
+---
+PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
+Bedakan antara pilihan artistik/estetika profesional (fotografi & seni 3D) yang disengaja dan cacat teknis murni:
+- Fotografi Konstruksi & Makro Industri (Concrete Finishing, Masonry Trowels, Construction Sites):
+  * Tekstur Semen Basah & Agregat Kerikil: Kerikil kasar, butiran pasir, air semen yang mengkilap, dan garis perbedaan antara permukaan yang diratakan roskam dan yang belum diratakan adalah fitur fisik nyata pekerjaan beton (**100% PASS** pada noise, artifacts, sensor_issues).
+  * Sarung Tangan Kerja Proyek (Construction Work Gloves): Sarung tangan kerja yang kotor berdebu semen yang memegang gagang kayu cetok adalah APD standar (**PASS** pada anatomical_errors & over_edited).
+  * DoF Sempit & Kabut Proyek (Atmospheric Construction Fog): Fokus makro tajam pada bilah cetok semen dengan latar belakang tiang jembatan, besi beton, dan ekskavator yang kabur lembut dalam kabut adalah karya bernilai komersial sangat tinggi (**PASS** pada blur, composition, lighting).
+- Render 3D & Konsep Sci-Fi/Teknologi (3D Datacenters, Server Racks, AI Cores & Holograms): Karya 3D digital isometric dengan server racks, core komputer futuristik bercahaya biru/cyan, pipa pendingin, lantai industri berkilau, dan pemandangan badai/langit dramatis di luar jendela kaca adalah genre seni 3D bernilai komersial tinggi di Adobe Stock.
+  * Overlay HUD & Diagram Holografik: Grafik matriks, jalur sirkuit glowing, visualisasi gelombang data, rumus fiksi ilmiah, dan logo akronim generik ("AI", "TECH") adalah elemen dekoratif sci-fi yang valid dan WAJIB "PASS" pada "text", "ai_artifacts", "structural_defects", dan "stock_acceptance".
+  * Emissive Lighting & Neon Glow: Kontras tinggi antara lampu neon/glow biru dengan interior ruang server gelap adalah gaya seni sci-fi yang sah, BUKAN overexposure/clipping (**PASS** pada lighting & exposure).
+  * Figur Siluet Skala (Catwalk Figures): Siluet kecil orang di kejauhan/jembatan layang berfungsi murni sebagai pembanding skala arsitektur 3D dan TIDAK memerlukan detail mikro (**PASS** pada anatomical_errors).
+- Depth of Field (DoF) dangkal / Bokeh Optik: Latar belakang atau latar depan buram yang lembut (optical bokeh / shallow depth of field) adalah kualitas bernilai jual sangat tinggi dan standar emas di Adobe Stock, BUKAN cacat blur. Selama bagian utama subjek tetap fokus tajam sempurna (tack-sharp), status "blur", "out_of_focus", dan "composition" WAJIB "PASS". Defokus optik pada elemen latar belakang (tabung lab, orang lain, pemandangan jauh) adalah fenomena lensa kamera alami, BUKAN cacat AI.
+- Teks Timbul & Fitur Produk Fisik (Embossed Text & Product Markings): Huruf timbul relief pada bahan plastik (seperti indikator "S", "C", "T", "T1", "T2", tanda panah arah pada kaset rapid test medis, atau angka ukur pada mistar/jangka sorong) dan garis reagen lateral flow adalah fitur fisik asli produk medis/industri. Ini BUKAN teks gibberish dan WAJIB dinyatakan "PASS" pada "text" dan "ai_artifacts".
+- Sarung Tangan & Alat Pelindung Diri (Gloves & PPE): Tangan yang mengenakan sarung tangan lateks/nitrile medis atau sarung tangan kerja lapangan tebal secara alami menutupi tekstur pori kulit dan lipatan sendi. Ini adalah perlengkapan kerja nyata, BUKAN efek waxy/lilin dan BUKAN cacat anatomi. Status "anatomical_errors" dan "over_edited" WAJIB "PASS".
+- Tekstur Alami Hewan & Lingkungan (Wildlife & Environmental Textures): Tekstur cangkang kura-kura/penyu dengan teritip (barnacles), butiran pasir pantai, genangan air pasang, dan pencahayaan alami mendung adalah tekstur dunia nyata yang otentik, BUKAN noise, BUKAN artefak, dan BUKAN over-editing.
+- Low-light & Shadow Noise Wajar: Foto dengan bayangan alami atau kondisi cuaca mendung/low-light wajar memiliki gradasi bayangan lembut. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
 
-STATUS & SKORING (KONSISTEN & KETAT):
-- PASS: Skor 75 - 100.
-- FAIL: Skor 0 - 69 (Jangan berikan skor 70-74 untuk status FAIL).
+---
+PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI:
+Ketika menerima lebih dari 1 gambar (tampilan penuh dan crop kuadran/makro):
+- Gunakan crop detail untuk memverifikasi ketajaman piksel asli pada subjek utama dan memastikan tidak ada cacat struktural fatal.
+- Ingat bahwa area di luar bidang fokus (luar depth of field) pada crop kuadran memang secara optik tidak setajam titik fokus utama — itu adalah hal normal dalam fotografi profesional.
+- Cacat fatal yang membatalkan (FAIL) adalah cacat nyata pada subjek atau anomali bentuk yang tidak logis di dunia nyata.
+
+---
+Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock berikut:
+
+1. OUT OF FOCUS / SHARPNESS ISSUES:
+   - Subjek utama wajib memiliki fokus yang tajam sempurna (tack-sharp).
+   - Latar belakang/depan yang blur karena depth of field sempit adalah NORMAL & PASS.
+
+2. EXPOSURE & LIGHTING:
+   - Pencahayaan seimbang dan terdefinisi dengan baik. Gradasi bayangan alami dan highlight wajar adalah PASS.
+   - Emissive glow neon pada seni sci-fi / 3D adalah PASS.
+   - Hanya tolak jika terjadi blown-out highlights ekstrem atau crushed shadows yang menghilangkan detail subjek secara fatal.
+
+3. NOISE & GRAIN:
+   - Tekstur pasir, kerikil beton basah, dan noise halus fotografi normal adalah PASS.
+   - Tolak hanya jika noise bintik warna parah merusak gambar atau jika AI denoiser meratakan subjek manusia tanpa tekstur sama sekali.
+
+4. IMAGE ARTIFACTS:
+   - Bebas dari pixelation kompresi JPEG berat, color banding kasar, atau noda sensor kotor.
+
+5. INTELLECTUAL PROPERTY & BRAND SAFETY:
+   - Teks fiksi ilmiah generik ("AI", "CPU", "SERVER") atau diagram HUD adalah 100% SAFE (ip_risk: PASS, legal_status: SAFE).
+   - Foto orang/manusia tanpa logo komersial adalah SAFE (requires_model_release: true, ip_risk: PASS, legal_status: SAFE).
+   - Jangan pernah menggagalkan foto/karya hanya karena menampilkan manusia atau profesi nyata.
+   - Tolak (FAIL) hanya jika terdapat logo merek dagang komersial terkenal (Nike, Apple, Starbucks, dll.) atau desain berhak cipta yang dilindungi.
+
+6. GENERATIVE AI & STRUCTURAL INTEGRITY:
+   - Gambar bersih dengan anatomi wajar, peralatan konstruksi logis, render 3D rapi, dan tekstur material asli = PASS (Skor 85-98).
+   - Tolak (FAIL) jika terdapat:
+     * Papan tanda mengambang tanpa paku/baut pengikat.
+     * Batang rumput/tanaman menembus tiang kayu padat (clipping).
+     * Teks tipografi plang bergelombang (wobbly letters) atau deformasi huruf AI.
+     * Jari bermutasi/menyatu mustahil ke benda, teks acak tak bermakna (gibberish) pada poster/buku dunia nyata, atau arsitektur melayang yang mustahil secara gravitasi.
+
+PANDUAN EVALUASI TOLERANSI KUALITAS:
+Tingkat Toleransi Saat Ini: ${tolerance}.
+- STRICT: Standar tertinggi tanpa kompromi cacat nyata. Jika ada cacat fokus subjek utama, cacat anatomi, struktur melayang/clipping, atau IP violation, nyatakan FAIL (skor 40-59). Gambar bersih sempurna tetap PASS (skor 88-96).
+- MEDIUM (Standar Resmi Adobe Stock): Standar kurasi komersial. Gambar bersih alami / foto konstruksi makro profesional dengan fokus tajam dan anatomi/alat normal WAJIB PASS (skor 86-96). Jika ada cacat kritis fatal nyata (papan melayang tanpa paku, rumput menembus kayu, teks wobbly cacat, jari bermutasi, IP pelanggaran jelas, subjek utama blur total), nyatakan FAIL (skor 45-64).
+- LOOSE: Menoleransi ketidaksempurnaan minor selama gambar bernilai komersial tinggi.
+
+STATUS & SKORING:
+- PASS (Layak Komersial / Bersih): Skor 85 - 98 (Aset bersih alami, tack-sharp, bebas anomali AI).
+- FAIL (Cacat Kualitas Nyata / Reject Risk): Skor 40 - 64.
 
 ATURAN OUTPUT TEKS:
-1. Jadilah SANGAT CERDAS, ANALITIS, dan FAKTUAL layaknya Ahli Forensik Fotografi Senior. Isi dari field \`visual_scan_analysis\` and \`detailed_feedback\` WAJIB sangat mendalam dan berbobot (minimal 3 paragraf). Jangan hanya menyebutkan kalimat pendek atau generik, tetapi jelaskan SECARA TEKNIS MENGAPA cacat itu terjadi berdasarkan BUKTI VISUAL NYATA yang ada pada gambar.
-2. DILARANG KERAS MENEBAK, BERHALUSINASI, ATAU MEMBUAT ASUMSI (NO GUESSING OR HALLUCINATION). JANGAN melaporkan cacat anatomi, teks rusak, watermark, logo, cacat komposisi, atau masalah pencahayaan/warna jika masalah tersebut TIDAK BENAR-BENAR TERLIHAT dengan jelas di dalam gambar. Jika gambar terlihat bagus dan aman, nyatakan dengan jujur dan berikan status PASS. Kegagalan mematuhi aturan ini akan merusak kredibilitas sistem kurasi.
-3. Untuk setiap item di dalam \`ai_vision_checks\`, tuliskan \`note\` yang spesifik, unik, dan BUKAN TEBAKAN, melainkan hasil pengamatan faktual terhadap piksel gambar, menyesuaikan temuan Anda yang paling relevan dengan parameter JSON.
+1. Berikan evaluasi faktual dan objektif pada 'visual_scan_analysis' dan 'detailed_feedback'.
+2. DILARANG KERAS MENEBAK ATAU BERHALUSINASI CACAT (ZERO-HALLUCINATION). Jika gambar bersih, nyatakan PASS secara jujur.
+3. Tuliskan teks respon dalam bahasa: ${targetLanguageName}.
 
-ATURAN BAHASA:
-` + `Gunakan bahasa sesuai dengan parameter requested language: ${targetLanguageName}. Semua isi teks dalam JSON respons wajib menggunakan bahasa tersebut secara konsisten.
-
-ATURAN HEATMAPS:
-Untuk bagian heatmaps, petakan nilai X dan Y dalam skala rentang 0-100 sebagai persentase lokasi, lalu jelaskan secara spesifik pada raw_value objek apa yang melanggar di area tersebut.
-
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.`;
+Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.` + metadataInstruction;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
         visual_scan_analysis: { type: Type.STRING },
         legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
+        requires_model_release: { type: Type.BOOLEAN, description: "True if recognizable people are in the image" },
+        requires_property_release: { type: Type.BOOLEAN, description: "True if recognizable modern architecture, artwork, or private property is in the image" },
         technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
         strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
         overall_score: { type: Type.NUMBER },
@@ -6146,7 +6196,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
                 anatomical_errors: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 ip_risk: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 structural_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                synthetic_ui_coherence: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 proportion_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 illustration_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
                 vector_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
@@ -6165,7 +6214,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             },
             required: [
                 "blur", "composition", "lighting", "exposure", "color_balance", "over_edited", "sensor_issues", "watermark", "logo", "text",
-                "anatomical_errors", "structural_defects", "synthetic_ui_coherence", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "noise", "artifacts", "ai_artifacts", "stock_acceptance", "metadata"
+                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "noise", "artifacts", "ai_artifacts", "stock_acceptance", "metadata"
             ]
         },
         heatmaps: {
@@ -6183,20 +6232,19 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
             }
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
   };
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC MUST use a Pro-tier model for consistent, high-accuracy visual analysis.
-  // Flash/Flash-Lite models have inherently lower visual scrutiny and produce
-  // inconsistent verdicts on the same image — they're fine for content generation
-  // but NOT for quality decisions that gate Adobe Stock acceptance.
-  // User model selection is for generation only; QC always uses a Pro model.
-  let selectedModel = 'gemini-3.6-pro-preview';
+  // QC routing: use high visual acuity model
+  let selectedModel = model || 'gemini-3.1-pro-preview';
+  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
+    selectedModel = 'gemini-3.1-pro-preview';
+  }
 
   // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
-  const modelsToTry = ['gemini-3.6-pro-preview', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   let responseText = "";
   let lastError;
   let usedModel = "";
@@ -6235,8 +6283,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
 
         // Pin deterministic sampling (temperature 0 / low topP) so the SAME model checking
-        // the SAME image twice gives a consistent verdict. ALL Flash and Flash-Lite models
-        // reject explicit sampling params — skip it for all flash-tier models.
+        // the SAME image twice gives a consistent verdict.
         const supportsSamplingControls = !/flash/i.test(modelName);
         const callConfig: any = {
           systemInstruction,
@@ -6267,15 +6314,25 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
     
     // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
+      // Ignore media-mismatched checks for standard photos (e.g. vector/illustration checks)
+      const isVectorAsset = fileType?.includes('eps') || fileType?.includes('svg') || fileType?.includes('ai') || fileType?.includes('vector');
+      if (!isVectorAsset) {
+        if (parsedResult.ai_vision_checks.vector_issues) {
+          parsedResult.ai_vision_checks.vector_issues = { status: 'PASS', note: 'Not applicable (Raster photographic asset).' };
+        }
+        if (parsedResult.ai_vision_checks.illustration_issues) {
+          parsedResult.ai_vision_checks.illustration_issues = { status: 'PASS', note: 'Not applicable (Raster photographic asset).' };
+        }
+      }
+
       let anyFail = false;
       let anyIpFail = false;
       let hasCriticalFail = false;
       
-      // Kunci kritis: masalah hukum, hak cipta, atau cacat AI/struktural parah
-      const criticalKeys = ['watermark', 'logo', 'text', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'synthetic_ui_coherence'];
-      // Kunci kualitas teknis: persis kategori "quality issues" yang dipakai Adobe Stock untuk menolak konten
-      // (fokus/ketajaman, eksposur, pencahayaan, warna, editing berlebih, sensor/noise, proporsi, komposisi)
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'proportion_defects', 'composition', 'illustration_issues', 'vector_issues', 'noise', 'artifacts'];
+      // Kunci kritis: masalah hukum, hak cipta, atau cacat AI/struktural fatal nyata
+      const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
+      // Kunci kualitas teknis utama
+      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts'];
       const failedCheckKeys: string[] = [];
       let anyTechnicalFail = false;
       let acceptanceFail = false;
@@ -6284,7 +6341,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
           anyFail = true;
           failedCheckKeys.push(key);
-          if (['watermark', 'logo', 'ip_risk', 'text'].includes(key)) {
+          if (['watermark', 'logo', 'ip_risk'].includes(key)) {
             anyIpFail = true;
           }
           if (criticalKeys.includes(key)) {
@@ -6299,40 +6356,51 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
 
-      // Terapkan penolakan atau kelulusan berdasarkan level toleransi.
-      // CATATAN PENTING: moderator Adobe Stock menolak gambar untuk SATU cacat teknis apa pun,
-      // sehingga MEDIUM (standar industri) kini wajib FAIL jika ada check teknis ATAU kritis yang FAIL.
+      // Terapkan penolakan atau kelulusan terkalibrasi berdasarkan level toleransi
       if (tolerance === 'STRICT') {
-        if (anyFail) {
+        if (hasCriticalFail || anyIpFail || (anyTechnicalFail && parsedResult.overall_score < 75) || parsedResult.recommendation === 'FAIL' || (parsedResult.overall_score && parsedResult.overall_score < 75)) {
           parsedResult.recommendation = "FAIL";
           if (parsedResult.overall_score >= 60) {
             parsedResult.overall_score = 59;
           }
+        } else {
+          parsedResult.recommendation = "PASS";
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
         }
       } else if (tolerance === 'MEDIUM') {
-        if (hasCriticalFail || anyTechnicalFail || acceptanceFail) {
+        // Default MEDIUM (Standar Resmi Adobe Stock):
+        // PASS jika aset bersih dan tidak ada cacat kritis/IP.
+        // Hanya FAIL jika terdapat cacat kritis nyata (anatomi/AI artifacts/struktur rusak/IP) ATAU cacat teknis berat yang dikonfirmasi oleh skor rendah (< 70).
+        if (hasCriticalFail || anyIpFail || (anyTechnicalFail && parsedResult.recommendation === 'FAIL' && parsedResult.overall_score < 70)) {
           parsedResult.recommendation = "FAIL";
           if (parsedResult.overall_score >= 66) {
-            parsedResult.overall_score = 65;
+            parsedResult.overall_score = 64;
           }
+        } else {
+          parsedResult.recommendation = "PASS";
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
         }
       } else if (tolerance === 'LOOSE') {
-        // LOOSE tetap menoleransi cacat teknis minor, tetapi TIDAK menoleransi cacat kritis,
-        // cacat teknis utama pada subjek, atau penolakan penerimaan stok.
-        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail ||
-          failedCheckKeys.some(k => ['blur', 'exposure', 'lighting', 'over_edited', 'proportion_defects'].includes(k));
+        // LOOSE tetap menoleransi cacat teknis minor, tetapi TIDAK menoleransi cacat kritis atau IP
+        const looseBlocking = anyIpFail || hasCriticalFail || acceptanceFail || (parsedResult.overall_score && parsedResult.overall_score < 60);
         if (looseBlocking) {
           parsedResult.recommendation = "FAIL";
           if (parsedResult.overall_score >= 70) {
             parsedResult.overall_score = 69;
           }
+        } else {
+          parsedResult.recommendation = "PASS";
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
         }
       }
 
       // Sinkronkan stock_acceptance dengan keputusan akhir agar UI tidak menampilkan kontradiksi
       if (parsedResult.recommendation === "FAIL" && parsedResult.ai_vision_checks.stock_acceptance) {
         parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
+      } else if (parsedResult.recommendation === "PASS" && parsedResult.ai_vision_checks.stock_acceptance) {
+        parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
       }
+
       // Lampirkan daftar check yang gagal agar frontend/debug mudah membaca alasan penolakan
       if (failedCheckKeys.length > 0) {
         (parsedResult as any).failed_checks = failedCheckKeys;
@@ -6343,14 +6411,16 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       }
     }
 
-    // TRANSPARENCY: tell the caller which model actually produced this verdict, and
-    // whether it silently differs from what the user selected. Different model tiers
-    // (Pro vs Flash vs Flash-Lite) have very different visual scrutiny — Pro reliably
-    // catches subtle AI artifacts / mechanical coherence issues that Flash-tier models
-    // often miss, and the retry/rotation logic above CAN swap models silently on
-    // 429/503/invalid-model errors. Surfacing this is the honest fix: it doesn't force
-    // every model to agree (that isn't possible with different underlying capability),
-    // it just stops the report from hiding which model actually looked at the image.
+    (parsedResult as any).model_used = usedModel || selectedModel;
+    (parsedResult as any).model_requested = selectedModel;
+    (parsedResult as any).model_fallback_occurred = !!usedModel && usedModel !== selectedModel;
+
+    return parsedResult;
+  } catch(e) {
+    console.warn("Parse Error on QA response:", responseText);
+    throw e;
+  }
+}ps the report from hiding which model actually looked at the image.
     (parsedResult as any).model_used = usedModel || selectedModel;
     (parsedResult as any).model_requested = selectedModel;
     (parsedResult as any).model_fallback_occurred = !!usedModel && usedModel !== selectedModel;
