@@ -6017,7 +6017,7 @@ export async function checkImageQuality(
 
   let metadataInstruction = "";
   if (imageMetadata) {
-    metadataInstruction = `\n\n---\n[DATA PENGUKURAN PIKSEL OBJEKTIF - WAJIB DIJADIKAN ACUAN UTAMA]\nBerikut adalah hasil pengukuran teknis NYATA dari piksel file gambar asli (dihitung menggunakan analisis Laplacian/statistik piksel, BUKAN estimasi visual):\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nATURAN PENTING TERKAIT DATA INI:\n1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI, sedangkan gambar yang Anda lihat secara visual mungkin telah di-downscale/dikompresi oleh sistem vision API sehingga cacat halus (blur ringan, noise, banding, blocking) BISA JADI TIDAK TERLIHAT JELAS secara visual oleh Anda. JANGAN mengabaikan indikasi cacat pada data pengukuran hanya karena gambar "terlihat baik-baik saja" secara visual — gabungkan kedua sumber bukti (visual + numerik).\n2. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus yang WAJIB memengaruhi status \`blur\`.\n3. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.\n4. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.\n5. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar (bukan seluruh gambar) terdeteksi jauh lebih blur dari area lain — ini adalah pola cacat AI generatif atau motion blur parsial yang sangat mudah TERLEWAT jika hanya melihat gambar secara sekilas. Periksa dan pertimbangkan dengan serius.\n6. Field \`megapixels\` dan dimensi/resolusi FILE TIDAK BOLEH dipakai sebagai quality gate, penalty, FAIL, WARNING, atau alasan menurunkan overall_score. Resolusi hanya boleh dianggap metadata informasional bila muncul di data teknis. Jangan menyebut resolusi rendah sebagai masalah kualitas. \`file_size_kb\` juga bukan indikator kualitas visual. Fokuskan penilaian pada bukti visual dan forensic pixel evidence seperti sharpness, noise, exposure, banding, compression, alpha edge, OCR/text integrity, structural defects, AI artifacts, dan IP.\n7. Untuk PNG transparan, field \`transparency\` adalah pemeriksaan khusus cutout. Persentase transparan yang tinggi dan partial-alpha anti-aliasing yang normal BUKAN cacat. Jangan FAIL hanya karena gambar memiliki transparansi atau pixel semi-transparan. Perlakukan \`edge_halo_risk_percent\` sebagai cacat hanya bila bukti menunjukkan matte/fringe warna yang berulang dan benar-benar terlihat pada batas objek.\n8. Jika bukti alpha-edge hanya level WARN, laporkan sebagai rekomendasi pemeriksaan, bukan automatic rejection. Bedakan anti-aliasing normal dari kontaminasi matte hitam/putih/warna.\n9. Jangan menyimpulkan high noise, blur, atau AI artifact hanya dari preview yang telah di-downscale ketika pengukuran piksel objektif menunjukkan sebaliknya. Gunakan angka teknis dan crop resolusi asli bersama-sama.\nJadikan data teknis di atas sebagai BUKTI UTAMA yang menguatkan atau mengoreksi kesan visual Anda, bukan sekadar informasi tambahan.`;
+    metadataInstruction = `\n\n---\n[DATA PENGUKURAN PIKSEL OBJEKTIF & FLORENCE-2 SPATIAL GROUNDING - WAJIB DIJADIKAN ACUAN UTAMA]\nBerikut adalah hasil pengukuran teknis NYATA (OpenCV + BRISQUE + NIQE + Segmentation + Florence-2 Visual Grounding) dari file gambar asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nATURAN PENTING TERKAIT DATA INI:\n1. Data ini adalah HASIL PENGUKURAN OBJEKTIF pada file resolusi ASLI. Gabungkan kedua sumber bukti (visual + numerik) secara objektif.\n2. Field \`brisque\` dan \`niqe\`: Skor BRISQUE > 45 atau NIQE > 6.0 mengindikasikan degradasi spasial/penghalusan sintetis AI.\n3. Field \`florence_grounding\` (Florence Dense Visual Grounding): Menyediakan koordinat kotak spasial presisi \`[ymin, xmin, ymax, xmax]\` (skala 0-1000) untuk setiap tangan/jari, layar monitor, dan alat peraga. Gunakan koordinat ini untuk memverifikasi detail mikro pada crop 100% resolusi asli tanpa tebakan.\n4. Field \`segmentation\` (\`intentional_bokeh_detected\` = true): Membuktikan bahwa blur latar belakang adalah kedalaman optik bokeh yang disengaja (100% PASS).\n5. Field \`sharpness.status\` yang bernilai "Extremely blurry / Out-of-focus" atau "Soft focus / Out of focus" adalah indikasi kuat kegagalan fokus subjek utama yang WAJIB memengaruhi status \`blur\`.\n6. Field \`noise.status\` "High Noise / Grain" dan \`brightness.status\` yang menyebut "clipping" adalah indikasi kuat kegagalan teknis yang WAJIB memengaruhi status \`noise\`/\`exposure\`/\`lighting\`.\n7. Field \`banding\` dan \`jpeg_blocking\` dengan status "Review..." adalah indikasi artefak kompresi/posterization yang WAJIB memengaruhi status \`artifacts\`.\n8. Field \`local_analysis.has_local_blur_anomaly\` = true berarti SEBAGIAN area gambar terdeteksi jauh lebih blur dari area lain — periksa pada koordinat yang dilaporkan.\n9. Field \`megapixels\` dan dimensi file BUKAN alasan penolakan kualitas. Fokuskan penilaian pada bukti forensik piksel dan integritas semantik visual.\n10. Jadikan data teknis dan Florence spatial anchors di atas sebagai BUKTI UTAMA yang memandu inspeksi forensik Anda.`;
   }
 
   
@@ -6390,34 +6390,40 @@ Pastikan SELURUH respons JSON ditulis dalam bahasa: ${targetLanguageName}.`;
       }
 
       // Terapkan penolakan atau kelulusan terkalibrasi berdasarkan level toleransi (STRICT, MEDIUM, LOOSE):
+      // ZERO-OVERRIDE BUG FIX: Jangan pernah memaksa gambar cacat menjadi PASS jika AI atau kriteria QC menemukan kegagalan!
+      const isFailing = parsedResult.recommendation === 'FAIL' || 
+                        (typeof parsedResult.overall_score === 'number' && parsedResult.overall_score < 70) ||
+                        anyFail || 
+                        hasCriticalFail || 
+                        anyIpFail || 
+                        acceptanceFail;
+
       if (tolerance === 'STRICT') {
-        if (hasCriticalFail || anyIpFail || (anyTechnicalFail && parsedResult.overall_score < 75) || parsedResult.recommendation === 'FAIL' || (parsedResult.overall_score && parsedResult.overall_score < 75)) {
+        if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 55, 59);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 50, 58);
         } else {
           parsedResult.recommendation = "PASS";
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
         }
       } else if (tolerance === 'LOOSE') {
-        // Mode LOOSE: menoleransi cacat minor, tolak hanya jika ada pelanggaran kritis atau IP
         const looseBlocking = hasCriticalFail || anyIpFail || acceptanceFail || (parsedResult.overall_score && parsedResult.overall_score < 60);
         if (looseBlocking) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 58, 65);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 55, 62);
         } else {
           parsedResult.recommendation = "PASS";
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
         }
       } else {
         // Default MEDIUM (Standar Resmi Adobe Stock):
-        // PASS jika aset bersih dan tidak ada cacat kritis/IP.
-        // Hanya FAIL jika terdapat cacat kritis nyata (anatomi/AI artifacts/struktur rusak/IP) ATAU cacat teknis berat yang dikonfirmasi oleh skor rendah (< 70).
-        if (hasCriticalFail || anyIpFail || (anyTechnicalFail && parsedResult.recommendation === 'FAIL' && parsedResult.overall_score < 70)) {
+        // Jika ditemukan cacat AI, anatomi, teks cacat, blur subjek utama, atau AI menyatakan FAIL -> Status WAJIB FAIL
+        if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 58, 64);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 52, 60);
         } else {
           parsedResult.recommendation = "PASS";
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 88, 88);
+          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
         }
       }
 
