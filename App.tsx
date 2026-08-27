@@ -1792,50 +1792,20 @@ const App: React.FC = () => {
           setCloudDailyCounts((prev) => Object.keys(prev).length === 0 ? prev : {});
         }
 
-        // 4. Sync Settings
-        if (data.settings) {
-          let settingsChanged = false;
-          
-          const syncKey = (cloudValue: string | undefined, localKey: string, setterList: any) => {
-            if (cloudValue !== undefined) {
-              const localValue = localStorage.getItem(localKey) || '';
-              if (cloudValue !== localValue) {
-                localStorage.setItem(localKey, cloudValue);
-                setterList(cloudValue.split(',').map((k: string) => k.trim()).filter(Boolean));
-                settingsChanged = true;
-              }
-            }
-          };
-
-          syncKey(data.settings.gemini_api_key, 'gemini_api_key', setGeminiKeysList);
-          syncKey(data.settings.groq_api_key, 'groq_api_key', setGroqKeysList);
-          syncKey(data.settings.mistral_api_key, 'mistral_api_key', setMistralKeysList);
-          syncKey(data.settings.openai_api_key, 'openai_api_key', setOpenaiKeysList);
-          syncKey(data.settings.openrouter_api_key, 'openrouter_api_key', setOpenrouterKeysList);
-          syncKey(data.settings.blackbox_api_key, 'blackbox_api_key', setBlackboxKeysList);
-          syncKey(data.settings.nvidia_api_key, 'nvidia_api_key', setNvidiaKeysList);
-          syncKey(data.settings.bluesminds_api_key, 'bluesminds_api_key', setBluesmindsKeysList);
-          syncKey(data.settings.aivene_api_key, 'aivene_api_key', setAiveneKeysList);
-          syncKey(data.settings.zai_api_key, 'zai_api_key', setZaiKeysList);
-
-
-          // Local settings are fully decoupled from Firestore real-time sync
-
-          if (settingsChanged) {
-             setHasCustomKeySaved(
-                (localStorage.getItem('gemini_api_key') || '').length > 0 ||
-                (localStorage.getItem('groq_api_key') || '').length > 0 ||
-                (localStorage.getItem('mistral_api_key') || '').length > 0 ||
-                (localStorage.getItem('openai_api_key') || '').length > 0 ||
-                (localStorage.getItem('openrouter_api_key') || '').length > 0 ||
-                (localStorage.getItem('blackbox_api_key') || '').length > 0 ||
-                (localStorage.getItem('nvidia_api_key') || '').length > 0 ||
-                (localStorage.getItem('bluesminds_api_key') || '').length > 0 ||
-                (localStorage.getItem('aivene_api_key') || '').length > 0 ||
-                (localStorage.getItem('zai_api_key') || '').length > 0
-             );
-          }
-        }
+        // 4. Settings Sync: Keep local API keys fully in user control
+        // Do not let background polling snapshot overwrite user's local deletions
+        setHasCustomKeySaved(
+          (localStorage.getItem('gemini_api_key') || '').length > 0 ||
+          (localStorage.getItem('groq_api_key') || '').length > 0 ||
+          (localStorage.getItem('mistral_api_key') || '').length > 0 ||
+          (localStorage.getItem('openai_api_key') || '').length > 0 ||
+          (localStorage.getItem('openrouter_api_key') || '').length > 0 ||
+          (localStorage.getItem('blackbox_api_key') || '').length > 0 ||
+          (localStorage.getItem('nvidia_api_key') || '').length > 0 ||
+          (localStorage.getItem('bluesminds_api_key') || '').length > 0 ||
+          (localStorage.getItem('aivene_api_key') || '').length > 0 ||
+          (localStorage.getItem('zai_api_key') || '').length > 0
+        );
       } else {
         // Init cloud user profile if missing
         const localKey = localStorage.getItem('mz_license_key') || '';

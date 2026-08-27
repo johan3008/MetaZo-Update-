@@ -1,199 +1,9 @@
-
-/**
- * CSVPLANET-STYLE AI SEARCH RANKING
- *
- * Source-derived behavior: CSVPlanet publicly describes:
- * - strongest keywords first
- * - single-word keyword mode
- * - niche and concept coverage
- * - specific subject, location, action, concept and usage terms
- * - commercial intent / buyer use cases
- *
- * Implementation principle:
- * AI decides which terms actually apply to the asset.
- * No hardcoded keyword vocabulary or category quotas.
- */
-const CSVPLANET_STYLE_AI_RANKING_RULES = `
-CSVPLANET-STYLE STOCK SEARCH RANKING
-
-The keyword list must be relevance-ranked for stock-buyer search.
-
-1. PRIMARY VISUAL SUBJECT
-Start with the strongest, most specific visible subject.
-Examples are illustrative only, not a vocabulary whitelist.
-
-2. SPECIFIC VISUAL DETAILS
-Add important visible objects, setting, location type, activity,
-compositionally meaningful details, and other concrete search terms.
-
-3. ACTION / ACTIVITY
-Include actions only when visually supported.
-
-4. NICHE / CONCEPT
-Add supported niche or conceptual terms that explain why a buyer
-might search for the asset.
-
-5. COMMERCIAL / USAGE INTENT
-When visually and contextually justified, include realistic usage
-terms that connect the asset to projects such as education, healthcare,
-marketing, website, presentation, advertising, travel, agriculture,
-business, or other applicable uses.
-
-Do not invent commercial uses merely because they are possible.
-The AI must decide whether the asset genuinely supports them.
-
-RANKING:
-- strongest and most specific search terms first
-- important subject terms before weak supporting terms
-- specific phrases can outrank generic single words when they represent
-  a stronger real search intent
-- niche and concept terms should appear only when supported
-- usage terms should never displace a clearly stronger visual subject
-- first 10 keywords are the highest-priority search terms
-
-KEYWORD FORM:
-- use natural basic English
-- single-word terms are preferred when they carry the concept cleanly
-- natural multi-word phrases are allowed when they create meaningful
-  search intent
-- never create artificial keyword combinations
-- never repeat the same concept in multiple grammatical forms
-
-GENERIC FILTER:
-Reject generic/filler terms such as words equivalent to:
-image, photo, picture, visual, subject, focus, sharp, quality,
-design, beautiful, colorful, element — unless a word has a specific
-asset-supported meaning that is genuinely useful.
-
-COLOR:
-Do not add ordinary colors merely because pixels contain that color.
-Use color only when the AI determines it is a meaningful search attribute.
-
-SEMANTIC DEDUPLICATION:
-AI decides whether two terms express the same searchable concept.
-Keep distinct concepts even when related.
-
-SEARCH COVERAGE:
-Aim for a balanced set across:
-- visual object/subject
-- setting/location
-- action
-- niche/concept
-- legitimate usage/commercial intent
-
-Do not force all five groups.
-The asset determines which groups are valid.
-
-COUNT:
-Generate enough strong candidates for the requested count, then select
-only the strongest valid terms. Never pad the list with weak keywords.
-
-FINAL:
-The result should look like a clean stock keyword list written by an
-experienced contributor, not a raw computer-vision tag dump.
-`;
-
-
-/**
- * AI-ONLY KEYWORD SEMANTICS
- *
- * AI decides keyword meaning, search intent, semantic equivalence and ranking.
- * Code does not maintain a hardcoded noun/verb/adjective/concept vocabulary.
- * Code only performs mechanical validation after AI generation.
- */
-const AI_ONLY_KEYWORD_RULES = `
-${CSVPLANET_STYLE_AI_RANKING_RULES}
-
-AI IS THE AUTHORITY FOR KEYWORD SEMANTICS.
-
-Analyze the actual visual evidence and determine:
-- nouns / subjects / objects
-- verbs / actions / activities
-- adjectives / descriptive characteristics
-- natural specific search phrases
-- conceptual and contextual search intent
-- semantic equivalence between different word forms
-- keyword priority and ranking
-
-Do NOT use hardcoded vocabulary dictionaries.
-Do NOT force noun/verb/adjective/concept quotas.
-Do NOT invent keywords to fill the requested count.
-
-SEARCH INTENT COVERAGE:
-Use, when supported by the asset:
-1. exact subject searches
-2. subject + action searches
-3. subject + attribute searches
-4. natural specific phrases
-5. legitimate conceptual/contextual searches
-
-SEMANTIC DEDUPLICATION:
-AI must recognize equivalent forms such as:
-Asia / Asian / Asians
-terrace / terraces / terraced
-farmer / farmers
-
-Choose the strongest single representation.
-
-Do NOT merge genuinely different search concepts merely because they are related.
-For example, farmer, farming and harvesting may all remain if each contributes
-a distinct buyer search intent.
-
-QUALITY:
-- Use natural basic English.
-- Prefer real stock-buyer search terms.
-- No filler or generic photo/UI words.
-- No unsupported inference.
-- No artificial word concatenation.
-- No ordinary pixel-color inventory.
-- First 10 keywords have the strongest search value.
-- Never pad weak terms just to reach the requested count.
-
-FINAL PRINCIPLE:
-AI decides WHAT the keyword means and WHETHER it is useful.
-Code only validates the final output mechanically.
-`;
-
-function validateAIKeywordOutput(
-  keywords: unknown,
-  targetCount: number
-): string[] {
-  const limit = Math.max(1, Math.min(49, Number(targetCount) || 25));
-  if (!Array.isArray(keywords)) return [];
-
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  // Preserve the AI's ranking order; validation must never re-rank semantically.
-  for (const value of keywords) {
-    const keyword = String(value ?? '')
-      .trim()
-      .replace(/\s+/g, ' ');
-
-    if (!keyword) continue;
-
-    const exactKey = keyword.toLowerCase();
-    if (seen.has(exactKey)) continue;
-
-    seen.add(exactKey);
-    result.push(keyword);
-
-    if (result.length >= limit) break;
-  }
-
-  return result;
-}
-
-
-const SEARCH_INTENT_KEYWORD_RULES = AI_ONLY_KEYWORD_RULES;
-
-import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI, Type } from "@google/genai";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt, StructuredKeywords } from "../types";
+import { StockMetadata, ToolType, VideoAnalysisResult, VideoPrompt } from "../types";
 import { HOLIDAYS_DATA } from "./holidaysData.ts";
 import { EXTRA_HOLIDAYS_DATA } from "./extraHolidaysData.ts";
-import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, MIRICANVAS_CATEGORIES, DREAMSTIME_MAIN_CATEGORIES, DREAMSTIME_SUB_CATEGORIES } from "../constants";
+import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, DREAMSTIME_CATEGORIES, MIRICANVAS_CATEGORIES } from "../constants";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -285,7 +95,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   groq: 'meta-llama/llama-4-scout-17b-16e-instruct',
   mistral: 'pixtral-12b',
   openai: 'gpt-4o-mini',
-  openrouter: 'google/gemini-2.0-flash-001',
+  openrouter: 'google/gemini-3.0-flash-001',
   blackbox: 'blackboxai',
   nvidia: 'meta/llama-3.3-70b-instruct',
   bluesminds: 'gpt-4o',
@@ -328,96 +138,48 @@ const NON_GEMINI_PROVIDERS = new Set(['groq', 'mistral', 'openai', 'openrouter',
  * - teks pengantar/penutup di luar JSON
  * - whitespace ekstra
  */
-/**
- * Ekstrak JSON yang valid dan tahan banting dari respons AI:
- * - Menangani markdown code fences (```json ... ```)
- * - Memperbaiki JSON rusak/malformed via jsonrepair
- * - Fallback regex ekstraksi field jika JSON benar-benar corrupt
- */
 function extractJSON(raw: string): string {
   if (!raw) return "{}";
-
-  // 1. Coba parse langsung jika sudah valid
+  
+  // Try direct parse first
   try {
     const trimmed = raw.trim();
     JSON.parse(trimmed);
     return trimmed;
   } catch (e) {}
 
-  // 2. Bersihkan markdown fences
   let cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
 
-  // 3. Coba perbaiki dengan jsonrepair
-  try {
-    const repaired = jsonrepair(cleaned);
-    JSON.parse(repaired);
-    return repaired;
-  } catch (e) {}
-
-  // 4. Cari blok kurung kurawal pertama & terakhir
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const slice = cleaned.slice(firstBrace, lastBrace + 1);
-    try {
-      const repairedSlice = jsonrepair(slice);
-      JSON.parse(repairedSlice);
-      return repairedSlice;
-    } catch (e) {
-      try {
-        JSON.parse(slice);
-        return slice;
-      } catch (e2) {}
+  // Robust extraction: find the first { or [ and the last matching } or ]
+  // If it fails to parse, try to find the next { or [
+  const tryExtract = (opener: string, closer: string): string | null => {
+    let startIdx = 0;
+    while ((startIdx = cleaned.indexOf(opener, startIdx)) !== -1) {
+      let endIdx = cleaned.lastIndexOf(closer);
+      while (endIdx > startIdx) {
+        const potential = cleaned.slice(startIdx, endIdx + 1);
+        try {
+          JSON.parse(potential);
+          return potential;
+        } catch (e) {
+          // Try a smaller window from the end
+          endIdx = cleaned.lastIndexOf(closer, endIdx - 1);
+        }
+      }
+      startIdx++;
     }
-  }
+    return null;
+  };
 
-  // 5. Cari blok kurung siku array
-  const firstBracket = cleaned.indexOf('[');
-  const lastBracket = cleaned.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    const slice = cleaned.slice(firstBracket, lastBracket + 1);
-    try {
-      const repairedSlice = jsonrepair(slice);
-      JSON.parse(repairedSlice);
-      return repairedSlice;
-    } catch (e) {
-      try {
-        JSON.parse(slice);
-        return slice;
-      } catch (e2) {}
-    }
-  }
+  // Prioritize objects {} as they are more common in our pipeline
+  const objectMatch = tryExtract('{', '}');
+  if (objectMatch) return objectMatch;
 
-  // 6. Failsafe Regex Parser: Ekstrak key-value manual jika model mengeluarkan format non-standar
-  try {
-    const titleMatch = raw.match(/"title"\s*:\s*"([^"]+)"/i);
-    const descMatch = raw.match(/"description"\s*:\s*"([^"]+)"/i);
-    const kwMatch = raw.match(/"keywords"\s*:\s*\[([^\]]+)\]/i);
-    const catMatch = raw.match(/"category_id"\s*:\s*(\d+)/i);
-    const scut1Match = raw.match(/"shutterstock_category_1"\s*:\s*"([^"]+)"/i);
-    const scut2Match = raw.match(/"shutterstock_category_2"\s*:\s*"([^"]+)"/i);
-
-    let kws: string[] = [];
-    if (kwMatch && kwMatch[1]) {
-      kws = kwMatch[1].split(',').map(s => s.replace(/["'\[\]]/g, '').trim()).filter(Boolean);
-    }
-
-    if (titleMatch || descMatch || kws.length > 0) {
-      return JSON.stringify({
-        title: titleMatch ? titleMatch[1] : '',
-        description: descMatch ? descMatch[1] : '',
-        keywords: kws,
-        category_id: catMatch ? parseInt(catMatch[1], 10) : 0,
-        shutterstock_category_1: scut1Match ? scut1Match[1] : '',
-        shutterstock_category_2: scut2Match ? scut2Match[1] : '',
-        category_reason: 'Extracted via failsafe parser'
-      });
-    }
-  } catch (e) {}
+  const arrayMatch = tryExtract('[', ']');
+  if (arrayMatch) return arrayMatch;
 
   return "{}";
 }
-
 
 const COLOR_KEYWORDS = new Set([
   'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'brown', 'black', 'white', 'gray', 'grey', 'gold', 'silver', 'bronze', 
@@ -425,31 +187,23 @@ const COLOR_KEYWORDS = new Set([
   'amber', 'olive', 'coral', 'crimson', 'scarlet', 'maroon', 'plum', 'ivory', 'mustard', 'khaki', 'mint', 'lime', 'tan', 'mauve', 'pastel'
 ]);
 
-// Connector / function words are never valid standalone microstock keywords.
-// They may appear naturally in titles/descriptions, but must never occupy keyword slots.
+// Connector / function words are not valid standalone search keywords and
+// should never be used to manufacture human-looking keyword phrases.
+// If a multi-word keyword contains one of these words, reject the entire
+// phrase instead of deleting the connector and leaving an unnatural phrase.
 const KEYWORD_CONNECTOR_WORDS = new Set([
-  'a', 'an', 'the', 'and', 'or', 'nor', 'but', 'if', 'then', 'than',
-  'of', 'in', 'on', 'at', 'to', 'for', 'from', 'by', 'with', 'without',
-  'into', 'onto', 'over', 'under', 'between', 'through', 'during', 'before',
-  'after', 'around', 'against', 'among', 'within', 'across', 'behind', 'beside',
-  'near', 'toward', 'towards', 'upon', 'via', 'as', 'per', 'while',
-  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'am', 'has', 'have', 'had',
-  'this', 'that', 'these', 'those', 'it', 'its', 'their', 'there', 'here'
+  'a', 'an', 'the', 'and', 'or', 'but', 'nor', 'yet', 'so', 'for',
+  'with', 'without', 'to', 'of', 'in', 'on', 'at', 'by', 'from', 'into',
+  'onto', 'over', 'under', 'between', 'through', 'during', 'within',
+  'against', 'among', 'around', 'before', 'after', 'behind', 'beside',
+  'near', 'than', 'via', 'as', 'is', 'are', 'was', 'were', 'be',
+  'da', 'dan', 'atau', 'dengan', 'serta', 'untuk', 'dari', 'di', 'ke',
+  'pada', 'dalam', 'oleh', 'yang', 'sebagai'
 ]);
 
-function isKeywordConnector(word: string): boolean {
-  return KEYWORD_CONNECTOR_WORDS.has(String(word || '').toLowerCase().trim());
-}
-
-function cleanKeywordOutput(raw: string): string {
-  const clean = sanitizeForIndexing(raw);
-  if (!clean) return '';
-  return clean
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter(word => !isKeywordConnector(word))
-    .join(' ')
-    .trim();
+function containsKeywordConnector(phrase: string): boolean {
+  const words = String(phrase || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  return words.some(word => KEYWORD_CONNECTOR_WORDS.has(word));
 }
 
 const PROHIBITED_KEYWORDS_SET = new Set([
@@ -461,16 +215,20 @@ const PROHIBITED_KEYWORDS_SET = new Set([
 ]);
 
 /**
- * Checks if a word is a prohibited brand, IP, standard name, or contains a color.
+ * Enforces the keyword IP/brand/name exclusion at the application layer.
+ * The AI prompt remains the primary semantic rule; this is a safety net for
+ * known protected terms that should never survive into final keywords.
  */
 function isProhibitedKeyword(word: string): boolean {
-  if (!word) return true;
-  const lower = word.toLowerCase().trim();
-  if (PROHIBITED_KEYWORDS_SET.has(lower)) return true;
-  return false;
+  const normalized = String(word || '').trim().toLowerCase();
+  if (!normalized) return true;
+
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  return tokens.some(token => PROHIBITED_KEYWORDS_SET.has(token)) ||
+         PROHIBITED_KEYWORDS_SET.has(normalized);
 }
 
-function getHeuristicCategories(title: string, keywords: string[]): {
+export function getHeuristicCategories(title: string, keywords: string[]): {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
@@ -562,51 +320,14 @@ function getHeuristicCategories(title: string, keywords: string[]): {
 
   const choice = mapping[bestCatId] || { cat1: "Abstract", cat2: "Backgrounds/Textures" };
 
-  // Map Adobe category to MiriCanvas category (content type based)
-  const miriCanvasMapping: Record<number, number> = {
-    1: 4, 2: 4, 3: 4, 4: 4, 5: 3, 6: 1, 7: 4,
-    8: 2, 9: 4, 10: 4, 11: 3, 12: 4, 13: 4,
-    14: 4, 15: 4, 16: 4, 17: 4, 18: 4, 19: 4, 20: 4, 21: 4
-  };
-  // Default MiriCanvas: Photo (4), Graphic/Abstract → PNG Element (2), Backgrounds → Background (3)
-
-  // Map Adobe category to Dreamstime Main + SubCategory
-  const dreamstimeMapping: Record<number, { main: number; sub: number }> = {
-    1: { main: 2, sub: 11 },   // Animals → Wildlife
-    2: { main: 3, sub: 12 },   // Buildings → Modern Buildings
-    3: { main: 5, sub: 23 },   // Business → Office
-    4: { main: 7, sub: 34 },   // Drinks → Beverages
-    5: { main: 11, sub: 51 },  // Environment → Landscapes
-    6: { main: 1, sub: 1 },    // States of Mind → Backgrounds
-    7: { main: 7, sub: 33 },   // Food → Meals
-    8: { main: 1, sub: 3 },    // Graphic Resources → Patterns
-    9: { main: 14, sub: 70 },  // Hobbies → Fitness
-    10: { main: 10, sub: 48 }, // Industry → Construction
-    11: { main: 11, sub: 51 }, // Landscapes → Landscapes
-    12: { main: 13, sub: 62 }, // Lifestyle → Lifestyle
-    13: { main: 13, sub: 63 }, // People → Portraits
-    14: { main: 11, sub: 56 }, // Plants → Flowers & Plants
-    15: { main: 4, sub: 22 },  // Culture → Visual Arts
-    16: { main: 6, sub: 29 },  // Science → Science
-    17: { main: 13, sub: 65 }, // Social Issues → Emotions
-    18: { main: 14, sub: 70 }, // Sports → Fitness
-    19: { main: 12, sub: 57 }, // Technology → Electronics
-    20: { main: 15, sub: 73 }, // Transport → Transportation
-    21: { main: 15, sub: 72 }  // Travel → Destinations
-  };
-  const dreamstimeChoice = dreamstimeMapping[bestCatId] || { main: 1, sub: 1 };
-
   return {
     category_id: bestCatId,
     shutterstock_category_1: choice.cat1,
-    shutterstock_category_2: choice.cat2,
-    miriCanvas_category_id: miriCanvasMapping[bestCatId] || 4,
-    dreamstime_main_category_id: dreamstimeChoice.main,
-    dreamstime_sub_category_id: dreamstimeChoice.sub
+    shutterstock_category_2: choice.cat2
   };
 }
 
-function ensureTitleLength(title: string, keywords: string[], description: string, titleLength?: string): string {
+export function ensureTitleLength(title: string, keywords: string[], description: string, titleLength?: string): string {
   if (!title || title.trim() === "" || title.includes("Write a descriptive title here") || title.includes("<generate a") || title.includes("A highly descriptive") || title.includes("A detailed")) {
     if (description && description.trim().length > 10 && !description.includes("Write a detailed description here") && !description.includes("<generate a") && !description.includes("A highly descriptive") && !description.includes("A detailed")) title = description;
     else if (keywords && keywords.length >= 3) title = keywords.slice(0, 5).join(' ');
@@ -615,13 +336,9 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
     title = String(title);
   }
   
-  // Clean input title: remove all commas, periods, hyphens/dashes, double spaces
-  let cleanedTitle = title
-    .replace(/[\u2010-\u2015_]/g, ' ') // en-dash, em-dash, dan varian unicode lain -> spasi
-    .replace(/-/g, ' ')                // tanda hubung biasa -> spasi (title tidak boleh ada tanda hubung)
-    .replace(/,/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // Clean input title: remove all commas, periods, double spaces
+  let cleanedTitle = title.replace(/,/g, ' ').replace(/[\-–—_]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
   if (cleanedTitle.endsWith('.')) {
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
@@ -666,8 +383,8 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
   }
   cleanedTitle = deduplicatedWords.join(' ');
 
-  // Guarantee absolute removal of any commas, periods, hyphens/dashes, double spaces
-  cleanedTitle = cleanedTitle.replace(/[\u2010-\u2015_-]/g, ' ').replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  // Guarantee absolute removal of any commas, periods, double spaces
+  cleanedTitle = cleanedTitle.replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
 
   // Sentence case capitalisation
   if (cleanedTitle.length > 0) {
@@ -677,7 +394,7 @@ function ensureTitleLength(title: string, keywords: string[], description: strin
   return cleanedTitle;
 }
 
-function ensureDescription(description: string, title: string, keywords: string[]): string {
+export function ensureDescription(description: string, title: string, keywords: string[]): string {
   if (!description || typeof description !== 'string') {
     description = "";
   }
@@ -713,7 +430,12 @@ function ensureDescription(description: string, title: string, keywords: string[
     return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
   
-  return description.trim();
+  const cleaned = description.trim().replace(/\s+/g, ' ');
+  if (cleaned.length <= 200) return cleaned;
+
+  const truncated = cleaned.slice(0, 200);
+  const lastSpace = truncated.lastIndexOf(' ');
+  return (lastSpace > 100 ? truncated.slice(0, lastSpace) : truncated).trim();
 }
 
 const getTitleLengthRule = (titleLength?: string) => {
@@ -745,611 +467,1283 @@ const getLanguageName = (code?: string) => {
   return map[code || 'en'] || 'ENGLISH';
 };
 
-/**
- * [ENFORCEMENT TERPUSAT] Menjamin keyword akhir 100% konsisten dengan keywordMode
- * yang dipilih user — dijalankan sebagai langkah TERAKHIR sebelum keyword dipakai,
- * terlepas dari sumbernya (AI, padding visualFacts, sinonim, long-tail). Hanya mode
- * 'mixed' (atau tidak diset) yang boleh berisi campuran satu-kata & multi-kata;
- * mode 'single' dan 'multi' selalu dipaksa murni sesuai definisinya.
- */
-/**
- * METAZO 7-STAGE SEO KEYWORD ARCHITECTURE:
- * 
- * OBJECT ──> PRIMARY KEYWORD ──> SYNONYM CHECK ──> RELEVANCE CHECK ──> DUPLICATE CHECK ──> SEO RANKING ──> FINAL KEYWORDS
- * 
- * Tahap 1: OBJECT — Ekstraksi subjek visual & elemen konkret dari VISUAL_FACTS.
- * Tahap 2: PRIMARY KEYWORD — Penetapan kata kunci utama objek inti (Keyword #1).
- * Tahap 3: SYNONYM CHECK — Ekspansi sinonim profesional lintas-wilayah (tanpa pengulangan sufiks -ing/-er/-s).
- * Tahap 4: RELEVANCE CHECK — Validasi grounding visual literal & search intent pembeli.
- * Tahap 5: DUPLICATE CHECK — Deduplikasi eksak & varian morfologi/stemming (anti root redundancy).
- * Tahap 6: SEO RANKING — Penataan hierarki 3-Tier (1-10: Objek Utama, 11-20: Detail/Aksi, 21-30+: Konsep/Intent).
- * Tahap 7: FINAL KEYWORDS — Penguncian presisi sesuai jumlah target keyword yang diminta.
- */
-/**
- * Membersihkan keyword untuk indexing: lowercase, trim, hapus karakter non-alfanumerik,
- * normalisasi spasi, hapus tanda baca di awal/akhir.
- */
-function sanitizeForIndexing(raw: string): string {
-  if (!raw || typeof raw !== 'string') return '';
-  return raw
-    .toLowerCase()
-    .trim()
-    .replace(/[\u2010-\u2015_]/g, ' ') // ganti semua jenis dash/hyphen unicode dan underscore dengan spasi
-    .replace(/-/g, ' ')          // ganti tanda hubung biasa dengan spasi (jangan pernah ada tanda hubung di keyword)
-    .replace(/[^\w\s]/g, '')     // hapus karakter spesial lainnya
-    .replace(/\s+/g, ' ')        // normalisasi spasi ganda
-    .trim();
+// ============================================================================
+// KEYWORD MARKET INTELLIGENCE V5
+// Asset-level performance intelligence from 400 Adobe Stock assets (Technology + Food + Abstract + Nature),
+// plus dynamic market-candidate discovery, contributor performance imports, and corpus signals.
+// Never fabricates keyword-attributed sales or search-volume values.
+// Configure with KEYWORD_MARKET_DATA_JSON or KEYWORD_MARKET_DATA_PATH.
+// ============================================================================
+type KeywordMarketSignal = {
+  popularity?: number; competition?: number; conversion?: number; trend?: number;
+  searchVolume?: number; sales?: number; downloads?: number; downloadsPerMonth?: number; assets?: number; confidence?: number;
+  avgDownloadsPerAsset?: number; avgDownloadsPerMonth?: number; datasets?: number;
+  historicalPerformance?: number; currentMomentum?: number; exposure?: number; marketScore?: number;
+  dataQuality?: string;
+  updatedAt?: string; platform?: string; source?: string;
+};
+type KeywordMarketDataset = {
+  version?: string; updatedAt?: string; platform?: string; source?: string;
+  keywords?: Record<string, KeywordMarketSignal>; [key: string]: any;
+};
+let keywordMarketSignals: Record<string, KeywordMarketSignal> | null = null;
+let keywordMarketMeta: Pick<KeywordMarketDataset, 'version' | 'updatedAt' | 'platform' | 'source'> = {};
+const BUILTIN_KEYWORD_MARKET_DATA: KeywordMarketDataset = {"version":"4.0","updatedAt":"2026-08-20","platform":"Adobe Stock","source":"derived from uploaded 100-technology + 100-food + 100-abstract + 100-nature asset datasets","assetCount":400,"datasetCount":4,"keywordCount":978,"notes":"Downloads and Downloads/Month are asset-level signals aggregated across assets containing each keyword. They are not direct keyword-attributed sales, search volume, or marketplace-wide popularity. Market scores are derived from asset performance, current momentum, exposure, and observation confidence.","datasets":["technology","food","abstract","nature"],"keywords":{"background":{"popularity":93.4,"trend":77.2,"confidence":100.0,"downloads":1808373.0,"downloadsPerMonth":22822.0,"assets":159,"avgDownloadsPerAsset":11373.42,"avgDownloadsPerMonth":143.53,"datasets":4,"historicalPerformance":89.8,"currentMomentum":77.2,"exposure":100.0,"marketScore":86.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vector":{"popularity":86.7,"trend":79.8,"confidence":100.0,"downloads":681417.0,"downloadsPerMonth":9715.6,"assets":57,"avgDownloadsPerAsset":11954.68,"avgDownloadsPerMonth":170.45,"datasets":4,"historicalPerformance":90.3,"currentMomentum":79.8,"exposure":80.0,"marketScore":83.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"and":{"popularity":89.0,"trend":75.6,"confidence":100.0,"downloads":938012.0,"downloadsPerMonth":12066.9,"assets":93,"avgDownloadsPerAsset":10086.15,"avgDownloadsPerMonth":129.75,"datasets":4,"historicalPerformance":88.7,"currentMomentum":75.6,"exposure":89.5,"marketScore":83.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"with":{"popularity":88.2,"trend":75.8,"confidence":100.0,"downloads":830958.0,"downloadsPerMonth":10859.4,"assets":83,"avgDownloadsPerAsset":10011.54,"avgDownloadsPerMonth":130.84,"datasets":4,"historicalPerformance":88.6,"currentMomentum":75.8,"exposure":87.3,"marketScore":82.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"white":{"popularity":85.7,"trend":77.4,"confidence":99.9,"downloads":582650.0,"downloadsPerMonth":7550.7,"assets":52,"avgDownloadsPerAsset":11204.81,"avgDownloadsPerMonth":145.21,"datasets":4,"historicalPerformance":89.7,"currentMomentum":77.4,"exposure":78.2,"marketScore":81.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"texture":{"popularity":85.0,"trend":78.0,"confidence":99.8,"downloads":526837.0,"downloadsPerMonth":6659.2,"assets":44,"avgDownloadsPerAsset":11973.57,"avgDownloadsPerMonth":151.35,"datasets":4,"historicalPerformance":90.3,"currentMomentum":78.0,"exposure":75.0,"marketScore":81.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"black":{"popularity":82.6,"trend":79.8,"confidence":99.0,"downloads":367393.0,"downloadsPerMonth":5282.0,"assets":31,"avgDownloadsPerAsset":11851.39,"avgDownloadsPerMonth":170.39,"datasets":4,"historicalPerformance":90.2,"currentMomentum":79.8,"exposure":68.3,"marketScore":80.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"abstract":{"popularity":84.5,"trend":78.3,"confidence":96.0,"downloads":492841.0,"downloadsPerMonth":6336.6,"assets":41,"avgDownloadsPerAsset":12020.51,"avgDownloadsPerMonth":154.55,"datasets":3,"historicalPerformance":90.4,"currentMomentum":78.3,"exposure":73.6,"marketScore":80.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"grunge":{"popularity":81.3,"trend":84.3,"confidence":92.1,"downloads":309182.0,"downloadsPerMonth":4549.5,"assets":20,"avgDownloadsPerAsset":15459.1,"avgDownloadsPerMonth":227.47,"datasets":3,"historicalPerformance":92.8,"currentMomentum":84.3,"exposure":60.0,"marketScore":79.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blue":{"popularity":82.7,"trend":77.1,"confidence":98.7,"downloads":375408.0,"downloadsPerMonth":4127.3,"assets":29,"avgDownloadsPerAsset":12945.1,"avgDownloadsPerMonth":142.32,"datasets":4,"historicalPerformance":91.1,"currentMomentum":77.1,"exposure":67.0,"marketScore":79.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"for":{"popularity":83.0,"trend":76.0,"confidence":99.4,"downloads":387313.0,"downloadsPerMonth":4785.8,"assets":36,"avgDownloadsPerAsset":10758.69,"avgDownloadsPerMonth":132.94,"datasets":4,"historicalPerformance":89.3,"currentMomentum":76.0,"exposure":71.1,"marketScore":79.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"isolated":{"popularity":79.8,"trend":81.1,"confidence":97.5,"downloads":238390.0,"downloadsPerMonth":4439.9,"assets":24,"avgDownloadsPerAsset":9932.92,"avgDownloadsPerMonth":185.0,"datasets":4,"historicalPerformance":88.5,"currentMomentum":81.1,"exposure":63.4,"marketScore":79.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"illustration":{"popularity":80.8,"trend":77.8,"confidence":98.1,"downloads":280911.0,"downloadsPerMonth":3887.5,"assets":26,"avgDownloadsPerAsset":10804.27,"avgDownloadsPerMonth":149.52,"datasets":4,"historicalPerformance":89.4,"currentMomentum":77.8,"exposure":64.9,"marketScore":78.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"transparent":{"popularity":78.9,"trend":87.1,"confidence":89.5,"downloads":211758.0,"downloadsPerMonth":4375.8,"assets":16,"avgDownloadsPerAsset":13234.88,"avgDownloadsPerMonth":273.49,"datasets":3,"historicalPerformance":91.3,"currentMomentum":87.1,"exposure":55.8,"marketScore":78.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"collection":{"popularity":79.9,"trend":82.0,"confidence":93.2,"downloads":247431.0,"downloadsPerMonth":3141.2,"assets":16,"avgDownloadsPerAsset":15464.44,"avgDownloadsPerMonth":196.33,"datasets":4,"historicalPerformance":92.8,"currentMomentum":82.0,"exposure":55.8,"marketScore":78.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"set":{"popularity":82.0,"trend":73.2,"confidence":99.4,"downloads":333978.0,"downloadsPerMonth":3977.0,"assets":36,"avgDownloadsPerAsset":9277.17,"avgDownloadsPerMonth":110.47,"datasets":4,"historicalPerformance":87.9,"currentMomentum":73.2,"exposure":71.1,"marketScore":77.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"paper":{"popularity":80.6,"trend":80.2,"confidence":92.6,"downloads":275048.0,"downloadsPerMonth":3661.0,"assets":21,"avgDownloadsPerAsset":13097.52,"avgDownloadsPerMonth":174.33,"datasets":3,"historicalPerformance":91.2,"currentMomentum":80.2,"exposure":60.9,"marketScore":77.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"icons":{"popularity":80.2,"trend":77.2,"confidence":96.4,"downloads":256140.0,"downloadsPerMonth":3013.6,"assets":21,"avgDownloadsPerAsset":12197.14,"avgDownloadsPerMonth":143.5,"datasets":4,"historicalPerformance":90.5,"currentMomentum":77.2,"exposure":60.9,"marketScore":77.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"design":{"popularity":79.3,"trend":79.0,"confidence":94.7,"downloads":224252.0,"downloadsPerMonth":2895.7,"assets":18,"avgDownloadsPerAsset":12458.44,"avgDownloadsPerMonth":160.87,"datasets":4,"historicalPerformance":90.7,"currentMomentum":79.0,"exposure":58.0,"marketScore":77.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"the":{"popularity":82.0,"trend":71.5,"confidence":99.1,"downloads":334710.0,"downloadsPerMonth":3171.8,"assets":32,"avgDownloadsPerAsset":10459.69,"avgDownloadsPerMonth":99.12,"datasets":4,"historicalPerformance":89.0,"currentMomentum":71.5,"exposure":68.9,"marketScore":76.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"christmas":{"popularity":79.7,"trend":79.9,"confidence":91.0,"downloads":238754.0,"downloadsPerMonth":3075.2,"assets":18,"avgDownloadsPerAsset":13264.11,"avgDownloadsPerMonth":170.84,"datasets":3,"historicalPerformance":91.3,"currentMomentum":79.9,"exposure":58.0,"marketScore":76.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"business":{"popularity":80.1,"trend":75.7,"confidence":93.8,"downloads":252854.0,"downloadsPerMonth":3122.1,"assets":24,"avgDownloadsPerAsset":10535.58,"avgDownloadsPerMonth":130.09,"datasets":3,"historicalPerformance":89.1,"currentMomentum":75.7,"exposure":63.4,"marketScore":75.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"technology":{"popularity":78.6,"trend":77.8,"confidence":91.0,"downloads":202780.0,"downloadsPerMonth":2684.0,"assets":18,"avgDownloadsPerAsset":11265.56,"avgDownloadsPerMonth":149.11,"datasets":3,"historicalPerformance":89.8,"currentMomentum":77.8,"exposure":58.0,"marketScore":74.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dark":{"popularity":78.7,"trend":75.4,"confidence":93.2,"downloads":203974.0,"downloadsPerMonth":2039.6,"assets":16,"avgDownloadsPerAsset":12748.38,"avgDownloadsPerMonth":127.47,"datasets":4,"historicalPerformance":90.9,"currentMomentum":75.4,"exposure":55.8,"marketScore":74.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sky":{"popularity":79.5,"trend":74.4,"confidence":92.6,"downloads":229653.0,"downloadsPerMonth":2519.2,"assets":21,"avgDownloadsPerAsset":10935.86,"avgDownloadsPerMonth":119.96,"datasets":3,"historicalPerformance":89.5,"currentMomentum":74.4,"exposure":60.9,"marketScore":74.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pattern":{"popularity":76.6,"trend":78.8,"confidence":91.3,"downloads":148542.0,"downloadsPerMonth":2226.7,"assets":14,"avgDownloadsPerAsset":10610.14,"avgDownloadsPerMonth":159.05,"datasets":4,"historicalPerformance":89.2,"currentMomentum":78.8,"exposure":53.4,"marketScore":74.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"space":{"popularity":77.7,"trend":79.0,"confidence":88.8,"downloads":175626.0,"downloadsPerMonth":1934.2,"assets":12,"avgDownloadsPerAsset":14635.5,"avgDownloadsPerMonth":161.18,"datasets":4,"historicalPerformance":92.3,"currentMomentum":79.0,"exposure":50.5,"marketScore":74.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"line":{"popularity":75.9,"trend":80.7,"confidence":88.8,"downloads":132236.0,"downloadsPerMonth":2156.7,"assets":12,"avgDownloadsPerAsset":11019.67,"avgDownloadsPerMonth":179.73,"datasets":4,"historicalPerformance":89.5,"currentMomentum":80.7,"exposure":50.5,"marketScore":73.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hand":{"popularity":75.7,"trend":81.7,"confidence":85.7,"downloads":129283.0,"downloadsPerMonth":1916.8,"assets":10,"avgDownloadsPerAsset":12928.3,"avgDownloadsPerMonth":191.68,"datasets":4,"historicalPerformance":91.1,"currentMomentum":81.7,"exposure":47.2,"marketScore":73.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"realistic":{"popularity":75.9,"trend":80.1,"confidence":85.1,"downloads":132738.0,"downloadsPerMonth":2075.3,"assets":12,"avgDownloadsPerAsset":11061.5,"avgDownloadsPerMonth":172.94,"datasets":3,"historicalPerformance":89.6,"currentMomentum":80.1,"exposure":50.5,"marketScore":72.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"gradient":{"popularity":75.6,"trend":83.5,"confidence":81.3,"downloads":125609.0,"downloadsPerMonth":2594.0,"assets":12,"avgDownloadsPerAsset":10467.42,"avgDownloadsPerMonth":216.17,"datasets":2,"historicalPerformance":89.0,"currentMomentum":83.5,"exposure":50.5,"marketScore":72.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"icon":{"popularity":75.9,"trend":81.2,"confidence":83.6,"downloads":132471.0,"downloadsPerMonth":2047.6,"assets":11,"avgDownloadsPerAsset":12042.82,"avgDownloadsPerMonth":186.15,"datasets":3,"historicalPerformance":90.4,"currentMomentum":81.2,"exposure":49.0,"marketScore":72.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"light":{"popularity":75.9,"trend":72.5,"confidence":93.2,"downloads":130753.0,"downloadsPerMonth":1694.1,"assets":16,"avgDownloadsPerAsset":8172.06,"avgDownloadsPerMonth":105.88,"datasets":4,"historicalPerformance":86.7,"currentMomentum":72.5,"exposure":55.8,"marketScore":71.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"paint":{"popularity":75.9,"trend":88.3,"confidence":74.1,"downloads":132443.0,"downloadsPerMonth":2351.5,"assets":8,"avgDownloadsPerAsset":16555.38,"avgDownloadsPerMonth":293.94,"datasets":2,"historicalPerformance":93.5,"currentMomentum":88.3,"exposure":43.3,"marketScore":71.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wooden":{"popularity":77.7,"trend":68.2,"confidence":94.7,"downloads":174960.0,"downloadsPerMonth":1442.3,"assets":18,"avgDownloadsPerAsset":9720.0,"avgDownloadsPerMonth":80.13,"datasets":4,"historicalPerformance":88.3,"currentMomentum":68.2,"exposure":58.0,"marketScore":71.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mockup":{"popularity":77.0,"trend":79.3,"confidence":81.1,"downloads":157914.0,"downloadsPerMonth":2463.6,"assets":15,"avgDownloadsPerAsset":10527.6,"avgDownloadsPerMonth":164.24,"datasets":1,"historicalPerformance":89.1,"currentMomentum":79.3,"exposure":54.6,"marketScore":71.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lights":{"popularity":76.2,"trend":84.4,"confidence":76.3,"downloads":138531.0,"downloadsPerMonth":2060.5,"assets":9,"avgDownloadsPerAsset":15392.33,"avgDownloadsPerMonth":228.94,"datasets":2,"historicalPerformance":92.8,"currentMomentum":84.4,"exposure":45.4,"marketScore":71.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"concept":{"popularity":74.2,"trend":78.0,"confidence":85.7,"downloads":101601.0,"downloadsPerMonth":1514.4,"assets":10,"avgDownloadsPerAsset":10160.1,"avgDownloadsPerMonth":151.44,"datasets":4,"historicalPerformance":88.8,"currentMomentum":78.0,"exposure":47.2,"marketScore":70.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wood":{"popularity":77.3,"trend":72.6,"confidence":87.6,"downloads":166046.0,"downloadsPerMonth":1495.2,"assets":14,"avgDownloadsPerAsset":11860.43,"avgDownloadsPerMonth":106.8,"datasets":3,"historicalPerformance":90.2,"currentMomentum":72.6,"exposure":53.4,"marketScore":70.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wave":{"popularity":73.2,"trend":82.3,"confidence":81.6,"downloads":85997.0,"downloadsPerMonth":1599.6,"assets":8,"avgDownloadsPerAsset":10749.62,"avgDownloadsPerMonth":199.95,"datasets":4,"historicalPerformance":89.3,"currentMomentum":82.3,"exposure":43.3,"marketScore":70.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"smartphone":{"popularity":76.5,"trend":79.5,"confidence":80.1,"downloads":144440.0,"downloadsPerMonth":2338.2,"assets":14,"avgDownloadsPerAsset":10317.14,"avgDownloadsPerMonth":167.01,"datasets":1,"historicalPerformance":88.9,"currentMomentum":79.5,"exposure":53.4,"marketScore":70.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"arrow":{"popularity":75.6,"trend":86.9,"confidence":71.7,"downloads":126451.0,"downloadsPerMonth":1886.5,"assets":7,"avgDownloadsPerAsset":18064.43,"avgDownloadsPerMonth":269.5,"datasets":2,"historicalPerformance":94.3,"currentMomentum":86.9,"exposure":41.0,"marketScore":70.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blank":{"popularity":76.1,"trend":76.6,"confidence":82.7,"downloads":136835.0,"downloadsPerMonth":1794.2,"assets":13,"avgDownloadsPerAsset":10525.77,"avgDownloadsPerMonth":138.02,"datasets":2,"historicalPerformance":89.1,"currentMomentum":76.6,"exposure":52.0,"marketScore":70.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tree":{"popularity":76.5,"trend":78.4,"confidence":79.9,"downloads":145352.0,"downloadsPerMonth":1704.3,"assets":11,"avgDownloadsPerAsset":13213.82,"avgDownloadsPerMonth":154.94,"datasets":2,"historicalPerformance":91.3,"currentMomentum":78.4,"exposure":49.0,"marketScore":70.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"style":{"popularity":73.7,"trend":79.8,"confidence":81.6,"downloads":92476.0,"downloadsPerMonth":1355.6,"assets":8,"avgDownloadsPerAsset":11559.5,"avgDownloadsPerMonth":169.45,"datasets":4,"historicalPerformance":90.0,"currentMomentum":79.8,"exposure":43.3,"marketScore":69.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"modern":{"popularity":74.3,"trend":75.7,"confidence":85.7,"downloads":102606.0,"downloadsPerMonth":1306.4,"assets":10,"avgDownloadsPerAsset":10260.6,"avgDownloadsPerMonth":130.64,"datasets":4,"historicalPerformance":88.9,"currentMomentum":75.7,"exposure":47.2,"marketScore":69.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"colorful":{"popularity":74.0,"trend":71.6,"confidence":88.8,"downloads":98172.0,"downloadsPerMonth":1195.6,"assets":12,"avgDownloadsPerAsset":8181.0,"avgDownloadsPerMonth":99.63,"datasets":4,"historicalPerformance":86.7,"currentMomentum":71.6,"exposure":50.5,"marketScore":69.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"halftone":{"popularity":74.1,"trend":83.6,"confidence":74.1,"downloads":99975.0,"downloadsPerMonth":1734.4,"assets":8,"avgDownloadsPerAsset":12496.88,"avgDownloadsPerMonth":216.8,"datasets":2,"historicalPerformance":90.8,"currentMomentum":83.6,"exposure":43.3,"marketScore":68.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"screen":{"popularity":75.8,"trend":77.2,"confidence":78.9,"downloads":130586.0,"downloadsPerMonth":1864.2,"assets":13,"avgDownloadsPerAsset":10045.08,"avgDownloadsPerMonth":143.4,"datasets":1,"historicalPerformance":88.7,"currentMomentum":77.2,"exposure":52.0,"marketScore":68.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"leaves":{"popularity":74.6,"trend":81.4,"confidence":75.4,"downloads":106806.0,"downloadsPerMonth":1317.4,"assets":7,"avgDownloadsPerAsset":15258.0,"avgDownloadsPerMonth":188.2,"datasets":3,"historicalPerformance":92.7,"currentMomentum":81.4,"exposure":41.0,"marketScore":68.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"view":{"popularity":73.4,"trend":71.6,"confidence":88.8,"downloads":88364.0,"downloadsPerMonth":1197.4,"assets":12,"avgDownloadsPerAsset":7363.67,"avgDownloadsPerMonth":99.78,"datasets":4,"historicalPerformance":85.7,"currentMomentum":71.6,"exposure":50.5,"marketScore":68.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"overlay":{"popularity":73.8,"trend":82.1,"confidence":75.4,"downloads":93776.0,"downloadsPerMonth":1379.3,"assets":7,"avgDownloadsPerAsset":13396.57,"avgDownloadsPerMonth":197.04,"datasets":3,"historicalPerformance":91.4,"currentMomentum":82.1,"exposure":41.0,"marketScore":68.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brush":{"popularity":73.9,"trend":89.8,"confidence":65.7,"downloads":93446.0,"downloadsPerMonth":1622.3,"assets":5,"avgDownloadsPerAsset":18689.2,"avgDownloadsPerMonth":324.46,"datasets":2,"historicalPerformance":94.6,"currentMomentum":89.8,"exposure":35.3,"marketScore":68.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"big":{"popularity":74.2,"trend":83.1,"confidence":72.6,"downloads":99776.0,"downloadsPerMonth":1261.5,"assets":6,"avgDownloadsPerAsset":16629.33,"avgDownloadsPerMonth":210.25,"datasets":3,"historicalPerformance":93.5,"currentMomentum":83.1,"exposure":38.3,"marketScore":68.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"phone":{"popularity":74.5,"trend":79.3,"confidence":76.1,"downloads":105778.0,"downloadsPerMonth":1805.8,"assets":11,"avgDownloadsPerAsset":9616.18,"avgDownloadsPerMonth":164.16,"datasets":1,"historicalPerformance":88.2,"currentMomentum":79.3,"exposure":49.0,"marketScore":68.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"new":{"popularity":73.9,"trend":73.3,"confidence":83.6,"downloads":96703.0,"downloadsPerMonth":1225.0,"assets":11,"avgDownloadsPerAsset":8791.18,"avgDownloadsPerMonth":111.36,"datasets":3,"historicalPerformance":87.4,"currentMomentum":73.3,"exposure":49.0,"marketScore":67.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"watercolor":{"popularity":73.7,"trend":78.7,"confidence":76.3,"downloads":93601.0,"downloadsPerMonth":1427.2,"assets":9,"avgDownloadsPerAsset":10400.11,"avgDownloadsPerMonth":158.58,"datasets":2,"historicalPerformance":89.0,"currentMomentum":78.7,"exposure":45.4,"marketScore":67.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mobile":{"popularity":73.8,"trend":79.9,"confidence":74.4,"downloads":94390.0,"downloadsPerMonth":1714.3,"assets":10,"avgDownloadsPerAsset":9439.0,"avgDownloadsPerMonth":171.43,"datasets":1,"historicalPerformance":88.1,"currentMomentum":79.9,"exposure":47.2,"marketScore":67.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"drawn":{"popularity":73.8,"trend":87.6,"confidence":65.7,"downloads":92398.0,"downloadsPerMonth":1403.7,"assets":5,"avgDownloadsPerAsset":18479.6,"avgDownloadsPerMonth":280.74,"datasets":2,"historicalPerformance":94.5,"currentMomentum":87.6,"exposure":35.3,"marketScore":67.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"yellow":{"popularity":71.0,"trend":84.7,"confidence":72.6,"downloads":59613.0,"downloadsPerMonth":1398.3,"assets":6,"avgDownloadsPerAsset":9935.5,"avgDownloadsPerMonth":233.05,"datasets":3,"historicalPerformance":88.5,"currentMomentum":84.7,"exposure":38.3,"marketScore":67.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"beautiful":{"popularity":74.6,"trend":76.7,"confidence":76.3,"downloads":108584.0,"downloadsPerMonth":1251.4,"assets":9,"avgDownloadsPerAsset":12064.89,"avgDownloadsPerMonth":139.04,"datasets":2,"historicalPerformance":90.4,"currentMomentum":76.7,"exposure":45.4,"marketScore":67.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"social":{"popularity":72.2,"trend":75.2,"confidence":81.6,"downloads":73067.0,"downloadsPerMonth":1009.4,"assets":8,"avgDownloadsPerAsset":9133.38,"avgDownloadsPerMonth":126.18,"datasets":4,"historicalPerformance":87.7,"currentMomentum":75.2,"exposure":43.3,"marketScore":67.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"color":{"popularity":74.7,"trend":85.2,"confidence":65.7,"downloads":107413.0,"downloadsPerMonth":1207.0,"assets":5,"avgDownloadsPerAsset":21482.6,"avgDownloadsPerMonth":241.4,"datasets":2,"historicalPerformance":96.0,"currentMomentum":85.2,"exposure":35.3,"marketScore":66.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"snow":{"popularity":74.8,"trend":73.9,"confidence":78.2,"downloads":111034.0,"downloadsPerMonth":1155.7,"assets":10,"avgDownloadsPerAsset":11103.4,"avgDownloadsPerMonth":115.57,"datasets":2,"historicalPerformance":89.6,"currentMomentum":73.9,"exposure":47.2,"marketScore":66.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"table":{"popularity":73.8,"trend":67.9,"confidence":87.4,"downloads":95092.0,"downloadsPerMonth":860.4,"assets":11,"avgDownloadsPerAsset":8644.73,"avgDownloadsPerMonth":78.22,"datasets":4,"historicalPerformance":87.2,"currentMomentum":67.9,"exposure":49.0,"marketScore":66.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stroke":{"popularity":72.1,"trend":89.8,"confidence":62.2,"downloads":68746.0,"downloadsPerMonth":1302.4,"assets":4,"avgDownloadsPerAsset":17186.5,"avgDownloadsPerMonth":325.6,"datasets":2,"historicalPerformance":93.8,"currentMomentum":89.8,"exposure":31.7,"marketScore":66.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flat":{"popularity":71.4,"trend":78.7,"confidence":75.4,"downloads":63860.0,"downloadsPerMonth":1107.5,"assets":7,"avgDownloadsPerAsset":9122.86,"avgDownloadsPerMonth":158.21,"datasets":3,"historicalPerformance":87.7,"currentMomentum":78.7,"exposure":41.0,"marketScore":66.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"seamless":{"popularity":72.4,"trend":85.8,"confidence":65.7,"downloads":73893.0,"downloadsPerMonth":1255.1,"assets":5,"avgDownloadsPerAsset":14778.6,"avgDownloadsPerMonth":251.02,"datasets":2,"historicalPerformance":92.4,"currentMomentum":85.8,"exposure":35.3,"marketScore":66.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"simple":{"popularity":73.6,"trend":80.8,"confidence":68.9,"downloads":91347.0,"downloadsPerMonth":1088.4,"assets":6,"avgDownloadsPerAsset":15224.5,"avgDownloadsPerMonth":181.4,"datasets":2,"historicalPerformance":92.7,"currentMomentum":80.8,"exposure":38.3,"marketScore":65.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"banner":{"popularity":72.0,"trend":74.1,"confidence":79.2,"downloads":71025.0,"downloadsPerMonth":824.2,"assets":7,"avgDownloadsPerAsset":10146.43,"avgDownloadsPerMonth":117.74,"datasets":4,"historicalPerformance":88.7,"currentMomentum":74.1,"exposure":41.0,"marketScore":65.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"golden":{"popularity":71.3,"trend":82.6,"confidence":69.5,"downloads":61731.0,"downloadsPerMonth":1017.8,"assets":5,"avgDownloadsPerAsset":12346.2,"avgDownloadsPerMonth":203.56,"datasets":3,"historicalPerformance":90.6,"currentMomentum":82.6,"exposure":35.3,"marketScore":65.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"backdrop":{"popularity":72.6,"trend":75.7,"confidence":75.4,"downloads":77897.0,"downloadsPerMonth":912.9,"assets":7,"avgDownloadsPerAsset":11128.14,"avgDownloadsPerMonth":130.41,"datasets":3,"historicalPerformance":89.6,"currentMomentum":75.7,"exposure":41.0,"marketScore":65.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"winter":{"popularity":73.9,"trend":75.0,"confidence":74.1,"downloads":96858.0,"downloadsPerMonth":998.6,"assets":8,"avgDownloadsPerAsset":12107.25,"avgDownloadsPerMonth":124.82,"datasets":2,"historicalPerformance":90.4,"currentMomentum":75.0,"exposure":43.3,"marketScore":65.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"data":{"popularity":72.6,"trend":78.5,"confidence":71.7,"downloads":77325.0,"downloadsPerMonth":1090.8,"assets":7,"avgDownloadsPerAsset":11046.43,"avgDownloadsPerMonth":155.83,"datasets":2,"historicalPerformance":89.6,"currentMomentum":78.5,"exposure":41.0,"marketScore":65.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dots":{"popularity":71.1,"trend":85.1,"confidence":65.7,"downloads":60043.0,"downloadsPerMonth":1195.6,"assets":5,"avgDownloadsPerAsset":12008.6,"avgDownloadsPerMonth":239.12,"datasets":2,"historicalPerformance":90.4,"currentMomentum":85.1,"exposure":35.3,"marketScore":65.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"trendy":{"popularity":72.6,"trend":83.1,"confidence":65.7,"downloads":76739.0,"downloadsPerMonth":1054.1,"assets":5,"avgDownloadsPerAsset":15347.8,"avgDownloadsPerMonth":210.82,"datasets":2,"historicalPerformance":92.7,"currentMomentum":83.1,"exposure":35.3,"marketScore":65.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blurred":{"popularity":72.5,"trend":77.2,"confidence":72.6,"downloads":75714.0,"downloadsPerMonth":863.7,"assets":6,"avgDownloadsPerAsset":12619.0,"avgDownloadsPerMonth":143.95,"datasets":3,"historicalPerformance":90.8,"currentMomentum":77.2,"exposure":38.3,"marketScore":65.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wall":{"popularity":72.2,"trend":78.0,"confidence":71.7,"downloads":72497.0,"downloadsPerMonth":1061.2,"assets":7,"avgDownloadsPerAsset":10356.71,"avgDownloadsPerMonth":151.6,"datasets":2,"historicalPerformance":88.9,"currentMomentum":78.0,"exposure":41.0,"marketScore":64.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"clouds":{"popularity":73.2,"trend":71.3,"confidence":78.2,"downloads":85565.0,"downloadsPerMonth":978.0,"assets":10,"avgDownloadsPerAsset":8556.5,"avgDownloadsPerMonth":97.8,"datasets":2,"historicalPerformance":87.1,"currentMomentum":71.3,"exposure":47.2,"marketScore":64.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"empty":{"popularity":71.2,"trend":69.2,"confidence":83.8,"downloads":62360.0,"downloadsPerMonth":768.4,"assets":9,"avgDownloadsPerAsset":6928.89,"avgDownloadsPerMonth":85.38,"datasets":4,"historicalPerformance":85.1,"currentMomentum":69.2,"exposure":45.4,"marketScore":64.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"gray":{"popularity":71.0,"trend":75.2,"confidence":76.4,"downloads":60203.0,"downloadsPerMonth":757.4,"assets":6,"avgDownloadsPerAsset":10033.83,"avgDownloadsPerMonth":126.23,"datasets":4,"historicalPerformance":88.6,"currentMomentum":75.2,"exposure":38.3,"marketScore":64.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"laptop":{"popularity":73.8,"trend":73.1,"confidence":74.4,"downloads":95179.0,"downloadsPerMonth":1102.0,"assets":10,"avgDownloadsPerAsset":9517.9,"avgDownloadsPerMonth":110.2,"datasets":1,"historicalPerformance":88.1,"currentMomentum":73.1,"exposure":47.2,"marketScore":64.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tropical":{"popularity":73.9,"trend":81.0,"confidence":65.1,"downloads":95857.0,"downloadsPerMonth":1100.7,"assets":6,"avgDownloadsPerAsset":15976.17,"avgDownloadsPerMonth":183.45,"datasets":1,"historicalPerformance":93.1,"currentMomentum":81.0,"exposure":38.3,"marketScore":64.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"scratches":{"popularity":72.9,"trend":79.1,"confidence":68.9,"downloads":81273.0,"downloadsPerMonth":973.0,"assets":6,"avgDownloadsPerAsset":13545.5,"avgDownloadsPerMonth":162.17,"datasets":2,"historicalPerformance":91.5,"currentMomentum":79.1,"exposure":38.3,"marketScore":64.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"photo":{"popularity":70.8,"trend":78.1,"confidence":72.6,"downloads":58123.0,"downloadsPerMonth":916.1,"assets":6,"avgDownloadsPerAsset":9687.17,"avgDownloadsPerMonth":152.68,"datasets":3,"historicalPerformance":88.3,"currentMomentum":78.1,"exposure":38.3,"marketScore":64.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"concrete":{"popularity":71.7,"trend":86.3,"confidence":62.2,"downloads":64868.0,"downloadsPerMonth":1037.5,"assets":4,"avgDownloadsPerAsset":16217.0,"avgDownloadsPerMonth":259.38,"datasets":2,"historicalPerformance":93.3,"currentMomentum":86.3,"exposure":31.7,"marketScore":64.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"food":{"popularity":73.3,"trend":63.2,"confidence":87.2,"downloads":85998.0,"downloadsPerMonth":1039.2,"assets":18,"avgDownloadsPerAsset":4777.67,"avgDownloadsPerMonth":57.73,"datasets":2,"historicalPerformance":81.5,"currentMomentum":63.2,"exposure":58.0,"marketScore":64.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"network":{"popularity":71.6,"trend":79.7,"confidence":69.5,"downloads":65312.0,"downloadsPerMonth":842.5,"assets":5,"avgDownloadsPerAsset":13062.4,"avgDownloadsPerMonth":168.5,"datasets":3,"historicalPerformance":91.2,"currentMomentum":79.7,"exposure":35.3,"marketScore":64.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"landscape":{"popularity":73.3,"trend":75.2,"confidence":71.7,"downloads":86825.0,"downloadsPerMonth":884.7,"assets":7,"avgDownloadsPerAsset":12403.57,"avgDownloadsPerMonth":126.39,"datasets":2,"historicalPerformance":90.7,"currentMomentum":75.2,"exposure":41.0,"marketScore":64.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dust":{"popularity":71.3,"trend":86.0,"confidence":62.2,"downloads":60891.0,"downloadsPerMonth":1012.7,"assets":4,"avgDownloadsPerAsset":15222.75,"avgDownloadsPerMonth":253.18,"datasets":2,"historicalPerformance":92.7,"currentMomentum":86.0,"exposure":31.7,"marketScore":64.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"textured":{"popularity":72.1,"trend":78.4,"confidence":68.9,"downloads":71585.0,"downloadsPerMonth":932.7,"assets":6,"avgDownloadsPerAsset":11930.83,"avgDownloadsPerMonth":155.45,"datasets":2,"historicalPerformance":90.3,"currentMomentum":78.4,"exposure":38.3,"marketScore":64.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"foliage":{"popularity":72.8,"trend":87.3,"confidence":58.1,"downloads":74151.0,"downloadsPerMonth":830.5,"assets":3,"avgDownloadsPerAsset":24717.0,"avgDownloadsPerMonth":276.83,"datasets":2,"historicalPerformance":97.3,"currentMomentum":87.3,"exposure":27.3,"marketScore":64.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"media":{"popularity":71.0,"trend":73.9,"confidence":75.4,"downloads":60636.0,"downloadsPerMonth":809.1,"assets":7,"avgDownloadsPerAsset":8662.29,"avgDownloadsPerMonth":115.59,"datasets":3,"historicalPerformance":87.2,"currentMomentum":73.9,"exposure":41.0,"marketScore":64.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sunset":{"popularity":72.7,"trend":77.1,"confidence":68.9,"downloads":78242.0,"downloadsPerMonth":857.1,"assets":6,"avgDownloadsPerAsset":13040.33,"avgDownloadsPerMonth":142.85,"datasets":2,"historicalPerformance":91.2,"currentMomentum":77.1,"exposure":38.3,"marketScore":63.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"from":{"popularity":72.4,"trend":66.7,"confidence":81.9,"downloads":75682.0,"downloadsPerMonth":727.3,"assets":10,"avgDownloadsPerAsset":7568.2,"avgDownloadsPerMonth":72.73,"datasets":3,"historicalPerformance":85.9,"currentMomentum":66.7,"exposure":47.2,"marketScore":63.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"your":{"popularity":71.1,"trend":81.5,"confidence":65.7,"downloads":60166.0,"downloadsPerMonth":951.0,"assets":5,"avgDownloadsPerAsset":12033.2,"avgDownloadsPerMonth":190.2,"datasets":2,"historicalPerformance":90.4,"currentMomentum":81.5,"exposure":35.3,"marketScore":63.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"nature":{"popularity":72.2,"trend":74.9,"confidence":71.7,"downloads":73064.0,"downloadsPerMonth":864.2,"assets":7,"avgDownloadsPerAsset":10437.71,"avgDownloadsPerMonth":123.46,"datasets":2,"historicalPerformance":89.0,"currentMomentum":74.9,"exposure":41.0,"marketScore":63.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"curve":{"popularity":68.1,"trend":88.3,"confidence":61.9,"downloads":35022.0,"downloadsPerMonth":883.4,"assets":3,"avgDownloadsPerAsset":11674.0,"avgDownloadsPerMonth":294.47,"datasets":3,"historicalPerformance":90.1,"currentMomentum":88.3,"exposure":27.3,"marketScore":63.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"gold":{"popularity":69.4,"trend":79.8,"confidence":69.5,"downloads":46062.0,"downloadsPerMonth":852.5,"assets":5,"avgDownloadsPerAsset":9212.4,"avgDownloadsPerMonth":170.5,"datasets":3,"historicalPerformance":87.8,"currentMomentum":79.8,"exposure":35.3,"marketScore":63.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vintage":{"popularity":71.5,"trend":72.3,"confidence":75.4,"downloads":65813.0,"downloadsPerMonth":731.8,"assets":7,"avgDownloadsPerAsset":9401.86,"avgDownloadsPerMonth":104.54,"datasets":3,"historicalPerformance":88.0,"currentMomentum":72.3,"exposure":41.0,"marketScore":63.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"old":{"popularity":72.2,"trend":79.6,"confidence":65.7,"downloads":71302.0,"downloadsPerMonth":839.9,"assets":5,"avgDownloadsPerAsset":14260.4,"avgDownloadsPerMonth":167.98,"datasets":2,"historicalPerformance":92.0,"currentMomentum":79.6,"exposure":35.3,"marketScore":63.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"iphone":{"popularity":71.3,"trend":83.6,"confidence":62.0,"downloads":62216.0,"downloadsPerMonth":1089.6,"assets":5,"avgDownloadsPerAsset":12443.2,"avgDownloadsPerMonth":217.92,"datasets":1,"historicalPerformance":90.7,"currentMomentum":83.6,"exposure":35.3,"marketScore":63.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"beach":{"popularity":73.5,"trend":73.5,"confidence":70.4,"downloads":90073.0,"downloadsPerMonth":905.7,"assets":8,"avgDownloadsPerAsset":11259.12,"avgDownloadsPerMonth":113.21,"datasets":1,"historicalPerformance":89.7,"currentMomentum":73.5,"exposure":43.3,"marketScore":63.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"element":{"popularity":69.5,"trend":73.5,"confidence":76.4,"downloads":47194.0,"downloadsPerMonth":679.7,"assets":6,"avgDownloadsPerAsset":7865.67,"avgDownloadsPerMonth":113.28,"datasets":4,"historicalPerformance":86.3,"currentMomentum":73.5,"exposure":38.3,"marketScore":63.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"surface":{"popularity":71.9,"trend":71.4,"confidence":75.4,"downloads":69432.0,"downloadsPerMonth":687.3,"assets":7,"avgDownloadsPerAsset":9918.86,"avgDownloadsPerMonth":98.19,"datasets":3,"historicalPerformance":88.5,"currentMomentum":71.4,"exposure":41.0,"marketScore":63.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"template":{"popularity":70.4,"trend":71.1,"confidence":77.9,"downloads":54970.0,"downloadsPerMonth":774.6,"assets":8,"avgDownloadsPerAsset":6871.25,"avgDownloadsPerMonth":96.83,"datasets":3,"historicalPerformance":85.0,"currentMomentum":71.1,"exposure":43.3,"marketScore":63.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"colors":{"popularity":70.4,"trend":78.1,"confidence":69.5,"downloads":53294.0,"downloadsPerMonth":759.4,"assets":5,"avgDownloadsPerAsset":10658.8,"avgDownloadsPerMonth":151.88,"datasets":3,"historicalPerformance":89.2,"currentMomentum":78.1,"exposure":35.3,"marketScore":63.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"png":{"popularity":69.5,"trend":85.2,"confidence":62.2,"downloads":45616.0,"downloadsPerMonth":962.8,"assets":4,"avgDownloadsPerAsset":11404.0,"avgDownloadsPerMonth":240.7,"datasets":2,"historicalPerformance":89.9,"currentMomentum":85.2,"exposure":31.7,"marketScore":63.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"torn":{"popularity":70.9,"trend":83.7,"confidence":62.2,"downloads":56522.0,"downloadsPerMonth":874.1,"assets":4,"avgDownloadsPerAsset":14130.5,"avgDownloadsPerMonth":218.52,"datasets":2,"historicalPerformance":91.9,"currentMomentum":83.7,"exposure":31.7,"marketScore":63.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"backgrounds":{"popularity":71.9,"trend":78.8,"confidence":65.7,"downloads":68435.0,"downloadsPerMonth":795.7,"assets":5,"avgDownloadsPerAsset":13687.0,"avgDownloadsPerMonth":159.14,"datasets":2,"historicalPerformance":91.6,"currentMomentum":78.8,"exposure":35.3,"marketScore":63.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hands":{"popularity":69.9,"trend":80.7,"confidence":65.9,"downloads":48713.0,"downloadsPerMonth":720.8,"assets":4,"avgDownloadsPerAsset":12178.25,"avgDownloadsPerMonth":180.2,"datasets":3,"historicalPerformance":90.5,"currentMomentum":80.7,"exposure":31.7,"marketScore":62.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"grey":{"popularity":72.0,"trend":75.5,"confidence":68.9,"downloads":70064.0,"downloadsPerMonth":769.4,"assets":6,"avgDownloadsPerAsset":11677.33,"avgDownloadsPerMonth":128.23,"datasets":2,"historicalPerformance":90.1,"currentMomentum":75.5,"exposure":38.3,"marketScore":62.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"woman":{"popularity":70.1,"trend":72.3,"confidence":75.4,"downloads":52092.0,"downloadsPerMonth":729.5,"assets":7,"avgDownloadsPerAsset":7441.71,"avgDownloadsPerMonth":104.21,"datasets":3,"historicalPerformance":85.8,"currentMomentum":72.3,"exposure":41.0,"marketScore":62.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stock":{"popularity":70.6,"trend":79.6,"confidence":65.7,"downloads":55159.0,"downloadsPerMonth":839.3,"assets":5,"avgDownloadsPerAsset":11031.8,"avgDownloadsPerMonth":167.86,"datasets":2,"historicalPerformance":89.6,"currentMomentum":79.6,"exposure":35.3,"marketScore":62.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"smoke":{"popularity":70.6,"trend":76.8,"confidence":68.9,"downloads":56287.0,"downloadsPerMonth":841.1,"assets":6,"avgDownloadsPerAsset":9381.17,"avgDownloadsPerMonth":140.18,"datasets":2,"historicalPerformance":88.0,"currentMomentum":76.8,"exposure":38.3,"marketScore":62.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"top":{"popularity":70.5,"trend":71.2,"confidence":75.4,"downloads":55549.0,"downloadsPerMonth":679.4,"assets":7,"avgDownloadsPerAsset":7935.57,"avgDownloadsPerMonth":97.06,"datasets":3,"historicalPerformance":86.4,"currentMomentum":71.2,"exposure":41.0,"marketScore":62.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"copy":{"popularity":70.5,"trend":79.2,"confidence":65.9,"downloads":53782.0,"downloadsPerMonth":653.6,"assets":4,"avgDownloadsPerAsset":13445.5,"avgDownloadsPerMonth":163.4,"datasets":3,"historicalPerformance":91.5,"currentMomentum":79.2,"exposure":31.7,"marketScore":62.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"effect":{"popularity":69.5,"trend":77.2,"confidence":69.5,"downloads":46626.0,"downloadsPerMonth":719.4,"assets":5,"avgDownloadsPerAsset":9325.2,"avgDownloadsPerMonth":143.88,"datasets":3,"historicalPerformance":87.9,"currentMomentum":77.2,"exposure":35.3,"marketScore":62.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"computer":{"popularity":71.4,"trend":75.8,"confidence":67.9,"downloads":64653.0,"downloadsPerMonth":915.9,"assets":7,"avgDownloadsPerAsset":9236.14,"avgDownloadsPerMonth":130.84,"datasets":1,"historicalPerformance":87.8,"currentMomentum":75.8,"exposure":41.0,"marketScore":62.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"decorative":{"popularity":68.3,"trend":88.4,"confidence":58.1,"downloads":36221.0,"downloadsPerMonth":892.1,"assets":3,"avgDownloadsPerAsset":12073.67,"avgDownloadsPerMonth":297.37,"datasets":2,"historicalPerformance":90.4,"currentMomentum":88.4,"exposure":27.3,"marketScore":62.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"retro":{"popularity":70.1,"trend":73.3,"confidence":72.6,"downloads":51840.0,"downloadsPerMonth":669.6,"assets":6,"avgDownloadsPerAsset":8640.0,"avgDownloadsPerMonth":111.6,"datasets":3,"historicalPerformance":87.2,"currentMomentum":73.3,"exposure":38.3,"marketScore":62.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"garland":{"popularity":71.2,"trend":80.8,"confidence":62.2,"downloads":59310.0,"downloadsPerMonth":723.3,"assets":4,"avgDownloadsPerAsset":14827.5,"avgDownloadsPerMonth":180.82,"datasets":2,"historicalPerformance":92.4,"currentMomentum":80.8,"exposure":31.7,"marketScore":62.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"holiday":{"popularity":71.2,"trend":80.8,"confidence":62.2,"downloads":59310.0,"downloadsPerMonth":723.3,"assets":4,"avgDownloadsPerAsset":14827.5,"avgDownloadsPerMonth":180.82,"datasets":2,"historicalPerformance":92.4,"currentMomentum":80.8,"exposure":31.7,"marketScore":62.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pink":{"popularity":69.3,"trend":74.1,"confidence":72.6,"downloads":45597.0,"downloadsPerMonth":703.2,"assets":6,"avgDownloadsPerAsset":7599.5,"avgDownloadsPerMonth":117.2,"datasets":3,"historicalPerformance":86.0,"currentMomentum":74.1,"exposure":38.3,"marketScore":62.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fresh":{"popularity":71.7,"trend":71.8,"confidence":71.7,"downloads":67407.0,"downloadsPerMonth":707.0,"assets":7,"avgDownloadsPerAsset":9629.57,"avgDownloadsPerMonth":101.0,"datasets":2,"historicalPerformance":88.2,"currentMomentum":71.8,"exposure":41.0,"marketScore":62.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"doodle":{"popularity":68.6,"trend":87.6,"confidence":58.1,"downloads":37852.0,"downloadsPerMonth":846.1,"assets":3,"avgDownloadsPerAsset":12617.33,"avgDownloadsPerMonth":282.03,"datasets":2,"historicalPerformance":90.8,"currentMomentum":87.6,"exposure":27.3,"marketScore":62.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"easter":{"popularity":72.4,"trend":70.4,"confidence":71.7,"downloads":75415.0,"downloadsPerMonth":645.3,"assets":7,"avgDownloadsPerAsset":10773.57,"avgDownloadsPerMonth":92.19,"datasets":2,"historicalPerformance":89.3,"currentMomentum":70.4,"exposure":41.0,"marketScore":62.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"badge":{"popularity":69.8,"trend":99.6,"confidence":44.6,"downloads":32682.0,"downloadsPerMonth":612.6,"assets":1,"avgDownloadsPerAsset":32682.0,"avgDownloadsPerMonth":612.6,"datasets":1,"historicalPerformance":100.0,"currentMomentum":99.6,"exposure":13.7,"marketScore":62.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sticker":{"popularity":69.8,"trend":99.6,"confidence":44.6,"downloads":32682.0,"downloadsPerMonth":612.6,"assets":1,"avgDownloadsPerAsset":32682.0,"avgDownloadsPerMonth":612.6,"datasets":1,"historicalPerformance":100.0,"currentMomentum":99.6,"exposure":13.7,"marketScore":62.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shadow":{"popularity":68.9,"trend":86.6,"confidence":58.1,"downloads":39383.0,"downloadsPerMonth":792.1,"assets":3,"avgDownloadsPerAsset":13127.67,"avgDownloadsPerMonth":264.03,"datasets":2,"historicalPerformance":91.2,"currentMomentum":86.6,"exposure":27.3,"marketScore":62.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"over":{"popularity":70.1,"trend":72.0,"confidence":73.2,"downloads":51023.0,"downloadsPerMonth":512.4,"assets":5,"avgDownloadsPerAsset":10204.6,"avgDownloadsPerMonth":102.48,"datasets":4,"historicalPerformance":88.8,"currentMomentum":72.0,"exposure":35.3,"marketScore":62.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"device":{"popularity":70.2,"trend":77.6,"confidence":65.7,"downloads":52385.0,"downloadsPerMonth":736.7,"assets":5,"avgDownloadsPerAsset":10477.0,"avgDownloadsPerMonth":147.34,"datasets":2,"historicalPerformance":89.1,"currentMomentum":77.6,"exposure":35.3,"marketScore":61.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"metal":{"popularity":70.3,"trend":74.5,"confidence":69.5,"downloads":53049.0,"downloadsPerMonth":600.7,"assets":5,"avgDownloadsPerAsset":10609.8,"avgDownloadsPerMonth":120.14,"datasets":3,"historicalPerformance":89.2,"currentMomentum":74.5,"exposure":35.3,"marketScore":61.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"young":{"popularity":70.6,"trend":72.1,"confidence":71.7,"downloads":56261.0,"downloadsPerMonth":722.5,"assets":7,"avgDownloadsPerAsset":8037.29,"avgDownloadsPerMonth":103.21,"datasets":2,"historicalPerformance":86.5,"currentMomentum":72.1,"exposure":41.0,"marketScore":61.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glitter":{"popularity":68.8,"trend":86.1,"confidence":58.1,"downloads":38991.0,"downloadsPerMonth":764.6,"assets":3,"avgDownloadsPerAsset":12997.0,"avgDownloadsPerMonth":254.87,"datasets":2,"historicalPerformance":91.1,"currentMomentum":86.1,"exposure":27.3,"marketScore":61.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"plant":{"popularity":72.2,"trend":90.1,"confidence":49.8,"downloads":61301.0,"downloadsPerMonth":660.6,"assets":2,"avgDownloadsPerAsset":30650.5,"avgDownloadsPerMonth":330.3,"datasets":1,"historicalPerformance":99.4,"currentMomentum":90.1,"exposure":21.6,"marketScore":61.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"arrows":{"popularity":71.6,"trend":86.1,"confidence":54.4,"downloads":61325.0,"downloadsPerMonth":766.7,"assets":3,"avgDownloadsPerAsset":20441.67,"avgDownloadsPerMonth":255.57,"datasets":1,"historicalPerformance":95.5,"currentMomentum":86.1,"exposure":27.3,"marketScore":61.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"geometric":{"popularity":68.7,"trend":75.8,"confidence":69.5,"downloads":40606.0,"downloadsPerMonth":655.0,"assets":5,"avgDownloadsPerAsset":8121.2,"avgDownloadsPerMonth":131.0,"datasets":3,"historicalPerformance":86.6,"currentMomentum":75.8,"exposure":35.3,"marketScore":61.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"digital":{"popularity":71.5,"trend":73.6,"confidence":67.9,"downloads":65272.0,"downloadsPerMonth":796.8,"assets":7,"avgDownloadsPerAsset":9324.57,"avgDownloadsPerMonth":113.83,"datasets":1,"historicalPerformance":87.9,"currentMomentum":73.6,"exposure":41.0,"marketScore":61.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"distressed":{"popularity":70.1,"trend":87.8,"confidence":54.4,"downloads":47690.0,"downloadsPerMonth":858.4,"assets":3,"avgDownloadsPerAsset":15896.67,"avgDownloadsPerMonth":286.13,"datasets":1,"historicalPerformance":93.1,"currentMomentum":87.8,"exposure":27.3,"marketScore":61.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"decorated":{"popularity":69.6,"trend":76.7,"confidence":65.9,"downloads":46167.0,"downloadsPerMonth":555.8,"assets":4,"avgDownloadsPerAsset":11541.75,"avgDownloadsPerMonth":138.95,"datasets":3,"historicalPerformance":90.0,"currentMomentum":76.7,"exposure":31.7,"marketScore":61.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"border":{"popularity":67.4,"trend":100.0,"confidence":44.6,"downloads":22334.0,"downloadsPerMonth":627.2,"assets":1,"avgDownloadsPerAsset":22334.0,"avgDownloadsPerMonth":627.2,"datasets":1,"historicalPerformance":96.3,"currentMomentum":100.0,"exposure":13.7,"marketScore":61.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"coniferous":{"popularity":67.4,"trend":100.0,"confidence":44.6,"downloads":22334.0,"downloadsPerMonth":627.2,"assets":1,"avgDownloadsPerAsset":22334.0,"avgDownloadsPerMonth":627.2,"datasets":1,"historicalPerformance":96.3,"currentMomentum":100.0,"exposure":13.7,"marketScore":61.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"garlands":{"popularity":67.4,"trend":100.0,"confidence":44.6,"downloads":22334.0,"downloadsPerMonth":627.2,"assets":1,"avgDownloadsPerAsset":22334.0,"avgDownloadsPerMonth":627.2,"datasets":1,"historicalPerformance":96.3,"currentMomentum":100.0,"exposure":13.7,"marketScore":61.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wide":{"popularity":67.8,"trend":90.1,"confidence":53.6,"downloads":30646.0,"downloadsPerMonth":660.7,"assets":2,"avgDownloadsPerAsset":15323.0,"avgDownloadsPerMonth":330.35,"datasets":2,"historicalPerformance":92.7,"currentMomentum":90.1,"exposure":21.6,"marketScore":61.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"decoration":{"popularity":70.4,"trend":78.9,"confidence":62.2,"downloads":52826.0,"downloadsPerMonth":640.3,"assets":4,"avgDownloadsPerAsset":13206.5,"avgDownloadsPerMonth":160.08,"datasets":2,"historicalPerformance":91.3,"currentMomentum":78.9,"exposure":31.7,"marketScore":61.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"waves":{"popularity":69.3,"trend":73.9,"confidence":69.5,"downloads":44693.0,"downloadsPerMonth":578.7,"assets":5,"avgDownloadsPerAsset":8938.6,"avgDownloadsPerMonth":115.74,"datasets":3,"historicalPerformance":87.5,"currentMomentum":73.9,"exposure":35.3,"marketScore":61.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"branches":{"popularity":69.3,"trend":87.3,"confidence":54.4,"downloads":42601.0,"downloadsPerMonth":828.6,"assets":3,"avgDownloadsPerAsset":14200.33,"avgDownloadsPerMonth":276.2,"datasets":1,"historicalPerformance":92.0,"currentMomentum":87.3,"exposure":27.3,"marketScore":61.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"front":{"popularity":69.2,"trend":76.9,"confidence":65.7,"downloads":44289.0,"downloadsPerMonth":706.2,"assets":5,"avgDownloadsPerAsset":8857.8,"avgDownloadsPerMonth":141.24,"datasets":2,"historicalPerformance":87.4,"currentMomentum":76.9,"exposure":35.3,"marketScore":61.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"eggs":{"popularity":71.7,"trend":71.1,"confidence":68.9,"downloads":67275.0,"downloadsPerMonth":578.4,"assets":6,"avgDownloadsPerAsset":11212.5,"avgDownloadsPerMonth":96.4,"datasets":2,"historicalPerformance":89.7,"currentMomentum":71.1,"exposure":38.3,"marketScore":61.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"studio":{"popularity":69.8,"trend":79.0,"confidence":62.2,"downloads":47417.0,"downloadsPerMonth":644.2,"assets":4,"avgDownloadsPerAsset":11854.25,"avgDownloadsPerMonth":161.05,"datasets":2,"historicalPerformance":90.2,"currentMomentum":79.0,"exposure":31.7,"marketScore":61.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"people":{"popularity":70.8,"trend":77.9,"confidence":62.0,"downloads":56882.0,"downloadsPerMonth":750.0,"assets":5,"avgDownloadsPerAsset":11376.4,"avgDownloadsPerMonth":150.0,"datasets":1,"historicalPerformance":89.8,"currentMomentum":77.9,"exposure":35.3,"marketScore":61.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"against":{"popularity":68.4,"trend":74.2,"confidence":69.5,"downloads":38964.0,"downloadsPerMonth":591.4,"assets":5,"avgDownloadsPerAsset":7792.8,"avgDownloadsPerMonth":118.28,"datasets":3,"historicalPerformance":86.2,"currentMomentum":74.2,"exposure":35.3,"marketScore":60.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sea":{"popularity":71.5,"trend":73.5,"confidence":65.7,"downloads":63546.0,"downloadsPerMonth":564.0,"assets":5,"avgDownloadsPerAsset":12709.2,"avgDownloadsPerMonth":112.8,"datasets":2,"historicalPerformance":90.9,"currentMomentum":73.5,"exposure":35.3,"marketScore":60.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"real":{"popularity":69.0,"trend":73.4,"confidence":69.5,"downloads":43006.0,"downloadsPerMonth":560.0,"assets":5,"avgDownloadsPerAsset":8601.2,"avgDownloadsPerMonth":112.0,"datasets":3,"historicalPerformance":87.2,"currentMomentum":73.4,"exposure":35.3,"marketScore":60.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"year":{"popularity":70.1,"trend":75.0,"confidence":65.7,"downloads":51109.0,"downloadsPerMonth":623.7,"assets":5,"avgDownloadsPerAsset":10221.8,"avgDownloadsPerMonth":124.74,"datasets":2,"historicalPerformance":88.8,"currentMomentum":75.0,"exposure":35.3,"marketScore":60.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"halloween":{"popularity":68.0,"trend":84.1,"confidence":58.1,"downloads":34403.0,"downloadsPerMonth":671.7,"assets":3,"avgDownloadsPerAsset":11467.67,"avgDownloadsPerMonth":223.9,"datasets":2,"historicalPerformance":89.9,"currentMomentum":84.1,"exposure":27.3,"marketScore":60.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blur":{"popularity":69.3,"trend":75.7,"confidence":65.9,"downloads":44094.0,"downloadsPerMonth":520.5,"assets":4,"avgDownloadsPerAsset":11023.5,"avgDownloadsPerMonth":130.12,"datasets":3,"historicalPerformance":89.5,"currentMomentum":75.7,"exposure":31.7,"marketScore":60.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"orange":{"popularity":70.0,"trend":74.8,"confidence":65.7,"downloads":50630.0,"downloadsPerMonth":615.9,"assets":5,"avgDownloadsPerAsset":10126.0,"avgDownloadsPerMonth":123.18,"datasets":2,"historicalPerformance":88.7,"currentMomentum":74.8,"exposure":35.3,"marketScore":60.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"close":{"popularity":69.4,"trend":69.9,"confidence":72.6,"downloads":46162.0,"downloadsPerMonth":537.4,"assets":6,"avgDownloadsPerAsset":7693.67,"avgDownloadsPerMonth":89.57,"datasets":3,"historicalPerformance":86.1,"currentMomentum":69.9,"exposure":38.3,"marketScore":60.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cloud":{"popularity":70.4,"trend":81.0,"confidence":58.1,"downloads":50379.0,"downloadsPerMonth":551.1,"assets":3,"avgDownloadsPerAsset":16793.0,"avgDownloadsPerMonth":183.7,"datasets":2,"historicalPerformance":93.6,"currentMomentum":81.0,"exposure":27.3,"marketScore":60.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"coil":{"popularity":66.7,"trend":98.8,"confidence":44.6,"downloads":20116.0,"downloadsPerMonth":579.9,"assets":1,"avgDownloadsPerAsset":20116.0,"avgDownloadsPerMonth":579.9,"datasets":1,"historicalPerformance":95.3,"currentMomentum":98.8,"exposure":13.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"emphasis":{"popularity":66.7,"trend":98.8,"confidence":44.6,"downloads":20116.0,"downloadsPerMonth":579.9,"assets":1,"avgDownloadsPerAsset":20116.0,"avgDownloadsPerMonth":579.9,"datasets":1,"historicalPerformance":95.3,"currentMomentum":98.8,"exposure":13.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"quirky":{"popularity":66.7,"trend":98.8,"confidence":44.6,"downloads":20116.0,"downloadsPerMonth":579.9,"assets":1,"avgDownloadsPerAsset":20116.0,"avgDownloadsPerMonth":579.9,"datasets":1,"historicalPerformance":95.3,"currentMomentum":98.8,"exposure":13.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"spring":{"popularity":66.7,"trend":98.8,"confidence":44.6,"downloads":20116.0,"downloadsPerMonth":579.9,"assets":1,"avgDownloadsPerAsset":20116.0,"avgDownloadsPerMonth":579.9,"datasets":1,"historicalPerformance":95.3,"currentMomentum":98.8,"exposure":13.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"twist":{"popularity":66.7,"trend":98.8,"confidence":44.6,"downloads":20116.0,"downloadsPerMonth":579.9,"assets":1,"avgDownloadsPerAsset":20116.0,"avgDownloadsPerMonth":579.9,"datasets":1,"historicalPerformance":95.3,"currentMomentum":98.8,"exposure":13.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"zigzag":{"popularity":66.7,"trend":98.8,"confidence":44.6,"downloads":20116.0,"downloadsPerMonth":579.9,"assets":1,"avgDownloadsPerAsset":20116.0,"avgDownloadsPerMonth":579.9,"datasets":1,"historicalPerformance":95.3,"currentMomentum":98.8,"exposure":13.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bokeh":{"popularity":69.1,"trend":75.4,"confidence":65.9,"downloads":42614.0,"downloadsPerMonth":510.9,"assets":4,"avgDownloadsPerAsset":10653.5,"avgDownloadsPerMonth":127.72,"datasets":3,"historicalPerformance":89.2,"currentMomentum":75.4,"exposure":31.7,"marketScore":60.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"violet":{"popularity":68.6,"trend":79.1,"confidence":61.9,"downloads":38085.0,"downloadsPerMonth":486.9,"assets":3,"avgDownloadsPerAsset":12695.0,"avgDownloadsPerMonth":162.3,"datasets":3,"historicalPerformance":90.9,"currentMomentum":79.1,"exposure":27.3,"marketScore":60.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"office":{"popularity":70.7,"trend":76.5,"confidence":62.0,"downloads":56353.0,"downloadsPerMonth":687.5,"assets":5,"avgDownloadsPerAsset":11270.6,"avgDownloadsPerMonth":137.5,"datasets":1,"historicalPerformance":89.8,"currentMomentum":76.5,"exposure":35.3,"marketScore":60.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shape":{"popularity":67.3,"trend":77.0,"confidence":65.9,"downloads":32237.0,"downloadsPerMonth":566.8,"assets":4,"avgDownloadsPerAsset":8059.25,"avgDownloadsPerMonth":141.7,"datasets":3,"historicalPerformance":86.5,"currentMomentum":77.0,"exposure":31.7,"marketScore":60.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"working":{"popularity":70.3,"trend":76.5,"confidence":62.0,"downloads":52603.0,"downloadsPerMonth":688.0,"assets":5,"avgDownloadsPerAsset":10520.6,"avgDownloadsPerMonth":137.6,"datasets":1,"historicalPerformance":89.1,"currentMomentum":76.5,"exposure":35.3,"marketScore":60.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brown":{"popularity":70.6,"trend":73.1,"confidence":65.9,"downloads":54187.0,"downloadsPerMonth":440.6,"assets":4,"avgDownloadsPerAsset":13546.75,"avgDownloadsPerMonth":110.15,"datasets":3,"historicalPerformance":91.5,"currentMomentum":73.1,"exposure":31.7,"marketScore":60.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"crumpled":{"popularity":70.6,"trend":76.0,"confidence":62.2,"downloads":54185.0,"downloadsPerMonth":530.2,"assets":4,"avgDownloadsPerAsset":13546.25,"avgDownloadsPerMonth":132.55,"datasets":2,"historicalPerformance":91.5,"currentMomentum":76.0,"exposure":31.7,"marketScore":60.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mega":{"popularity":69.8,"trend":73.8,"confidence":65.7,"downloads":49125.0,"downloadsPerMonth":574.5,"assets":5,"avgDownloadsPerAsset":9825.0,"avgDownloadsPerMonth":114.9,"datasets":2,"historicalPerformance":88.4,"currentMomentum":73.8,"exposure":35.3,"marketScore":60.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"image":{"popularity":68.8,"trend":74.5,"confidence":65.9,"downloads":40701.0,"downloadsPerMonth":481.2,"assets":4,"avgDownloadsPerAsset":10175.25,"avgDownloadsPerMonth":120.3,"datasets":3,"historicalPerformance":88.8,"currentMomentum":74.5,"exposure":31.7,"marketScore":60.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"soft":{"popularity":69.9,"trend":67.6,"confidence":72.6,"downloads":50302.0,"downloadsPerMonth":460.4,"assets":6,"avgDownloadsPerAsset":8383.67,"avgDownloadsPerMonth":76.73,"datasets":3,"historicalPerformance":86.9,"currentMomentum":67.6,"exposure":38.3,"marketScore":60.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"different":{"popularity":68.7,"trend":71.6,"confidence":69.5,"downloads":40733.0,"downloadsPerMonth":499.0,"assets":5,"avgDownloadsPerAsset":8146.6,"avgDownloadsPerMonth":99.8,"datasets":3,"historicalPerformance":86.6,"currentMomentum":71.6,"exposure":35.3,"marketScore":60.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rustic":{"popularity":71.6,"trend":64.2,"confidence":74.1,"downloads":66561.0,"downloadsPerMonth":492.1,"assets":8,"avgDownloadsPerAsset":8320.12,"avgDownloadsPerMonth":61.51,"datasets":2,"historicalPerformance":86.8,"currentMomentum":64.2,"exposure":43.3,"marketScore":60.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"connection":{"popularity":69.3,"trend":80.4,"confidence":58.1,"downloads":42011.0,"downloadsPerMonth":530.3,"assets":3,"avgDownloadsPerAsset":14003.67,"avgDownloadsPerMonth":176.77,"datasets":2,"historicalPerformance":91.8,"currentMomentum":80.4,"exposure":27.3,"marketScore":59.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"touching":{"popularity":69.3,"trend":80.4,"confidence":58.1,"downloads":42011.0,"downloadsPerMonth":530.3,"assets":3,"avgDownloadsPerAsset":14003.67,"avgDownloadsPerMonth":176.77,"datasets":2,"historicalPerformance":91.8,"currentMomentum":80.4,"exposure":27.3,"marketScore":59.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sparkle":{"popularity":66.3,"trend":88.2,"confidence":53.6,"downloads":24021.0,"downloadsPerMonth":585.1,"assets":2,"avgDownloadsPerAsset":12010.5,"avgDownloadsPerMonth":292.55,"datasets":2,"historicalPerformance":90.4,"currentMomentum":88.2,"exposure":21.6,"marketScore":59.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rendering":{"popularity":69.3,"trend":76.5,"confidence":62.2,"downloads":43860.0,"downloadsPerMonth":549.6,"assets":4,"avgDownloadsPerAsset":10965.0,"avgDownloadsPerMonth":137.4,"datasets":2,"historicalPerformance":89.5,"currentMomentum":76.5,"exposure":31.7,"marketScore":59.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"green":{"popularity":68.0,"trend":68.9,"confidence":73.2,"downloads":36813.0,"downloadsPerMonth":418.2,"assets":5,"avgDownloadsPerAsset":7362.6,"avgDownloadsPerMonth":83.64,"datasets":4,"historicalPerformance":85.7,"currentMomentum":68.9,"exposure":35.3,"marketScore":59.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stars":{"popularity":69.6,"trend":68.0,"confidence":71.7,"downloads":48425.0,"downloadsPerMonth":554.1,"assets":7,"avgDownloadsPerAsset":6917.86,"avgDownloadsPerMonth":79.16,"datasets":2,"historicalPerformance":85.1,"currentMomentum":68.0,"exposure":41.0,"marketScore":59.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"more":{"popularity":68.0,"trend":77.4,"confidence":61.9,"downloads":34609.0,"downloadsPerMonth":435.2,"assets":3,"avgDownloadsPerAsset":11536.33,"avgDownloadsPerMonth":145.07,"datasets":3,"historicalPerformance":90.0,"currentMomentum":77.4,"exposure":27.3,"marketScore":59.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"room":{"popularity":68.3,"trend":70.5,"confidence":69.5,"downloads":38138.0,"downloadsPerMonth":463.3,"assets":5,"avgDownloadsPerAsset":7627.6,"avgDownloadsPerMonth":92.66,"datasets":3,"historicalPerformance":86.0,"currentMomentum":70.5,"exposure":35.3,"marketScore":59.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ecommerce":{"popularity":69.3,"trend":92.3,"confidence":44.6,"downloads":30265.0,"downloadsPerMonth":381.6,"assets":1,"avgDownloadsPerAsset":30265.0,"avgDownloadsPerMonth":381.6,"datasets":1,"historicalPerformance":99.3,"currentMomentum":92.3,"exposure":13.7,"marketScore":59.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"finance":{"popularity":69.3,"trend":92.3,"confidence":44.6,"downloads":30265.0,"downloadsPerMonth":381.6,"assets":1,"avgDownloadsPerAsset":30265.0,"avgDownloadsPerMonth":381.6,"datasets":1,"historicalPerformance":99.3,"currentMomentum":92.3,"exposure":13.7,"marketScore":59.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shapes":{"popularity":66.0,"trend":86.7,"confidence":53.6,"downloads":22680.0,"downloadsPerMonth":532.7,"assets":2,"avgDownloadsPerAsset":11340.0,"avgDownloadsPerMonth":266.35,"datasets":2,"historicalPerformance":89.8,"currentMomentum":86.7,"exposure":21.6,"marketScore":59.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"festive":{"popularity":68.9,"trend":79.0,"confidence":58.1,"downloads":39846.0,"downloadsPerMonth":484.8,"assets":3,"avgDownloadsPerAsset":13282.0,"avgDownloadsPerMonth":161.6,"datasets":2,"historicalPerformance":91.3,"currentMomentum":79.0,"exposure":27.3,"marketScore":59.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"widescreen":{"popularity":68.9,"trend":79.0,"confidence":58.1,"downloads":39846.0,"downloadsPerMonth":484.8,"assets":3,"avgDownloadsPerAsset":13282.0,"avgDownloadsPerMonth":161.6,"datasets":2,"historicalPerformance":91.3,"currentMomentum":79.0,"exposure":27.3,"marketScore":59.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"xmas":{"popularity":68.9,"trend":79.0,"confidence":58.1,"downloads":39846.0,"downloadsPerMonth":484.8,"assets":3,"avgDownloadsPerAsset":13282.0,"avgDownloadsPerMonth":161.6,"datasets":2,"historicalPerformance":91.3,"currentMomentum":79.0,"exposure":27.3,"marketScore":59.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"artificial":{"popularity":68.5,"trend":83.6,"confidence":53.6,"downloads":33926.0,"downloadsPerMonth":434.8,"assets":2,"avgDownloadsPerAsset":16963.0,"avgDownloadsPerMonth":217.4,"datasets":2,"historicalPerformance":93.7,"currentMomentum":83.6,"exposure":21.6,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"intelligence":{"popularity":68.5,"trend":83.6,"confidence":53.6,"downloads":33926.0,"downloadsPerMonth":434.8,"assets":2,"avgDownloadsPerAsset":16963.0,"avgDownloadsPerMonth":217.4,"datasets":2,"historicalPerformance":93.7,"currentMomentum":83.6,"exposure":21.6,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"learning":{"popularity":68.5,"trend":83.6,"confidence":53.6,"downloads":33926.0,"downloadsPerMonth":434.8,"assets":2,"avgDownloadsPerAsset":16963.0,"avgDownloadsPerMonth":217.4,"datasets":2,"historicalPerformance":93.7,"currentMomentum":83.6,"exposure":21.6,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"machine":{"popularity":68.5,"trend":83.6,"confidence":53.6,"downloads":33926.0,"downloadsPerMonth":434.8,"assets":2,"avgDownloadsPerAsset":16963.0,"avgDownloadsPerMonth":217.4,"datasets":2,"historicalPerformance":93.7,"currentMomentum":83.6,"exposure":21.6,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"robot":{"popularity":68.5,"trend":83.6,"confidence":53.6,"downloads":33926.0,"downloadsPerMonth":434.8,"assets":2,"avgDownloadsPerAsset":16963.0,"avgDownloadsPerMonth":217.4,"datasets":2,"historicalPerformance":93.7,"currentMomentum":83.6,"exposure":21.6,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"science":{"popularity":68.5,"trend":83.6,"confidence":53.6,"downloads":33926.0,"downloadsPerMonth":434.8,"assets":2,"avgDownloadsPerAsset":16963.0,"avgDownloadsPerMonth":217.4,"datasets":2,"historicalPerformance":93.7,"currentMomentum":83.6,"exposure":21.6,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"particles":{"popularity":68.7,"trend":78.4,"confidence":58.4,"downloads":40240.0,"downloadsPerMonth":619.8,"assets":4,"avgDownloadsPerAsset":10060.0,"avgDownloadsPerMonth":154.95,"datasets":1,"historicalPerformance":88.7,"currentMomentum":78.4,"exposure":31.7,"marketScore":59.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cursor":{"popularity":68.8,"trend":83.0,"confidence":53.6,"downloads":35527.0,"downloadsPerMonth":417.9,"assets":2,"avgDownloadsPerAsset":17763.5,"avgDownloadsPerMonth":208.95,"datasets":2,"historicalPerformance":94.1,"currentMomentum":83.0,"exposure":21.6,"marketScore":59.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glass":{"popularity":68.5,"trend":72.0,"confidence":65.9,"downloads":38567.0,"downloadsPerMonth":409.1,"assets":4,"avgDownloadsPerAsset":9641.75,"avgDownloadsPerMonth":102.28,"datasets":3,"historicalPerformance":88.3,"currentMomentum":72.0,"exposure":31.7,"marketScore":58.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mark":{"popularity":68.9,"trend":85.7,"confidence":49.8,"downloads":36246.0,"downloadsPerMonth":499.4,"assets":2,"avgDownloadsPerAsset":18123.0,"avgDownloadsPerMonth":249.7,"datasets":1,"historicalPerformance":94.3,"currentMomentum":85.7,"exposure":21.6,"marketScore":58.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"subtle":{"popularity":69.3,"trend":80.9,"confidence":54.4,"downloads":41968.0,"downloadsPerMonth":546.1,"assets":3,"avgDownloadsPerAsset":13989.33,"avgDownloadsPerMonth":182.03,"datasets":1,"historicalPerformance":91.8,"currentMomentum":80.9,"exposure":27.3,"marketScore":58.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shiny":{"popularity":67.5,"trend":82.2,"confidence":54.4,"downloads":31727.0,"downloadsPerMonth":597.2,"assets":3,"avgDownloadsPerAsset":10575.67,"avgDownloadsPerMonth":199.07,"datasets":1,"historicalPerformance":89.1,"currentMomentum":82.2,"exposure":27.3,"marketScore":58.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mini":{"popularity":68.4,"trend":77.8,"confidence":58.1,"downloads":36445.0,"downloadsPerMonth":447.9,"assets":3,"avgDownloadsPerAsset":12148.33,"avgDownloadsPerMonth":149.3,"datasets":2,"historicalPerformance":90.5,"currentMomentum":77.8,"exposure":27.3,"marketScore":58.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stone":{"popularity":68.3,"trend":71.1,"confidence":65.9,"downloads":37458.0,"downloadsPerMonth":386.3,"assets":4,"avgDownloadsPerAsset":9364.5,"avgDownloadsPerMonth":96.58,"datasets":3,"historicalPerformance":88.0,"currentMomentum":71.1,"exposure":31.7,"marketScore":58.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"product":{"popularity":66.5,"trend":70.0,"confidence":69.7,"downloads":28109.0,"downloadsPerMonth":360.8,"assets":4,"avgDownloadsPerAsset":7027.25,"avgDownloadsPerMonth":90.2,"datasets":4,"historicalPerformance":85.2,"currentMomentum":70.0,"exposure":31.7,"marketScore":58.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dot":{"popularity":67.5,"trend":78.3,"confidence":58.1,"downloads":31666.0,"downloadsPerMonth":463.9,"assets":3,"avgDownloadsPerAsset":10555.33,"avgDownloadsPerMonth":154.63,"datasets":2,"historicalPerformance":89.1,"currentMomentum":78.3,"exposure":27.3,"marketScore":58.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"star":{"popularity":66.8,"trend":83.3,"confidence":53.6,"downloads":25760.0,"downloadsPerMonth":427.1,"assets":2,"avgDownloadsPerAsset":12880.0,"avgDownloadsPerMonth":213.55,"datasets":2,"historicalPerformance":91.0,"currentMomentum":83.3,"exposure":21.6,"marketScore":58.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"closeup":{"popularity":68.8,"trend":73.0,"confidence":62.2,"downloads":40974.0,"downloadsPerMonth":438.2,"assets":4,"avgDownloadsPerAsset":10243.5,"avgDownloadsPerMonth":109.55,"datasets":2,"historicalPerformance":88.8,"currentMomentum":73.0,"exposure":31.7,"marketScore":58.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"layer":{"popularity":68.1,"trend":81.4,"confidence":53.6,"downloads":31781.0,"downloadsPerMonth":378.0,"assets":2,"avgDownloadsPerAsset":15890.5,"avgDownloadsPerMonth":189.0,"datasets":2,"historicalPerformance":93.1,"currentMomentum":81.4,"exposure":21.6,"marketScore":58.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"human":{"popularity":67.9,"trend":77.4,"confidence":58.1,"downloads":33952.0,"downloadsPerMonth":435.5,"assets":3,"avgDownloadsPerAsset":11317.33,"avgDownloadsPerMonth":145.17,"datasets":2,"historicalPerformance":89.8,"currentMomentum":77.4,"exposure":27.3,"marketScore":58.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"card":{"popularity":68.1,"trend":73.6,"confidence":62.2,"downloads":36373.0,"downloadsPerMonth":453.2,"assets":4,"avgDownloadsPerAsset":9093.25,"avgDownloadsPerMonth":113.3,"datasets":2,"historicalPerformance":87.7,"currentMomentum":73.6,"exposure":31.7,"marketScore":58.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"display":{"popularity":67.0,"trend":71.8,"confidence":65.9,"downloads":30557.0,"downloadsPerMonth":403.6,"assets":4,"avgDownloadsPerAsset":7639.25,"avgDownloadsPerMonth":100.9,"datasets":3,"historicalPerformance":86.0,"currentMomentum":71.8,"exposure":31.7,"marketScore":58.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fog":{"popularity":67.6,"trend":85.5,"confidence":49.8,"downloads":29290.0,"downloadsPerMonth":490.6,"assets":2,"avgDownloadsPerAsset":14645.0,"avgDownloadsPerMonth":245.3,"datasets":1,"historicalPerformance":92.3,"currentMomentum":85.5,"exposure":21.6,"marketScore":58.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"communication":{"popularity":67.0,"trend":82.5,"confidence":53.6,"downloads":26874.0,"downloadsPerMonth":405.8,"assets":2,"avgDownloadsPerAsset":13437.0,"avgDownloadsPerMonth":202.9,"datasets":2,"historicalPerformance":91.4,"currentMomentum":82.5,"exposure":21.6,"marketScore":58.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bright":{"popularity":68.1,"trend":73.2,"confidence":62.2,"downloads":36544.0,"downloadsPerMonth":443.5,"assets":4,"avgDownloadsPerAsset":9136.0,"avgDownloadsPerMonth":110.88,"datasets":2,"historicalPerformance":87.7,"currentMomentum":73.2,"exposure":31.7,"marketScore":58.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"100":{"popularity":68.3,"trend":80.6,"confidence":53.6,"downloads":32876.0,"downloadsPerMonth":358.0,"assets":2,"avgDownloadsPerAsset":16438.0,"avgDownloadsPerMonth":179.0,"datasets":2,"historicalPerformance":93.4,"currentMomentum":80.6,"exposure":21.6,"marketScore":58.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"falling":{"popularity":68.4,"trend":76.2,"confidence":58.1,"downloads":36622.0,"downloadsPerMonth":404.5,"assets":3,"avgDownloadsPerAsset":12207.33,"avgDownloadsPerMonth":134.83,"datasets":2,"historicalPerformance":90.5,"currentMomentum":76.2,"exposure":27.3,"marketScore":58.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pastel":{"popularity":65.9,"trend":75.7,"confidence":62.2,"downloads":25613.0,"downloadsPerMonth":520.4,"assets":4,"avgDownloadsPerAsset":6403.25,"avgDownloadsPerMonth":130.1,"datasets":2,"historicalPerformance":84.3,"currentMomentum":75.7,"exposure":31.7,"marketScore":58.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"natural":{"popularity":67.9,"trend":67.3,"confidence":69.5,"downloads":36158.0,"downloadsPerMonth":376.2,"assets":5,"avgDownloadsPerAsset":7231.6,"avgDownloadsPerMonth":75.24,"datasets":3,"historicalPerformance":85.5,"currentMomentum":67.3,"exposure":35.3,"marketScore":58.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"other":{"popularity":66.1,"trend":82.9,"confidence":53.6,"downloads":23266.0,"downloadsPerMonth":414.3,"assets":2,"avgDownloadsPerAsset":11633.0,"avgDownloadsPerMonth":207.15,"datasets":2,"historicalPerformance":90.1,"currentMomentum":82.9,"exposure":21.6,"marketScore":57.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"similar":{"popularity":66.9,"trend":85.3,"confidence":49.8,"downloads":26375.0,"downloadsPerMonth":486.0,"assets":2,"avgDownloadsPerAsset":13187.5,"avgDownloadsPerMonth":243.0,"datasets":1,"historicalPerformance":91.3,"currentMomentum":85.3,"exposure":21.6,"marketScore":57.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"clinic":{"popularity":67.8,"trend":80.5,"confidence":53.6,"downloads":30364.0,"downloadsPerMonth":356.2,"assets":2,"avgDownloadsPerAsset":15182.0,"avgDownloadsPerMonth":178.1,"datasets":2,"historicalPerformance":92.6,"currentMomentum":80.5,"exposure":21.6,"marketScore":57.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"corridor":{"popularity":67.8,"trend":80.5,"confidence":53.6,"downloads":30364.0,"downloadsPerMonth":356.2,"assets":2,"avgDownloadsPerAsset":15182.0,"avgDownloadsPerMonth":178.1,"datasets":2,"historicalPerformance":92.6,"currentMomentum":80.5,"exposure":21.6,"marketScore":57.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hospital":{"popularity":67.8,"trend":80.5,"confidence":53.6,"downloads":30364.0,"downloadsPerMonth":356.2,"assets":2,"avgDownloadsPerAsset":15182.0,"avgDownloadsPerMonth":178.1,"datasets":2,"historicalPerformance":92.6,"currentMomentum":80.5,"exposure":21.6,"marketScore":57.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"medical":{"popularity":67.7,"trend":76.4,"confidence":58.1,"downloads":32642.0,"downloadsPerMonth":408.3,"assets":3,"avgDownloadsPerAsset":10880.67,"avgDownloadsPerMonth":136.1,"datasets":2,"historicalPerformance":89.4,"currentMomentum":76.4,"exposure":27.3,"marketScore":57.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"accounting":{"popularity":68.2,"trend":83.0,"confidence":49.8,"downloads":32327.0,"downloadsPerMonth":418.3,"assets":2,"avgDownloadsPerAsset":16163.5,"avgDownloadsPerMonth":209.15,"datasets":1,"historicalPerformance":93.2,"currentMomentum":83.0,"exposure":21.6,"marketScore":57.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"leaf":{"popularity":67.8,"trend":64.1,"confidence":71.7,"downloads":36322.0,"downloadsPerMonth":428.8,"assets":7,"avgDownloadsPerAsset":5188.86,"avgDownloadsPerMonth":61.26,"datasets":2,"historicalPerformance":82.3,"currentMomentum":64.1,"exposure":41.0,"marketScore":57.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"60s":{"popularity":66.0,"trend":90.7,"confidence":44.6,"downloads":17792.0,"downloadsPerMonth":343.9,"assets":1,"avgDownloadsPerAsset":17792.0,"avgDownloadsPerMonth":343.9,"datasets":1,"historicalPerformance":94.2,"currentMomentum":90.7,"exposure":13.7,"marketScore":57.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"70s":{"popularity":66.0,"trend":90.7,"confidence":44.6,"downloads":17792.0,"downloadsPerMonth":343.9,"assets":1,"avgDownloadsPerAsset":17792.0,"avgDownloadsPerMonth":343.9,"datasets":1,"historicalPerformance":94.2,"currentMomentum":90.7,"exposure":13.7,"marketScore":57.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"frame":{"popularity":67.8,"trend":75.3,"confidence":58.1,"downloads":33228.0,"downloadsPerMonth":381.5,"assets":3,"avgDownloadsPerAsset":11076.0,"avgDownloadsPerMonth":127.17,"datasets":2,"historicalPerformance":89.6,"currentMomentum":75.3,"exposure":27.3,"marketScore":57.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"super":{"popularity":67.2,"trend":72.8,"confidence":61.9,"downloads":29986.0,"downloadsPerMonth":324.2,"assets":3,"avgDownloadsPerAsset":9995.33,"avgDownloadsPerMonth":108.07,"datasets":3,"historicalPerformance":88.6,"currentMomentum":72.8,"exposure":27.3,"marketScore":57.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"monochrome":{"popularity":68.0,"trend":88.0,"confidence":44.6,"downloads":24523.0,"downloadsPerMonth":288.7,"assets":1,"avgDownloadsPerAsset":24523.0,"avgDownloadsPerMonth":288.7,"datasets":1,"historicalPerformance":97.2,"currentMomentum":88.0,"exposure":13.7,"marketScore":57.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"splattered":{"popularity":68.0,"trend":88.0,"confidence":44.6,"downloads":24523.0,"downloadsPerMonth":288.7,"assets":1,"avgDownloadsPerAsset":24523.0,"avgDownloadsPerMonth":288.7,"datasets":1,"historicalPerformance":97.2,"currentMomentum":88.0,"exposure":13.7,"marketScore":57.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"confetti":{"popularity":64.3,"trend":92.1,"confidence":44.6,"downloads":13516.0,"downloadsPerMonth":376.4,"assets":1,"avgDownloadsPerAsset":13516.0,"avgDownloadsPerMonth":376.4,"datasets":1,"historicalPerformance":91.5,"currentMomentum":92.1,"exposure":13.7,"marketScore":57.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glittering":{"popularity":64.3,"trend":92.1,"confidence":44.6,"downloads":13516.0,"downloadsPerMonth":376.4,"assets":1,"avgDownloadsPerAsset":13516.0,"avgDownloadsPerMonth":376.4,"datasets":1,"historicalPerformance":91.5,"currentMomentum":92.1,"exposure":13.7,"marketScore":57.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"marketing":{"popularity":68.8,"trend":73.3,"confidence":58.4,"downloads":40424.0,"downloadsPerMonth":445.3,"assets":4,"avgDownloadsPerAsset":10106.0,"avgDownloadsPerMonth":111.33,"datasets":1,"historicalPerformance":88.7,"currentMomentum":73.3,"exposure":31.7,"marketScore":57.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"high":{"popularity":66.4,"trend":62.3,"confidence":75.4,"downloads":29090.0,"downloadsPerMonth":381.1,"assets":7,"avgDownloadsPerAsset":4155.71,"avgDownloadsPerMonth":54.44,"datasets":3,"historicalPerformance":80.2,"currentMomentum":62.3,"exposure":41.0,"marketScore":57.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"square":{"popularity":65.9,"trend":80.9,"confidence":53.6,"downloads":22298.0,"downloadsPerMonth":365.5,"assets":2,"avgDownloadsPerAsset":11149.0,"avgDownloadsPerMonth":182.75,"datasets":2,"historicalPerformance":89.7,"currentMomentum":80.9,"exposure":21.6,"marketScore":57.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"urban":{"popularity":67.6,"trend":78.2,"confidence":54.4,"downloads":32000.0,"downloadsPerMonth":460.6,"assets":3,"avgDownloadsPerAsset":10666.67,"avgDownloadsPerMonth":153.53,"datasets":1,"historicalPerformance":89.2,"currentMomentum":78.2,"exposure":27.3,"marketScore":57.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"web":{"popularity":68.4,"trend":67.3,"confidence":65.7,"downloads":38744.0,"downloadsPerMonth":376.0,"assets":5,"avgDownloadsPerAsset":7748.8,"avgDownloadsPerMonth":75.2,"datasets":2,"historicalPerformance":86.2,"currentMomentum":67.3,"exposure":35.3,"marketScore":57.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rough":{"popularity":66.7,"trend":83.1,"confidence":49.8,"downloads":25704.0,"downloadsPerMonth":421.1,"assets":2,"avgDownloadsPerAsset":12852.0,"avgDownloadsPerMonth":210.55,"datasets":1,"historicalPerformance":91.0,"currentMomentum":83.1,"exposure":21.6,"marketScore":57.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"world":{"popularity":66.7,"trend":75.7,"confidence":58.1,"downloads":27699.0,"downloadsPerMonth":390.7,"assets":3,"avgDownloadsPerAsset":9233.0,"avgDownloadsPerMonth":130.23,"datasets":2,"historicalPerformance":87.8,"currentMomentum":75.7,"exposure":27.3,"marketScore":57.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"panorama":{"popularity":68.2,"trend":73.8,"confidence":58.1,"downloads":35413.0,"downloadsPerMonth":345.2,"assets":3,"avgDownloadsPerAsset":11804.33,"avgDownloadsPerMonth":115.07,"datasets":2,"historicalPerformance":90.2,"currentMomentum":73.8,"exposure":27.3,"marketScore":57.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"autumn":{"popularity":68.3,"trend":70.0,"confidence":62.2,"downloads":37662.0,"downloadsPerMonth":359.6,"assets":4,"avgDownloadsPerAsset":9415.5,"avgDownloadsPerMonth":89.9,"datasets":2,"historicalPerformance":88.0,"currentMomentum":70.0,"exposure":31.7,"marketScore":57.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"horizontal":{"popularity":66.1,"trend":79.2,"confidence":54.4,"downloads":25163.0,"downloadsPerMonth":491.1,"assets":3,"avgDownloadsPerAsset":8387.67,"avgDownloadsPerMonth":163.7,"datasets":1,"historicalPerformance":86.9,"currentMomentum":79.2,"exposure":27.3,"marketScore":56.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"irregularities":{"popularity":67.2,"trend":78.7,"confidence":53.6,"downloads":27874.0,"downloadsPerMonth":317.4,"assets":2,"avgDownloadsPerAsset":13937.0,"avgDownloadsPerMonth":158.7,"datasets":2,"historicalPerformance":91.8,"currentMomentum":78.7,"exposure":21.6,"marketScore":56.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mint":{"popularity":67.2,"trend":78.7,"confidence":53.6,"downloads":27874.0,"downloadsPerMonth":317.4,"assets":2,"avgDownloadsPerAsset":13937.0,"avgDownloadsPerMonth":158.7,"datasets":2,"historicalPerformance":91.8,"currentMomentum":78.7,"exposure":21.6,"marketScore":56.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pale":{"popularity":67.2,"trend":78.7,"confidence":53.6,"downloads":27874.0,"downloadsPerMonth":317.4,"assets":2,"avgDownloadsPerAsset":13937.0,"avgDownloadsPerMonth":158.7,"datasets":2,"historicalPerformance":91.8,"currentMomentum":78.7,"exposure":21.6,"marketScore":56.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ecology":{"popularity":67.3,"trend":74.5,"confidence":58.1,"downloads":30573.0,"downloadsPerMonth":360.6,"assets":3,"avgDownloadsPerAsset":10191.0,"avgDownloadsPerMonth":120.2,"datasets":2,"historicalPerformance":88.8,"currentMomentum":74.5,"exposure":27.3,"marketScore":56.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shopping":{"popularity":67.3,"trend":74.5,"confidence":58.1,"downloads":30573.0,"downloadsPerMonth":360.6,"assets":3,"avgDownloadsPerAsset":10191.0,"avgDownloadsPerMonth":120.2,"datasets":2,"historicalPerformance":88.8,"currentMomentum":74.5,"exposure":27.3,"marketScore":56.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"editor":{"popularity":67.6,"trend":86.8,"confidence":44.6,"downloads":23198.0,"downloadsPerMonth":268.2,"assets":1,"avgDownloadsPerAsset":23198.0,"avgDownloadsPerMonth":268.2,"datasets":1,"historicalPerformance":96.7,"currentMomentum":86.8,"exposure":13.7,"marketScore":56.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cake":{"popularity":69.9,"trend":65.0,"confidence":65.1,"downloads":50313.0,"downloadsPerMonth":390.0,"assets":6,"avgDownloadsPerAsset":8385.5,"avgDownloadsPerMonth":65.0,"datasets":1,"historicalPerformance":86.9,"currentMomentum":65.0,"exposure":38.3,"marketScore":56.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"perspective":{"popularity":65.4,"trend":83.8,"confidence":49.8,"downloads":20898.0,"downloadsPerMonth":439.1,"assets":2,"avgDownloadsPerAsset":10449.0,"avgDownloadsPerMonth":219.55,"datasets":1,"historicalPerformance":89.0,"currentMomentum":83.8,"exposure":21.6,"marketScore":56.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"outline":{"popularity":67.2,"trend":74.0,"confidence":58.1,"downloads":30427.0,"downloadsPerMonth":349.6,"assets":3,"avgDownloadsPerAsset":10142.33,"avgDownloadsPerMonth":116.53,"datasets":2,"historicalPerformance":88.7,"currentMomentum":74.0,"exposure":27.3,"marketScore":56.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"underline":{"popularity":64.5,"trend":89.7,"confidence":44.6,"downloads":13969.0,"downloadsPerMonth":321.6,"assets":1,"avgDownloadsPerAsset":13969.0,"avgDownloadsPerMonth":321.6,"datasets":1,"historicalPerformance":91.8,"currentMomentum":89.7,"exposure":13.7,"marketScore":56.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"any":{"popularity":66.5,"trend":78.5,"confidence":53.6,"downloads":24557.0,"downloadsPerMonth":312.8,"assets":2,"avgDownloadsPerAsset":12278.5,"avgDownloadsPerMonth":156.4,"datasets":2,"historicalPerformance":90.6,"currentMomentum":78.5,"exposure":21.6,"marketScore":56.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"drink":{"popularity":66.5,"trend":78.5,"confidence":53.6,"downloads":24557.0,"downloadsPerMonth":312.8,"assets":2,"avgDownloadsPerAsset":12278.5,"avgDownloadsPerMonth":156.4,"datasets":2,"historicalPerformance":90.6,"currentMomentum":78.5,"exposure":21.6,"marketScore":56.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"many":{"popularity":66.5,"trend":78.5,"confidence":53.6,"downloads":24557.0,"downloadsPerMonth":312.8,"assets":2,"avgDownloadsPerAsset":12278.5,"avgDownloadsPerMonth":156.4,"datasets":2,"historicalPerformance":90.6,"currentMomentum":78.5,"exposure":21.6,"marketScore":56.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"together":{"popularity":67.2,"trend":76.9,"confidence":54.4,"downloads":30135.0,"downloadsPerMonth":421.2,"assets":3,"avgDownloadsPerAsset":10045.0,"avgDownloadsPerMonth":140.4,"datasets":1,"historicalPerformance":88.7,"currentMomentum":76.9,"exposure":27.3,"marketScore":56.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ghost":{"popularity":65.0,"trend":88.5,"confidence":44.6,"downloads":15214.0,"downloadsPerMonth":298.2,"assets":1,"avgDownloadsPerAsset":15214.0,"avgDownloadsPerMonth":298.2,"datasets":1,"historicalPerformance":92.6,"currentMomentum":88.5,"exposure":13.7,"marketScore":56.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"gothic":{"popularity":65.0,"trend":88.5,"confidence":44.6,"downloads":15214.0,"downloadsPerMonth":298.2,"assets":1,"avgDownloadsPerAsset":15214.0,"avgDownloadsPerMonth":298.2,"datasets":1,"historicalPerformance":92.6,"currentMomentum":88.5,"exposure":13.7,"marketScore":56.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"overlays":{"popularity":65.0,"trend":88.5,"confidence":44.6,"downloads":15214.0,"downloadsPerMonth":298.2,"assets":1,"avgDownloadsPerAsset":15214.0,"avgDownloadsPerMonth":298.2,"datasets":1,"historicalPerformance":92.6,"currentMomentum":88.5,"exposure":13.7,"marketScore":56.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"spooky":{"popularity":65.0,"trend":88.5,"confidence":44.6,"downloads":15214.0,"downloadsPerMonth":298.2,"assets":1,"avgDownloadsPerAsset":15214.0,"avgDownloadsPerMonth":298.2,"datasets":1,"historicalPerformance":92.6,"currentMomentum":88.5,"exposure":13.7,"marketScore":56.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"creative":{"popularity":66.3,"trend":70.6,"confidence":62.2,"downloads":27219.0,"downloadsPerMonth":375.0,"assets":4,"avgDownloadsPerAsset":6804.75,"avgDownloadsPerMonth":93.75,"datasets":2,"historicalPerformance":84.9,"currentMomentum":70.6,"exposure":31.7,"marketScore":56.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"plywood":{"popularity":67.1,"trend":77.1,"confidence":53.6,"downloads":27036.0,"downloadsPerMonth":285.0,"assets":2,"avgDownloadsPerAsset":13518.0,"avgDownloadsPerMonth":142.5,"datasets":2,"historicalPerformance":91.5,"currentMomentum":77.1,"exposure":21.6,"marketScore":56.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"holographic":{"popularity":66.9,"trend":73.0,"confidence":58.1,"downloads":28682.0,"downloadsPerMonth":328.6,"assets":3,"avgDownloadsPerAsset":9560.67,"avgDownloadsPerMonth":109.53,"datasets":2,"historicalPerformance":88.2,"currentMomentum":73.0,"exposure":27.3,"marketScore":56.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"various":{"popularity":67.7,"trend":72.1,"confidence":58.1,"downloads":32499.0,"downloadsPerMonth":309.6,"assets":3,"avgDownloadsPerAsset":10833.0,"avgDownloadsPerMonth":103.2,"datasets":2,"historicalPerformance":89.4,"currentMomentum":72.1,"exposure":27.3,"marketScore":56.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"applications":{"popularity":65.5,"trend":87.3,"confidence":44.6,"downloads":16508.0,"downloadsPerMonth":276.9,"assets":1,"avgDownloadsPerAsset":16508.0,"avgDownloadsPerMonth":276.9,"datasets":1,"historicalPerformance":93.4,"currentMomentum":87.3,"exposure":13.7,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"corners":{"popularity":65.5,"trend":87.3,"confidence":44.6,"downloads":16508.0,"downloadsPerMonth":276.9,"assets":1,"avgDownloadsPerAsset":16508.0,"avgDownloadsPerMonth":276.9,"datasets":1,"historicalPerformance":93.4,"currentMomentum":87.3,"exposure":13.7,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"popular":{"popularity":65.5,"trend":87.3,"confidence":44.6,"downloads":16508.0,"downloadsPerMonth":276.9,"assets":1,"avgDownloadsPerAsset":16508.0,"avgDownloadsPerMonth":276.9,"datasets":1,"historicalPerformance":93.4,"currentMomentum":87.3,"exposure":13.7,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rounded":{"popularity":65.5,"trend":87.3,"confidence":44.6,"downloads":16508.0,"downloadsPerMonth":276.9,"assets":1,"avgDownloadsPerAsset":16508.0,"avgDownloadsPerMonth":276.9,"datasets":1,"historicalPerformance":93.4,"currentMomentum":87.3,"exposure":13.7,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mock":{"popularity":66.6,"trend":80.8,"confidence":49.8,"downloads":25220.0,"downloadsPerMonth":363.4,"assets":2,"avgDownloadsPerAsset":12610.0,"avgDownloadsPerMonth":181.7,"datasets":1,"historicalPerformance":90.8,"currentMomentum":80.8,"exposure":21.6,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"panoramic":{"popularity":66.8,"trend":80.4,"confidence":49.8,"downloads":26145.0,"downloadsPerMonth":354.4,"assets":2,"avgDownloadsPerAsset":13072.5,"avgDownloadsPerMonth":177.2,"datasets":1,"historicalPerformance":91.2,"currentMomentum":80.4,"exposure":21.6,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"detailed":{"popularity":67.0,"trend":72.8,"confidence":58.1,"downloads":29483.0,"downloadsPerMonth":323.9,"assets":3,"avgDownloadsPerAsset":9827.67,"avgDownloadsPerMonth":107.97,"datasets":2,"historicalPerformance":88.4,"currentMomentum":72.8,"exposure":27.3,"marketScore":56.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bat":{"popularity":63.4,"trend":89.6,"confidence":44.6,"downloads":11776.0,"downloadsPerMonth":321.2,"assets":1,"avgDownloadsPerAsset":11776.0,"avgDownloadsPerMonth":321.2,"datasets":1,"historicalPerformance":90.2,"currentMomentum":89.6,"exposure":13.7,"marketScore":56.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bats":{"popularity":63.4,"trend":89.6,"confidence":44.6,"downloads":11776.0,"downloadsPerMonth":321.2,"assets":1,"avgDownloadsPerAsset":11776.0,"avgDownloadsPerMonth":321.2,"datasets":1,"historicalPerformance":90.2,"currentMomentum":89.6,"exposure":13.7,"marketScore":56.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"purposes":{"popularity":68.0,"trend":84.1,"confidence":44.6,"downloads":24500.0,"downloadsPerMonth":224.8,"assets":1,"avgDownloadsPerAsset":24500.0,"avgDownloadsPerMonth":224.8,"datasets":1,"historicalPerformance":97.2,"currentMomentum":84.1,"exposure":13.7,"marketScore":56.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"point":{"popularity":67.4,"trend":75.2,"confidence":54.4,"downloads":30950.0,"downloadsPerMonth":379.1,"assets":3,"avgDownloadsPerAsset":10316.67,"avgDownloadsPerMonth":126.37,"datasets":1,"historicalPerformance":88.9,"currentMomentum":75.2,"exposure":27.3,"marketScore":56.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"olio":{"popularity":69.0,"trend":73.8,"confidence":53.6,"downloads":37010.0,"downloadsPerMonth":230.6,"assets":2,"avgDownloadsPerAsset":18505.0,"avgDownloadsPerMonth":115.3,"datasets":2,"historicalPerformance":94.5,"currentMomentum":73.8,"exposure":21.6,"marketScore":55.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"olive":{"popularity":69.0,"trend":73.8,"confidence":53.6,"downloads":37010.0,"downloadsPerMonth":230.6,"assets":2,"avgDownloadsPerAsset":18505.0,"avgDownloadsPerMonth":115.3,"datasets":2,"historicalPerformance":94.5,"currentMomentum":73.8,"exposure":21.6,"marketScore":55.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pane":{"popularity":69.0,"trend":73.8,"confidence":53.6,"downloads":37010.0,"downloadsPerMonth":230.6,"assets":2,"avgDownloadsPerAsset":18505.0,"avgDownloadsPerMonth":115.3,"datasets":2,"historicalPerformance":94.5,"currentMomentum":73.8,"exposure":21.6,"marketScore":55.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"park":{"popularity":66.7,"trend":76.3,"confidence":53.6,"downloads":25718.0,"downloadsPerMonth":270.6,"assets":2,"avgDownloadsPerAsset":12859.0,"avgDownloadsPerMonth":135.3,"datasets":2,"historicalPerformance":91.0,"currentMomentum":76.3,"exposure":21.6,"marketScore":55.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pack":{"popularity":66.2,"trend":69.6,"confidence":62.2,"downloads":26713.0,"downloadsPerMonth":349.3,"assets":4,"avgDownloadsPerAsset":6678.25,"avgDownloadsPerMonth":87.33,"datasets":2,"historicalPerformance":84.7,"currentMomentum":69.6,"exposure":31.7,"marketScore":55.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"elements":{"popularity":64.1,"trend":69.0,"confidence":65.9,"downloads":19079.0,"downloadsPerMonth":336.8,"assets":4,"avgDownloadsPerAsset":4769.75,"avgDownloadsPerMonth":84.2,"datasets":3,"historicalPerformance":81.5,"currentMomentum":69.0,"exposure":31.7,"marketScore":55.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"illumination":{"popularity":66.5,"trend":85.0,"confidence":44.6,"downloads":19464.0,"downloadsPerMonth":238.5,"assets":1,"avgDownloadsPerAsset":19464.0,"avgDownloadsPerMonth":238.5,"datasets":1,"historicalPerformance":95.0,"currentMomentum":85.0,"exposure":13.7,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"app":{"popularity":64.4,"trend":82.3,"confidence":49.8,"downloads":17661.0,"downloadsPerMonth":400.4,"assets":2,"avgDownloadsPerAsset":8830.5,"avgDownloadsPerMonth":200.2,"datasets":1,"historicalPerformance":87.4,"currentMomentum":82.3,"exposure":21.6,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"global":{"popularity":67.2,"trend":78.9,"confidence":49.8,"downloads":27552.0,"downloadsPerMonth":320.3,"assets":2,"avgDownloadsPerAsset":13776.0,"avgDownloadsPerMonth":160.15,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.9,"exposure":21.6,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"infographic":{"popularity":67.2,"trend":78.9,"confidence":49.8,"downloads":27552.0,"downloadsPerMonth":320.3,"assets":2,"avgDownloadsPerAsset":13776.0,"avgDownloadsPerMonth":160.15,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.9,"exposure":21.6,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"plan":{"popularity":67.2,"trend":78.9,"confidence":49.8,"downloads":27552.0,"downloadsPerMonth":320.3,"assets":2,"avgDownloadsPerAsset":13776.0,"avgDownloadsPerMonth":160.15,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.9,"exposure":21.6,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mesh":{"popularity":65.9,"trend":77.1,"confidence":53.6,"downloads":22639.0,"downloadsPerMonth":286.2,"assets":2,"avgDownloadsPerAsset":11319.5,"avgDownloadsPerMonth":143.1,"datasets":2,"historicalPerformance":89.8,"currentMomentum":77.1,"exposure":21.6,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"night":{"popularity":67.0,"trend":62.8,"confidence":68.9,"downloads":31376.0,"downloadsPerMonth":338.1,"assets":6,"avgDownloadsPerAsset":5229.33,"avgDownloadsPerMonth":56.35,"datasets":2,"historicalPerformance":82.4,"currentMomentum":62.8,"exposure":38.3,"marketScore":55.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"aged":{"popularity":66.2,"trend":76.5,"confidence":53.6,"downloads":23628.0,"downloadsPerMonth":274.7,"assets":2,"avgDownloadsPerAsset":11814.0,"avgDownloadsPerMonth":137.35,"datasets":2,"historicalPerformance":90.2,"currentMomentum":76.5,"exposure":21.6,"marketScore":55.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"software":{"popularity":67.3,"trend":74.2,"confidence":54.4,"downloads":30725.0,"downloadsPerMonth":353.9,"assets":3,"avgDownloadsPerAsset":10241.67,"avgDownloadsPerMonth":117.97,"datasets":1,"historicalPerformance":88.8,"currentMomentum":74.2,"exposure":27.3,"marketScore":55.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"thin":{"popularity":66.5,"trend":62.7,"confidence":69.5,"downloads":28591.0,"downloadsPerMonth":279.0,"assets":5,"avgDownloadsPerAsset":5718.2,"avgDownloadsPerMonth":55.8,"datasets":3,"historicalPerformance":83.2,"currentMomentum":62.7,"exposure":35.3,"marketScore":55.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"strokes":{"popularity":63.1,"trend":88.3,"confidence":44.6,"downloads":11312.0,"downloadsPerMonth":295.1,"assets":1,"avgDownloadsPerAsset":11312.0,"avgDownloadsPerMonth":295.1,"datasets":1,"historicalPerformance":89.8,"currentMomentum":88.3,"exposure":13.7,"marketScore":55.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"holding":{"popularity":65.1,"trend":80.9,"confidence":49.8,"downloads":19861.0,"downloadsPerMonth":364.2,"assets":2,"avgDownloadsPerAsset":9930.5,"avgDownloadsPerMonth":182.1,"datasets":1,"historicalPerformance":88.5,"currentMomentum":80.9,"exposure":21.6,"marketScore":55.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"edges":{"popularity":67.4,"trend":78.0,"confidence":49.8,"downloads":28486.0,"downloadsPerMonth":303.3,"assets":2,"avgDownloadsPerAsset":14243.0,"avgDownloadsPerMonth":151.65,"datasets":1,"historicalPerformance":92.0,"currentMomentum":78.0,"exposure":21.6,"marketScore":55.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fruit":{"popularity":65.0,"trend":76.7,"confidence":54.4,"downloads":21158.0,"downloadsPerMonth":417.4,"assets":3,"avgDownloadsPerAsset":7052.67,"avgDownloadsPerMonth":139.13,"datasets":1,"historicalPerformance":85.2,"currentMomentum":76.7,"exposure":27.3,"marketScore":55.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ocean":{"popularity":67.2,"trend":64.5,"confidence":65.7,"downloads":32013.0,"downloadsPerMonth":313.9,"assets":5,"avgDownloadsPerAsset":6402.6,"avgDownloadsPerMonth":62.78,"datasets":2,"historicalPerformance":84.3,"currentMomentum":64.5,"exposure":35.3,"marketScore":55.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"instagram":{"popularity":66.6,"trend":78.7,"confidence":49.8,"downloads":25185.0,"downloadsPerMonth":315.8,"assets":2,"avgDownloadsPerAsset":12592.5,"avgDownloadsPerMonth":157.9,"datasets":1,"historicalPerformance":90.8,"currentMomentum":78.7,"exposure":21.6,"marketScore":55.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"analysis":{"popularity":65.0,"trend":76.3,"confidence":54.4,"downloads":21291.0,"downloadsPerMonth":407.2,"assets":3,"avgDownloadsPerAsset":7097.0,"avgDownloadsPerMonth":135.73,"datasets":1,"historicalPerformance":85.3,"currentMomentum":76.3,"exposure":27.3,"marketScore":55.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"clear":{"popularity":66.7,"trend":75.2,"confidence":53.6,"downloads":25500.0,"downloadsPerMonth":253.0,"assets":2,"avgDownloadsPerAsset":12750.0,"avgDownloadsPerMonth":126.5,"datasets":2,"historicalPerformance":90.9,"currentMomentum":75.2,"exposure":21.6,"marketScore":55.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"team":{"popularity":68.2,"trend":72.7,"confidence":54.4,"downloads":35240.0,"downloadsPerMonth":321.1,"assets":3,"avgDownloadsPerAsset":11746.67,"avgDownloadsPerMonth":107.03,"datasets":1,"historicalPerformance":90.2,"currentMomentum":72.7,"exposure":27.3,"marketScore":55.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"perfect":{"popularity":67.0,"trend":70.9,"confidence":58.1,"downloads":29156.0,"downloadsPerMonth":285.7,"assets":3,"avgDownloadsPerAsset":9718.67,"avgDownloadsPerMonth":95.23,"datasets":2,"historicalPerformance":88.3,"currentMomentum":70.9,"exposure":27.3,"marketScore":55.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"10s":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"11pro":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"12pro":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"2021":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"january":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ukraine":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vinnitsa":{"popularity":65.3,"trend":85.1,"confidence":44.6,"downloads":15980.0,"downloadsPerMonth":239.4,"assets":1,"avgDownloadsPerAsset":15980.0,"avgDownloadsPerMonth":239.4,"datasets":1,"historicalPerformance":93.1,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"presentation":{"popularity":65.3,"trend":76.6,"confidence":53.6,"downloads":20523.0,"downloadsPerMonth":275.6,"assets":2,"avgDownloadsPerAsset":10261.5,"avgDownloadsPerMonth":137.8,"datasets":2,"historicalPerformance":88.9,"currentMomentum":76.6,"exposure":21.6,"marketScore":55.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"calmness":{"popularity":64.9,"trend":85.1,"confidence":44.6,"downloads":14875.0,"downloadsPerMonth":239.2,"assets":1,"avgDownloadsPerAsset":14875.0,"avgDownloadsPerMonth":239.2,"datasets":1,"historicalPerformance":92.4,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"horizon":{"popularity":64.9,"trend":85.1,"confidence":44.6,"downloads":14875.0,"downloadsPerMonth":239.2,"assets":1,"avgDownloadsPerAsset":14875.0,"avgDownloadsPerMonth":239.2,"datasets":1,"historicalPerformance":92.4,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"inspire":{"popularity":64.9,"trend":85.1,"confidence":44.6,"downloads":14875.0,"downloadsPerMonth":239.2,"assets":1,"avgDownloadsPerAsset":14875.0,"avgDownloadsPerMonth":239.2,"datasets":1,"historicalPerformance":92.4,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sand":{"popularity":64.9,"trend":85.1,"confidence":44.6,"downloads":14875.0,"downloadsPerMonth":239.2,"assets":1,"avgDownloadsPerAsset":14875.0,"avgDownloadsPerMonth":239.2,"datasets":1,"historicalPerformance":92.4,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"seascape":{"popularity":64.9,"trend":85.1,"confidence":44.6,"downloads":14875.0,"downloadsPerMonth":239.2,"assets":1,"avgDownloadsPerAsset":14875.0,"avgDownloadsPerMonth":239.2,"datasets":1,"historicalPerformance":92.4,"currentMomentum":85.1,"exposure":13.7,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"baubles":{"popularity":66.1,"trend":83.7,"confidence":44.6,"downloads":18049.0,"downloadsPerMonth":218.8,"assets":1,"avgDownloadsPerAsset":18049.0,"avgDownloadsPerMonth":218.8,"datasets":1,"historicalPerformance":94.3,"currentMomentum":83.7,"exposure":13.7,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sheet":{"popularity":66.0,"trend":78.5,"confidence":49.8,"downloads":22911.0,"downloadsPerMonth":313.4,"assets":2,"avgDownloadsPerAsset":11455.5,"avgDownloadsPerMonth":156.7,"datasets":1,"historicalPerformance":89.9,"currentMomentum":78.5,"exposure":21.6,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flower":{"popularity":65.1,"trend":72.3,"confidence":58.1,"downloads":21633.0,"downloadsPerMonth":314.1,"assets":3,"avgDownloadsPerAsset":7211.0,"avgDownloadsPerMonth":104.7,"datasets":2,"historicalPerformance":85.5,"currentMomentum":72.3,"exposure":27.3,"marketScore":55.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"logotype":{"popularity":65.3,"trend":75.7,"confidence":53.6,"downloads":20485.0,"downloadsPerMonth":260.2,"assets":2,"avgDownloadsPerAsset":10242.5,"avgDownloadsPerMonth":130.1,"datasets":2,"historicalPerformance":88.8,"currentMomentum":75.7,"exposure":21.6,"marketScore":55.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pro":{"popularity":63.4,"trend":86.4,"confidence":44.6,"downloads":11711.0,"downloadsPerMonth":260.8,"assets":1,"avgDownloadsPerAsset":11711.0,"avgDownloadsPerMonth":260.8,"datasets":1,"historicalPerformance":90.1,"currentMomentum":86.4,"exposure":13.7,"marketScore":54.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fire":{"popularity":68.4,"trend":71.8,"confidence":53.6,"downloads":33634.0,"downloadsPerMonth":202.2,"assets":2,"avgDownloadsPerAsset":16817.0,"avgDownloadsPerMonth":101.1,"datasets":2,"historicalPerformance":93.6,"currentMomentum":71.8,"exposure":21.6,"marketScore":54.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fireplace":{"popularity":68.4,"trend":71.8,"confidence":53.6,"downloads":33634.0,"downloadsPerMonth":202.2,"assets":2,"avgDownloadsPerAsset":16817.0,"avgDownloadsPerMonth":101.1,"datasets":2,"historicalPerformance":93.6,"currentMomentum":71.8,"exposure":21.6,"marketScore":54.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"analyst":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"connected":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dashboard":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"kpi":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"metrics":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"system":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"uses":{"popularity":62.8,"trend":86.6,"confidence":44.6,"downloads":10696.0,"downloadsPerMonth":264.3,"assets":1,"avgDownloadsPerAsset":10696.0,"avgDownloadsPerMonth":264.3,"datasets":1,"historicalPerformance":89.3,"currentMomentum":86.6,"exposure":13.7,"marketScore":54.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"long":{"popularity":64.6,"trend":62.7,"confidence":69.7,"downloads":20911.0,"downloadsPerMonth":222.6,"assets":4,"avgDownloadsPerAsset":5227.75,"avgDownloadsPerMonth":55.65,"datasets":4,"historicalPerformance":82.4,"currentMomentum":62.7,"exposure":31.7,"marketScore":54.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"healthy":{"popularity":67.5,"trend":62.6,"confidence":65.1,"downloads":34217.0,"downloadsPerMonth":331.6,"assets":6,"avgDownloadsPerAsset":5702.83,"avgDownloadsPerMonth":55.27,"datasets":1,"historicalPerformance":83.2,"currentMomentum":62.6,"exposure":38.3,"marketScore":54.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"snowflakes":{"popularity":66.5,"trend":73.3,"confidence":53.6,"downloads":24563.0,"downloadsPerMonth":223.6,"assets":2,"avgDownloadsPerAsset":12281.5,"avgDownloadsPerMonth":111.8,"datasets":2,"historicalPerformance":90.6,"currentMomentum":73.3,"exposure":21.6,"marketScore":54.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hue":{"popularity":65.1,"trend":83.1,"confidence":44.6,"downloads":15374.0,"downloadsPerMonth":210.1,"assets":1,"avgDownloadsPerAsset":15374.0,"avgDownloadsPerMonth":210.1,"datasets":1,"historicalPerformance":92.7,"currentMomentum":83.1,"exposure":13.7,"marketScore":54.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"basket":{"popularity":67.6,"trend":71.5,"confidence":53.6,"downloads":29698.0,"downloadsPerMonth":198.0,"assets":2,"avgDownloadsPerAsset":14849.0,"avgDownloadsPerMonth":99.0,"datasets":2,"historicalPerformance":92.4,"currentMomentum":71.5,"exposure":21.6,"marketScore":54.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chocolate":{"popularity":69.1,"trend":62.5,"confidence":62.0,"downloads":43412.0,"downloadsPerMonth":275.5,"assets":5,"avgDownloadsPerAsset":8682.4,"avgDownloadsPerMonth":55.1,"datasets":1,"historicalPerformance":87.2,"currentMomentum":62.5,"exposure":35.3,"marketScore":54.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"air":{"popularity":66.2,"trend":81.5,"confidence":44.6,"downloads":18547.0,"downloadsPerMonth":189.3,"assets":1,"avgDownloadsPerAsset":18547.0,"avgDownloadsPerMonth":189.3,"datasets":1,"historicalPerformance":94.6,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"arms":{"popularity":66.2,"trend":81.5,"confidence":44.6,"downloads":18547.0,"downloadsPerMonth":189.3,"assets":1,"avgDownloadsPerAsset":18547.0,"avgDownloadsPerMonth":189.3,"datasets":1,"historicalPerformance":94.6,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"breathing":{"popularity":66.2,"trend":81.5,"confidence":44.6,"downloads":18547.0,"downloadsPerMonth":189.3,"assets":1,"avgDownloadsPerAsset":18547.0,"avgDownloadsPerMonth":189.3,"datasets":1,"historicalPerformance":94.6,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"enjoying":{"popularity":66.2,"trend":81.5,"confidence":44.6,"downloads":18547.0,"downloadsPerMonth":189.3,"assets":1,"avgDownloadsPerAsset":18547.0,"avgDownloadsPerMonth":189.3,"datasets":1,"historicalPerformance":94.6,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"outstretched":{"popularity":66.2,"trend":81.5,"confidence":44.6,"downloads":18547.0,"downloadsPerMonth":189.3,"assets":1,"avgDownloadsPerAsset":18547.0,"avgDownloadsPerMonth":189.3,"datasets":1,"historicalPerformance":94.6,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wind":{"popularity":66.2,"trend":81.5,"confidence":44.6,"downloads":18547.0,"downloadsPerMonth":189.3,"assets":1,"avgDownloadsPerAsset":18547.0,"avgDownloadsPerMonth":189.3,"datasets":1,"historicalPerformance":94.6,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"products":{"popularity":64.7,"trend":83.0,"confidence":44.6,"downloads":14388.0,"downloadsPerMonth":208.6,"assets":1,"avgDownloadsPerAsset":14388.0,"avgDownloadsPerMonth":208.6,"datasets":1,"historicalPerformance":92.1,"currentMomentum":83.0,"exposure":13.7,"marketScore":54.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"used":{"popularity":64.7,"trend":83.0,"confidence":44.6,"downloads":14388.0,"downloadsPerMonth":208.6,"assets":1,"avgDownloadsPerAsset":14388.0,"avgDownloadsPerMonth":208.6,"datasets":1,"historicalPerformance":92.1,"currentMomentum":83.0,"exposure":13.7,"marketScore":54.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"group":{"popularity":66.0,"trend":76.4,"confidence":49.8,"downloads":23014.0,"downloadsPerMonth":273.1,"assets":2,"avgDownloadsPerAsset":11507.0,"avgDownloadsPerMonth":136.55,"datasets":1,"historicalPerformance":90.0,"currentMomentum":76.4,"exposure":21.6,"marketScore":54.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"purple":{"popularity":66.7,"trend":72.2,"confidence":53.6,"downloads":25544.0,"downloadsPerMonth":207.2,"assets":2,"avgDownloadsPerAsset":12772.0,"avgDownloadsPerMonth":103.6,"datasets":2,"historicalPerformance":91.0,"currentMomentum":72.2,"exposure":21.6,"marketScore":54.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"damaged":{"popularity":64.7,"trend":82.6,"confidence":44.6,"downloads":14555.0,"downloadsPerMonth":203.2,"assets":1,"avgDownloadsPerAsset":14555.0,"avgDownloadsPerMonth":203.2,"datasets":1,"historicalPerformance":92.2,"currentMomentum":82.6,"exposure":13.7,"marketScore":54.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stamps":{"popularity":64.7,"trend":82.6,"confidence":44.6,"downloads":14555.0,"downloadsPerMonth":203.2,"assets":1,"avgDownloadsPerAsset":14555.0,"avgDownloadsPerMonth":203.2,"datasets":1,"historicalPerformance":92.2,"currentMomentum":82.6,"exposure":13.7,"marketScore":54.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"types":{"popularity":64.7,"trend":82.6,"confidence":44.6,"downloads":14555.0,"downloadsPerMonth":203.2,"assets":1,"avgDownloadsPerAsset":14555.0,"avgDownloadsPerMonth":203.2,"datasets":1,"historicalPerformance":92.2,"currentMomentum":82.6,"exposure":13.7,"marketScore":54.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"futuristic":{"popularity":66.5,"trend":67.9,"confidence":58.4,"downloads":28107.0,"downloadsPerMonth":313.3,"assets":4,"avgDownloadsPerAsset":7026.75,"avgDownloadsPerMonth":78.33,"datasets":1,"historicalPerformance":85.2,"currentMomentum":67.9,"exposure":31.7,"marketScore":54.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"organic":{"popularity":64.3,"trend":67.5,"confidence":62.2,"downloads":19706.0,"downloadsPerMonth":304.8,"assets":4,"avgDownloadsPerAsset":4926.5,"avgDownloadsPerMonth":76.2,"datasets":2,"historicalPerformance":81.8,"currentMomentum":67.5,"exposure":31.7,"marketScore":54.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"silver":{"popularity":65.4,"trend":81.5,"confidence":44.6,"downloads":16189.0,"downloadsPerMonth":190.2,"assets":1,"avgDownloadsPerAsset":16189.0,"avgDownloadsPerMonth":190.2,"datasets":1,"historicalPerformance":93.2,"currentMomentum":81.5,"exposure":13.7,"marketScore":54.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"asters":{"popularity":68.8,"trend":77.5,"confidence":44.6,"downloads":27761.0,"downloadsPerMonth":146.0,"assets":1,"avgDownloadsPerAsset":27761.0,"avgDownloadsPerMonth":146.0,"datasets":1,"historicalPerformance":98.4,"currentMomentum":77.5,"exposure":13.7,"marketScore":54.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"forest":{"popularity":66.5,"trend":75.2,"confidence":49.8,"downloads":24586.0,"downloadsPerMonth":252.2,"assets":2,"avgDownloadsPerAsset":12293.0,"avgDownloadsPerMonth":126.1,"datasets":1,"historicalPerformance":90.6,"currentMomentum":75.2,"exposure":21.6,"marketScore":54.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pumpkin":{"popularity":66.8,"trend":67.1,"confidence":58.1,"downloads":28139.0,"downloadsPerMonth":224.0,"assets":3,"avgDownloadsPerAsset":9379.67,"avgDownloadsPerMonth":74.67,"datasets":2,"historicalPerformance":88.0,"currentMomentum":67.1,"exposure":27.3,"marketScore":54.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"birthday":{"popularity":66.5,"trend":61.3,"confidence":65.7,"downloads":28864.0,"downloadsPerMonth":254.5,"assets":5,"avgDownloadsPerAsset":5772.8,"avgDownloadsPerMonth":50.9,"datasets":2,"historicalPerformance":83.3,"currentMomentum":61.3,"exposure":35.3,"marketScore":54.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flowing":{"popularity":61.7,"trend":85.4,"confidence":44.6,"downloads":8919.0,"downloadsPerMonth":244.4,"assets":1,"avgDownloadsPerAsset":8919.0,"avgDownloadsPerMonth":244.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":85.4,"exposure":13.7,"marketScore":53.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bundle":{"popularity":64.9,"trend":81.6,"confidence":44.6,"downloads":14945.0,"downloadsPerMonth":190.6,"assets":1,"avgDownloadsPerAsset":14945.0,"avgDownloadsPerMonth":190.6,"datasets":1,"historicalPerformance":92.5,"currentMomentum":81.6,"exposure":13.7,"marketScore":53.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flyer":{"popularity":64.9,"trend":81.6,"confidence":44.6,"downloads":14945.0,"downloadsPerMonth":190.6,"assets":1,"avgDownloadsPerAsset":14945.0,"avgDownloadsPerMonth":190.6,"datasets":1,"historicalPerformance":92.5,"currentMomentum":81.6,"exposure":13.7,"marketScore":53.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"apple":{"popularity":68.3,"trend":62.0,"confidence":62.0,"downloads":38290.0,"downloadsPerMonth":266.5,"assets":5,"avgDownloadsPerAsset":7658.0,"avgDownloadsPerMonth":53.3,"datasets":1,"historicalPerformance":86.0,"currentMomentum":62.0,"exposure":35.3,"marketScore":53.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"screens":{"popularity":65.1,"trend":76.0,"confidence":49.8,"downloads":19672.0,"downloadsPerMonth":264.9,"assets":2,"avgDownloadsPerAsset":9836.0,"avgDownloadsPerMonth":132.45,"datasets":1,"historicalPerformance":88.4,"currentMomentum":76.0,"exposure":21.6,"marketScore":53.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"water":{"popularity":65.7,"trend":61.8,"confidence":65.9,"downloads":24599.0,"downloadsPerMonth":210.6,"assets":4,"avgDownloadsPerAsset":6149.75,"avgDownloadsPerMonth":52.65,"datasets":3,"historicalPerformance":83.9,"currentMomentum":61.8,"exposure":31.7,"marketScore":53.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"1800":{"popularity":63.7,"trend":82.3,"confidence":44.6,"downloads":12431.0,"downloadsPerMonth":200.3,"assets":1,"avgDownloadsPerAsset":12431.0,"avgDownloadsPerMonth":200.3,"datasets":1,"historicalPerformance":90.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"emoji":{"popularity":63.7,"trend":82.3,"confidence":44.6,"downloads":12431.0,"downloadsPerMonth":200.3,"assets":1,"avgDownloadsPerAsset":12431.0,"avgDownloadsPerMonth":200.3,"datasets":1,"historicalPerformance":90.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"emote":{"popularity":63.7,"trend":82.3,"confidence":44.6,"downloads":12431.0,"downloadsPerMonth":200.3,"assets":1,"avgDownloadsPerAsset":12431.0,"avgDownloadsPerMonth":200.3,"datasets":1,"historicalPerformance":90.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"emoticon":{"popularity":63.7,"trend":82.3,"confidence":44.6,"downloads":12431.0,"downloadsPerMonth":200.3,"assets":1,"avgDownloadsPerAsset":12431.0,"avgDownloadsPerMonth":200.3,"datasets":1,"historicalPerformance":90.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"twemoji":{"popularity":63.7,"trend":82.3,"confidence":44.6,"downloads":12431.0,"downloadsPerMonth":200.3,"assets":1,"avgDownloadsPerAsset":12431.0,"avgDownloadsPerMonth":200.3,"datasets":1,"historicalPerformance":90.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"smart":{"popularity":65.4,"trend":75.2,"confidence":49.8,"downloads":20835.0,"downloadsPerMonth":251.6,"assets":2,"avgDownloadsPerAsset":10417.5,"avgDownloadsPerMonth":125.8,"datasets":1,"historicalPerformance":89.0,"currentMomentum":75.2,"exposure":21.6,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"planks":{"popularity":65.2,"trend":72.3,"confidence":53.6,"downloads":19950.0,"downloadsPerMonth":209.4,"assets":2,"avgDownloadsPerAsset":9975.0,"avgDownloadsPerMonth":104.7,"datasets":2,"historicalPerformance":88.6,"currentMomentum":72.3,"exposure":21.6,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"walnut":{"popularity":65.2,"trend":72.3,"confidence":53.6,"downloads":19950.0,"downloadsPerMonth":209.4,"assets":2,"avgDownloadsPerAsset":9975.0,"avgDownloadsPerMonth":104.7,"datasets":2,"historicalPerformance":88.6,"currentMomentum":72.3,"exposure":21.6,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tablet":{"popularity":66.3,"trend":70.1,"confidence":54.4,"downloads":26255.0,"downloadsPerMonth":270.9,"assets":3,"avgDownloadsPerAsset":8751.67,"avgDownloadsPerMonth":90.3,"datasets":1,"historicalPerformance":87.3,"currentMomentum":70.1,"exposure":27.3,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"selection":{"popularity":66.5,"trend":66.5,"confidence":58.4,"downloads":28032.0,"downloadsPerMonth":285.6,"assets":4,"avgDownloadsPerAsset":7008.0,"avgDownloadsPerMonth":71.4,"datasets":1,"historicalPerformance":85.2,"currentMomentum":66.5,"exposure":31.7,"marketScore":53.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"clay":{"popularity":62.5,"trend":83.6,"confidence":44.6,"downloads":10215.0,"downloadsPerMonth":216.7,"assets":1,"avgDownloadsPerAsset":10215.0,"avgDownloadsPerMonth":216.7,"datasets":1,"historicalPerformance":88.8,"currentMomentum":83.6,"exposure":13.7,"marketScore":53.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"multiethnic":{"popularity":63.6,"trend":82.1,"confidence":44.6,"downloads":12259.0,"downloadsPerMonth":197.7,"assets":1,"avgDownloadsPerAsset":12259.0,"avgDownloadsPerMonth":197.7,"datasets":1,"historicalPerformance":90.6,"currentMomentum":82.1,"exposure":13.7,"marketScore":53.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"focused":{"popularity":64.9,"trend":80.6,"confidence":44.6,"downloads":14970.0,"downloadsPerMonth":179.5,"assets":1,"avgDownloadsPerAsset":14970.0,"avgDownloadsPerMonth":179.5,"datasets":1,"historicalPerformance":92.5,"currentMomentum":80.6,"exposure":13.7,"marketScore":53.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"merry":{"popularity":65.3,"trend":75.1,"confidence":49.8,"downloads":20541.0,"downloadsPerMonth":250.5,"assets":2,"avgDownloadsPerAsset":10270.5,"avgDownloadsPerMonth":125.25,"datasets":1,"historicalPerformance":88.9,"currentMomentum":75.1,"exposure":21.6,"marketScore":53.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"man":{"popularity":62.8,"trend":71.0,"confidence":58.1,"downloads":14936.0,"downloadsPerMonth":287.6,"assets":3,"avgDownloadsPerAsset":4978.67,"avgDownloadsPerMonth":95.87,"datasets":2,"historicalPerformance":81.9,"currentMomentum":71.0,"exposure":27.3,"marketScore":53.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"art":{"popularity":64.3,"trend":62.8,"confidence":65.9,"downloads":19802.0,"downloadsPerMonth":225.0,"assets":4,"avgDownloadsPerAsset":4950.5,"avgDownloadsPerMonth":56.25,"datasets":3,"historicalPerformance":81.8,"currentMomentum":62.8,"exposure":31.7,"marketScore":53.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"four":{"popularity":61.2,"trend":84.8,"confidence":44.6,"downloads":8239.0,"downloadsPerMonth":234.4,"assets":1,"avgDownloadsPerAsset":8239.0,"avgDownloadsPerMonth":234.4,"datasets":1,"historicalPerformance":86.7,"currentMomentum":84.8,"exposure":13.7,"marketScore":53.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"post":{"popularity":61.2,"trend":84.8,"confidence":44.6,"downloads":8239.0,"downloadsPerMonth":234.4,"assets":1,"avgDownloadsPerAsset":8239.0,"avgDownloadsPerMonth":234.4,"datasets":1,"historicalPerformance":86.7,"currentMomentum":84.8,"exposure":13.7,"marketScore":53.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"beige":{"popularity":64.6,"trend":80.8,"confidence":44.6,"downloads":14238.0,"downloadsPerMonth":180.8,"assets":1,"avgDownloadsPerAsset":14238.0,"avgDownloadsPerMonth":180.8,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.8,"exposure":13.7,"marketScore":53.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"kraft":{"popularity":64.6,"trend":80.8,"confidence":44.6,"downloads":14238.0,"downloadsPerMonth":180.8,"assets":1,"avgDownloadsPerAsset":14238.0,"avgDownloadsPerMonth":180.8,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.8,"exposure":13.7,"marketScore":53.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lines":{"popularity":65.9,"trend":74.3,"confidence":49.8,"downloads":22371.0,"downloadsPerMonth":238.3,"assets":2,"avgDownloadsPerAsset":11185.5,"avgDownloadsPerMonth":119.15,"datasets":1,"historicalPerformance":89.7,"currentMomentum":74.3,"exposure":21.6,"marketScore":53.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fruits":{"popularity":66.6,"trend":65.6,"confidence":58.4,"downloads":28668.0,"downloadsPerMonth":270.7,"assets":4,"avgDownloadsPerAsset":7167.0,"avgDownloadsPerMonth":67.68,"datasets":1,"historicalPerformance":85.4,"currentMomentum":65.6,"exposure":31.7,"marketScore":53.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"all":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"countries":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"emojis":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"emoticons":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flags":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stickers":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"symbols":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"type":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"workers":{"popularity":63.3,"trend":77.1,"confidence":49.8,"downloads":14787.0,"downloadsPerMonth":286.0,"assets":2,"avgDownloadsPerAsset":7393.5,"avgDownloadsPerMonth":143.0,"datasets":1,"historicalPerformance":85.7,"currentMomentum":77.1,"exposure":21.6,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"logo":{"popularity":65.0,"trend":51.4,"confidence":80.0,"downloads":23296.0,"downloadsPerMonth":237.6,"assets":9,"avgDownloadsPerAsset":2588.44,"avgDownloadsPerMonth":26.4,"datasets":3,"historicalPerformance":75.6,"currentMomentum":51.4,"exposure":45.4,"marketScore":53.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"facebook":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"linkedin":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"periscope":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pinterest":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"snapchat":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"telegram":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"twitter":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vimeo":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"whatsap":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"youtube":{"popularity":64.6,"trend":80.3,"confidence":44.6,"downloads":14162.0,"downloadsPerMonth":175.5,"assets":1,"avgDownloadsPerAsset":14162.0,"avgDownloadsPerMonth":175.5,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.3,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cosmos":{"popularity":64.4,"trend":80.2,"confidence":44.6,"downloads":13789.0,"downloadsPerMonth":174.6,"assets":1,"avgDownloadsPerAsset":13789.0,"avgDownloadsPerMonth":174.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":80.2,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"galaxies":{"popularity":64.4,"trend":80.2,"confidence":44.6,"downloads":13789.0,"downloadsPerMonth":174.6,"assets":1,"avgDownloadsPerAsset":13789.0,"avgDownloadsPerMonth":174.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":80.2,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"nebula":{"popularity":64.4,"trend":80.2,"confidence":44.6,"downloads":13789.0,"downloadsPerMonth":174.6,"assets":1,"avgDownloadsPerAsset":13789.0,"avgDownloadsPerMonth":174.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":80.2,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"creased":{"popularity":64.6,"trend":80.1,"confidence":44.6,"downloads":14184.0,"downloadsPerMonth":173.3,"assets":1,"avgDownloadsPerAsset":14184.0,"avgDownloadsPerMonth":173.3,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.1,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"poster":{"popularity":64.6,"trend":80.1,"confidence":44.6,"downloads":14184.0,"downloadsPerMonth":173.3,"assets":1,"avgDownloadsPerAsset":14184.0,"avgDownloadsPerMonth":173.3,"datasets":1,"historicalPerformance":92.0,"currentMomentum":80.1,"exposure":13.7,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"management":{"popularity":62.4,"trend":77.9,"confidence":49.8,"downloads":12758.0,"downloadsPerMonth":301.0,"assets":2,"avgDownloadsPerAsset":6379.0,"avgDownloadsPerMonth":150.5,"datasets":1,"historicalPerformance":84.3,"currentMomentum":77.9,"exposure":21.6,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mild":{"popularity":64.3,"trend":75.5,"confidence":49.8,"downloads":17445.0,"downloadsPerMonth":257.4,"assets":2,"avgDownloadsPerAsset":8722.5,"avgDownloadsPerMonth":128.7,"datasets":1,"historicalPerformance":87.3,"currentMomentum":75.5,"exposure":21.6,"marketScore":53.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"devices":{"popularity":64.5,"trend":74.9,"confidence":49.8,"downloads":18068.0,"downloadsPerMonth":247.7,"assets":2,"avgDownloadsPerAsset":9034.0,"avgDownloadsPerMonth":123.85,"datasets":1,"historicalPerformance":87.6,"currentMomentum":74.9,"exposure":21.6,"marketScore":53.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cupcake":{"popularity":67.0,"trend":64.4,"confidence":58.4,"downloads":30673.0,"downloadsPerMonth":250.2,"assets":4,"avgDownloadsPerAsset":7668.25,"avgDownloadsPerMonth":62.55,"datasets":1,"historicalPerformance":86.1,"currentMomentum":64.4,"exposure":31.7,"marketScore":53.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brutal":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brutalist":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"contemporary":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"grids":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"oval":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"primitive":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"spiral":{"popularity":61.5,"trend":83.1,"confidence":44.6,"downloads":8711.0,"downloadsPerMonth":211.1,"assets":1,"avgDownloadsPerAsset":8711.0,"avgDownloadsPerMonth":211.1,"datasets":1,"historicalPerformance":87.3,"currentMomentum":83.1,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"investment":{"popularity":64.4,"trend":79.8,"confidence":44.6,"downloads":13925.0,"downloadsPerMonth":170.0,"assets":1,"avgDownloadsPerAsset":13925.0,"avgDownloadsPerMonth":170.0,"datasets":1,"historicalPerformance":91.8,"currentMomentum":79.8,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"iphonex":{"popularity":64.4,"trend":79.8,"confidence":44.6,"downloads":13925.0,"downloadsPerMonth":170.0,"assets":1,"avgDownloadsPerAsset":13925.0,"avgDownloadsPerMonth":170.0,"datasets":1,"historicalPerformance":91.8,"currentMomentum":79.8,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shot":{"popularity":64.4,"trend":79.8,"confidence":44.6,"downloads":13925.0,"downloadsPerMonth":170.0,"assets":1,"avgDownloadsPerAsset":13925.0,"avgDownloadsPerMonth":170.0,"datasets":1,"historicalPerformance":91.8,"currentMomentum":79.8,"exposure":13.7,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"text":{"popularity":64.3,"trend":71.7,"confidence":53.6,"downloads":17315.0,"downloadsPerMonth":201.2,"assets":2,"avgDownloadsPerAsset":8657.5,"avgDownloadsPerMonth":100.6,"datasets":2,"historicalPerformance":87.2,"currentMomentum":71.7,"exposure":21.6,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"candle":{"popularity":66.2,"trend":69.2,"confidence":53.6,"downloads":23681.0,"downloadsPerMonth":171.1,"assets":2,"avgDownloadsPerAsset":11840.5,"avgDownloadsPerMonth":85.55,"datasets":2,"historicalPerformance":90.2,"currentMomentum":69.2,"exposure":21.6,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"happy":{"popularity":64.5,"trend":61.3,"confidence":65.7,"downloads":20877.0,"downloadsPerMonth":254.7,"assets":5,"avgDownloadsPerAsset":4175.4,"avgDownloadsPerMonth":50.94,"datasets":2,"historicalPerformance":80.2,"currentMomentum":61.3,"exposure":35.3,"marketScore":53.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fluid":{"popularity":64.8,"trend":79.0,"confidence":44.6,"downloads":14630.0,"downloadsPerMonth":160.9,"assets":1,"avgDownloadsPerAsset":14630.0,"avgDownloadsPerMonth":160.9,"datasets":1,"historicalPerformance":92.3,"currentMomentum":79.0,"exposure":13.7,"marketScore":53.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"liquid":{"popularity":64.8,"trend":79.0,"confidence":44.6,"downloads":14630.0,"downloadsPerMonth":160.9,"assets":1,"avgDownloadsPerAsset":14630.0,"avgDownloadsPerMonth":160.9,"datasets":1,"historicalPerformance":92.3,"currentMomentum":79.0,"exposure":13.7,"marketScore":53.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"teal":{"popularity":64.8,"trend":79.0,"confidence":44.6,"downloads":14630.0,"downloadsPerMonth":160.9,"assets":1,"avgDownloadsPerAsset":14630.0,"avgDownloadsPerMonth":160.9,"datasets":1,"historicalPerformance":92.3,"currentMomentum":79.0,"exposure":13.7,"marketScore":53.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bunny":{"popularity":64.1,"trend":74.6,"confidence":49.8,"downloads":16901.0,"downloadsPerMonth":242.6,"assets":2,"avgDownloadsPerAsset":8450.5,"avgDownloadsPerMonth":121.3,"datasets":1,"historicalPerformance":87.0,"currentMomentum":74.6,"exposure":21.6,"marketScore":52.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dirt":{"popularity":64.3,"trend":78.8,"confidence":44.6,"downloads":13672.0,"downloadsPerMonth":159.4,"assets":1,"avgDownloadsPerAsset":13672.0,"avgDownloadsPerMonth":159.4,"datasets":1,"historicalPerformance":91.6,"currentMomentum":78.8,"exposure":13.7,"marketScore":52.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"eps10":{"popularity":65.0,"trend":73.3,"confidence":49.8,"downloads":19457.0,"downloadsPerMonth":223.0,"assets":2,"avgDownloadsPerAsset":9728.5,"avgDownloadsPerMonth":111.5,"datasets":1,"historicalPerformance":88.3,"currentMomentum":73.3,"exposure":21.6,"marketScore":52.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vegetables":{"popularity":65.7,"trend":64.9,"confidence":58.4,"downloads":24762.0,"downloadsPerMonth":258.4,"assets":4,"avgDownloadsPerAsset":6190.5,"avgDownloadsPerMonth":64.6,"datasets":1,"historicalPerformance":84.0,"currentMomentum":64.9,"exposure":31.7,"marketScore":52.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"graphic":{"popularity":63.7,"trend":64.3,"confidence":62.2,"downloads":17957.0,"downloadsPerMonth":247.7,"assets":4,"avgDownloadsPerAsset":4489.25,"avgDownloadsPerMonth":61.93,"datasets":2,"historicalPerformance":80.9,"currentMomentum":64.3,"exposure":31.7,"marketScore":52.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"craft":{"popularity":63.9,"trend":79.0,"confidence":44.6,"downloads":12800.0,"downloadsPerMonth":161.8,"assets":1,"avgDownloadsPerAsset":12800.0,"avgDownloadsPerMonth":161.8,"datasets":1,"historicalPerformance":91.0,"currentMomentum":79.0,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"newspaper":{"popularity":63.9,"trend":79.0,"confidence":44.6,"downloads":12800.0,"downloadsPerMonth":161.8,"assets":1,"avgDownloadsPerAsset":12800.0,"avgDownloadsPerMonth":161.8,"datasets":1,"historicalPerformance":91.0,"currentMomentum":79.0,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"page":{"popularity":63.9,"trend":79.0,"confidence":44.6,"downloads":12800.0,"downloadsPerMonth":161.8,"assets":1,"avgDownloadsPerAsset":12800.0,"avgDownloadsPerMonth":161.8,"datasets":1,"historicalPerformance":91.0,"currentMomentum":79.0,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"recycled":{"popularity":63.9,"trend":79.0,"confidence":44.6,"downloads":12800.0,"downloadsPerMonth":161.8,"assets":1,"avgDownloadsPerAsset":12800.0,"avgDownloadsPerMonth":161.8,"datasets":1,"historicalPerformance":91.0,"currentMomentum":79.0,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vignette":{"popularity":63.9,"trend":79.0,"confidence":44.6,"downloads":12800.0,"downloadsPerMonth":161.8,"assets":1,"avgDownloadsPerAsset":12800.0,"avgDownloadsPerMonth":161.8,"datasets":1,"historicalPerformance":91.0,"currentMomentum":79.0,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"oriental":{"popularity":64.4,"trend":78.7,"confidence":44.6,"downloads":13759.0,"downloadsPerMonth":158.6,"assets":1,"avgDownloadsPerAsset":13759.0,"avgDownloadsPerMonth":158.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ornamental":{"popularity":64.4,"trend":78.7,"confidence":44.6,"downloads":13759.0,"downloadsPerMonth":158.6,"assets":1,"avgDownloadsPerAsset":13759.0,"avgDownloadsPerMonth":158.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"patterns":{"popularity":64.4,"trend":78.7,"confidence":44.6,"downloads":13759.0,"downloadsPerMonth":158.6,"assets":1,"avgDownloadsPerAsset":13759.0,"avgDownloadsPerMonth":158.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"swatches":{"popularity":64.4,"trend":78.7,"confidence":44.6,"downloads":13759.0,"downloadsPerMonth":158.6,"assets":1,"avgDownloadsPerAsset":13759.0,"avgDownloadsPerMonth":158.6,"datasets":1,"historicalPerformance":91.7,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sandy":{"popularity":65.9,"trend":67.8,"confidence":54.4,"downloads":24384.0,"downloadsPerMonth":233.7,"assets":3,"avgDownloadsPerAsset":8128.0,"avgDownloadsPerMonth":77.9,"datasets":1,"historicalPerformance":86.6,"currentMomentum":67.8,"exposure":27.3,"marketScore":52.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shadows":{"popularity":63.5,"trend":79.4,"confidence":44.6,"downloads":11940.0,"downloadsPerMonth":165.8,"assets":1,"avgDownloadsPerAsset":11940.0,"avgDownloadsPerMonth":165.8,"datasets":1,"historicalPerformance":90.3,"currentMomentum":79.4,"exposure":13.7,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cement":{"popularity":64.2,"trend":78.6,"confidence":44.6,"downloads":13319.0,"downloadsPerMonth":157.3,"assets":1,"avgDownloadsPerAsset":13319.0,"avgDownloadsPerMonth":157.3,"datasets":1,"historicalPerformance":91.4,"currentMomentum":78.6,"exposure":13.7,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"plane":{"popularity":66.9,"trend":75.2,"confidence":44.6,"downloads":20466.0,"downloadsPerMonth":126.5,"assets":1,"avgDownloadsPerAsset":20466.0,"avgDownloadsPerMonth":126.5,"datasets":1,"historicalPerformance":95.5,"currentMomentum":75.2,"exposure":13.7,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"using":{"popularity":64.8,"trend":72.8,"confidence":49.8,"downloads":18910.0,"downloadsPerMonth":215.7,"assets":2,"avgDownloadsPerAsset":9455.0,"avgDownloadsPerMonth":107.85,"datasets":1,"historicalPerformance":88.1,"currentMomentum":72.8,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"editable":{"popularity":65.3,"trend":72.3,"confidence":49.8,"downloads":20465.0,"downloadsPerMonth":208.5,"assets":2,"avgDownloadsPerAsset":10232.5,"avgDownloadsPerMonth":104.25,"datasets":1,"historicalPerformance":88.8,"currentMomentum":72.3,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"grid":{"popularity":65.3,"trend":72.3,"confidence":49.8,"downloads":20465.0,"downloadsPerMonth":208.5,"assets":2,"avgDownloadsPerAsset":10232.5,"avgDownloadsPerMonth":104.25,"datasets":1,"historicalPerformance":88.8,"currentMomentum":72.3,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pixel":{"popularity":65.3,"trend":72.3,"confidence":49.8,"downloads":20465.0,"downloadsPerMonth":208.5,"assets":2,"avgDownloadsPerAsset":10232.5,"avgDownloadsPerMonth":104.25,"datasets":1,"historicalPerformance":88.8,"currentMomentum":72.3,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"galaxy":{"popularity":65.6,"trend":72.0,"confidence":49.8,"downloads":21462.0,"downloadsPerMonth":205.5,"assets":2,"avgDownloadsPerAsset":10731.0,"avgDownloadsPerMonth":102.75,"datasets":1,"historicalPerformance":89.3,"currentMomentum":72.0,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"outer":{"popularity":65.6,"trend":72.0,"confidence":49.8,"downloads":21462.0,"downloadsPerMonth":205.5,"assets":2,"avgDownloadsPerAsset":10731.0,"avgDownloadsPerMonth":102.75,"datasets":1,"historicalPerformance":89.3,"currentMomentum":72.0,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"universe":{"popularity":65.6,"trend":72.0,"confidence":49.8,"downloads":21462.0,"downloadsPerMonth":205.5,"assets":2,"avgDownloadsPerAsset":10731.0,"avgDownloadsPerMonth":102.75,"datasets":1,"historicalPerformance":89.3,"currentMomentum":72.0,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mountains":{"popularity":66.3,"trend":71.0,"confidence":49.8,"downloads":24008.0,"downloadsPerMonth":192.3,"assets":2,"avgDownloadsPerAsset":12004.0,"avgDownloadsPerMonth":96.15,"datasets":1,"historicalPerformance":90.4,"currentMomentum":71.0,"exposure":21.6,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chalkboard":{"popularity":65.4,"trend":65.0,"confidence":58.1,"downloads":22681.0,"downloadsPerMonth":195.2,"assets":3,"avgDownloadsPerAsset":7560.33,"avgDownloadsPerMonth":65.07,"datasets":2,"historicalPerformance":85.9,"currentMomentum":65.0,"exposure":27.3,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"symbol":{"popularity":62.3,"trend":57.8,"confidence":72.6,"downloads":14999.0,"downloadsPerMonth":242.2,"assets":6,"avgDownloadsPerAsset":2499.83,"avgDownloadsPerMonth":40.37,"datasets":3,"historicalPerformance":75.3,"currentMomentum":57.8,"exposure":38.3,"marketScore":52.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"broken":{"popularity":63.8,"trend":78.7,"confidence":44.6,"downloads":12641.0,"downloadsPerMonth":157.8,"assets":1,"avgDownloadsPerAsset":12641.0,"avgDownloadsPerMonth":157.8,"datasets":1,"historicalPerformance":90.9,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cracks":{"popularity":63.8,"trend":78.7,"confidence":44.6,"downloads":12641.0,"downloadsPerMonth":157.8,"assets":1,"avgDownloadsPerAsset":12641.0,"avgDownloadsPerMonth":157.8,"datasets":1,"historicalPerformance":90.9,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"scratch":{"popularity":63.8,"trend":78.7,"confidence":44.6,"downloads":12641.0,"downloadsPerMonth":157.8,"assets":1,"avgDownloadsPerAsset":12641.0,"avgDownloadsPerMonth":157.8,"datasets":1,"historicalPerformance":90.9,"currentMomentum":78.7,"exposure":13.7,"marketScore":52.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"balls":{"popularity":64.0,"trend":78.6,"confidence":44.6,"downloads":12941.0,"downloadsPerMonth":157.1,"assets":1,"avgDownloadsPerAsset":12941.0,"avgDownloadsPerMonth":157.1,"datasets":1,"historicalPerformance":91.1,"currentMomentum":78.6,"exposure":13.7,"marketScore":52.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"frameless":{"popularity":64.6,"trend":73.0,"confidence":49.8,"downloads":18186.0,"downloadsPerMonth":218.2,"assets":2,"avgDownloadsPerAsset":9093.0,"avgDownloadsPerMonth":109.1,"datasets":1,"historicalPerformance":87.7,"currentMomentum":73.0,"exposure":21.6,"marketScore":52.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"corporate":{"popularity":65.0,"trend":72.3,"confidence":49.8,"downloads":19442.0,"downloadsPerMonth":209.5,"assets":2,"avgDownloadsPerAsset":9721.0,"avgDownloadsPerMonth":104.75,"datasets":1,"historicalPerformance":88.3,"currentMomentum":72.3,"exposure":21.6,"marketScore":52.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"abstarct":{"popularity":60.5,"trend":82.3,"confidence":44.6,"downloads":7396.0,"downloadsPerMonth":199.6,"assets":1,"avgDownloadsPerAsset":7396.0,"avgDownloadsPerMonth":199.6,"datasets":1,"historicalPerformance":85.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"illustartion":{"popularity":60.5,"trend":82.3,"confidence":44.6,"downloads":7396.0,"downloadsPerMonth":199.6,"assets":1,"avgDownloadsPerAsset":7396.0,"avgDownloadsPerMonth":199.6,"datasets":1,"historicalPerformance":85.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"noodle":{"popularity":60.5,"trend":82.3,"confidence":44.6,"downloads":7396.0,"downloadsPerMonth":199.6,"assets":1,"avgDownloadsPerAsset":7396.0,"avgDownloadsPerMonth":199.6,"datasets":1,"historicalPerformance":85.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ornament":{"popularity":60.5,"trend":82.3,"confidence":44.6,"downloads":7396.0,"downloadsPerMonth":199.6,"assets":1,"avgDownloadsPerAsset":7396.0,"avgDownloadsPerMonth":199.6,"datasets":1,"historicalPerformance":85.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ramen":{"popularity":60.5,"trend":82.3,"confidence":44.6,"downloads":7396.0,"downloadsPerMonth":199.6,"assets":1,"avgDownloadsPerAsset":7396.0,"avgDownloadsPerMonth":199.6,"datasets":1,"historicalPerformance":85.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"spaghetti":{"popularity":60.5,"trend":82.3,"confidence":44.6,"downloads":7396.0,"downloadsPerMonth":199.6,"assets":1,"avgDownloadsPerAsset":7396.0,"avgDownloadsPerMonth":199.6,"datasets":1,"historicalPerformance":85.7,"currentMomentum":82.3,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"models":{"popularity":63.1,"trend":79.1,"confidence":44.6,"downloads":11249.0,"downloadsPerMonth":162.9,"assets":1,"avgDownloadsPerAsset":11249.0,"avgDownloadsPerMonth":162.9,"datasets":1,"historicalPerformance":89.7,"currentMomentum":79.1,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"max":{"popularity":64.3,"trend":77.9,"confidence":44.6,"downloads":13627.0,"downloadsPerMonth":150.3,"assets":1,"avgDownloadsPerAsset":13627.0,"avgDownloadsPerMonth":150.3,"datasets":1,"historicalPerformance":91.6,"currentMomentum":77.9,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"model":{"popularity":64.3,"trend":77.9,"confidence":44.6,"downloads":13627.0,"downloadsPerMonth":150.3,"assets":1,"avgDownloadsPerAsset":13627.0,"avgDownloadsPerMonth":150.3,"datasets":1,"historicalPerformance":91.6,"currentMomentum":77.9,"exposure":13.7,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"code":{"popularity":64.2,"trend":72.9,"confidence":49.8,"downloads":17089.0,"downloadsPerMonth":217.7,"assets":2,"avgDownloadsPerAsset":8544.5,"avgDownloadsPerMonth":108.85,"datasets":1,"historicalPerformance":87.1,"currentMomentum":72.9,"exposure":21.6,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"graph":{"popularity":64.2,"trend":69.0,"confidence":54.4,"downloads":18775.0,"downloadsPerMonth":252.5,"assets":3,"avgDownloadsPerAsset":6258.33,"avgDownloadsPerMonth":84.17,"datasets":1,"historicalPerformance":84.1,"currentMomentum":69.0,"exposure":27.3,"marketScore":52.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"halfton":{"popularity":62.0,"trend":80.2,"confidence":44.6,"downloads":9398.0,"downloadsPerMonth":174.0,"assets":1,"avgDownloadsPerAsset":9398.0,"avgDownloadsPerMonth":174.0,"datasets":1,"historicalPerformance":88.0,"currentMomentum":80.2,"exposure":13.7,"marketScore":52.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"metallic":{"popularity":62.5,"trend":79.8,"confidence":44.6,"downloads":10211.0,"downloadsPerMonth":169.5,"assets":1,"avgDownloadsPerAsset":10211.0,"avgDownloadsPerMonth":169.5,"datasets":1,"historicalPerformance":88.8,"currentMomentum":79.8,"exposure":13.7,"marketScore":52.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mountain":{"popularity":66.3,"trend":70.2,"confidence":49.8,"downloads":23923.0,"downloadsPerMonth":182.7,"assets":2,"avgDownloadsPerAsset":11961.5,"avgDownloadsPerMonth":91.35,"datasets":1,"historicalPerformance":90.3,"currentMomentum":70.2,"exposure":21.6,"marketScore":52.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"note":{"popularity":63.1,"trend":78.6,"confidence":44.6,"downloads":11240.0,"downloadsPerMonth":157.6,"assets":1,"avgDownloadsPerAsset":11240.0,"avgDownloadsPerMonth":157.6,"datasets":1,"historicalPerformance":89.7,"currentMomentum":78.6,"exposure":13.7,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"notebook":{"popularity":63.1,"trend":78.6,"confidence":44.6,"downloads":11240.0,"downloadsPerMonth":157.6,"assets":1,"avgDownloadsPerAsset":11240.0,"avgDownloadsPerMonth":157.6,"datasets":1,"historicalPerformance":89.7,"currentMomentum":78.6,"exposure":13.7,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"polka":{"popularity":63.1,"trend":78.6,"confidence":44.6,"downloads":11240.0,"downloadsPerMonth":157.6,"assets":1,"avgDownloadsPerAsset":11240.0,"avgDownloadsPerMonth":157.6,"datasets":1,"historicalPerformance":89.7,"currentMomentum":78.6,"exposure":13.7,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"smooth":{"popularity":63.3,"trend":78.5,"confidence":44.6,"downloads":11671.0,"downloadsPerMonth":155.8,"assets":1,"avgDownloadsPerAsset":11671.0,"avgDownloadsPerMonth":155.8,"datasets":1,"historicalPerformance":90.1,"currentMomentum":78.5,"exposure":13.7,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cloth":{"popularity":62.7,"trend":70.9,"confidence":53.6,"downloads":13457.0,"downloadsPerMonth":191.1,"assets":2,"avgDownloadsPerAsset":6728.5,"avgDownloadsPerMonth":95.55,"datasets":2,"historicalPerformance":84.8,"currentMomentum":70.9,"exposure":21.6,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"window":{"popularity":65.5,"trend":70.9,"confidence":49.8,"downloads":21173.0,"downloadsPerMonth":190.1,"assets":2,"avgDownloadsPerAsset":10586.5,"avgDownloadsPerMonth":95.05,"datasets":1,"historicalPerformance":89.2,"currentMomentum":70.9,"exposure":21.6,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"construction":{"popularity":65.8,"trend":63.5,"confidence":58.1,"downloads":23990.0,"downloadsPerMonth":176.3,"assets":3,"avgDownloadsPerAsset":7996.67,"avgDownloadsPerMonth":58.77,"datasets":2,"historicalPerformance":86.5,"currentMomentum":63.5,"exposure":27.3,"marketScore":52.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"open":{"popularity":64.9,"trend":71.3,"confidence":49.8,"downloads":19235.0,"downloadsPerMonth":196.0,"assets":2,"avgDownloadsPerAsset":9617.5,"avgDownloadsPerMonth":98.0,"datasets":1,"historicalPerformance":88.2,"currentMomentum":71.3,"exposure":21.6,"marketScore":52.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rays":{"popularity":63.9,"trend":77.0,"confidence":44.6,"downloads":12670.0,"downloadsPerMonth":142.1,"assets":1,"avgDownloadsPerAsset":12670.0,"avgDownloadsPerMonth":142.1,"datasets":1,"historicalPerformance":90.9,"currentMomentum":77.0,"exposure":13.7,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sunlight":{"popularity":63.9,"trend":77.0,"confidence":44.6,"downloads":12670.0,"downloadsPerMonth":142.1,"assets":1,"avgDownloadsPerAsset":12670.0,"avgDownloadsPerMonth":142.1,"datasets":1,"historicalPerformance":90.9,"currentMomentum":77.0,"exposure":13.7,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"crater":{"popularity":66.4,"trend":74.2,"confidence":44.6,"downloads":19080.0,"downloadsPerMonth":118.0,"assets":1,"avgDownloadsPerAsset":19080.0,"avgDownloadsPerMonth":118.0,"datasets":1,"historicalPerformance":94.8,"currentMomentum":74.2,"exposure":13.7,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cereal":{"popularity":65.9,"trend":69.7,"confidence":49.8,"downloads":22643.0,"downloadsPerMonth":176.9,"assets":2,"avgDownloadsPerAsset":11321.5,"avgDownloadsPerMonth":88.45,"datasets":1,"historicalPerformance":89.8,"currentMomentum":69.7,"exposure":21.6,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"farm":{"popularity":65.2,"trend":67.5,"confidence":53.6,"downloads":20042.0,"downloadsPerMonth":152.6,"assets":2,"avgDownloadsPerAsset":10021.0,"avgDownloadsPerMonth":76.3,"datasets":2,"historicalPerformance":88.6,"currentMomentum":67.5,"exposure":21.6,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"raised":{"popularity":65.2,"trend":67.5,"confidence":53.6,"downloads":20042.0,"downloadsPerMonth":152.6,"assets":2,"avgDownloadsPerAsset":10021.0,"avgDownloadsPerMonth":76.3,"datasets":2,"historicalPerformance":88.6,"currentMomentum":67.5,"exposure":21.6,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"strawberries":{"popularity":65.2,"trend":67.5,"confidence":53.6,"downloads":20042.0,"downloadsPerMonth":152.6,"assets":2,"avgDownloadsPerAsset":10021.0,"avgDownloadsPerMonth":76.3,"datasets":2,"historicalPerformance":88.6,"currentMomentum":67.5,"exposure":21.6,"marketScore":52.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"asphalt":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"reflection":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"scene":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"searchlight":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"smog":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"street":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wet":{"popularity":63.5,"trend":77.4,"confidence":44.6,"downloads":11928.0,"downloadsPerMonth":145.9,"assets":1,"avgDownloadsPerAsset":11928.0,"avgDownloadsPerMonth":145.9,"datasets":1,"historicalPerformance":90.3,"currentMomentum":77.4,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chef":{"popularity":65.2,"trend":75.1,"confidence":44.6,"downloads":15719.0,"downloadsPerMonth":125.5,"assets":1,"avgDownloadsPerAsset":15719.0,"avgDownloadsPerMonth":125.5,"datasets":1,"historicalPerformance":93.0,"currentMomentum":75.1,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cooking":{"popularity":65.2,"trend":75.1,"confidence":44.6,"downloads":15719.0,"downloadsPerMonth":125.5,"assets":1,"avgDownloadsPerAsset":15719.0,"avgDownloadsPerMonth":125.5,"datasets":1,"historicalPerformance":93.0,"currentMomentum":75.1,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"male":{"popularity":65.2,"trend":75.1,"confidence":44.6,"downloads":15719.0,"downloadsPerMonth":125.5,"assets":1,"avgDownloadsPerAsset":15719.0,"avgDownloadsPerMonth":125.5,"datasets":1,"historicalPerformance":93.0,"currentMomentum":75.1,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"professional":{"popularity":65.2,"trend":75.1,"confidence":44.6,"downloads":15719.0,"downloadsPerMonth":125.5,"assets":1,"avgDownloadsPerAsset":15719.0,"avgDownloadsPerMonth":125.5,"datasets":1,"historicalPerformance":93.0,"currentMomentum":75.1,"exposure":13.7,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rocky":{"popularity":64.8,"trend":71.0,"confidence":49.8,"downloads":18724.0,"downloadsPerMonth":191.7,"assets":2,"avgDownloadsPerAsset":9362.0,"avgDownloadsPerMonth":95.85,"datasets":1,"historicalPerformance":88.0,"currentMomentum":71.0,"exposure":21.6,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"layout":{"popularity":59.1,"trend":67.9,"confidence":61.9,"downloads":8249.0,"downloadsPerMonth":234.6,"assets":3,"avgDownloadsPerAsset":2749.67,"avgDownloadsPerMonth":78.2,"datasets":3,"historicalPerformance":76.2,"currentMomentum":67.9,"exposure":27.3,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"development":{"popularity":64.2,"trend":67.8,"confidence":54.4,"downloads":18666.0,"downloadsPerMonth":233.0,"assets":3,"avgDownloadsPerAsset":6222.0,"avgDownloadsPerMonth":77.67,"datasets":1,"historicalPerformance":84.0,"currentMomentum":67.8,"exposure":27.3,"marketScore":51.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"developers":{"popularity":64.3,"trend":76.0,"confidence":44.6,"downloads":13571.0,"downloadsPerMonth":133.1,"assets":1,"avgDownloadsPerAsset":13571.0,"avgDownloadsPerMonth":133.1,"datasets":1,"historicalPerformance":91.5,"currentMomentum":76.0,"exposure":13.7,"marketScore":51.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ink":{"popularity":64.5,"trend":75.8,"confidence":44.6,"downloads":14059.0,"downloadsPerMonth":131.1,"assets":1,"avgDownloadsPerAsset":14059.0,"avgDownloadsPerMonth":131.1,"datasets":1,"historicalPerformance":91.9,"currentMomentum":75.8,"exposure":13.7,"marketScore":51.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brick":{"popularity":64.7,"trend":75.2,"confidence":44.6,"downloads":14512.0,"downloadsPerMonth":126.3,"assets":1,"avgDownloadsPerAsset":14512.0,"avgDownloadsPerMonth":126.3,"datasets":1,"historicalPerformance":92.2,"currentMomentum":75.2,"exposure":13.7,"marketScore":51.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"application":{"popularity":64.0,"trend":71.3,"confidence":49.8,"downloads":16604.0,"downloadsPerMonth":196.3,"assets":2,"avgDownloadsPerAsset":8302.0,"avgDownloadsPerMonth":98.15,"datasets":1,"historicalPerformance":86.8,"currentMomentum":71.3,"exposure":21.6,"marketScore":51.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"idea":{"popularity":64.7,"trend":70.5,"confidence":49.8,"downloads":18437.0,"downloadsPerMonth":185.7,"assets":2,"avgDownloadsPerAsset":9218.5,"avgDownloadsPerMonth":92.85,"datasets":1,"historicalPerformance":87.8,"currentMomentum":70.5,"exposure":21.6,"marketScore":51.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cup":{"popularity":66.3,"trend":64.5,"confidence":54.4,"downloads":26301.0,"downloadsPerMonth":188.0,"assets":3,"avgDownloadsPerAsset":8767.0,"avgDownloadsPerMonth":62.67,"datasets":1,"historicalPerformance":87.3,"currentMomentum":64.5,"exposure":27.3,"marketScore":51.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"process":{"popularity":64.8,"trend":69.9,"confidence":49.8,"downloads":18881.0,"downloadsPerMonth":178.4,"assets":2,"avgDownloadsPerAsset":9440.5,"avgDownloadsPerMonth":89.2,"datasets":1,"historicalPerformance":88.1,"currentMomentum":69.9,"exposure":21.6,"marketScore":51.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"gears":{"popularity":62.7,"trend":77.2,"confidence":44.6,"downloads":10530.0,"downloadsPerMonth":143.3,"assets":1,"avgDownloadsPerAsset":10530.0,"avgDownloadsPerMonth":143.3,"datasets":1,"historicalPerformance":89.1,"currentMomentum":77.2,"exposure":13.7,"marketScore":51.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"joining":{"popularity":62.7,"trend":77.2,"confidence":44.6,"downloads":10530.0,"downloadsPerMonth":143.3,"assets":1,"avgDownloadsPerAsset":10530.0,"avgDownloadsPerMonth":143.3,"datasets":1,"historicalPerformance":89.1,"currentMomentum":77.2,"exposure":13.7,"marketScore":51.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"two":{"popularity":64.0,"trend":70.6,"confidence":49.8,"downloads":16583.0,"downloadsPerMonth":186.9,"assets":2,"avgDownloadsPerAsset":8291.5,"avgDownloadsPerMonth":93.45,"datasets":1,"historicalPerformance":86.8,"currentMomentum":70.6,"exposure":21.6,"marketScore":51.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"nest":{"popularity":65.4,"trend":65.9,"confidence":53.6,"downloads":20676.0,"downloadsPerMonth":137.8,"assets":2,"avgDownloadsPerAsset":10338.0,"avgDownloadsPerMonth":68.9,"datasets":2,"historicalPerformance":88.9,"currentMomentum":65.9,"exposure":21.6,"marketScore":51.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"restaurant":{"popularity":63.7,"trend":58.2,"confidence":65.7,"downloads":18422.0,"downloadsPerMonth":208.2,"assets":5,"avgDownloadsPerAsset":3684.4,"avgDownloadsPerMonth":41.64,"datasets":2,"historicalPerformance":79.0,"currentMomentum":58.2,"exposure":35.3,"marketScore":51.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"coffee":{"popularity":66.0,"trend":58.1,"confidence":62.0,"downloads":26683.0,"downloadsPerMonth":205.8,"assets":5,"avgDownloadsPerAsset":5336.6,"avgDownloadsPerMonth":41.16,"datasets":1,"historicalPerformance":82.6,"currentMomentum":58.1,"exposure":35.3,"marketScore":51.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flowers":{"popularity":63.7,"trend":67.6,"confidence":53.6,"downloads":15879.0,"downloadsPerMonth":153.3,"assets":2,"avgDownloadsPerAsset":7939.5,"avgDownloadsPerMonth":76.65,"datasets":2,"historicalPerformance":86.4,"currentMomentum":67.6,"exposure":21.6,"marketScore":51.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"folded":{"popularity":62.1,"trend":77.3,"confidence":44.6,"downloads":9632.0,"downloadsPerMonth":144.1,"assets":1,"avgDownloadsPerAsset":9632.0,"avgDownloadsPerMonth":144.1,"datasets":1,"historicalPerformance":88.2,"currentMomentum":77.3,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"made":{"popularity":62.1,"trend":77.3,"confidence":44.6,"downloads":9632.0,"downloadsPerMonth":144.1,"assets":1,"avgDownloadsPerAsset":9632.0,"avgDownloadsPerMonth":144.1,"datasets":1,"historicalPerformance":88.2,"currentMomentum":77.3,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"maze":{"popularity":62.1,"trend":77.3,"confidence":44.6,"downloads":9632.0,"downloadsPerMonth":144.1,"assets":1,"avgDownloadsPerAsset":9632.0,"avgDownloadsPerMonth":144.1,"datasets":1,"historicalPerformance":88.2,"currentMomentum":77.3,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"arts":{"popularity":62.4,"trend":76.9,"confidence":44.6,"downloads":9962.0,"downloadsPerMonth":141.1,"assets":1,"avgDownloadsPerAsset":9962.0,"avgDownloadsPerMonth":141.1,"datasets":1,"historicalPerformance":88.6,"currentMomentum":76.9,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"banana":{"popularity":62.4,"trend":76.9,"confidence":44.6,"downloads":9962.0,"downloadsPerMonth":141.1,"assets":1,"avgDownloadsPerAsset":9962.0,"avgDownloadsPerMonth":141.1,"datasets":1,"historicalPerformance":88.6,"currentMomentum":76.9,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"luxury":{"popularity":62.4,"trend":76.9,"confidence":44.6,"downloads":9962.0,"downloadsPerMonth":141.1,"assets":1,"avgDownloadsPerAsset":9962.0,"avgDownloadsPerMonth":141.1,"datasets":1,"historicalPerformance":88.6,"currentMomentum":76.9,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wallpaper":{"popularity":62.4,"trend":76.9,"confidence":44.6,"downloads":9962.0,"downloadsPerMonth":141.1,"assets":1,"avgDownloadsPerAsset":9962.0,"avgDownloadsPerMonth":141.1,"datasets":1,"historicalPerformance":88.6,"currentMomentum":76.9,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hexagonal":{"popularity":62.8,"trend":76.4,"confidence":44.6,"downloads":10769.0,"downloadsPerMonth":136.2,"assets":1,"avgDownloadsPerAsset":10769.0,"avgDownloadsPerMonth":136.2,"datasets":1,"historicalPerformance":89.3,"currentMomentum":76.4,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"frost":{"popularity":62.9,"trend":76.1,"confidence":44.6,"downloads":10904.0,"downloadsPerMonth":133.9,"assets":1,"avgDownloadsPerAsset":10904.0,"avgDownloadsPerMonth":133.9,"datasets":1,"historicalPerformance":89.4,"currentMomentum":76.1,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"feather":{"popularity":65.0,"trend":73.6,"confidence":44.6,"downloads":15238.0,"downloadsPerMonth":113.4,"assets":1,"avgDownloadsPerAsset":15238.0,"avgDownloadsPerMonth":113.4,"datasets":1,"historicalPerformance":92.7,"currentMomentum":73.6,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"peacock":{"popularity":65.0,"trend":73.6,"confidence":44.6,"downloads":15238.0,"downloadsPerMonth":113.4,"assets":1,"avgDownloadsPerAsset":15238.0,"avgDownloadsPerMonth":113.4,"datasets":1,"historicalPerformance":92.7,"currentMomentum":73.6,"exposure":13.7,"marketScore":51.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ears":{"popularity":60.0,"trend":79.2,"confidence":44.6,"downloads":6879.0,"downloadsPerMonth":163.8,"assets":1,"avgDownloadsPerAsset":6879.0,"avgDownloadsPerMonth":163.8,"datasets":1,"historicalPerformance":85.0,"currentMomentum":79.2,"exposure":13.7,"marketScore":51.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"party":{"popularity":60.0,"trend":79.2,"confidence":44.6,"downloads":6879.0,"downloadsPerMonth":163.8,"assets":1,"avgDownloadsPerAsset":6879.0,"avgDownloadsPerMonth":163.8,"datasets":1,"historicalPerformance":85.0,"currentMomentum":79.2,"exposure":13.7,"marketScore":51.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"city":{"popularity":63.0,"trend":75.9,"confidence":44.6,"downloads":11028.0,"downloadsPerMonth":132.3,"assets":1,"avgDownloadsPerAsset":11028.0,"avgDownloadsPerMonth":132.3,"datasets":1,"historicalPerformance":89.5,"currentMomentum":75.9,"exposure":13.7,"marketScore":51.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"connect":{"popularity":63.0,"trend":75.9,"confidence":44.6,"downloads":11028.0,"downloadsPerMonth":132.3,"assets":1,"avgDownloadsPerAsset":11028.0,"avgDownloadsPerMonth":132.3,"datasets":1,"historicalPerformance":89.5,"currentMomentum":75.9,"exposure":13.7,"marketScore":51.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"intricate":{"popularity":63.0,"trend":75.9,"confidence":44.6,"downloads":11028.0,"downloadsPerMonth":132.3,"assets":1,"avgDownloadsPerAsset":11028.0,"avgDownloadsPerMonth":132.3,"datasets":1,"historicalPerformance":89.5,"currentMomentum":75.9,"exposure":13.7,"marketScore":51.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ripe":{"popularity":63.0,"trend":70.6,"confidence":49.8,"downloads":14156.0,"downloadsPerMonth":187.5,"assets":2,"avgDownloadsPerAsset":7078.0,"avgDownloadsPerMonth":93.75,"datasets":1,"historicalPerformance":85.3,"currentMomentum":70.6,"exposure":21.6,"marketScore":51.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dry":{"popularity":61.2,"trend":69.7,"confidence":53.6,"downloads":10641.0,"downloadsPerMonth":176.0,"assets":2,"avgDownloadsPerAsset":5320.5,"avgDownloadsPerMonth":88.0,"datasets":2,"historicalPerformance":82.5,"currentMomentum":69.7,"exposure":21.6,"marketScore":51.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"floor":{"popularity":62.5,"trend":75.9,"confidence":44.6,"downloads":10207.0,"downloadsPerMonth":131.9,"assets":1,"avgDownloadsPerAsset":10207.0,"avgDownloadsPerMonth":131.9,"datasets":1,"historicalPerformance":88.8,"currentMomentum":75.9,"exposure":13.7,"marketScore":51.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"25x25px":{"popularity":63.3,"trend":74.8,"confidence":44.6,"downloads":11569.0,"downloadsPerMonth":122.5,"assets":1,"avgDownloadsPerAsset":11569.0,"avgDownloadsPerMonth":122.5,"datasets":1,"historicalPerformance":90.0,"currentMomentum":74.8,"exposure":13.7,"marketScore":51.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chalk":{"popularity":64.0,"trend":74.1,"confidence":44.6,"downloads":12966.0,"downloadsPerMonth":117.6,"assets":1,"avgDownloadsPerAsset":12966.0,"avgDownloadsPerMonth":117.6,"datasets":1,"historicalPerformance":91.1,"currentMomentum":74.1,"exposure":13.7,"marketScore":51.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"neon":{"popularity":61.8,"trend":61.8,"confidence":61.9,"downloads":12762.0,"downloadsPerMonth":157.8,"assets":3,"avgDownloadsPerAsset":4254.0,"avgDownloadsPerMonth":52.6,"datasets":3,"historicalPerformance":80.4,"currentMomentum":61.8,"exposure":27.3,"marketScore":50.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"her":{"popularity":61.6,"trend":76.1,"confidence":44.6,"downloads":8897.0,"downloadsPerMonth":133.7,"assets":1,"avgDownloadsPerAsset":8897.0,"avgDownloadsPerMonth":133.7,"datasets":1,"historicalPerformance":87.5,"currentMomentum":76.1,"exposure":13.7,"marketScore":50.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"box":{"popularity":62.6,"trend":74.8,"confidence":44.6,"downloads":10394.0,"downloadsPerMonth":122.7,"assets":1,"avgDownloadsPerAsset":10394.0,"avgDownloadsPerMonth":122.7,"datasets":1,"historicalPerformance":89.0,"currentMomentum":74.8,"exposure":13.7,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cardboard":{"popularity":62.6,"trend":74.8,"confidence":44.6,"downloads":10394.0,"downloadsPerMonth":122.7,"assets":1,"avgDownloadsPerAsset":10394.0,"avgDownloadsPerMonth":122.7,"datasets":1,"historicalPerformance":89.0,"currentMomentum":74.8,"exposure":13.7,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"designs":{"popularity":62.6,"trend":74.8,"confidence":44.6,"downloads":10394.0,"downloadsPerMonth":122.7,"assets":1,"avgDownloadsPerAsset":10394.0,"avgDownloadsPerMonth":122.7,"datasets":1,"historicalPerformance":89.0,"currentMomentum":74.8,"exposure":13.7,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"packing":{"popularity":62.6,"trend":74.8,"confidence":44.6,"downloads":10394.0,"downloadsPerMonth":122.7,"assets":1,"avgDownloadsPerAsset":10394.0,"avgDownloadsPerMonth":122.7,"datasets":1,"historicalPerformance":89.0,"currentMomentum":74.8,"exposure":13.7,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"distress":{"popularity":60.5,"trend":69.6,"confidence":53.6,"downloads":9467.0,"downloadsPerMonth":174.8,"assets":2,"avgDownloadsPerAsset":4733.5,"avgDownloadsPerMonth":87.4,"datasets":2,"historicalPerformance":81.4,"currentMomentum":69.6,"exposure":21.6,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"camera":{"popularity":64.1,"trend":68.2,"confidence":49.8,"downloads":16885.0,"downloadsPerMonth":160.2,"assets":2,"avgDownloadsPerAsset":8442.5,"avgDownloadsPerMonth":80.1,"datasets":1,"historicalPerformance":87.0,"currentMomentum":68.2,"exposure":21.6,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"medicine":{"popularity":63.0,"trend":66.5,"confidence":53.6,"downloads":14101.0,"downloadsPerMonth":143.3,"assets":2,"avgDownloadsPerAsset":7050.5,"avgDownloadsPerMonth":71.65,"datasets":2,"historicalPerformance":85.2,"currentMomentum":66.5,"exposure":21.6,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ice":{"popularity":64.2,"trend":61.2,"confidence":58.1,"downloads":18594.0,"downloadsPerMonth":151.8,"assets":3,"avgDownloadsPerAsset":6198.0,"avgDownloadsPerMonth":50.6,"datasets":2,"historicalPerformance":84.0,"currentMomentum":61.2,"exposure":27.3,"marketScore":50.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"200":{"popularity":62.4,"trend":74.7,"confidence":44.6,"downloads":10052.0,"downloadsPerMonth":122.4,"assets":1,"avgDownloadsPerAsset":10052.0,"avgDownloadsPerMonth":122.4,"datasets":1,"historicalPerformance":88.7,"currentMomentum":74.7,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"elegant":{"popularity":62.4,"trend":74.7,"confidence":44.6,"downloads":10027.0,"downloadsPerMonth":122.0,"assets":1,"avgDownloadsPerAsset":10027.0,"avgDownloadsPerMonth":122.0,"datasets":1,"historicalPerformance":88.6,"currentMomentum":74.7,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"even":{"popularity":62.4,"trend":74.7,"confidence":44.6,"downloads":10052.0,"downloadsPerMonth":122.4,"assets":1,"avgDownloadsPerAsset":10052.0,"avgDownloadsPerMonth":122.4,"datasets":1,"historicalPerformance":88.7,"currentMomentum":74.7,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"jar":{"popularity":62.4,"trend":74.7,"confidence":44.6,"downloads":10027.0,"downloadsPerMonth":122.0,"assets":1,"avgDownloadsPerAsset":10027.0,"avgDownloadsPerMonth":122.0,"datasets":1,"historicalPerformance":88.6,"currentMomentum":74.7,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ultimate":{"popularity":62.4,"trend":74.7,"confidence":44.6,"downloads":10052.0,"downloadsPerMonth":122.4,"assets":1,"avgDownloadsPerAsset":10052.0,"avgDownloadsPerMonth":122.4,"datasets":1,"historicalPerformance":88.7,"currentMomentum":74.7,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vectors":{"popularity":62.4,"trend":74.7,"confidence":44.6,"downloads":10052.0,"downloadsPerMonth":122.4,"assets":1,"avgDownloadsPerAsset":10052.0,"avgDownloadsPerMonth":122.4,"datasets":1,"historicalPerformance":88.7,"currentMomentum":74.7,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"connecting":{"popularity":63.0,"trend":74.0,"confidence":44.6,"downloads":11080.0,"downloadsPerMonth":116.5,"assets":1,"avgDownloadsPerAsset":11080.0,"avgDownloadsPerMonth":116.5,"datasets":1,"historicalPerformance":89.6,"currentMomentum":74.0,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"marble":{"popularity":63.1,"trend":73.8,"confidence":44.6,"downloads":11270.0,"downloadsPerMonth":115.2,"assets":1,"avgDownloadsPerAsset":11270.0,"avgDownloadsPerMonth":115.2,"datasets":1,"historicalPerformance":89.8,"currentMomentum":73.8,"exposure":13.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"plate":{"popularity":65.1,"trend":59.7,"confidence":58.4,"downloads":22386.0,"downloadsPerMonth":183.7,"assets":4,"avgDownloadsPerAsset":5596.5,"avgDownloadsPerMonth":45.93,"datasets":1,"historicalPerformance":83.0,"currentMomentum":59.7,"exposure":31.7,"marketScore":50.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"click":{"popularity":62.0,"trend":75.0,"confidence":44.6,"downloads":9400.0,"downloadsPerMonth":124.5,"assets":1,"avgDownloadsPerAsset":9400.0,"avgDownloadsPerMonth":124.5,"datasets":1,"historicalPerformance":88.0,"currentMomentum":75.0,"exposure":13.7,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"loading":{"popularity":62.0,"trend":75.0,"confidence":44.6,"downloads":9400.0,"downloadsPerMonth":124.5,"assets":1,"avgDownloadsPerAsset":9400.0,"avgDownloadsPerMonth":124.5,"datasets":1,"historicalPerformance":88.0,"currentMomentum":75.0,"exposure":13.7,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mouse":{"popularity":62.0,"trend":75.0,"confidence":44.6,"downloads":9400.0,"downloadsPerMonth":124.5,"assets":1,"avgDownloadsPerAsset":9400.0,"avgDownloadsPerMonth":124.5,"datasets":1,"historicalPerformance":88.0,"currentMomentum":75.0,"exposure":13.7,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fir":{"popularity":63.5,"trend":73.1,"confidence":44.6,"downloads":11916.0,"downloadsPerMonth":110.1,"assets":1,"avgDownloadsPerAsset":11916.0,"avgDownloadsPerMonth":110.1,"datasets":1,"historicalPerformance":90.3,"currentMomentum":73.1,"exposure":13.7,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hipster":{"popularity":63.5,"trend":73.1,"confidence":44.6,"downloads":11916.0,"downloadsPerMonth":110.1,"assets":1,"avgDownloadsPerAsset":11916.0,"avgDownloadsPerMonth":110.1,"datasets":1,"historicalPerformance":90.3,"currentMomentum":73.1,"exposure":13.7,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"misty":{"popularity":63.5,"trend":73.1,"confidence":44.6,"downloads":11916.0,"downloadsPerMonth":110.1,"assets":1,"avgDownloadsPerAsset":11916.0,"avgDownloadsPerMonth":110.1,"datasets":1,"historicalPerformance":90.3,"currentMomentum":73.1,"exposure":13.7,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"figure":{"popularity":60.0,"trend":72.5,"confidence":49.8,"downloads":8737.0,"downloadsPerMonth":211.8,"assets":2,"avgDownloadsPerAsset":4368.5,"avgDownloadsPerMonth":105.9,"datasets":1,"historicalPerformance":80.6,"currentMomentum":72.5,"exposure":21.6,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"seeds":{"popularity":63.3,"trend":68.5,"confidence":49.8,"downloads":14919.0,"downloadsPerMonth":162.9,"assets":2,"avgDownloadsPerAsset":7459.5,"avgDownloadsPerMonth":81.45,"datasets":1,"historicalPerformance":85.8,"currentMomentum":68.5,"exposure":21.6,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"project":{"popularity":64.4,"trend":67.4,"confidence":49.8,"downloads":17760.0,"downloadsPerMonth":152.1,"assets":2,"avgDownloadsPerAsset":8880.0,"avgDownloadsPerMonth":76.05,"datasets":1,"historicalPerformance":87.5,"currentMomentum":67.4,"exposure":21.6,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"assorted":{"popularity":64.5,"trend":67.2,"confidence":49.8,"downloads":18015.0,"downloadsPerMonth":149.9,"assets":2,"avgDownloadsPerAsset":9007.5,"avgDownloadsPerMonth":74.95,"datasets":1,"historicalPerformance":87.6,"currentMomentum":67.2,"exposure":21.6,"marketScore":50.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"map":{"popularity":64.0,"trend":72.3,"confidence":44.6,"downloads":12912.0,"downloadsPerMonth":104.7,"assets":1,"avgDownloadsPerAsset":12912.0,"avgDownloadsPerMonth":104.7,"datasets":1,"historicalPerformance":91.1,"currentMomentum":72.3,"exposure":13.7,"marketScore":50.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"linear":{"popularity":60.6,"trend":64.8,"confidence":58.1,"downloads":10590.0,"downloadsPerMonth":192.6,"assets":3,"avgDownloadsPerAsset":3530.0,"avgDownloadsPerMonth":64.2,"datasets":2,"historicalPerformance":78.6,"currentMomentum":64.8,"exposure":27.3,"marketScore":50.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"esp":{"popularity":62.4,"trend":73.8,"confidence":44.6,"downloads":10036.0,"downloadsPerMonth":114.8,"assets":1,"avgDownloadsPerAsset":10036.0,"avgDownloadsPerMonth":114.8,"datasets":1,"historicalPerformance":88.6,"currentMomentum":73.8,"exposure":13.7,"marketScore":50.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"photorealistic":{"popularity":62.4,"trend":73.8,"confidence":44.6,"downloads":10036.0,"downloadsPerMonth":114.8,"assets":1,"avgDownloadsPerAsset":10036.0,"avgDownloadsPerMonth":114.8,"datasets":1,"historicalPerformance":88.6,"currentMomentum":73.8,"exposure":13.7,"marketScore":50.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bowl":{"popularity":65.0,"trend":70.8,"confidence":44.6,"downloads":15238.0,"downloadsPerMonth":94.8,"assets":1,"avgDownloadsPerAsset":15238.0,"avgDownloadsPerMonth":94.8,"datasets":1,"historicalPerformance":92.7,"currentMomentum":70.8,"exposure":13.7,"marketScore":50.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"assortment":{"popularity":62.5,"trend":68.9,"confidence":49.8,"downloads":13142.0,"downloadsPerMonth":167.4,"assets":2,"avgDownloadsPerAsset":6571.0,"avgDownloadsPerMonth":83.7,"datasets":1,"historicalPerformance":84.6,"currentMomentum":68.9,"exposure":21.6,"marketScore":50.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"minimal":{"popularity":59.3,"trend":60.3,"confidence":65.9,"downloads":8867.0,"downloadsPerMonth":190.6,"assets":4,"avgDownloadsPerAsset":2216.75,"avgDownloadsPerMonth":47.65,"datasets":3,"historicalPerformance":74.1,"currentMomentum":60.3,"exposure":31.7,"marketScore":50.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"growing":{"popularity":64.0,"trend":71.7,"confidence":44.6,"downloads":12868.0,"downloadsPerMonth":100.7,"assets":1,"avgDownloadsPerAsset":12868.0,"avgDownloadsPerMonth":100.7,"datasets":1,"historicalPerformance":91.0,"currentMomentum":71.7,"exposure":13.7,"marketScore":50.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"aesthetic":{"popularity":61.9,"trend":66.5,"confidence":53.6,"downloads":11836.0,"downloadsPerMonth":143.5,"assets":2,"avgDownloadsPerAsset":5918.0,"avgDownloadsPerMonth":71.75,"datasets":2,"historicalPerformance":83.6,"currentMomentum":66.5,"exposure":21.6,"marketScore":50.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cut":{"popularity":59.7,"trend":76.5,"confidence":44.6,"downloads":6564.0,"downloadsPerMonth":137.4,"assets":1,"avgDownloadsPerAsset":6564.0,"avgDownloadsPerMonth":137.4,"datasets":1,"historicalPerformance":84.6,"currentMomentum":76.5,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"half":{"popularity":59.7,"trend":76.5,"confidence":44.6,"downloads":6564.0,"downloadsPerMonth":137.4,"assets":1,"avgDownloadsPerAsset":6564.0,"avgDownloadsPerMonth":137.4,"datasets":1,"historicalPerformance":84.6,"currentMomentum":76.5,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"peach":{"popularity":59.7,"trend":76.5,"confidence":44.6,"downloads":6564.0,"downloadsPerMonth":137.4,"assets":1,"avgDownloadsPerAsset":6564.0,"avgDownloadsPerMonth":137.4,"datasets":1,"historicalPerformance":84.6,"currentMomentum":76.5,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pit":{"popularity":59.7,"trend":76.5,"confidence":44.6,"downloads":6564.0,"downloadsPerMonth":137.4,"assets":1,"avgDownloadsPerAsset":6564.0,"avgDownloadsPerMonth":137.4,"datasets":1,"historicalPerformance":84.6,"currentMomentum":76.5,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"conceptual":{"popularity":61.9,"trend":73.9,"confidence":44.6,"downloads":9198.0,"downloadsPerMonth":116.1,"assets":1,"avgDownloadsPerAsset":9198.0,"avgDownloadsPerMonth":116.1,"datasets":1,"historicalPerformance":87.8,"currentMomentum":73.9,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"era":{"popularity":61.9,"trend":73.9,"confidence":44.6,"downloads":9198.0,"downloadsPerMonth":116.1,"assets":1,"avgDownloadsPerAsset":9198.0,"avgDownloadsPerMonth":116.1,"datasets":1,"historicalPerformance":87.8,"currentMomentum":73.9,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"generation":{"popularity":61.9,"trend":73.9,"confidence":44.6,"downloads":9198.0,"downloadsPerMonth":116.1,"assets":1,"avgDownloadsPerAsset":9198.0,"avgDownloadsPerMonth":116.1,"datasets":1,"historicalPerformance":87.8,"currentMomentum":73.9,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"next":{"popularity":61.9,"trend":73.9,"confidence":44.6,"downloads":9198.0,"downloadsPerMonth":116.1,"assets":1,"avgDownloadsPerAsset":9198.0,"avgDownloadsPerMonth":116.1,"datasets":1,"historicalPerformance":87.8,"currentMomentum":73.9,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"transformation":{"popularity":61.9,"trend":73.9,"confidence":44.6,"downloads":9198.0,"downloadsPerMonth":116.1,"assets":1,"avgDownloadsPerAsset":9198.0,"avgDownloadsPerMonth":116.1,"datasets":1,"historicalPerformance":87.8,"currentMomentum":73.9,"exposure":13.7,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pasta":{"popularity":59.4,"trend":72.2,"confidence":49.8,"downloads":7886.0,"downloadsPerMonth":207.2,"assets":2,"avgDownloadsPerAsset":3943.0,"avgDownloadsPerMonth":103.6,"datasets":1,"historicalPerformance":79.7,"currentMomentum":72.2,"exposure":21.6,"marketScore":50.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cellphone":{"popularity":59.1,"trend":76.8,"confidence":44.6,"downloads":5950.0,"downloadsPerMonth":139.6,"assets":1,"avgDownloadsPerAsset":5950.0,"avgDownloadsPerMonth":139.6,"datasets":1,"historicalPerformance":83.6,"currentMomentum":76.8,"exposure":13.7,"marketScore":50.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blackboard":{"popularity":63.9,"trend":66.4,"confidence":49.8,"downloads":16235.0,"downloadsPerMonth":142.3,"assets":2,"avgDownloadsPerAsset":8117.5,"avgDownloadsPerMonth":71.15,"datasets":1,"historicalPerformance":86.6,"currentMomentum":66.4,"exposure":21.6,"marketScore":50.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"board":{"popularity":63.9,"trend":66.4,"confidence":49.8,"downloads":16235.0,"downloadsPerMonth":142.3,"assets":2,"avgDownloadsPerAsset":8117.5,"avgDownloadsPerMonth":71.15,"datasets":1,"historicalPerformance":86.6,"currentMomentum":66.4,"exposure":21.6,"marketScore":50.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"developer":{"popularity":61.4,"trend":73.7,"confidence":44.6,"downloads":8621.0,"downloadsPerMonth":114.6,"assets":1,"avgDownloadsPerAsset":8621.0,"avgDownloadsPerMonth":114.6,"datasets":1,"historicalPerformance":87.2,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"programming":{"popularity":61.4,"trend":73.7,"confidence":44.6,"downloads":8621.0,"downloadsPerMonth":114.6,"assets":1,"avgDownloadsPerAsset":8621.0,"avgDownloadsPerMonth":114.6,"datasets":1,"historicalPerformance":87.2,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"script":{"popularity":61.4,"trend":73.7,"confidence":44.6,"downloads":8621.0,"downloadsPerMonth":114.6,"assets":1,"avgDownloadsPerAsset":8621.0,"avgDownloadsPerMonth":114.6,"datasets":1,"historicalPerformance":87.2,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"droplets":{"popularity":62.6,"trend":72.4,"confidence":44.6,"downloads":10366.0,"downloadsPerMonth":104.8,"assets":1,"avgDownloadsPerAsset":10366.0,"avgDownloadsPerMonth":104.8,"datasets":1,"historicalPerformance":89.0,"currentMomentum":72.4,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glow":{"popularity":63.0,"trend":71.9,"confidence":44.6,"downloads":11129.0,"downloadsPerMonth":102.0,"assets":1,"avgDownloadsPerAsset":11129.0,"avgDownloadsPerMonth":102.0,"datasets":1,"historicalPerformance":89.6,"currentMomentum":71.9,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"particle":{"popularity":63.0,"trend":71.9,"confidence":44.6,"downloads":11129.0,"downloadsPerMonth":102.0,"assets":1,"avgDownloadsPerAsset":11129.0,"avgDownloadsPerMonth":102.0,"datasets":1,"historicalPerformance":89.6,"currentMomentum":71.9,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fantastic":{"popularity":63.7,"trend":71.2,"confidence":44.6,"downloads":12307.0,"downloadsPerMonth":97.5,"assets":1,"avgDownloadsPerAsset":12307.0,"avgDownloadsPerMonth":97.5,"datasets":1,"historicalPerformance":90.6,"currentMomentum":71.2,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"andes":{"popularity":63.7,"trend":71.0,"confidence":44.6,"downloads":12443.0,"downloadsPerMonth":96.2,"assets":1,"avgDownloadsPerAsset":12443.0,"avgDownloadsPerMonth":96.2,"datasets":1,"historicalPerformance":90.7,"currentMomentum":71.0,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"landscapes":{"popularity":63.7,"trend":71.0,"confidence":44.6,"downloads":12443.0,"downloadsPerMonth":96.2,"assets":1,"avgDownloadsPerAsset":12443.0,"avgDownloadsPerMonth":96.2,"datasets":1,"historicalPerformance":90.7,"currentMomentum":71.0,"exposure":13.7,"marketScore":49.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"decor":{"popularity":61.0,"trend":73.7,"confidence":44.6,"downloads":7973.0,"downloadsPerMonth":114.2,"assets":1,"avgDownloadsPerAsset":7973.0,"avgDownloadsPerMonth":114.2,"datasets":1,"historicalPerformance":86.4,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pine":{"popularity":61.0,"trend":73.7,"confidence":44.6,"downloads":7973.0,"downloadsPerMonth":114.2,"assets":1,"avgDownloadsPerAsset":7973.0,"avgDownloadsPerMonth":114.2,"datasets":1,"historicalPerformance":86.4,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"poinsettia":{"popularity":61.0,"trend":73.7,"confidence":44.6,"downloads":7973.0,"downloadsPerMonth":114.2,"assets":1,"avgDownloadsPerAsset":7973.0,"avgDownloadsPerMonth":114.2,"datasets":1,"historicalPerformance":86.4,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sweets":{"popularity":61.0,"trend":73.7,"confidence":44.6,"downloads":7973.0,"downloadsPerMonth":114.2,"assets":1,"avgDownloadsPerAsset":7973.0,"avgDownloadsPerMonth":114.2,"datasets":1,"historicalPerformance":86.4,"currentMomentum":73.7,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dotted":{"popularity":61.7,"trend":73.0,"confidence":44.6,"downloads":9044.0,"downloadsPerMonth":109.2,"assets":1,"avgDownloadsPerAsset":9044.0,"avgDownloadsPerMonth":109.2,"datasets":1,"historicalPerformance":87.6,"currentMomentum":73.0,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"manager":{"popularity":62.9,"trend":71.6,"confidence":44.6,"downloads":10859.0,"downloadsPerMonth":99.7,"assets":1,"avgDownloadsPerAsset":10859.0,"avgDownloadsPerMonth":99.7,"datasets":1,"historicalPerformance":89.4,"currentMomentum":71.6,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"meeting":{"popularity":62.9,"trend":71.6,"confidence":44.6,"downloads":10859.0,"downloadsPerMonth":99.7,"assets":1,"avgDownloadsPerAsset":10859.0,"avgDownloadsPerMonth":99.7,"datasets":1,"historicalPerformance":89.4,"currentMomentum":71.6,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"photographer":{"popularity":63.3,"trend":71.0,"confidence":44.6,"downloads":11565.0,"downloadsPerMonth":96.1,"assets":1,"avgDownloadsPerAsset":11565.0,"avgDownloadsPerMonth":96.1,"datasets":1,"historicalPerformance":90.0,"currentMomentum":71.0,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wonan":{"popularity":63.3,"trend":71.0,"confidence":44.6,"downloads":11565.0,"downloadsPerMonth":96.1,"assets":1,"avgDownloadsPerAsset":11565.0,"avgDownloadsPerMonth":96.1,"datasets":1,"historicalPerformance":90.0,"currentMomentum":71.0,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"island":{"popularity":63.3,"trend":70.9,"confidence":44.6,"downloads":11686.0,"downloadsPerMonth":95.4,"assets":1,"avgDownloadsPerAsset":11686.0,"avgDownloadsPerMonth":95.4,"datasets":1,"historicalPerformance":90.1,"currentMomentum":70.9,"exposure":13.7,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"building":{"popularity":64.5,"trend":64.9,"confidence":49.8,"downloads":17974.0,"downloadsPerMonth":128.5,"assets":2,"avgDownloadsPerAsset":8987.0,"avgDownloadsPerMonth":64.25,"datasets":1,"historicalPerformance":87.6,"currentMomentum":64.9,"exposure":21.6,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"quality":{"popularity":60.0,"trend":63.7,"confidence":58.1,"downloads":9605.0,"downloadsPerMonth":178.4,"assets":3,"avgDownloadsPerAsset":3201.67,"avgDownloadsPerMonth":59.47,"datasets":2,"historicalPerformance":77.7,"currentMomentum":63.7,"exposure":27.3,"marketScore":49.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shine":{"popularity":61.4,"trend":73.1,"confidence":44.6,"downloads":8583.0,"downloadsPerMonth":109.8,"assets":1,"avgDownloadsPerAsset":8583.0,"avgDownloadsPerMonth":109.8,"datasets":1,"historicalPerformance":87.1,"currentMomentum":73.1,"exposure":13.7,"marketScore":49.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"suit":{"popularity":61.4,"trend":73.1,"confidence":44.6,"downloads":8583.0,"downloadsPerMonth":109.8,"assets":1,"avgDownloadsPerAsset":8583.0,"avgDownloadsPerMonth":109.8,"datasets":1,"historicalPerformance":87.1,"currentMomentum":73.1,"exposure":13.7,"marketScore":49.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"time":{"popularity":62.3,"trend":71.9,"confidence":44.6,"downloads":9955.0,"downloadsPerMonth":101.6,"assets":1,"avgDownloadsPerAsset":9955.0,"avgDownloadsPerMonth":101.6,"datasets":1,"historicalPerformance":88.6,"currentMomentum":71.9,"exposure":13.7,"marketScore":49.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"market":{"popularity":61.1,"trend":73.0,"confidence":44.6,"downloads":8180.0,"downloadsPerMonth":109.6,"assets":1,"avgDownloadsPerAsset":8180.0,"avgDownloadsPerMonth":109.6,"datasets":1,"historicalPerformance":86.7,"currentMomentum":73.0,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"trading":{"popularity":61.1,"trend":73.0,"confidence":44.6,"downloads":8180.0,"downloadsPerMonth":109.6,"assets":1,"avgDownloadsPerAsset":8180.0,"avgDownloadsPerMonth":109.6,"datasets":1,"historicalPerformance":86.7,"currentMomentum":73.0,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"about":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"businesswoman":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"client":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"email":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"portable":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"reading":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sitting":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"something":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"thinking":{"popularity":61.3,"trend":72.8,"confidence":44.6,"downloads":8425.0,"downloadsPerMonth":107.7,"assets":1,"avgDownloadsPerAsset":8425.0,"avgDownloadsPerMonth":107.7,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.8,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lilacs":{"popularity":63.9,"trend":69.5,"confidence":44.6,"downloads":12859.0,"downloadsPerMonth":87.3,"assets":1,"avgDownloadsPerAsset":12859.0,"avgDownloadsPerMonth":87.3,"datasets":1,"historicalPerformance":91.0,"currentMomentum":69.5,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vase":{"popularity":63.9,"trend":69.5,"confidence":44.6,"downloads":12859.0,"downloadsPerMonth":87.3,"assets":1,"avgDownloadsPerAsset":12859.0,"avgDownloadsPerMonth":87.3,"datasets":1,"historicalPerformance":91.0,"currentMomentum":69.5,"exposure":13.7,"marketScore":49.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"analytics":{"popularity":61.4,"trend":72.6,"confidence":44.6,"downloads":8533.0,"downloadsPerMonth":106.2,"assets":1,"avgDownloadsPerAsset":8533.0,"avgDownloadsPerMonth":106.2,"datasets":1,"historicalPerformance":87.1,"currentMomentum":72.6,"exposure":13.7,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"coding":{"popularity":61.4,"trend":72.6,"confidence":44.6,"downloads":8533.0,"downloadsPerMonth":106.2,"assets":1,"avgDownloadsPerAsset":8533.0,"avgDownloadsPerMonth":106.2,"datasets":1,"historicalPerformance":87.1,"currentMomentum":72.6,"exposure":13.7,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"isometric":{"popularity":61.4,"trend":72.6,"confidence":44.6,"downloads":8533.0,"downloadsPerMonth":106.2,"assets":1,"avgDownloadsPerAsset":8533.0,"avgDownloadsPerMonth":106.2,"datasets":1,"historicalPerformance":87.1,"currentMomentum":72.6,"exposure":13.7,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"trends":{"popularity":61.4,"trend":72.6,"confidence":44.6,"downloads":8533.0,"downloadsPerMonth":106.2,"assets":1,"avgDownloadsPerAsset":8533.0,"avgDownloadsPerMonth":106.2,"datasets":1,"historicalPerformance":87.1,"currentMomentum":72.6,"exposure":13.7,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"seen":{"popularity":62.9,"trend":70.7,"confidence":44.6,"downloads":10822.0,"downloadsPerMonth":94.3,"assets":1,"avgDownloadsPerAsset":10822.0,"avgDownloadsPerMonth":94.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":70.7,"exposure":13.7,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"underwater":{"popularity":62.9,"trend":70.7,"confidence":44.6,"downloads":10822.0,"downloadsPerMonth":94.3,"assets":1,"avgDownloadsPerAsset":10822.0,"avgDownloadsPerMonth":94.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":70.7,"exposure":13.7,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"kitchen":{"popularity":62.4,"trend":66.6,"confidence":49.8,"downloads":12805.0,"downloadsPerMonth":144.5,"assets":2,"avgDownloadsPerAsset":6402.5,"avgDownloadsPerMonth":72.25,"datasets":1,"historicalPerformance":84.3,"currentMomentum":66.6,"exposure":21.6,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sun":{"popularity":62.3,"trend":63.9,"confidence":53.6,"downloads":12570.0,"downloadsPerMonth":120.4,"assets":2,"avgDownloadsPerAsset":6285.0,"avgDownloadsPerMonth":60.2,"datasets":2,"historicalPerformance":84.1,"currentMomentum":63.9,"exposure":21.6,"marketScore":49.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"entrance":{"popularity":61.3,"trend":72.1,"confidence":44.6,"downloads":8393.0,"downloadsPerMonth":103.4,"assets":1,"avgDownloadsPerAsset":8393.0,"avgDownloadsPerMonth":103.4,"datasets":1,"historicalPerformance":86.9,"currentMomentum":72.1,"exposure":13.7,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"holidays":{"popularity":61.3,"trend":72.1,"confidence":44.6,"downloads":8468.0,"downloadsPerMonth":103.1,"assets":1,"avgDownloadsPerAsset":8468.0,"avgDownloadsPerMonth":103.1,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.1,"exposure":13.7,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"information":{"popularity":61.3,"trend":72.1,"confidence":44.6,"downloads":8468.0,"downloadsPerMonth":103.1,"assets":1,"avgDownloadsPerAsset":8468.0,"avgDownloadsPerMonth":103.1,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.1,"exposure":13.7,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"owner":{"popularity":61.3,"trend":72.1,"confidence":44.6,"downloads":8393.0,"downloadsPerMonth":103.4,"assets":1,"avgDownloadsPerAsset":8393.0,"avgDownloadsPerMonth":103.4,"datasets":1,"historicalPerformance":86.9,"currentMomentum":72.1,"exposure":13.7,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"scan":{"popularity":61.3,"trend":72.1,"confidence":44.6,"downloads":8468.0,"downloadsPerMonth":103.1,"assets":1,"avgDownloadsPerAsset":8468.0,"avgDownloadsPerMonth":103.1,"datasets":1,"historicalPerformance":87.0,"currentMomentum":72.1,"exposure":13.7,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cafe":{"popularity":62.6,"trend":66.1,"confidence":49.8,"downloads":13331.0,"downloadsPerMonth":139.6,"assets":2,"avgDownloadsPerAsset":6665.5,"avgDownloadsPerMonth":69.8,"datasets":1,"historicalPerformance":84.7,"currentMomentum":66.1,"exposure":21.6,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"greeting":{"popularity":61.2,"trend":64.9,"confidence":53.6,"downloads":10524.0,"downloadsPerMonth":128.7,"assets":2,"avgDownloadsPerAsset":5262.0,"avgDownloadsPerMonth":64.35,"datasets":2,"historicalPerformance":82.4,"currentMomentum":64.9,"exposure":21.6,"marketScore":49.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lamp":{"popularity":61.0,"trend":72.3,"confidence":44.6,"downloads":8090.0,"downloadsPerMonth":104.5,"assets":1,"avgDownloadsPerAsset":8090.0,"avgDownloadsPerMonth":104.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":72.3,"exposure":13.7,"marketScore":49.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rotated":{"popularity":61.1,"trend":72.1,"confidence":44.6,"downloads":8150.0,"downloadsPerMonth":103.4,"assets":1,"avgDownloadsPerAsset":8150.0,"avgDownloadsPerMonth":103.4,"datasets":1,"historicalPerformance":86.6,"currentMomentum":72.1,"exposure":13.7,"marketScore":49.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mockups":{"popularity":61.3,"trend":71.9,"confidence":44.6,"downloads":8423.0,"downloadsPerMonth":102.0,"assets":1,"avgDownloadsPerAsset":8423.0,"avgDownloadsPerMonth":102.0,"datasets":1,"historicalPerformance":87.0,"currentMomentum":71.9,"exposure":13.7,"marketScore":49.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"phones":{"popularity":61.3,"trend":71.9,"confidence":44.6,"downloads":8423.0,"downloadsPerMonth":102.0,"assets":1,"avgDownloadsPerAsset":8423.0,"avgDownloadsPerMonth":102.0,"datasets":1,"historicalPerformance":87.0,"currentMomentum":71.9,"exposure":13.7,"marketScore":49.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tulips":{"popularity":63.1,"trend":69.7,"confidence":44.6,"downloads":11296.0,"downloadsPerMonth":88.4,"assets":1,"avgDownloadsPerAsset":11296.0,"avgDownloadsPerMonth":88.4,"datasets":1,"historicalPerformance":89.8,"currentMomentum":69.7,"exposure":13.7,"marketScore":49.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"edge":{"popularity":61.2,"trend":71.8,"confidence":44.6,"downloads":8315.0,"downloadsPerMonth":101.4,"assets":1,"avgDownloadsPerAsset":8315.0,"avgDownloadsPerMonth":101.4,"datasets":1,"historicalPerformance":86.8,"currentMomentum":71.8,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"monitor":{"popularity":61.1,"trend":71.8,"confidence":44.6,"downloads":8166.0,"downloadsPerMonth":101.2,"assets":1,"avgDownloadsPerAsset":8166.0,"avgDownloadsPerMonth":101.2,"datasets":1,"historicalPerformance":86.7,"currentMomentum":71.8,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"monoblock":{"popularity":61.1,"trend":71.8,"confidence":44.6,"downloads":8166.0,"downloadsPerMonth":101.2,"assets":1,"avgDownloadsPerAsset":8166.0,"avgDownloadsPerMonth":101.2,"datasets":1,"historicalPerformance":86.7,"currentMomentum":71.8,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"you":{"popularity":61.1,"trend":71.8,"confidence":44.6,"downloads":8166.0,"downloadsPerMonth":101.2,"assets":1,"avgDownloadsPerAsset":8166.0,"avgDownloadsPerMonth":101.2,"datasets":1,"historicalPerformance":86.7,"currentMomentum":71.8,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brainstorming":{"popularity":62.9,"trend":69.7,"confidence":44.6,"downloads":10810.0,"downloadsPerMonth":88.3,"assets":1,"avgDownloadsPerAsset":10810.0,"avgDownloadsPerMonth":88.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":69.7,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glare":{"popularity":62.9,"trend":69.7,"confidence":44.6,"downloads":10810.0,"downloadsPerMonth":88.3,"assets":1,"avgDownloadsPerAsset":10810.0,"avgDownloadsPerMonth":88.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":69.7,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"intentional":{"popularity":62.9,"trend":69.7,"confidence":44.6,"downloads":10810.0,"downloadsPerMonth":88.3,"assets":1,"avgDownloadsPerAsset":10810.0,"avgDownloadsPerMonth":88.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":69.7,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"paperwork":{"popularity":62.9,"trend":69.7,"confidence":44.6,"downloads":10810.0,"downloadsPerMonth":88.3,"assets":1,"avgDownloadsPerAsset":10810.0,"avgDownloadsPerMonth":88.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":69.7,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"work":{"popularity":62.9,"trend":69.7,"confidence":44.6,"downloads":10810.0,"downloadsPerMonth":88.3,"assets":1,"avgDownloadsPerAsset":10810.0,"avgDownloadsPerMonth":88.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":69.7,"exposure":13.7,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"furnished":{"popularity":61.0,"trend":64.4,"confidence":53.6,"downloads":10337.0,"downloadsPerMonth":125.0,"assets":2,"avgDownloadsPerAsset":5168.5,"avgDownloadsPerMonth":62.5,"datasets":2,"historicalPerformance":82.3,"currentMomentum":64.4,"exposure":21.6,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"nasa":{"popularity":61.0,"trend":64.4,"confidence":53.6,"downloads":10337.0,"downloadsPerMonth":125.0,"assets":2,"avgDownloadsPerAsset":5168.5,"avgDownloadsPerMonth":62.5,"datasets":2,"historicalPerformance":82.3,"currentMomentum":64.4,"exposure":21.6,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"this":{"popularity":61.0,"trend":64.4,"confidence":53.6,"downloads":10337.0,"downloadsPerMonth":125.0,"assets":2,"avgDownloadsPerAsset":5168.5,"avgDownloadsPerMonth":62.5,"datasets":2,"historicalPerformance":82.3,"currentMomentum":64.4,"exposure":21.6,"marketScore":49.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"geometrical":{"popularity":61.7,"trend":70.7,"confidence":44.6,"downloads":9025.0,"downloadsPerMonth":94.1,"assets":1,"avgDownloadsPerAsset":9025.0,"avgDownloadsPerMonth":94.1,"datasets":1,"historicalPerformance":87.6,"currentMomentum":70.7,"exposure":13.7,"marketScore":49.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"logos":{"popularity":61.7,"trend":70.7,"confidence":44.6,"downloads":9025.0,"downloadsPerMonth":94.1,"assets":1,"avgDownloadsPerAsset":9025.0,"avgDownloadsPerMonth":94.1,"datasets":1,"historicalPerformance":87.6,"currentMomentum":70.7,"exposure":13.7,"marketScore":49.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"frozen":{"popularity":62.9,"trend":69.2,"confidence":44.6,"downloads":10807.0,"downloadsPerMonth":85.3,"assets":1,"avgDownloadsPerAsset":10807.0,"avgDownloadsPerMonth":85.3,"datasets":1,"historicalPerformance":89.4,"currentMomentum":69.2,"exposure":13.7,"marketScore":48.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dna":{"popularity":61.0,"trend":70.9,"confidence":44.6,"downloads":8085.0,"downloadsPerMonth":95.5,"assets":1,"avgDownloadsPerAsset":8085.0,"avgDownloadsPerMonth":95.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":70.9,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"doctor":{"popularity":61.0,"trend":70.9,"confidence":44.6,"downloads":8085.0,"downloadsPerMonth":95.5,"assets":1,"avgDownloadsPerAsset":8085.0,"avgDownloadsPerMonth":95.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":70.9,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"electronic":{"popularity":61.0,"trend":70.9,"confidence":44.6,"downloads":8085.0,"downloadsPerMonth":95.5,"assets":1,"avgDownloadsPerAsset":8085.0,"avgDownloadsPerMonth":95.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":70.9,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"healthcare":{"popularity":61.0,"trend":70.9,"confidence":44.6,"downloads":8085.0,"downloadsPerMonth":95.5,"assets":1,"avgDownloadsPerAsset":8085.0,"avgDownloadsPerMonth":95.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":70.9,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"record":{"popularity":61.0,"trend":70.9,"confidence":44.6,"downloads":8085.0,"downloadsPerMonth":95.5,"assets":1,"avgDownloadsPerAsset":8085.0,"avgDownloadsPerMonth":95.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":70.9,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"virtual":{"popularity":61.0,"trend":70.9,"confidence":44.6,"downloads":8085.0,"downloadsPerMonth":95.5,"assets":1,"avgDownloadsPerAsset":8085.0,"avgDownloadsPerMonth":95.5,"datasets":1,"historicalPerformance":86.6,"currentMomentum":70.9,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"earth":{"popularity":61.4,"trend":70.5,"confidence":44.6,"downloads":8577.0,"downloadsPerMonth":92.9,"assets":1,"avgDownloadsPerAsset":8577.0,"avgDownloadsPerMonth":92.9,"datasets":1,"historicalPerformance":87.1,"currentMomentum":70.5,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"europe":{"popularity":61.4,"trend":70.5,"confidence":44.6,"downloads":8577.0,"downloadsPerMonth":92.9,"assets":1,"avgDownloadsPerAsset":8577.0,"avgDownloadsPerMonth":92.9,"datasets":1,"historicalPerformance":87.1,"currentMomentum":70.5,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"planet":{"popularity":61.4,"trend":70.5,"confidence":44.6,"downloads":8577.0,"downloadsPerMonth":92.9,"assets":1,"avgDownloadsPerAsset":8577.0,"avgDownloadsPerMonth":92.9,"datasets":1,"historicalPerformance":87.1,"currentMomentum":70.5,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bearded":{"popularity":62.8,"trend":69.0,"confidence":44.6,"downloads":10653.0,"downloadsPerMonth":84.0,"assets":1,"avgDownloadsPerAsset":10653.0,"avgDownloadsPerMonth":84.0,"datasets":1,"historicalPerformance":89.2,"currentMomentum":69.0,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"reedling":{"popularity":62.8,"trend":69.0,"confidence":44.6,"downloads":10653.0,"downloadsPerMonth":84.0,"assets":1,"avgDownloadsPerAsset":10653.0,"avgDownloadsPerMonth":84.0,"datasets":1,"historicalPerformance":89.2,"currentMomentum":69.0,"exposure":13.7,"marketScore":48.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"colored":{"popularity":62.8,"trend":68.7,"confidence":44.6,"downloads":10627.0,"downloadsPerMonth":82.6,"assets":1,"avgDownloadsPerAsset":10627.0,"avgDownloadsPerMonth":82.6,"datasets":1,"historicalPerformance":89.2,"currentMomentum":68.7,"exposure":13.7,"marketScore":48.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"everest":{"popularity":62.8,"trend":68.7,"confidence":44.6,"downloads":10627.0,"downloadsPerMonth":82.6,"assets":1,"avgDownloadsPerAsset":10627.0,"avgDownloadsPerMonth":82.6,"datasets":1,"historicalPerformance":89.2,"currentMomentum":68.7,"exposure":13.7,"marketScore":48.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"kala":{"popularity":62.8,"trend":68.7,"confidence":44.6,"downloads":10627.0,"downloadsPerMonth":82.6,"assets":1,"avgDownloadsPerAsset":10627.0,"avgDownloadsPerMonth":82.6,"datasets":1,"historicalPerformance":89.2,"currentMomentum":68.7,"exposure":13.7,"marketScore":48.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mount":{"popularity":62.8,"trend":68.7,"confidence":44.6,"downloads":10627.0,"downloadsPerMonth":82.6,"assets":1,"avgDownloadsPerAsset":10627.0,"avgDownloadsPerMonth":82.6,"datasets":1,"historicalPerformance":89.2,"currentMomentum":68.7,"exposure":13.7,"marketScore":48.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"patthar":{"popularity":62.8,"trend":68.7,"confidence":44.6,"downloads":10627.0,"downloadsPerMonth":82.6,"assets":1,"avgDownloadsPerAsset":10627.0,"avgDownloadsPerMonth":82.6,"datasets":1,"historicalPerformance":89.2,"currentMomentum":68.7,"exposure":13.7,"marketScore":48.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"strategy":{"popularity":62.4,"trend":64.4,"confidence":49.8,"downloads":12872.0,"downloadsPerMonth":125.0,"assets":2,"avgDownloadsPerAsset":6436.0,"avgDownloadsPerMonth":62.5,"datasets":1,"historicalPerformance":84.4,"currentMomentum":64.4,"exposure":21.6,"marketScore":48.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"aluminium":{"popularity":62.0,"trend":69.4,"confidence":44.6,"downloads":9395.0,"downloadsPerMonth":86.7,"assets":1,"avgDownloadsPerAsset":9395.0,"avgDownloadsPerMonth":86.7,"datasets":1,"historicalPerformance":88.0,"currentMomentum":69.4,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"body":{"popularity":62.0,"trend":69.4,"confidence":44.6,"downloads":9395.0,"downloadsPerMonth":86.7,"assets":1,"avgDownloadsPerAsset":9395.0,"avgDownloadsPerMonth":86.7,"datasets":1,"historicalPerformance":88.0,"currentMomentum":69.4,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"focus":{"popularity":62.0,"trend":69.4,"confidence":44.6,"downloads":9395.0,"downloadsPerMonth":86.7,"assets":1,"avgDownloadsPerAsset":9395.0,"avgDownloadsPerMonth":86.7,"datasets":1,"historicalPerformance":88.0,"currentMomentum":69.4,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"whole":{"popularity":62.0,"trend":69.4,"confidence":44.6,"downloads":9395.0,"downloadsPerMonth":86.7,"assets":1,"avgDownloadsPerAsset":9395.0,"avgDownloadsPerMonth":86.7,"datasets":1,"historicalPerformance":88.0,"currentMomentum":69.4,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"panels":{"popularity":62.7,"trend":68.5,"confidence":44.6,"downloads":10516.0,"downloadsPerMonth":81.4,"assets":1,"avgDownloadsPerAsset":10516.0,"avgDownloadsPerMonth":81.4,"datasets":1,"historicalPerformance":89.1,"currentMomentum":68.5,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cancun":{"popularity":63.2,"trend":67.7,"confidence":44.6,"downloads":11480.0,"downloadsPerMonth":77.6,"assets":1,"avgDownloadsPerAsset":11480.0,"avgDownloadsPerMonth":77.6,"datasets":1,"historicalPerformance":89.9,"currentMomentum":67.7,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sunrise":{"popularity":63.2,"trend":67.7,"confidence":44.6,"downloads":11480.0,"downloadsPerMonth":77.6,"assets":1,"avgDownloadsPerAsset":11480.0,"avgDownloadsPerMonth":77.6,"datasets":1,"historicalPerformance":89.9,"currentMomentum":67.7,"exposure":13.7,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sparkling":{"popularity":60.2,"trend":63.9,"confidence":53.6,"downloads":9038.0,"downloadsPerMonth":120.8,"assets":2,"avgDownloadsPerAsset":4519.0,"avgDownloadsPerMonth":60.4,"datasets":2,"historicalPerformance":81.0,"currentMomentum":63.9,"exposure":21.6,"marketScore":48.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"designer":{"popularity":61.0,"trend":70.0,"confidence":44.6,"downloads":8071.0,"downloadsPerMonth":90.1,"assets":1,"avgDownloadsPerAsset":8071.0,"avgDownloadsPerMonth":90.1,"datasets":1,"historicalPerformance":86.5,"currentMomentum":70.0,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"experience":{"popularity":61.0,"trend":70.0,"confidence":44.6,"downloads":8071.0,"downloadsPerMonth":90.1,"assets":1,"avgDownloadsPerAsset":8071.0,"avgDownloadsPerMonth":90.1,"datasets":1,"historicalPerformance":86.5,"currentMomentum":70.0,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"prototype":{"popularity":61.0,"trend":70.0,"confidence":44.6,"downloads":8071.0,"downloadsPerMonth":90.1,"assets":1,"avgDownloadsPerAsset":8071.0,"avgDownloadsPerMonth":90.1,"datasets":1,"historicalPerformance":86.5,"currentMomentum":70.0,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sketch":{"popularity":61.0,"trend":70.0,"confidence":44.6,"downloads":8071.0,"downloadsPerMonth":90.1,"assets":1,"avgDownloadsPerAsset":8071.0,"avgDownloadsPerMonth":90.1,"datasets":1,"historicalPerformance":86.5,"currentMomentum":70.0,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"user":{"popularity":61.0,"trend":70.0,"confidence":44.6,"downloads":8071.0,"downloadsPerMonth":90.1,"assets":1,"avgDownloadsPerAsset":8071.0,"avgDownloadsPerMonth":90.1,"datasets":1,"historicalPerformance":86.5,"currentMomentum":70.0,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wireframe":{"popularity":61.0,"trend":70.0,"confidence":44.6,"downloads":8071.0,"downloadsPerMonth":90.1,"assets":1,"avgDownloadsPerAsset":8071.0,"avgDownloadsPerMonth":90.1,"datasets":1,"historicalPerformance":86.5,"currentMomentum":70.0,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"24x24px":{"popularity":61.6,"trend":69.3,"confidence":44.6,"downloads":8896.0,"downloadsPerMonth":86.0,"assets":1,"avgDownloadsPerAsset":8896.0,"avgDownloadsPerMonth":86.0,"datasets":1,"historicalPerformance":87.5,"currentMomentum":69.3,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"600":{"popularity":61.6,"trend":69.3,"confidence":44.6,"downloads":8896.0,"downloadsPerMonth":86.0,"assets":1,"avgDownloadsPerAsset":8896.0,"avgDownloadsPerMonth":86.0,"datasets":1,"historicalPerformance":87.5,"currentMomentum":69.3,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"growth":{"popularity":62.6,"trend":68.4,"confidence":44.6,"downloads":10347.0,"downloadsPerMonth":81.2,"assets":1,"avgDownloadsPerAsset":10347.0,"avgDownloadsPerMonth":81.2,"datasets":1,"historicalPerformance":88.9,"currentMomentum":68.4,"exposure":13.7,"marketScore":48.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"candy":{"popularity":62.4,"trend":68.0,"confidence":44.6,"downloads":10022.0,"downloadsPerMonth":78.8,"assets":1,"avgDownloadsPerAsset":10022.0,"avgDownloadsPerMonth":78.8,"datasets":1,"historicalPerformance":88.6,"currentMomentum":68.0,"exposure":13.7,"marketScore":48.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"jelly":{"popularity":62.4,"trend":68.0,"confidence":44.6,"downloads":10022.0,"downloadsPerMonth":78.8,"assets":1,"avgDownloadsPerAsset":10022.0,"avgDownloadsPerMonth":78.8,"datasets":1,"historicalPerformance":88.6,"currentMomentum":68.0,"exposure":13.7,"marketScore":48.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"mit":{"popularity":62.7,"trend":67.7,"confidence":44.6,"downloads":10477.0,"downloadsPerMonth":77.4,"assets":1,"avgDownloadsPerAsset":10477.0,"avgDownloadsPerMonth":77.4,"datasets":1,"historicalPerformance":89.1,"currentMomentum":67.7,"exposure":13.7,"marketScore":48.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sonnenstrahlen":{"popularity":62.7,"trend":67.7,"confidence":44.6,"downloads":10477.0,"downloadsPerMonth":77.4,"assets":1,"avgDownloadsPerAsset":10477.0,"avgDownloadsPerMonth":77.4,"datasets":1,"historicalPerformance":89.1,"currentMomentum":67.7,"exposure":13.7,"marketScore":48.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wald":{"popularity":62.7,"trend":67.7,"confidence":44.6,"downloads":10477.0,"downloadsPerMonth":77.4,"assets":1,"avgDownloadsPerAsset":10477.0,"avgDownloadsPerMonth":77.4,"datasets":1,"historicalPerformance":89.1,"currentMomentum":67.7,"exposure":13.7,"marketScore":48.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"menu":{"popularity":61.5,"trend":60.8,"confidence":54.4,"downloads":12055.0,"downloadsPerMonth":147.8,"assets":3,"avgDownloadsPerAsset":4018.33,"avgDownloadsPerMonth":49.27,"datasets":1,"historicalPerformance":79.8,"currentMomentum":60.8,"exposure":27.3,"marketScore":48.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"colleagues":{"popularity":61.3,"trend":68.9,"confidence":44.6,"downloads":8433.0,"downloadsPerMonth":83.5,"assets":1,"avgDownloadsPerAsset":8433.0,"avgDownloadsPerMonth":83.5,"datasets":1,"historicalPerformance":87.0,"currentMomentum":68.9,"exposure":13.7,"marketScore":48.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rectangle":{"popularity":58.9,"trend":66.9,"confidence":49.8,"downloads":7371.0,"downloadsPerMonth":147.2,"assets":2,"avgDownloadsPerAsset":3685.5,"avgDownloadsPerMonth":73.6,"datasets":1,"historicalPerformance":79.0,"currentMomentum":66.9,"exposure":21.6,"marketScore":48.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"planning":{"popularity":60.9,"trend":64.6,"confidence":49.8,"downloads":10133.0,"downloadsPerMonth":126.8,"assets":2,"avgDownloadsPerAsset":5066.5,"avgDownloadsPerMonth":63.4,"datasets":1,"historicalPerformance":82.1,"currentMomentum":64.6,"exposure":21.6,"marketScore":48.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"illustrati":{"popularity":62.4,"trend":67.1,"confidence":44.6,"downloads":10004.0,"downloadsPerMonth":74.2,"assets":1,"avgDownloadsPerAsset":10004.0,"avgDownloadsPerMonth":74.2,"datasets":1,"historicalPerformance":88.6,"currentMomentum":67.1,"exposure":13.7,"marketScore":48.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"monitors":{"popularity":62.4,"trend":67.1,"confidence":44.6,"downloads":10004.0,"downloadsPerMonth":74.2,"assets":1,"avgDownloadsPerAsset":10004.0,"avgDownloadsPerMonth":74.2,"datasets":1,"historicalPerformance":88.6,"currentMomentum":67.1,"exposure":13.7,"marketScore":48.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"summer":{"popularity":60.9,"trend":61.5,"confidence":53.6,"downloads":10089.0,"downloadsPerMonth":103.1,"assets":2,"avgDownloadsPerAsset":5044.5,"avgDownloadsPerMonth":51.55,"datasets":2,"historicalPerformance":82.0,"currentMomentum":61.5,"exposure":21.6,"marketScore":48.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"while":{"popularity":59.9,"trend":62.4,"confidence":53.6,"downloads":8574.0,"downloadsPerMonth":109.3,"assets":2,"avgDownloadsPerAsset":4287.0,"avgDownloadsPerMonth":54.65,"datasets":2,"historicalPerformance":80.5,"currentMomentum":62.4,"exposure":21.6,"marketScore":47.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hologram":{"popularity":60.1,"trend":62.0,"confidence":53.6,"downloads":8893.0,"downloadsPerMonth":106.7,"assets":2,"avgDownloadsPerAsset":4446.5,"avgDownloadsPerMonth":53.35,"datasets":2,"historicalPerformance":80.8,"currentMomentum":62.0,"exposure":21.6,"marketScore":47.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rainbow":{"popularity":60.0,"trend":69.5,"confidence":44.6,"downloads":6820.0,"downloadsPerMonth":86.9,"assets":1,"avgDownloadsPerAsset":6820.0,"avgDownloadsPerMonth":86.9,"datasets":1,"historicalPerformance":84.9,"currentMomentum":69.5,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"clean":{"popularity":60.5,"trend":68.6,"confidence":44.6,"downloads":7405.0,"downloadsPerMonth":82.1,"assets":1,"avgDownloadsPerAsset":7405.0,"avgDownloadsPerMonth":82.1,"datasets":1,"historicalPerformance":85.7,"currentMomentum":68.6,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"eating":{"popularity":60.5,"trend":68.6,"confidence":44.6,"downloads":7405.0,"downloadsPerMonth":82.1,"assets":1,"avgDownloadsPerAsset":7405.0,"avgDownloadsPerMonth":82.1,"datasets":1,"historicalPerformance":85.7,"currentMomentum":68.6,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"superfood":{"popularity":60.5,"trend":68.6,"confidence":44.6,"downloads":7405.0,"downloadsPerMonth":82.1,"assets":1,"avgDownloadsPerAsset":7405.0,"avgDownloadsPerMonth":82.1,"datasets":1,"historicalPerformance":85.7,"currentMomentum":68.6,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vegetable":{"popularity":60.5,"trend":68.6,"confidence":44.6,"downloads":7405.0,"downloadsPerMonth":82.1,"assets":1,"avgDownloadsPerAsset":7405.0,"avgDownloadsPerMonth":82.1,"datasets":1,"historicalPerformance":85.7,"currentMomentum":68.6,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"designed":{"popularity":61.5,"trend":67.7,"confidence":44.6,"downloads":8691.0,"downloadsPerMonth":77.2,"assets":1,"avgDownloadsPerAsset":8691.0,"avgDownloadsPerMonth":77.2,"datasets":1,"historicalPerformance":87.3,"currentMomentum":67.7,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"iconset":{"popularity":61.5,"trend":67.7,"confidence":44.6,"downloads":8691.0,"downloadsPerMonth":77.2,"assets":1,"avgDownloadsPerAsset":8691.0,"avgDownloadsPerMonth":77.2,"datasets":1,"historicalPerformance":87.3,"currentMomentum":67.7,"exposure":13.7,"marketScore":47.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"berries":{"popularity":60.6,"trend":68.4,"confidence":44.6,"downloads":7514.0,"downloadsPerMonth":80.8,"assets":1,"avgDownloadsPerAsset":7514.0,"avgDownloadsPerMonth":80.8,"datasets":1,"historicalPerformance":85.9,"currentMomentum":68.4,"exposure":13.7,"marketScore":47.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"nuts":{"popularity":60.6,"trend":68.4,"confidence":44.6,"downloads":7514.0,"downloadsPerMonth":80.8,"assets":1,"avgDownloadsPerAsset":7514.0,"avgDownloadsPerMonth":80.8,"datasets":1,"historicalPerformance":85.9,"currentMomentum":68.4,"exposure":13.7,"marketScore":47.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"superfoods":{"popularity":60.6,"trend":68.4,"confidence":44.6,"downloads":7514.0,"downloadsPerMonth":80.8,"assets":1,"avgDownloadsPerAsset":7514.0,"avgDownloadsPerMonth":80.8,"datasets":1,"historicalPerformance":85.9,"currentMomentum":68.4,"exposure":13.7,"marketScore":47.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pralines":{"popularity":62.7,"trend":66.0,"confidence":44.6,"downloads":10501.0,"downloadsPerMonth":69.1,"assets":1,"avgDownloadsPerAsset":10501.0,"avgDownloadsPerMonth":69.1,"datasets":1,"historicalPerformance":89.1,"currentMomentum":66.0,"exposure":13.7,"marketScore":47.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"latte":{"popularity":62.2,"trend":61.8,"confidence":49.8,"downloads":12453.0,"downloadsPerMonth":105.3,"assets":2,"avgDownloadsPerAsset":6226.5,"avgDownloadsPerMonth":52.65,"datasets":1,"historicalPerformance":84.1,"currentMomentum":61.8,"exposure":21.6,"marketScore":47.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"looking":{"popularity":59.9,"trend":61.8,"confidence":53.6,"downloads":8542.0,"downloadsPerMonth":105.0,"assets":2,"avgDownloadsPerAsset":4271.0,"avgDownloadsPerMonth":52.5,"datasets":2,"historicalPerformance":80.4,"currentMomentum":61.8,"exposure":21.6,"marketScore":47.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bitten":{"popularity":61.6,"trend":66.9,"confidence":44.6,"downloads":8804.0,"downloadsPerMonth":73.3,"assets":1,"avgDownloadsPerAsset":8804.0,"avgDownloadsPerMonth":73.3,"datasets":1,"historicalPerformance":87.4,"currentMomentum":66.9,"exposure":13.7,"marketScore":47.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cutlery":{"popularity":59.5,"trend":69.1,"confidence":44.6,"downloads":6323.0,"downloadsPerMonth":84.7,"assets":1,"avgDownloadsPerAsset":6323.0,"avgDownloadsPerMonth":84.7,"datasets":1,"historicalPerformance":84.2,"currentMomentum":69.1,"exposure":13.7,"marketScore":47.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fork":{"popularity":59.5,"trend":69.1,"confidence":44.6,"downloads":6323.0,"downloadsPerMonth":84.7,"assets":1,"avgDownloadsPerAsset":6323.0,"avgDownloadsPerMonth":84.7,"datasets":1,"historicalPerformance":84.2,"currentMomentum":69.1,"exposure":13.7,"marketScore":47.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"knife":{"popularity":59.5,"trend":69.1,"confidence":44.6,"downloads":6323.0,"downloadsPerMonth":84.7,"assets":1,"avgDownloadsPerAsset":6323.0,"avgDownloadsPerMonth":84.7,"datasets":1,"historicalPerformance":84.2,"currentMomentum":69.1,"exposure":13.7,"marketScore":47.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"silhouette":{"popularity":59.5,"trend":69.1,"confidence":44.6,"downloads":6323.0,"downloadsPerMonth":84.7,"assets":1,"avgDownloadsPerAsset":6323.0,"avgDownloadsPerMonth":84.7,"datasets":1,"historicalPerformance":84.2,"currentMomentum":69.1,"exposure":13.7,"marketScore":47.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"spoon":{"popularity":59.5,"trend":69.1,"confidence":44.6,"downloads":6323.0,"downloadsPerMonth":84.7,"assets":1,"avgDownloadsPerAsset":6323.0,"avgDownloadsPerMonth":84.7,"datasets":1,"historicalPerformance":84.2,"currentMomentum":69.1,"exposure":13.7,"marketScore":47.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"counter":{"popularity":60.0,"trend":68.2,"confidence":44.6,"downloads":6811.0,"downloadsPerMonth":80.0,"assets":1,"avgDownloadsPerAsset":6811.0,"avgDownloadsPerMonth":80.0,"datasets":1,"historicalPerformance":84.9,"currentMomentum":68.2,"exposure":13.7,"marketScore":47.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blueprints":{"popularity":61.9,"trend":65.9,"confidence":44.6,"downloads":9327.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":9327.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.9,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"house":{"popularity":61.9,"trend":65.9,"confidence":44.6,"downloads":9327.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":9327.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.9,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"worker":{"popularity":61.9,"trend":65.9,"confidence":44.6,"downloads":9327.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":9327.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.9,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"coconut":{"popularity":61.6,"trend":65.9,"confidence":44.6,"downloads":8881.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":8881.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.5,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"halves":{"popularity":61.6,"trend":65.9,"confidence":44.6,"downloads":8881.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":8881.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.5,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"milk":{"popularity":61.6,"trend":65.9,"confidence":44.6,"downloads":8881.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":8881.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.5,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"straw":{"popularity":61.6,"trend":65.9,"confidence":44.6,"downloads":8881.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":8881.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.5,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"striped":{"popularity":61.6,"trend":65.9,"confidence":44.6,"downloads":8881.0,"downloadsPerMonth":68.6,"assets":1,"avgDownloadsPerAsset":8881.0,"avgDownloadsPerMonth":68.6,"datasets":1,"historicalPerformance":87.5,"currentMomentum":65.9,"exposure":13.7,"marketScore":47.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"action":{"popularity":61.6,"trend":64.9,"confidence":44.6,"downloads":8903.0,"downloadsPerMonth":64.4,"assets":1,"avgDownloadsPerAsset":8903.0,"avgDownloadsPerMonth":64.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":64.9,"exposure":13.7,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fisherman":{"popularity":61.6,"trend":64.9,"confidence":44.6,"downloads":8903.0,"downloadsPerMonth":64.4,"assets":1,"avgDownloadsPerAsset":8903.0,"avgDownloadsPerMonth":64.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":64.9,"exposure":13.7,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fishing":{"popularity":61.6,"trend":64.9,"confidence":44.6,"downloads":8903.0,"downloadsPerMonth":64.4,"assets":1,"avgDownloadsPerAsset":8903.0,"avgDownloadsPerMonth":64.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":64.9,"exposure":13.7,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lake":{"popularity":61.6,"trend":64.9,"confidence":44.6,"downloads":8903.0,"downloadsPerMonth":64.4,"assets":1,"avgDownloadsPerAsset":8903.0,"avgDownloadsPerMonth":64.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":64.9,"exposure":13.7,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"thailand":{"popularity":61.6,"trend":64.9,"confidence":44.6,"downloads":8903.0,"downloadsPerMonth":64.4,"assets":1,"avgDownloadsPerAsset":8903.0,"avgDownloadsPerMonth":64.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":64.9,"exposure":13.7,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"when":{"popularity":61.6,"trend":64.9,"confidence":44.6,"downloads":8903.0,"downloadsPerMonth":64.4,"assets":1,"avgDownloadsPerAsset":8903.0,"avgDownloadsPerMonth":64.4,"datasets":1,"historicalPerformance":87.5,"currentMomentum":64.9,"exposure":13.7,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"heart":{"popularity":62.0,"trend":60.2,"confidence":49.8,"downloads":12068.0,"downloadsPerMonth":94.5,"assets":2,"avgDownloadsPerAsset":6034.0,"avgDownloadsPerMonth":47.25,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.2,"exposure":21.6,"marketScore":47.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"scoa":{"popularity":61.1,"trend":65.5,"confidence":44.6,"downloads":8140.0,"downloadsPerMonth":66.9,"assets":1,"avgDownloadsPerAsset":8140.0,"avgDownloadsPerMonth":66.9,"datasets":1,"historicalPerformance":86.6,"currentMomentum":65.5,"exposure":13.7,"marketScore":46.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"delicious":{"popularity":61.6,"trend":64.8,"confidence":44.6,"downloads":8766.0,"downloadsPerMonth":64.0,"assets":1,"avgDownloadsPerAsset":8766.0,"avgDownloadsPerMonth":64.0,"datasets":1,"historicalPerformance":87.3,"currentMomentum":64.8,"exposure":13.7,"marketScore":46.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"small":{"popularity":59.5,"trend":56.4,"confidence":58.1,"downloads":8769.0,"downloadsPerMonth":110.8,"assets":3,"avgDownloadsPerAsset":2923.0,"avgDownloadsPerMonth":36.93,"datasets":2,"historicalPerformance":76.8,"currentMomentum":56.4,"exposure":27.3,"marketScore":46.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"truffles":{"popularity":62.1,"trend":63.8,"confidence":44.6,"downloads":9542.0,"downloadsPerMonth":60.1,"assets":1,"avgDownloadsPerAsset":9542.0,"avgDownloadsPerMonth":60.1,"datasets":1,"historicalPerformance":88.2,"currentMomentum":63.8,"exposure":13.7,"marketScore":46.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fired":{"popularity":60.1,"trend":66.0,"confidence":44.6,"downloads":6936.0,"downloadsPerMonth":69.4,"assets":1,"avgDownloadsPerAsset":6936.0,"avgDownloadsPerMonth":69.4,"datasets":1,"historicalPerformance":85.1,"currentMomentum":66.0,"exposure":13.7,"marketScore":46.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"grill":{"popularity":60.1,"trend":66.0,"confidence":44.6,"downloads":6936.0,"downloadsPerMonth":69.4,"assets":1,"avgDownloadsPerAsset":6936.0,"avgDownloadsPerMonth":69.4,"datasets":1,"historicalPerformance":85.1,"currentMomentum":66.0,"exposure":13.7,"marketScore":46.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dump":{"popularity":60.8,"trend":65.1,"confidence":44.6,"downloads":7746.0,"downloadsPerMonth":65.3,"assets":1,"avgDownloadsPerAsset":7746.0,"avgDownloadsPerMonth":65.3,"datasets":1,"historicalPerformance":86.2,"currentMomentum":65.1,"exposure":13.7,"marketScore":46.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vertical":{"popularity":60.8,"trend":65.1,"confidence":44.6,"downloads":7746.0,"downloadsPerMonth":65.3,"assets":1,"avgDownloadsPerAsset":7746.0,"avgDownloadsPerMonth":65.3,"datasets":1,"historicalPerformance":86.2,"currentMomentum":65.1,"exposure":13.7,"marketScore":46.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"garlic":{"popularity":61.8,"trend":63.9,"confidence":44.6,"downloads":9112.0,"downloadsPerMonth":60.3,"assets":1,"avgDownloadsPerAsset":9112.0,"avgDownloadsPerMonth":60.3,"datasets":1,"historicalPerformance":87.7,"currentMomentum":63.9,"exposure":13.7,"marketScore":46.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rosemary":{"popularity":61.8,"trend":63.9,"confidence":44.6,"downloads":9112.0,"downloadsPerMonth":60.3,"assets":1,"avgDownloadsPerAsset":9112.0,"avgDownloadsPerMonth":60.3,"datasets":1,"historicalPerformance":87.7,"currentMomentum":63.9,"exposure":13.7,"marketScore":46.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"candles":{"popularity":59.5,"trend":66.4,"confidence":44.6,"downloads":6321.0,"downloadsPerMonth":71.0,"assets":1,"avgDownloadsPerAsset":6321.0,"avgDownloadsPerMonth":71.0,"datasets":1,"historicalPerformance":84.2,"currentMomentum":66.4,"exposure":13.7,"marketScore":46.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sprinkles":{"popularity":59.5,"trend":66.4,"confidence":44.6,"downloads":6321.0,"downloadsPerMonth":71.0,"assets":1,"avgDownloadsPerAsset":6321.0,"avgDownloadsPerMonth":71.0,"datasets":1,"historicalPerformance":84.2,"currentMomentum":66.4,"exposure":13.7,"marketScore":46.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ten":{"popularity":59.5,"trend":66.4,"confidence":44.6,"downloads":6321.0,"downloadsPerMonth":71.0,"assets":1,"avgDownloadsPerAsset":6321.0,"avgDownloadsPerMonth":71.0,"datasets":1,"historicalPerformance":84.2,"currentMomentum":66.4,"exposure":13.7,"marketScore":46.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"basil":{"popularity":61.0,"trend":64.2,"confidence":44.6,"downloads":8050.0,"downloadsPerMonth":61.6,"assets":1,"avgDownloadsPerAsset":8050.0,"avgDownloadsPerMonth":61.6,"datasets":1,"historicalPerformance":86.5,"currentMomentum":64.2,"exposure":13.7,"marketScore":46.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pork":{"popularity":61.0,"trend":64.2,"confidence":44.6,"downloads":8050.0,"downloadsPerMonth":61.6,"assets":1,"avgDownloadsPerAsset":8050.0,"avgDownloadsPerMonth":61.6,"datasets":1,"historicalPerformance":86.5,"currentMomentum":64.2,"exposure":13.7,"marketScore":46.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"crane":{"popularity":61.5,"trend":63.8,"confidence":44.6,"downloads":8647.0,"downloadsPerMonth":59.9,"assets":1,"avgDownloadsPerAsset":8647.0,"avgDownloadsPerMonth":59.9,"datasets":1,"historicalPerformance":87.2,"currentMomentum":63.8,"exposure":13.7,"marketScore":46.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"site":{"popularity":61.5,"trend":63.8,"confidence":44.6,"downloads":8647.0,"downloadsPerMonth":59.9,"assets":1,"avgDownloadsPerAsset":8647.0,"avgDownloadsPerMonth":59.9,"datasets":1,"historicalPerformance":87.2,"currentMomentum":63.8,"exposure":13.7,"marketScore":46.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pictograms":{"popularity":60.2,"trend":54.2,"confidence":58.1,"downloads":9883.0,"downloadsPerMonth":95.8,"assets":3,"avgDownloadsPerAsset":3294.33,"avgDownloadsPerMonth":31.93,"datasets":2,"historicalPerformance":77.9,"currentMomentum":54.2,"exposure":27.3,"marketScore":46.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fitness":{"popularity":59.9,"trend":64.9,"confidence":44.6,"downloads":6749.0,"downloadsPerMonth":64.6,"assets":1,"avgDownloadsPerAsset":6749.0,"avgDownloadsPerMonth":64.6,"datasets":1,"historicalPerformance":84.8,"currentMomentum":64.9,"exposure":13.7,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sport":{"popularity":59.9,"trend":64.9,"confidence":44.6,"downloads":6749.0,"downloadsPerMonth":64.6,"assets":1,"avgDownloadsPerAsset":6749.0,"avgDownloadsPerMonth":64.6,"datasets":1,"historicalPerformance":84.8,"currentMomentum":64.9,"exposure":13.7,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"girl":{"popularity":62.8,"trend":61.6,"confidence":44.6,"downloads":10779.0,"downloadsPerMonth":52.0,"assets":1,"avgDownloadsPerAsset":10779.0,"avgDownloadsPerMonth":52.0,"datasets":1,"historicalPerformance":89.3,"currentMomentum":61.6,"exposure":13.7,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"little":{"popularity":62.8,"trend":61.6,"confidence":44.6,"downloads":10779.0,"downloadsPerMonth":52.0,"assets":1,"avgDownloadsPerAsset":10779.0,"avgDownloadsPerMonth":52.0,"datasets":1,"historicalPerformance":89.3,"currentMomentum":61.6,"exposure":13.7,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"smells":{"popularity":62.8,"trend":61.6,"confidence":44.6,"downloads":10779.0,"downloadsPerMonth":52.0,"assets":1,"avgDownloadsPerAsset":10779.0,"avgDownloadsPerMonth":52.0,"datasets":1,"historicalPerformance":89.3,"currentMomentum":61.6,"exposure":13.7,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"foam":{"popularity":59.8,"trend":57.9,"confidence":53.6,"downloads":8493.0,"downloadsPerMonth":81.3,"assets":2,"avgDownloadsPerAsset":4246.5,"avgDownloadsPerMonth":40.65,"datasets":2,"historicalPerformance":80.4,"currentMomentum":57.9,"exposure":21.6,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pure":{"popularity":59.8,"trend":57.9,"confidence":53.6,"downloads":8493.0,"downloadsPerMonth":81.3,"assets":2,"avgDownloadsPerAsset":4246.5,"avgDownloadsPerMonth":40.65,"datasets":2,"historicalPerformance":80.4,"currentMomentum":57.9,"exposure":21.6,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"turquoise":{"popularity":59.8,"trend":57.9,"confidence":53.6,"downloads":8493.0,"downloadsPerMonth":81.3,"assets":2,"avgDownloadsPerAsset":4246.5,"avgDownloadsPerMonth":40.65,"datasets":2,"historicalPerformance":80.4,"currentMomentum":57.9,"exposure":21.6,"marketScore":46.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"corn":{"popularity":60.8,"trend":63.8,"confidence":44.6,"downloads":7766.0,"downloadsPerMonth":59.8,"assets":1,"avgDownloadsPerAsset":7766.0,"avgDownloadsPerMonth":59.8,"datasets":1,"historicalPerformance":86.2,"currentMomentum":63.8,"exposure":13.7,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"indian":{"popularity":60.8,"trend":63.8,"confidence":44.6,"downloads":7766.0,"downloadsPerMonth":59.8,"assets":1,"avgDownloadsPerAsset":7766.0,"avgDownloadsPerMonth":59.8,"datasets":1,"historicalPerformance":86.2,"currentMomentum":63.8,"exposure":13.7,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lens":{"popularity":61.4,"trend":63.0,"confidence":44.6,"downloads":8492.0,"downloadsPerMonth":56.8,"assets":1,"avgDownloadsPerAsset":8492.0,"avgDownloadsPerMonth":56.8,"datasets":1,"historicalPerformance":87.0,"currentMomentum":63.0,"exposure":13.7,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"video":{"popularity":61.4,"trend":63.0,"confidence":44.6,"downloads":8492.0,"downloadsPerMonth":56.8,"assets":1,"avgDownloadsPerAsset":8492.0,"avgDownloadsPerMonth":56.8,"datasets":1,"historicalPerformance":87.0,"currentMomentum":63.0,"exposure":13.7,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chilli":{"popularity":61.8,"trend":62.5,"confidence":44.6,"downloads":9119.0,"downloadsPerMonth":55.0,"assets":1,"avgDownloadsPerAsset":9119.0,"avgDownloadsPerMonth":55.0,"datasets":1,"historicalPerformance":87.7,"currentMomentum":62.5,"exposure":13.7,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dehydrate":{"popularity":61.8,"trend":62.5,"confidence":44.6,"downloads":9119.0,"downloadsPerMonth":55.0,"assets":1,"avgDownloadsPerAsset":9119.0,"avgDownloadsPerMonth":55.0,"datasets":1,"historicalPerformance":87.7,"currentMomentum":62.5,"exposure":13.7,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"evening":{"popularity":61.3,"trend":58.6,"confidence":49.8,"downloads":10804.0,"downloadsPerMonth":85.0,"assets":2,"avgDownloadsPerAsset":5402.0,"avgDownloadsPerMonth":42.5,"datasets":1,"historicalPerformance":82.7,"currentMomentum":58.6,"exposure":21.6,"marketScore":46.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"defocused":{"popularity":59.2,"trend":64.9,"confidence":44.6,"downloads":5994.0,"downloadsPerMonth":64.5,"assets":1,"avgDownloadsPerAsset":5994.0,"avgDownloadsPerMonth":64.5,"datasets":1,"historicalPerformance":83.7,"currentMomentum":64.9,"exposure":13.7,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tabletop":{"popularity":59.2,"trend":64.9,"confidence":44.6,"downloads":5994.0,"downloadsPerMonth":64.5,"assets":1,"avgDownloadsPerAsset":5994.0,"avgDownloadsPerMonth":64.5,"datasets":1,"historicalPerformance":83.7,"currentMomentum":64.9,"exposure":13.7,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dumplings":{"popularity":60.5,"trend":63.5,"confidence":44.6,"downloads":7414.0,"downloadsPerMonth":58.7,"assets":1,"avgDownloadsPerAsset":7414.0,"avgDownloadsPerMonth":58.7,"datasets":1,"historicalPerformance":85.7,"currentMomentum":63.5,"exposure":13.7,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pelmeni":{"popularity":60.5,"trend":63.5,"confidence":44.6,"downloads":7414.0,"downloadsPerMonth":58.7,"assets":1,"avgDownloadsPerAsset":7414.0,"avgDownloadsPerMonth":58.7,"datasets":1,"historicalPerformance":85.7,"currentMomentum":63.5,"exposure":13.7,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"russian":{"popularity":60.5,"trend":63.5,"confidence":44.6,"downloads":7414.0,"downloadsPerMonth":58.7,"assets":1,"avgDownloadsPerAsset":7414.0,"avgDownloadsPerMonth":58.7,"datasets":1,"historicalPerformance":85.7,"currentMomentum":63.5,"exposure":13.7,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pie":{"popularity":60.6,"trend":63.3,"confidence":44.6,"downloads":7525.0,"downloadsPerMonth":58.0,"assets":1,"avgDownloadsPerAsset":7525.0,"avgDownloadsPerMonth":58.0,"datasets":1,"historicalPerformance":85.9,"currentMomentum":63.3,"exposure":13.7,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"alley":{"popularity":61.2,"trend":58.3,"confidence":49.8,"downloads":10565.0,"downloadsPerMonth":83.7,"assets":2,"avgDownloadsPerAsset":5282.5,"avgDownloadsPerMonth":41.85,"datasets":1,"historicalPerformance":82.5,"currentMomentum":58.3,"exposure":21.6,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"covered":{"popularity":61.2,"trend":58.3,"confidence":49.8,"downloads":10542.0,"downloadsPerMonth":83.7,"assets":2,"avgDownloadsPerAsset":5271.0,"avgDownloadsPerMonth":41.85,"datasets":1,"historicalPerformance":82.4,"currentMomentum":58.3,"exposure":21.6,"marketScore":46.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bread":{"popularity":61.3,"trend":62.3,"confidence":44.6,"downloads":8358.0,"downloadsPerMonth":54.3,"assets":1,"avgDownloadsPerAsset":8358.0,"avgDownloadsPerMonth":54.3,"datasets":1,"historicalPerformance":86.9,"currentMomentum":62.3,"exposure":13.7,"marketScore":45.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"accents":{"popularity":58.8,"trend":64.7,"confidence":44.6,"downloads":5655.0,"downloadsPerMonth":63.5,"assets":1,"avgDownloadsPerAsset":5655.0,"avgDownloadsPerMonth":63.5,"datasets":1,"historicalPerformance":83.1,"currentMomentum":64.7,"exposure":13.7,"marketScore":45.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brochure":{"popularity":58.8,"trend":64.7,"confidence":44.6,"downloads":5655.0,"downloadsPerMonth":63.5,"assets":1,"avgDownloadsPerAsset":5655.0,"avgDownloadsPerMonth":63.5,"datasets":1,"historicalPerformance":83.1,"currentMomentum":64.7,"exposure":13.7,"marketScore":45.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"classic":{"popularity":58.9,"trend":64.6,"confidence":44.6,"downloads":5732.0,"downloadsPerMonth":63.1,"assets":1,"avgDownloadsPerAsset":5732.0,"avgDownloadsPerMonth":63.1,"datasets":1,"historicalPerformance":83.3,"currentMomentum":64.6,"exposure":13.7,"marketScore":45.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ornate":{"popularity":58.9,"trend":64.6,"confidence":44.6,"downloads":5732.0,"downloadsPerMonth":63.1,"assets":1,"avgDownloadsPerAsset":5732.0,"avgDownloadsPerMonth":63.1,"datasets":1,"historicalPerformance":83.3,"currentMomentum":64.6,"exposure":13.7,"marketScore":45.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"templates":{"popularity":58.9,"trend":64.6,"confidence":44.6,"downloads":5732.0,"downloadsPerMonth":63.1,"assets":1,"avgDownloadsPerAsset":5732.0,"avgDownloadsPerMonth":63.1,"datasets":1,"historicalPerformance":83.3,"currentMomentum":64.6,"exposure":13.7,"marketScore":45.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wedding":{"popularity":58.9,"trend":64.6,"confidence":44.6,"downloads":5732.0,"downloadsPerMonth":63.1,"assets":1,"avgDownloadsPerAsset":5732.0,"avgDownloadsPerMonth":63.1,"datasets":1,"historicalPerformance":83.3,"currentMomentum":64.6,"exposure":13.7,"marketScore":45.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"one":{"popularity":59.1,"trend":64.0,"confidence":44.6,"downloads":5917.0,"downloadsPerMonth":60.6,"assets":1,"avgDownloadsPerAsset":5917.0,"avgDownloadsPerMonth":60.6,"datasets":1,"historicalPerformance":83.6,"currentMomentum":64.0,"exposure":13.7,"marketScore":45.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"784":{"popularity":60.5,"trend":62.4,"confidence":44.6,"downloads":7370.0,"downloadsPerMonth":54.7,"assets":1,"avgDownloadsPerAsset":7370.0,"avgDownloadsPerMonth":54.7,"datasets":1,"historicalPerformance":85.7,"currentMomentum":62.4,"exposure":13.7,"marketScore":45.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"solid":{"popularity":60.5,"trend":62.4,"confidence":44.6,"downloads":7370.0,"downloadsPerMonth":54.7,"assets":1,"avgDownloadsPerAsset":7370.0,"avgDownloadsPerMonth":54.7,"datasets":1,"historicalPerformance":85.7,"currentMomentum":62.4,"exposure":13.7,"marketScore":45.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"universal":{"popularity":60.5,"trend":62.4,"confidence":44.6,"downloads":7370.0,"downloadsPerMonth":54.7,"assets":1,"avgDownloadsPerAsset":7370.0,"avgDownloadsPerMonth":54.7,"datasets":1,"historicalPerformance":85.7,"currentMomentum":62.4,"exposure":13.7,"marketScore":45.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"beer":{"popularity":59.2,"trend":63.6,"confidence":44.6,"downloads":5987.0,"downloadsPerMonth":59.1,"assets":1,"avgDownloadsPerAsset":5987.0,"avgDownloadsPerMonth":59.1,"datasets":1,"historicalPerformance":83.7,"currentMomentum":63.6,"exposure":13.7,"marketScore":45.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bubble":{"popularity":59.2,"trend":63.6,"confidence":44.6,"downloads":5987.0,"downloadsPerMonth":59.1,"assets":1,"avgDownloadsPerAsset":5987.0,"avgDownloadsPerMonth":59.1,"datasets":1,"historicalPerformance":83.7,"currentMomentum":63.6,"exposure":13.7,"marketScore":45.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"froth":{"popularity":59.2,"trend":63.6,"confidence":44.6,"downloads":5987.0,"downloadsPerMonth":59.1,"assets":1,"avgDownloadsPerAsset":5987.0,"avgDownloadsPerMonth":59.1,"datasets":1,"historicalPerformance":83.7,"currentMomentum":63.6,"exposure":13.7,"marketScore":45.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pouring":{"popularity":59.2,"trend":63.6,"confidence":44.6,"downloads":5987.0,"downloadsPerMonth":59.1,"assets":1,"avgDownloadsPerAsset":5987.0,"avgDownloadsPerMonth":59.1,"datasets":1,"historicalPerformance":83.7,"currentMomentum":63.6,"exposure":13.7,"marketScore":45.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"antique":{"popularity":60.9,"trend":61.4,"confidence":44.6,"downloads":7907.0,"downloadsPerMonth":51.3,"assets":1,"avgDownloadsPerAsset":7907.0,"avgDownloadsPerMonth":51.3,"datasets":1,"historicalPerformance":86.3,"currentMomentum":61.4,"exposure":13.7,"marketScore":45.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"book":{"popularity":60.9,"trend":61.4,"confidence":44.6,"downloads":7907.0,"downloadsPerMonth":51.3,"assets":1,"avgDownloadsPerAsset":7907.0,"avgDownloadsPerMonth":51.3,"datasets":1,"historicalPerformance":86.3,"currentMomentum":61.4,"exposure":13.7,"marketScore":45.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cupcakes":{"popularity":60.5,"trend":61.7,"confidence":44.6,"downloads":7413.0,"downloadsPerMonth":52.3,"assets":1,"avgDownloadsPerAsset":7413.0,"avgDownloadsPerMonth":52.3,"datasets":1,"historicalPerformance":85.7,"currentMomentum":61.7,"exposure":13.7,"marketScore":45.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"random":{"popularity":56.5,"trend":66.2,"confidence":44.6,"downloads":3888.0,"downloadsPerMonth":70.2,"assets":1,"avgDownloadsPerAsset":3888.0,"avgDownloadsPerMonth":70.2,"datasets":1,"historicalPerformance":79.5,"currentMomentum":66.2,"exposure":13.7,"marketScore":45.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"shop":{"popularity":59.6,"trend":62.6,"confidence":44.6,"downloads":6412.0,"downloadsPerMonth":55.3,"assets":1,"avgDownloadsPerAsset":6412.0,"avgDownloadsPerMonth":55.3,"datasets":1,"historicalPerformance":84.3,"currentMomentum":62.6,"exposure":13.7,"marketScore":45.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"popcorn":{"popularity":60.0,"trend":61.7,"confidence":44.6,"downloads":6855.0,"downloadsPerMonth":52.4,"assets":1,"avgDownloadsPerAsset":6855.0,"avgDownloadsPerMonth":52.4,"datasets":1,"historicalPerformance":85.0,"currentMomentum":61.7,"exposure":13.7,"marketScore":45.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"leisure":{"popularity":60.1,"trend":61.6,"confidence":44.6,"downloads":6934.0,"downloadsPerMonth":51.9,"assets":1,"avgDownloadsPerAsset":6934.0,"avgDownloadsPerMonth":51.9,"datasets":1,"historicalPerformance":85.1,"currentMomentum":61.6,"exposure":13.7,"marketScore":45.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cocina":{"popularity":60.5,"trend":61.0,"confidence":44.6,"downloads":7356.0,"downloadsPerMonth":49.8,"assets":1,"avgDownloadsPerAsset":7356.0,"avgDownloadsPerMonth":49.8,"datasets":1,"historicalPerformance":85.7,"currentMomentum":61.0,"exposure":13.7,"marketScore":45.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"coliflor":{"popularity":60.5,"trend":61.0,"confidence":44.6,"downloads":7356.0,"downloadsPerMonth":49.8,"assets":1,"avgDownloadsPerAsset":7356.0,"avgDownloadsPerMonth":49.8,"datasets":1,"historicalPerformance":85.7,"currentMomentum":61.0,"exposure":13.7,"marketScore":45.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"con":{"popularity":60.5,"trend":61.0,"confidence":44.6,"downloads":7356.0,"downloadsPerMonth":49.8,"assets":1,"avgDownloadsPerAsset":7356.0,"avgDownloadsPerMonth":49.8,"datasets":1,"historicalPerformance":85.7,"currentMomentum":61.0,"exposure":13.7,"marketScore":45.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sana":{"popularity":60.5,"trend":61.0,"confidence":44.6,"downloads":7356.0,"downloadsPerMonth":49.8,"assets":1,"avgDownloadsPerAsset":7356.0,"avgDownloadsPerMonth":49.8,"datasets":1,"historicalPerformance":85.7,"currentMomentum":61.0,"exposure":13.7,"marketScore":45.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"drinks":{"popularity":59.6,"trend":61.9,"confidence":44.6,"downloads":6446.0,"downloadsPerMonth":52.9,"assets":1,"avgDownloadsPerAsset":6446.0,"avgDownloadsPerMonth":52.9,"datasets":1,"historicalPerformance":84.4,"currentMomentum":61.9,"exposure":13.7,"marketScore":45.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tab":{"popularity":59.2,"trend":61.0,"confidence":44.6,"downloads":6041.0,"downloadsPerMonth":50.0,"assets":1,"avgDownloadsPerAsset":6041.0,"avgDownloadsPerMonth":50.0,"datasets":1,"historicalPerformance":83.8,"currentMomentum":61.0,"exposure":13.7,"marketScore":44.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"barbecue":{"popularity":58.9,"trend":56.8,"confidence":49.8,"downloads":7366.0,"downloadsPerMonth":75.9,"assets":2,"avgDownloadsPerAsset":3683.0,"avgDownloadsPerMonth":37.95,"datasets":1,"historicalPerformance":79.0,"currentMomentum":56.8,"exposure":21.6,"marketScore":44.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"multicolored":{"popularity":59.4,"trend":53.7,"confidence":53.6,"downloads":7928.0,"downloadsPerMonth":61.8,"assets":2,"avgDownloadsPerAsset":3964.0,"avgDownloadsPerMonth":30.9,"datasets":2,"historicalPerformance":79.7,"currentMomentum":53.7,"exposure":21.6,"marketScore":44.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fried":{"popularity":59.9,"trend":55.4,"confidence":49.8,"downloads":8540.0,"downloadsPerMonth":69.2,"assets":2,"avgDownloadsPerAsset":4270.0,"avgDownloadsPerMonth":34.6,"datasets":1,"historicalPerformance":80.4,"currentMomentum":55.4,"exposure":21.6,"marketScore":44.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"3000":{"popularity":59.2,"trend":60.3,"confidence":44.6,"downloads":6016.0,"downloadsPerMonth":47.8,"assets":1,"avgDownloadsPerAsset":6016.0,"avgDownloadsPerMonth":47.8,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.3,"exposure":13.7,"marketScore":44.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"casino":{"popularity":59.2,"trend":60.3,"confidence":44.6,"downloads":6016.0,"downloadsPerMonth":47.8,"assets":1,"avgDownloadsPerAsset":6016.0,"avgDownloadsPerMonth":47.8,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.3,"exposure":13.7,"marketScore":44.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"company":{"popularity":59.2,"trend":60.3,"confidence":44.6,"downloads":6016.0,"downloadsPerMonth":47.8,"assets":1,"avgDownloadsPerAsset":6016.0,"avgDownloadsPerMonth":47.8,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.3,"exposure":13.7,"marketScore":44.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fashion":{"popularity":59.2,"trend":60.3,"confidence":44.6,"downloads":6016.0,"downloadsPerMonth":47.8,"assets":1,"avgDownloadsPerAsset":6016.0,"avgDownloadsPerMonth":47.8,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.3,"exposure":13.7,"marketScore":44.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"renovation":{"popularity":59.2,"trend":60.3,"confidence":44.6,"downloads":6016.0,"downloadsPerMonth":47.8,"assets":1,"avgDownloadsPerAsset":6016.0,"avgDownloadsPerMonth":47.8,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.3,"exposure":13.7,"marketScore":44.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"seo":{"popularity":59.2,"trend":60.3,"confidence":44.6,"downloads":6016.0,"downloadsPerMonth":47.8,"assets":1,"avgDownloadsPerAsset":6016.0,"avgDownloadsPerMonth":47.8,"datasets":1,"historicalPerformance":83.7,"currentMomentum":60.3,"exposure":13.7,"marketScore":44.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bakery":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dessert":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"honey":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"life":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"still":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sweet":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"yummy":{"popularity":59.2,"trend":59.9,"confidence":44.6,"downloads":6057.0,"downloadsPerMonth":46.4,"assets":1,"avgDownloadsPerAsset":6057.0,"avgDownloadsPerMonth":46.4,"datasets":1,"historicalPerformance":83.8,"currentMomentum":59.9,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"day":{"popularity":59.5,"trend":59.5,"confidence":44.6,"downloads":6329.0,"downloadsPerMonth":45.1,"assets":1,"avgDownloadsPerAsset":6329.0,"avgDownloadsPerMonth":45.1,"datasets":1,"historicalPerformance":84.2,"currentMomentum":59.5,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sunny":{"popularity":59.5,"trend":59.5,"confidence":44.6,"downloads":6329.0,"downloadsPerMonth":45.1,"assets":1,"avgDownloadsPerAsset":6329.0,"avgDownloadsPerMonth":45.1,"datasets":1,"historicalPerformance":84.2,"currentMomentum":59.5,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wheat":{"popularity":59.5,"trend":59.5,"confidence":44.6,"downloads":6329.0,"downloadsPerMonth":45.1,"assets":1,"avgDownloadsPerAsset":6329.0,"avgDownloadsPerMonth":45.1,"datasets":1,"historicalPerformance":84.2,"currentMomentum":59.5,"exposure":13.7,"marketScore":44.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cream":{"popularity":59.3,"trend":54.9,"confidence":49.8,"downloads":7880.0,"downloadsPerMonth":66.8,"assets":2,"avgDownloadsPerAsset":3940.0,"avgDownloadsPerMonth":33.4,"datasets":1,"historicalPerformance":79.6,"currentMomentum":54.9,"exposure":21.6,"marketScore":44.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"beans":{"popularity":59.7,"trend":54.6,"confidence":49.8,"downloads":8351.0,"downloadsPerMonth":65.6,"assets":2,"avgDownloadsPerAsset":4175.5,"avgDownloadsPerMonth":32.8,"datasets":1,"historicalPerformance":80.2,"currentMomentum":54.6,"exposure":21.6,"marketScore":44.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tomatoes":{"popularity":59.4,"trend":58.5,"confidence":44.6,"downloads":6210.0,"downloadsPerMonth":42.3,"assets":1,"avgDownloadsPerAsset":6210.0,"avgDownloadsPerMonth":42.3,"datasets":1,"historicalPerformance":84.0,"currentMomentum":58.5,"exposure":13.7,"marketScore":43.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"juice":{"popularity":59.3,"trend":57.6,"confidence":44.6,"downloads":6092.0,"downloadsPerMonth":40.0,"assets":1,"avgDownloadsPerAsset":6092.0,"avgDownloadsPerMonth":40.0,"datasets":1,"historicalPerformance":83.8,"currentMomentum":57.6,"exposure":13.7,"marketScore":43.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dining":{"popularity":59.7,"trend":57.4,"confidence":44.6,"downloads":6487.0,"downloadsPerMonth":39.3,"assets":1,"avgDownloadsPerAsset":6487.0,"avgDownloadsPerMonth":39.3,"datasets":1,"historicalPerformance":84.4,"currentMomentum":57.4,"exposure":13.7,"marketScore":43.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"consisting":{"popularity":56.6,"trend":60.5,"confidence":44.6,"downloads":3957.0,"downloadsPerMonth":48.2,"assets":1,"avgDownloadsPerAsset":3957.0,"avgDownloadsPerMonth":48.2,"datasets":1,"historicalPerformance":79.7,"currentMomentum":60.5,"exposure":13.7,"marketScore":43.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"triangles":{"popularity":56.6,"trend":60.5,"confidence":44.6,"downloads":3957.0,"downloadsPerMonth":48.2,"assets":1,"avgDownloadsPerAsset":3957.0,"avgDownloadsPerMonth":48.2,"datasets":1,"historicalPerformance":79.7,"currentMomentum":60.5,"exposure":13.7,"marketScore":43.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"oranges":{"popularity":59.1,"trend":57.2,"confidence":44.6,"downloads":5918.0,"downloadsPerMonth":38.9,"assets":1,"avgDownloadsPerAsset":5918.0,"avgDownloadsPerMonth":38.9,"datasets":1,"historicalPerformance":83.6,"currentMomentum":57.2,"exposure":13.7,"marketScore":43.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"thanksgiving":{"popularity":59.1,"trend":57.2,"confidence":44.6,"downloads":5918.0,"downloadsPerMonth":38.9,"assets":1,"avgDownloadsPerAsset":5918.0,"avgDownloadsPerMonth":38.9,"datasets":1,"historicalPerformance":83.6,"currentMomentum":57.2,"exposure":13.7,"marketScore":43.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"turkey":{"popularity":59.1,"trend":57.2,"confidence":44.6,"downloads":5918.0,"downloadsPerMonth":38.9,"assets":1,"avgDownloadsPerAsset":5918.0,"avgDownloadsPerMonth":38.9,"datasets":1,"historicalPerformance":83.6,"currentMomentum":57.2,"exposure":13.7,"marketScore":43.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"macaroon":{"popularity":59.2,"trend":56.7,"confidence":44.6,"downloads":5992.0,"downloadsPerMonth":37.5,"assets":1,"avgDownloadsPerAsset":5992.0,"avgDownloadsPerMonth":37.5,"datasets":1,"historicalPerformance":83.7,"currentMomentum":56.7,"exposure":13.7,"marketScore":43.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"tasty":{"popularity":59.2,"trend":56.7,"confidence":44.6,"downloads":5992.0,"downloadsPerMonth":37.5,"assets":1,"avgDownloadsPerAsset":5992.0,"avgDownloadsPerMonth":37.5,"datasets":1,"historicalPerformance":83.7,"currentMomentum":56.7,"exposure":13.7,"marketScore":43.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"blaue":{"popularity":59.1,"trend":56.6,"confidence":44.6,"downloads":5952.0,"downloadsPerMonth":37.4,"assets":1,"avgDownloadsPerAsset":5952.0,"avgDownloadsPerMonth":37.4,"datasets":1,"historicalPerformance":83.6,"currentMomentum":56.6,"exposure":13.7,"marketScore":43.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fluessigkeit":{"popularity":59.1,"trend":56.6,"confidence":44.6,"downloads":5952.0,"downloadsPerMonth":37.4,"assets":1,"avgDownloadsPerAsset":5952.0,"avgDownloadsPerMonth":37.4,"datasets":1,"historicalPerformance":83.6,"currentMomentum":56.6,"exposure":13.7,"marketScore":43.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glas":{"popularity":59.1,"trend":56.6,"confidence":44.6,"downloads":5952.0,"downloadsPerMonth":37.4,"assets":1,"avgDownloadsPerAsset":5952.0,"avgDownloadsPerMonth":37.4,"datasets":1,"historicalPerformance":83.6,"currentMomentum":56.6,"exposure":13.7,"marketScore":43.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"baked":{"popularity":58.8,"trend":56.7,"confidence":44.6,"downloads":5652.0,"downloadsPerMonth":37.5,"assets":1,"avgDownloadsPerAsset":5652.0,"avgDownloadsPerMonth":37.5,"datasets":1,"historicalPerformance":83.1,"currentMomentum":56.7,"exposure":13.7,"marketScore":43.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dish":{"popularity":58.8,"trend":56.7,"confidence":44.6,"downloads":5652.0,"downloadsPerMonth":37.5,"assets":1,"avgDownloadsPerAsset":5652.0,"avgDownloadsPerMonth":37.5,"datasets":1,"historicalPerformance":83.1,"currentMomentum":56.7,"exposure":13.7,"marketScore":43.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"snowflake":{"popularity":53.9,"trend":61.5,"confidence":44.6,"downloads":2597.0,"downloadsPerMonth":51.6,"assets":1,"avgDownloadsPerAsset":2597.0,"avgDownloadsPerMonth":51.6,"datasets":1,"historicalPerformance":75.6,"currentMomentum":61.5,"exposure":13.7,"marketScore":42.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"field":{"popularity":58.1,"trend":49.6,"confidence":53.6,"downloads":6478.0,"downloadsPerMonth":46.7,"assets":2,"avgDownloadsPerAsset":3239.0,"avgDownloadsPerMonth":23.35,"datasets":2,"historicalPerformance":77.8,"currentMomentum":49.6,"exposure":21.6,"marketScore":42.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"botanical":{"popularity":52.7,"trend":61.3,"confidence":44.6,"downloads":2143.0,"downloadsPerMonth":51.0,"assets":1,"avgDownloadsPerAsset":2143.0,"avgDownloadsPerMonth":51.0,"datasets":1,"historicalPerformance":73.8,"currentMomentum":61.3,"exposure":13.7,"marketScore":42.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cocoa":{"popularity":53.7,"trend":59.8,"confidence":44.6,"downloads":2510.0,"downloadsPerMonth":46.2,"assets":1,"avgDownloadsPerAsset":2510.0,"avgDownloadsPerMonth":46.2,"datasets":1,"historicalPerformance":75.3,"currentMomentum":59.8,"exposure":13.7,"marketScore":42.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"drops":{"popularity":58.9,"trend":50.3,"confidence":44.6,"downloads":5740.0,"downloadsPerMonth":24.5,"assets":1,"avgDownloadsPerAsset":5740.0,"avgDownloadsPerMonth":24.5,"datasets":1,"historicalPerformance":83.3,"currentMomentum":50.3,"exposure":13.7,"marketScore":40.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chart":{"popularity":52.5,"trend":56.3,"confidence":44.6,"downloads":2062.0,"downloadsPerMonth":36.7,"assets":1,"avgDownloadsPerAsset":2062.0,"avgDownloadsPerMonth":36.7,"datasets":1,"historicalPerformance":73.4,"currentMomentum":56.3,"exposure":13.7,"marketScore":40.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"document":{"popularity":52.5,"trend":56.3,"confidence":44.6,"downloads":2062.0,"downloadsPerMonth":36.7,"assets":1,"avgDownloadsPerAsset":2062.0,"avgDownloadsPerMonth":36.7,"datasets":1,"historicalPerformance":73.4,"currentMomentum":56.3,"exposure":13.7,"marketScore":40.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"financial":{"popularity":52.5,"trend":56.3,"confidence":44.6,"downloads":2062.0,"downloadsPerMonth":36.7,"assets":1,"avgDownloadsPerAsset":2062.0,"avgDownloadsPerMonth":36.7,"datasets":1,"historicalPerformance":73.4,"currentMomentum":56.3,"exposure":13.7,"marketScore":40.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"report":{"popularity":52.5,"trend":56.3,"confidence":44.6,"downloads":2062.0,"downloadsPerMonth":36.7,"assets":1,"avgDownloadsPerAsset":2062.0,"avgDownloadsPerMonth":36.7,"datasets":1,"historicalPerformance":73.4,"currentMomentum":56.3,"exposure":13.7,"marketScore":40.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"research":{"popularity":52.5,"trend":56.3,"confidence":44.6,"downloads":2062.0,"downloadsPerMonth":36.7,"assets":1,"avgDownloadsPerAsset":2062.0,"avgDownloadsPerMonth":36.7,"datasets":1,"historicalPerformance":73.4,"currentMomentum":56.3,"exposure":13.7,"marketScore":40.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"statistic":{"popularity":52.5,"trend":56.3,"confidence":44.6,"downloads":2062.0,"downloadsPerMonth":36.7,"assets":1,"avgDownloadsPerAsset":2062.0,"avgDownloadsPerMonth":36.7,"datasets":1,"historicalPerformance":73.4,"currentMomentum":56.3,"exposure":13.7,"marketScore":40.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"palmeras":{"popularity":52.0,"trend":51.2,"confidence":44.6,"downloads":1914.0,"downloadsPerMonth":26.0,"assets":1,"avgDownloadsPerAsset":1914.0,"avgDownloadsPerMonth":26.0,"datasets":1,"historicalPerformance":72.7,"currentMomentum":51.2,"exposure":13.7,"marketScore":38.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"playa":{"popularity":52.0,"trend":51.2,"confidence":44.6,"downloads":1914.0,"downloadsPerMonth":26.0,"assets":1,"avgDownloadsPerAsset":1914.0,"avgDownloadsPerMonth":26.0,"datasets":1,"historicalPerformance":72.7,"currentMomentum":51.2,"exposure":13.7,"marketScore":38.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"una":{"popularity":52.0,"trend":51.2,"confidence":44.6,"downloads":1914.0,"downloadsPerMonth":26.0,"assets":1,"avgDownloadsPerAsset":1914.0,"avgDownloadsPerMonth":26.0,"datasets":1,"historicalPerformance":72.7,"currentMomentum":51.2,"exposure":13.7,"marketScore":38.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"verano":{"popularity":52.0,"trend":51.2,"confidence":44.6,"downloads":1914.0,"downloadsPerMonth":26.0,"assets":1,"avgDownloadsPerAsset":1914.0,"avgDownloadsPerMonth":26.0,"datasets":1,"historicalPerformance":72.7,"currentMomentum":51.2,"exposure":13.7,"marketScore":38.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"xico":{"popularity":52.0,"trend":51.2,"confidence":44.6,"downloads":1914.0,"downloadsPerMonth":26.0,"assets":1,"avgDownloadsPerAsset":1914.0,"avgDownloadsPerMonth":26.0,"datasets":1,"historicalPerformance":72.7,"currentMomentum":51.2,"exposure":13.7,"marketScore":38.4,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"plastic":{"popularity":51.5,"trend":50.9,"confidence":44.6,"downloads":1765.0,"downloadsPerMonth":25.5,"assets":1,"avgDownloadsPerAsset":1765.0,"avgDownloadsPerMonth":25.5,"datasets":1,"historicalPerformance":71.9,"currentMomentum":50.9,"exposure":13.7,"marketScore":38.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wrap":{"popularity":51.5,"trend":50.9,"confidence":44.6,"downloads":1765.0,"downloadsPerMonth":25.5,"assets":1,"avgDownloadsPerAsset":1765.0,"avgDownloadsPerMonth":25.5,"datasets":1,"historicalPerformance":71.9,"currentMomentum":50.9,"exposure":13.7,"marketScore":38.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"wrinkled":{"popularity":51.5,"trend":50.9,"confidence":44.6,"downloads":1765.0,"downloadsPerMonth":25.5,"assets":1,"avgDownloadsPerAsset":1765.0,"avgDownloadsPerMonth":25.5,"datasets":1,"historicalPerformance":71.9,"currentMomentum":50.9,"exposure":13.7,"marketScore":38.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"endless":{"popularity":49.4,"trend":39.4,"confidence":53.6,"downloads":1596.0,"downloadsPerMonth":23.4,"assets":2,"avgDownloadsPerAsset":798.0,"avgDownloadsPerMonth":11.7,"datasets":2,"historicalPerformance":64.3,"currentMomentum":39.4,"exposure":21.6,"marketScore":35.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"loop":{"popularity":49.4,"trend":39.4,"confidence":53.6,"downloads":1596.0,"downloadsPerMonth":23.4,"assets":2,"avgDownloadsPerAsset":798.0,"avgDownloadsPerMonth":11.7,"datasets":2,"historicalPerformance":64.3,"currentMomentum":39.4,"exposure":21.6,"marketScore":35.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"rising":{"popularity":49.4,"trend":39.4,"confidence":53.6,"downloads":1596.0,"downloadsPerMonth":23.4,"assets":2,"avgDownloadsPerAsset":798.0,"avgDownloadsPerMonth":11.7,"datasets":2,"historicalPerformance":64.3,"currentMomentum":39.4,"exposure":21.6,"marketScore":35.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"steam":{"popularity":49.4,"trend":39.4,"confidence":53.6,"downloads":1596.0,"downloadsPerMonth":23.4,"assets":2,"avgDownloadsPerAsset":798.0,"avgDownloadsPerMonth":11.7,"datasets":2,"historicalPerformance":64.3,"currentMomentum":39.4,"exposure":21.6,"marketScore":35.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"roasted":{"popularity":50.5,"trend":38.3,"confidence":44.6,"downloads":1502.0,"downloadsPerMonth":10.8,"assets":1,"avgDownloadsPerAsset":1502.0,"avgDownloadsPerMonth":10.8,"datasets":1,"historicalPerformance":70.4,"currentMomentum":38.3,"exposure":13.7,"marketScore":33.5,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"240":{"popularity":47.5,"trend":36.2,"confidence":53.6,"downloads":1192.0,"downloadsPerMonth":18.6,"assets":2,"avgDownloadsPerAsset":596.0,"avgDownloadsPerMonth":9.3,"datasets":2,"historicalPerformance":61.5,"currentMomentum":36.2,"exposure":21.6,"marketScore":33.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"estate":{"popularity":47.5,"trend":36.2,"confidence":53.6,"downloads":1192.0,"downloadsPerMonth":18.6,"assets":2,"avgDownloadsPerAsset":596.0,"avgDownloadsPerMonth":9.3,"datasets":2,"historicalPerformance":61.5,"currentMomentum":36.2,"exposure":21.6,"marketScore":33.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"etc":{"popularity":47.5,"trend":36.2,"confidence":53.6,"downloads":1192.0,"downloadsPerMonth":18.6,"assets":2,"avgDownloadsPerAsset":596.0,"avgDownloadsPerMonth":9.3,"datasets":2,"historicalPerformance":61.5,"currentMomentum":36.2,"exposure":21.6,"marketScore":33.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"recruitment":{"popularity":47.5,"trend":36.2,"confidence":53.6,"downloads":1192.0,"downloadsPerMonth":18.6,"assets":2,"avgDownloadsPerAsset":596.0,"avgDownloadsPerMonth":9.3,"datasets":2,"historicalPerformance":61.5,"currentMomentum":36.2,"exposure":21.6,"marketScore":33.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sachet":{"popularity":47.5,"trend":36.2,"confidence":53.6,"downloads":1192.0,"downloadsPerMonth":18.6,"assets":2,"avgDownloadsPerAsset":596.0,"avgDownloadsPerMonth":9.3,"datasets":2,"historicalPerformance":61.5,"currentMomentum":36.2,"exposure":21.6,"marketScore":33.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"foil":{"popularity":46.7,"trend":38.8,"confidence":44.6,"downloads":808.0,"downloadsPerMonth":11.2,"assets":1,"avgDownloadsPerAsset":808.0,"avgDownloadsPerMonth":11.2,"datasets":1,"historicalPerformance":64.4,"currentMomentum":38.8,"exposure":13.7,"marketScore":32.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"iridescent":{"popularity":46.7,"trend":38.8,"confidence":44.6,"downloads":808.0,"downloadsPerMonth":11.2,"assets":1,"avgDownloadsPerAsset":808.0,"avgDownloadsPerMonth":11.2,"datasets":1,"historicalPerformance":64.4,"currentMomentum":38.8,"exposure":13.7,"marketScore":32.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vaporwave":{"popularity":46.7,"trend":38.8,"confidence":44.6,"downloads":808.0,"downloadsPerMonth":11.2,"assets":1,"avgDownloadsPerAsset":808.0,"avgDownloadsPerMonth":11.2,"datasets":1,"historicalPerformance":64.4,"currentMomentum":38.8,"exposure":13.7,"marketScore":32.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"direction":{"popularity":46.2,"trend":31.5,"confidence":53.6,"downloads":961.0,"downloadsPerMonth":13.2,"assets":2,"avgDownloadsPerAsset":480.5,"avgDownloadsPerMonth":6.6,"datasets":2,"historicalPerformance":59.4,"currentMomentum":31.5,"exposure":21.6,"marketScore":31.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"drawing":{"popularity":46.2,"trend":31.5,"confidence":53.6,"downloads":961.0,"downloadsPerMonth":13.2,"assets":2,"avgDownloadsPerAsset":480.5,"avgDownloadsPerMonth":6.6,"datasets":2,"historicalPerformance":59.4,"currentMomentum":31.5,"exposure":21.6,"marketScore":31.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"exposure":{"popularity":46.2,"trend":31.5,"confidence":53.6,"downloads":961.0,"downloadsPerMonth":13.2,"assets":2,"avgDownloadsPerAsset":480.5,"avgDownloadsPerMonth":6.6,"datasets":2,"historicalPerformance":59.4,"currentMomentum":31.5,"exposure":21.6,"marketScore":31.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"photoshop":{"popularity":46.2,"trend":31.5,"confidence":53.6,"downloads":961.0,"downloadsPerMonth":13.2,"assets":2,"avgDownloadsPerAsset":480.5,"avgDownloadsPerMonth":6.6,"datasets":2,"historicalPerformance":59.4,"currentMomentum":31.5,"exposure":21.6,"marketScore":31.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"portrait":{"popularity":46.2,"trend":31.5,"confidence":53.6,"downloads":961.0,"downloadsPerMonth":13.2,"assets":2,"avgDownloadsPerAsset":480.5,"avgDownloadsPerMonth":6.6,"datasets":2,"historicalPerformance":59.4,"currentMomentum":31.5,"exposure":21.6,"marketScore":31.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"without":{"popularity":46.2,"trend":31.5,"confidence":53.6,"downloads":961.0,"downloadsPerMonth":13.2,"assets":2,"avgDownloadsPerAsset":480.5,"avgDownloadsPerMonth":6.6,"datasets":2,"historicalPerformance":59.4,"currentMomentum":31.5,"exposure":21.6,"marketScore":31.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"checker":{"popularity":40.3,"trend":38.2,"confidence":44.6,"downloads":293.0,"downloadsPerMonth":10.7,"assets":1,"avgDownloadsPerAsset":293.0,"avgDownloadsPerMonth":10.7,"datasets":1,"historicalPerformance":54.7,"currentMomentum":38.2,"exposure":13.7,"marketScore":29.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fabric":{"popularity":40.3,"trend":38.2,"confidence":44.6,"downloads":293.0,"downloadsPerMonth":10.7,"assets":1,"avgDownloadsPerAsset":293.0,"avgDownloadsPerMonth":10.7,"datasets":1,"historicalPerformance":54.7,"currentMomentum":38.2,"exposure":13.7,"marketScore":29.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chicken":{"popularity":43.5,"trend":33.4,"confidence":44.6,"downloads":490.0,"downloadsPerMonth":7.6,"assets":1,"avgDownloadsPerAsset":490.0,"avgDownloadsPerMonth":7.6,"datasets":1,"historicalPerformance":59.6,"currentMomentum":33.4,"exposure":13.7,"marketScore":29.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"linguine":{"popularity":43.5,"trend":33.4,"confidence":44.6,"downloads":490.0,"downloadsPerMonth":7.6,"assets":1,"avgDownloadsPerAsset":490.0,"avgDownloadsPerMonth":7.6,"datasets":1,"historicalPerformance":59.6,"currentMomentum":33.4,"exposure":13.7,"marketScore":29.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"liver":{"popularity":43.5,"trend":33.4,"confidence":44.6,"downloads":490.0,"downloadsPerMonth":7.6,"assets":1,"avgDownloadsPerAsset":490.0,"avgDownloadsPerMonth":7.6,"datasets":1,"historicalPerformance":59.6,"currentMomentum":33.4,"exposure":13.7,"marketScore":29.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cherry":{"popularity":42.8,"trend":32.3,"confidence":44.6,"downloads":438.0,"downloadsPerMonth":7.0,"assets":1,"avgDownloadsPerAsset":438.0,"avgDownloadsPerMonth":7.0,"datasets":1,"historicalPerformance":58.5,"currentMomentum":32.3,"exposure":13.7,"marketScore":28.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"crumble":{"popularity":42.8,"trend":32.3,"confidence":44.6,"downloads":438.0,"downloadsPerMonth":7.0,"assets":1,"avgDownloadsPerAsset":438.0,"avgDownloadsPerMonth":7.0,"datasets":1,"historicalPerformance":58.5,"currentMomentum":32.3,"exposure":13.7,"marketScore":28.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"skillet":{"popularity":42.8,"trend":32.3,"confidence":44.6,"downloads":438.0,"downloadsPerMonth":7.0,"assets":1,"avgDownloadsPerAsset":438.0,"avgDownloadsPerMonth":7.0,"datasets":1,"historicalPerformance":58.5,"currentMomentum":32.3,"exposure":13.7,"marketScore":28.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"catering":{"popularity":41.8,"trend":32.8,"confidence":44.6,"downloads":371.0,"downloadsPerMonth":7.3,"assets":1,"avgDownloadsPerAsset":371.0,"avgDownloadsPerMonth":7.3,"datasets":1,"historicalPerformance":56.9,"currentMomentum":32.8,"exposure":13.7,"marketScore":28.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"good":{"popularity":41.8,"trend":32.8,"confidence":44.6,"downloads":371.0,"downloadsPerMonth":7.3,"assets":1,"avgDownloadsPerAsset":371.0,"avgDownloadsPerMonth":7.3,"datasets":1,"historicalPerformance":56.9,"currentMomentum":32.8,"exposure":13.7,"marketScore":28.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"lots":{"popularity":41.8,"trend":32.8,"confidence":44.6,"downloads":371.0,"downloadsPerMonth":7.3,"assets":1,"avgDownloadsPerAsset":371.0,"avgDownloadsPerMonth":7.3,"datasets":1,"historicalPerformance":56.9,"currentMomentum":32.8,"exposure":13.7,"marketScore":28.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"american":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"beef":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"bone":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"fillet":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"herbs":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"large":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"piece":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"porterhouse":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"salt":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sliced":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"steak":{"popularity":42.7,"trend":31.3,"confidence":44.6,"downloads":430.0,"downloadsPerMonth":6.5,"assets":1,"avgDownloadsPerAsset":430.0,"avgDownloadsPerMonth":6.5,"datasets":1,"historicalPerformance":58.4,"currentMomentum":31.3,"exposure":13.7,"marketScore":28.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vegan":{"popularity":43.2,"trend":25.7,"confidence":49.8,"downloads":596.0,"downloadsPerMonth":8.5,"assets":2,"avgDownloadsPerAsset":298.0,"avgDownloadsPerMonth":4.25,"datasets":1,"historicalPerformance":54.8,"currentMomentum":25.7,"exposure":21.6,"marketScore":27.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"sandwiches":{"popularity":42.5,"trend":26.2,"confidence":49.8,"downloads":529.0,"downloadsPerMonth":8.8,"assets":2,"avgDownloadsPerAsset":264.5,"avgDownloadsPerMonth":4.4,"datasets":1,"historicalPerformance":53.7,"currentMomentum":26.2,"exposure":21.6,"marketScore":27.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cuisines":{"popularity":43.5,"trend":25.0,"confidence":44.6,"downloads":485.0,"downloadsPerMonth":4.0,"assets":1,"avgDownloadsPerAsset":485.0,"avgDownloadsPerMonth":4.0,"datasets":1,"historicalPerformance":59.5,"currentMomentum":25.0,"exposure":13.7,"marketScore":26.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"stage":{"popularity":39.2,"trend":23.3,"confidence":44.6,"downloads":245.0,"downloadsPerMonth":3.5,"assets":1,"avgDownloadsPerAsset":245.0,"avgDownloadsPerMonth":3.5,"datasets":1,"historicalPerformance":53.0,"currentMomentum":23.3,"exposure":13.7,"marketScore":23.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"goldfish":{"popularity":35.2,"trend":25.3,"confidence":44.6,"downloads":129.0,"downloadsPerMonth":4.1,"assets":1,"avgDownloadsPerAsset":129.0,"avgDownloadsPerMonth":4.1,"datasets":1,"historicalPerformance":46.8,"currentMomentum":25.3,"exposure":13.7,"marketScore":22.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"oranda":{"popularity":35.2,"trend":25.3,"confidence":44.6,"downloads":129.0,"downloadsPerMonth":4.1,"assets":1,"avgDownloadsPerAsset":129.0,"avgDownloadsPerMonth":4.1,"datasets":1,"historicalPerformance":46.8,"currentMomentum":25.3,"exposure":13.7,"marketScore":22.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"file":{"popularity":36.2,"trend":23.7,"confidence":44.6,"downloads":152.0,"downloadsPerMonth":3.6,"assets":1,"avgDownloadsPerAsset":152.0,"avgDownloadsPerMonth":3.6,"datasets":1,"historicalPerformance":48.4,"currentMomentum":23.7,"exposure":13.7,"marketScore":22.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flying":{"popularity":36.2,"trend":23.7,"confidence":44.6,"downloads":152.0,"downloadsPerMonth":3.6,"assets":1,"avgDownloadsPerAsset":152.0,"avgDownloadsPerMonth":3.6,"datasets":1,"historicalPerformance":48.4,"currentMomentum":23.7,"exposure":13.7,"marketScore":22.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"macaw":{"popularity":36.2,"trend":23.7,"confidence":44.6,"downloads":152.0,"downloadsPerMonth":3.6,"assets":1,"avgDownloadsPerAsset":152.0,"avgDownloadsPerMonth":3.6,"datasets":1,"historicalPerformance":48.4,"currentMomentum":23.7,"exposure":13.7,"marketScore":22.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"parrot":{"popularity":36.2,"trend":23.7,"confidence":44.6,"downloads":152.0,"downloadsPerMonth":3.6,"assets":1,"avgDownloadsPerAsset":152.0,"avgDownloadsPerMonth":3.6,"datasets":1,"historicalPerformance":48.4,"currentMomentum":23.7,"exposure":13.7,"marketScore":22.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"road":{"popularity":40.2,"trend":19.0,"confidence":44.6,"downloads":286.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":286.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":54.4,"currentMomentum":19.0,"exposure":13.7,"marketScore":22.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"storm":{"popularity":40.2,"trend":19.0,"confidence":44.6,"downloads":286.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":286.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":54.4,"currentMomentum":19.0,"exposure":13.7,"marketScore":22.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"adventure":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"backpacks":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"couple":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"family":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"hiking":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"trail":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"travel":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"travelers":{"popularity":37.2,"trend":19.0,"confidence":44.6,"downloads":177.0,"downloadsPerMonth":2.4,"assets":1,"avgDownloadsPerAsset":177.0,"avgDownloadsPerMonth":2.4,"datasets":1,"historicalPerformance":49.9,"currentMomentum":19.0,"exposure":13.7,"marketScore":21.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"recycle":{"popularity":38.9,"trend":15.4,"confidence":44.6,"downloads":232.0,"downloadsPerMonth":1.7,"assets":1,"avgDownloadsPerAsset":232.0,"avgDownloadsPerMonth":1.7,"datasets":1,"historicalPerformance":52.4,"currentMomentum":15.4,"exposure":13.7,"marketScore":21.0,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"pearl":{"popularity":36.6,"trend":17.1,"confidence":44.6,"downloads":162.0,"downloadsPerMonth":2.0,"assets":1,"avgDownloadsPerAsset":162.0,"avgDownloadsPerMonth":2.0,"datasets":1,"historicalPerformance":49.0,"currentMomentum":17.1,"exposure":13.7,"marketScore":20.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"jack":{"popularity":37.0,"trend":14.8,"confidence":44.6,"downloads":172.0,"downloadsPerMonth":1.6,"assets":1,"avgDownloadsPerAsset":172.0,"avgDownloadsPerMonth":1.6,"datasets":1,"historicalPerformance":49.6,"currentMomentum":14.8,"exposure":13.7,"marketScore":20.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"puppy":{"popularity":37.0,"trend":14.8,"confidence":44.6,"downloads":172.0,"downloadsPerMonth":1.6,"assets":1,"avgDownloadsPerAsset":172.0,"avgDownloadsPerMonth":1.6,"datasets":1,"historicalPerformance":49.6,"currentMomentum":14.8,"exposure":13.7,"marketScore":20.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"russel":{"popularity":37.0,"trend":14.8,"confidence":44.6,"downloads":172.0,"downloadsPerMonth":1.6,"assets":1,"avgDownloadsPerAsset":172.0,"avgDownloadsPerMonth":1.6,"datasets":1,"historicalPerformance":49.6,"currentMomentum":14.8,"exposure":13.7,"marketScore":20.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"birds":{"popularity":33.0,"trend":16.0,"confidence":53.6,"downloads":114.0,"downloadsPerMonth":3.6,"assets":2,"avgDownloadsPerAsset":57.0,"avgDownloadsPerMonth":1.8,"datasets":2,"historicalPerformance":39.1,"currentMomentum":16.0,"exposure":21.6,"marketScore":19.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"burning":{"popularity":33.0,"trend":16.0,"confidence":53.6,"downloads":114.0,"downloadsPerMonth":3.6,"assets":2,"avgDownloadsPerAsset":57.0,"avgDownloadsPerMonth":1.8,"datasets":2,"historicalPerformance":39.1,"currentMomentum":16.0,"exposure":21.6,"marketScore":19.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flaying":{"popularity":33.0,"trend":16.0,"confidence":53.6,"downloads":114.0,"downloadsPerMonth":3.6,"assets":2,"avgDownloadsPerAsset":57.0,"avgDownloadsPerMonth":1.8,"datasets":2,"historicalPerformance":39.1,"currentMomentum":16.0,"exposure":21.6,"marketScore":19.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"heaven":{"popularity":33.0,"trend":16.0,"confidence":53.6,"downloads":114.0,"downloadsPerMonth":3.6,"assets":2,"avgDownloadsPerAsset":57.0,"avgDownloadsPerMonth":1.8,"datasets":2,"historicalPerformance":39.1,"currentMomentum":16.0,"exposure":21.6,"marketScore":19.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"away":{"popularity":36.1,"trend":14.8,"confidence":44.6,"downloads":149.0,"downloadsPerMonth":1.6,"assets":1,"avgDownloadsPerAsset":149.0,"avgDownloadsPerMonth":1.6,"datasets":1,"historicalPerformance":48.2,"currentMomentum":14.8,"exposure":13.7,"marketScore":19.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"standing":{"popularity":36.1,"trend":14.8,"confidence":44.6,"downloads":149.0,"downloadsPerMonth":1.6,"assets":1,"avgDownloadsPerAsset":149.0,"avgDownloadsPerMonth":1.6,"datasets":1,"historicalPerformance":48.2,"currentMomentum":14.8,"exposure":13.7,"marketScore":19.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"avocado":{"popularity":36.5,"trend":14.2,"confidence":44.6,"downloads":158.0,"downloadsPerMonth":1.5,"assets":1,"avgDownloadsPerAsset":158.0,"avgDownloadsPerMonth":1.5,"datasets":1,"historicalPerformance":48.8,"currentMomentum":14.2,"exposure":13.7,"marketScore":19.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"brunch":{"popularity":36.5,"trend":14.2,"confidence":44.6,"downloads":158.0,"downloadsPerMonth":1.5,"assets":1,"avgDownloadsPerAsset":158.0,"avgDownloadsPerMonth":1.5,"datasets":1,"historicalPerformance":48.8,"currentMomentum":14.2,"exposure":13.7,"marketScore":19.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"soup":{"popularity":36.5,"trend":14.2,"confidence":44.6,"downloads":158.0,"downloadsPerMonth":1.5,"assets":1,"avgDownloadsPerAsset":158.0,"avgDownloadsPerMonth":1.5,"datasets":1,"historicalPerformance":48.8,"currentMomentum":14.2,"exposure":13.7,"marketScore":19.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"vegetarian":{"popularity":36.5,"trend":14.2,"confidence":44.6,"downloads":158.0,"downloadsPerMonth":1.5,"assets":1,"avgDownloadsPerAsset":158.0,"avgDownloadsPerMonth":1.5,"datasets":1,"historicalPerformance":48.8,"currentMomentum":14.2,"exposure":13.7,"marketScore":19.7,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"scoops":{"popularity":35.5,"trend":14.2,"confidence":44.6,"downloads":134.0,"downloadsPerMonth":1.5,"assets":1,"avgDownloadsPerAsset":134.0,"avgDownloadsPerMonth":1.5,"datasets":1,"historicalPerformance":47.2,"currentMomentum":14.2,"exposure":13.7,"marketScore":19.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"film":{"popularity":31.3,"trend":9.1,"confidence":44.6,"downloads":69.0,"downloadsPerMonth":0.8,"assets":1,"avgDownloadsPerAsset":69.0,"avgDownloadsPerMonth":0.8,"datasets":1,"historicalPerformance":40.9,"currentMomentum":9.1,"exposure":13.7,"marketScore":15.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"flare":{"popularity":31.3,"trend":9.1,"confidence":44.6,"downloads":69.0,"downloadsPerMonth":0.8,"assets":1,"avgDownloadsPerAsset":69.0,"avgDownloadsPerMonth":0.8,"datasets":1,"historicalPerformance":40.9,"currentMomentum":9.1,"exposure":13.7,"marketScore":15.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"palm":{"popularity":31.3,"trend":9.1,"confidence":44.6,"downloads":69.0,"downloadsPerMonth":0.8,"assets":1,"avgDownloadsPerAsset":69.0,"avgDownloadsPerMonth":0.8,"datasets":1,"historicalPerformance":40.9,"currentMomentum":9.1,"exposure":13.7,"marketScore":15.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"toned":{"popularity":31.3,"trend":9.1,"confidence":44.6,"downloads":69.0,"downloadsPerMonth":0.8,"assets":1,"avgDownloadsPerAsset":69.0,"avgDownloadsPerMonth":0.8,"datasets":1,"historicalPerformance":40.9,"currentMomentum":9.1,"exposure":13.7,"marketScore":15.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"trees":{"popularity":31.3,"trend":9.1,"confidence":44.6,"downloads":69.0,"downloadsPerMonth":0.8,"assets":1,"avgDownloadsPerAsset":69.0,"avgDownloadsPerMonth":0.8,"datasets":1,"historicalPerformance":40.9,"currentMomentum":9.1,"exposure":13.7,"marketScore":15.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"angle":{"popularity":28.4,"trend":7.3,"confidence":53.6,"downloads":54.0,"downloadsPerMonth":1.2,"assets":2,"avgDownloadsPerAsset":27.0,"avgDownloadsPerMonth":0.6,"datasets":2,"historicalPerformance":32.1,"currentMomentum":7.3,"exposure":21.6,"marketScore":14.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"picture":{"popularity":28.4,"trend":7.3,"confidence":53.6,"downloads":54.0,"downloadsPerMonth":1.2,"assets":2,"avgDownloadsPerAsset":27.0,"avgDownloadsPerMonth":0.6,"datasets":2,"historicalPerformance":32.1,"currentMomentum":7.3,"exposure":21.6,"marketScore":14.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"taking":{"popularity":28.4,"trend":7.3,"confidence":53.6,"downloads":54.0,"downloadsPerMonth":1.2,"assets":2,"avgDownloadsPerAsset":27.0,"avgDownloadsPerMonth":0.6,"datasets":2,"historicalPerformance":32.1,"currentMomentum":7.3,"exposure":21.6,"marketScore":14.9,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"interacting":{"popularity":25.4,"trend":8.2,"confidence":44.6,"downloads":26.0,"downloadsPerMonth":0.7,"assets":1,"avgDownloadsPerAsset":26.0,"avgDownloadsPerMonth":0.7,"datasets":1,"historicalPerformance":31.7,"currentMomentum":8.2,"exposure":13.7,"marketScore":13.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"motion":{"popularity":25.4,"trend":8.2,"confidence":44.6,"downloads":26.0,"downloadsPerMonth":0.7,"assets":1,"avgDownloadsPerAsset":26.0,"avgDownloadsPerMonth":0.7,"datasets":1,"historicalPerformance":31.7,"currentMomentum":8.2,"exposure":13.7,"marketScore":13.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glowing":{"popularity":25.8,"trend":5.2,"confidence":49.8,"downloads":35.0,"downloadsPerMonth":0.8,"assets":2,"avgDownloadsPerAsset":17.5,"avgDownloadsPerMonth":0.4,"datasets":1,"historicalPerformance":28.1,"currentMomentum":5.2,"exposure":21.6,"marketScore":12.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"title":{"popularity":21.8,"trend":0.3,"confidence":72.6,"downloads":17.0,"downloadsPerMonth":0.1,"assets":6,"avgDownloadsPerAsset":2.83,"avgDownloadsPerMonth":0.02,"datasets":3,"historicalPerformance":12.9,"currentMomentum":0.3,"exposure":38.3,"marketScore":10.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"glitch":{"popularity":18.8,"trend":0.8,"confidence":49.8,"downloads":10.0,"downloadsPerMonth":0.1,"assets":2,"avgDownloadsPerAsset":5.0,"avgDownloadsPerMonth":0.05,"datasets":1,"historicalPerformance":17.2,"currentMomentum":0.8,"exposure":21.6,"marketScore":8.3,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"floral":{"popularity":13.4,"trend":1.5,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.1,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.1,"datasets":1,"historicalPerformance":13.3,"currentMomentum":1.5,"exposure":13.7,"marketScore":6.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"naturalism":{"popularity":13.4,"trend":1.5,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.1,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.1,"datasets":1,"historicalPerformance":13.3,"currentMomentum":1.5,"exposure":13.7,"marketScore":6.1,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"crystal":{"popularity":13.4,"trend":0.0,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":13.3,"currentMomentum":0.0,"exposure":13.7,"marketScore":5.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"cyberpunk":{"popularity":13.4,"trend":0.0,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":13.3,"currentMomentum":0.0,"exposure":13.7,"marketScore":5.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"displace":{"popularity":13.4,"trend":0.0,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":13.3,"currentMomentum":0.0,"exposure":13.7,"marketScore":5.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"ingredient":{"popularity":13.4,"trend":0.0,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":13.3,"currentMomentum":0.0,"exposure":13.7,"marketScore":5.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"titles":{"popularity":13.4,"trend":0.0,"confidence":44.6,"downloads":3.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":3.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":13.3,"currentMomentum":0.0,"exposure":13.7,"marketScore":5.6,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"delights":{"popularity":11.9,"trend":0.0,"confidence":49.8,"downloads":2.0,"downloadsPerMonth":0.0,"assets":2,"avgDownloadsPerAsset":1.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":6.7,"currentMomentum":0.0,"exposure":21.6,"marketScore":5.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"dimensional":{"popularity":11.9,"trend":0.0,"confidence":49.8,"downloads":2.0,"downloadsPerMonth":0.0,"assets":2,"avgDownloadsPerAsset":1.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":6.7,"currentMomentum":0.0,"exposure":21.6,"marketScore":5.2,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"botanic":{"popularity":11.7,"trend":0.0,"confidence":44.6,"downloads":2.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":2.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":10.6,"currentMomentum":0.0,"exposure":13.7,"marketScore":4.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"transition":{"popularity":11.7,"trend":0.0,"confidence":44.6,"downloads":2.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":2.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":10.6,"currentMomentum":0.0,"exposure":13.7,"marketScore":4.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"chrome":{"popularity":9.1,"trend":0.0,"confidence":44.6,"downloads":1.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":1.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":6.7,"currentMomentum":0.0,"exposure":13.7,"marketScore":3.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"},"patterned":{"popularity":9.1,"trend":0.0,"confidence":44.6,"downloads":1.0,"downloadsPerMonth":0.0,"assets":1,"avgDownloadsPerAsset":1.0,"avgDownloadsPerMonth":0.0,"datasets":1,"historicalPerformance":6.7,"currentMomentum":0.0,"exposure":13.7,"marketScore":3.8,"source":"adobe-stock-public-400-tech-food-abstract-nature-dataset","platform":"Adobe Stock","dataQuality":"asset-level-performance-derived-not-keyword-sales"}}};
+
+function normalizeSignal(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(100, n));
 }
-
-function processKeywordsSemanticLegacy(
-  rawAiKeywords: string[],
-  targetCount: number,
-  visualFacts: any,
-  toolType?: ToolType,
-  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed',
-  title?: string,
-  description?: string
-): string[] {
-  /**
-   * Semantic keyword engine.
-   *
-   * There is deliberately no fixed 70/30 split, no fixed 8/9-stage quota,
-   * no forced "common words", and no synthetic padding such as "forest scene".
-   * The engine ranks only candidates that can be grounded in the asset analysis.
-   */
-  const clean = (v: any) => sanitizeForIndexing(String(v ?? ''));
-  const tokens = (v: string) => clean(v).split(/\s+/).filter(Boolean);
-  const facts = buildTieredVisualAnalysis(visualFacts);
-
-  const primary = facts.objects.filter(o => o.tier === 'primary').map(o => clean(o.name));
-  const secondary = facts.objects.filter(o => o.tier !== 'background').map(o => clean(o.name));
-  const background = facts.objects.filter(o => o.tier === 'background').map(o => clean(o.name));
-  const attributes = facts.attributes.map(clean).filter(Boolean);
-  const scenes = facts.scene.map(clean).filter(Boolean);
-  const concepts = facts.concepts.map(clean).filter(Boolean);
-  const actions = Array.isArray(visualFacts?.actions) ? visualFacts.actions.map(clean).filter(Boolean) : [];
-  const colors = Array.isArray(visualFacts?.colors) ? visualFacts.colors.map(clean).filter(Boolean) : [];
-
-  const titleText = clean(title || '');
-  const descriptionText = clean(description || '');
-  const visualCorpus = [...primary, ...secondary, ...background, ...attributes, ...scenes, ...concepts, ...actions, ...colors].join(' ');
-  const visualTokens = new Set(visualCorpus.split(/\s+/).filter(w => w.length > 2));
-
-  const trendTerms: Record<string, number> = {
-    // Current Adobe 2026 trend vocabulary, used only as a small boost when grounded.
-    'all the feels': 8, 'sensory': 7, 'tactile': 7, 'texture': 5,
-    'connectioneering': 6, 'connection': 5, 'surreal': 8, 'surrealism': 8,
-    'local flavor': 6, 'authentic': 5, 'nostalgia': 7, 'nostalgic': 7,
-    'glassmorphism': 9, 'minimalism': 7, 'minimalist': 7, 'halftone': 7,
-    'stippling': 6, 'grainy': 5, 'fantasy': 7, 'cinematic': 4,
-    'futuristic': 7, '3d': 6, 'artificial intelligence': 8, 'ai': 7
-  };
-
-  const commercialTerms = new Set([
-    'background','banner','wallpaper','advertising','marketing','campaign','design','template',
-    'technology','innovation','sustainability','travel','tourism','hospitality','education',
-    'healthcare','finance','business','environment','seasonal','christmas','holiday'
-  ]);
-
-  const stop = new Set(['a','an','the','and','or','of','in','on','at','to','for','with','by','from','as','is','are','this','that','image','picture','asset','stock']);
-
-  const normalizeCandidate = (raw: string): string => cleanKeywordOutput(raw);
-  const isAllowedMode = (kw: string) => {
-    const parts = kw.split(/\s+/).filter(Boolean);
-    if (!parts.length || parts.some(isKeywordConnector)) return false;
-    const count = parts.length;
-    if (keywordMode === 'single') return count === 1;
-    if (keywordMode === 'multi') return count >= 2 && count <= 4;
-    return count >= 1 && count <= 4;
-  };
-
-  // Token overlap is intentionally strict: a candidate must share vocabulary
-  // with visual facts/title/description OR be an exact AI-generated concept.
-  // A long word is NOT considered relevant merely because it has 4+ characters.
-  const phraseOverlap = (kw: string, source: string[]) => {
-    const kTokens = tokens(kw).filter(t => !stop.has(t));
-    if (!kTokens.length) return 0;
-    const joined = kTokens.join(' ');
-    let hits = 0;
-    for (const src of source) {
-      const srcTokens = new Set(tokens(src));
-      if (src === joined || src.includes(joined) || joined.includes(src)) hits += 2;
-      hits += kTokens.filter(t => srcTokens.has(t)).length;
-    }
-    return Math.min(8, hits);
-  };
-
-  const synonymGrounding = (kw: string) => {
-    const kTokens = tokens(kw);
-    let score = 0;
-    for (const token of kTokens) {
-      for (const src of [...primary, ...secondary, ...background]) {
-        if (getSynonymsFor(src).some(s => clean(s) === token)) score += 2;
-      }
-    }
-    return Math.min(6, score);
-  };
-
-  const candidates = new Map<string, { raw: string; source: 'ai' | 'visual' }>();
-  (rawAiKeywords || []).forEach(raw => {
-    const k = normalizeCandidate(raw);
-    if (k && !candidates.has(k)) candidates.set(k, { raw: k, source: 'ai' });
-  });
-
-  // Add only literal visual terms as fallback. No random padding and no invented modifiers.
-  [...primary, ...secondary, ...background, ...attributes, ...scenes, ...actions, ...concepts, ...colors].forEach(raw => {
-    const k = normalizeCandidate(raw);
-    if (k && !candidates.has(k)) candidates.set(k, { raw: k, source: 'visual' });
-    // Useful atomic terms from multi-word visual facts.
-    tokens(k).filter(t => t.length > 2 && !stop.has(t)).forEach(t => {
-      if (!candidates.has(t)) candidates.set(t, { raw: t, source: 'visual' });
-    });
-  });
-
-  const scored = [...candidates.values()].map((candidate, index) => {
-    const kw = candidate.raw;
-    if (!kw || kw.split(/\s+/).some(t => isKeywordConnector(t))) return { kw, score: -999, grounding: 0 };
-    const kTokens = tokens(kw).filter(t => !stop.has(t) && !isKeywordConnector(t));
-    const overlap = phraseOverlap(kw, [...primary, ...secondary, ...background, ...attributes, ...scenes, ...actions, ...concepts, titleText, descriptionText]);
-    const syn = synonymGrounding(kw);
-    const exactPrimary = primary.some(p => p === kw);
-    const subjectMatch = secondary.some(o => o === kw || o.includes(kw) || kw.includes(o));
-    const contextMatch = [...scenes, ...attributes, ...colors].some(a => a === kw || a.includes(kw) || kw.includes(a));
-    const conceptMatch = concepts.some(c => c === kw || c.includes(kw) || kw.includes(c));
-    const actionMatch = actions.some(a => a === kw || a.includes(kw) || kw.includes(a));
-
-    const grounding = Math.min(100, overlap * 10 + syn * 8 + (exactPrimary ? 25 : 0) + (subjectMatch ? 15 : 0) + (contextMatch ? 10 : 0) + (conceptMatch ? 12 : 0) + (actionMatch ? 10 : 0));
-    if (grounding < 18 && candidate.source === 'ai') return { kw, score: -999, grounding };
-    if (grounding < 12) return { kw, score: -999, grounding };
-
-    // Search intent: what a buyer would type to find this exact visual.
-    const searchIntent = Math.min(100,
-      (exactPrimary ? 35 : 0) +
-      (subjectMatch ? 20 : 0) +
-      (contextMatch ? 15 : 0) +
-      (conceptMatch ? 15 : 0) +
-      (actionMatch ? 10 : 0) +
-      (commercialTerms.has(kw) ? 5 : 0)
-    );
-
-    const specificity = Math.min(100, 35 + kTokens.length * 15 + (kw.length >= 8 ? 15 : 0));
-    const trendBoost = Object.entries(trendTerms).reduce((best, [term, weight]) => {
-      if (kw === term || kw.includes(term) || term.includes(kw)) return Math.max(best, weight);
-      return best;
-    }, 0) * (grounding >= 45 ? 1 : 0);
-
-    const naturalnessPenalty = kTokens.filter(t => stop.has(t)).length * 12;
-    const genericPenalty = /^(thing|stuff|scene|element|detail|asset|content|backgrounds?)$/.test(kw) ? 25 : 0;
-    const sourceBonus = candidate.source === 'ai' ? 4 : 0;
-    const priorityBonus = index < 10 ? 2 : 0;
-
-    const score = Math.round(
-      grounding * 0.42 +
-      searchIntent * 0.28 +
-      specificity * 0.14 +
-      trendBoost * 0.10 +
-      sourceBonus + priorityBonus - naturalnessPenalty - genericPenalty
-    );
-
-    return { kw, score, grounding };
-  }).filter(x => x.score > 0);
-
-  scored.sort((a, b) => b.score - a.score);
-
-  // Exact/semantic deduplication, but do not aggressively stem legitimate concepts.
-  const result: string[] = [];
-  const signatures = new Set<string>();
-  for (const item of scored) {
-    const kw = cleanKeywordOutput(item.kw);
-    if (!kw || !isAllowedMode(kw)) continue;
-    const signature = tokens(kw).filter(t => !stop.has(t)).sort().join(' ');
-    if (!signature || signatures.has(signature)) continue;
-    if (result.some(existing => existing === kw)) continue;
-    signatures.add(signature);
-    result.push(kw);
-    if (result.length >= targetCount) break;
+function normalizeKeywordMarketDataset(input: any): Record<string, KeywordMarketSignal> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const source = input.keywords && typeof input.keywords === 'object' ? input.keywords : input;
+  const output: Record<string, KeywordMarketSignal> = {};
+  for (const [rawKeyword, rawSignal] of Object.entries(source)) {
+    if (!rawKeyword || !rawSignal || typeof rawSignal !== 'object' || Array.isArray(rawSignal)) continue;
+    const keyword = sanitizeForIndexing(rawKeyword);
+    // Never allow connectors, prohibited/IP terms, or empty entries from a
+    // market corpus to become candidates. The corpus is a ranking signal, not
+    // a license to inject bad keywords into metadata.
+    if (!keyword || containsKeywordConnector(keyword) || isProhibitedKeyword(keyword)) continue;
+    output[keyword] = rawSignal as KeywordMarketSignal;
   }
-
-  return result.slice(0, targetCount);
-}
-
-
-/**
- * SEO SINGLE WORD ENGINE
- *
- * Output pattern is intentionally close to professional microstock keyword lists:
- * pendant, jewelry, faith, symbol, jewish, judaism, stone, limestone, religion...
- *
- * Principles:
- * - exactly one word per keyword
- * - no connectors / stop words / phrases
- * - no forced category quotas
- * - no 70/30 split
- * - no synthetic filler
- * - no artificial "keyword + concept" padding
- * - candidates must be grounded in visual facts, title/description, or a defensible synonym
- * - search intent is a ranking signal, not permission to invent unrelated terms
- * - trend is only a small boost when the trend is actually supported by the asset
- */
-function processSingleWordSeoKeywords(
-  rawAiKeywords: string[],
-  targetCount: number,
-  visualFacts: any,
-  title = '',
-  description = ''
-): string[] {
-  /**
-   * HUMAN MICROSTOCK KEYWORD ENGINE
-   *
-   * Goal: make the final list look curated by an experienced stock contributor,
-   * not generated by a rigid taxonomy. There are NO fixed category quotas,
-   * NO 70/30 split, NO filler, and NO keyword padding.
-   *
-   * Ranking philosophy:
-   * 1. What is actually visible / happening.
-   * 2. The most important searchable distinctions.
-   * 3. Useful physical details: material, texture, lighting, color, composition.
-   * 4. Context and meaning only when clearly supported.
-   * 5. Search intent and trend are tie-breakers/boosts, never invention engines.
-   */
-  const normalize = (v: any): string => sanitizeForIndexing(String(v ?? ''));
-  const stopWords = KEYWORD_CONNECTOR_WORDS;
-  const blocked = new Set([
-    'a','an','the','and','or','of','in','on','at','to','for','with','by','from','as',
-    'is','are','was','were','be','been','being','this','that','these','those',
-    'image','picture','asset','stock','photo','photograph','photography',
-    'vector','illustration','graphic','svg','video','footage','clip','content',
-    'thing','stuff','item','scene','view','visual','element'
-  ]);
-
-  const extractWords = (value: any): string[] => {
-    if (value == null) return [];
-    return normalize(value).split(/\s+/)
-      .map(w => w.trim())
-      .filter(w => w.length >= 2)
-      .filter(w => !stopWords.has(w))
-      .filter(w => !blocked.has(w))
-      .filter(w => !isProhibitedKeyword(w));
-  };
-
-  const collect = (arr: any): string[] => {
-    if (!Array.isArray(arr)) return [];
-    return arr.flatMap((item: any) => {
-      if (typeof item === 'string') return extractWords(item);
-      if (item && typeof item === 'object') return extractWords(item.name || item.value || item.label || '');
-      return [];
-    });
-  };
-
-  const collectWeighted = (arr: any): Array<{word: string; importance: number}> => {
-    if (!Array.isArray(arr)) return [];
-    return arr.flatMap((item: any) => {
-      if (typeof item === 'string') return extractWords(item).map(word => ({ word, importance: 55 }));
-      if (item && typeof item === 'object') {
-        const words = extractWords(item.name || item.value || item.label || '');
-        const importance = Math.max(0, Math.min(100, Number(item.importance ?? item.confidence ?? 55)));
-        return words.map(word => ({ word, importance }));
-      }
-      return [];
-    });
-  };
-
-  const primary = collectWeighted(visualFacts?.primary_subjects);
-  const secondary = collectWeighted(visualFacts?.secondary_subjects);
-  const background = collectWeighted(visualFacts?.background_elements);
-  const attributes = collect(visualFacts?.attributes || visualFacts?.visual_attributes);
-  const colors = collect(visualFacts?.colors);
-  const actions = collect(visualFacts?.actions);
-  const composition = collect(visualFacts?.composition);
-  const concepts = [
-    ...collect(visualFacts?.concepts),
-    ...collect(visualFacts?.commercial_concepts),
-    ...collect(visualFacts?.commercial_themes),
-  ];
-
-  const titleWords = extractWords(title);
-  const descriptionWords: string[] = [];
-
-  const primarySet = new Set(primary.map(x => x.word));
-  const secondarySet = new Set(secondary.map(x => x.word));
-  const backgroundSet = new Set(background.map(x => x.word));
-  const attributeSet = new Set(attributes);
-  const colorSet = new Set(colors);
-  const actionSet = new Set(actions);
-  const compositionSet = new Set(composition);
-  const conceptSet = new Set(concepts);
-  const titleSet = new Set(titleWords);
-  const descriptionSet = new Set<string>();
-
-  // Only synonyms derived from detected visual subjects are eligible.
-  const synonymSet = new Set<string>();
-  [...primary, ...secondary, ...background].forEach(({word}) => {
-    getSynonymsFor(word).forEach(syn => extractWords(syn).forEach(w => synonymSet.add(w)));
-  });
-
-  // Trend vocabulary is intentionally small and only provides a modest boost.
-  const trendWeights: Record<string, number> = {
-    immersive: 5, tactile: 5, sensory: 4, texture: 4, textured: 4,
-    surreal: 5, surrealism: 5, authentic: 4, nostalgia: 4, nostalgic: 4,
-    minimalism: 4, minimalist: 4, futuristic: 4, fantasy: 4, cinematic: 3,
-    sustainability: 4, wellness: 4, heritage: 4, craft: 4, editorial: 3,
-    organic: 3, automation: 4, technology: 3, digital: 3, innovation: 3
-  };
-
-  const commercialIntent = new Set([
-    'advertising','marketing','editorial','education','healthcare','medical','science',
-    'technology','business','finance','travel','tourism','hospitality','fashion',
-    'jewelry','accessory','food','beverage','architecture','lifestyle','wellness',
-    'environment','sustainability','religion','culture','heritage','background',
-    'texture','pattern','design','symbol','concept'
-  ]);
-
-  type Evidence = 'primary'|'secondary'|'background'|'attribute'|'color'|'action'|'composition'|'concept'|'title'|'description'|'synonym'|'ai';
-  type Candidate = { word: string; score: number; firstSeen: number; evidence: Set<Evidence> };
-  const candidates = new Map<string, Candidate>();
-  let firstSeen = 0;
-
-  const add = (raw: any, evidence: Evidence) => {
-    for (const wordRaw of extractWords(raw)) {
-      const word = wordRaw.toLowerCase();
-      if (!word || word.includes(' ')) continue;
-
-      const evidenceSet = candidates.get(word)?.evidence || new Set<Evidence>();
-      evidenceSet.add(evidence);
-
-      // AI suggestions are NOT trusted by themselves. They need corroboration
-      // from visual facts, title/description, or a defensible visual synonym.
-      const grounded = primarySet.has(word) || secondarySet.has(word) || backgroundSet.has(word) ||
-        attributeSet.has(word) || colorSet.has(word) || actionSet.has(word) ||
-        compositionSet.has(word) || conceptSet.has(word) || titleSet.has(word) ||
-        synonymSet.has(word) || titleSet.has(word);
-      if (evidence === 'ai' && !grounded) return;
-
-      let score = 0;
-      const importance = primary.find(x => x.word === word)?.importance ??
-        secondary.find(x => x.word === word)?.importance ??
-        background.find(x => x.word === word)?.importance ?? 55;
-
-      // Human-like hierarchy: salient visible subjects dominate, but details
-      // can outrank a weak generic subject when they are more distinctive.
-      if (primarySet.has(word)) score += 58 + importance * 0.30;
-      if (secondarySet.has(word)) score += 38 + importance * 0.22;
-      if (backgroundSet.has(word)) score += 18 + importance * 0.12;
-      if (attributeSet.has(word)) score += 34;
-      if (colorSet.has(word)) score += 22;
-      if (actionSet.has(word)) score += 36;
-      if (compositionSet.has(word)) score += 20;
-      if (conceptSet.has(word)) score += 28;
-      if (titleSet.has(word)) score += 22;
-      if (synonymSet.has(word)) score += 17;
-      if (evidence === 'ai') score += 3;
-
-      // Search intent: buyer usefulness, but only after visual grounding.
-      if (commercialIntent.has(word)) score += 7;
-      if (word.length >= 6 && word.length <= 14) score += 3;
-      if (/^(very|really|beautiful|stunning|amazing|nice|good|great)$/.test(word)) score -= 35;
-
-      // Trend can only boost an already-grounded candidate.
-      if (trendWeights[word] && grounded) score += trendWeights[word];
-
-      // Penalize vague words that do not help identify the asset.
-      if (/^(nature|object|thing|stuff|scene|background|content|design|visual)$/.test(word)) score -= 18;
-
-      const existing = candidates.get(word);
-      if (!existing || score > existing.score) {
-        candidates.set(word, { word, score, firstSeen: existing?.firstSeen ?? firstSeen++, evidence: evidenceSet });
-      }
-    }
-  };
-
-  // Evidence is added in natural visual order. The final sort uses score, not a quota.
-  primary.forEach(x => add(x.word, 'primary'));
-  secondary.forEach(x => add(x.word, 'secondary'));
-  background.forEach(x => add(x.word, 'background'));
-  attributes.forEach(x => add(x, 'attribute'));
-  colors.forEach(x => add(x, 'color'));
-  actions.forEach(x => add(x, 'action'));
-  composition.forEach(x => add(x, 'composition'));
-  concepts.forEach(x => add(x, 'concept'));
-  titleWords.forEach(x => add(x, 'title'));
-  synonymSet.forEach(x => add(x, 'synonym'));
-  (rawAiKeywords || []).forEach(x => add(x, 'ai'));
-
-  const ranked = [...candidates.values()].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.firstSeen - b.firstSeen;
-  });
-
-  const output: string[] = [];
-  const seen = new Set<string>();
-  const seenPluralRoots = new Set<string>();
-
-  for (const item of ranked) {
-    const word = item.word;
-    if (!word || seen.has(word)) continue;
-    if (stopWords.has(word) || blocked.has(word)) continue;
-    if (isProhibitedKeyword(word)) continue;
-
-    // Single mode is intentionally strict. Phrases are never split into junk;
-    // only actual single-word candidates survive.
-    if (keywordMode === 'single' && /\s/.test(word)) continue;
-
-    // Avoid wasting slots on obvious singular/plural duplicates, while preserving
-    // genuinely different words such as jewish / judaism or represent / representing.
-    const root = microstockKeywordRoot(word);
-    if (seenPluralRoots.has(root)) continue;
-
-    seen.add(word);
-    seenPluralRoots.add(root);
-    output.push(word);
-    if (output.length >= targetCount) break;
-  }
-
   return output;
 }
 
-function microstockKeywordRoot(word: string): string {
-  const w = String(word || '').toLowerCase().trim();
-  if (!w) return '';
-  // Conservative plural normalization. Do NOT collapse words such as
-  // jewish/judaism, business, glass, news, physics, christmas, etc.
-  if (w.length <= 4) return w;
-  if (w.endsWith('ies') && w.length > 5) return w.slice(0, -3) + 'y';
-  if (/(ches|shes|xes|zes)$/.test(w) && w.length > 5) return w.slice(0, -2);
-  if (w.endsWith('s') && !/(ss|us|is|ous|ics|mas|ws)$/.test(w) && w.length > 5) return w.slice(0, -1);
-  return w;
+/**
+ * Import contributor performance CSV into the market-intelligence layer.
+ * Supported columns are intentionally flexible so Adobe/Shutterstock exports
+ * can be normalized without tying the core ranking engine to one marketplace.
+ * Expected useful fields: keyword(s), downloads/sales/earnings, platform, date.
+ *
+ * IMPORTANT: this does not claim that a download was caused by one keyword.
+ * Performance is treated as an asset-level signal and distributed across the
+ * asset's keyword set with conservative attribution confidence.
+ */
+export type KeywordPerformanceObservation = {
+  assetId?: string;
+  platform?: string;
+  date?: string;
+  keywords: string[];
+  downloads?: number;
+  sales?: number;
+  earnings?: number;
+};
+
+export type KeywordPerformanceAggregate = KeywordMarketSignal & {
+  keyword: string;
+  observations: number;
+  assets: number;
+  downloads: number;
+  sales: number;
+  earnings: number;
+  confidence: number;
+};
+
+function parseDelimitedLine(line: string, delimiter = ','): string[] {
+  const out: string[] = [];
+  let current = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (quoted && line[i + 1] === '"') { current += '"'; i++; }
+      else quoted = !quoted;
+    } else if (ch === delimiter && !quoted) {
+      out.push(current.trim()); current = '';
+    } else current += ch;
+  }
+  out.push(current.trim());
+  return out;
 }
 
-function processKeywordsSemantic(
-  rawAiKeywords: string[],
-  targetCount: number,
-  visualFacts: any,
-  toolType?: ToolType,
-  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed',
-  title?: string,
-  description?: string
-): string[] {
-  if (keywordMode === 'single') {
-    return processSingleWordSeoKeywords(rawAiKeywords, targetCount, visualFacts, title, description);
+function parsePerformanceNumber(value: unknown): number {
+  if (value === undefined || value === null || value === '') return 0;
+  const cleaned = String(value).replace(/[^0-9.\-]/g, '');
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+function splitKeywordField(value: unknown): string[] {
+  return String(value || '')
+    .split(/[,;|]/g)
+    .map(x => sanitizeForIndexing(x).trim())
+    .filter(Boolean);
+}
+
+export function parseKeywordPerformanceCSV(csvText: string): KeywordPerformanceObservation[] {
+  const lines = String(csvText || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+  const delimiter = (lines[0].match(/;/g)?.length || 0) > (lines[0].match(/,/g)?.length || 0) ? ';' : ',';
+  const headers = parseDelimitedLine(lines[0], delimiter).map(h => sanitizeForIndexing(h).replace(/\s+/g, '_'));
+  const find = (...names: string[]) => names.map(n => sanitizeForIndexing(n).replace(/\s+/g, '_')).find(n => headers.includes(n));
+  const keywordCol = find('keywords', 'keyword', 'tags', 'tags_keywords', 'stock_keywords');
+  const assetCol = find('asset_id', 'asset', 'filename', 'file_name', 'content_id');
+  const platformCol = find('platform', 'marketplace', 'site');
+  const dateCol = find('date', 'download_date', 'month', 'period');
+  const downloadCol = find('downloads', 'download', 'dl', 'number_of_downloads');
+  const salesCol = find('sales', 'sale', 'orders', 'licenses');
+  const earningsCol = find('earnings', 'revenue', 'income', 'royalties');
+  if (!keywordCol && !assetCol) return [];
+
+  const idx = (name?: string) => name ? headers.indexOf(name) : -1;
+  const rows: KeywordPerformanceObservation[] = [];
+  for (const line of lines.slice(1)) {
+    const cells = parseDelimitedLine(line, delimiter);
+    const keywords = keywordCol ? splitKeywordField(cells[idx(keywordCol)]) : [];
+    if (!keywords.length) continue;
+    rows.push({
+      assetId: assetCol ? cells[idx(assetCol)] : undefined,
+      platform: platformCol ? cells[idx(platformCol)] : undefined,
+      date: dateCol ? cells[idx(dateCol)] : undefined,
+      keywords: Array.from(new Set(keywords)),
+      downloads: downloadCol ? parsePerformanceNumber(cells[idx(downloadCol)]) : 0,
+      sales: salesCol ? parsePerformanceNumber(cells[idx(salesCol)]) : 0,
+      earnings: earningsCol ? parsePerformanceNumber(cells[idx(earningsCol)]) : 0
+    });
   }
-  return processKeywordsSemanticLegacy(rawAiKeywords, targetCount, visualFacts, toolType, keywordMode, title, description);
+  return rows;
+}
+
+export function aggregateKeywordPerformance(
+  observations: KeywordPerformanceObservation[],
+  platform = 'multi-stock'
+): Record<string, KeywordPerformanceAggregate> {
+  const map = new Map<string, KeywordPerformanceAggregate>();
+  for (const obs of observations) {
+    const uniqueKeywords = Array.from(new Set(obs.keywords.map(k => sanitizeForIndexing(k)).filter(Boolean)));
+    if (!uniqueKeywords.length) continue;
+    // Conservative attribution: asset-level performance is divided among its keywords.
+    const attribution = 1 / uniqueKeywords.length;
+    for (const keyword of uniqueKeywords) {
+      const current = map.get(keyword) || {
+        keyword, observations: 0, assets: 0, downloads: 0, sales: 0, earnings: 0,
+        popularity: 0, conversion: 0, trend: 0, searchVolume: 0, confidence: 0,
+        platform, source: 'contributor-performance-csv'
+      };
+      current.observations += 1;
+      current.assets += obs.assetId ? 1 : 0;
+      current.downloads += (obs.downloads || 0) * attribution;
+      current.sales += (obs.sales || 0) * attribution;
+      current.earnings += (obs.earnings || 0) * attribution;
+      map.set(keyword, current);
+    }
+  }
+
+  const values = Array.from(map.values());
+  const maxDownloads = Math.max(1, ...values.map(x => x.downloads));
+  const maxSales = Math.max(1, ...values.map(x => x.sales));
+  const maxEarnings = Math.max(1, ...values.map(x => x.earnings));
+  for (const item of values) {
+    item.popularity = Math.round(100 * Math.log1p(item.downloads) / Math.log1p(maxDownloads));
+    item.sales = Math.round(100 * Math.log1p(item.sales) / Math.log1p(maxSales));
+    item.conversion = Math.round(100 * Math.log1p(item.earnings) / Math.log1p(maxEarnings));
+    item.confidence = Math.min(100, 35 + Math.log2(item.observations + 1) * 15);
+  }
+  return Object.fromEntries(values.map(x => [x.keyword, x]));
+}
+
+export type MetadataKeywordRecord = {
+  filename: string;
+  title?: string;
+  keywords: string[];
+  category?: string | number;
+};
+
+function normalizeAssetKey(value: unknown): string {
+  let s = String(value || '').trim().toLowerCase();
+  if (!s) return '';
+  s = s.replace(/^['\"]|['\"]$/g, '');
+  s = s.replace(/\s+\(\d+\)(?=\.[a-z0-9]+$)/i, '');
+  s = s.replace(/\.[a-z0-9]{1,8}$/i, '');
+  return s.replace(/[^a-z0-9]+/g, '');
+}
+
+function parseMetadataCSV(csvText: string): MetadataKeywordRecord[] {
+  const lines = String(csvText || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+  const delimiter = (lines[0].match(/;/g)?.length || 0) > (lines[0].match(/,/g)?.length || 0) ? ';' : ',';
+  const headers = parseDelimitedLine(lines[0], delimiter).map(h => sanitizeForIndexing(h).replace(/\s+/g, '_'));
+  const find = (...names: string[]) => names.map(n => sanitizeForIndexing(n).replace(/\s+/g, '_')).find(n => headers.includes(n));
+  const filenameCol = find('filename', 'file_name', 'asset', 'asset_id');
+  const titleCol = find('title', 'name');
+  const keywordsCol = find('keywords', 'keyword', 'tags');
+  const categoryCol = find('category', 'category_id');
+  if (!filenameCol || !keywordsCol) return [];
+  const idx = (name?: string) => name ? headers.indexOf(name) : -1;
+  return lines.slice(1).map(line => {
+    const cells = parseDelimitedLine(line, delimiter);
+    return {
+      filename: cells[idx(filenameCol)] || '',
+      title: titleCol ? cells[idx(titleCol)] || '' : '',
+      keywords: Array.from(new Set(splitKeywordField(cells[idx(keywordsCol)]))),
+      category: categoryCol ? cells[idx(categoryCol)] : undefined
+    };
+  }).filter(x => x.filename && x.keywords.length);
+}
+
+/** Adobe Stock contributor download exports may arrive without a header. */
+export function parseContributorDownloadCSV(csvText: string): KeywordPerformanceObservation[] {
+  const lines = String(csvText || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return [];
+  const delimiter = (lines[0].match(/;/g)?.length || 0) > (lines[0].match(/,/g)?.length || 0) ? ';' : ',';
+  const first = parseDelimitedLine(lines[0], delimiter);
+  const normalizedFirst = first.map(x => sanitizeForIndexing(x).replace(/\s+/g, '_'));
+  const looksLikeHeader = normalizedFirst.some(x => ['date','download_date','asset_id','asset','filename','file_name','earnings','revenue','downloads'].includes(x));
+  let start = 0;
+  let columns = { date: 0, asset: 1, title: 2, earnings: 4, filename: 6, platform: 5 };
+  if (looksLikeHeader) {
+    const headers = normalizedFirst;
+    const find = (...names: string[]) => names.map(n => sanitizeForIndexing(n).replace(/\s+/g, '_')).find(n => headers.includes(n));
+    const indexOf = (...names: string[]) => { const found = find(...names); return found ? headers.indexOf(found) : -1; };
+    columns = {
+      date: indexOf('date','download_date','period'), asset: indexOf('asset_id','asset','content_id'), title: indexOf('title','name'),
+      earnings: indexOf('earnings','revenue','royalties','income'), filename: indexOf('filename','file_name'), platform: indexOf('platform','media_type','marketplace')
+    };
+    start = 1;
+  }
+  const rows: KeywordPerformanceObservation[] = [];
+  for (const line of lines.slice(start)) {
+    const cells = parseDelimitedLine(line, delimiter);
+    const filename = columns.filename >= 0 ? cells[columns.filename] : '';
+    const assetId = columns.asset >= 0 ? cells[columns.asset] : '';
+    const title = columns.title >= 0 ? cells[columns.title] : '';
+    const earnings = columns.earnings >= 0 ? parsePerformanceNumber(cells[columns.earnings]) : 0;
+    if (!filename && !assetId && !title) continue;
+    const row: any = { assetId: assetId || filename || title, platform: columns.platform >= 0 ? cells[columns.platform] : 'Adobe Stock', date: columns.date >= 0 ? cells[columns.date] : undefined, keywords: [], downloads: 1, sales: 1, earnings };
+    row.__filename = filename;
+    row.__title = title;
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** Join metadata keywords with contributor asset-level performance. */
+export function mergePerformanceWithMetadataCSV(metadataCsv: string, performanceCsv: string, platform = 'Adobe Stock') {
+  const metadata = parseMetadataCSV(metadataCsv);
+  const performanceRows = parseContributorDownloadCSV(performanceCsv);
+  const byFilename = new Map<string, MetadataKeywordRecord>();
+  const byTitle = new Map<string, MetadataKeywordRecord>();
+  for (const item of metadata) {
+    const fk = normalizeAssetKey(item.filename); if (fk) byFilename.set(fk, item);
+    const tk = normalizeAssetKey(item.title); if (tk) byTitle.set(tk, item);
+  }
+  const matched: KeywordPerformanceObservation[] = [];
+  let unmatched = 0;
+  for (const row of performanceRows as any[]) {
+    const item = (normalizeAssetKey(row.__filename) && byFilename.get(normalizeAssetKey(row.__filename))) || byTitle.get(normalizeAssetKey(row.__title));
+    if (!item) { unmatched++; continue; }
+    matched.push({ assetId: row.assetId, platform: row.platform || platform, date: row.date, keywords: item.keywords, downloads: row.downloads || 1, sales: row.sales || 1, earnings: row.earnings || 0 });
+  }
+  const signals = aggregateKeywordPerformance(matched, platform);
+  keywordMarketSignals = { ...(keywordMarketSignals || {}), ...signals };
+  keywordMarketMeta = { version: '1.1', updatedAt: new Date().toISOString(), platform, source: 'metadata-plus-contributor-downloads-csv' };
+  return { metadataAssets: metadata.length, performanceRows: performanceRows.length, matchedRows: matched.length, unmatchedRows: unmatched, keywords: Object.keys(signals).length, signals };
+}
+
+export function exportKeywordIntelligenceJSON() {
+  return JSON.stringify({ version: keywordMarketMeta.version || '1.1', updatedAt: keywordMarketMeta.updatedAt || new Date().toISOString(), platform: keywordMarketMeta.platform || 'multi-stock', source: keywordMarketMeta.source || 'contributor-performance-csv', keywords: keywordMarketSignals || {} }, null, 2);
+}
+
+export function importKeywordPerformanceCSV(csvText: string, platform = 'multi-stock') {
+  const observations = parseKeywordPerformanceCSV(csvText);
+  const signals = aggregateKeywordPerformance(observations, platform);
+  keywordMarketSignals = { ...(keywordMarketSignals || {}), ...signals };
+  keywordMarketMeta = { version: '1.0', updatedAt: new Date().toISOString(), platform, source: 'contributor-performance-csv' };
+  return { observations: observations.length, keywords: Object.keys(signals).length, signals };
+}
+function loadKeywordMarketSignals(): Record<string, KeywordMarketSignal> {
+  if (keywordMarketSignals) return keywordMarketSignals;
+  keywordMarketSignals = {};
+  try {
+    let parsed: KeywordMarketDataset | null = null;
+    if (process.env.KEYWORD_MARKET_DATA_JSON) parsed = JSON.parse(process.env.KEYWORD_MARKET_DATA_JSON);
+    else if (process.env.KEYWORD_MARKET_DATA_PATH) {
+      const filePath = path.resolve(process.env.KEYWORD_MARKET_DATA_PATH);
+      if (fs.existsSync(filePath)) parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      parsed = BUILTIN_KEYWORD_MARKET_DATA;
+    }
+    if (parsed) {
+      keywordMarketMeta = { version: parsed.version, updatedAt: parsed.updatedAt, platform: parsed.platform, source: parsed.source };
+      keywordMarketSignals = normalizeKeywordMarketDataset(parsed);
+      console.log(`[Keyword Market Intelligence] Loaded ${Object.keys(keywordMarketSignals).length} signals`);
+    }
+  } catch (error: any) {
+    console.warn('[Keyword Market Intelligence] Invalid dataset:', error?.message || error);
+  }
+  return keywordMarketSignals;
+}
+function getKeywordMarketSignal(keyword: string): KeywordMarketSignal {
+  const data = loadKeywordMarketSignals();
+  const key = sanitizeForIndexing(keyword);
+  const direct = data[key];
+  if (direct) return { ...direct, platform: direct.platform || keywordMarketMeta.platform, source: direct.source || keywordMarketMeta.source, updatedAt: direct.updatedAt || keywordMarketMeta.updatedAt };
+  return data[key.replace(/[-_]+/g, ' ')] || {};
+}
+function hasUsableMarketSignal(signal: KeywordMarketSignal): boolean {
+  return [
+    signal.marketScore, signal.historicalPerformance, signal.currentMomentum,
+    signal.popularity, signal.trend, signal.downloads, signal.downloadsPerMonth
+  ].some(v => Number.isFinite(Number(v)));
+}
+
+
+/**
+ * Extract evidence terms from VISUAL_FACTS without turning the whole JSON into
+ * an uncontrolled bag of words. These terms are used only to discover extra
+ * market candidates; the final relevance scorer remains the gatekeeper.
+ */
+function getVisualEvidenceTerms(visualFacts: any): Set<string> {
+  const tiers = buildTieredVisualAnalysis(visualFacts || {});
+  const raw = [
+    ...tiers.objects.map((x: any) => x?.name),
+    ...tiers.attributes,
+    ...tiers.scene,
+    ...tiers.concepts
+  ].filter(Boolean).map((x: any) => sanitizeForIndexing(String(x)));
+
+  const terms = new Set<string>();
+  for (const value of raw) {
+    if (!value) continue;
+    for (const token of value.split(/\s+/)) {
+      if (token.length >= 3 && !KEYWORD_CONNECTOR_WORDS.has(token) && !isProhibitedKeyword(token)) {
+        terms.add(token);
+      }
+    }
+    // Preserve useful 2-3 word visual concepts as exact evidence.
+    if (value.split(/\s+/).length <= 3 && !containsKeywordConnector(value) && !isProhibitedKeyword(value)) {
+      terms.add(value);
+    }
+  }
+  return terms;
 }
 
 /**
- * AGKEYWORDS RULE: Split keywords into 70% SEO-friendly + 30% common words.
- * SEO-friendly = high search volume, buyer intent, commercial terms.
- * Common words = basic descriptors (colors, shapes, simple emotions, materials).
- * Called as a final post-processing step on the ranked keyword list.
+ * Build a dynamic market candidate pool from the loaded corpus.
+ * This is deliberately NOT "take the top popular keywords". A market keyword
+ * must have a bridge to the current VISUAL_FACTS, otherwise it is ignored.
  */
-function applyAgKeywordsSeoCommonSplit(keywords: string[], targetCount: number): string[] {
-  if (keywords.length < 5) return keywords;
+function discoverMarketCandidates(visualFacts: any, limit = 180): string[] {
+  const market = loadKeywordMarketSignals();
+  const evidence = getVisualEvidenceTerms(visualFacts);
+  if (!evidence.size) return [];
 
-  // ⚠️ WARNA TIDAK TERMASUK (dibuang dari keyword slot) — per PRD v2.0 8-dimensi
-  const COMMON_WORD_SET = new Set([
-    'big', 'small', 'large', 'tiny', 'huge', 'medium', 'little',
-    'round', 'square', 'flat', 'curved', 'straight', 'long', 'short',
-    'wide', 'narrow', 'thick', 'thin', 'tall', 'deep',
-    'old', 'new', 'young', 'modern', 'ancient', 'vintage', 'classic',
-    'bright', 'dark', 'light', 'dim', 'colorful', 'vibrant', 'pale',
-    'clean', 'dirty', 'clear', 'blurry', 'sharp', 'soft', 'hard',
-    'smooth', 'rough', 'shiny', 'dull', 'glossy', 'matte',
-    'high', 'low', 'top', 'bottom', 'left', 'right', 'front', 'back',
-    'side', 'center', 'middle', 'edge', 'corner',
-    'wood', 'metal', 'glass', 'plastic', 'stone', 'paper', 'cloth',
-    'fabric', 'leather', 'steel', 'concrete', 'brick', 'marble',
-    'man', 'woman', 'child', 'baby', 'girl', 'boy', 'person', 'people',
-    'human', 'male', 'female', 'adult', 'teenager', 'senior',
-    'smile', 'laugh', 'cry', 'happy', 'sad', 'angry', 'calm', 'excited',
-    'day', 'night', 'morning', 'evening', 'sun', 'moon', 'sky', 'cloud',
-    'rain', 'snow', 'wind', 'storm', 'fog', 'mist',
-    'tree', 'flower', 'grass', 'leaf', 'plant', 'water', 'fire', 'earth',
-    'food', 'drink', 'fruit', 'vegetable', 'meat', 'bread', 'rice',
-    'house', 'room', 'door', 'window', 'wall', 'floor', 'roof', 'table',
-    'chair', 'bed', 'desk', 'shelf', 'lamp', 'mirror',
-    'car', 'bus', 'train', 'plane', 'boat', 'bike', 'road', 'street',
-    'open', 'closed', 'empty', 'full', 'single', 'double', 'triple',
-    'horizontal', 'vertical', 'diagonal', 'angled', 'parallel',
-    'summer', 'winter', 'spring', 'autumn', 'fall', 'seasonal',
+  const scored = Object.entries(market).map(([keyword, signal]) => {
+    const words = keyword.split(/\s+/).filter(Boolean);
+    const directOverlap = words.filter(w => evidence.has(w)).length;
+    const phraseOverlap = evidence.has(keyword) ? 3 : 0;
+    const semanticBridge = words.some(w =>
+      ['christmas', 'holiday', 'festive', 'seasonal', 'background', 'texture', 'pattern', 'decoration', 'food', 'nature', 'technology', 'abstract', 'business', 'travel'].includes(w)
+    ) && [...evidence].some(e => keyword.includes(e) || e.includes(keyword)) ? 1 : 0;
+    const marketScore = calculateMarketOpportunity(signal);
+    const confidence = normalizeSignal(signal.confidence ?? 50);
+    const relevance = Math.min(100, directOverlap * 35 + phraseOverlap * 20 + semanticBridge * 10);
+    const score = relevance * 0.70 + marketScore * 0.20 + confidence * 0.10;
+    return { keyword, score, relevance };
+  })
+    .filter(x => x.relevance >= 35)
+    .sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, limit).map(x => x.keyword);
+}
+
+/**
+ * Public snapshot for the UI. It lets the app show exactly what intelligence
+ * is available instead of presenting derived market signals as real search
+ * volume or keyword-attributed sales.
+ */
+export function getKeywordIntelligenceSnapshot(limit = 100) {
+  const data = loadKeywordMarketSignals();
+  const entries = Object.entries(data)
+    .map(([keyword, signal]) => ({
+      keyword,
+      marketScore: calculateMarketOpportunity(signal),
+      downloads: Number(signal.downloads || 0),
+      downloadsPerMonth: Number(signal.downloadsPerMonth || 0),
+      assets: Number(signal.assets || 0),
+      confidence: Number(signal.confidence || 0),
+      trend: Number(signal.currentMomentum ?? signal.trend ?? 0),
+      dataQuality: signal.dataQuality || 'derived-asset-performance'
+    }))
+    .sort((a, b) => b.marketScore - a.marketScore);
+  return {
+    version: '5.1',
+    meta: keywordMarketMeta,
+    availableKeywords: entries.length,
+    derivedAssetPerformance: true,
+    keywordAttributedSalesAvailable: false,
+    searchVolumeAvailable: false,
+    keywords: entries.slice(0, Math.max(1, limit))
+  };
+}
+
+function calculateMarketOpportunity(signal: KeywordMarketSignal): number {
+  if (!hasUsableMarketSignal(signal)) return 0;
+
+  // V5: marketScore is a derived asset-performance signal, not keyword-attributed sales; it is a ranking signal only.
+  // It combines historical performance, current momentum and exposure while confidence
+  // reflects how many independent assets/datasets support the observation.
+  if (Number.isFinite(Number(signal.marketScore))) {
+    return Math.round(normalizeSignal(signal.marketScore));
+  }
+
+  if (Number.isFinite(Number(signal.historicalPerformance)) ||
+      Number.isFinite(Number(signal.currentMomentum))) {
+    const historical = normalizeSignal(signal.historicalPerformance);
+    const momentum = normalizeSignal(signal.currentMomentum);
+    const exposure = normalizeSignal(signal.exposure);
+    const confidence = Number.isFinite(Number(signal.confidence))
+      ? normalizeSignal(signal.confidence)
+      : 60;
+    const base = historical * 0.35 + momentum * 0.45 + exposure * 0.20;
+    return Math.round(base * (0.55 + confidence * 0.0045));
+  }
+
+  // Backward compatibility with older external market datasets.
+  if (Number.isFinite(Number(signal.popularity)) &&
+      (Number.isFinite(Number(signal.downloadsPerMonth)) || Number.isFinite(Number(signal.downloads)))) {
+    const popularity = normalizeSignal(signal.popularity);
+    const trend = normalizeSignal(signal.trend);
+    const volume = normalizeSignal(signal.searchVolume);
+    const confidence = Number.isFinite(Number(signal.confidence)) ? normalizeSignal(signal.confidence) : 100;
+    const base = popularity * 0.55 + trend * 0.30 + volume * 0.15;
+    return Math.round(base * (0.55 + confidence * 0.0045));
+  }
+
+  const popularity = normalizeSignal(signal.popularity);
+  const conversion = normalizeSignal(signal.conversion);
+  const trend = normalizeSignal(signal.trend);
+  const volume = normalizeSignal(signal.searchVolume);
+  const sales = normalizeSignal(signal.sales);
+  const competition = normalizeSignal(signal.competition);
+  const confidence = Number.isFinite(Number(signal.confidence)) ? normalizeSignal(signal.confidence) : 100;
+  const base = popularity * 0.30 + conversion * 0.30 + trend * 0.15 + volume * 0.10 + sales * 0.10 + (100 - competition) * 0.05;
+  return Math.round(base * (0.60 + confidence * 0.004));
+}
+
+
+// ============================================================================
+// V5.1 MARKET INTELLIGENCE: MASTER CANDIDATE POOL + SEMANTIC ROLE HIERARCHY + USER PERFORMANCE
+// ============================================================================
+// Market data is a discovery/ranking signal only. It supports semantic search ranking and never licenses nonsensical keywords.
+// The engine can combine built-in market corpus, imported contributor performance,
+// and AI-generated candidates into one dynamically ranked pool.
+
+function getMarketCandidatePool(limit = 150): string[] {
+  const data = loadKeywordMarketSignals();
+  return Object.entries(data)
+    .filter(([k, v]) => {
+      const term = sanitizeForIndexing(k);
+      if (!term || term.length < 2 || isProhibitedKeyword(term)) return false;
+      return hasUsableMarketSignal(v);
+    })
+    .sort((a, b) => calculateMarketOpportunity(b[1]) - calculateMarketOpportunity(a[1]))
+    .slice(0, Math.max(20, limit))
+    .map(([k]) => k);
+}
+
+function isKeywordVisuallySupported(keyword: string, visualFacts: any): boolean {
+  const k = sanitizeForIndexing(keyword);
+  if (!k || isProhibitedKeyword(k)) return false;
+  const groups = [
+    ...(visualFacts?.primary_subject || visualFacts?.primarySubject || []),
+    ...(visualFacts?.secondary_subject || visualFacts?.secondarySubject || []),
+    ...(visualFacts?.background || []),
+    ...(visualFacts?.attributes || []),
+    ...(visualFacts?.scene || []),
+    ...(visualFacts?.concepts || []),
+    ...(visualFacts?.style || []),
+    ...(visualFacts?.composition || []),
+    ...(visualFacts?.colors || []),
+    ...(visualFacts?.technical_attributes || visualFacts?.technicalAttributes || [])
+  ].map((x: any) => sanitizeForIndexing(String(x))).filter(Boolean);
+  if (!groups.length) return true;
+  const words = k.split(/\s+/).filter(Boolean);
+  const evidenceText = groups.join(' ');
+  const direct = words.some(w => w.length > 2 && evidenceText.includes(w));
+  const market = getKeywordMarketSignal(k);
+  const marketSupported = hasUsableMarketSignal(market) && Number(market.confidence || 0) >= 80;
+  // A market term may enter discovery when it has a meaningful semantic relationship to the current metadata context.
+  // Broad generic terms still need a visual anchor and are not allowed as filler.
+  return direct || (words.length > 1 && words.some(w => evidenceText.includes(w)));
+}
+
+function buildMasterKeywordCandidatePool(
+  aiCandidates: string[],
+  visualFacts: any,
+  targetCount: number
+): string[] {
+  // Keep expansion AI-driven. Market data must never inject or manufacture
+  // keywords into the final metadata. The Vision model remains the source of truth.
+  const normalized = aiCandidates
+    .map(k => sanitizeForIndexing(k))
+    .filter(Boolean)
+    .filter(k => !isProhibitedKeyword(k));
+
+  return semanticDeduplicate(normalized);
+}
+
+export function getKeywordIntelligenceStatus() {
+  const data = loadKeywordMarketSignals();
+  return {
+    version: keywordMarketMeta.version || BUILTIN_KEYWORD_MARKET_DATA.version || '5.0',
+    updatedAt: keywordMarketMeta.updatedAt || BUILTIN_KEYWORD_MARKET_DATA.updatedAt,
+    platform: keywordMarketMeta.platform || BUILTIN_KEYWORD_MARKET_DATA.platform,
+    source: keywordMarketMeta.source || BUILTIN_KEYWORD_MARKET_DATA.source,
+    keywordSignals: Object.keys(data).length,
+    hasImportedPerformance: Boolean(keywordMarketSignals && keywordMarketMeta.source && /contributor|metadata-plus/i.test(keywordMarketMeta.source)),
+    note: 'Market signals are asset-performance-derived unless an external provider supplies verified search/sales data.'
+  };
+}
+
+export function resetKeywordIntelligenceToBuiltin() {
+  keywordMarketSignals = null;
+  keywordMarketMeta = {};
+  loadKeywordMarketSignals();
+  return getKeywordIntelligenceStatus();
+}
+
+
+// ============================================================================
+// V5.1 SEMANTIC KEYWORD ROLE HIERARCHY
+// ============================================================================
+// Keyword order follows the information architecture of the asset, not fixed
+// slots. Main subject gets the strongest priority, followed by environment,
+// seasonal context, concept, style/visual attributes, commercial intent and
+// secondary attributes. A role is optional: it only exists when VISUAL_FACTS
+// provide evidence for it.
+
+type KeywordSemanticRole =
+  | 'main_subject'
+  | 'subject_variation'
+  | 'environment'
+  | 'action_state'
+  | 'secondary_subject'
+  | 'visual_style'
+  | 'composition'
+  | 'seasonal'
+  | 'concept'
+  | 'commercial_use'
+  | 'color'
+  | 'attribute'
+  | 'generic';
+
+interface KeywordRoleContext {
+  primary: string[];
+  secondary: string[];
+  environment: string[];
+  actions: string[];
+  style: string[];
+  composition: string[];
+  seasonal: string[];
+  concepts: string[];
+  commercial: string[];
+  colors: string[];
+  attributes: string[];
+}
+
+const SEMANTIC_ROLE_PRIORITY: Record<KeywordSemanticRole, number> = {
+  main_subject: 100,
+  subject_variation: 94,
+  environment: 86,
+  action_state: 82,
+  secondary_subject: 78,
+  visual_style: 72,
+  composition: 68,
+  seasonal: 64,
+  concept: 60,
+  commercial_use: 56,
+  color: 48,
+  attribute: 44,
+  generic: 20
+};
+
+const SEASONAL_TERMS = new Set([
+  'christmas','xmas','holiday','holidays','festive','seasonal','winter','summer',
+  'spring','autumn','fall','easter','halloween','valentines','valentine',
+  'thanksgiving','new year','newyear','ramadan','diwali','hanukkah','birthday'
+]);
+
+const COMMERCIAL_TERMS = new Set([
+  'background','banner','poster','template','advertising','advertisement',
+  'marketing','social media','copy space','web banner','cover','flyer',
+  'brochure','presentation','branding','mockup','card','invitation'
+]);
+
+function uniqueCleanStrings(values: any[]): string[] {
+  return Array.from(new Set((values || [])
+    .filter((x: any) => typeof x === 'string')
+    .map((x: string) => sanitizeForIndexing(x))
+    .filter(Boolean)));
+}
+
+function buildKeywordRoleContext(visualFacts: any): KeywordRoleContext {
+  const tiers = buildTieredVisualAnalysis(visualFacts || {});
+  const primary = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'primary').map(o => o.name));
+  const secondary = uniqueCleanStrings(tiers.objects.filter(o => o.tier === 'secondary').map(o => o.name));
+  const environment = uniqueCleanStrings([
+    ...tiers.scene,
+    ...tiers.objects.filter(o => o.tier === 'background').map(o => o.name),
+    ...(Array.isArray(visualFacts?.environment) ? visualFacts.environment : []),
+    ...(Array.isArray(visualFacts?.setting) ? visualFacts.setting : []),
+    ...(Array.isArray(visualFacts?.location) ? visualFacts.location : [])
   ]);
+  const actions = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.actions) ? visualFacts.actions : []),
+    ...(Array.isArray(visualFacts?.action) ? visualFacts.action : []),
+    ...(Array.isArray(visualFacts?.states) ? visualFacts.states : [])
+  ]);
+  const style = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.style) ? visualFacts.style : []),
+    ...(Array.isArray(visualFacts?.visual_style) ? visualFacts.visual_style : []),
+    ...(Array.isArray(visualFacts?.visualStyle) ? visualFacts.visualStyle : []),
+    ...(Array.isArray(visualFacts?.attributes) ? visualFacts.attributes : [])
+  ]);
+  const composition = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.composition) ? visualFacts.composition : []),
+    ...(Array.isArray(visualFacts?.layout) ? visualFacts.layout : []),
+    ...(Array.isArray(visualFacts?.camera_composition) ? visualFacts.camera_composition : [])
+  ]);
+  const seasonal = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.seasonal_context) ? visualFacts.seasonal_context : []),
+    ...(Array.isArray(visualFacts?.seasonal) ? visualFacts.seasonal : []),
+    ...(Array.isArray(visualFacts?.occasion) ? visualFacts.occasion : []),
+    ...(Array.isArray(visualFacts?.events) ? visualFacts.events : []),
+    ...(visualFacts?.season ? [visualFacts.season] : []),
+    ...(visualFacts?.holiday ? [visualFacts.holiday] : [])
+  ]).filter(v => [...SEASONAL_TERMS].some(t => v === t || v.includes(t)));
+  const concepts = uniqueCleanStrings([
+    ...tiers.concepts,
+    ...(Array.isArray(visualFacts?.concepts) ? visualFacts.concepts : []),
+    ...(Array.isArray(visualFacts?.themes) ? visualFacts.themes : []),
+    ...(Array.isArray(visualFacts?.commercial_concepts) ? visualFacts.commercial_concepts : [])
+  ]);
+  const commercial = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.commercial_use) ? visualFacts.commercial_use : []),
+    ...(Array.isArray(visualFacts?.use_cases) ? visualFacts.use_cases : []),
+    ...(Array.isArray(visualFacts?.applications) ? visualFacts.applications : [])
+  ]).filter(v => [...COMMERCIAL_TERMS].some(t => v === t || v.includes(t)));
+  const colors = uniqueCleanStrings([
+    ...(Array.isArray(visualFacts?.colors) ? visualFacts.colors : []),
+    ...(Array.isArray(visualFacts?.color) ? visualFacts.color : [])
+  ]).filter(v => v.split(/\s+/).some(w => COLOR_KEYWORDS.has(w)));
+  const attributes = uniqueCleanStrings([
+    ...tiers.attributes,
+    ...(Array.isArray(visualFacts?.technical_attributes) ? visualFacts.technical_attributes : []),
+    ...(Array.isArray(visualFacts?.technicalAttributes) ? visualFacts.technicalAttributes : [])
+  ]);
+  return { primary, secondary, environment, actions, style, composition, seasonal, concepts, commercial, colors, attributes };
+}
 
-  const seoKeywords: string[] = [];
-  const commonKeywords: string[] = [];
+function keywordMatchesEvidence(keyword: string, evidence: string[]): boolean {
+  const k = sanitizeForIndexing(keyword);
+  if (!k || !evidence.length) return false;
+  return evidence.some(e => e === k || e.includes(k) || k.includes(e) ||
+    k.split(/\s+/).some(w => w.length > 2 && e.split(/\s+/).includes(w)));
+}
 
-  for (const kw of keywords) {
-    const w = kw.toLowerCase().trim();
-    if (COMMON_WORD_SET.has(w) || (w.length <= 3 && !/^[A-Z]/.test(kw))) {
-      commonKeywords.push(kw);
-    } else {
-      seoKeywords.push(kw);
+function classifyKeywordSemanticRole(keyword: string, ctx: KeywordRoleContext): KeywordSemanticRole {
+  const k = sanitizeForIndexing(keyword);
+  if (!k) return 'generic';
+  const words = k.split(/\s+/);
+  const isColor = words.some(w => COLOR_KEYWORDS.has(w));
+  if (isColor && keywordMatchesEvidence(k, ctx.colors)) return 'color';
+  if (keywordMatchesEvidence(k, ctx.primary)) {
+    const exactPrimary = ctx.primary.some(x => x === k);
+    return exactPrimary ? 'main_subject' : 'subject_variation';
+  }
+  if (keywordMatchesEvidence(k, ctx.environment)) return 'environment';
+  if (keywordMatchesEvidence(k, ctx.actions)) return 'action_state';
+  if (keywordMatchesEvidence(k, ctx.secondary)) return 'secondary_subject';
+  if (keywordMatchesEvidence(k, ctx.style)) return 'visual_style';
+  if (keywordMatchesEvidence(k, ctx.composition)) return 'composition';
+  if (keywordMatchesEvidence(k, ctx.seasonal)) return 'seasonal';
+  if (keywordMatchesEvidence(k, ctx.concepts)) return 'concept';
+  if (keywordMatchesEvidence(k, ctx.commercial)) return 'commercial_use';
+  if (keywordMatchesEvidence(k, ctx.attributes)) return 'attribute';
+  return 'generic';
+}
+
+/** Generate only evidence-backed phrase combinations; there are no role quotas. */
+function buildStructuredKeywordCandidates(ctx: KeywordRoleContext): string[] {
+  const out: string[] = [];
+  const push = (v: string) => {
+    const k = sanitizeForIndexing(v);
+    if (!k || isProhibitedKeyword(k) || containsKeywordConnector(k)) return;
+    out.push(k);
+  };
+  for (const subject of ctx.primary.slice(0, 4)) {
+    push(subject);
+    for (const style of ctx.style.slice(0, 4)) push(`${style} ${subject}`);
+    for (const season of ctx.seasonal.slice(0, 3)) push(`${season} ${subject}`);
+    for (const env of ctx.environment.slice(0, 3)) push(`${subject} ${env}`);
+    for (const concept of ctx.concepts.slice(0, 3)) push(`${concept} ${subject}`);
+  }
+  for (const secondary of ctx.secondary.slice(0, 4)) push(secondary);
+  for (const env of ctx.environment.slice(0, 5)) push(env);
+  for (const season of ctx.seasonal.slice(0, 5)) push(season);
+  for (const concept of ctx.concepts.slice(0, 6)) push(concept);
+  for (const style of ctx.style.slice(0, 6)) push(style);
+  return Array.from(new Set(out));
+}
+
+const BASIC_ENGLISH_FILLER_KEYWORDS = new Set([
+  'subject', 'focus', 'sharp', 'blurry', 'detail', 'quality', 'image', 'photo',
+  'picture', 'design', 'nice', 'beautiful', 'amazing', 'stunning', 'gorgeous',
+  'pretty', 'awesome', 'perfect', 'wonderful', 'incredible', 'masterpiece', 'best',
+  'top', 'high quality', 'superb', 'fantastic', 'lovely', 'professional',
+  'visual', 'element', 'object', 'thing', 'composition', 'color', 'colour',
+  'lifestyle', 'adult', 'formal', 'up', 'down', 'out', 'off', 'back',
+  'red', 'blue', 'green', 'yellow', 'white', 'black', 'orange', 'purple', 'pink', 'brown', 'gray', 'grey', 'colorful'
+]);
+
+function isWeakGenericKeyword(keyword: string): boolean {
+  const k = String(keyword || '').toLowerCase().trim();
+  return BASIC_ENGLISH_FILLER_KEYWORDS.has(k);
+}
+
+function scoreKeywordForRanking(
+  keyword: string,
+  ctx: KeywordRoleContext,
+  originalIndex: number,
+  titleTerms: Set<string>
+): number {
+  const normalized = sanitizeForIndexing(keyword);
+  const role = classifyKeywordSemanticRole(normalized, ctx);
+
+  const rolePriority: Record<KeywordSemanticRole, number> = {
+    main_subject: 1000,
+    subject_variation: 900,
+    action_state: 800,
+    environment: 700,
+    secondary_subject: 650,
+    concept: 580,
+    seasonal: 520,
+    visual_style: 450,
+    attribute: 400,
+    composition: 330,
+    commercial_use: 220,
+    color: 180,
+    generic: 0
+  };
+
+  let score = rolePriority[role];
+
+  const evidenceGroups: Array<{ values: string[]; weight: number }> = [
+    { values: ctx.primary, weight: 140 },
+    { values: ctx.actions, weight: 110 },
+    { values: ctx.environment, weight: 95 },
+    { values: ctx.secondary, weight: 80 },
+    { values: ctx.concepts, weight: 68 },
+    { values: ctx.seasonal, weight: 58 },
+    { values: ctx.style, weight: 48 },
+    { values: ctx.attributes, weight: 40 },
+    { values: ctx.composition, weight: 30 },
+    { values: ctx.colors, weight: 18 },
+    { values: ctx.commercial, weight: 12 }
+  ];
+
+  for (const group of evidenceGroups) {
+    if (group.values.some(value => value === normalized)) {
+      score += group.weight;
+      break;
+    }
+    if (group.values.some(value => keywordMatchesEvidence(normalized, [value]))) {
+      score += Math.round(group.weight * 0.45);
+      break;
     }
   }
 
-  // Target: 70% SEO + 30% common, capped at targetCount
-  const targetCommonCount = Math.round(targetCount * 0.30);
+  const canonical = adobeKeywordCanonical(normalized);
+  const titleMatch = [...titleTerms].some(term =>
+    canonical === term || canonical.includes(term) || term.includes(canonical)
+  );
+  if (titleMatch) score += 160;
 
-  // Trim excess common words if we have too many
-  const finalCommon = commonKeywords.slice(0, targetCommonCount);
-  // Move excess common words to SEO side
-  const promoted = commonKeywords.slice(targetCommonCount);
-  const finalSeo = [...seoKeywords, ...promoted];
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount === 1) score += 8;
+  else if (wordCount === 2) score += 16;
+  else if (wordCount === 3) score += 7;
+  else score -= 50;
 
-  // If we don't have enough common words, take shorter words from SEO
-  let result: string[];
-  if (finalCommon.length < targetCommonCount) {
-    const deficit = targetCommonCount - finalCommon.length;
-    // Take the shortest SEO keywords as common
-    const sortedSeo = [...finalSeo].sort((a, b) => a.length - b.length);
-    const promotedToCommon = sortedSeo.slice(0, deficit);
-    const remainingSeo = finalSeo.filter(k => !promotedToCommon.includes(k));
-    result = [...remainingSeo, ...finalCommon, ...promotedToCommon];
-  } else {
-    result = [...finalSeo, ...finalCommon];
-  }
+  if (containsKeywordConnector(normalized)) score -= 40;
+  if (role === 'generic') score -= 120;
+  if (role === 'color') score -= 18;
+  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 60;
 
-  return result.slice(0, targetCount);
+  return score * 1000 - originalIndex;
 }
 
-function enforceStrictKeywordMode(
+
+
+
+export interface KeywordScoreBreakdown {
+  keyword: string;
+  score: number;
+  normalizedScore: number;
+  rank: number;
+  role: KeywordSemanticRole;
+  evidence: string;
+  titleRelevant: boolean;
+  buyerSearchability: number;
+  topTenPriority: "critical" | "high" | "supporting";
+}
+
+export function scoreMetadataGenKeywords(
   keywords: string[],
-  keywordMode: 'mixed' | 'single' | 'multi' | undefined,
-  targetCount: number,
+  visualFacts: any
+): KeywordScoreBreakdown[] {
+  const ctx = buildKeywordRoleContext(visualFacts || {});
+  const title = visualFacts?.title || visualFacts?.metadata_title || "";
+  const titleTerms = titleKeywordTerms(title);
+
+  return (Array.isArray(keywords) ? keywords : [])
+    .map((keyword, index) => {
+      const normalized = sanitizeForIndexing(keyword);
+      const role = classifyKeywordSemanticRole(normalized, ctx);
+      const score = scoreKeywordForRanking(keyword, ctx, index, titleTerms);
+      const titleRelevant = [...titleTerms].some(term => {
+        const canonical = adobeKeywordCanonical(normalized);
+        return canonical === term || canonical.includes(term) || term.includes(canonical);
+      });
+      const buyerSearchability = buyerSearchabilityScore(
+        keyword,
+        role,
+        visualFacts
+      );
+
+      let evidence = "Role-based relevance";
+      const groups: Array<[string, string[]]> = [
+        ["main subject", ctx.primary],
+        ["action/state", ctx.actions],
+        ["environment", ctx.environment],
+        ["secondary subject", ctx.secondary],
+        ["concept", ctx.concepts],
+        ["seasonal", ctx.seasonal],
+        ["visual style", ctx.style],
+        ["attribute", ctx.attributes],
+        ["composition", ctx.composition],
+        ["color", ctx.colors],
+        ["commercial use", ctx.commercial]
+      ];
+      for (const [label, values] of groups) {
+        if (values.some(value => keywordMatchesEvidence(normalized, [value]))) {
+          evidence = `Supported by ${label} evidence`;
+          break;
+        }
+      }
+
+      return {
+        keyword,
+        score,
+        normalizedScore: Math.max(0, Math.min(100, Math.round(score / 14))),
+        rank: 0,
+        role,
+        evidence,
+        titleRelevant,
+        buyerSearchability,
+        topTenPriority: "supporting" as const
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      topTenPriority:
+        index === 0
+          ? "critical"
+          : index < 10
+            ? "high"
+            : "supporting"
+    }));
+}
+
+export interface MetadataTitleSearchability {
+  score: number;
+  status: "PASS" | "REVIEW" | "FAIL";
+  wordCount: number;
+  concreteTermCount: number;
+  buyerIntentTerms: string[];
+  warnings: string[];
+}
+
+export function validateMetadataTitleSearchability(
+  title: string,
+  keywords: string[],
+  visualFacts: any = {}
+): MetadataTitleSearchability {
+  const normalized = normalizeAdobeKeyword(title);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const keywordSet = new Set(
+    (Array.isArray(keywords) ? keywords : []).map(keyword => adobeKeywordCanonical(keyword))
+  );
+  const titleTerms = [...titleKeywordTerms(title)];
+
+  const concreteTermCount = titleTerms.filter(term => {
+    const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+    return factsText.includes(term);
+  }).length;
+
+  const buyerIntentTerms = titleTerms.filter(term =>
+    keywordSet.has(term) ||
+    [...keywordSet].some(keyword => keyword.includes(term) || term.includes(keyword))
+  );
+
+  const warnings: string[] = [];
+  if (words.length < 3) warnings.push("Title is too vague for buyer search.");
+  if (words.length > 18) warnings.push("Title is too long and may read like keyword stuffing.");
+  if (concreteTermCount < Math.min(2, titleTerms.length)) {
+    warnings.push("Title lacks enough concrete visual terms supported by the asset.");
+  }
+  if (buyerIntentTerms.length < Math.min(2, titleTerms.length)) {
+    warnings.push("Title has weak overlap with the strongest searchable keywords.");
+  }
+
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        Math.min(1, concreteTermCount / Math.max(1, Math.min(4, titleTerms.length))) * 45 +
+        Math.min(1, buyerIntentTerms.length / Math.max(1, Math.min(4, titleTerms.length))) * 35 +
+        (words.length >= 3 && words.length <= 14 ? 20 : 8)
+      )
+    )
+  );
+
+  return {
+    score,
+    status: score >= 80 ? "PASS" : score >= 60 ? "REVIEW" : "FAIL",
+    wordCount: words.length,
+    concreteTermCount,
+    buyerIntentTerms,
+    warnings
+  };
+}
+
+export interface MetadataTitleKeywordConsistency {
+  score: number;
+  status: "PASS" | "REVIEW" | "FAIL";
+  titleTerms: string[];
+  coveredTitleTerms: string[];
+  missingImportantTitleTerms: string[];
+  unsupportedTitleTerms: string[];
+  topTenKeywordCoverage: number;
+  titleSearchability: MetadataTitleSearchability;
+  warnings: string[];
+}
+
+export function validateMetadataTitleKeywordConsistency(
+  title: string,
+  keywords: string[],
+  visualFacts: any = {}
+): MetadataTitleKeywordConsistency {
+  const normalizedTitle = normalizeAdobeKeyword(title);
+  const titleTerms = [...titleKeywordTerms(normalizedTitle)];
+  const keywordCanonicals = (Array.isArray(keywords) ? keywords : [])
+    .map(keyword => adobeKeywordCanonical(keyword));
+
+  const coveredTitleTerms = titleTerms.filter(term =>
+    keywordCanonicals.some(keyword =>
+      keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+
+  const topTen = keywordCanonicals.slice(0, 10);
+  const topTenCovered = titleTerms.filter(term =>
+    topTen.some(keyword =>
+      keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+
+  const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+  const unsupportedTitleTerms = titleTerms.filter(term => {
+    const words = term.split(/\s+/);
+    return words.length > 0 && !words.every(word => factsText.includes(word));
+  });
+
+  const missingImportantTitleTerms = titleTerms.filter(term =>
+    !topTen.some(keyword =>
+      keyword === term || keyword.includes(term) || term.includes(keyword)
+    )
+  );
+
+  const coverage = titleTerms.length
+    ? coveredTitleTerms.length / titleTerms.length
+    : 1;
+  const topTenCoverage = titleTerms.length
+    ? topTenCovered.length / titleTerms.length
+    : 1;
+
+  const warnings: string[] = [];
+  if (unsupportedTitleTerms.length) {
+    warnings.push("Title contains terms not supported by VISUAL_FACTS.");
+  }
+  if (missingImportantTitleTerms.length) {
+    warnings.push("Important title concepts are missing from the first 10 keywords.");
+  }
+  if (coverage < 0.5) {
+    warnings.push("Title and keyword set have weak semantic overlap.");
+  }
+
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        coverage * 55 +
+        topTenCoverage * 30 +
+        (unsupportedTitleTerms.length === 0 ? 15 : 0)
+      )
+    )
+  );
+
+  const titleSearchability = validateMetadataTitleSearchability(
+    title,
+    keywords,
+    visualFacts
+  );
+
+  return {
+    score: Math.round((score + titleSearchability.score) / 2),
+    status:
+      unsupportedTitleTerms.length > 0 ||
+      titleSearchability.status === "FAIL"
+        ? "FAIL"
+        : score < 80 ||
+            missingImportantTitleTerms.length > 0 ||
+            titleSearchability.status === "REVIEW"
+          ? "REVIEW"
+          : "PASS",
+    titleTerms,
+    coveredTitleTerms,
+    missingImportantTitleTerms,
+    unsupportedTitleTerms,
+    topTenKeywordCoverage: Math.round(topTenCoverage * 100),
+    titleSearchability,
+    warnings: [...warnings, ...titleSearchability.warnings]
+  };
+}
+
+
+
+export function rankMetadataGenKeywords(
+  keywords: string[],
   visualFacts: any
 ): string[] {
-  if (keywordMode !== 'single' && keywordMode !== 'multi') {
-    // Mode 'mixed' (default): tidak ada pemaksaan format, campuran diperbolehkan.
-    return keywords.slice(0, targetCount);
-  }
+  const ctx = buildKeywordRoleContext(visualFacts || {});
+  const titleTerms = titleKeywordTerms(visualFacts?.title || visualFacts?.metadata_title);
 
-  const hashString = (str: string): number => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return hash;
-  };
-  const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
+  const ranked = keywords
+    .map((keyword, index) => ({
+      keyword,
+      score: scoreKeywordForRanking(keyword, ctx, index, titleTerms)
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.keyword);
 
-  const result: string[] = [];
-  const addWord = (w: string) => {
-    const v = cleanKeywordOutput(w);
-    if (v.length > 1 && !isProhibitedKeyword(v) && !v.split(/\s+/).some(isKeywordConnector) && !result.includes(v)) {
-      result.push(v);
-    }
-  };
-
-  const processOne = (kwRaw: string) => {
-    const clean = sanitizeForIndexing(kwRaw);
-    if (!clean || clean.length <= 1 || isProhibitedKeyword(clean)) return;
-    if (keywordMode === 'single') {
-      clean.split(/\s+/).forEach(p => {
-        if (p.length > 1 && !isProhibitedKeyword(p)) addWord(p);
-      });
-    } else {
-      // keywordMode === 'multi'
-      let val = clean;
-      if (!clean.includes(' ')) {
-        const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
-        val = `${clean} ${mod}`;
-      }
-      addWord(val);
-    }
-  };
-
-  keywords.forEach(processOne);
-
-  // Jika setelah pemaksaan format jumlahnya berkurang di bawah target (wajar terjadi pada
-  // mode 'single' karena beberapa frasa panjang melebur jadi kata yang sama), tambal dari
-  // ekspansi sinonim/long-tail berbasis visualFacts asli — bukan kategori generik — lalu
-  // format ulang setiap kandidat baru supaya tetap murni sesuai mode.
-  if (result.length < targetCount) {
-    const extra = expandFromVisualFacts(result, visualFacts, (targetCount - result.length) * 3);
-    extra.forEach(processOne);
-  }
-
-  return result.slice(0, targetCount);
+  return ranked;
 }
 
-function ensureKeywordCount(
+
+
+const BUYER_SEARCH_PRIORITY_TERMS = new Set([
+  "family", "business", "technology", "healthcare", "education", "finance",
+  "food", "travel", "nature", "people", "portrait", "office",
+  "home", "work", "team", "meeting", "marketing", "construction", "industry",
+  "agriculture", "farming", "medical", "fitness", "wellness",
+  "texture", "landscape", "city", "architecture", "transportation",
+  "sustainability", "environment", "celebration", "holiday", "festival"
+]);
+
+function buyerSearchabilityScore(
+  keyword: string,
+  role: KeywordSemanticRole,
+  visualFacts: any
+): number {
+  const normalized = normalizeAdobeKeyword(keyword);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  let score = 50;
+
+  if (BUYER_SEARCH_PRIORITY_TERMS.has(normalized)) score += 12;
+  if (words.length === 1) score += 8;
+  if (words.length === 2) score += 10;
+  if (words.length === 3) score += 4;
+  if (words.length > 3) score -= 20;
+
+  if (
+    role === "main_subject" ||
+    role === "subject_variation" ||
+    role === "action_state" ||
+    role === "environment"
+  ) {
+    score += 20;
+  }
+
+  const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+  if (words.every(word => factsText.includes(word))) score += 10;
+
+  if (ADOBE_KEYWORD_FILLER.has(normalized)) score -= 40;
+  if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) score -= 40;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+const ADOBE_STOCK_MAX_KEYWORDS = 49;
+const ADOBE_STOCK_IDEAL_MIN_KEYWORDS = 15;
+const ADOBE_STOCK_IDEAL_MAX_KEYWORDS = 35;
+
+const ADOBE_KEYWORD_FILLER = new Set([
+  "image", "photo", "picture", "photograph", "stock", "visual", "design",
+  "nice", "beautiful", "amazing", "stunning", "gorgeous", "pretty", "awesome",
+  "perfect", "wonderful", "incredible", "masterpiece", "best", "top", "quality",
+  "high quality", "superb", "fantastic", "lovely", "professional", "focus",
+  "sharp", "blurry", "detail", "composition", "element", "object", "thing",
+  "subject", "generic", "background", "color", "colour", "lifestyle",
+  "adult", "formal", "up", "down", "out", "off", "back",
+  "red", "blue", "green", "yellow", "white", "black", "orange", "purple", "pink", "brown", "gray", "grey", "colorful"
+]);
+
+const ADOBE_KEYWORD_IP_PATTERN =
+  /\b(google|apple|microsoft|amazon|facebook|instagram|youtube|nike|adidas|coca[\s-]?cola|pepsi|disney|netflix|openai|tesla)\b/i;
+
+const ADOBE_KEYWORD_TECHNICAL_PATTERN =
+  /\b(?:iso|f\/?\d+(?:\.\d+)?|1\/\d+s|\d+(?:\.\d+)?\s*mm|megapixel|megapixels|fps|4k|8k|hd|uhd|jpeg|jpg|png|raw|tiff|psd|ai|eps|svg|mb|gb)\b/i;
+
+const ADOBE_KEYWORD_NUMBER_PATTERN = /\b\d+(?:\.\d+)?\b/;
+
+function normalizeAdobeKeyword(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function adobeKeywordCanonical(value: string): string {
+  const normalized = normalizeAdobeKeyword(value);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return words
+    .map(word => {
+      if (word.endsWith("ies") && word.length > 4) return `${word.slice(0, -3)}y`;
+      if (word.endsWith("es") && word.length > 4) return word.slice(0, -2);
+      if (word.endsWith("s") && word.length > 3) return word.slice(0, -1);
+      return word;
+    })
+    .join(" ");
+}
+
+const TITLE_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "into",
+  "is", "of", "on", "or", "the", "to", "with", "without", "near", "over",
+  "under", "during"
+]);
+
+function titleKeywordTerms(title?: string): Set<string> {
+  return new Set(
+    normalizeAdobeKeyword(title)
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !TITLE_STOP_WORDS.has(word))
+      .map(word => adobeKeywordCanonical(word))
+  );
+}
+
+function isAdobeKeywordCompliant(
+  keyword: string,
+  visualFacts: any,
+  title?: string
+): boolean {
+  const normalized = normalizeAdobeKeyword(keyword);
+  if (!normalized || normalized.length < 2) return false;
+  if (ADOBE_KEYWORD_FILLER.has(normalized)) return false;
+  if (isProhibitedKeyword(normalized) || ADOBE_KEYWORD_IP_PATTERN.test(normalized)) return false;
+  if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) return false;
+  if (ADOBE_KEYWORD_NUMBER_PATTERN.test(normalized)) return false;
+
+  const wordCount = normalized.split(/\s+/).length;
+  if (wordCount > 3) return false;
+
+  // Adobe favors concise concepts. Keep multi-word phrases only when they
+  // are explicitly supported by the visual facts rather than keyword stuffing.
+  if (wordCount > 1) {
+    const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
+    const phraseWords = normalized.split(/\s+/);
+    const allWordsSupported = phraseWords.every(word => factsText.includes(word));
+    if (!allWordsSupported) return false;
+  }
+
+  return true;
+}
+
+export interface AdobeKeywordValidation {
+  valid: boolean;
+  keywords: string[];
+  removed: Array<{ keyword: string; reason: string }>;
+  warnings: string[];
+  maxKeywords: number;
+  idealRange: [number, number];
+}
+
+export function validateAdobeStockKeywords(
+  keywords: unknown,
+  visualFacts: any = {},
+  title?: string
+): AdobeKeywordValidation {
+  const source = Array.isArray(keywords) ? keywords : [];
+  const seen = new Set<string>();
+  const valid: string[] = [];
+  const removed: Array<{ keyword: string; reason: string }> = [];
+
+  for (const raw of source) {
+    const keyword = normalizeAdobeKeyword(raw);
+    if (!keyword) continue;
+
+    const canonical = adobeKeywordCanonical(keyword);
+    if (seen.has(canonical)) {
+      removed.push({ keyword, reason: "duplicate_or_singular_plural_duplicate" });
+      continue;
+    }
+
+    if (!isAdobeKeywordCompliant(keyword, visualFacts, title)) {
+      removed.push({ keyword, reason: "not_compliant_with_adobe_keyword_rules" });
+      continue;
+    }
+
+    seen.add(canonical);
+    valid.push(keyword);
+    if (valid.length >= ADOBE_STOCK_MAX_KEYWORDS) break;
+  }
+
+  const titleTerms = titleKeywordTerms(title);
+  const topTenTitleTerms = [...titleTerms].filter(term =>
+    valid.slice(0, 10).some(keyword => adobeKeywordCanonical(keyword).includes(term))
+  );
+
+  const warnings: string[] = [];
+  if (valid.length > ADOBE_STOCK_IDEAL_MAX_KEYWORDS) {
+    warnings.push("More than 35 keywords: review whether lower-ranked terms add real search value.");
+  }
+  if (valid.length < ADOBE_STOCK_IDEAL_MIN_KEYWORDS) {
+    warnings.push("Fewer than 15 keywords: add only additional visually supported terms; never use filler.");
+  }
+  if (titleTerms.size > 0 && topTenTitleTerms.length < Math.min(3, titleTerms.size)) {
+    warnings.push("Important title terms are missing from the first 10 keywords.");
+  }
+
+  return {
+    valid: removed.length === 0 && valid.length <= ADOBE_STOCK_MAX_KEYWORDS,
+    keywords: valid,
+    removed,
+    warnings,
+    maxKeywords: ADOBE_STOCK_MAX_KEYWORDS,
+    idealRange: [ADOBE_STOCK_IDEAL_MIN_KEYWORDS, ADOBE_STOCK_IDEAL_MAX_KEYWORDS]
+  };
+}
+
+export function ensureKeywordCount(
   keywords: string[],
   targetCount: number,
   visualFacts: any,
@@ -1358,523 +1752,51 @@ function ensureKeywordCount(
   categoryId?: number,
   keywordMode?: 'mixed' | 'single' | 'multi'
 ): string[] {
-  // STRICT RELEVANCE FILTER: Only keep keywords with direct visual connection.
-  // Keywords that don't match any detected visual element are discarded.
-  const hashString = (str: string): number => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return hash;
+  const requested = Number(targetCount);
+  const target = Math.min(
+    ADOBE_STOCK_MAX_KEYWORDS,
+    Math.max(0, Number.isFinite(requested) ? Math.floor(requested) : 0)
+  );
+  if (!target) return [];
+
+  const normalizedCandidates = (Array.isArray(keywords) ? keywords : [])
+    .filter((value): value is string => typeof value === "string")
+    .map(normalizeAdobeKeyword)
+    .filter(Boolean)
+    .map(keyword => {
+      return keyword;
+    })
+    .filter(keyword => isAdobeKeywordCompliant(keyword, visualFacts, title));
+
+  const validation = validateAdobeStockKeywords(
+    normalizedCandidates,
+    visualFacts,
+    title
+  );
+
+  // Ranking happens after compliance cleanup so forbidden, duplicated, and
+  // spammy terms can never consume a high-priority position.
+  const rankingFacts = {
+    ...(visualFacts || {}),
+    title: title || visualFacts?.title || visualFacts?.metadata_title
   };
+  const ranked = rankMetadataGenKeywords(
+    validation.keywords.slice(0, target),
+    rankingFacts
+  );
 
-  // 1. Clean and deduplicate input keywords
-  let uniqueKeywords: string[] = [];
-  if (Array.isArray(keywords)) {
-    keywords.forEach(k => {
-      if (typeof k === 'string') {
-        const clean = cleanKeywordOutput(k);
-        if (clean.length > 1 && !isProhibitedKeyword(clean) && !clean.split(/\s+/).some(isKeywordConnector)) {
-          if (keywordMode === 'single' && clean.includes(' ')) {
-            // Split multi-words into individual single words
-            const pieces = clean.split(/\s+/);
-            pieces.forEach(p => {
-              if (p.length > 1 && !isProhibitedKeyword(p)) {
-                // Check for exact and near duplicates (plurals/singulars)
-                const isDuplicate = uniqueKeywords.some(existing => 
-                  existing === p || 
-                  existing === p + 's' || 
-                  p === existing + 's' || 
-                  existing === p + 'es' || 
-                  p === existing + 'es' ||
-                  existing.replace(/ies$/, 'y') === p ||
-                  p.replace(/ies$/, 'y') === existing
-                );
-                if (!isDuplicate) {
-                  uniqueKeywords.push(p);
-                }
-              }
-            });
-          } else {
-            let cleanVal = clean;
-            if (keywordMode === 'multi' && !clean.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
-              cleanVal = `${clean} ${mod}`;
-            }
-
-            // Check for exact and near duplicates (plurals/singulars)
-            const isDuplicate = uniqueKeywords.some(existing => 
-              existing === cleanVal || 
-              existing === cleanVal + 's' || 
-              cleanVal === existing + 's' || 
-              existing === cleanVal + 'es' || 
-              cleanVal === existing + 'es' ||
-              existing.replace(/ies$/, 'y') === cleanVal ||
-              cleanVal.replace(/ies$/, 'y') === existing
-            );
-            if (!isDuplicate) {
-              uniqueKeywords.push(cleanVal);
-            }
-          }
-        }
-      }
-    });
+  const titleTerms = titleKeywordTerms(title);
+  if (titleTerms.size > 0) {
+    const titleMatched = ranked.filter(keyword =>
+      [...titleTerms].some(term => adobeKeywordCanonical(keyword).includes(term))
+    );
+    const remaining = ranked.filter(keyword => !titleMatched.includes(keyword));
+    return [...titleMatched, ...remaining].slice(0, target);
   }
 
-  if (uniqueKeywords.length >= targetCount) {
-    return uniqueKeywords.slice(0, targetCount);
-  }
-
-  const STOP_WORDS = new Set([
-    'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'in', 'with', 'by', 'of', 'to', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'us', 'our', 'you', 'your', 'he', 'him', 'his', 'she', 'her', 'isolated', 'stock', 'photo', 'image', 'picture', 'vector', 'illustration', 'captured', 'professional', 'high', 'quality', 'resolution', 'super', 'ultra', 'beautiful', 'stunning', 'amazing', 'perfect', 'ideal'
-  ]);
-
-  // Helper helper to clean a string of words and append to list
-  const extractWords = (str: any) => {
-    if (!str || typeof str !== 'string') return [];
-    return str.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .split(/\s+/)
-      .map(w => w.trim())
-      .filter(w => w.length > 1 && !STOP_WORDS.has(w) && !isProhibitedKeyword(w));
-  };
-
-  // Build candidate sources in order of priority (only from actual visually-detected facts):
-  const sources: string[][] = [];
-
-  // 1. From visual facts primary subjects
-  if (visualFacts && visualFacts.primary_subjects && Array.isArray(visualFacts.primary_subjects)) {
-    const words: string[] = [];
-    visualFacts.primary_subjects.forEach((x: any) => {
-      if (x && typeof x === 'object' && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-
-  // 2. From visual facts secondary subjects
-  if (visualFacts && visualFacts.secondary_subjects && Array.isArray(visualFacts.secondary_subjects)) {
-    const words: string[] = [];
-    visualFacts.secondary_subjects.forEach((x: any) => {
-      if (x && typeof x === 'object' && x.name) {
-        words.push(...extractWords(x.name));
-      }
-    });
-    sources.push(words);
-  }
-
-  // 3. From visual facts colors & actions
-  if (visualFacts && visualFacts.colors && Array.isArray(visualFacts.colors)) {
-    sources.push(visualFacts.colors.flatMap((c: any) => {
-      if (typeof c === 'string') return extractWords(c);
-      return [];
-    }));
-  }
-  if (visualFacts && visualFacts.actions && Array.isArray(visualFacts.actions)) {
-    sources.push(visualFacts.actions.flatMap((a: any) => {
-      if (typeof a === 'string') return extractWords(a);
-      return [];
-    }));
-  }
-
-  // 4. From Title and Description (already generated based on visual facts)
-  if (title && typeof title === 'string') {
-    sources.push(extractWords(title));
-  }
-  if (description && typeof description === 'string') {
-    sources.push(extractWords(description));
-  }
-
-  // Pad the uniqueKeywords checking each source (semuanya berasal dari fakta visual asli)
-  for (const source of sources) {
-    if (uniqueKeywords.length >= targetCount) break;
-    if (Array.isArray(source)) {
-      const cleanSource = Array.from(new Set(source));
-      for (const word of cleanSource) {
-        if (uniqueKeywords.length >= targetCount) break;
-        if (typeof word === 'string') {
-          let cleanWord = word.trim().toLowerCase();
-          if (cleanWord.length > 1 && !isProhibitedKeyword(cleanWord)) {
-            if (keywordMode === 'multi' && !cleanWord.includes(' ')) {
-              const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-              const mod = modifiers[Math.abs(hashString(cleanWord)) % modifiers.length];
-              cleanWord = `${cleanWord} ${mod}`;
-            }
-            if (!uniqueKeywords.includes(cleanWord)) {
-              uniqueKeywords.push(cleanWord);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // 6. [PENGGANTI FALLBACK KATEGORI GENERIK] Bila masih kurang dari target, ekspansi
-  // lebih lanjut dari sinonim & long-tail keyword yang dibangun murni dari visualFacts
-  // (subjek, warna, aksi yang benar-benar terdeteksi di gambar) — bukan daftar generik
-  // per kategori Adobe Stock yang tidak berhubungan langsung dengan isi gambar.
-  // PENTING: hasil ekspansi ini juga HARUS mematuhi keywordMode secara ketat
-  // (single = semua satu kata, multi = semua dua+ kata), kecuali mode 'mixed'.
-  if (uniqueKeywords.length < targetCount) {
-    const synonymExpansion = expandFromVisualFacts(uniqueKeywords, visualFacts, (targetCount - uniqueKeywords.length) * 2);
-    for (const rawWord of synonymExpansion) {
-      if (uniqueKeywords.length >= targetCount) break;
-      const clean = sanitizeForIndexing(rawWord);
-      if (clean.length <= 1 || isProhibitedKeyword(clean)) continue;
-
-      if (keywordMode === 'single' && clean.includes(' ')) {
-        // Pecah frasa jadi kata tunggal agar konsisten dengan mode 'single'
-        const pieces = clean.split(/\s+/);
-        for (const p of pieces) {
-          if (uniqueKeywords.length >= targetCount) break;
-          if (p.length > 1 && !isProhibitedKeyword(p) && !uniqueKeywords.includes(p)) {
-            uniqueKeywords.push(p);
-          }
-        }
-      } else {
-        let cleanVal = clean;
-        if (keywordMode === 'multi' && !clean.includes(' ')) {
-          const modifiers = ['concept', 'background', 'scene', 'design', 'style', 'detail', 'asset', 'element'];
-          const mod = modifiers[Math.abs(hashString(clean)) % modifiers.length];
-          cleanVal = `${clean} ${mod}`;
-        }
-        if (!uniqueKeywords.includes(cleanVal)) {
-          uniqueKeywords.push(cleanVal);
-        }
-      }
-    }
-  }
-
-  // Catatan: fallback generik per kategori sudah dihapus. Jika keyword yang benar-benar
-  // relevan (hasil AI + sinonim + long-tail) masih belum mencapai targetCount, fungsi ini
-  // akan mengembalikan LEBIH SEDIKIT keyword daripada target, alih-alih memaksakan kata
-  // generik yang tidak nyambung dengan gambar.
-  return uniqueKeywords.slice(0, targetCount);
+  return ranked.slice(0, target);
 }
 
-async function callOpenAICompatibleWithRetry(params: {
-  systemInstruction?: string;
-  contents: any;
-  responseMimeType?: string;
-  responseSchema?: any;
-  config?: any;
-  model?: string;
-}): Promise<string> {
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
-
-  if (!PROVIDER_ENDPOINTS[provider]) {
-    throw new Error(`Unsupported provider: ${provider}`);
-  }
-
-  const endpoint = PROVIDER_ENDPOINTS[provider];
-  const providerState = store?.[provider];
-  const keysList: string[] = (providerState && providerState.keys) || [];
-  const maxRotationAttempts = keysList.length > 0 ? keysList.length : 1;
-  let lastErr: any;
-
-  for (let rot = 0; rot < maxRotationAttempts; rot++) {
-    let apiKey = '';
-
-    if (keysList.length > 0) {
-      const activeIdx = providerState.activeIndex || 0;
-      apiKey = keysList[activeIdx];
-      if (provider === 'nvidia') {
-        console.log(`[NVIDIA DEBUG] Using key index ${activeIdx}/${keysList.length} (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
-      }
-    } else {
-      apiKey = process.env[PROVIDER_ENV_KEYS[provider]] || '';
-      if (provider === 'nvidia') {
-        console.log(`[NVIDIA DEBUG] Using key from process.env (Starts with: ${(apiKey || "").substring(0, 8)}...)`);
-      }
-    }
-
-    if (!apiKey && provider === 'nvidia') {
-      console.warn('NVIDIA key missing. Fallback to Gemini.');
-      const fallbackResult = await getAIClient().models.generateContent({
-        model: 'gemini-3.6-pro-preview',
-        contents: params.contents,
-        config: params.config
-      });
-      // Handle both raw Gemini response and our normalized {text} response
-      return typeof fallbackResult.text === 'function' ? await fallbackResult.text() : (fallbackResult.text || '');
-    }
-
-    if (!apiKey) {
-      throw new Error(`API Key untuk ${provider.toUpperCase()} belum dikonfigurasi. Silakan tambahkan Key Anda di pengaturan.`);
-    }
-
-    const messages: any[] = [];
-    let userSystemInstruction = '';
-    if (params.systemInstruction) {
-      if (provider === 'aivene') {
-        userSystemInstruction = `[SYSTEM INSTRUCTION]\n${params.systemInstruction}\n\n[USER INPUT]\n`;
-      } else {
-        messages.push({ role: 'system', content: params.systemInstruction });
-      }
-    }
-
-    let hasImages = false;
-    const contentParts: any[] = [];
-    
-    if (userSystemInstruction) {
-      contentParts.push({ type: 'text', text: userSystemInstruction });
-    }
-
-    const addPart = (part: any) => {
-      if (!part) return;
-      if (typeof part === 'string') {
-        contentParts.push({ type: 'text', text: part });
-      } else if (part.text) {
-        contentParts.push({ type: 'text', text: part.text });
-      } else if (part.inlineData) {
-        hasImages = true;
-        contentParts.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    };
-
-    if (typeof params.contents === 'string') {
-      contentParts.push({ type: 'text', text: params.contents });
-    } else if (Array.isArray(params.contents)) {
-      params.contents.forEach(addPart);
-    } else if (params.contents && typeof params.contents === 'object') {
-      if (Array.isArray(params.contents.parts)) {
-        params.contents.parts.forEach(addPart);
-      } else {
-        addPart(params.contents);
-      }
-    }
-
-    let finalContent: any;
-    if (!hasImages) {
-      finalContent = contentParts.map(p => p.text).join('\n');
-    } else {
-      finalContent = contentParts.length === 1 && contentParts[0].type === 'text' ? contentParts[0].text : contentParts;
-    }
-
-    messages.push({
-      role: 'user',
-      content: finalContent
-    });
-
-    let model = params.model || PROVIDER_DEFAULT_MODELS[provider];
-
-    // NVIDIA NIM mapping and sanitization
-    if (provider === 'nvidia') {
-      // mapping legacy or short names to official NIM names
-      if (model === 'stepfun_step35_flash') model = 'stepfun-ai/step-3.5-flash';
-      if (model.startsWith('stepfun/')) model = model.replace('stepfun/', 'stepfun-ai/');
-      if (model === 'nemotron') model = 'nvidia/llama-3.1-nemotron-70b-instruct';
-      if (!model.includes('/')) {
-         // If it's a bare name like 'llama-3.2-90b-vision-instruct', prepend 'meta/'
-         if (model.includes('llama-3.2')) model = `meta/${model}`;
-         else if (model.includes('nemotron')) model = `nvidia/${model}`;
-         else if (model.includes('paligemma')) model = `google/${model}`;
-         else if (model.includes('step')) model = `stepfun-ai/${model}`;
-      }
-      
-      // Sanitasi: NVIDIA NIM sometimes dislikes double slashes or missing namespaces
-      model = model.trim();
-      if (model.startsWith('/')) model = model.substring(1);
-    }
-
-    // Validasi: kalau model yang dipassing user adalah nama model gemini/gemma
-    // (artinya caller belum sempat resolve), pakai default provider ini.
-    if (provider !== 'aivene' && (model?.startsWith('gemini-') || model?.startsWith('gemma-'))) {
-      model = PROVIDER_DEFAULT_MODELS[provider];
-    }
-
-    // Map the model 'llama-4-scout-17b-16e-instruct' to the exact name required by Groq
-    if (provider === 'groq' && model === 'llama-4-scout-17b-16e-instruct') {
-      model = 'meta-llama/llama-4-scout-17b-16e-instruct';
-    }
-
-    const payload: any = {
-      model,
-      messages,
-      temperature: params.config?.temperature ?? 0.85,
-    };
-    
-    if (params.config?.topP !== undefined) {
-      payload.top_p = params.config.topP;
-    }
-
-    if (params.config?.seed !== undefined) {
-      payload.seed = params.config.seed;
-    }
-
-    if (SUPPORTS_JSON_MODE.has(provider)) {
-      payload.response_format = { type: "json_object" };
-    }
-
-    if (provider === 'groq' || provider === 'openai' || provider === 'openrouter' || provider === 'nvidia' || provider === 'aivene' || provider === 'zai') {
-      payload.max_tokens = provider === 'nvidia' ? 4096 : 8192;
-    } else if (provider === 'bluesminds') {
-      // Do not send max_tokens to avoid pre-check reservation failures on limited balance or custom endpoints
-    }
-    payload.stream = false;
-
-    if (params.responseMimeType === 'application/json') {
-      let schemaInstruction = '\n\nIMPORTANT: Start your response DIRECTLY with the opening curly brace "{" (or square bracket "[" if an array is requested). DO NOT write any introductory or concluding text. DO NOT use markdown code blocks. The response MUST be a valid JSON object or array.';
-      if (provider === 'nvidia') {
-        schemaInstruction = '\n\nOutput only a valid JSON. Do not include any explanation or markdown formatting. The JSON must directly start with { or [ and end with } or ].';
-      }
-      if (params.responseSchema) {
-        schemaInstruction += ` The JSON MUST strictly match this schema: ${JSON.stringify(params.responseSchema)}`;
-      }
-
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === 'user') {
-        if (typeof lastMessage.content === 'string') {
-          lastMessage.content += schemaInstruction;
-        } else if (Array.isArray(lastMessage.content)) {
-          lastMessage.content.push({ type: 'text', text: schemaInstruction });
-        }
-      } else {
-        messages.push({ role: 'user', content: schemaInstruction });
-      }
-    }
-
-    let tryCount = 0;
-    while (tryCount < 2) {
-      try {
-        console.log(`[callOpenAICompatibleWithRetry] Fetching ${provider.toUpperCase()} completions with model ${model}...`);
-
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`,
-        };
-        // OpenRouter butuh header tambahan untuk identifikasi (opsional tapi disarankan)
-        if (provider === 'openrouter') {
-          headers['HTTP-Referer'] = process.env.APP_URL || 'http://localhost';
-          headers['X-Title'] = 'JohMeta';
-        }
-
-        // Z.AI requires Accept-Language header
-        if (provider === 'zai') {
-          headers['Accept-Language'] = 'en-US,en';
-          payload.do_sample = false;
-        }
-
-        if (provider === 'nvidia') {
-          const sanPayload = { ...payload, messages: payload.messages.map((m: any) => ({ ...m, content: typeof m.content === 'string' ? m.content : '[REDACTED CONTENT]' })) };
-          console.log(`[NVIDIA DEBUG] Sending payload to ${endpoint} with model ${model}:`, JSON.stringify(sanPayload));
-        }
-
-        const fetchTimeout = (provider === 'nvidia' || provider === 'mistral') ? 30000 : 25000;
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-          // @ts-ignore - undici/node-fetch support signal/timeout
-          signal: AbortSignal.timeout(fetchTimeout)
-        });
-
-        // Safe logging of the response
-        const responseDataRawForLogging = await response.clone().text();
-        console.log(`[${provider.toUpperCase()} DEBUG] Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, First 200 chars: ${responseDataRawForLogging.substring(0, 200)}`);
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.warn(`[${provider.toUpperCase()} API FAILURE] Status: ${response.status}, Response: ${errText}`);
-          throw new Error(`HTTP ${response.status}: ${errText}`);
-        }
-
-        const responseDataRaw = await response.text();
-        let responseData;
-        try {
-          responseData = JSON.parse(responseDataRaw);
-        } catch (e) {
-          console.error(`[callOpenAICompatibleWithRetry] Failed to parse JSON. Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}, RawResponse: ${responseDataRaw.substring(0, 500)}`);
-          throw new Error(`Failed to parse JSON from ${provider}. RawResponse Sample: ${responseDataRaw.substring(0, 200)}`);
-        }
-        let answer = responseData.choices?.[0]?.message?.content;
-        if (!answer && responseData.choices?.[0]?.message) {
-          answer = responseData.choices[0].message.reasoning || responseData.choices[0].message.reasoning_content;
-        }
-        if (!answer) {
-          console.warn(`[callOpenAICompatibleWithRetry] Empty answer received from ${provider}. Response payload:`, JSON.stringify(responseData));
-          if (responseData.error) {
-            throw new Error(`${provider.toUpperCase()} API Error: ${responseData.error.message || JSON.stringify(responseData.error)} (Code: ${responseData.error.code || 'unknown'})`);
-          }
-          throw new Error(`Empty response content received from ${provider.toUpperCase()}`);
-        }
-        if (params.responseMimeType === 'application/json') {
-          answer = extractJSON(answer);
-          if (answer.replace(/\s/g, '') === '{}') {
-            console.warn(`[callOpenAICompatibleWithRetry] Model hallucinated empty JSON string. Retrying...`);
-            // Add 'quota' to trigger a retry gracefully
-            throw new Error(`Model returned empty json object string {}. Trigger quota rotation/retry.`);
-          }
-        }
-        return answer;
-      } catch (err: any) {
-        console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] error:`, err);
-        const status = err.status || (err.message && err.message.includes('HTTP ') ? err.message.split(' ')[1].replace(':', '') : 'unknown');
-        console.warn(`[${provider.toUpperCase()} ERROR DETAILS] Status: ${status}, Message: ${err.message}, Key Index: ${providerState?.activeIndex}`);
-        lastErr = err;
-
-        const errorMsg = String(err.message || "").toLowerCase();
-
-        // Handle API key rotation on limit or auth errors
-        const isRateLimit = errorMsg.includes('429') && (errorMsg.includes('try again') || errorMsg.includes('retry in') || errorMsg.includes('wait'));
-        const shouldRotate = (errorMsg.includes('429') && !isRateLimit) || errorMsg.includes('quota') || 
-                             errorMsg.includes('exceeded') || errorMsg.includes('exhausted') || 
-                             errorMsg.includes('403') || errorMsg.includes('401');
-        
-        if (shouldRotate) {
-           console.warn(`[${provider.toUpperCase()}] Error requires rotation: ${errorMsg}. Trying next key.`);
-           if (providerState && providerState.keys && keysList.length > 1) {
-              providerState.activeIndex = (providerState.activeIndex + 1) % keysList.length;
-              break;
-           } else {
-              throw err;
-           }
-        }
-
-        // Automatic model fallback and exponential backoff
-        tryCount++;
-        const fallback = PROVIDER_FALLBACK_MODELS[provider];
-        const isRetryableError = errorMsg.includes('429') || 
-                                 errorMsg.includes('quota') || 
-                                 errorMsg.includes('limit') || 
-                                 errorMsg.includes('timeout') || 
-                                 errorMsg.includes('exceeded') || 
-                                 errorMsg.includes('fetch failed') ||
-                                 errorMsg.includes('400') || errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('invalid') ||
-                                 errorMsg.includes('500') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504') || errorMsg.includes('524') || errorMsg.includes('upstream_error') ||
-                                 errorMsg.includes('extra data') ||
-                                 errorMsg.includes('empty response content') ||
-                                 errorMsg.includes('empty json object') ||
-                                 errorMsg.includes('bad_response_status_code');
-
-        if (tryCount === 1 && fallback && fallback !== model) {
-          model = fallback;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Model failed. Falling back to alternative model: ${model}`);
-          payload.model = model;
-          continue;
-        }
-
-        if (tryCount < 2 && isRetryableError) {
-          const backoff = Math.pow(2, tryCount) * 1000 + Math.random() * 1000;
-          console.warn(`[callOpenAICompatibleWithRetry - ${provider.toUpperCase()}] Retrying error (attempt ${tryCount}/2) after ${backoff / 1000}s...`);
-          await new Promise(resolve => setTimeout(resolve, backoff));
-          continue;
-        }
-
-        throw err;
-      }
-    }
-  }
-  throw lastErr;
-}
 
 function getAIClient(): any {
   return {
@@ -1918,7 +1840,7 @@ function getAIClient(): any {
         }
 
         const runGeminiDirectFetch = async (keyToUse: string, params: any) => {
-          const model = params.model || 'gemini-3.5-flash';
+          const model = params.model || 'gemini-2.5-flash';
           const cleanModel = model.startsWith('models/') ? model : `models/${model}`;
           const url = `https://generativelanguage.googleapis.com/v1beta/${cleanModel}:generateContent?key=${keyToUse}`;
 
@@ -2084,6 +2006,127 @@ function getAIClient(): any {
   };
 }
 
+// ============================================================================
+// OPENAI COMPATIBLE PROVIDERS ADAPTER
+// ============================================================================
+export const callOpenAICompatibleWithRetry = async (
+  params: {
+    systemInstruction?: string;
+    contents: string | any[] | any;
+    responseMimeType?: string;
+    responseSchema?: any;
+    config?: any;
+    model?: string;
+  },
+  maxAttempts: number = 3
+): Promise<string> => {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'openai';
+  let apiKey = (store && store.apiKey) || process.env[PROVIDER_ENV_KEYS[provider]] || '';
+  
+  if (!apiKey) {
+    throw new Error(`API key for provider ${provider} is missing. Please set ${PROVIDER_ENV_KEYS[provider]}.`);
+  }
+
+  const endpoint = PROVIDER_ENDPOINTS[provider];
+  const modelToUse = params.model || PROVIDER_DEFAULT_MODELS[provider];
+  
+  let messages: any[] = [];
+  if (params.systemInstruction) {
+    messages.push({ role: "system", content: params.systemInstruction });
+  }
+
+  if (typeof params.contents === 'string') {
+    messages.push({ role: "user", content: params.contents });
+  } else if (Array.isArray(params.contents)) {
+    let contentParts: any[] = [];
+    for (const part of params.contents) {
+      if (part.text) {
+        contentParts.push({ type: "text", text: part.text });
+      } else if (part.inlineData) {
+        contentParts.push({ 
+          type: "image_url", 
+          image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` } 
+        });
+      }
+    }
+    messages.push({ role: "user", content: contentParts.length > 0 ? contentParts : "" });
+  } else if (params.contents && params.contents.parts) {
+     let contentParts: any[] = [];
+     for (const part of params.contents.parts) {
+        if (part.text) {
+           contentParts.push({ type: "text", text: part.text });
+        } else if (part.inlineData) {
+           contentParts.push({ 
+              type: "image_url", 
+              image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` } 
+           });
+        }
+     }
+     messages.push({ role: "user", content: contentParts.length > 0 ? contentParts : "" });
+  }
+
+  const payload: any = {
+    model: modelToUse,
+    messages: messages,
+    temperature: params.config?.temperature ?? 0.8,
+  };
+
+  if (params.config?.seed !== undefined) {
+    payload.seed = params.config.seed;
+  }
+
+  if (params.responseMimeType === 'application/json' && SUPPORTS_JSON_MODE.has(provider)) {
+    payload.response_format = { type: "json_object" };
+  }
+
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          ...(provider === "openrouter" ? {
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "MetaZo",
+          } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const errObj = data.error || data;
+        const errorMsg = errObj.message || JSON.stringify(errObj);
+        throw new Error(`[${provider.toUpperCase()}] API Error: ${errorMsg}`);
+      }
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+         return data.choices[0].message.content;
+      }
+      
+      throw new Error(`[${provider.toUpperCase()}] Unexpected response format: ${JSON.stringify(data)}`);
+      
+    } catch (err: any) {
+      lastErr = err;
+      if (err.message && (err.message.includes("429") || err.message.includes("rate limit"))) {
+         await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+         continue;
+      }
+      if (attempt < maxAttempts - 1) {
+         console.warn(`[${provider.toUpperCase()}] Retry ${attempt + 1}/${maxAttempts} due to error: ${err.message}`);
+         continue;
+      }
+      break;
+    }
+  }
+  
+  throw lastErr;
+};
+
 // Helper for robust API calls with retry
 const callGeminiWithRetry = async (
   modelName: string,
@@ -2095,17 +2138,11 @@ const callGeminiWithRetry = async (
   let currentModel = modelName;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const res = await getAIClient().models.generateContent({
+      return await getAIClient().models.generateContent({
         model: currentModel,
         contents,
         config
       });
-      // Transparency: record which model actually produced this response, since
-      // internal retry/rotation logic below may silently swap to a different model
-      // than the one originally requested (invalid model 400/404, quota 429, 503).
-      // Additive, non-breaking property — every existing call site is unaffected.
-      try { if (res && typeof res === 'object') (res as any)._usedModel = currentModel; } catch {}
-      return res;
     } catch (err: any) {
       lastError = err;
       const statusCode = err.status || err.code;
@@ -2144,7 +2181,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.5-flash', 'gemini-3.5-flash'];
+          const rotationModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -2276,7 +2313,7 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
       descriptionRule: `- Detail physical realism, authentic human expressions, real-world textures, lighting qualities, and photographic depth of field.
 - MUST conclude the description with a sentence starting with "Perfect for..." or "Ideal for..." specifically mentioning photography uses, e.g., "Ideal for commercial advertising, marketing campaigns, editorial web blogs, or social media banner graphics."`,
       risetKeywordRule: `- Conduct deep photographic and real-world concept research: identify visual subjects, authentic expressions, clothing textures, environment details, weather conditions, lighting attributes, and depth of field.
-- Map realistic physical synonyms, human-centric emotional adjectives, and situational contexts.`,
+- Map only natural visual synonyms and clearly supported contexts. Avoid speculative emotional, cultural, industry, or situational expansion.`,
       seoBoostRule: `- Heavily front-load high-converting keywords to capture exact search patterns of commercial buyers.
 - Focus keywords on the actual visual subjects, environments, clothing, emotional expressions, lighting styles (e.g. golden hour, soft studio light), and commercial contexts, while strictly avoiding terms like "photo", "photography", "realistic", "candid", "lifestyle shot", dsb.`,
       prohibitedExemptions: "Keep titles and keywords completely free of photography terms or camera styles, focusing exclusively on visual subject matter and actions."
@@ -2286,7 +2323,7 @@ export function getToolTypeDirectives(toolType: ToolType): ToolTypeDirectives {
 
 // ============================================================================
 // METADATAGEN STRUCTURED PIPELINE
-// Modul terstruktur untuk MetadataGen ����������� mencakup 8 lapisan sesuai spesifikasi:
+// Modul terstruktur untuk MetadataGen — mencakup 8 lapisan sesuai spesifikasi:
 //   1. Analisis visual bertingkat (scene → object → attributes → concepts)
 //   2. Formula judul per jenis aset (photo, AI image, illustration, vector, video)
 //   3. Sistem pembobotan keyword (SEO / visual / commercial / trend score)
@@ -2339,12 +2376,9 @@ function buildTieredVisualAnalysis(visualFacts: any): TieredVisualAnalysis {
   ].filter((x: any) => typeof x === 'string');
 
   const concepts: string[] = [
-    ...(Array.isArray(visualFacts?.concepts) ? visualFacts.concepts : []),
-    ...(Array.isArray(visualFacts?.commercial_concepts) ? visualFacts.commercial_concepts : []),
-    ...(Array.isArray(visualFacts?.commercial_themes) ? visualFacts.commercial_themes : []),
     ...(visualFacts?.deeper_meaning_and_symbolism ? [String(visualFacts.deeper_meaning_and_symbolism)] : []),
     ...(visualFacts?.understanding_and_context ? [String(visualFacts.understanding_and_context)] : [])
-  ].filter((x: any) => typeof x === 'string' && x.trim().length > 0);
+  ];
 
   return { scene, objects, attributes, concepts };
 }
@@ -2400,6 +2434,46 @@ function applyTitleTemplate(subtype: AssetSubtype, tiers: TieredVisualAnalysis, 
   return title;
 }
 
+
+// ---- SEASONAL / EVENT KEYWORD CONTEXT --------------------------------------
+// Calendar context is a discovery aid, not permission to invent an event.
+// An event keyword may be used only when the asset's visual evidence clearly
+// supports the event/season or when the asset is an explicit calendar/holiday
+// design. The calendar helps the model recognize common microstock demand
+// periods such as Christmas in December, Halloween in October, etc.
+const MICROSTOCK_EVENT_CALENDAR: Record<string, string[]> = {
+  january: ["new year", "new year resolutions", "winter", "back to work"],
+  february: ["valentine's day", "valentine", "lunar new year", "chinese new year", "ramadan"],
+  march: ["international women's day", "st patrick's day", "holi", "ramadan", "eid al-fitr", "spring", "easter preparation"],
+  april: ["easter", "april fools", "earth day", "spring", "songkran"],
+  may: ["eid al-adha", "mothers day", "labor day", "spring", "graduation"],
+  june: ["fathers day", "summer", "pride month", "graduation", "eid al-adha"],
+  july: ["summer", "independence day", "back to school", "travel season"],
+  august: ["back to school", "summer", "independence day", "harvest season"],
+  september: ["back to school", "autumn", "fall", "labor day", "harvest"],
+  october: ["halloween", "autumn", "fall", "breast cancer awareness", "thanksgiving preparation"],
+  november: ["thanksgiving", "black friday", "cyber monday", "christmas preparation", "autumn"],
+  december: ["christmas", "christmas day", "new year", "new year's eve", "hanukkah", "winter", "holiday season"],
+};
+
+function getSeasonalEventKeywordContext(metadataLanguage?: string): string {
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'long' }).toLowerCase();
+  const events = MICROSTOCK_EVENT_CALENDAR[month] || [];
+  const language = getLanguageName(metadataLanguage);
+  return `
+12. CONCEPT & EVENT CALENDAR (Seasonal Microstock Demand):
+   - Current calendar month: ${month}.
+   - Relevant seasonal/event themes for this period: ${events.join(', ')}.
+   - Use event/season keywords ONLY when the AI Vision detects clear visual evidence, symbols, decorations, colors, text, costumes, objects, or unmistakable thematic cues for that event/season.
+   - For explicit holiday/event assets, event names such as "christmas", "christmas decoration", "halloween", "valentine's day", etc. are valid high-value CONCEPT/EVENT keywords when visually supported.
+   - Do not infer an event merely because it is on the calendar. A generic winter scene is not automatically Christmas; a red/green object is not automatically Christmas.
+   - Distinguish EVENT from generic CONCEPT: event = a named calendar occasion; concept = the broader idea communicated by the asset.
+   - If an asset clearly represents a future seasonal event even outside the current month (for example a Christmas asset uploaded in August), the event may still be used because the asset itself is the evidence.
+   - Do not add country-specific holidays unless the visual evidence supports the specific cultural event.
+   - Output keywords in ${language}; preserve established English event names when they are the natural stock-search term.`;
+}
+
 // ---- LAPISAN 3: SISTEM PEMBOBOTAN KEYWORD ----------------------------------
 
 interface KeywordScore {
@@ -2435,34 +2509,62 @@ const TREND_TERMS = new Set([
  */
 function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: number, total: number, title?: string): KeywordScore {
   const lower = keyword.toLowerCase().trim();
-  const wordCount = lower.split(/\s+/).length;
+  const words = lower.split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
 
-  const objectMatch = tiers.objects.find(o => o.name.toLowerCase().includes(lower) || lower.includes(o.name.toLowerCase()));
-  const attributeMatch = tiers.attributes.some(a => a.toLowerCase().includes(lower) || lower.includes(a.toLowerCase()));
-  const visualScore = objectMatch ? Math.min(100, objectMatch.importance + 20) : (attributeMatch ? 70 : 30);
+  // Visual evidence is the dominant signal. Unknown terms are not automatically
+  // rejected because legitimate concepts/search-intent phrases may not be exact
+  // labels in VISUAL_FACTS.
+  const objectMatch = tiers.objects.find(o => {
+    const n = o.name.toLowerCase().trim();
+    return n === lower || n.includes(lower) || lower.includes(n);
+  });
+  const attributeMatch = tiers.attributes.some(a => {
+    const n = String(a).toLowerCase().trim();
+    return n === lower || n.includes(lower) || lower.includes(n);
+  });
+  const sceneMatch = tiers.scene.some(s => {
+    const n = String(s).toLowerCase().trim();
+    return n === lower || n.includes(lower) || lower.includes(n);
+  });
+  const conceptMatch = tiers.concepts.some(c => {
+    const n = String(c).toLowerCase().trim();
+    return n === lower || n.includes(lower) || lower.includes(n);
+  });
 
-  const positionFactor = 1 - (position / Math.max(1, total));
-  const seoScore = Math.round((wordCount >= 1 && wordCount <= 3 ? 85 : 40) * 0.6 + positionFactor * 40);
+  let visualScore = 22;
+  if (objectMatch) visualScore = Math.min(100, 78 + Number(objectMatch.importance || 50) * 0.22);
+  else if (attributeMatch) visualScore = 76;
+  else if (sceneMatch) visualScore = 68;
+  else if (conceptMatch) visualScore = 62;
 
-  const commercialScore = (COMMERCIAL_INTENT_TERMS.has(lower) || Array.from(COMMERCIAL_INTENT_TERMS).some(t => lower.includes(t))) ? 95 : 35;
-  const trendScore = Array.from(TREND_TERMS).some(t => lower.includes(t)) ? 90 : 30;
+  // Natural short search phrases are preferred. Do not reward verbosity.
+  const phraseScore = wordCount === 1 ? 82 : wordCount <= 3 ? 92 : wordCount <= 4 ? 72 : 45;
+  const seoScore = Math.round(phraseScore * 0.75 + (1 - position / Math.max(1, total)) * 25);
 
-  // Title-Keyword Synergy Bonus for Adobe Stock Ranking: Top keywords MUST align with main title words
+  const commercialScore =
+    (COMMERCIAL_INTENT_TERMS.has(lower) ||
+      Array.from(COMMERCIAL_INTENT_TERMS).some(t => lower.includes(t)))
+      ? 78 : 35;
+
+  const trendScore =
+    Array.from(TREND_TERMS).some(t => lower.includes(t)) ? 70 : 30;
+
   let titleBonus = 0;
   if (title) {
-    const titleLower = title.toLowerCase();
-    if (titleLower.includes(lower)) {
-      titleBonus = 40;
-    } else {
-      const kwWords = lower.split(/\s+/);
-      const matchingWords = kwWords.filter(w => w.length > 2 && titleLower.includes(w));
-      if (matchingWords.length > 0) {
-        titleBonus = matchingWords.length * 15;
-      }
-    }
+    const titleWords = new Set(title.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+    const overlap = words.filter(w => titleWords.has(w)).length;
+    titleBonus = Math.min(15, overlap * 5);
   }
 
-  const totalScore = Math.round((visualScore * 0.35 + seoScore * 0.25 + commercialScore * 0.25 + trendScore * 0.15) + titleBonus);
+  // Relevance > search quality > commercial usefulness > trend.
+  const totalScore = Math.round(
+    visualScore * 0.55 +
+    seoScore * 0.20 +
+    commercialScore * 0.10 +
+    trendScore * 0.05 +
+    titleBonus * 0.10
+  );
 
   return { keyword, seoScore, visualScore, commercialScore, trendScore, totalScore };
 }
@@ -2482,67 +2584,57 @@ function scoreKeyword(keyword: string, tiers: TieredVisualAnalysis, position: nu
  * memaksimalkan bobot SEO di Adobe Stock, Shutterstock, dan marketplace lainnya.
  */
 /**
- * METAZO 7-TIER KEYWORD RANKING ENGINE (PRD v2.0)
- * 
- * Struktur 8-Dimensi Microstock:
- * 1. MAIN SUBJECT — Subjek utama dalam gambar
- * 2. SPECIFIC DESCRIPTION — Deskripsi spesifik (demografi, material, tipe)
- * 3. ACTION / MOTION — Aksi, gerakan, ekspresi, pose
- * 4. VISUAL ATTRIBUTE — Komposisi, angle, lighting (TANPA WARNA)
- * 5. MOOD — Suasana & tone emosional
- * 6. STYLE / ASSET TYPE — Gaya visual, format
- * 7. CONCEPT — Tema besar, ide abstrak, komersial
- * 8. USE CASE / CONTEXT — Use case, lokasi, environment
- * 
- * ⚠️ Warna tidak termasuk — buang slot keyword
- * 
- * Prinsip:
- * - Akurasi > Jumlah Keyword
- * - Relevansi > Keyword Viral
- * - Buyer Intent > Kata Keren
- * - Urutan Keyword Sangat Penting
+ * AI selects the keywords. Application code only cleans and deduplicates them.
  */
-function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number, title?: string): string[] {
+function buildVerifiedKeywordPipeline(
+  aiCandidates: string[],
+  _visualFacts: any,
+  _tiers: TieredVisualAnalysis,
+  targetCount: number,
+  _keywordMode?: 'mixed' | 'single' | 'multi'
+): string[] {
+  const cleaned = (aiCandidates || [])
+    .filter(k => typeof k === 'string')
+    .map(k => sanitizeForIndexing(k))
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const uniqueExact = cleaned.filter(keyword => {
+    const key = keyword.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return targetCount > 0 ? uniqueExact.slice(0, targetCount) : uniqueExact;
+}
+
+function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, targetCount: number): string[] {
   if (keywords.length === 0) return keywords;
 
   const lower = (s: string) => s.toLowerCase().trim();
 
   // Ekstrak elemen visual dari tiers
   const primarySubjects = tiers.objects
-    .filter(o => o.tier === 'primary' || o.importance >= 70)
+    .filter(o => o.tier === 'primary')
     .map(o => lower(o.name));
   const allSubjects = tiers.objects.map(o => lower(o.name));
   const attributes = tiers.attributes.map(a => lower(String(a)));
   const scene = tiers.scene.map(s => lower(String(s)));
   const concepts = tiers.concepts.map(c => lower(String(c)));
 
-  // ==== DYNAMIC 4-TIER PERCENTAGE STRUCTURE (applies to every provider, scales with targetCount) ====
-  // TIER 1 (~25%): MAIN SUBJECT — the single most important keyword(s)
-  // TIER 2 (~25%): SCENE CONTEXT — setting, environment, lighting, mood, location, use case
-  // TIER 3 (~25%): OBJECT / ACTIVITY — secondary objects, demographic/material detail, action/motion
-  // TIER 4 (remainder ~25%): ADDITIONAL CONCEPTS — abstract/commercial concepts + overflow from tiers 1-3
-  // Caps are computed as a PERCENTAGE of targetCount so the pattern stays proportionally identical
-  // whether the user requests 40, 30, 20, or any other keyword count — never hardcoded fixed numbers.
-  const tier1Cap = Math.max(1, Math.round(targetCount * 0.25));
-  const tier2Cap = Math.max(1, Math.round(targetCount * 0.25));
-  const tier3Cap = Math.max(1, Math.round(targetCount * 0.25));
-  // Tier 4 has no hard cap — it absorbs the remainder plus any overflow so no keyword is ever dropped.
+  // --- Stage classification helpers ---
+  const matchesSubject = (kw: string): boolean =>
+    allSubjects.some(s => s.includes(kw) || kw.includes(s));
 
-  const t1_mainSubject: string[] = [];
-  const t2_sceneContext: string[] = [];
-  const t3_objectActivity: string[] = [];
-  const t4_additionalConcepts: string[] = [];
+  const matchesAttribute = (kw: string): boolean =>
+    attributes.some(a => kw.includes(a) || a.includes(kw));
 
-  // ⚠️ Warna TIDAK termasuk keyword — filter out semua warna
-  const COLOR_WORDS = new Set([
-    'red', 'blue', 'green', 'yellow', 'black', 'white', 'brown', 'pink',
-    'purple', 'gray', 'grey', 'orange', 'gold', 'silver', 'beige', 'navy',
-    'teal', 'cyan', 'magenta', 'lavender', 'coral', 'turquoise', 'maroon',
-    'olive', 'indigo', 'violet', 'burgundy', 'crimson', 'amber', 'jade',
-    'ruby', 'sapphire', 'emerald', 'charcoal', 'ivory', 'cream', 'tan',
-    'multicolored', 'colorful', 'vibrant', 'pastel', 'neon', 'monochrome'
-  ]);
+  const matchesScene = (kw: string): boolean =>
+    scene.some(s => kw.includes(s) || s.includes(kw));
 
+  const matchesConcept = (kw: string): boolean =>
+    concepts.some(c => kw.includes(c) || c.includes(kw));
+
+  // Action verbs (gerakan / aksi)
   const ACTION_TERMS = new Set([
     'running', 'walking', 'jumping', 'sitting', 'standing', 'flying', 'swimming',
     'dancing', 'holding', 'reaching', 'lifting', 'working', 'typing', 'driving',
@@ -2550,268 +2642,176 @@ function rankAndWeightKeywords(keywords: string[], tiers: TieredVisualAnalysis, 
     'laughing', 'smiling', 'looking', 'watching', 'listening', 'thinking',
     'playing', 'climbing', 'falling', 'floating', 'rising', 'flowing', 'moving',
     'growing', 'blooming', 'shining', 'glowing', 'reflecting', 'spinning',
-    'collaborating', 'brainstorming', 'discussing', 'meeting', 'planning',
-    'aiming', 'splashing', 'squirting', 'shooting', 'gesturing'
+    'exercise', 'workout', 'yoga', 'meditation', 'training', 'practice',
+    'traveling', 'exploring', 'hiking', 'surfing', 'cycling', 'commuting'
   ]);
 
-  const MOOD_TERMS = new Set([
-    'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful',
-    'serious', 'inspiring', 'mysterious', 'joyful', 'melancholic',
-    'nostalgic', 'hopeful', 'tense', 'relaxing', 'uplifting', 'brooding'
-  ]);
-
-  const STYLE_TERMS = new Set([
-    'photo', 'photography', 'lifestyle photography', 'editorial', 'advertisement',
-    'illustration', 'vector', 'flat lay', '3D render', 'digital art',
-    'cinematic', 'documentary', 'portrait', 'landscape', 'aerial',
-    'mockup', 'template', 'isolated', 'realistic', 'minimal', 'vintage'
-  ]);
-
-  const USE_CASE_TERMS = new Set([
-    'social media post', 'website banner', 'presentation', 'blog',
-    'advertisement', 'landing page', 'print', 'billboard', 'brochure',
-    'flyer', 'poster', 'book cover', 'magazine', 'newsletter'
-  ]);
-
-  const isActionWord = (kw: string): boolean => {
+  const isAction = (kw: string): boolean => {
     const w = lower(kw);
     if (ACTION_TERMS.has(w)) return true;
-    return Array.from(ACTION_TERMS).some(a => w.includes(a));
+    return Array.from(ACTION_TERMS).some(a => w.includes(a) || a.includes(w));
   };
 
-  const matchesAnySubject = (kw: string): boolean => {
-    return allSubjects.some(s => s.includes(kw) || kw.includes(s));
+  // Technique / style terms
+  const TECHNIQUE_TERMS = new Set([
+    'watercolor', 'oil painting', 'sketch', 'line art', 'vector', 'flat design',
+    '3d render', 'cinematic', 'macro', 'close-up', 'wide shot', 'aerial view',
+    'drone shot', 'long exposure', 'bokeh', 'depth of field', 'grainy', 'vintage',
+    'retro', 'minimalist', 'abstract', 'geometric', 'isometric', 'gradient',
+    'monochrome', 'black and white', 'sepia', 'duotone', 'vibrant', 'pastel',
+    'high contrast', 'soft focus', 'flat lay', 'top view', 'panoramic',
+    'portrait orientation', 'landscape orientation', 'square format',
+    'high key', 'low key', 'rim lighting', 'backlit', 'silhouette', 'shadow play',
+    'golden hour', 'blue hour', 'night', 'daylight', 'natural light', 'studio light'
+  ]);
+
+  const isTechnique = (kw: string): boolean => {
+    const w = lower(kw);
+    if (TECHNIQUE_TERMS.has(w)) return true;
+    return Array.from(TECHNIQUE_TERMS).some(t => w.includes(t) || t.includes(w));
   };
 
-  const matchesAnyAttribute = (kw: string): boolean => {
-    return attributes.some(a => kw.includes(a) || a.includes(kw));
+  // Industry terms
+  const INDUSTRY_TERMS = new Set([
+    'healthcare', 'medical', 'technology', 'fintech', 'finance', 'education',
+    'marketing', 'advertising', 'real estate', 'hospitality', 'food industry',
+    'fashion', 'beauty', 'fitness', 'wellness', 'automotive', 'construction',
+    'agriculture', 'manufacturing', 'retail', 'e-commerce', 'entertainment',
+    'media', 'publishing', 'legal', 'insurance', 'travel', 'tourism',
+    'sustainability', 'green energy', 'renewable', 'corporate', 'startup',
+    'nonprofit', 'government', 'transportation', 'logistics', 'science', 'research'
+  ]);
+
+  const isIndustry = (kw: string): boolean => {
+    const w = lower(kw);
+    if (INDUSTRY_TERMS.has(w)) return true;
+    return Array.from(INDUSTRY_TERMS).some(ind => w.includes(ind) || ind.includes(w));
   };
 
-  const matchesAnyScene = (kw: string): boolean => {
-    return scene.some(s => kw.includes(s) || s.includes(kw));
+  // Use Case terms
+  const USECASE_TERMS = new Set([
+    'banner', 'landing page', 'presentation', 'brochure', 'flyer', 'poster',
+    'social media', 'instagram', 'facebook', 'website', 'blog', 'magazine',
+    'newsletter', 'annual report', 'billboard', 'packaging', 'product label',
+    'app design', 'ui design', 'wallpaper', 'background', 'cover photo',
+    'header', 'thumbnail', 'icon', 'logo', 'infographic', 'editorial',
+    'commercial', 'advertisement', 'promo', 'catalog', 'menu', 'invitation',
+    'greeting card', 'calendar', 'textbook', 'wall art', 'canvas print',
+    'copy space', 'text space', 'isolated', 'template', 'mockup'
+  ]);
+
+  const isUseCase = (kw: string): boolean => {
+    const w = lower(kw);
+    if (USECASE_TERMS.has(w)) return true;
+    return Array.from(USECASE_TERMS).some(u => w.includes(u) || u.includes(w));
   };
+
+  // Composition terms
+  const COMPOSITION_TERMS = new Set([
+    'rule of thirds', 'symmetry', 'asymmetry', 'leading lines', 'diagonal',
+    'framing', 'negative space', 'positive space', 'foreground', 'background',
+    'midground', 'layered', 'depth', 'perspective', 'vanishing point',
+    'balanced', 'unbalanced', 'centered', 'off-center', 'isolated subject',
+    'group composition', 'single object', 'pattern', 'texture', 'repetition',
+    'contrast', 'harmony', 'minimal', 'clean', 'uncluttered', 'cluttered',
+    'spacious', 'tight crop', 'full frame', 'environmental portrait'
+  ]);
+
+  const isComposition = (kw: string): boolean => {
+    const w = lower(kw);
+    if (COMPOSITION_TERMS.has(w)) return true;
+    return Array.from(COMPOSITION_TERMS).some(c => w.includes(c) || c.includes(w));
+  };
+
+  // --- Classify each keyword into stage buckets ---
+  const stages: { stage: number; label: string; items: string[] }[] = [
+    { stage: 1, label: 'SUBJECT', items: [] },
+    { stage: 2, label: 'ACTION', items: [] },
+    { stage: 3, label: 'ATTRIBUTE', items: [] },
+    { stage: 4, label: 'LOCATION/ENVIRONMENT', items: [] },
+    { stage: 5, label: 'CONCEPT', items: [] },
+    { stage: 6, label: 'EMOTION', items: [] },
+    { stage: 7, label: 'COMMERCIAL USE', items: [] },
+    { stage: 8, label: 'SEMANTIC/LONG-TAIL', items: [] }
+  ];
 
   const seen = new Set<string>();
 
   for (const kw of keywords) {
     const k = lower(kw);
     if (!k || k.length < 2 || seen.has(k)) continue;
-
-    // ⚠️ Skip color words entirely — they waste keyword slots
-    if (COLOR_WORDS.has(k)) continue;
-
     seen.add(k);
 
-    const isPrimarySubj = primarySubjects.some(s => s === k || k === s || k.includes(s) || s.includes(k));
-    const isSubjectMatch = matchesAnySubject(k);
-    const isDemographic = /\b(asian|caucasian|african|hispanic|millennial|gen z|baby boomer|teenager|senior|child|adult|male|female|man|woman|boy|girl|young|old|middle aged)\b/i.test(k);
-    const isMaterial = /\b(wooden|ceramic|plastic|metallic|glass|fabric|leather|stone|paper|cardboard|steel|bronze|concrete|brick|marble|granite)\b/i.test(k);
-    const isAction = isActionWord(k);
-    const isAttr = matchesAnyAttribute(k);
-    const isSceneContext = matchesAnyScene(k) || USE_CASE_TERMS.has(k) || MOOD_TERMS.has(k) || STYLE_TERMS.has(k) || isAttr;
+    const wordsCount = k.split(/\s+/).length;
 
-    // TIER 1 (~25%): MAIN SUBJECT — the single most important keyword(s)
-    if ((isPrimarySubj || isSubjectMatch) && t1_mainSubject.length < tier1Cap) {
-      t1_mainSubject.push(kw);
+    // STAGE 1: SUBJECT — exact primary/secondary visual subjects always come first,
+    // including multi-word subjects such as "prosthetic arm" or "red apple".
+    if (primarySubjects.some(s => s === k || k === s) || (matchesSubject(k) && allSubjects.length > 0)) {
+      stages[0].items.push(kw);
       continue;
     }
 
-    // TIER 2 (~25%): SCENE CONTEXT — setting, environment, lighting, mood, location, use case
-    if (isSceneContext && t2_sceneContext.length < tier2Cap) {
-      t2_sceneContext.push(kw);
+    // STAGE 2: ACTION
+    if (isAction(k)) {
+      stages[1].items.push(kw);
       continue;
     }
 
-    // TIER 3 (~25%): OBJECT / ACTIVITY — secondary objects, demographic/material detail, action/motion
-    if ((isSubjectMatch || isAction || isDemographic || isMaterial) && t3_objectActivity.length < tier3Cap) {
-      t3_objectActivity.push(kw);
+    // STAGE 3: ATTRIBUTE
+    if (matchesAttribute(k) || isTechnique(k) || isComposition(k)) {
+      stages[2].items.push(kw);
       continue;
     }
 
-    // TIER 4 (remainder): ADDITIONAL CONCEPTS — abstract/commercial concepts + overflow from tiers 1-3
-    t4_additionalConcepts.push(kw);
+    // STAGE 4: LOCATION/ENVIRONMENT
+    if (matchesScene(k)) {
+      stages[3].items.push(kw);
+      continue;
+    }
+
+    // EMOTION vs CONCEPT logic
+    const EMOTION_TERMS = new Set(['happy', 'sad', 'angry', 'joy', 'fear', 'excited', 'stress', 'love', 'cry', 'smile', 'laugh', 'depressed', 'anxious', 'peaceful', 'calm', 'romantic']);
+    const isEmotion = Array.from(EMOTION_TERMS).some(e => k.includes(e));
+
+    // STAGE 6: EMOTION
+    if (isEmotion) {
+      stages[5].items.push(kw);
+      continue;
+    }
+
+    // STAGE 5: CONCEPT
+    if (matchesConcept(k)) {
+      stages[4].items.push(kw);
+      continue;
+    }
+
+    // STAGE 7: COMMERCIAL USE
+    if (isIndustry(k) || isUseCase(k)) {
+      stages[6].items.push(kw);
+      continue;
+    }
+
+    // STAGE 8: SEMANTIC/LONG-TAIL — only after subject/action/attribute/context
+    // checks have had a chance to classify the phrase naturally.
+    if (wordsCount >= 2) {
+      stages[7].items.push(kw);
+      continue;
+    }
+
+    // Fallback based on length if somehow it wasn't caught
+    if (wordsCount === 1) {
+      stages[2].items.push(kw); // Default to ATTRIBUTE
+    } else {
+      stages[7].items.push(kw); // Default to LONG-TAIL
+    }
   }
 
-  if (primarySubjects.length > 0) {
-    const mainSubj = primarySubjects[0];
-    const idxInTier1 = t1_mainSubject.findIndex(k => lower(k) === mainSubj || lower(k).includes(mainSubj));
-    if (idxInTier1 > 0) {
-      const [main] = t1_mainSubject.splice(idxInTier1, 1);
-      t1_mainSubject.unshift(main);
-    } else if (idxInTier1 === -1 && mainSubj.length > 1) {
-      t1_mainSubject.unshift(mainSubj);
-    }
-  }
-
-  // Final assembly follows the mandatory 4-tier order: MAIN SUBJECT -> SCENE CONTEXT ->
-  // OBJECT/ACTIVITY -> ADDITIONAL CONCEPTS. Tier boundaries scale proportionally (~25% each)
-  // with targetCount, so the same pattern holds whether the request is for 40, 30, 20, etc.
-  const combined = [
-    ...t1_mainSubject,
-    ...t2_sceneContext,
-    ...t3_objectActivity,
-    ...t4_additionalConcepts
-  ];
-
-  return combined.slice(0, targetCount);
+  // Final Ranking: preserve evidence-backed candidates and order them by semantic priority.
+  // IMPORTANT: never pad, synthesize, or invent keywords here.
+  const finalResult = stages.flatMap(stage => stage.items);
+  return finalResult.slice(0, targetCount);
 }
 
-// ---- LAPISAN 4: EKSPANSI SINONIM & LONG-TAIL KEYWORD -----------------------
-
-const SYNONYM_MAP: Record<string, string[]> = {
-  // Objects / Subjects
-  'car': ['automobile', 'vehicle', 'automotive'],
-  'phone': ['smartphone', 'mobile phone', 'cellular phone', 'mobile device'],
-  'lift': ['elevator'],
-  'sidewalk': ['pavement', 'walkway'],
-  'doctor': ['physician', 'healthcare worker', 'medical professional'],
-  'nurse': ['healthcare worker', 'medical staff', 'caregiver'],
-  'shop': ['store', 'retail outlet', 'boutique', 'market'],
-  'computer': ['laptop', 'pc', 'workstation', 'digital device'],
-  'house': ['home', 'residence', 'residential building'],
-  'building': ['architecture', 'structure', 'edifice'],
-  'road': ['street', 'highway', 'avenue', 'pathway'],
-  'city': ['urban area', 'metropolis', 'downtown'],
-  'beach': ['seashore', 'coastline', 'shore'],
-  'sea': ['ocean', 'marine water'],
-  'forest': ['woodland', 'jungle', 'nature reserve'],
-  'money': ['finance', 'currency', 'capital', 'funds'],
-  'food': ['cuisine', 'meal', 'dish', 'refreshment'],
-  'drink': ['beverage', 'refreshment'],
-  'dog': ['canine', 'puppy', 'pet'],
-  'cat': ['feline', 'kitten', 'pet'],
-  'plant': ['flora', 'botanical', 'vegetation'],
-  'flower': ['blossom', 'petal', 'bloom'],
-  'autumn': ['fall', 'autumnal'],
-  'fall': ['autumn', 'autumnal'],
-  'trolley': ['shopping cart', 'cart'],
-  'subway': ['underground', 'metro', 'transit'],
-  'trash': ['garbage', 'rubbish', 'waste'],
-  'copyspace': ['copy space', 'text space', 'blank space'],
-  'isolated': ['white background', 'cutout', 'standalone'],
-  'sunset': ['dusk', 'sundown', 'golden hour'],
-  'sunrise': ['dawn', 'morning light', 'daybreak'],
-
-  // Actions
-  'work': ['employment', 'job', 'business'],
-  'walk': ['stroll', 'stride'],
-  'run': ['sprint', 'jog'],
-  'eat': ['dine', 'consume'],
-  'talk': ['converse', 'discuss'],
-  'happy': ['joyful', 'cheerful', 'delighted'],
-  'idea': ['concept', 'notion', 'thought']
-};
-
-// Reverse lookup index dibangun sekali dari SYNONYM_MAP agar pencarian sinonim bekerja
-// dua arah (mis. mencari "car" harus juga menemukan entri di mana "car" adalah nilai
-// dari kunci "automobile", bukan hanya saat "car" adalah kunci).
-const REVERSE_SYNONYM_MAP: Record<string, string[]> = {};
-Object.entries(SYNONYM_MAP).forEach(([key, values]) => {
-  values.forEach(v => {
-    const lv = v.toLowerCase();
-    if (!REVERSE_SYNONYM_MAP[lv]) REVERSE_SYNONYM_MAP[lv] = [];
-    REVERSE_SYNONYM_MAP[lv].push(key);
-    // Juga hubungkan sesama nilai dalam grup sinonim yang sama (mis. "automobile" <-> "vehicle")
-    values.forEach(v2 => {
-      if (v2.toLowerCase() !== lv) {
-        if (!REVERSE_SYNONYM_MAP[lv]) REVERSE_SYNONYM_MAP[lv] = [];
-        REVERSE_SYNONYM_MAP[lv].push(v2.toLowerCase());
-      }
-    });
-  });
-});
-
-function getSynonymsFor(word: string): string[] {
-  const lower = word.toLowerCase();
-  const out = new Set<string>();
-  (SYNONYM_MAP[lower] || []).forEach(s => out.add(s.toLowerCase()));
-  (REVERSE_SYNONYM_MAP[lower] || []).forEach(s => out.add(s.toLowerCase()));
-  return Array.from(out);
-}
-
-/**
- * Menghasilkan varian tunggal/jamak sederhana dari sebuah kata (bukan kamus generik,
- * murni transformasi morfologis dari keyword yang SUDAH relevan/terdeteksi).
- */
-function pluralSingularVariant(word: string): string | null {
-  const w = word.toLowerCase();
-  if (w.length < 3) return null;
-  if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
-  if (w.endsWith('y') && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + 'ies';
-  if (w.endsWith('es') && (w.endsWith('ses') || w.endsWith('xes') || w.endsWith('ches') || w.endsWith('shes'))) return w.slice(0, -2);
-  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
-  if (!w.endsWith('s')) return w + 's';
-  return null;
-}
-
-/**
- * Ekspansi murni berbasis keyword yang SUDAH relevan (bukan daftar kategori generik):
- * (a) sinonim/istilah regional dua arah untuk cross-search discoverability,
- * (b) long-tail phrase dengan menggabungkan SETIAP subjek (primary + secondary) dengan
- *     modifier atribut/scene yang benar-benar terdeteksi di gambar,
- * (c) kombinasi subjek x warna dan subjek x aksi yang terdeteksi,
- * (d) varian tunggal/jamak dari keyword yang sudah ada,
- * (e) pemecahan frasa multi-kata yang sudah relevan menjadi kata tunggal yang bermakna.
- */
-function expandSynonymsAndLongTail(keywords: string[], tiers: TieredVisualAnalysis, maxNew: number): string[] {
-  if (maxNew <= 0) return [];
-  const existing = new Set(keywords.map(k => k.toLowerCase()));
-  const expansions: string[] = [];
-  const pushIfNew = (val: string) => {
-    const v = val.trim().toLowerCase();
-    if (v.length > 1 && !existing.has(v) && !isProhibitedKeyword(v)) {
-      expansions.push(v);
-      existing.add(v);
-    }
-  };
-
-  // (a) Sinonim dua arah dari setiap keyword yang sudah relevan
-  keywords.forEach(k => {
-    getSynonymsFor(k).forEach(pushIfNew);
-  });
-
-  // (d) Varian tunggal/jamak ditiadakan agar sesuai algoritma microstock (mencegah duplikasi akar kata -ing/-er/-s)
-
-  // (e) Pecah frasa multi-kata relevan menjadi kata tunggal yang bermakna
-  const genericConnectors = new Set(['a', 'an', 'the', 'and', 'or', 'of', 'in', 'on', 'at', 'with', 'for']);
-  keywords.forEach(k => {
-    if (k.includes(' ')) {
-      k.split(/\s+/).forEach(part => {
-        if (part.length > 2 && !genericConnectors.has(part)) pushIfNew(part);
-      });
-    }
-  });
-
-  // (b) Long-tail: SETIAP subjek (primary + secondary + background) x modifier
-  // (atribut warna/aksi/teks + scene) — seluruhnya berasal dari fakta visual terdeteksi,
-  // bukan daftar kategori generik.
-  const allSubjects = [...(tiers.objects || [])].map(o => o?.name).filter(Boolean) as string[];
-  const modifiers = [...(tiers.attributes || []).slice(0, 6), ...(tiers.scene || []).slice(0, 4)];
-  allSubjects.slice(0, 6).forEach(subject => {
-    modifiers.forEach(mod => {
-      const modLower = String(mod).toLowerCase();
-      // subjek + modifier
-      const phraseA = `${subject.toLowerCase()} ${modLower}`.trim();
-      if (phraseA.split(/\s+/).length >= 2 && phraseA.split(/\s+/).length <= 4) pushIfNew(phraseA);
-      // modifier + subjek (urutan alternatif untuk cakupan pencarian yang lebih luas)
-      const phraseB = `${modLower} ${subject.toLowerCase()}`.trim();
-      if (phraseB.split(/\s+/).length >= 2 && phraseB.split(/\s+/).length <= 4) pushIfNew(phraseB);
-    });
-  });
-
-  return expansions.slice(0, maxNew);
-}
-
-/**
- * Versi expandSynonymsAndLongTail yang bekerja langsung dari visualFacts mentah
- * (dipakai sebagai pengganti fallback kategori generik di dalam ensureKeywordCount,
- * di mana objek TieredVisualAnalysis penuh belum tentu tersedia).
- */
-function expandFromVisualFacts(existingKeywords: string[], visualFacts: any, maxNew: number): string[] {
-  if (maxNew <= 0) return [];
-  const pseudoTiers: TieredVisualAnalysis = buildTieredVisualAnalysis(visualFacts);
-  return expandSynonymsAndLongTail(existingKeywords, pseudoTiers, maxNew);
-}
 
 // ---- LAPISAN 5: FILTER OTOMATIS PEDOMAN ADOBE STOCK & SHUTTERSTOCK --------
 
@@ -2827,19 +2827,10 @@ const MARKETPLACE_BANNED_TERMS = new Set([
 ]);
 
 /**
- * Mengecek apakah sebuah keyword melanggar pedoman Adobe Stock / Shutterstock:
- * brand & IP (via isProhibitedKeyword), klaim superlatif tak terverifikasi,
- * konten eksplisit, spam CTA, atau bukan berupa frasa pendek (kalimat penuh).
+ * Keyword post-processing is mechanical only: cleaning and deduplication.
  */
 function violatesMarketplaceGuidelines(keyword: string): boolean {
-  const lower = keyword.toLowerCase().trim();
-  if (!lower) return true;
-  if (isProhibitedKeyword(lower)) return true;
-  if (MARKETPLACE_BANNED_TERMS.has(lower)) return true;
-  if (Array.from(MARKETPLACE_BANNED_TERMS).some(term => lower.includes(term))) return true;
-  // Pedoman marketplace: keyword harus frasa pendek, bukan kalimat (maks ~4 kata)
-  if (lower.split(/\s+/).length > 4) return true;
-  return false;
+  return !String(keyword || '').trim();
 }
 
 function filterBannedKeywords(keywords: string[]): string[] {
@@ -2849,73 +2840,38 @@ function filterBannedKeywords(keywords: string[]): string[] {
 // ---- LAPISAN 6: DEDUPLIKASI SEMANTIK (BUKAN HANYA TEKS SAMA) --------------
 
 function stemWord(word: string): string {
-  const w = word.toLowerCase().trim();
-  if (w.length <= 3) return w;
-  
-  // Plural / inflectional endings
+  const w = word.toLowerCase();
   if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
   if (w.endsWith('es') && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('ing') && w.length > 5) {
-    let base = w.slice(0, -3);
-    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) base = base.slice(0, -1); // running -> run
-    return base;
-  }
-  if (w.endsWith('ed') && w.length > 4) {
-    let base = w.slice(0, -2);
-    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) base = base.slice(0, -1); // stopped -> stop
-    return base;
-  }
-  if (w.endsWith('er') && w.length > 4) {
-    let base = w.slice(0, -2);
-    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) base = base.slice(0, -1); // runner -> run
-    return base;
-  }
-  if (w.endsWith('or') && w.length > 4) return w.slice(0, -2); // creator -> creat
-  if (w.endsWith('tion') && w.length > 5) return w.slice(0, -4); // creation -> crea
-  if (w.endsWith('ment') && w.length > 5) return w.slice(0, -4);
-  if (w.endsWith('ness') && w.length > 5) return w.slice(0, -4);
-  if (w.endsWith('able') && w.length > 5) return w.slice(0, -4);
-  if (w.endsWith('ly') && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('ist') && w.length > 4) return w.slice(0, -3);
+  if (w.endsWith('ing') && w.length > 5) return w.slice(0, -3);
+  if (w.endsWith('ed') && w.length > 4) return w.slice(0, -2);
   if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) return w.slice(0, -1);
   return w;
 }
 
 /**
- * Filter anti-spam akhiran / duplikasi akar kata (Root Word / Suffix Deduplication)
- * Sesuai algoritma mesin pencari Microstock (Adobe Stock & Shutterstock).
- * Melarang pengulangan akar kata dengan akhiran -ing, -er, -ed, -s, dsb.
- * Hanya menyimpan bentuk pertama yang paling relevan dan natural.
+ * Signature semantik: setiap kata di-stem lalu diurutkan alfabetis, sehingga
+ * frasa yang secara makna identik namun berbeda urutan/bentuk kata
+ * (mis. "beach sunset" vs "sunset beaches" vs "sunset at the beach") terdeteksi sebagai duplikat,
+ * bukan hanya deduplikasi string yang persis sama.
  */
-function deduplicateStemVariants(keywords: string[]): string[] {
-  const seenSingleWordStems = new Set<string>();
-  const seenSignatures = new Set<string>();
-  const result: string[] = [];
 
-  for (const kw of keywords) {
-    const clean = kw.toLowerCase().trim();
-    if (!clean || clean.length < 2) continue;
+/**
+ * Sanitasi mendalam khusus untuk memastikan kata kunci 100% ramah indeksasi (Indexable)
+ * pada algoritma mesin pencari microstock (Adobe Stock, Shutterstock, Freepik, Getty).
+ */
+function sanitizeForIndexing(kw: string): string {
+  if (!kw) return '';
+  let clean = kw
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
+    .replace(/\s+/g, ' ')          // Normalisasi spasi
+    .trim();
 
-    const words = clean.split(/\s+/);
-    
-    // Untuk single-word keyword, pastikan akar kata belum pernah muncul
-    if (words.length === 1) {
-      const stem = stemWord(clean);
-      if (seenSingleWordStems.has(stem)) {
-        continue; // Tolak varian kata yang hanya beda akhiran (-ing, -er, -ed, -s)
-      }
-      seenSingleWordStems.add(stem);
-    }
-
-    // Cek semantic signature untuk multi-word maupun single-word
-    const sig = semanticKeySignature(clean);
-    if (seenSignatures.has(sig)) continue;
-    seenSignatures.add(sig);
-
-    result.push(kw);
-  }
-
-  return result;
+  const words = clean.split(' ').filter(w => w.length >= 2);
+  
+  return words.join(' ');
 }
 
 function semanticKeySignature(phrase: string): string {
@@ -2929,7 +2885,95 @@ function semanticKeySignature(phrase: string): string {
 }
 
 function semanticDeduplicate(keywords: string[]): string[] {
-  return deduplicateStemVariants(keywords);
+  const result: string[] = [];
+  const seenSignatures = new Set<string>();
+
+  // Common microstock redundancies: keep the more standard/searchable form.
+  const familyCanonical: Record<string, string> = {
+    xmas: 'christmas',
+    'newyear': 'new year',
+    decor: 'decoration',
+    decorative: 'decoration',
+    golden: 'gold',
+    elegance: 'elegant',
+    glossy: 'shiny',
+    seasonal: 'holiday'
+  };
+
+  const canonicalize = (phrase: string): string => {
+    const words = phrase.toLowerCase().split(/\s+/).map(w => familyCanonical[w] || w);
+    return words.join(' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const familyKeys = new Set<string>();
+  for (const raw of keywords) {
+    const kw = sanitizeForIndexing(raw);
+    if (!kw) continue;
+    const canonical = canonicalize(kw);
+    const signature = semanticKeySignature(canonical);
+    if (!signature || seenSignatures.has(signature)) continue;
+
+    // Exact semantic-family dedupe for near-equivalent single words/phrases.
+    const familyKey = canonical.split(/\s+/).map(w => familyCanonical[w] || w).join(' ');
+    if (familyKeys.has(familyKey)) continue;
+
+    seenSignatures.add(signature);
+    familyKeys.add(familyKey);
+    result.push(canonical);
+  }
+
+  // Phrase prioritization: when a generic one-word term is already represented
+  // by a more specific phrase, keep the phrase and drop the redundant singleton.
+  const multiWord = result.filter(k => k.includes(' '));
+  const phraseFiltered = result.filter(k => {
+    if (k.includes(' ')) return true;
+    return !multiWord.some(phrase => {
+      const words = phrase.split(/\s+/);
+      if (words.length < 2 || !words.includes(k)) return false;
+      // Only suppress generic singleton repetition; keep useful standalone
+      // color/material terms such as gold, white, ceramic.
+      const preserve = new Set(['gold','white','black','blue','red','green','brown','silver','ceramic','porcelain','wood','metal']);
+      return !preserve.has(k);
+    });
+  });
+
+  return capSynonymClusters(phraseFiltered);
+}
+
+// Groups of near-synonymous concepts that commonly get over-generated by the
+// AI despite instructions not to (e.g. an office scene producing "office",
+// "business", "corporate", "workspace", "administrative", "clerical",
+// "service", "client", "paperwork", "form", "application", "reception" all
+// at once). Only the strongest N terms per cluster survive; the rest are
+// dropped as redundant padding. Order of input is preserved as a relevance
+// proxy (earlier = ranked higher by the AI/vision pipeline already).
+const KEYWORD_SYNONYM_CLUSTERS: string[][] = [
+  ['office', 'business', 'corporate', 'workspace', 'administrative', 'clerical', 'bureaucracy', 'paperwork', 'form', 'application', 'service', 'client'],
+  ['reception', 'lobby', 'waiting room', 'waiting', 'foyer'],
+  ['interview', 'consultation', 'meeting', 'appointment', 'candidate'],
+  ['calm', 'quiet', 'peaceful', 'serene', 'tranquil'],
+  ['patience', 'anticipation', 'expectation'],
+];
+const MAX_KEEP_PER_CLUSTER = 3;
+
+function capSynonymClusters(keywords: string[]): string[] {
+  const dropIndices = new Set<number>();
+
+  for (const cluster of KEYWORD_SYNONYM_CLUSTERS) {
+    const clusterSet = new Set(cluster);
+    const matches: number[] = [];
+    keywords.forEach((kw, idx) => {
+      if (clusterSet.has(kw)) matches.push(idx);
+    });
+    if (matches.length > MAX_KEEP_PER_CLUSTER) {
+      // Keep the first N occurrences (highest relevance order already applied
+      // upstream), drop the rest as redundant synonym padding.
+      matches.slice(MAX_KEEP_PER_CLUSTER).forEach(idx => dropIndices.add(idx));
+    }
+  }
+
+  if (dropIndices.size === 0) return keywords;
+  return keywords.filter((_, idx) => !dropIndices.has(idx));
 }
 
 // ---- LAPISAN 7: PENENTUAN KATEGORI YANG LEBIH AKURAT -----------------------
@@ -3030,136 +3074,392 @@ function validateFinalMetadata(
 // END METADATAGEN STRUCTURED PIPELINE
 // ============================================================================
 
-// ============================================================================
-// 8-DIMENSI KEYWORD — buildStructuredKeywords()
-// Mengklasifikasikan keyword AI Vision ke 8-dimensi Microstock:
-// Main Subject → Specific Description → Action/Motion → Visual Attribute
-// → Mood → Style/Asset Type → Concept → Use Case → Context
-// ⚠️ Warna tidak termasuk dalam keyword (buang slot)
-// ============================================================================
+// UNIVERSAL KEYWORD SPECIFICATION
+  // This contract is intentionally provider/model invariant. It defines the quality
+  // standard; provider adapters should only handle transport/schema/model differences.
+const UNIVERSAL_KEYWORD_SPECIFICATION = `
+UNIVERSAL MICROSTOCK KEYWORD SPECIFICATION — APPLY IDENTICALLY TO EVERY PROVIDER AND MODEL
 
-function buildStructuredKeywords(
-  keywords: string[],
-  tiers: TieredVisualAnalysis
-): StructuredKeywords {
-  const lower = (s: string) => s.toLowerCase().trim();
+ROLE:
+You are an expert AI Vision + Microstock Keyword Specialist.
 
-  const primarySubjects = tiers.objects
-    .filter(o => o.tier === 'primary' || o.importance >= 70)
-    .map(o => lower(o.name));
-  const allSubjects = tiers.objects.map(o => lower(o.name));
-  const attributes = tiers.attributes.map(a => lower(String(a)));
-  const scene = tiers.scene.map(s => lower(String(s)));
+PRIMARY OBJECTIVE:
+Look at the actual asset first, understand it like a human stock contributor, then produce the most useful keywords for that exact asset. The keyword list must describe the asset naturally and help a real buyer find it.
 
-  const ACTION_PATTERNS = new Set([
-    'running', 'walking', 'jumping', 'sitting', 'standing', 'flying', 'swimming',
-    'dancing', 'holding', 'reaching', 'lifting', 'working', 'typing', 'driving',
-    'reading', 'writing', 'cooking', 'eating', 'drinking', 'sleeping', 'talking',
-    'laughing', 'smiling', 'looking', 'watching', 'listening', 'thinking',
-    'playing', 'climbing', 'falling', 'floating', 'rising', 'flowing', 'moving',
-    'collaborating', 'brainstorming', 'discussing', 'meeting', 'planning',
-    'aiming', 'splashing', 'squirting', 'shooting', 'gesturing'
-  ]);
+1. AI VISION IS THE SOURCE OF TRUTH
+- Carefully inspect the complete asset from edge to edge.
+- Understand the dominant visual subject before thinking about SEO.
+- Every keyword must be supported by the supplied visual evidence or by a directly supported, natural search phrase.
+- Never invent objects, people, places, materials, actions, professions, events, emotions, brands, names, industries, audiences, or use cases.
 
-  const MOOD_PATTERNS = new Set([
-    'calm', 'energetic', 'happy', 'romantic', 'dramatic', 'peaceful',
-    'serious', 'inspiring', 'mysterious', 'joyful', 'melancholic',
-    'nostalgic', 'hopeful', 'tense', 'relaxing', 'uplifting'
-  ]);
+2. MAIN SUBJECT FIRST — THIS IS THE CORE ORDER
+- Identify the MAIN SUBJECT that is visually dominant, central, distinctive, or most important to the asset.
+- The strongest Main Subject keyword MUST appear first whenever it is a valid keyword.
+- After the Main Subject, add useful specific descriptions of that subject, natural subject variations, and closely related visible details.
+- Then add important secondary subjects and supporting objects.
+- Only after the important subjects are covered should the list expand into setting, action/state, visual attributes, seasonal context, concepts, and genuinely useful search intent.
+- Never force this order when the image itself clearly makes another subject more important. AI Vision decides the hierarchy.
 
-  const STYLE_PATTERNS = new Set([
-    'photo', 'photography', 'lifestyle photography', 'editorial', 'advertisement',
-    'illustration', 'vector', 'flat lay', '3D render', 'digital art',
-    'cinematic', 'documentary', 'portrait', 'landscape', 'aerial',
-    'mockup', 'template', 'isolated', 'realistic', 'minimal', 'vintage'
-  ]);
+3. NATURAL MICROSTOCK KEYWORD ORDER
+Use this hierarchy as a priority, NOT as fixed slots:
+MAIN SUBJECT → SPECIFIC MAIN SUBJECT → SECONDARY SUBJECTS → SUPPORTING OBJECTS → SETTING/CONTEXT → ACTION/STATE → VISUAL ATTRIBUTES → SEASON/EVENT → CONCEPT → USE/SEARCH INTENT.
+- The list must remain natural.
+- Do not reserve percentages or quotas for any category.
+- Do not deliberately spread keywords across categories.
+- The best relevant keyword wins the next position.
 
-  const USE_CASE_PATTERNS = new Set([
-    'social media post', 'website banner', 'presentation', 'blog',
-    'advertisement', 'landing page', 'print', 'billboard', 'brochure',
-    'flyer', 'poster', 'book cover', 'magazine', 'newsletter'
-  ]);
+4. SEARCH INTENT
+- Think like a real stock buyer searching for this exact visual.
+- Prefer normal buyer-facing words and natural short phrases.
+- Search intent may improve wording, but it can NEVER override visual truth.
+- Do not add generic SEO words such as marketing, business, website, advertising, lifestyle, or social media unless the visual genuinely supports that search intent.
 
-  // ⚠️ Warna TIDAK termasuk keyword
-  const COLOR_WORDS = /\b(red|blue|green|yellow|black|white|brown|pink|purple|gray|grey|orange|gold|silver|beige|navy|teal|cyan|magenta|lavender|coral|turquoise|maroon|olive|indigo|violet|burgundy|crimson|amber|jade|ruby|sapphire|emerald|charcoal|ivory|cream|tan|multicolored|colorful|vibrant|pastel|neon|monochrome)\b/i;
+5. SINGLE WORDS AND PHRASES
+- Use single words when they are the strongest natural term.
+- Use 2-3 word phrases when the phrase is more specific and useful intact.
+- Prefer “ramadan lanterns” over splitting the meaning when that phrase is a natural description.
+- Never manufacture awkward keyword combinations.
+- Never use full sentences.
 
-  const result: StructuredKeywords = {
-    mainSubject: [],
-    specificDescription: [],
-    actionMotion: [],
-    visualAttribute: [],
-    mood: [],
-    styleAssetType: [],
-    concept: [],
-    useCase: [],
-    context: []
-  };
+6. SEMANTIC EXPANSION
+- Expand only from meanings already established by AI Vision.
+- Natural synonyms and specific variations are allowed when they provide real search value.
+- Do not create synonym spam such as multiple nearly identical variants simply to increase count.
+- A longer keyword is valid only when it adds meaningful specificity.
 
-  const seen = new Set<string>();
+7. COLOR CONTROL
+- Use a maximum of 1–2 color keywords in the final list.
+- Choose only the most visually important/useful colors.
+- Never fill the keyword list with many shades or redundant color variants.
 
-  for (const kw of keywords) {
-    const k = lower(kw);
-    if (!k || k.length < 2 || seen.has(k) || COLOR_WORDS.test(k)) continue;
-    seen.add(k);
+8. COMMERCIAL VALUE
+- Commercial usefulness is an enrichment signal, not a license to hallucinate.
+- Prefer concrete subject relevance over vague marketing language.
+- Do not manufacture buyer use cases.
 
-    // Tier 1: Main Subject
-    if (primarySubjects.some(s => s === k || k === s || k.includes(s) || s.includes(k))) {
-      result.mainSubject.push(kw);
-      continue;
+9. IP / NAMES
+- Never include brands, trademarks, company names, product names, celebrities, fictional characters, artists, protected creative works, or other identifying names.
+
+10. FORMAT
+- Follow the selected keyword mode.
+- Final keywords must be lowercase.
+- Remove duplicates and semantic duplicates.
+- Do not include media-type filler such as photo, image, picture, stock, vector, or illustration unless explicitly allowed by the asset/platform rules.
+
+11. FINAL SELF-AUDIT
+Before returning the list, check every keyword:
+- Is it supported by the asset?
+- Is it useful for finding this exact asset?
+- Is it more useful than a weaker generic alternative?
+- Is it redundant?
+- Is it speculative?
+- Does its position make sense compared with the Main Subject?
+Remove weak, unrelated, or spammy terms.
+
+11A. ADOBE STOCK COMPLIANCE
+- Maximum 49 keywords per asset.
+- 15–35 keywords is a practical target range when the asset genuinely supports that many.
+- Never add filler just to reach 15, 35, or any requested count.
+- The first 10 keywords must carry the strongest relevance.
+- Important words/concepts from the title should appear within the first 10 when relevant.
+- Use one metadata language consistently.
+- Use each keyword only once; singular/plural variants do not need separate entries.
+- Avoid trademarks, brands, product names, artist names, celebrities, private-person names,
+  government agency names, and third-party intellectual property.
+- Avoid camera specifications, file formats, file sizes, numbers, and technical capture data.
+- Prefer concise concepts. Do not create long descriptive sentences as keywords.
+- Do not keyword speculative uses, audiences, industries, locations, demographics, or concepts.
+- Do not use background details that are irrelevant to a buyer.
+- Do not use opposite concepts unless both are genuinely represented and meaningful.
+- Prefer specific visual terms over vague broader terms when both compete for a position.
+
+12. EXACT COUNT
+The requested count is mandatory.
+- If the user requests 10, return exactly the 10 strongest valid keywords.
+- If the user requests 25, return exactly the 25 strongest valid keywords.
+- If the user requests 40, return exactly the 40 strongest valid keywords.
+- If the user requests more than 49, cap the output at 49.
+- Never use filler merely to hit the number.
+- If the first generation is short, perform another AI generation pass using the same VISUAL_FACTS and ask only for additional valid keywords that have not already been represented.
+- Re-rank the complete candidate list after expansion.
+
+12B. BUYER SEARCH LANGUAGE / SEO
+- Write metadata in the natural vocabulary a stock buyer would type into search.
+- Prefer concrete nouns, observable actions, settings, subjects, and commercially recognizable concepts.
+- Prefer common searchable wording over literary, poetic, clever, or unnecessarily technical language.
+- Use the most specific common term supported by the visual asset; do not use obscure synonyms only for SEO.
+- Do not repeat the same concept through unnecessary synonyms or keyword stuffing.
+- Title should read naturally as a human search-relevant description, not as a keyword list.
+- Keyword order must reflect buyer search priority: what is shown first and what buyers are most likely to search for.
+- SEO must never override visual accuracy. A high-search-volume term that is not visibly supported must be rejected.
+- Avoid speculative buyer intent such as "copy space", "advertising", "banner", "website", "social media", "marketing" unless the visual composition or concept clearly supports it.
+- Use commercially useful concepts only when they are visually defensible.
+
+12A. TITLE ↔ KEYWORD CONSISTENCY
+- The title is the semantic anchor for the keyword set, not a separate SEO field.
+- Important title concepts should be represented in the first 10 keywords when visually supported.
+- Do not force every title word into keywords; grammatical filler words do not count.
+- A title term that is not visually supported must be removed or rewritten rather than compensated for with keywords.
+- Keywords must not introduce a major subject that contradicts or materially changes the title.
+- Title and keywords must describe the same asset, subject, action, setting, and visual context.
+- When title and keywords disagree, prefer VISUAL_FACTS and correct the metadata rather than inventing evidence.
+
+13. PROVIDER CONSISTENCY
+The same keyword philosophy applies to Gemini, GPT, Mistral, Claude, Llama, Groq, OpenRouter, NVIDIA, or any other provider. The provider may phrase a keyword differently, but Main Subject priority, visual accuracy, natural ordering, and exact count remain mandatory.
+`
+
+
+/**
+ * Provider-independent keyword expansion pass.
+ * Used only when the first metadata response does not contain enough valid,
+ * unique keywords. It asks the SAME provider/model for additional candidates
+ * grounded strictly in VISUAL_FACTS instead of fabricating keywords in code.
+ */
+async function expandKeywordsWithAI(
+  existingKeywords: string[],
+  visualFacts: any,
+  targetCount: number,
+  provider: string,
+  model: string,
+  keywordMode: 'mixed' | 'single' | 'multi' | undefined,
+  metadataLanguage?: string
+): Promise<string[]> {
+  const current = ensureKeywordCount(existingKeywords, targetCount, visualFacts, undefined, undefined, undefined, keywordMode);
+  if (current.length >= targetCount) return current;
+
+  const modeRule =
+    keywordMode === 'single'
+      ? 'STRICTLY SINGLE WORDS ONLY (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. Separate concepts like "coffee cup" into "coffee" and "cup".'
+      : keywordMode === 'multi'
+        ? 'Every keyword MUST be a natural 2-5 word phrase. NO single words.'
+        : 'Use a balanced mix of natural single words and 2-5 word search phrases. DO NOT unnecessarily split compound phrases that are naturally searched together.';
+
+  const language = getLanguageName(metadataLanguage);
+  let candidates = [...current];
+
+  for (let pass = 0; pass < 6 && candidates.length < targetCount; pass++) {
+    const needed = Math.min(30, Math.max(10, targetCount - candidates.length + 8));
+    const expansionSystem = `${UNIVERSAL_KEYWORD_SPECIFICATION}
+
+EXPANSION PASS:
+The first keyword generation pass produced ${candidates.length} valid keywords but the target is ${targetCount}.
+Generate ${needed} ADDITIONAL candidate keywords that are genuinely supported by VISUAL_FACTS.
+Do not repeat existing keywords. Continue from the existing Main Subject hierarchy. First look for missing specific Main Subject
+terms or natural subject phrases, then missing important secondary/supporting subjects, then setting,
+action/state, visual attributes, seasonal context, supported concepts, and realistic buyer search intent.
+Do not invent anything merely to reach the count.
+${modeRule}
+Output keywords in ${language}. Return JSON only in this form: {"keywords":["keyword 1","keyword 2"]}`;
+
+    const contentsText = `VISUAL_FACTS:
+${JSON.stringify(visualFacts, null, 2)}
+
+EXISTING KEYWORDS:
+${JSON.stringify(candidates)}
+
+Generate only NEW, evidence-backed candidates.`;
+
+    try {
+      let raw: any;
+      if (NON_GEMINI_PROVIDERS.has(provider)) {
+        raw = await callOpenAICompatibleWithRetry({
+          systemInstruction: expansionSystem,
+          contents: contentsText,
+          responseMimeType: "application/json",
+          config: { temperature: 0.15, topP: 0.8 },
+          model
+        });
+      } else {
+        raw = await callGeminiWithRetry(
+          model && model.startsWith('gemini-') ? model : 'gemini-2.5-flash',
+          { parts: [{ text: contentsText }] },
+          {
+            systemInstruction: expansionSystem,
+            responseMimeType: "application/json",
+            temperature: 0.15,
+            topP: 0.8
+          }
+        );
+      }
+
+      const parsed = JSON.parse(extractJSON(typeof raw === 'string' ? raw : raw?.text || '{}'));
+      const additions = Array.isArray(parsed?.keywords) ? parsed.keywords : [];
+      if (!additions.length) break;
+
+      const expandedPool = buildMasterKeywordCandidatePool(
+        [...candidates, ...additions], visualFacts, targetCount
+      );
+      candidates = ensureKeywordCount(
+        expandedPool,
+        targetCount,
+        visualFacts,
+        undefined,
+        undefined,
+        undefined,
+        keywordMode
+      );
+    } catch (err: any) {
+      console.warn(`[Keyword Expansion] Pass ${pass + 1} failed for ${provider}/${model}:`, err?.message || err);
+      break;
     }
-
-    // Tier 2: Specific Description
-    const isDemographic = /\b(asian|caucasian|african|hispanic|millennial|gen z|baby boomer|teenager|senior|child|adult|male|female|man|woman|boy|girl|young|old|middle aged)\b/i.test(k);
-    const isMaterial = /\b(wooden|ceramic|plastic|metallic|glass|fabric|leather|stone|paper|cardboard|steel|bronze|concrete|brick|marble|granite)\b/i.test(k);
-    if (isDemographic || isMaterial) {
-      result.specificDescription.push(kw);
-      continue;
-    }
-
-    // Tier 3: Action / Motion
-    if (ACTION_PATTERNS.has(k) || /(ing|ed)$/.test(k)) {
-      result.actionMotion.push(kw);
-      continue;
-    }
-
-    // Tier 4: Visual Attribute (composition, angle, lighting — no colors)
-    const isVisualAttr = /\b(shot|view|angle|light|lighting|depth of field|bokeh|copy space|negative space|close.?up|medium|wide|front|side|top|aerial|bird.?eye|backlit|silhouette|shadow|reflection|texture|pattern|minimal|clean|rustic|wooden|glass|metal|concrete|brick|marble|steel)\b/i.test(k);
-    if (isVisualAttr && !COLOR_WORDS.test(k)) {
-      result.visualAttribute.push(kw);
-      continue;
-    }
-
-    // Tier 5: Mood
-    if (MOOD_PATTERNS.has(k)) {
-      result.mood.push(kw);
-      continue;
-    }
-
-    // Tier 6: Style / Asset Type
-    if (STYLE_PATTERNS.has(k)) {
-      result.styleAssetType.push(kw);
-      continue;
-    }
-
-    // Tier 8: Use Case
-    if (USE_CASE_PATTERNS.has(k)) {
-      result.useCase.push(kw);
-      continue;
-    }
-
-    // Tier 9: Context (location, environment)
-    if (scene.some(s => k.includes(s) || s.includes(k)) ||
-        /\b(indoor|outdoor|office|home|studio|nature|urban|rural|beach|mountain|forest|city|park|building|room|garden|street|road|summer|winter|spring|autumn|fall|day|night|morning|evening)\b/i.test(k)) {
-      result.context.push(kw);
-      continue;
-    }
-
-    // Tier 7: Concept (fallback)
-    result.concept.push(kw);
   }
 
-  return result;
+  return candidates;
 }
+
+/**
+ * CANONICAL METADATAGEN KEYWORD PIPELINE
+ *
+ * This is the single keyword path used by MetadataGen for both single and batch
+ * generation. The AI supplies semantic candidates. Application code then
+ * performs safe normalization, protected-term exclusion, semantic deduplication,
+ * evidence-based relevance ranking, exact-count trimming, and AI expansion when needed.
+ * No fixed slots, category quotas, percentage quotas, or synthetic fillers.
+ */
+async function applyMetadataGenKeywordLogic(options: {
+  rawKeywords: any;
+  visualFacts: any;
+  targetCount: number;
+  provider: string;
+  model: string;
+  keywordMode?: 'mixed' | 'single' | 'multi';
+  metadataLanguage?: string;
+}): Promise<string[]> {
+  const {
+    rawKeywords,
+    visualFacts,
+    targetCount,
+    provider,
+    model,
+    keywordMode,
+    metadataLanguage
+  } = options;
+
+  const cleaned: string[] = [];
+  const source = Array.isArray(rawKeywords) ? rawKeywords : [];
+
+  for (const raw of source) {
+    if (typeof raw !== 'string') continue;
+    const phrase = raw
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, ' ');
+    if (phrase.length <= 1) continue;
+
+    if (!isProhibitedKeyword(phrase)) {
+      cleaned.push(phrase);
+    }
+  }
+
+  const rankingFacts = {
+    ...(visualFacts || {}),
+    title: visualFacts?.title || visualFacts?.metadata_title || ""
+  };
+  const masterPool = buildMasterKeywordCandidatePool(cleaned, rankingFacts, targetCount);
+  let finalKeywords = ensureKeywordCount(
+    masterPool,
+    targetCount,
+    rankingFacts,
+    rankingFacts.title,
+    undefined,
+    undefined,
+    keywordMode
+  );
+
+  if (finalKeywords.length < targetCount) {
+    finalKeywords = await expandKeywordsWithAI(
+      finalKeywords,
+      visualFacts,
+      targetCount,
+      provider,
+      model,
+      keywordMode,
+      metadataLanguage
+    );
+  }
+
+  return finalKeywords.slice(0, targetCount);
+}
+
+
+const UNIVERSAL_KEYWORD_RULES = `
+You are an elite microstock metadata expert specializing in SEO for commercial digital assets, explicitly targeting the Adobe Sensei Search Algorithm and Shutterstock's discovery engine.
+
+UNIVERSAL ENFORCEMENT ACROSS ALL AI MODELS & PROVIDERS (Gemini, OpenAI, Groq, OpenRouter, Mistral, DeepSeek, Claude, Llama, Local LLMs):
+- ABSOLUTELY NO LAZY OLD TEMPLATES OR HARDCODED FILLER LISTS: You are strictly forbidden from dumping predefined keyword lists, generic boilerplate arrays, or superficial tags.
+- DYNAMIC DEEP REVERSE-ENGINEERING: Every keyword must be intelligently derived through the 8-tier cognitive pipeline below, purely grounded in the asset's visual reality.
+
+CRITICAL ARCHITECTURE — 8-TIER COGNITIVE KEYWORD PIPELINE:
+You MUST construct metadata through these 8 structured cognitive steps rather than generating a random list of words:
+
+1. VISUAL DETECTION:
+   - Identify the exact primary objects and core subject matter visibly present in the frame.
+
+2. SUBJECT RANKING:
+   - Rank detected subjects by visual dominance, focal sharpness, and hierarchy (Main Subject > Secondary Objects > Background Elements).
+   - Place the highest-ranked subjects at the very beginning of the keyword list.
+
+3. RELATIONSHIP & INTERACTION:
+   - Identify how subjects interact with each other and their props (actions, gestures, physical contact, poses, active verbs).
+
+4. ENVIRONMENT & SETTING:
+   - Identify the specific location, scene, or environment (indoor, outdoor, studio, office, nature, urban, workspace).
+
+5. VISUAL ATTRIBUTES & LIGHTING:
+   - Detail tangible attributes: material, texture, condition, shape, physical position, angle, and lighting atmosphere (soft light, studio lighting, golden hour).
+
+6. GROUNDED CONCEPTS:
+   - Extract only high-value conceptual themes that are GENUINELY and directly supported by visual evidence (e.g. teamwork, sustainability, wellness, innovation). Never hallucinate unsupported concepts.
+
+7. COMMERCIAL INTENT:
+   - Identify how commercial buyers and designers will search for and use this asset (advertising, marketing, UI header, poster, banner template, editorial).
+
+8. SEO RANKING & FRONT-LOADING (FORMULA 10 KEYWORD TERATAS / TOP 10 TIER):
+   Strictly organize the first 10 keywords using this exact tier structure:
+   - Posisi 1–3: Subjek Utama & Lokasi Spesifik ([Subjek Utama] + [Lokasi/Nama Objek Spesifik] + [Tipe Visual]). Elemen inti yang langsung membedakan aset.
+   - Posisi 4–6: Konsep Utama & Setting Waktu/Tempat ([Waktu/Kondisi] + [Kategori Tempat] + [Struktur Utama]).
+   - Posisi 7–8: Aksi & Elemen Dinamis ([Aksi/Aktivitas] + [Efek Cahaya/Elemen Bergerak]).
+   - Posisi 9–10: Kategori Makro / Commercial Intent ([Kategori Arsitektur/Wisata/Industri/Tema Komersial bernilai jual tinggi]).
+   - Posisi 11+: Atribut pendukung, variasi semantik, material, tekstur, dan kata kunci penunjang yang relevan.
+
+STRICT NEGATIVE FILTERS (MANDATORY & ENFORCED):
+- NO OVERLY GENERIC FILLERS: Eliminate "image", "photo", "picture", "element", "object", "thing", "generic", "background", "design", "stock", "visual", "detail".
+- NO STANDALONE COLORS AS PRIMARY: Do not use standalone color words (e.g. "red", "blue", "green", "white", "black") as primary keywords.
+- ZERO TOLERANCE FOR SUBJECTIVE WORDS: Strictly forbid "beautiful", "amazing", "stunning", "gorgeous", "pretty", "nice", "awesome", "perfect", "high quality", "best", "superb", "lovely", "incredible", "masterpiece".
+- ELIMINATE UNRELATED / SPAM KEYWORDS: Zero tolerance for keywords not directly tied to the visual evidence.
+- FORMAT: Lowercase, comma-separated, matching the requested count, output strictly in the requested language.
+
+GOLDEN BENCHMARK REFERENCE EXAMPLES (FOLLOW THIS EXACT STRUCTURAL STANDARD):
+1. Example [Food / Ingredients]:
+   - Title: "Cacao beans and dark chocolate pieces on a textured fabric surface"
+   - Keywords: "chocolate, cacao, cocoa, beans, dark, rustic, ingredient, food, organic, natural, burlap, jute, fabric, texture, sweet, dessert, artisanal, brown, raw, roasted, chunks, pieces, cooking, confectionery, gourmet, healthy, snack, closeup, macro, agriculture, plant, seed, caffeine, culinary, wooden, interior, morning, breakfast, kitchen, harvest"
+   - Category: 7
+
+2. Example [Asian Dining / Culinary]:
+   - Title: "Fresh sushi rolls set on a wooden table with soy sauce and chopsticks"
+   - Keywords: "sushi, japanese, food, roll, maki, salmon, tuna, seafood, dining, restaurant, fresh, gourmet, appetizer, meal, asian, cuisine, chopsticks, soy, ginger, wasabi, wooden, table, lunch, dinner, healthy, delicious, rice, avocado, nori, sashimi, culinary, snack, tray, authentic, plate, raw, kitchen, traditional, fish, background"
+   - Category: 7
+
+3. Example [Travel / Wellness / Geothermal]:
+   - Title: "Woman in bikini walking into natural hot spring near basalt rocks"
+   - Keywords: "woman, bikini, thermal, spring, basalt, volcanic, wellness, travel, steam, geothermal, nature, pool, outdoor, relaxation, rocks, water, adventure, spa, fitness, lifestyle, swimming, vacation, mist, canyon, scenic, healthy, beauty, bathing, swimwear, exploring, nordic, environment, geology, recreation, tourism, journey, serenity, active, stone, cold"
+   - Category: 21
+
+4. Example [Holiday / Family Lifestyle]:
+   - Title: "Happy multi generational family decorating a gingerbread house together"
+   - Keywords: "christmas, family, gingerbread, house, decorating, holiday, togetherness, celebration, grandparents, children, parents, winter, festive, tradition, laughing, kitchen, table, candy, icing, sweets, home, happiness, love, seasonal, december, baking, food, dessert, generations, cozy, warmth, tree, lights, indoor, smile, joy, activity, bonding, childhood, handmade"
+   - Category: 12
+
+5. Example [3D Graphic / Render / Background]:
+   - Title: "Abstract 3d geometric frame with floating spheres and pastel glow"
+   - Keywords: "abstract, frame, 3d, sphere, background, geometric, pastel, futuristic, digital, border, technology, modern, purple, teal, pink, glow, light, glossy, floating, creative, graphic, illustration, tech, space, element, dynamic, composition, luxury, design, banner, copyspace, motion, energy, shiny, virtual, render, gradient, bubble, minimal, decoration"
+   - Category: 8
+`;
+
+
+
+
 
 export const generateStockMetadata = async (
   frames: string[],
@@ -3172,17 +3472,15 @@ export const generateStockMetadata = async (
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
-  exifMetadata?: any,
-  keyConcepts?: string,
-  editorialMode?: boolean
+  exifMetadata?: any
 ): Promise<StockMetadata> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash' || activeModel === 'gemini-3-flash-preview') {
-      activeModel = 'gemini-3-flash-preview';
+    if (!activeModel || activeModel === 'gemini-2.5-pro' || activeModel === 'gemini-2.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -3190,56 +3488,43 @@ export const generateStockMetadata = async (
 
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
-  const miricanvasCategoriesText = MIRICANVAS_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
-  const dreamstimeCategoriesText = DREAMSTIME_MAIN_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   
   const imageParts = frames.map(frame => processFrameServer(frame));
 
   let exifInstruction = "";
   if (exifMetadata && Object.keys(exifMetadata).length > 0) {
-    exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+    exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(exifMetadata, null, 2)}\n\`\`\`\nGunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temuan visual. Jangan memasukkan GPS, tanggal, software, kamera, lensa, atau detail EXIF lain ke title, description, atau keywords kecuali detail tersebut terlihat jelas atau memang relevan secara editorial.`;
   }
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 50) : 25;
-  const aiRequestCount = targetCount + 10; // Buffer +10 agar array tetap gemuk setelah deduplikasi
+  const requestedKeywordCount = parseInt(String(keywordCount), 10) || 25;
+  const targetCount = Math.min(ADOBE_STOCK_MAX_KEYWORDS, Math.max(0, requestedKeywordCount));
 
   const directives = getToolTypeDirectives(toolType);
 
-  // Human-curated keyword generation: candidates first, ranking later.
-  let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-  let keywordRulePromptText = `HUMAN-CURATED MICROSTOCK KEYWORDS (CSVPLANET STYLE). Think like an experienced stock contributor manually tagging this exact asset for CSVPlanet.
-
-VISUAL TRUTH FIRST (NO RANDOM KEYWORDS): Every single keyword MUST be traceable to something clearly visible, happening, materially present, or an unmistakable concept directly represented by the asset. STRICTLY PROHIBITED to invent or guess popular keywords, industries, or trends that are not in the visual.
-
-STRUCTURED & NEAT: Group and select keywords in a highly structured, logical, and neat manner. Avoid chaotic or messy keyword dumping. 
-
-THE TOP 10 RULE: The first 10 keywords are the absolute most critical. They must describe the core essence of the asset perfectly (exact main subject, critical action, distinctive detail, and exact buyer search intent). 
-
-NATURAL KEYWORD MIX: Create a useful human-looking mixture of the main subject, secondary objects, distinctive attributes, material, texture, color, lighting, action, environment, setting, mood, symbolism, and editorial/commercial context when genuinely supported. Do not force a category quota.
-
-SEARCH INTENT: Ask what a real buyer would type when trying to find this exact visual. Prefer specific useful words over vague words. 
-
-QUALITY: No filler, no keyword padding, no duplicate roots, no brands, no names of famous people or characters, no media-format labels, no connector words. Colors are allowed when they materially describe the asset.
-
-The final list should feel like a highly structured, top-tier CSVPlanet contributor selected the words a buyer would actually search.`;
+  // Dynamic keyword rules: no fixed slots, no category quotas.
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word English candidate keywords.`;
-    keywordRulePromptText += `\nSINGLE-WORD MODE: every keyword item must contain exactly one word. Use natural words such as pendant, jewelry, faith, symbol, stone, religion, texture, culture, history, devotion, chain, light, surface, metallic, weathered, contrast, highlights, endurance, editorial, belief when the asset supports them. Do not create phrases and do not split artificial phrases into unrelated words.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE:\nGenerate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} natural multi-word search terms.`;
-    keywordRulePromptText += `\nMULTI MODE: use only genuinely natural 2–4 word search phrases that a buyer would type. Do not manufacture long-tail phrases just to increase coverage.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
   } else {
-    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} natural mixed single-word and short multi-word search terms.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
-  // --- STAGE 1: GEMINI VISION ---
+  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
-  console.log(`[JohMeta Pipeline] Stage 1: Running Gemini Vision (Visual Facts Detection)...`);
+  
+  console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
+  
   const mediaTypeContext = directives.mediaTypeContext;
-  const fallbackGeminiModel = 'gemini-3-flash-preview';
-  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
 
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+  const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
+  
   const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
 Analyze only what is visually verifiable in the image.
@@ -3247,29 +3532,42 @@ Analyze only what is visually verifiable in the image.
 ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
+MAIN SUBJECT PRIORITY:
+Before listing secondary details, determine the single strongest MAIN SUBJECT of the asset.
+Choose it by visual dominance, central importance, distinctive identity, size/prominence, and the role it plays in the overall composition.
+Do not choose a subject merely because it is culturally interesting or commercially popular.
+If multiple subjects exist, rank them by actual visual importance and assign importance scores.
+The first primary_subject should represent the strongest visual subject whenever one can be identified.
+The downstream keyword generator will use this order to place the Main Subject first in the final keyword list.
+
 VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
 2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. COMMERCIAL & ABSTRACT CONCEPTS (ONLY WHEN SUPPORTED):
-Identify commercial concepts, themes, symbolism, or search intent only when they are genuinely represented by visible content or an unmistakable visual context. Do NOT invent business, industry, lifestyle, or marketing concepts merely because they are commercially popular. If no strong concept is present, leave those fields conservative.
+4. Never hallucinate brands, trademarked logos, or copyrighted characters.
+5. If uncertain, provide the closest accurate generic description.
 
-5. GEOGRAPHICAL LOCATION & LANDMARKS (ONLY WHEN VERIFIED): Report a city, country, landmark, or specific location only when it is clearly recognizable from the visual asset or explicitly present in reliable EXIF metadata. Do not infer a location from generic architecture, vegetation, weather, or cultural appearance alone.
-5. Never hallucinate brands, trademarked logos, or copyrighted characters.
-6. If uncertain, provide the closest accurate generic description.
-7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
-8. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
-9. ASSET UNDERSTANDING AND CONTEXT: Explain the likely subject, context, mood, and practical use only when supported by the asset. Separate what is visibly true from what is only a possible interpretation. Never use commercial use cases to invent new objects or themes.
+FORMATTING RULES FOR VISUAL FACTS:
+- Describe items, actions, and concepts using highly descriptive, concrete, and neat terms (e.g., "chicken", "fried", "crispy", "glaze", "knife", "cutting board", "cooking", "serving").
+- ABSOLUTELY AVOID using long sentences or robotic phrasing in the arrays. Extract the core nouns, verbs, and descriptive adjectives cleanly so they can directly feed the keyword engine.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
-PRIMARY OBJECTIVE:
-Deeply and exhaustively detect every visible subject, action, color, visible text, material, texture, lighting, and composition detail. You must recognize the contents of assets deeply and in extraordinary detail.
-Also assess the likely context, mood, symbolism, and practical meaning of the asset, but keep interpretations conservative and clearly grounded in what is visible. Do not invent commercial use-cases.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
+PRIMARY OBJECTIVE — ANALYZE THE ACTUAL ASSET THROUGH 8 VISUAL DIMENSIONS:
+1. OBJECTS: Identify visible primary, secondary, and background objects.
+2. ACTIVITIES: Identify only actions that are visibly happening.
+3. CONCEPTS: Identify clear themes or concepts strongly supported by the visual scene.
+4. ATMOSPHERE: Identify visible mood/atmosphere such as professional, calm, festive, dramatic, minimal, etc. only when visually supported.
+5. LOCATION / SETTING: Identify the visible environment or setting; do not guess an exact place.
+6. VISUAL CHARACTERISTICS: Identify framing, orientation, camera angle, close-up, copy space, composition, perspective, texture, lighting, and other visible characteristics.
+7. COLORS / VISUAL ELEMENTS: Identify actual visible colors, materials, textures, lighting, and distinctive visual elements.
+8. EVENT / SEASONAL RELEVANCE: Identify named events or seasons only when unmistakable visual evidence supports them (for example Christmas decorations, Halloween costumes, Ramadan/Eid cues, Valentine's symbols). The calendar alone is never evidence.
+
+ANALYSIS PRINCIPLE: AI Vision is the source of truth for what the asset contains. Do not hallucinate or infer unsupported religion, culture, exact location, profession, audience, industry, tourism, emotion, event, or commercial use case. If a dimension is not supported, return an empty array.
+
+Also perform visual semantic analysis for the most relevant microstock categories from the official lists.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
@@ -3278,7 +3576,6 @@ Asset Context: ${mediaTypeContext}
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
 - Shutterstock Categories: ${shutterstockCategoriesText}
-- MiriCanvas Categories: ${miricanvasCategoriesText}
 
 OUTPUT FORMAT:
 {
@@ -3305,12 +3602,18 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
-    "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
-    "understanding_and_context": "Explain your deep understanding of the asset: its narrative, commercial intent, target audience, and overall context (pemahaman mendalam tentang narasi, konteks, dan tujuan penggunaan komersial aset ini).",
+    "concepts": [],
+    "atmosphere": [],
+    "location_setting": [],
+    "visual_characteristics": [],
+    "event_seasonal_relevance": [],
+    "deeper_meaning_and_symbolism": "Only describe a concept or meaning when it is strongly supported by visible evidence. Do not infer religion, culture, profession, location, emotion, event, or use case without clear visual support.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
@@ -3318,37 +3621,7 @@ OUTPUT FORMAT:
 
   const promptText = toolType === ToolType.VIDEO 
     ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`
-    : `Tugas: Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
-
-  // Enforced responseSchema for clean, structured Vision output
-  const visionResponseSchema = {
-    type: Type.OBJECT,
-    properties: {
-      VISUAL_FACTS: {
-        type: Type.OBJECT,
-        properties: {
-          primary_subjects: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
-          secondary_subjects: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
-          background_elements: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, importance: { type: Type.NUMBER } }, required: ["name", "importance"] } },
-          visible_text: { type: Type.ARRAY, items: { type: Type.STRING } },
-          colors: { type: Type.ARRAY, items: { type: Type.STRING } },
-          actions: { type: Type.ARRAY, items: { type: Type.STRING } },
-          composition: { type: Type.ARRAY, items: { type: Type.STRING } },
-          concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Core commercial concepts, business themes, abstract metaphors, and buyer search intents (e.g., teamwork, digital transformation, sustainability, wellness, innovation, remote work, freedom, growth)" },
-          commercial_concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific high-value buyer commercial concepts and industry use cases" },
-          deeper_meaning_and_symbolism: { type: Type.STRING },
-          understanding_and_context: { type: Type.STRING },
-          semantic_category_analysis: {
-            type: Type.OBJECT,
-            properties: { adobe_id: { type: Type.NUMBER }, shutterstock_category_1: { type: Type.STRING }, shutterstock_category_2: { type: Type.STRING }, reason: { type: Type.STRING } },
-            required: ["adobe_id", "shutterstock_category_1", "shutterstock_category_2", "reason"]
-          }
-        },
-        required: ["primary_subjects", "secondary_subjects", "background_elements", "visible_text", "colors", "actions", "composition", "deeper_meaning_and_symbolism", "understanding_and_context", "semantic_category_analysis"]
-      }
-    },
-    required: ["VISUAL_FACTS"]
-  };
+    : `Tugas: Analyze the actual asset across 8 dimensions: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, and Event/Seasonal Relevance. Use only visible evidence; leave unsupported dimensions empty. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
 
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, { 
@@ -3356,7 +3629,6 @@ OUTPUT FORMAT:
     }, {
       systemInstruction: visionSystemInstruction,
       responseMimeType: "application/json",
-      responseSchema: visionResponseSchema,
       temperature: 0.0,
       topP: 0.8 });
     
@@ -3365,33 +3637,21 @@ OUTPUT FORMAT:
       throw new Error("Vision Analysis produced empty results.");
     }
   } catch (err: any) {
-    console.warn("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
-    // Fallback static facts if vision fails
-    visualFactsJson = JSON.stringify({
-      VISUAL_FACTS: {
-        primary_subjects: [{ name: "main subject", importance: 100 }],
-        secondary_subjects: [],
-        background_elements: [],
-        visible_text: [],
-        colors: ["natural"],
-        actions: ["commercial poses"],
-        composition: ["professional"],
-        semantic_category_analysis: {
-          adobe_id: 0,
-          shutterstock_category_1: "",
-          shutterstock_category_2: "",
-          reason: "Fallback static categories used."
-        }
-      }
-    });
+    console.error("[JohMeta Pipeline] Gemini Vision Stage 1 Failed:", err.message || err);
+    throw new Error(`AI Vision gagal menganalisis aset: ${err.message || "Vision analysis failed"}`);
   }
 
-  // Parse facts for next stages
+  // Parse facts for next stages. Never invent visual facts when Vision returns malformed data.
   let visualFacts: any = {};
   try {
-    visualFacts = JSON.parse(extractJSON(visualFactsJson)).VISUAL_FACTS || {};
-  } catch (e) {
-    visualFacts = { primary_subjects: [{ name: "subject", importance: 100 }], actions: ["posing"] };
+    const parsedVision = JSON.parse(extractJSON(visualFactsJson));
+    visualFacts = parsedVision?.VISUAL_FACTS;
+    if (!visualFacts || typeof visualFacts !== "object" || Array.isArray(visualFacts)) {
+      throw new Error("VISUAL_FACTS missing or invalid");
+    }
+  } catch (e: any) {
+    console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
+    throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
   }
 
   const dominantSubjects = [
@@ -3415,7 +3675,7 @@ ABSOLUTE RULES FOR CUSTOM INSTRUCTION:
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
 
-${mediaContext}${customPromptCommand}${exifInstruction}${keyConcepts ? `\n\nKEY CONCEPTS REFERENCE (Use only as a user-provided context check. Never introduce a keyword unless it is supported by VISUAL_FACTS): "${keyConcepts}"` : ''}
+${mediaContext}${customPromptCommand}${exifInstruction}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -3428,43 +3688,15 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. COLORS ARE OPTIONAL: Include a color when it materially helps identify the visual; never add colors merely to fill slots.
 
-
-MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
-1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
-2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
-3. KEYWORD SHAPE: ${keywordMode === 'single' ? "Generate one-word keywords only. Never output compound phrases." : "Use short natural search terms appropriate to the selected keyword mode."}
-4. HUMAN CURATION OVER SLOT FILLING: Use only useful, grounded terms. Do not add keywords merely to reach the target count. A shorter list of strong terms is better than padded metadata.
-5. KEYWORD ORDER (CSVPLANET TOP 10 PRIORITY): The first 10 keywords MUST be the most critical, hyper-relevant words describing the core essence of the asset. Rank them systematically: [Main Subject] -> [Action/Interaction] -> [Distinctive detail/Texture] -> [Core Concept]. Ensure it is highly structured, neat, and zero random/hallucinated keywords are present.
-
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION: Include a location or landmark only when clearly recognizable or explicitly verified by EXIF. Do not infer a place from generic visual characteristics.
-- NATURAL & DETAILED PHRASING (NO ROBOTIC CLICHES): Write titles and descriptions that are highly detailed, evocative, and sound completely natural, as if written by a professional native English stock curator. Avoid robotic, repetitive, or dry templates. Do not use cheap, subjective marketing adjectives like "beautiful", "stunning", "high-quality", but use highly descriptive and precise nouns, active verbs, and atmospheric adjectives (e.g., "warm golden hour lighting", "misty morning atmosphere", "lush tropical foliage"). Ensure descriptions flow like real, coherent human-written captions rather than disconnected visual details.
-- HUMAN SEARCH INTENT: rank words according to what a real buyer would search for this exact asset. Do not turn the keyword list into sentences or artificial long-tail phrases.
-- SEMANTIC CONTEXT: Use concepts, mood, symbolism, and commercial context only when the visual clearly supports them. Do not force the 5Ws when the asset does not contain those facts.
-- HIGH-VALUE NICHE FRONT-LOADING: Place the most descriptive, highly specific visual keywords at the very beginning of the Title. Search algorithms weigh the first 3-5 words significantly higher than the rest!
-- SPECIAL ASSET TYPES (FLATLAY & GREEN SCREEN): If the visual facts indicate a "Flatlay" (top-down view) or "Green Screen" (chroma key background), you MUST include "Flatlay" or "Green Screen" (and their variations like "Top-down view", "Chroma Key") prominently in BOTH the Title and Keywords.
 
 Rules for Titles:
-1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
-   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
-   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
-   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
-   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
-2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
-   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
-   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
-   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
-3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
-   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
-   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
-4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
+2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
-5. FORMAT & KEPATUHAN:
-   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
-   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
-   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
+3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+4. Use easy-to-read phrases, NOT formal sentence structures.
+5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -3472,18 +3704,8 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
-
 Rules for Keywords:
-- Generate only keywords grounded in VISUAL_FACTS.
-- Rank by realistic buyer search intent: exact subject first, then useful distinguishing details, setting, action, mood/style, season and concept when supported.
-- Do not force category quotas, 70/30 splits, viral terms or filler.
-- Trend terms are only a small relevance boost when the visual genuinely supports them.
-- Never invent use cases, industries, locations, people, objects or events.
-- Keep keywords lowercase, natural and short; respect the selected single/multi/mixed mode.
-- Colors are allowed when useful.
-- No brands, trademarks, famous people, fictional characters or artist names.
-- Put the strongest buyer-facing terms first; the first 10 should be the strongest combination of visual relevance and search intent.
+${keywordRulePromptText}
 
 
 Rules for Categories:
@@ -3496,14 +3718,10 @@ ${categoriesText}
 Shutterstock Categories:
 ${shutterstockCategoriesText}
 
-MiriCanvas Categories:
-${miricanvasCategoriesText}
-
-Dreamstime Main Categories:
-${dreamstimeCategoriesText}
-
-VISUAL_FACTS:
+VISUAL_FACTS (SOURCE OF TRUTH):
 ${JSON.stringify(visualFacts, null, 2)}
+
+Use these 8 Vision dimensions when generating keywords: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, Event/Seasonal Relevance.
 
 CRITICAL: DO NOT OUTPUT THE PLACEHOLDER STRINGS. YOU MUST WRITE YOUR OWN GENERATED TITLE AND DESCRIPTION.
 OUTPUT FORMAT:
@@ -3513,7 +3731,9 @@ OUTPUT FORMAT:
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
-  "shutterstock_category_2": "Backgrounds/Textures",
+  "shutterstock_category_2": "Backgrounds/Textures"
+      "dreamstime_category": "",
+      "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
 }
 If generation fails, return {"error": "metadata_generation_failed"}.`;
@@ -3521,28 +3741,12 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   let draftMetadata: any = {};
   try {
     let genResponse: any;
-    // Enforced responseSchema for structured, clean Metadata output
-    const metadataGenResponseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING, description: "A highly descriptive natural language title representing the core subject" },
-        description: { type: Type.STRING, description: "A detailed visual description focusing on subjects, setting, and mood" },
-        keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Array of relevant keywords in natural, formal language" },
-        category_id: { type: Type.NUMBER, description: "Adobe Stock numeric category ID" },
-        shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
-        shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
-        category_reason: { type: Type.STRING, description: "Brief visual semantic reason for category selection" }
-      },
-      required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason"]
-    };
-
     if (NON_GEMINI_PROVIDERS.has(provider)) {
         try {
             genResponse = await callOpenAICompatibleWithRetry({
                 systemInstruction: genSystemInstruction,
                 contents: `Generate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
                 responseMimeType: "application/json",
-                responseSchema: metadataGenResponseSchema,
                 config: { temperature: temperature ?? 0.3, topP: 0.9 },
                 model: activeModel
             });
@@ -3554,7 +3758,6 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
                 }, {
                   systemInstruction: genSystemInstruction,
                   responseMimeType: "application/json",
-                  responseSchema: metadataGenResponseSchema,
                   temperature: temperature ?? 0.3,
                   topP: 0.9 
                 });
@@ -3565,7 +3768,6 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
           }, {
             systemInstruction: genSystemInstruction,
             responseMimeType: "application/json",
-            responseSchema: metadataGenResponseSchema,
             temperature: temperature ?? 0.3,
             topP: 0.9 
           });
@@ -3634,24 +3836,21 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
-   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
-   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
-   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
-   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
-2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
-   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
-   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
-   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
-3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
-   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
-   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
-4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
-   ${directives.titleRule}
-5. FORMAT & KEPATUHAN:
-   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
-   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
-   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
+- Use clear natural language.
+- Describe only visible elements in the image.
+- Put the main subject at the beginning of the title.
+- Include important commercial keywords naturally.
+- Do not use keyword stuffing.
+- Do not use brand names, trademarks, company names, or copyrighted terms.
+- Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
+- SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+  ${directives.titleRule}
+- Do not use articles unless necessary (a, an, the).
+- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
+- Include a commercial concept only when it is clearly supported by visible evidence (business, finance, technology, healthcare, education, sustainability, etc.).
+- Use sentence case.
+- Output only one title.
+- Do not include explanations, labels, quotation marks, or numbering.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -3659,17 +3858,9 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
-- Generate only keywords grounded in VISUAL_FACTS.
-- Rank by realistic buyer search intent and visual relevance.
-- Do not force quotas, 70/30 splits, trend buzzwords or filler.
-- Use trend language only when genuinely supported by the asset.
-- Keep keywords natural, lowercase and mode-compliant.
-- NEVER output connector/function words as standalone keywords (for example: a, an, the, and, or, of, in, on, at, to, for, from, by, with, without, as, is, are, this, that).
-- NEVER use connector words as filler inside a keyword phrase. Remove them when constructing keyword phrases.
-- Colors are allowed when useful.
+${keywordRulePromptText}
 
 
 Rules for Categories:
@@ -3681,12 +3872,6 @@ ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
-
-MiriCanvas Categories:
-${miricanvasCategoriesText}
-
-Dreamstime Main Categories:
-${dreamstimeCategoriesText}
 
 VISUAL_FACTS:
 ${JSON.stringify(visualFacts, null, 2)}
@@ -3702,35 +3887,20 @@ OUTPUT FORMAT:
   "keywords": [],
   "category_id": 0,
   "shutterstock_category_1": "",
-  "shutterstock_category_2": "",
+  "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
   "confidence_score": 0.95
 }`;
 
   let finalMetadataRaw: any = {};
   try {
-    // Enforced responseSchema for clean, validated Metadata output
-    const validatorResponseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING, description: "Validated, natural language title" },
-        description: { type: Type.STRING, description: "Validated visual description" },
-        keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Validated keyword array" },
-        category_id: { type: Type.NUMBER, description: "Adobe Stock category ID" },
-        shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
-        shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
-        category_reason: { type: Type.STRING, description: "Visual semantic reason" },
-        confidence_score: { type: Type.NUMBER, description: "Confidence score 0-1" }
-      },
-      required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason", "confidence_score"]
-    };
-
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
           systemInstruction: validatorSystemInstruction,
           contents: `Audit and validate the Draft Metadata against VISUAL_FACTS. Return final JSON. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
-          responseSchema: validatorResponseSchema,
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
@@ -3739,7 +3909,6 @@ OUTPUT FORMAT:
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
-          responseSchema: validatorResponseSchema,
           temperature: temperature ?? 0.1,
           topP: 0.8 })
     );
@@ -3752,11 +3921,13 @@ OUTPUT FORMAT:
       ...draftMetadata, 
       category_id: heur.category_id, 
       shutterstock_category_1: heur.shutterstock_category_1, 
-      shutterstock_category_2: heur.shutterstock_category_2 
+      shutterstock_category_2: heur.shutterstock_category_2,
+      dreamstime_category: "Abstract",
+      miricanvas_category: "Background" 
     };
   }
 
-  // --- TAHAP 7: FINAL SANITIZATION & RETURN (MetadataGen Structured Pipeline) ---
+  // --- TAHAP 7: FINAL SANITIZATION & RETURN ---
   try {
     let data = (finalMetadataRaw && typeof finalMetadataRaw === 'object' && !Array.isArray(finalMetadataRaw)) ? { ...finalMetadataRaw } : {};
     
@@ -3772,51 +3943,56 @@ OUTPUT FORMAT:
 
     // Ensure description is valid
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
-
-    // [LAPISAN 1] Bangun analisis visual bertingkat (scene → object → attributes → concepts)
-    // dari VISUAL_FACTS TAHAP 1. Menjadi dasar untuk Lapisan 2, 3, dan 4 di bawah.
-    const tieredVisual = buildTieredVisualAnalysis(visualFacts);
-    const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
-
-        // 1. Pemrosesan Keyword via 7-Stage Pipeline (OBJECT -> PRIMARY KW -> SYNONYM -> RELEVANCE -> DEDUP -> SEO RANK -> FINAL)
-    data.keywords = processKeywordsSemantic(
-      Array.isArray(data.keywords) ? data.keywords : [],
-      targetCount,
-      visualFacts,
-      toolType,
-      keywordMode
-    );
-
-    // [LAPISAN 2] Formula judul: gunakan template khusus per jenis aset (photo/AI image/
-    // illustration/vector/video) sebagai fallback bila judul dari AI kosong/generik/placeholder.
-    let candidateTitle = String(data.title || "").trim();
-    const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
-    if (isGenericTitle) {
-      candidateTitle = applyTitleTemplate(assetSubtype, tieredVisual, titleLength);
+    
+    // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
+    if (!data.keywords || !Array.isArray(data.keywords)) {
+      data.keywords = [];
     }
+      const finalKeywordList = await applyMetadataGenKeywordLogic({
+        rawKeywords: data.keywords,
+        visualFacts,
+        targetCount,
+        provider,
+        model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
+        keywordMode,
+        metadataLanguage
+      });
+
+      data.keywords = finalKeywordList;
 
     // 1.5. Enforce professional title length strictly
-    data.title = ensureTitleLength(candidateTitle, data.keywords || [], data.description || "", titleLength);
+    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength);
 
-    // [LAPISAN 7] Penentuan kategori yang lebih akurat: cross-validasi hasil analisis
-    // semantik visual AI (TAHAP 1) dengan heuristik pattern-matching title/keyword.
-    const accurateCategory = determineAccurateCategory(data.title, data.keywords || [], visualFacts, data.category_id);
+    const keywordQuality = scoreMetadataGenKeywords(data.keywords || [], {
+      ...(visualFacts || {}),
+      title: data.title
+    });
+    const titleKeywordConsistency = validateMetadataTitleKeywordConsistency(
+      data.title || "",
+      data.keywords || [],
+      visualFacts || {}
+    );
+    data.keyword_quality = {
+      scores: keywordQuality,
+      title_keyword_consistency: titleKeywordConsistency,
+      title_searchability: titleKeywordConsistency.titleSearchability
+    };
 
     // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
     const parsedCategoryId = parseInt(String(data.category_id), 10);
     if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
-      data.category_id = accurateCategory.category_id;
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.category_id = heur.category_id;
     } else {
-      // AI-supplied category_id is in-range: still cross-validate via Lapisan 7,
-      // and only override when confidence is high (AI vision + heuristic agree).
-      data.category_id = accurateCategory.confidence >= 0.75 ? accurateCategory.category_id : parsedCategoryId;
+      data.category_id = parsedCategoryId;
     }
 
     // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
     const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
     if (!data.shutterstock_category_1 || !validShutterstockCats.includes(data.shutterstock_category_1)) {
-      data.shutterstock_category_1 = validShutterstockCats.includes(accurateCategory.shutterstock_category_1) ? accurateCategory.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
     }
 
     if (
@@ -3824,7 +4000,8 @@ OUTPUT FORMAT:
       !validShutterstockCats.includes(data.shutterstock_category_2) || 
       data.shutterstock_category_2 === data.shutterstock_category_1
     ) {
-      let secondFallback = accurateCategory.shutterstock_category_2;
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      let secondFallback = heur.shutterstock_category_2;
       if (secondFallback === data.shutterstock_category_1) {
         const possibleVal = toolType === ToolType.VIDEO ? "Backgrounds/Textures" : "Abstract";
         secondFallback = validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || possibleVal;
@@ -3832,46 +4009,72 @@ OUTPUT FORMAT:
       data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Backgrounds/Textures");
     }
     
-    data.category_reason = data.category_reason || accurateCategory.reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
-
-    // [LAPISAN 8] Validasi akhir non-blocking: title length, keyword count, indikasi duplikasi,
-    // kepatuhan marketplace, dan validitas kategori. Hasil dicatat di log untuk visibilitas QA.
-    const qaReport = validateFinalMetadata(data, targetCount, titleLength, validShutterstockCats);
-    if (!qaReport.valid) {
-      console.warn("[MetadataGen Lapisan 8 - Validasi Akhir] Errors:", qaReport.errors);
-    }
-    if (qaReport.warnings.length > 0) {
-      console.log("[MetadataGen Lapisan 8 - Validasi Akhir] Warnings:", qaReport.warnings);
-    }
+    data.category_reason = data.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
     
     return data as StockMetadata;
   } catch (error) {
-    console.warn("[JohMeta Parse Error] Non-fatal parse warning, applying ultra-resilient fallback:", error);
-    
-    // Failsafe generation from visual facts so user never gets blocked by a parse error
-    const tieredVisual = buildTieredVisualAnalysis(visualFacts);
-    const assetSubtype = detectAssetSubtype(toolType, visualFacts, customPrompt);
-    const fallbackTitle = ensureTitleLength(applyTitleTemplate(assetSubtype, tieredVisual, titleLength), [], "", titleLength);
-    const fallbackKeywords = processKeywordsSemantic(
-      [],
-      targetCount,
-      visualFacts,
-      toolType,
-      keywordMode
-    );
-    const fallbackDesc = ensureDescription("", fallbackTitle, fallbackKeywords);
-    const accurateCat = determineAccurateCategory(fallbackTitle, fallbackKeywords, visualFacts, 0);
-    const validShutterCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
+    // FINAL RECOVERY: never fail the whole metadata request because one
+    // optional field returned by an AI/provider has an unexpected shape.
+    // Normalize the last known draft and return a valid StockMetadata object.
+    console.warn("[JohMeta Parse Recovery] Final metadata normalization recovered from:", error);
 
-    return {
-      title: fallbackTitle,
-      description: fallbackDesc,
-      keywords: fallbackKeywords,
-      category_id: accurateCat.category_id || 1,
-      shutterstock_category_1: accurateCat.shutterstock_category_1 || validShutterCats[0] || "Abstract",
-      shutterstock_category_2: accurateCat.shutterstock_category_2 || validShutterCats[1] || "Backgrounds/Textures",
-      category_reason: accurateCat.reason || "Generated via resilient fallback pipeline."
-    } as StockMetadata;
+    try {
+      const recovery: any = (draftMetadata && typeof draftMetadata === 'object' && !Array.isArray(draftMetadata))
+        ? { ...draftMetadata }
+        : {};
+
+      recovery.title = String(recovery.title || recovery.name || recovery.headline || "Stock asset").trim();
+      recovery.description = String(recovery.description || recovery.desc || recovery.caption || recovery.title || "Visual stock asset").trim();
+
+      const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
+      const safeKeywords = rawKeywords
+        .filter((k: any) => typeof k === 'string')
+        .map((k: string) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' '))
+        .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
+
+      try {
+        recovery.keywords = await applyMetadataGenKeywordLogic({
+          rawKeywords: safeKeywords,
+          visualFacts,
+          targetCount,
+          provider,
+          model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
+          keywordMode,
+          metadataLanguage
+        });
+      } catch (keywordRecoveryError) {
+        console.warn("[JohMeta Pipeline] Keyword recovery normalization failed:", keywordRecoveryError);
+        recovery.keywords = Array.from(new Set(safeKeywords)).slice(0, targetCount);
+      }
+
+      const parsedRecoveryCategory = parseInt(String(recovery.category_id), 10);
+      if (!Number.isFinite(parsedRecoveryCategory) || parsedRecoveryCategory < 1 || parsedRecoveryCategory > 21) {
+        const heur = getHeuristicCategories(recovery.title, recovery.keywords);
+        recovery.category_id = heur.category_id;
+        recovery.shutterstock_category_1 = heur.shutterstock_category_1;
+        recovery.shutterstock_category_2 = heur.shutterstock_category_2;
+        recovery.dreamstime_category = "Abstract";
+        recovery.miricanvas_category = "Background";
+      }
+
+      recovery.category_reason = recovery.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+      recovery.confidence_score = Number.isFinite(Number(recovery.confidence_score)) ? Number(recovery.confidence_score) : 0.5;
+
+      return recovery as StockMetadata;
+    } catch (recoveryError) {
+      console.error("[JohMeta Parse Recovery] Recovery failed:", recoveryError);
+      return {
+        title: "Stock asset",
+        description: "Visual stock asset",
+        keywords: [],
+        category_id: 8,
+        shutterstock_category_1: "Abstract",
+        shutterstock_category_2: "Backgrounds/Textures",
+        dreamstime_category: "Abstract",
+        miricanvas_category: "Background",
+        category_reason: "Fallback metadata generated after response normalization failure."
+      } as StockMetadata;
+    }
   }
 };
 
@@ -3885,18 +4088,17 @@ export const generateBatchStockMetadata = async (
   keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
-  aiModelPerformance?: 'speed' | 'detail',
-  keyConcepts?: string,
-  editorialMode?: boolean
+  aiModelPerformance?: 'speed' | 'detail'
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   const directives = getToolTypeDirectives(toolType);
+  const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-3.6-pro-preview' || activeModel === 'gemini-3.5-flash' || activeModel === 'gemini-3-flash-preview') {
-      activeModel = 'gemini-3-flash-preview';
+    if (!activeModel || activeModel === 'gemini-2.5-pro' || activeModel === 'gemini-2.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -3904,32 +4106,25 @@ export const generateBatchStockMetadata = async (
 
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
-  const miricanvasCategoriesText = MIRICANVAS_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
-  const dreamstimeCategoriesText = DREAMSTIME_MAIN_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
 
   // Amankan hitungan target keyword sejak awal
-  const targetCount = keywordCount ? (parseInt(String(keywordCount), 10) || 50) : 25;
-  const aiRequestCount = targetCount   // Rules for keywords depending on keywordMode for batch
-  let keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-  let keywordRulePromptText = `SEMANTIC STOCK SEARCH: think like a buyer searching for this exact asset. Generate only terms grounded in the supplied visual facts. Start with concrete subjects, then useful distinguishing attributes, setting, action, mood, style, season or concept when relevant. Do not force category quotas, 70/30 splits, viral buzzwords or filler. Trend terms are only a small boost when visually supported. Do not invent use cases, industries, locations, people, objects or events. Keep terms natural, searchable, lowercase and short. Colors are allowed when useful. No brands, trademarks, famous people, fictional characters or artist names.`;
+  const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
+  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} single-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-    keywordRulePromptText = `SINGLE-WORD MICROSTOCK METADATA. Generate only individual English words, separated as separate keyword items. Follow this natural stock pattern: pendant, jewelry, faith, symbol, religion, stone, texture, culture, history, devotion, chain, light, surface, metallic, weathered, contrast, highlights, endurance, editorial, belief. Every word must be directly visible, clearly implied by the visual, or a defensible one-word synonym of a detected subject or concept. Rank by buyer search intent and visual relevance. Use concrete subjects first, then specific attributes, materials, actions, setting, concepts, editorial/commercial context when genuinely supported. Do not invent buzzwords or force trends. No phrases, no compound keywords, no connector words, no filler, no duplicate roots, no brands, no names, no media-type labels, no punctuation. Colors are allowed when they materially describe the asset. Keep useful forms such as resting, showing, representing, textured when they are genuinely supported by the asset.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE:\nGenerate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} meaningful multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
-    keywordRulePromptText += `\nMULTI MODE: use natural 2–4 word search phrases.`;
+    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
   } else {
-    keywordRuleSchemaDesc = `Generate up to ${aiRequestCount} mixed single-word and multi-word candidate keywords in ${getLanguageName(metadataLanguage)}.`;
+    keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
-
-  const noMediaFormatRule = `
-Keep metadata focused on the actual subject matter. Avoid subjective marketing language, brands, trademarks, famous people, fictional characters and artist names. Use clean lowercase keywords without hashtags or punctuation.`;
-  keywordRulePromptText += noMediaFormatRule;
 
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const fallbackGeminiModel = 'gemini-3-flash-preview';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -3945,29 +4140,61 @@ Analyze only what is visually verifiable in the image.
 ABSOLUTE RULE:
 Describe only what is clearly visible in the image.
 
+MAIN SUBJECT PRIORITY:
+Before listing secondary details, determine the single strongest MAIN SUBJECT of the asset.
+Choose it by visual dominance, central importance, distinctive identity, size/prominence, and the role it plays in the overall composition.
+Do not choose a subject merely because it is culturally interesting or commercially popular.
+If multiple subjects exist, rank them by actual visual importance and assign importance scores.
+The first primary_subject should represent the strongest visual subject whenever one can be identified.
+The downstream keyword generator will use this order to place the Main Subject first in the final keyword list.
+
 VISUAL ACCURACY RULES:
 1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner, not just the center or main subject. Check every edge, corner, background, and small element.
 2. NO HALLUCINATION: Perform a deep and thorough visual scan. You are strictly forbidden from guessing, making things up, or assuming details if you do not physically see them in the image. Your analysis must be 100% based on visual facts.
 3. Identify subjects naturally and act like a human based on strong visual, cultural, or contextual cues. For example: if a subject clearly appears to be an "Indian woman" wearing cultural attire or having distinct features, directly identify her as an "Indian woman" rather than broadly describing physical features. This applies to recognizing professions, events, locations, nationalities, relationships, and emotions when they are visually evident.
-4. COMMERCIAL & ABSTRACT CONCEPTS (ONLY WHEN SUPPORTED):
-Identify commercial concepts, themes, symbolism, or search intent only when they are genuinely represented by visible content or an unmistakable visual context. Do NOT invent business, industry, lifestyle, or marketing concepts merely because they are commercially popular. If no strong concept is present, leave those fields conservative.
+4. Never hallucinate brands, trademarked logos, or copyrighted characters.
+5. If uncertain, provide the closest accurate generic description.
 
-5. GEOGRAPHICAL LOCATION & LANDMARKS (ONLY WHEN VERIFIED): Report a city, country, landmark, or specific location only when it is clearly recognizable from the visual asset or explicitly present in reliable EXIF metadata. Do not infer a location from generic architecture, vegetation, weather, or cultural appearance alone.
-5. Never hallucinate brands, trademarked logos, or copyrighted characters.
-6. If uncertain, provide the closest accurate generic description.
-7. SPECIAL ASSET TYPES: Carefully detect if the asset is a "Flatlay" (top-down view of objects arranged on a surface) or a "Green Screen" (subject isolated on a bright chroma-key green background). If present, explicitly state these terms in your analysis.
-8. DEEP DETAIL RECOGNITION: Extensively analyze textures, materials, lighting conditions, shadows, specific object interactions, spatial relationships, micro-expressions, and fine details. Describe the environment, weather, and specific architectural or natural traits in extreme detail. You must recognize the contents of assets deeply and in extraordinary detail.
-9. ASSET UNDERSTANDING AND CONTEXT: Explain the likely subject, context, mood, and practical use only when supported by the asset. Separate what is visibly true from what is only a possible interpretation. Never use commercial use cases to invent new objects or themes.
+FORMATTING RULES FOR VISUAL FACTS:
+- Describe items, actions, and concepts using highly descriptive, concrete, and neat terms (e.g., "chicken", "fried", "crispy", "glaze", "knife", "cutting board", "cooking", "serving").
+- ABSOLUTELY AVOID using long sentences or robotic phrasing in the arrays. Extract the core nouns, verbs, and descriptive adjectives cleanly so they can directly feed the keyword engine.
 
 STRICT PROHIBITIONS:
 * Never include specific brand names or trademarked logos (must be described generically).
 * Never include copyrighted characters.
 
-PRIMARY OBJECTIVE:
-Deeply and exhaustively detect every visible subject, action, color, visible text, material, texture, lighting, and composition detail. You must recognize the contents of assets deeply and in extraordinary detail.
-Also assess the likely context, mood, symbolism, and practical meaning of the asset, but keep interpretations conservative and clearly grounded in what is visible. Do not invent commercial use-cases.
-Also, conduct a deep assessment on the asset's artistic theme, deeper meaning, and symbolic concept (baca makna mendalam & artistik dari aset tersebut).
-Also, perform a profound visual semantic analysis of the image content to suggest the most relevant microstock categories from the official lists.
+PRIMARY OBJECTIVE — BUILD GROUNDED VISUAL_FACTS:
+Analyze the actual asset as a structured evidence record for downstream metadata generation.
+Do not write a caption, title, description, or keywords here.
+Every fact must be traceable to visible evidence in the supplied frame(s).
+If a fact is uncertain or not visible, omit it or mark confidence low rather than guessing.
+
+VISUAL ANALYSIS DIMENSIONS:
+1. PRIMARY SUBJECTS — the main visually dominant objects/people/animals.
+2. SECONDARY SUBJECTS — supporting visible objects or subjects.
+3. BACKGROUND ELEMENTS — visible environmental/background details that can support keywords.
+4. ACTIONS — only actions that are visibly occurring.
+5. RELATIONSHIPS — visible spatial/interacting relationships between subjects.
+6. ATTRIBUTES — visible material, shape, texture, pattern, condition, size relationship, clothing, etc.
+7. COLORS — actual dominant and secondary visible colors.
+8. TEXT — exact visible text only; do not invent or repair unreadable text.
+9. SETTING — generic visible setting/environment; never guess exact location.
+10. COMPOSITION — orientation, framing, angle, perspective, close-up, copy space, symmetry, layout, foreground/midground/background.
+11. LIGHTING — visible light direction/quality, shadows, highlights, natural/artificial appearance.
+12. CONCEPTS — only concepts clearly communicated by the image; distinguish direct visual meaning from interpretation.
+13. EVENT/SEASON — only when unmistakably supported by visual cues.
+14. TECHNICAL/VISUAL CHARACTERISTICS — photo/illustration/render appearance, isolated/background treatment, transparency if actually evident, etc.
+
+EVIDENCE DISCIPLINE:
+- Visual evidence is the source of truth.
+- Do not infer profession, nationality, religion, culture, exact location, audience, industry, emotion, use case, or symbolism unless the visual evidence strongly supports it.
+- A color alone is not evidence of a holiday or cultural event.
+- A generic object is not evidence of a brand or product model.
+- Do not convert subjective aesthetic judgments into facts.
+- Do not use EXIF to invent visual content; EXIF is technical corroboration only.
+- Prefer precise generic descriptions when identification is uncertain.
+
+For important subjects, provide importance and confidence scores. Use 0–100 scores.
 Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
@@ -3976,7 +4203,6 @@ Asset Context: ${mediaTypeContext}
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
 - Shutterstock Categories: ${shutterstockCategoriesText}
-- MiriCanvas Categories: ${miricanvasCategoriesText}
 
 OUTPUT FORMAT:
 {
@@ -4004,11 +4230,12 @@ OUTPUT FORMAT:
     "actions": [],
     "composition": [],
     "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
-    "understanding_and_context": "Explain your deep understanding of the asset: its narrative, commercial intent, target audience, and overall context (pemahaman mendalam tentang narasi, konteks, dan tujuan penggunaan komersial aset ini).",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
@@ -4021,7 +4248,7 @@ OUTPUT FORMAT:
       let itemVisionInstruction = visionSystemInstruction;
       let itemExifDesc = "";
       if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
-        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(items[i].exifMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda (seperti jenis kamera, lensa, pengaturan, resolusi asli, koordinat lokasi/GPS, tanggal, atau software pengedit/pembuat).`;
+        const exifInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(items[i].exifMetadata, null, 2)}\n\`\`\`\nGunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temuan visual. Jangan memasukkan GPS, tanggal, software, kamera, lensa, atau detail EXIF lain ke title, description, atau keywords kecuali detail tersebut terlihat jelas atau memang relevan secara editorial.`;
         itemVisionInstruction += exifInstruction;
         itemExifDesc = `\nASSET #${i + 1} EXIFTOOL TECHNICAL METADATA:\n${JSON.stringify(items[i].exifMetadata, null, 2)}`;
       }
@@ -4039,32 +4266,18 @@ OUTPUT FORMAT:
           visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${facts}${itemExifDesc}`);
           let parsedFacts: any = {};
           try {
-             parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS || {};
-          } catch(e) {
-             parsedFacts = { primary_subjects: [], secondary_subjects: [], background_elements: [], visible_text: [], colors: [], actions: [], composition: [], semantic_category_analysis: { adobe_id: 0, shutterstock_category_1: "", shutterstock_category_2: "", reason: "Fallback default." } };
+             parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
+             if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
+               throw new Error("VISUAL_FACTS missing or invalid");
+             }
+          } catch(e: any) {
+             console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
+             throw new Error(`AI Vision mengembalikan hasil analisis yang tidak valid untuk aset #${i + 1}.`);
           }
           parsedVisualFactsList.push(parsedFacts);
       } catch (err: any) {
-          console.warn(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
-          const fallbackFacts = {
-              VISUAL_FACTS: {
-                primary_subjects: [{ name: "main subject", importance: 100 }],
-                secondary_subjects: [],
-                background_elements: [],
-                visible_text: [],
-                colors: ["natural"],
-                actions: ["commercial posing"],
-                composition: ["professional"],
-                semantic_category_analysis: {
-                  adobe_id: 0,
-                  shutterstock_category_1: "",
-                  shutterstock_category_2: "",
-                  reason: "Fallback static categories used."
-                }
-              }
-          };
-          visualDescriptions.push(`ASSET #${i + 1} VISUAL_FACTS:\n${JSON.stringify(fallbackFacts)}`);
-          parsedVisualFactsList.push(fallbackFacts.VISUAL_FACTS);
+          console.error(`[JohMeta Pipeline - Batch] Vision failed for item ${i}:`, err.message || err);
+          throw new Error(`AI Vision gagal menganalisis aset #${i + 1}: ${err.message || "Vision analysis failed"}`);
       }
   }
 
@@ -4105,42 +4318,15 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. COLORS ARE OPTIONAL: Include a color when it materially helps identify the visual; never add colors merely to fill slots.
 
-
-MICROSTOCK KEYWORD INDEXING ENGINE DIRECTIVES (CRITICAL FOR ADOBE STOCK INDEXING):
-1. CLEAN INDEXABLE SYNTAX: Every keyword MUST be 100% clean, lowercase, without special symbols, hashtags, or emojis.
-2. NO SINGULAR/PLURAL REDUNDANCY: Do NOT list both singular and plural forms of the same root word (e.g. avoid 'car' AND 'cars', 'tree' AND 'trees') as stock search engines automatically stem root words. Duplicate roots waste valuable indexing capacity.
-3. KEYWORD SHAPE: ${keywordMode === 'single' ? "Generate one-word keywords only. Never output compound phrases." : "Use short natural search terms appropriate to the selected keyword mode."}
-4. HUMAN CURATION OVER SLOT FILLING: Use only useful, grounded terms. Do not add keywords merely to reach the target count. A shorter list of strong terms is better than padded metadata.
-5. KEYWORD ORDER: Put the strongest buyer-facing terms first, but let the actual visual determine the order. There is no fixed subject/detail/concept quota.
-
-MICROSTOCK ALGORITHMIC SEO & DISCOVERABILITY RULES:
-- GEOGRAPHICAL LOCATION & LANDMARK INTEGRATION: Include a location or landmark only when clearly recognizable or explicitly verified by EXIF. Do not infer a place from generic visual characteristics.
-- NATURAL & DETAILED PHRASING (NO ROBOTIC CLICHES): Write titles and descriptions that are highly detailed, evocative, and sound completely natural, as if written by a professional native English stock curator. Avoid robotic, repetitive, or dry templates. Do not use cheap, subjective marketing adjectives like "beautiful", "stunning", "high-quality", but use highly descriptive and precise nouns, active verbs, and atmospheric adjectives (e.g., "warm golden hour lighting", "misty morning atmosphere", "lush tropical foliage"). Ensure descriptions flow like real, coherent human-written captions rather than disconnected visual details.
-- SEARCH INTENT MATCHING: Design metadata to precisely match the search queries of professional commercial buyers (e.g., designers, marketing teams, agency publishers). Ask yourself: "What actual commercial search query would a buyer type to purchase this exact asset?"
-- SEMANTIC RELEVANCE: Start with concrete visible subjects and distinctive details. Add abstract concepts only when they are clearly represented. Never add demographic, industry, or use-case words just because they are commercially popular.
-- HIGH-VALUE NICHE FRONT-LOADING: Place the highest-value, highly specific visual descriptors and niche-relevant keywords at the very beginning of the Titles and Keywords list. Microstock search algorithms weigh earlier words much higher!
 
 Rules for Titles:
-1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
-   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
-   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
-   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
-   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
-2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
-   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
-   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
-   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
-3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
-   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
-   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
-4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+1. Focus directly on the main subject and action. Introduce the content clearly. Front-load the most relevant searchable visual keywords. CRITICAL: MUST NOT start with "Vector of", "Illustration of", "Drawing of", "Continuous line drawing of", "High Quality", "High-Quality", "Premium", "Beautiful", or "Stunning". Absolutely DO NOT use subjective marketing language or generic quality descriptors (e.g. "High quality image of...").
+2. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
    ${directives.titleRule}
-5. FORMAT & KEPATUHAN:
-   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
-   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
-   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
+3. Use Sentence case (only the first letter of the entire title should be capitalized, with the rest in lowercase except for proper nouns).
+4. Use easy-to-read phrases, NOT formal sentence structures.
+5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -4148,12 +4334,9 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
-
 Rules for Keywords:
-1. Start with the most important, high-converting commercial descriptors. Sort them in descending order of relevance.
-2. Ensure no IP, brands, or names are included.
 ${keywordRulePromptText}
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
@@ -4164,12 +4347,6 @@ ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
-
-MiriCanvas Categories:
-${miricanvasCategoriesText}
-
-Dreamstime Main Categories:
-${dreamstimeCategoriesText}
 
 STRICT DEFINING RULES:
 - Return a JSON OBJECT containing a "results" array of exactly ${items.length} objects.
@@ -4189,7 +4366,9 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 1,
       "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures",
+      "shutterstock_category_2": "Backgrounds/Textures"
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
     }
   ]
@@ -4197,24 +4376,6 @@ OUTPUT FORMAT:
 
   let draftMetadataArray: any = [];
   try {
-    // Enforced responseSchema for clean, structured batch Metadata output
-    const batchMetadataGenSchema = {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING, description: "A highly descriptive natural language title" },
-          description: { type: Type.STRING, description: "A detailed visual description" },
-          keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Array of relevant keywords in natural, formal language" },
-          category_id: { type: Type.NUMBER, description: "Adobe Stock numeric category ID" },
-          shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
-          shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
-          category_reason: { type: Type.STRING, description: "Brief visual semantic reason for category selection" }
-        },
-        required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason"]
-      }
-    };
-
     let genResponse;
     if (NON_GEMINI_PROVIDERS.has(provider)) {
       try {
@@ -4222,7 +4383,6 @@ OUTPUT FORMAT:
           systemInstruction: genSystemInstruction,
           contents: `Generate draft metadata array based on VISUAL_FACTS for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
-          responseSchema: batchMetadataGenSchema,
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         });
@@ -4234,7 +4394,6 @@ OUTPUT FORMAT:
           }, {
             systemInstruction: genSystemInstruction,
             responseMimeType: "application/json",
-            responseSchema: batchMetadataGenSchema,
             temperature: temperature ?? 0.1,
             topP: 0.8 });
       }
@@ -4244,7 +4403,6 @@ OUTPUT FORMAT:
         }, {
           systemInstruction: genSystemInstruction,
           responseMimeType: "application/json",
-          responseSchema: batchMetadataGenSchema,
           temperature: temperature ?? 0.1,
           topP: 0.8 });
     }
@@ -4309,28 +4467,24 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. COLORS ARE OPTIONAL: Include a color when it materially helps identify the visual; never add colors merely to fill slots.
 7. NATURAL HUMAN-LIKE INFERENCE: Identify demographics, professions, cultures, and context naturally like a human would. If a person visually appears to be an "Indian woman", describe her as an "Indian woman" rather than "woman with brown skin". If someone is wearing a white coat in a clinic, call them a "doctor". Apply this human-like recognition to ethnicities, locations, seasons, relationships, and events based on strong visual and cultural cues. Do NOT be overly literal or robotic.
 
 Rules for Titles:
-1. FORMULA APA YANG ADA DI ASET, ALUR & KONSEP:
-   - Gunakan apa yang nyata ada di aset (Subjek Utama / Objek Konkret).
-   - Jelaskan alur, interaksi, atau aktivitas yang sedang berlangsung (Alur & Aksi).
-   - Sertakan konsep, suasana, atau konteks komersialnya (Konsep & Setting).
-   - Formula Struktur: [Subjek Visual Utama] + [Aktivitas / Alur Interaksi] + [Konteks Lingkungan] + [Konsep / Nilai Komersial].
-2. BUYER SEARCH MINDSET (SEO-FRIENDLY):
-   - Selalu pikir: "Kalau gue jadi buyer, gue search apa?"
-   - Tempatkan kata kunci subjek utama di 3-5 kata pertama judul agar ramah algoritma mesin pencari Microstock (Adobe Stock, Shutterstock).
-   - DILARANG menggunakan kata marketing/subjektif murahan ("High Quality", "Beautiful", "Stunning", "Premium", dsb.).
-3. NATURAL HUMAN LANGUAGE (BUKAN TUMPUKAN KEYWORD):
-   - Tulis dalam bahasa Inggris formal natural yang mudah dibaca buyer sekilas seperti kurator katalog stok profesional.
-   - DILARANG memisahkan kata dengan koma seperti daftar tag. Judul harus kalimat/frasa utuh.
-4. SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
-   ${directives.titleRule}
-5. FORMAT & KEPATUHAN:
-   - Sentence case (hanya huruf pertama judul dan nama diri/proper noun yang kapital).
-   - Bebas dari brand/IP, nama orang terkenal, atau kata format media ("photo", "vector", "illustration").
-   - NO PLACEHOLDERS: Tulis langsung teks judul sebenarnya.
+- Use clear natural language.
+- Describe only visible elements in the image.
+- Put the main subject at the beginning of the title.
+- Include important commercial keywords naturally.
+- Do not use keyword stuffing.
+- Do not use brand names, trademarks, company names, or copyrighted terms.
+- Do not use marketing or subjective language such as "High Quality", "High-Quality", "Premium", "best", "amazing", "stunning", "beautiful", "perfect", or "Top". NEVER start titles with "High quality image of...", "Beautiful...", or similar subjective generic phrases.
+- SPECIFIC TITLE GUIDELINES FOR THE ASSET TYPE:
+  ${directives.titleRule}
+- Do not use articles unless necessary (a, an, the).
+- CRITICAL TITLE STRUCTURE: [Main Subject] + [Action] + [Environment] + [Purpose or Concept]. Must be SEO friendly and highly relevant to the asset.
+- Include a commercial concept only when it is clearly supported by visible evidence (business, finance, technology, healthcare, education, sustainability, etc.).
+- Use sentence case.
+- Output only one title.
+- Do not include explanations, labels, quotation marks, or numbering.
 
 Rules for Descriptions:
 1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
@@ -4338,10 +4492,10 @@ Rules for Descriptions:
    ${directives.descriptionRule}
 3. Provide a thorough literal visual breakdown of the scene. Focus heavily on what is literally visible in the image rather than abstract concepts. Buyers and reviewers prefer practical and literal descriptions. Include colors, composition, and specific details using human-like language. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
 4. Limit to 200 characters.
-5. NO PLACEHOLDERS: NEVER output placeholder text (e.g. "Write a detailed description here"). Generate the actual descriptive text based entirely on the visual facts.
 
 Rules for Keywords:
 ${keywordRulePromptText}
+
 
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
@@ -4352,12 +4506,6 @@ ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
-
-MiriCanvas Categories:
-${miricanvasCategoriesText}
-
-Dreamstime Main Categories:
-${dreamstimeCategoriesText}
 
 SOURCE VISUAL_FACTS:
 ${visualDescriptions.join('\n\n')}
@@ -4375,7 +4523,9 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": "",
+      "shutterstock_category_2": ""
+      "dreamstime_category": "",
+      "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
       "confidence_score": 0.95
     }
@@ -4384,31 +4534,11 @@ OUTPUT FORMAT:
 
   let finalMetadataArray: any = [];
   try {
-    // Enforced responseSchema for clean, validated batch Metadata output
-    const batchValidatorSchema = {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING, description: "Validated natural language title" },
-          description: { type: Type.STRING, description: "Validated visual description" },
-          keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Validated keyword array" },
-          category_id: { type: Type.NUMBER, description: "Adobe Stock category ID" },
-          shutterstock_category_1: { type: Type.STRING, description: "Primary Shutterstock category" },
-          shutterstock_category_2: { type: Type.STRING, description: "Secondary Shutterstock category" },
-          category_reason: { type: Type.STRING, description: "Visual semantic reason" },
-          confidence_score: { type: Type.NUMBER, description: "Confidence score 0-1" }
-        },
-        required: ["title", "description", "keywords", "category_id", "shutterstock_category_1", "shutterstock_category_2", "category_reason", "confidence_score"]
-      }
-    };
-
     const validResponse = await (NON_GEMINI_PROVIDERS.has(provider) 
       ? callOpenAICompatibleWithRetry({
           systemInstruction: validatorSystemInstruction,
           contents: `Audit and validate the Draft Metadata array for ${items.length} assets. [RunID: ${Date.now()}-${Math.random()}]`,
           responseMimeType: "application/json",
-          responseSchema: batchValidatorSchema,
           config: { temperature: temperature ?? 0.1, topP: 0.8 },
           model: activeModel
         })
@@ -4417,7 +4547,6 @@ OUTPUT FORMAT:
         }, {
           systemInstruction: validatorSystemInstruction,
           responseMimeType: "application/json",
-          responseSchema: batchValidatorSchema,
           temperature: temperature ?? 0.1,
           topP: 0.8 })
     );
@@ -4431,7 +4560,9 @@ OUTPUT FORMAT:
         ...d, 
         category_id: heur.category_id, 
         shutterstock_category_1: heur.shutterstock_category_1, 
-        shutterstock_category_2: heur.shutterstock_category_2 
+        shutterstock_category_2: heur.shutterstock_category_2,
+      dreamstime_category: "Abstract",
+      miricanvas_category: "Background" 
       };
     });
   }
@@ -4468,7 +4599,7 @@ OUTPUT FORMAT:
       dataArray = dataArray.slice(0, items.length);
     }
 
-    return dataArray.map((rawMetadata, index) => {
+    return Promise.all(dataArray.map(async (rawMetadata, index) => {
         // Ensure metadata is a valid object
         let metadata: any = (rawMetadata && typeof rawMetadata === 'object' && !Array.isArray(rawMetadata)) ? { ...rawMetadata } : {};
 
@@ -4485,51 +4616,41 @@ OUTPUT FORMAT:
         // Ensure description is valid
         metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
 
-        const assetVisualFacts = parsedVisualFactsList[index] || {};
-
-        // [LAPISAN 1] Bangun analisis visual bertingkat (scene → object → attributes → concepts)
-        // per item batch, dari VISUAL_FACTS item tersebut.
-        const tieredVisual = buildTieredVisualAnalysis(assetVisualFacts);
-        const assetSubtype = detectAssetSubtype(toolType, assetVisualFacts, customPrompt);
-
         // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
-        // 1. Pemrosesan Keyword Batch via 7-Stage Pipeline
-            metadata.keywords = processKeywordsSemantic(
-              Array.isArray(metadata.keywords) ? metadata.keywords : [],
-              targetCount,
-              assetVisualFacts,
-              toolType,
-              keywordMode,
-              metadata.title || "",
-              metadata.description || ""
-            );
-
-        // [LAPISAN 2] Formula judul per jenis aset — fallback bila judul AI kosong/generik
-        let candidateTitle = String(metadata.title || "").trim();
-        const isGenericTitle = !candidateTitle || candidateTitle.toLowerCase() === "stock asset" || candidateTitle.length < 6;
-        if (isGenericTitle) {
-          candidateTitle = applyTitleTemplate(assetSubtype, tieredVisual, titleLength);
+        if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
+            metadata.keywords = [];
         }
+            const assetVisualFacts = parsedVisualFactsList[index] || {};
+            const finalKeywordList = await applyMetadataGenKeywordLogic({
+              rawKeywords: metadata.keywords,
+              visualFacts: assetVisualFacts,
+              targetCount,
+              provider,
+              model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
+              keywordMode,
+              metadataLanguage
+            });
+
+            metadata.keywords = finalKeywordList;
 
         // 1.5. Enforce professional title length strictly
-        metadata.title = ensureTitleLength(candidateTitle, metadata.keywords || [], metadata.description || "", titleLength);
-
-        // [LAPISAN 7] Penentuan kategori yang lebih akurat: cross-validasi AI vision × heuristik
-        const accurateCategory = determineAccurateCategory(metadata.title, metadata.keywords || [], assetVisualFacts, metadata.category_id);
+        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength);
 
         // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
         const parsedCategoryId = parseInt(String(metadata.category_id), 10);
         if (isNaN(parsedCategoryId) || parsedCategoryId < 1 || parsedCategoryId > 21) {
-            metadata.category_id = accurateCategory.category_id;
+            const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+            metadata.category_id = heur.category_id;
         } else {
-            metadata.category_id = accurateCategory.confidence >= 0.75 ? accurateCategory.category_id : parsedCategoryId;
+            metadata.category_id = parsedCategoryId;
         }
 
         // 2. Sanitasi & Fallback Otomatis Kategori Shutterstock
         const validShutterstockCats = toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES;
 
         if (!metadata.shutterstock_category_1 || !validShutterstockCats.includes(metadata.shutterstock_category_1)) {
-            metadata.shutterstock_category_1 = validShutterstockCats.includes(accurateCategory.shutterstock_category_1) ? accurateCategory.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
+            const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+            metadata.shutterstock_category_1 = validShutterstockCats.includes(heur.shutterstock_category_1) ? heur.shutterstock_category_1 : (validShutterstockCats[0] || "Abstract");
         }
 
         if (
@@ -4537,7 +4658,8 @@ OUTPUT FORMAT:
           !validShutterstockCats.includes(metadata.shutterstock_category_2) || 
           metadata.shutterstock_category_2 === metadata.shutterstock_category_1
         ) {
-          let secondFallback = accurateCategory.shutterstock_category_2;
+          const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+          let secondFallback = heur.shutterstock_category_2;
           if (secondFallback === metadata.shutterstock_category_1) {
               const possibleVal = toolType === ToolType.VIDEO ? "Backgrounds/Textures" : "Abstract";
               secondFallback = validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || possibleVal;
@@ -4545,53 +4667,41 @@ OUTPUT FORMAT:
           metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures");
         }
 
-        metadata.category_reason = metadata.category_reason || accurateCategory.reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
-
-        // [LAPISAN 8] Validasi akhir non-blocking per item batch
-        const qaReport = validateFinalMetadata(metadata, targetCount, titleLength, validShutterstockCats);
-        if (!qaReport.valid) {
-          console.warn(`[MetadataGen Lapisan 8 - Batch item ${index}] Errors:`, qaReport.errors);
-        }
-        if (qaReport.warnings.length > 0) {
-          console.log(`[MetadataGen Lapisan 8 - Batch item ${index}] Warnings:`, qaReport.warnings);
-        }
+        metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
 
         const targetId = items[index] ? items[index].id : (items[0]?.id || 'unknown');
         return { id: targetId, metadata };
-    });
+    }));
   } catch (error) {
     console.warn("[JohMeta Pipeline - Batch] Parse Error:", error);
     throw new Error("Gagal memproses respons batch metadata. Silakan coba kembali.");
   }
 };
 
-function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string) {
+function processPromptResults(parsed: any, count: number, subject: string, userNegativePrompt: string, styleCategory?: string) {
   let validatedPrompts = (parsed.prompts || []).filter((p: any) => typeof p === 'string' && p.trim().length > 0);
   
   if (validatedPrompts.length === 0) {
-    // If absolutely no prompts, at least returning something to avoid crash, but ideally shouldn't happen
-    validatedPrompts = [`${subject} professional stock photography`].map(p => p);
+    validatedPrompts = [`${styleCategory || ''} of ${subject}, high quality professional stock asset`].map(p => p.trim());
   }
 
   const originalLength = validatedPrompts.length;
   if (validatedPrompts.length < count) {
-    const modifiers = [
-      "cinematic macro photography, highly detailed",
-      "isometric 3D render, octane render, stylized lighting",
-      "vibrant watercolor ink illustration, splash art",
-      "futuristic cyberpunk city night life background, neon glow",
-      "classical oil painting, textured brush strokes, masterwork",
-      "minimalist flat graphic design icon",
-      "dramatic backlight, rim lighting, atmospheric depth",
-      "wide angle landscape composition, beautiful morning light",
-      "studio lighting portrait, bokeh depth of field",
-      "vintage retro concept art, detailed illustration"
+    const angleMods = [
+      "eye-level candid view, natural lighting",
+      "close-up detail focus, shallow depth of field",
+      "three-quarter perspective, balanced composition",
+      "overhead flat lay view, clean negative space",
+      "wide-angle scene, contextual environment",
+      "soft side lighting, gentle shadow depth",
+      "golden hour atmospheric glow, elegant framing",
+      "clean studio illumination, tack-sharp focus"
     ];
     let modIdx = 0;
     while (validatedPrompts.length < count) {
       const base = validatedPrompts[validatedPrompts.length % originalLength];
-      const mod = modifiers[modIdx % modifiers.length];
-      validatedPrompts.push(`${base}, ${mod} (variation #${validatedPrompts.length + 1})`);
+      const mod = angleMods[modIdx % angleMods.length];
+      validatedPrompts.push(`${base}, ${mod}`);
       modIdx++;
     }
   } else if (validatedPrompts.length > count) {
@@ -4615,8 +4725,8 @@ function processPromptResults(parsed: any, count: number, subject: string, userN
     negativePrompt: appendNeg || parsed.negativePrompt || "",
     styleExplanation: parsed.styleExplanation || [
       `Berhasil mensintesis ${count} variasi prompt bertema ${subject}.`,
-      `Menggunakan spektrum gaya dan variabilitas komposisi visual.`,
-      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion.`
+      `Menggunakan variabilitas komposisi visual yang konsisten dengan subjek utama.`,
+      `Seluruh prompt dioptimasi dalam bahasa Inggris untuk Midjourney/Stable Diffusion/Adobe Firefly.`
     ]
   };
 }
@@ -4638,7 +4748,6 @@ export const generateOptimizedPrompt = async (options: {
   darkHorrorSubStyle?: string;
   referenceImages?: string[];
   cameraAngles?: string[];
-  isLicensed?: boolean;
 }): Promise<{ prompts: string[]; negativePrompt: string; styleExplanation: string[] }> => {
   const { 
     subject, 
@@ -4656,24 +4765,17 @@ export const generateOptimizedPrompt = async (options: {
     vectorSubType = undefined,
     darkHorrorSubStyle = undefined,
     referenceImages = undefined,
-    cameraAngles = undefined,
-    isLicensed = false
+    cameraAngles = undefined
   } = options;
 
   const count = Math.min(Math.max(variation, 10), 150);
 
-  // 🏷️ PRO vs TRIAL differentiation: PRO gets full quality, Trial gets basic
-  const promptTier = isLicensed ? 'PRO' : 'TRIAL';
-  
-  // TRIAL: cap variations at 15, reduce word richness
-  const effectiveCount = isLicensed ? count : Math.min(count, 15);
-  
   // ELEMEN KEJUTAN (Surprise Element) - Random Salt & Diversity Injection (Expanded for Adobe Stock Similarity Protection)
   const defaultAngles = ["low-angle shot", "eye-level shot", "high-angle perspective", "overhead aerial shot", "macro close-up", "medium shot", "wide-angle panoramic shot", "three-quarter portrait shot", "extreme close-up", "Dutch angle", "worm's-eye view", "bird's-eye view", "first-person POV"];
   const angles = cameraAngles && cameraAngles.length > 0 ? cameraAngles : defaultAngles;
-  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "warm indoor ambient light", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "warm sunset backlight", "bright natural daylight", "soft diffused studio light", "gentle afternoon sunlight", "warm golden sidelight"];
+  const lightings = ["golden hour light", "bright overcast daylight", "soft window light", "dramatic side-lighting", "warm indoor ambient light", "moody twilight", "misty dawn light", "vibrant studio rim-lighting", "sun-dappled shadows", "cool soft morning light", "neon cyberpunk glow", "chiaroscuro lighting", "bioluminescent ambient light", "ethereal volumetric rays", "harsh cinematic spotlight", "dramatic backlighting with lens flare"];
   const compositions = ["rule of thirds alignment", "symmetric composition", "minimalist empty-space negative layout", "diagonal leading lines", "frame-within-a-frame depth", "centered dominant focus with spacious copy space", "shallow depth-of-field", "dynamic foreground elements with blurred background", "forced perspective", "kaleidoscopic symmetry", "abstract fragmented framing", "dramatic low-angle heroic composition", "ultra-wide architectural framing"];
-  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "gentle winter light", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "golden dusk sunset sky", "bright midday sun", "cool overcast daylight", "soft warm evening glow", "peaceful twilight sky", "bright morning sunlight"];
+  const seasonsOrWeathers = ["crisp autumn afternoon", "warm summer glow", "misty spring morning", "subtle winter frost", "gentle drizzle rain", "clear sunny day", "soft foggy atmosphere", "dusk sunset sky", "thunderstorm dramatic sky", "heavy snow blizzard", "post-apocalyptic ash fall", "magical glowing floating embers", "surreal cosmic starscape"];
   const colorPalettes = ["natural warm earthy tones", "subtle cool pastel hues", "vivid high-saturation colors", "sophisticated minimalist monochromatic tones", "muted organic color palette", "soft warm gold and cream", "vibrant neon cyberpunk palette", "dark moody cinematic tones", "surreal iridiscent colors", "high-contrast duotone", "hyper-saturated pop art colors"];
 
   // Linear Congruential Generator (PRNG) using the seed to ensure deterministic but highly varied selections
@@ -4688,49 +4790,49 @@ export const generateOptimizedPrompt = async (options: {
     return arr[Math.floor(r * arr.length)];
   };
 
-  // 🚫 PNG MODE check — must be defined BEFORE camera angle logic
-  const isPngMode = promptMode === 'png';
-  
   const userCameraAngle = cameraAngles && cameraAngles.length > 0 ? cameraAngles.join(', ') : null;
-  
-  // 🚫 PNG MODE: Camera angles are FORBIDDEN — they belong to Background/Photographic mode only
-  const effectiveUserCameraAngle = isPngMode ? null : userCameraAngle;
-  
-  const randomAngle = effectiveUserCameraAngle || selectRandom(defaultAngles);
+  const randomAngle = userCameraAngle || selectRandom(defaultAngles);
   const randomLighting = selectRandom(lightings);
   const randomComp = selectRandom(compositions);
   const randomSeason = selectRandom(seasonsOrWeathers);
   const randomColor = selectRandom(colorPalettes);
 
   // 🎲 [Backend Helper] — Dynamic Injection Engine
-  const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "serene", "kinetic", "immersive", "transcendent", "majestic", "delicate", "vivid", "radiant", "tranquil", "refined"];
+  const creativeSurprise = ["ethereal", "crisp", "sumptuous", "pristine", "luminous", "brooding", "serene", "kinetic", "immersive", "transcendent", "haunting", "majestic", "raw", "delicate", "vivid"];
   const dynamicMood = selectRandom(creativeSurprise);
-  const randomTemp = 0.80 + Math.random() * 0.15;
+  const randomTemp = 0.70 + Math.random() * 0.10;
 
   // Camera angle directive — minimal & natural, especially for Photorealistic
-  // 🚫 DISABLED for PNG mode: Camera angles only apply in Background mode
-  const cameraAngleDirective = !isPngMode && effectiveUserCameraAngle
+  const cameraAngleDirective = userCameraAngle
     ? (styleCategory === 'Photorealistic'
-        ? ` Blend the "${effectiveUserCameraAngle}" perspective naturally as a candid real-world photo angle — like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.`
+        ? ` Blend the "${userCameraAngle}" perspective naturally as a candid real-world photo angle — like a photographer simply choosing where to stand. Do NOT stage or theatrically compose the scene.`
         : styleCategory === 'Cinematic'
-        ? ` Use "${effectiveUserCameraAngle}" with cinematic framing and movie-like composition.`
-        : ` MUST use this specific camera angle: "${effectiveUserCameraAngle}". Do not randomize or substitute.`)
+        ? ` Use "${userCameraAngle}" with cinematic framing and movie-like composition.`
+        : ` MUST use this specific camera angle: "${userCameraAngle}". Do not randomize or substitute.`)
     : '';
 
   // When user selected camera angle, omit angle from randomSaltInjection to prevent over-emphasis
-  // 🚫 PNG mode: always use randomAngle (no camera), never user camera
-  const saltAngle = !isPngMode && effectiveUserCameraAngle ? 'User-selected angle (see Camera details rule)' : randomAngle;
+  const saltAngle = userCameraAngle ? 'User-selected angle (see Camera details rule)' : randomAngle;
   const randomSaltInjection = `[Dynamic Modifiers: ${dynamicMood} mood, ${saltAngle}, ${randomLighting}, ${randomComp}, ${randomSeason}, ${randomColor}, Seed ID: ${seed}, Temperature: ${randomTemp.toFixed(2)}]`;
 
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
 
+  const isPngMode = promptMode === 'png';
   let modeConstraint = "";
 
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
-      ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and fluid artistic lines.'
-      : ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus on flat design aesthetic, featuring clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO gradients, NO shading, NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes. High contrast, clean vector silhouettes, and elegant proportions.',
+      ? ' - Style Guide: STRICTLY 2D GRADIENT FLAT DESIGN. Focus on modern flat vector illustration utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes.'
+      : vectorSubType === 'flat_vector'
+      ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus purely on clean figurative 2D flat vector artwork, clean hand-crafted paths, smooth curves, organic line art, and harmonious solid color blocks typical of professional editorial illustrations. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly shapes, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative flat illustration.'
+      : vectorSubType === 'minimal_flat'
+      ? ' - Style Guide: STRICTLY MINIMAL FLAT DESIGN. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients.'
+      : vectorSubType === 'corporate_flat'
+      ? ' - Style Guide: STRICTLY CORPORATE FLAT ILLUSTRATION (Alegria / Tech Corporate Style). Stylized characters with fluid sweeping postures, oversized expressive limbs, clean flat colors, and modern tech business aesthetic.'
+      : vectorSubType === 'isometric_flat'
+      ? ' - Style Guide: STRICTLY ISOMETRIC FLAT DESIGN. Flat 2D isometric style using orthographic 30-degree parallel projection without camera perspective, rendered in clean, flat, shadow-free vector graphics with distinct solid color planes.'
+      : ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Clean vector paths, flat solid colors, beautiful 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, and NO geometric fragmentation.',
     "3D Render": ' - MANDATORY RENDER ENGINE LOCK: This style MUST exclusively depict Unreal Engine 5 real-time 3D rendering aesthetics — Lumen dynamic global illumination, Nanite micro-detail geometry, physically-based rendering (PBR) materials, real-time ray-traced reflections, soft volumetric studio lighting, and smooth high-fidelity 3D surfaces (glossy or matte plastic, metal, or ceramic). Every prompt variation MUST explicitly include "Unreal Engine 5" or "Unreal Engine real-time render" phrasing. STRICTLY FORBIDDEN — under no circumstances mention or blend in: isometric/orthographic perspective, glassmorphism/frosted glass/translucent glass effects, voxel art, low-poly faceting, or any other render engine name (Octane, Cinema 4D, Blender Cycles, V-Ray, Redshift, KeyShot). Do NOT cross-contaminate this style with any other PNG style vocabulary. Keep every variation 100% authentic to a pure Unreal Engine 5 CGI render.',
     "Sticker Illustration": ' - You must explicitly append tags such as "sticker format", "die-cut stickers", "sticker asset with white border" and "thick sticker outline" into the prompt variations.',
     "Flat Icon": ' - Focus on simplified pictograms, 2D minimalist design, strong symbol-based visual language, and high-contrast solid colors.',
@@ -4848,11 +4950,11 @@ When generating prompts for "Dark Horror Aesthetic", follow these core directive
   }
 
   let vectorSubTypeDirective = '';
-  if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
+  if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
     } else if (vectorSubType === 'flat_vector') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks.';
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative 2D flat vector illustration.';
     } else if (vectorSubType === 'corporate_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Corporate Flat Illustration" aesthetic (Alegria style / tech corporate art). Characterized by stylized figures with oversized limbs, fluid sweeping postures, expressive dynamic organic poses, friendly tech character design, clean flat gradients or solid colors, and professional corporate vector elements.';
     } else if (vectorSubType === 'gradient_flat') {
@@ -4902,7 +5004,7 @@ Make sure your generated prompts do not contain these elements or depict them in
   const isPhotographic = ['Photorealistic', 'Cinematic', 'Vintage Photography'].includes(styleCategory);
 
   let effectiveStyleCategory = styleCategory;
-  if (styleCategory === 'Vector Art' && isPngMode && vectorSubType) {
+  if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Vector Art - Minimal Flat Design';
     else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Vector Art - Flat Vector Illustration';
     else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Vector Art - Corporate Flat Illustration';
@@ -4926,7 +5028,7 @@ ${isPngMode ? `- Requested PNG Background color: ${pngBgColor}` : ""}
 ${modeConstraint}
 
 PROMPT GENERATION PRIORITY (STRICT ORDER):
-1. Theme subject: The core subject MUST remain the dominant focus of the prompt.
+1. ABSOLUTE SUBJECT ADHERENCE (CRITICAL FOR SMALL/LITE MODELS): The exact core subject "${subject}" MUST remain the central, dominant focus of every single prompt. You are STRICTLY FORBIDDEN from wandering off-topic (ngawur) or hallucinating entirely different topics. No matter how much you vary the environment or style, the original subject MUST be clearly visible and accurate to the user's request.
 2. Visual characteristics: Describe specific colors, shapes, and the overall aesthetic vibe.
 3. Materials and textures: Detail the surfaces, physical properties, and tactile qualities (e.g., stacked paper layers for Paper Cut, hand-molded clay textures for Claymation, canvas grain/pigments for Oil/Watercolor paintings, clean vector geometry for Vector Art).
 4. Environment: Only introduce environmental details if they naturally fit the theme. Do not introduce unrelated environments.
@@ -4934,32 +5036,47 @@ PROMPT GENERATION PRIORITY (STRICT ORDER):
 6. ${isPhotographic ? `Camera details: Specific lens types, aperture, and camera angles (e.g., 85mm lens, f/1.8, high shutter speed, DSLR).${cameraAngleDirective}` : 'Medium-Specific details: Focus entirely on visual craftsmanship and physical/digital medium characteristics. Do NOT include camera models, focal lengths, shutter speeds, or photographic sensor details.'}
 
 Rules for the Generated Prompts:
-0. PROMPT STRUCTURE FORMULA: Every prompt MUST strictly start with "${effectiveStyleCategory}" and then follow this sequence: [Subject] [Action] [Visual Characteristics] [Materials/Textures] [Environment] [Lighting]${isPhotographic ? ' [Camera Details]' : ''} [Commercial Intent]. Combine these elements into a fluid, professional description.
-0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
-0.15 STYLE PURITY LOCK — ZERO CROSS-CONTAMINATION (CRITICAL — READ TWICE):
-      Each style has its OWN vocabulary domain. You MUST use ONLY the vocabulary belonging to the selected style. NEVER leak terms from other style domains.
-      ─ STYLE VOCABULARY DOMAINS ─
-      📸 Photographic Domain (Cinematic, Photorealistic, Vintage Photography, Dark Horror, Corporate Tech): camera lenses, apertures, DSLR, film grain, lighting setups, real-world environments, human subjects, candid moments. FORBIDDEN: "vector", "flat design", "outline", "stroke", "fill color", "isometric grid", "voxel", "polygon count", "render engine".
-      🎨 Vector/Illustration Domain (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): vector paths, solid fills, clean outlines, flat colors, geometric shapes, stroke weight, anchor points. FORBIDDEN: camera terms, 3D materials, photorealism, "shot on", "lens", real-world physics.
-      🧱 3D/CGI Domain (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric, Claymation): polygons, materials, textures, global illumination, ray tracing, subsurface scattering, voxel grids. FORBIDDEN: "photograph", "camera", "vector", "flat 2D".
-      🖌️ Traditional Art Domain (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): brushstrokes, pigments, paper grain, canvas, textile, folded paper. FORBIDDEN: digital 3D terms, camera terms, "vector".
-      🎮 Stylized Domain (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style): cel-shading, brick toys, pixel grid, expressive features. FORBIDDEN: photorealism, 3D render jargon, vector flat design.
-      ⚠️ BEFORE WRITING EACH PROMPT: check which domain the selected style belongs to, then filter your vocabulary to ONLY that domain. Cross-domain leakage = FAIL.
+0. MEDIUM-SPECIFIC DIVERSITY & LOGICAL SCENE FRAMEWORK (TAILORED PER STYLE DOMAIN):
+      Every generated prompt variation MUST represent a completely DIFFERENT, CREATIVE, and LOGICAL composition of the subject "${subject}", tailored specifically to the medium of "${effectiveStyleCategory}":
+
+      ─ FOR PHOTOGRAPHIC & CINEMATIC STYLES (Photorealistic, Cinematic, Vintage):
+        * Variasikan skenario kehidupan nyata: persiapan, aksi penggunaan, momen candid, interaksi, detail bahan baku.
+        * Variasikan framing & pencahayaan alami: macro close-up, eye-level portrait, overhead knolling flat lay, wide environmental landscape, golden hour, morning window light, clean softbox studio.
+
+      ─ FOR VECTOR & GRAPHIC DESIGN STYLES (Vector Art, Graphic Design, Flat Icon, Sticker, Line Art):
+        * Variasikan layout grafis & hierarki desain: layout banner promosi horizontal, kartu poster vertikal dengan negative space, komposisi emblem/lencana terpusat, tata letak infografis modular, susunan siluet dinamis.
+        * Variasikan palet warna & teknik vektor: palet warna duotone kontras tinggi, palet pastel kontemporer, kombinasi monokromatik elegan, ketebalan garis (stroke weight), dan bentuk lengkungan geometris/organik.
+
+      ─ FOR 3D & CGI STYLES (3D Render, 3D CGI, Isometric, Lowpoly, Voxel):
+        * Variasikan panggung & sudut 3D: diorama isometrik modular 30 derajat, panggung pedestal produk mengapung, studio clay render minimalis, pencahayaan tiga titik (three-point studio lighting), material matte vs glossy ceramic.
+
+      ─ FOR TRADITIONAL & CRAFT STYLES (Paper Cut, Watercolor, Oil Painting, Origami, Embroidery):
+        * Variasikan teknik medium fisik: tingkatan lapisan tumpukan kertas 3D dengan bayangan lembut, sapuan basah cat air (wet-on-wet wash), tekstur impasto goresan palet tebal, lipatan origami geometris rapi, pola tusukan benang bordir timbul.
+
+      - LOGIKA MANUSIA & RELEVANSI SUBJEK (Strict Human Logic):
+        * Setiap variasi harus tetap masuk akal, relevan dengan subjek "${subject}", dan bernilai komersial tinggi.
+        * DILARANG mengulang-ulang kalimat yang sama dengan hanya mengganti 1 kata.
+
+      0.1 DOMAIN AUTHENTICITY: For artistic, illustrated, graphic, 3D, and crafted styles, you are strictly forbidden from forcing photographic jargon (such as "shot on", "aperture", "f-stop", "lens", "shutter speed", "DSLR", "realistic photography", "realistic skin/hair texture") into the prompts. They must remain 100% true to their original non-photographic artistic style.
+0.15 UNIVERSAL STYLE PURITY & CONSISTENCY LOCK (CRITICAL — ZERO TOLERANCE FOR STYLE DRIFT):
+      You MUST maintain 100% pure consistency with the selected style "${effectiveStyleCategory}".
+      - Every single prompt variation MUST begin with "${effectiveStyleCategory}" as its stylistic prefix.
+      - NEVER contaminate or mix the vocabulary of the chosen style with another style.
+      - 📸 PHOTOGRAPHIC (Photorealistic, Cinematic, Vintage Photography): Use ONLY camera lenses (50mm, 85mm, 35mm), lighting setups, aperture (f/1.8, f/2.8), and natural textures. FORBIDDEN: "vector", "3D render", "illustration", "flat art", "drawing", "CGI".
+      - 🎨 VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
+      - 🧱 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
+      - 🖌️ TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
+      - 🎮 STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
+      - UNDER NO CIRCUMSTANCES should any prompt drift into abstract geometric patterns or unrelated styles unless explicitly requested.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
-1. ALWAYS translate the core subject "${subject}" to descriptive, high-quality, vivid English first if it was entered in another language (like Indonesian).
-2. Return EXACTLY ${count} unique prompt variations as an array. Each must be distinct, professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
+1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
+2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
 3. WORD COUNT CONSTRAINT: Each generated prompt SHOULD be between ${minWords} and ${maxWords} words long. Adjust the level of detail to strictly match this requested length profile.
 4. COMMERCIAL STOCK COMPLIANCE: Focus on clean, high-resolution, sharp focus, uncluttered, professional editorial photography/art aesthetics, suitable for Shutterstock/Adobe Stock. Absolutely avoid trademarked logos or specific intellectual property (IP). Under any circumstances, NEVER include any brand names, trademarked names, manufacturer names, or proprietary product lines (e.g., Apple, Nike, Adidas, BMW, Vespa, LEGO, GoPro, iPhone). Use completely generic descriptions instead.
    Under Adobe Stock Content Policy for Artist Names, Real Known People, and Fictional Characters (https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
    - Do NOT generate prompts that reference, suggest, or contain names of real known people (including celebrities, politicians, athletes, historical figures, or public figures).
    - Do NOT generate prompts referencing fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Marvel/DC superheroes, LEGO characters, Barbie, etc.).
    - Do NOT generate prompts referencing specific artists (living or deceased) whose work is protected by copyright (e.g., "in the style of Van Gogh", "drawn by Picasso", "Andy Warhol style", etc.). Keep style references strictly generic.
-4.1 WEATHER & ATMOSPHERE — NATURAL & STYLE-APPROPRIATE ONLY (CRITICAL FOR ALL STYLES):
-   - ABSOLUTELY FORBIDDEN weather/atmosphere terms across ALL styles: "thunderstorm", "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", "ominous black clouds", "post-apocalyptic ash", "doomsday sky", "hellish red sky", "tornado", "hurricane", "tsunami", "volcanic eruption".
-   - For PHOTOREALISTIC / CINEMATIC / LIFESTYLE styles: Use ONLY natural, believable weather — sunny, partly cloudy, golden hour, soft overcast, gentle morning mist, warm afternoon light, crisp autumn air, peaceful twilight. The mood comes from COMPOSITION and LIGHTING, not from forced dramatic weather.
-   - For FANTASY / SCIFI / DARK HORROR: Atmospheric elements must serve the genre authentically — not default to lightning and thunder. Use fog, shadow, eerie stillness, bioluminescent glow, or cosmic ambiance instead.
-   - DEFAULT WEATHER RULE: When no specific weather is requested, ALWAYS default to neutral/pleasant conditions: "clear sunny day", "soft natural daylight", "gentle overcast light", or "warm ambient indoor lighting". Never default to dramatic weather.
-   - Variety in weather comes from subtle shifts: morning vs afternoon light, angle of sun, indoor vs outdoor, season-appropriate conditions — NOT from inserting storms and darkness.
 5. NO KEYWORD SPAM: Strictly forbidden to provide a list of repetitive commas, keywords, or SEO tags. Describe the *composition* naturally and vividly (like a magazine editorial).
 6. The list must contain exactly ${count} different strings. Do not repeat prompts.
 7. The negativePrompt MUST be a single concise string starting with the word "Avoid" followed by a list of elements to exclude. If there are truly no relevant negative elements for a specific request, return an empty string for this field instead of using placeholders like "none" or "N/A".
@@ -4972,18 +5089,18 @@ Rules for the Generated Prompts:
     - Moderators look for NOTICEABLE DIFFERENCES including variations in composition, color, expression, or scenario. You must be extremely selective and output only your most varied, premium, and distinct concepts.
 11. ADOBE STOCK SIMILARITY PROTECTION ACTIVE (CRITICAL CORE DIRECTIVE):
     - DO NOT generate prompts that sound like generic, common, or natural stock photos (e.g., "business people shaking hands", "happy family in park", "generic coffee cup on table").
-    - You must forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
+    - EXTREME DIVERSITY MANDATE: You MUST forcefully inject high creativity, surrealism, extreme stylization, bizarre but commercially viable angles, or deeply artistic metaphors so the resulting image is wildly unique and stands out from the millions of generic Adobe Stock assets.
     - Break the standard stock photography molds by using hyper-specific, unusual subject interactions, highly dramatic emotional states, or avant-garde conceptual presentations. Make the prompts incredibly creative, unpredictable, and highly varied.
-    - Inject extreme variation across:
-      * Composition & Camera Angle: Vary across wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, and overhead drone shots.
-      * Color Palette & Lighting Setup: Vary across natural golden hour, bright overcast daylight, neon nights, moody low-key twilight, soft studio lighting, high-contrast chiaroscuro, and cool pastel hues.
-      * Subjects, Expressions & Poses: Vary characters' ages, genders, ethnicities, actions, emotional expressions (e.g., focused, joyful, contemplative, active, serene), and direct interactions with their surroundings.
-      * Scenario & Environment: Change environments completely (e.g., indoors vs. outdoors, modern minimalist spaces vs. raw nature, urban landscapes vs. intimate workspaces).
+    - FOR EACH OF THE ${count} VARIATIONS, YOU MUST CHANGE THE FOLLOWING (NO REPETITION ALLOWED):
+      * Composition & Camera Angle: Shift dramatically between wide shots, extreme close-up, medium shots, bird's-eye view, low-angle perspective, overhead drone shots, and macro shots.
+      * Color Palette & Lighting Setup: Cycle completely through different lighting setups (golden hour, bright overcast, neon cyberpunk, moody twilight, studio strobes, chiaroscuro, pastel, vibrant saturation).
+      * Subjects, Expressions & Poses: Radically alter ages, genders, ethnicities, fashion styles, micro-actions, emotional expressions (focused, joyful, contemplative, serene, aggressive), and dynamic poses.
+      * Scenario & Environment: Teleport the subject to entirely different backgrounds for each prompt (e.g., minimalist modern studio, lush jungle, gritty cyberpunk alley, serene beach at dawn, chaotic urban intersection).
     - ANTI-CLICHÉ & ANTI-FORCED-DRAMA RULE (CRITICAL):
       * DO NOT default to cliché dramatic weather tropes such as "dramatic stormy sky", "dark thunderclouds", "lightning strikes", "apocalyptic sky", "raging thunderstorm", or "ominous black clouds" unless the subject EXPLICITLY requires it (e.g., a storm-chaser documentary scene).
       * Creativity does NOT mean forced drama, darkness, or apocalyptic weather. A beautiful Cinematic scene can be a warm golden-hour field, a sleek modern interior, a serene misty forest, a vibrant cityscape at dusk, or an intimate candlelit room — not just dark skies and lightning.
       * For Dark Horror Aesthetic: atmosphere comes from lighting, texture, composition, and psychological tension — NOT from defaulting to thunder and lightning. Use fog, decay, shadow, unsettling framing, eerie stillness, or subtle wrongness.
-      * Each prompt MUST reflect the AUTHENTIC character of its style, not a lazy default dramatic template. Vary environments naturally: sunny, overcast, dawn, dusk, indoor, outdoor, urban, natural, abstract ��� whatever fits the subject and style genuinely.
+      * Each prompt MUST reflect the AUTHENTIC character of its style, not a lazy default dramatic template. Vary environments naturally: sunny, overcast, dawn, dusk, indoor, outdoor, urban, natural, abstract — whatever fits the subject and style genuinely.
     - ZERO-GENERIC PROMPT RULE (CRITICAL — READ CAREFULLY):
       * DO NOT write prompts that sound like generic stock photo descriptions. Specifically FORBIDDEN patterns:
         — "a person standing..." / "a person sitting..." / "a person holding..." without hyper-specific, unusual detail
@@ -5022,7 +5139,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
       prompts: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: `An array containing exactly ${effectiveCount} unique generated prompt variations based on the visual idea, strictly in English.${promptTier === 'TRIAL' ? ' (NOTE: This is a TRIAL account — limited to basic prompt quality. Upgrade to PRO for premium detailed prompts with advanced composition, lighting, and artistic depth.)' : ''}`
+        description: `An array containing exactly ${count} unique generated prompt variations based on the visual idea, strictly in English.`
       },
       negativePrompt: {
         type: Type.STRING,
@@ -5037,7 +5154,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-pro-preview', 'gemini-3.5-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-latest'];
   let lastError: any = null;
 
   const safetySettings = [
@@ -5060,15 +5177,15 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     });
   }
 
-  let instructionText = `Expand the concept into ${effectiveCount} unique immersive prompt variations of type "${styleCategory}" strictly based on the subject: "${subject}".\n\nCRITICAL: Write fully formed, vivid natural language sentences. DO NOT use comma-separated keyword lists or tags. Each variation MUST be a complete, descriptive paragraph.`;
+  let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" strictly featuring the exact core subject: "${subject}".\n\nCRITICAL SUBJECT ADHERENCE:\n1. Every prompt variation MUST center around "${subject}". Do NOT replace, mutate, or drift away from this subject.\n2. Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph.\n3. DO NOT use comma-separated keyword lists or tags.`;
   if (referenceImages && referenceImages.length > 0) {
     instructionText = `You are given ${referenceImages.length} reference image(s) as visual input showing a specific aesthetic style, layout, color palette, lighting, texture, and composition. Combine/mix this visual style with the base subject concept: "${subject}".
 
-Expand the concept into ${effectiveCount} unique immersive prompt variations of type "${styleCategory}".
+Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}".
 
 CRITICAL DIRECTIVES:
 1. MIX/BLEND: Every generated prompt MUST feel like a perfect hybrid combination of the visual style/atmosphere of the reference images and the subject matter of "${subject}".
-2. EXTRACT AESTHETIC: Do not just literally copy the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to vividly describe "${subject}".
+2. EXTRACT AESTHETIC: Do not just literally copy the reference images, instead extract their artistic style, curves, line flow, color tones, lighting, or layout, and apply that aesthetic to describe "${subject}".
 3. HIGH QUALITY: Write fully formed, vivid natural language sentences in English. Each variation MUST be a complete, descriptive paragraph. DO NOT use comma-separated keyword lists or tags.`;
   }
 
@@ -5085,7 +5202,7 @@ CRITICAL DIRECTIVES:
           contents: parts,
           responseMimeType: "application/json",
           responseSchema,
-          config: { temperature: randomTemp, seed: seed, topP: 0.99 },
+          config: { temperature: randomTemp, seed: seed, topP: 0.85 },
           model
         });
         
@@ -5100,7 +5217,7 @@ CRITICAL DIRECTIVES:
         }
         
         if (promptArray.length > 0) {
-            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt);
+            return processPromptResults({ prompts: promptArray, negativePrompt: parsed.negativePrompt || '', styleExplanation: parsed.styleExplanation || [] }, count, subject, userNegativePrompt, styleCategory);
         }
         throw new Error('Missing or empty prompts array in JSON response');
       } catch (err: any) {
@@ -5128,15 +5245,15 @@ CRITICAL DIRECTIVES:
             responseSchema,
             temperature: randomTemp,
             seed: seed,
-            topP: 0.99,
-            topK: 100,
+            topP: 0.85,
+            topK: 40,
             safetySettings: safetySettings
           });
 
           const text = response.text || "{}";
           const parsed = JSON.parse(extractJSON(text));
           if (parsed && Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
-            return processPromptResults(parsed, count, subject, userNegativePrompt);
+            return processPromptResults(parsed, count, subject, userNegativePrompt, styleCategory);
           }
           throw new Error('Missing or empty prompts array in JSON response');
         } catch (err: any) {
@@ -5568,13 +5685,6 @@ CRITICAL DIRECTIVES:
       "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
       "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
     ],
-    "Silhouette": [
-      "minimalist high-contrast black silhouette vector graphic, clean solid black outline shape on solid white background, elegant look",
-      "contemporary fine silhouette design asset, crisp solid black vector contours, minimalist aesthetic, graceful curves",
-      "modern solid shape profile silhouette illustration, sleek black shapes, high contrast minimalist art on solid white, no details",
-      "elegant minimalist standalone silhouette vector, pristine sharp black fill path, creative vector shape art",
-      "minimalist solid silhouette outline vector illustration, modern clean shape strokes, smooth styling with high clarity"
-    ]
   };
 
   const activeModifiers = styleFallbackMap[styleCategory] || styleFallbackMap["Cinematic"];
@@ -5613,71 +5723,84 @@ CRITICAL DIRECTIVES:
 
 export const analyzeImageToPrompt = async (
   image: string,
-  styleCategory: string = 'Cinematic',
+  styleCategory: string = 'Default',
+  variation: number = 5,
   model?: string
-): Promise<{ prompt: string; description: string }> => {
+): Promise<{ prompts: string[]; prompt: string; description: string }> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
+  const count = Math.min(Math.max(variation, 5), 15);
   
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
-Analyze the provided image and generate a highly detailed, professional text-to-image prompt.
+  let styleHandlingInstruction = "";
+  if (styleCategory === 'Default' || styleCategory === 'Original Style' || styleCategory === 'Match Image') {
+    styleHandlingInstruction = `3. STYLE PRESERVATION (DEFAULT / MATCH ORIGINAL IMAGE STYLE):
+   - Deeply analyze the EXACT visual medium, art style, rendering technique, and aesthetic of the uploaded image (e.g. realistic photograph, 3D CGI render, flat 2D vector, watercolor painting, pixel art, cyberpunk illustration, vintage engraving, claymation, line art, etc.).
+   - STRICTLY PRESERVE and deeply emulate this exact same art style, rendering medium, texture, and visual fidelity across all generated prompt variations. Do NOT convert into an unrelated style.`;
+  } else if (styleCategory === 'Flat Illustration' || styleCategory === 'Flat Vector') {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO FLAT ILLUSTRATION:
+   - Convert the aesthetic completely into a clean, modern 2D Flat Vector Illustration style.
+   - Emphasize crisp vector outlines, flat harmonious color palettes, clean geometric and organic shapes, minimalist shading, generous clean copy space, and aesthetic editorial illustration qualities typical of professional flat vector art.`;
+  } else if (styleCategory === 'Graphic Design') {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO COMMERCIAL GRAPHIC DESIGN (ZERO TYPOGRAPHY RULE):
+   - Convert the aesthetic completely into a professional commercial advertising layout, banner template, or poster composition crafted in Adobe Illustrator/Photoshop style with geometric shapes, flat vector elements, and vibrant commercial color palettes.
+   - STRICT BAN ON ALL TYPOGRAPHY & TEXT: You are STRICTLY FORBIDDEN from including any readable text, fake words, letters, gibberish characters, placeholder fonts, or printed typography in the prompt.
+   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST explicitly feature spacious, clean, uncluttered empty copy space / negative space (e.g., "spacious clean negative copy space on the right, blank layout area for text overlay, no typography, no letters, purely graphic background"). This makes the asset 100% editable and commercially sellable on microstock platforms.`;
+  } else {
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO "${styleCategory}":
+   - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).`;
+  }
 
-CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the image word-for-word. Instead, identify its visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
-5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the image contains recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
+  const systemInstruction = `You are a World-Class AI Visual Reverse-Engineering Analyst and Master Prompt Engineer.
+Analyze the provided image and generate EXACTLY ${count} unique, highly varied, professional text-to-image prompt variations in English, tailored to the target style "${styleCategory}".
 
-STEP 1: EXTRACT THE FOLLOWING DATA POINTS AS A BASELINE:
-- Subject (The main entity)
-- Action (What is happening)
-- Environment (Setting, location, context)
-- Mood (Emotional tone)
-- Lighting (Type, direction, intensity)
-- Camera angle (Position relative to subject)
-- Lens estimate (Focal length, aperture, depth of field)
-- Composition (Framing, rule of thirds, perspective)
-- Visual style (Current aesthetic baseline)
+CRITICAL REVERSE-ENGINEERING & DIVERSITY RULES (MANDATORY):
+1. EXTRACT CORE NICHE & THEME:
+   - Identify the underlying subject matter, commercial intent, vibe, color tone, lighting, and composition of the uploaded image.
+2. GENERATE ${count} DIVERSE COMPANION / SISTER VARIATIONS (DO NOT CLONE):
+   - Every single prompt variation MUST be distinctly DIFFERENT from the original image and DIFFERENT from each other.
+   - Variasikan:
+     * Sudut Kamera & Framing: macro close-up, overhead flat lay knolling, wide environmental shot, eye-level candid, 3/4 dynamic perspective.
+     * Skenario & Aksi: Tampilkan subjek dalam aksi, interaksi, tahapan persiapan, atau konteks penggunaan yang berbeda di dunia nyata.
+     * Pencahayaan & Waktu: Golden hour, soft morning window light, clean studio lighting, moody atmospheric light.
+     * Komposisi & Copy Space: Letakkan subjek dengan komposisi seimbang (rule of thirds, off-center) dan sertakan clean copy space untuk kebutuhan komersial stok.
+   - All variations must be plausible, logical, and commercially viable.
+${styleHandlingInstruction}
+4. COMMERCIAL READINESS & COPY SPACE:
+   - All prompts must be formatted to produce high-demand commercial stock imagery with clean, usable negative space / copy space suitable for marketing, website headers, advertisements, and editorial overlays.
+5. ZERO IP RISK:
+   - Replace any brand names/logos with generic descriptive terms (e.g. 'luxury modern coupe' instead of 'Porsche').
 
-STEP 2: GENERATE A DETAILED PROMPT MATCHING THE SELECTED STYLE: ${styleCategory}
-Adapt the prompt structure according to the chosen style:
-- If 'Photorealistic': focus on RAW photo quality, technical camera specs, hyper-real textures.
-- If 'Cinematic': focus on anamorphic lens effects, color grading, lighting scenarios, film stock.
-- If 'Adobe Stock': focus on clean backgrounds, commercial appeal, high contrast, studio lighting.
-- If 'Editorial': focus on fashion/magazine composition, avant-garde elements, professional retouching styles.
-- If 'Lifestyle': focus on natural motion, candid moments, warm/authentic lighting, everyday settings.
-- If 'Fine Art': focus on brushstrokes, medium textures, artistic theory, museum-quality lighting.
-- If 'Grimdark Gothic Horror Painterly': focus on macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy and gothic horror art.
-
-CRITICAL RULES:
-1. OUTPUT PROMPT MUST BE IN ENGLISH.
-2. The description should be a concise summary of the visual analysis and how this variation differs or complements the original asset.
-3. Return a JSON object with "prompt" and "description".`;
+CRITICAL OUTPUT FORMAT:
+- Return a JSON object with:
+  - "prompts": an array of EXACTLY ${count} distinct prompt strings in English.
+  - "description": a brief explanation in Indonesian summarizing the visual analysis and how these variations provide commercial companion diversity.`;
 
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
-      prompt: { type: Type.STRING, description: 'The generated image-to-image prompt.' },
-      description: { type: Type.STRING, description: 'Brief description of the image content.' }
+      prompts: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: `Array of exactly ${count} unique prompt variations in English.`
+      },
+      description: { type: Type.STRING, description: 'Brief description of image analysis in Indonesian.' }
     },
-    required: ["prompt", "description"]
+    required: ["prompts", "description"]
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
   let lastError;
   let responseText = "";
 
-  // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
   const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
   for (const modelName of modelsToTryList) {
     try {
-      response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Analyze this image and generate an optimized prompt for style: ${styleCategory}` }] }, {
+      const response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Reverse-engineer this image and generate ${count} unique, varied sister prompt variations matching style: "${styleCategory}".` }] }, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.0
+        temperature: 0.65
       });
       responseText = response.text || "{}";
       break;
@@ -5695,7 +5818,15 @@ CRITICAL RULES:
 
   try {
     const data = JSON.parse(extractJSON(responseText));
-    return data as { prompt: string; description: string };
+    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
+      ? data.prompts 
+      : (data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`]);
+      
+    return {
+      prompts: promptList,
+      prompt: promptList[0] || "",
+      description: data.description || "Analisis visual dan ekstraksi variasi prompt selesai."
+    };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
     throw new Error("Failed to parse AI response. Please try again.");
@@ -5705,91 +5836,32 @@ CRITICAL RULES:
 export const analyzeBatchImageToPrompt = async (
   images: string[],
   styleCategory: string = 'Cinematic',
+  variation: number = 5,
   model?: string
-): Promise<{ prompt: string; description: string }[]> => {
-  const store = apiKeyStorage.getStore();
-  const provider = (store && store.provider) || 'gemini';
+): Promise<{ prompts: string[]; prompt: string; description: string }[]> => {
+  const concurrency = 4;
+  const results: { prompts: string[]; prompt: string; description: string }[] = new Array(images.length);
   
-  const systemInstruction = `You are an expert AI visual analyst and prompt engineer.
-Analyze the provided images and generate a highly detailed, professional text-to-image prompt for each one.
-
-CRITICAL VISUAL ANALYSIS AND VARIATION RULES:
-1. FULL SCAN: You MUST examine the ENTIRE image from corner to corner to extract its core subject, commercial concept, and design/photographic niche.
-2. NO DIRECT REPLICATION: Do not just literally transcribe or describe the images word-for-word. Instead, identify their visual and commercial niche/theme (e.g., "minimalist organic skincare cosmetics flatlay", "cozy Scandinavian coffee shop interior", "futuristic cyberpunk city street at dusk").
-3. GENERATE NICHE PROMPT VARIATION: Generate a highly professional, optimized text-to-image prompt as a sister variation of that niche. It should not be exactly identical to the input image, but rather feel like a high-quality companion asset or beautiful sibling image within the same thematic series (e.g., subtle variations in composition, background details, object arrangement, or action while retaining the premium quality, camera optics, lighting, and aesthetic flavor).
-4. NO HALLUCINATION: Baseline technical facts (lens, lighting, composition, style) must be derived from the image, but the exact visual setup should be synthesized as a beautiful, high-quality niche variation.
-5. STRICT NO INTELLECTUAL PROPERTY (IP) COMPLIANCE: You are STRICTLY FORBIDDEN from including any trademarked brand names, company names, product lines, registered logos, or patented product designs (e.g., do NOT use "Apple", "Nike", "Adidas", "iPhone", "BMW", "Mercedes", "LEGO", "GoPro", "Vespa", "Tesla", etc.) or specific copyrighted characters in the generated prompt or description. If the images contain recognizable branded items, you MUST describe them using completely generic terms (e.g., "sleek modern smartphone" instead of "iPhone", "athletic running shoes" instead of "Nike shoes", "modern electric sedan" instead of "Tesla", "classic European retro scooter" instead of "Vespa"). This ensures the resulting prompts comply with commercial stock policies and avoid any intellectual property (IP) refusal.
-
-FOR EACH IMAGE, EXTRACT AND ANALYZE:
-- Subject, Action, Environment, Mood, Lighting, Camera angle, Lens estimate, Composition, Visual style.
-
-GENERATE PROMPT MATCHING STYLE: ${styleCategory}
-Adapt the logic based on style:
-- Photorealistic/Cinematic: High technical detail, optics, and lighting.
-- Adobe Stock/Editorial: Commercial composition and polish.
-- Lifestyle/Fine Art: Emotional resonance and artistic medium.
-- Grimdark Gothic Horror Painterly: Macabre atmospheres, oppressive shadows, eerie mist, decaying architecture, unsettling lighting, and heavy impasto painterly brushstrokes characteristic of dark fantasy.
-
-CRITICAL BATCH RULES:
-1. You are receiving ${images.length} distinct images.
-2. You MUST return a JSON array containing EXACTLY ${images.length} objects.
-3. OUTPUT PROMPTS MUST BE IN ENGLISH.
-
-Return a JSON array of objects, each with "prompt" and "description".`;
-
-  const responseSchema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        prompt: { type: Type.STRING, description: 'The generated image-to-image prompt.' },
-        description: { type: Type.STRING, description: 'Brief description of the image content.' }
-      },
-      required: ["prompt", "description"]
-    }
-  };
-
-  const parts: any[] = [];
-  for (let i = 0; i < images.length; i++) {
-    parts.push({ text: `\n\n--- IMAGE ${i + 1} ---\n` });
-    parts.push(processFrameServer(images[i]));
-  }
-  parts.push({ text: `\nAnalyze these ${images.length} images and return the JSON array.` });
-
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
-  let lastError;
-
-  // Forcing Gemini for all AI Vision to ensure valid, hallucination-free output across providers
-  const modelsToTryList = model && model.startsWith('gemini') ? [model, ...modelsToTry] : modelsToTry;
-  for (const modelName of modelsToTryList) {
-    try {
-      const res = await callGeminiWithRetry(modelName, { parts }, {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.0
-      });
-      responseText = res.text || "[]";
-      break;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[analyzeBatchImageToPrompt] Failed with ${modelName}:`, err.message || err);
-      if (err.message && err.message.includes('API_KEY')) throw err;
-    }
+  for (let i = 0; i < images.length; i += concurrency) {
+    const chunk = images.slice(i, i + concurrency);
+    const chunkPromises = chunk.map(async (img, offset) => {
+      const index = i + offset;
+      try {
+        const res = await analyzeImageToPrompt(img, styleCategory, variation, model);
+        results[index] = res;
+      } catch (err: any) {
+        console.warn(`[analyzeBatchImageToPrompt] Error on image index ${index}:`, err.message);
+        results[index] = {
+          prompts: [`${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`],
+          prompt: `${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`,
+          description: "Gagal mengekstrak analisis detail gambar, menggunakan prompt estimasi gaya."
+        };
+      }
+    });
+    await Promise.all(chunkPromises);
   }
 
-  if (!responseText) {
-    console.warn("analyzeBatchImageToPrompt bypassed:", lastError?.message);
-    throw lastError || new Error("Failed to analyze images in batch.");
-  }
-
-  try {
-    const data = JSON.parse(extractJSON(responseText));
-    return data as { prompt: string; description: string }[];
-  } catch (error) {
-    console.warn("Gemini Parse Error:", error, responseText);
-    throw new Error("Failed to parse AI response. Please try again.");
-  }
+  return results;
 };
 
 export const analyzeVideoKeyword = async (keyword: string, model?: string): Promise<VideoAnalysisResult> => {
@@ -5847,7 +5919,7 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
 
   let responseText = "";
   // Forcing Gemini for Video Analysis to ensure consistency and prevent variations across providers
-  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', prompt, {
+  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
     responseMimeType: "application/json",
     responseSchema,
     temperature: 0.0,
@@ -5906,7 +5978,7 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
       model
     });
   } else {
-    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', prompt, {
+    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
       responseMimeType: "application/json",
       responseSchema
     });
@@ -5944,234 +6016,61 @@ export async function checkImageQuality(
 
   let metadataInstruction = "";
   if (imageMetadata) {
-    metadataInstruction = `\n\n[DATA EXIFTOOL - REFERENSI TEKNIS]\nBerikut adalah data Metadata EXIF asli dari file Gambar yang diekstrak menggunakan ExifTool:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nJadikan data teknis di atas sebagai panduan kuat untuk melengkapi temuan audit visual Anda.`;
+    metadataInstruction = `\n\n---\n[DATA PENGUKURAN TEKNIS OBJEKTIF & PIXEL FORENSIK]\nHasil analisis OpenCV / BRISQUE / NIQE pada file asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nPETUNJUK ANALISIS PIKSEL:\n1. Skor BRISQUE > 45 atau NIQE > 6.0: Indikasi kuat degradasi spasial / blur / over-smoothing AI.\n2. Sharpness bernilai rendah atau has_local_blur_anomaly = true: Indikasi kuat subjek utama tidak fokus / blur.\n3. Noise / Clipping tinggi: Indikasi masalah pencahayaan dan grain.\n4. Gunakan data numerik di atas bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat.`;
   }
 
-  let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi Adobe Stock & Shutterstock komersial.
+  const systemInstruction = `Anda adalah "AI Quality Inspector & Stock Curator" profesional tingkat tinggi yang bertugas mengaudit aset visual (Foto, AI Generation, 3D Render, Ilustrasi) sesuai standar penolakan & penerimaan resmi Adobe Stock, Shutterstock, dan Getty Images ("Quality Issues", "Technical Issues", "IP / Legal").
 
-Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi mandiri yang sangat ketat:
-1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang, logo pada produk/pakaian, plat nomor, tanda tangan, wajah tanpa model release, serta teks/watermark ilegal.
-2. Modul AI Anomaly & Anatomi: Mendeteksi cacat struktural AI generatif, wajah kerumunan yang meleleh/hancur di latar belakang (melted background faces), benda-benda aneh yang bentuknya tidak logis (nonsensical objects/hallucinations), pola rumit yang hancur (pattern degradation), blur yang terlihat seperti coretan kasar bukan bokeh natural (unnatural depth of field), sirkuit meleleh (melted details), pola acak cacat, ketidaksesuaian perspektif logis, inkonsistensi bayangan/refleksi, juling mata, juling asimetris wajah, dan distorsi anatomi (seperti jari tangan melengkung aneh, menyatu, atau lebih dari 5).
-3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus (soft focus vs sharp), pencahayaan (overexposed/blown highlights vs underexposed/crushed shadows), artifact kompresi, luminance noise parah pada shadow, chromatic aberration, dan noda sensor kamera (sensor dust spots).
+TUGAS UTAMA:
+Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF. Temukan segala jenis cacat kualitas gambar, keburaman (blur), artefak generatif AI, cacat anatomi, kerusakan mekanis, noise, dan pelanggaran IP.
 
----
-PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
-Bedakan antara pilihan artistik/estetika premium yang disengaja dan cacat teknis murni:
-- Depth of Field (DoF) dangkal / Bokeh: Latar belakang buram yang indah (bokeh lembut) adalah kualitas bernilai jual sangat tinggi dan dicari di Adobe Stock, BUKAN cacat. Selama bagian utama subjek tetap fokus tajam sempurna (tack-sharp), tandai status "PASS" pada "blur" dan "out_of_focus".
-- Low-light & Shadow Noise: Foto bernuansa malam hari, lilin, atau siluet dramatis secara wajar memiliki noise halus. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
-- High-Contrast & Shadows: Bayangan yang dalam (crushed shadows) atau sorotan cahaya terang yang dramatis sering kali merupakan unsur seni/pencahayaan yang indah. Jangan langsung menganggapnya cacat eksposur jika itu memperkuat mood estetika foto.
-- BATASAN PENGECUALIAN ARTISTIK (CRITICAL): Pengecualian estetika di atas (bokeh, noise halus, bayangan dramatis) HANYA berlaku untuk pilihan artistik murni. Pengecualian ini TIDAK PERNAH berlaku untuk cacat struktural AI, objek yang tidak logis secara mekanis, anatomi cacat, atau teks rusak — temuan tersebut WAJIB FAIL di semua mode toleransi tanpa kecuali.
+PANDUAN PEMERIKSAAN SETIAP KATEGORI:
 
----
-PROTOKOL FORENSIC REKONSILIASI (WAJIB):
-- Jangan menilai kualitas hanya dari thumbnail. Gabungkan gambar penuh, crop resolusi asli 100%, dan pengukuran piksel objektif.
-- Pengukuran objektif adalah bukti teknis, bukan vonis visual. Konfirmasi artifact dengan melihat pola yang benar-benar terlihat.
-- Skor JPEG blocking sedang TIDAK otomatis berarti artifact. Cari pola blok 8x8 yang berulang pada area halus; jangan salahkan tekstur PCB, kabel, rambut, bokeh, atau edge alami.
-- OCR adalah bukti bantu dan dapat salah membaca circuit traces, ikon, bokeh, dan micro-text. Jangan menyebut gibberish kecuali bentuk huruf/angka memang terlihat rusak secara visual.
-- Jika OCR mendeteksi teks, baca hanya teks yang benar-benar dapat dibaca. Jika tidak dapat dibaca, nyatakan bahwa teks terlalu kecil/tidak terbaca dan periksa apakah memang pseudo-text AI.
-- Untuk isolated subject dengan background hitam/putih, periksa perimeter 1–3 piksel untuk matte halo. Rambut tipis, renda, bulu, highlight kain, dan anti-aliasing alami TIDAK boleh otomatis disebut halo.
-- Untuk hardware/PCB/server-room: periksa pin chip, jalur PCB, solder/via, konektor, kabel, ventilasi rack, LED, panel UI, perspektif, dan hubungan mekanis. Cacat struktural yang benar-benar terlihat harus FAIL; jangan mengarang cacat hanya karena gambar terlihat AI-generated.
-- Pisahkan tiga kelas hasil: FAIL = cacat terkonfirmasi yang material; WARNING = sinyal objektif yang perlu inspeksi manusia; PASS = tidak ada bukti cacat material. Jangan mengubah WARNING menjadi FAIL hanya karena skor numerik moderat.
+1. KETAJAMAN & FOKUS (blur):
+   - WAJIB PASS: Subjek utama tajam sempurna (tack-sharp). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera) adalah NORMAL dan bernilai artistik tinggi.
+   - WAJIB FAIL: Subjek utama tidak fokus, soft focus, motion blur kamera, atau detail penting subjek kabur/meleleh.
 
-PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI (CRITICAL):
-Jika Anda menerima LEBIH DARI 1 gambar, gambar PERTAMA adalah tampilan penuh, dan gambar ke-2, ke-3, ke-4, dst. adalah CROP DETAIL RESOLUSI ASLI 100% PIXEL (bukan hasil upscale) yang diambil dari 4 wilayah KUADRAN ber-overlap 20% yang bersama-sama mencakup SELURUH permukaan gambar, berurutan: ATAS-KIRI, ATAS-KANAN, BAWAH-KIRI, lalu BAWAH-KANAN.
-- Gunakan setiap crop KHUSUS untuk inspeksi forensik tingkat piksel: artefak kompresi, pixel banding, noise mikroskopis, tepian objek, jari tangan, wajah, dan logika mekanis objek.
-- ZONA RAWAN KRITIS (WAJIB DIPERIKSA EKSTRA TELITI): Pada foto orang memegang/menyentuh objek (produk, model, botol, alat, dsb.), titik kontak tangan-jari-objek PALING SERING berada di paruh BAWAH frame (kuadran BAWAH-KIRI/BAWAH-KANAN) — dekat dada, perut, atau pinggang subjek. Zona inilah yang paling sering mengandung cacat AI generatif (jari menyatu/meleleh ke objek, objek yang menembus pakaian, genggaman yang mustahil secara fisik) namun paling mudah terlewat jika hanya melihat gambar penuh yang telah diperkecil. Periksa kuadran bawah dengan tingkat kecurigaan setara atau lebih tinggi daripada kuadran atas.
-- Sebutkan di laporan visual_scan_analysis crop wilayah mana (atas-kiri/atas-kanan/bawah-kiri/bawah-kanan) tempat Anda menemukan cacat.
-- Cacat yang terkonfirmasi pada SALAH SATU crop saja sudah cukup untuk menyatakan FAIL pada check terkait — moderator Adobe Stock memeriksa gambar pada zoom 100-200% di SELURUH area, bukan hanya tampilan penuh.
+2. ARTEFAK AI GENERATIF (ai_artifacts):
+   - WAJIB PASS: Render 3D / seni digital / foto yang bersih, terdefinisi rapi, dan konsisten secara visual.
+   - WAJIB FAIL: Tekstur meleleh (melted textures), bagian objek yang menyatu tanpa batas fisik, gumpalan piksel yang smudged/mushy, elemen melayang yang tidak logis, atau halusinasi sintetis AI.
 
----
-Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock untuk Alasan Penolakan Konten (Content Refusal Criteria) berikut (Lakukan inspeksi visual seolah-olah gambar diperbesar/Zoom 100%. Manfaatkan SEMUA crop detail resolusi asli yang diberikan!):
-1. OUT OF FOCUS / SHARPNESS ISSUES (Masalah Fokus & Ketajaman):
-   - Subjek utama wajib memiliki fokus yang tajam sempurna (pin-sharp atau tack-sharp).
-   - Deteksi motion blur yang tidak disengaja akibat pergerakan kamera lambat (camera shake) atau shutter speed subjek yang tidak memadai.
-   - Deteksi "soft focus" di mana subjek utama tampak kabur atau tidak terdefinisi secara detail.
-   - Pengecualian: Depth of Field (DoF) dangkal yang disengaja diperbolehkan hanya jika bagian subjek yang penting tetap fokus tajam sempurna (tack-sharp).
-2. EXPOSURE & LIGHTING ISSUES (Masalah Eksposur & Pencahayaan):
-   - Overexposure: Blown highlights/highlights clipping (kehilangan detail pada area terang).
-   - Underexposure: Crushed shadows/muddy shadows (gelap berlumpur dengan noise tinggi atau detail shadow terpotong).
-   - Kontras berlebih (harsh contrast) yang menghilangkan kemulusan gradasi atau pencahayaan datar (flat/muddy lighting) yang membosankan.
-3. NOISE & GRAIN (Masalah Derau):
-   - Deteksi luminance noise (derau bintik pasir) yang kasar dan chromatic/color noise (bintik warna piksel merah/hijau/biru yang tidak semestinya, terutama pada area bayangan) akibat ISO tinggi atau pemrosesan berlebih.
-   - Deteksi "over-aggressive noise reduction" (pengurangan derau berlebih) yang menyebabkan detail tekstur kulit atau benda menghilang dan tampak mulus seperti lilin/plastik (waxy skin / plastic-like textures).
-4. IMAGE ARTIFACTS (Artefak Gambar & Teknis):
-   - Artefak kompresi JPEG: Pixelation parah, blockiness (makro-blok), gradasi patah (color banding/posterization) di area langit atau latar belakang halus.
-   - Chromatic Aberration: Color fringing (pembiasan warna magenta/hijau) di tepian objek berkontras tinggi.
-   - Noda sensor (sensor dust spots): Bintik atau lingkaran abu-abu buram yang samar di langit polos atau area latar belakang seragam akibat sensor kamera kotor.
-   - Over-sharpening: Efek lingkaran cahaya (halos) putih/terang di sekeliling tepian subjek akibat penajaman digital berlebih.
+3. ANATOMI & FISIK MANUSIA (anatomical_errors):
+   - WAJIB PASS: Anatomi normal (tangan 5 jari wajar, sarung tangan pelindung kerja/medis yang logis, pose wajar).
+   - WAJIB FAIL: Jari cacat (jumlah jari != 5, jari menyatu/melebur, sendi patah/terkilir), tangan/jari melebur ke dalam gagang alat/layar/benda, mata asimetris/rusak, gigi bertumpuk aneh, atau wajah terdistorsi.
 
-5. INTELLECTUAL PROPERTY & BRAND SAFETY (Kekayaan Intelektual, Hukum & Batasan Terkenal Resmi):
-   - PUBLIC DOMAIN EXCEPTION (PENGECUALIAN AMAN): Dokumen sejarah, teks kuno, dan dokumen pemerintah dari domain publik (seperti The Constitution, The Bill of Rights, Declaration of Independence, naskah kuno, peta sejarah) adalah 100% AMAN dan TIDAK MELANGGAR IP. Jangan flag dokumen publik atau sejarah sebagai pelanggaran IP.
-   - Merek & Logo Komersial: Logo, merek dagang, nama brand, produk bermerek, karya seni berhak cipta (seperti ilustrasi/font modern), tato tanpa rilis artis, serta bangunan/arsitektur yang membutuhkan Property Release. PENGECUALIAN: Tulisan tangan/kaligrafi/font kuno pada dokumen sejarah publik domain adalah AMAN.
-   - Desain Fisik & Bentuk Produk Khas: Desain fisik khas dari produk komersial modern, seperti mainan (lego bricks, boneka Barbie), barang fesyen, elektronik (desain bodi iPhone/MacBook/iPad termasuk penempatan kamera belakang khas, tombol home, notch layar, kamera Polaroid klasik beserta bingkai putihnya, sepatu Converse Chuck Taylor dengan pola bintang/karet pelindung hidung kaki, sepatu Dr. Martens dengan jahitan kuning ikonik, sol merah sepatu Christian Louboutin, Beats by Dre dengan simbol 'b'), atau perabot desainer (designer furniture).
-   - Desain Otomotif Khas: Kisi-kisi depan (grille) mobil yang khas seperti BMW kidney grille, Rolls-Royce Spirit of Ecstasy/grille, Jeep 7-slot front grille, logo bintang Mercedes, bentuk Vespa/Lambretta ikonik.
-   - Bangunan, Landmark & Lokasi Tiket yang Dilindungi IP (SANGAT KETAT):
-     * Penggambaran lokasi berbayar/bertiket (ticketed locations) atau situs terlarang/dibatasi (restricted sites) tanpa rilis properti (property releases) yang diperlukan.
-     * Landmark atau monumen tertentu tidak dapat diterima sama sekali karena batasan hak cipta desain bangunan modern atau pengelola tempat.
-     * Menara Eiffel di malam hari (karena efek tata cahaya berhak cipta). Menara Eiffel di siang hari aman, tetapi malam hari dilarang keras.
-     * Burj Al Arab, Burj Khalifa (Dubai)
-     * Sydney Opera House (Australia)
-     * Atomium (Brussels)
-     * Louvre Pyramid (Paris)
-     * Space Needle (Seattle)
-     * Hollywood Sign & Hollywood Walk of Fame (Los Angeles)
-     * Istana Neuschwanstein (Jerman)
-     * CN Tower (Toronto)
-     * The Shard, London Eye, Tower Bridge (London)
-     * Transamerica Pyramid (San Francisco)
-     * Kuil Sagrada Família (khusus bagian interior)
-     * Taipei 101 (Taiwan)
-     * Menara Kembar Petronas (Malaysia)
-     * Monumen bersejarah, kuil, atau situs warisan arkeologis yang dikelola oleh pembatasan hukum properti setempat (seperti Machu Picchu, Stonehenge, Chichen Itza).
-   - Karya Seni Berhak Cipta & Hak Cipta Visual (TERMASUK ADOBE STOCK GENERATIVE AI CONTENT POLICY - https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
-     * Karya cipta ciptaan orang lain (copyrighted works), termasuk seni (art), patung (sculptures), seni jalanan (street art), grafiti, mural dinding, ilustrasi (illustrations), font spesifik, atau elemen grafis (graphic elements).
-     * Karakter fiksi berhak cipta: Tokoh fiksi dari buku, film, komik, game, atau acara televisi (seperti Disney, Mickey Mouse, Hello Kitty, Pokémon, tokoh anime, superhero Marvel/DC, Barbie, LEGO, dsb.) = FAIL secara instan jika terdeteksi.
-     * Nama Artis / Gaya Artis Berhak Cipta: Visual yang meniru gaya khas seniman tertentu yang masih dilindungi hak cipta (misal: "in the style of Van Gogh", "drawn by Picasso", dsb.) = FAIL secara instan jika diindikasikan meniru artis berhak cipta.
-     * Nama Orang Nyata Terkenal (Real Known People): Kemiripan visual dengan selebritas, politisi, atlet, tokoh sejarah terkenal, atau figur publik lainnya = FAIL secara instan.
-     * Lukisan museum modern, instalasi patung kontemporer (seperti Cloud Gate / "The Bean" di Chicago, Patung Banteng Wall Street "Charging Bull").
-   - Dokumen Negara, Uang & Identitas: PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN. PENGECUALIAN: Dokumen sejarah/publik domain (seperti Bill of Rights, Konstitusi) adalah AMAN.
-// ============================================================================
-// MATRIKS BENCHMARK PEMBEDA MUTLAK: STANDAR KURASI ADOBE STOCK (PASS VS FAIL)
-// ============================================================================
-// STANDAR KURASI KOMERSIAL RESMI ADOBE STOCK & SHUTTERSTOCK:
-// 1. ASET KOMERSIAL BERSIH (PASS - Skor 85-98):
-//    - Subjek utama tack-sharp (fokus tajam sempurna), tekstur kulit/benda alami (bukan plastik/lilin).
-//    - Latar belakang bokeh optik yang bersih (shallow depth of field yang disengaja pada background/latar adalah fitur artistik bernilai komersial tinggi, 100% PASS).
-//    - Fotografi Industri, Konstruksi & Pertukangan (Masonry, Concrete, Construction Site, Tools):
-//      * Tekstur fisik adukan semen/beton basah, agregat kerikil kasar, butiran pasir, kilau air/slurry, dan garis batas perataan cetok/roskam (troweled smooth finish vs rough aggregate) adalah tekstur material asli yang bernilai komersial tinggi (100% PASS pada noise, sensor_issues, ai_artifacts).
-//      * Sarung tangan proyek/industri tebal berdebu semen (construction work gloves) dengan genggaman kuat pada gagang alat adalah perlengkapan kerja nyata (PASS pada anatomical_errors & over_edited).
-//      * Latar belakang proyek konstruksi (tiang beton, anyaman besi rebar, alat berat, pekerja berompi K3) yang berada dalam defokus optik/kabut atmosferik lembut adalah komposisi fotografi profesional standar emas (100% PASS pada blur, composition, lighting).
-//    - Seni Digital 3D, Ilustrasi Konsep Sci-Fi & Isometric (Datacenter, Server Room, AI Supercomputer Core, Hologram HUD, Circuit Traces, Glowing Pipes): Seluruh elemen fiksi ilmiah, diagram HUD holografik, grafik data futuristik, dan logo teknologi generik ("AI", "CORE", dll.) adalah elemen artistik komersial bernilai tinggi (100% PASS).
-//    - Pencahayaan Emissive/Neon Glow pada interior gelap (cyberpunk/high-tech aesthetic) adalah gaya visual 3D yang sah (PASS).
-//    - Figur Siluet Skala Arsitektur (orang kecil di catwalk/jembatan layang untuk pembanding skala ruangan) tidak memerlukan detail mikro (PASS).
-//    - Anatomi manusia normal pada subjek utama (tangan dengan 5 jari, sarung tangan medis/lapangan wajar, genggaman alat logis).
-//    - Teks/tulisan timbul pada produk plastik (seperti tanda S, C, T pada kaset tes, angka kaliber/skala ukur) adalah fitur fisik produk asli yang valid (PASS).
-//    - Tekstur alami hewan liar (cangkang penyu, pasir, bebatuan, cipratan air) adalah tekstur organik otentik (PASS).
-//    - Struktur benda buatan manusia utuh, kokoh, dan logis (sambungan paku/baut jelas).
-//
-// 2. CACAT KUALITAS & HALUSINASI GENERATIF NYATA (FAIL - Skor < 65, REJECT QUALITY ISSUES):
-//    - Citra Medis AI / Scan DEXA & Workstation Dokter (Medical AI Hallucinations & Clinical Workspace Defects):
-//      * Cacat Anatomi Tangan & Genggaman Alat Medis/Stylus: Sendi jempol bengkok tidak anatomis saat memegang stylus tablet, jari kelingking/manis menyatu/kaku, jari bersarung tangan lateks yang menempel/melebur tidak wajar ke layar monitor, atau tangan kedua dekat keyboard yang terdistorsi (FAIL pada anatomical_errors & ai_artifacts).
-//      * Halusinasi Antarmuka Medis (Medical UI & Chart Hallucinations): Monitor scan klinis (DEXA bone scan, CT, X-Ray) yang mencampur scan tulang dengan jaring-jaring kosmik/nebula fantasi yang tidak realistis untuk stok medis klinis, grafik bar/kurva dengan teks piksel semu (unreadable UI gibberish) di bawah judul scan (FAIL pada ai_artifacts & text).
-//      * Bordir Nama & Label Pakaian Scrub Cacat (Scrub Embroidery & Brand Tag Impersonation): Bordir nama dokter ("Dr. S. Chen") dengan font bergelombang/rusak, atau label badge tiruan brand pakaian medis (seperti patch scrub FIGS) yang terdistorsi (FAIL pada text, ip_risk, ai_artifacts).
-//      * Deformasi Model Tulang Plastik: Model peraga tulang meja (seperti femur) yang memiliki persendian asimetris, cacat bentuk, atau melebur (FAIL pada structural_defects).
-//      * Bingkai Kacamata & Telinga Melebur: Bingkai kacamata menyatu ke dalam kulit pelipis atau tulang rawan telinga dengan artefak peleburan AI (FAIL pada ai_artifacts).
-//    - Papan Tanda Melayang / Tanpa Pengencang (Floating Signboard / Missing Fasteners): Papan petunjuk atau plang kayu yang menempel pada tiang tanpa paku, baut, sekrup, atau klem penyangga yang nyata (menempel seperti stiker melayang tanpa gravitasi/konstruksi logis).
-//    - Clipping Vegetasi / Rumput Menembus Kayu Padat: Helai rumput, ilalang, atau tanaman yang menembus langsung ke dalam tiang kayu solid/batu tanpa tumpuan tanah yang logis.
-//    - Peleburan Dedaunan / Grass Mush: Vegetasi pada bidang fokus depan yang sebagian tajam tetapi sebagian meleleh/smudged menjadi gumpalan piksel tanpa detail helai daun individual.
-//    - Tipografi AI Terdistorsi / Wobbly Lettering: Teks plang/tanda (seperti rambu larangan, nama tempat) dengan garis huruf bergelombang, ketebalan batang huruf tidak rata, baseline bergelombang, atau artefak distorsi tipografi AI.
-//    - Serat Kayu Melebur / Swirling Grain: Pola serat kayu yang berputar seperti cairan atau terputus secara tidak alami.
-//    - Anatomi Tangan & Genggaman Cacat: Jari menyatu/melebur ke dalam objek tanpa batas fisik, jumlah jari != 5, sendi terkilir mustahil.
-//    - Figur Latar Belakang Cacat AI: Pada area yang selevel fokus, wajah terdistorsi parah/meleleh atau anggota tubuh cacat tak beraturan. (Defokus optik/bokeh wajar pada latar belakang BUKAN cacat).
-//    - Teks Gibberish Semu: Teks tiruan acak yang menyerupai karakter alien pada objek dunia nyata yang seharusnya memiliki tulisan terbaca (seperti surat kabar, plang nama jalan nyata, kemasan produk bermerek). Diagram HUD sci-fi atau simbol sirkuit dekoratif BUKAN gibberish.
-//    - Anomali Struktur Fisik: Tiang melayang tanpa tumpuan, moncong bengkok asimetris parah, struktur mekanis mustahil.
-//    - Cacat Teknis Fatal: Subjek utama soft focus/blur menyeluruh, overexposure/clipping parah, atau noise ekstrem.
-// ============================================================================
+4. CACAT STRUKTURAL & MEKANIS (structural_defects):
+   - WAJIB PASS: Benda buatan manusia yang utuh dan logis (kendaraan, furnitur, alat pertukangan, gedung).
+   - WAJIB FAIL: Struktur rusak atau tidak masuk akal (contoh: sepeda tanpa rantai, pedal meleleh, roda terdistorsi, tiang melayang tanpa penyangga, garis arsitektur bergelombang).
 
-// ============================================================================
-// MANDAT INSPEKSI FORENSIK PIKSEL MURNI (ANTI-TEBAKAN & ZERO-HALLUCINATION)
-// ============================================================================
-// 1. SETIAP KLAIM CACAT WAJIB MEMILIKI BUKTI KOORDINAT PIKSEL NYATA:
-//    - Periksa setiap kuadran crop pada resolusi 100% piksel asli.
-//    - Laporkan secara spesifik lokasi, jenis cacat, dan anomali visual yang ditemukan.
-// 2. DETEKSI DINI CACAT GENERATIF HALUS (PENYEBAB UTAMA REJEKSI ADOBE STOCK):
-//    - Periksa sambungan fisik: Apakah plang/papan tanda terpasang dengan paku/baut nyata, atau melayang tanpa pengencang? (FAIL jika floating tanpa pengencang).
-//    - Periksa tabrakan objek (clipping): Apakah rumput/daun menembus objek padat (seperti tiang kayu atau batu)? (FAIL jika clipping).
-//    - Periksa teks cetak: Apakah huruf-huruf pada plang memiliki garis yang lurus dan rata, atau bergelombang/cacat bentuk khas AI? (FAIL jika wobbly AI text).
-// 3. DILARANG MENGANGGAP FITUR FOTOGRAFI, SENI 3D & PRODUK NYATA SEBAGAI CACAT AI:
-//    - Tekstur adukan semen/beton basah, batu kerikil agregat, dan sarung tangan proyek adalah tekstur fisik asli konstruksi yang 100% PASS.
-//    - Render 3D / Isometric sci-fi datacenter, server rack, tabung glowing, diagram HUD holografik, dan core AI adalah karya 3D komersial premium yang 100% PASS.
-//    - Latar belakang bokeh/blur karena depth of field sempit adalah KUALITAS PREMIUM FOTO, bukan blur cacat.
-//    - Huruf cetakan timbul plastik (seperti S, C, T pada alat tes kesehatan atau angka pada jangka sorong) adalah fitur produk asli, bukan AI gibberish.
-//    - Sarung tangan medis/lapangan/konstruksi yang menutupi tekstur kulit adalah alat pelindung kerja wajar, bukan lilin/waxy.
-//    - Cangkang hewan, pasir pantai, dan permukaan organik alami adalah tekstur nyata, bukan noise/artefak.
-// ============================================================================
+5. PROPORSI & PERSPEKTIF (proportion_defects):
+   - WAJIB FAIL jika terjadi distorsi perspektif yang janggal, skala objek yang salah parah, atau sudut sendi tubuh yang mustahil.
 
-let systemInstruction = `Anda adalah "Ai Vision", mesin kurator profesional tingkat lanjut yang dikonfigurasi khusus menyelaraskan aturan dengan standar kualitas teknis premium industri dan pedoman kurasi penolakan resmi Adobe Stock & Shutterstock ("Quality Issues", "Technical Issues", "IP / Legal").
+6. TEKSTUR LILIN / OVER-EDITED (over_edited):
+   - WAJIB FAIL jika kulit manusia tampak seperti lilin/plastik (waxy plastic skin) akibat denoiser/AI smoothing berlebihan yang menghilangkan pori-pori dan tekstur alami.
 
-Tugas Anda terbagi menjadi 3 modul utama dengan standar kualitas kurasi profesional yang sangat objektif dan akurat:
-1. Modul OCR, Brand Safety & IP Check: Memindai hak cipta intelektual, merek dagang komersial, logo pada produk/pakaian, plat nomor, serta watermark ilegal. Teks fiksi ilmiah generik (seperti "AI", "DATA", "CPU", "SERVER", diagram HUD, atau rumus skematis) adalah 100% SAFE (ip_risk: PASS, legal_status: SAFE). Foto orang/subjek manusia nyata tanpa logo komersial adalah SAFE (requires_model_release: true, ip_risk: PASS, legal_status: SAFE).
-2. Modul AI Anomaly & Anatomi (Generative Defects & Structural Physics): Memeriksa ada/tidaknya cacat AI generatif nyata seperti:
-   * Plang / Papan Tanda Tanpa Pengencang (Floating Signboard): Papan kayu yang menempel di tiang tanpa paku/sekrup/baut yang logis.
-   * Clipping Vegetasi: Rumput/tanaman yang menembus kayu padat atau batu.
-   * Tipografi AI Cacat: Huruf bergelombang (wobbly strokes), baseline melengkung, atau distorsi font AI pada rambu/papan.
-   * Peleburan Tekstur (Generative Smearing): Rumput atau serat kayu yang meleleh tanpa kontinuitas fisik.
-   * Anatomi cacat: Jari ekstra/kurang, anggota tubuh melebur ke objek padat, teks pseudo-gibberish pada dokumen/poster nyata, atau struktur fisik yang tidak logis.
-3. Modul Pixel Analysis (Technical Quality): Memastikan kualitas teknis piksel, ketajaman fokus subjek utama (tack-sharp), pencahayaan seimbang, dan ketiadaan artefak kompresi yang merusak.
+7. NOISE, GRAIN & SENSOR (noise, sensor_issues):
+   - WAJIB PASS jika grain halus alami fotografi.
+   - WAJIB FAIL jika chromatic noise parah, bintik warna digital mengotori gambar, atau debu sensor yang jelas.
 
----
-PANDUAN KESEIMBANGAN ESTETIKA & TEKNIS (CRITICAL BALANCE FOR PROFESSIONAL CONTENT):
-Bedakan antara pilihan artistik/estetika profesional (fotografi & seni 3D) yang disengaja dan cacat teknis murni:
-- Fotografi Konstruksi & Makro Industri (Concrete Finishing, Masonry Trowels, Construction Sites):
-  * Tekstur Semen Basah & Agregat Kerikil: Kerikil kasar, butiran pasir, air semen yang mengkilap, dan garis perbedaan antara permukaan yang diratakan roskam dan yang belum diratakan adalah fitur fisik nyata pekerjaan beton (**100% PASS** pada noise, artifacts, sensor_issues).
-  * Sarung Tangan Kerja Proyek (Construction Work Gloves): Sarung tangan kerja yang kotor berdebu semen yang memegang gagang kayu cetok adalah APD standar (**PASS** pada anatomical_errors & over_edited).
-  * DoF Sempit & Kabut Proyek (Atmospheric Construction Fog): Fokus makro tajam pada bilah cetok semen dengan latar belakang tiang jembatan, besi beton, dan ekskavator yang kabur lembut dalam kabut adalah karya bernilai komersial sangat tinggi (**PASS** pada blur, composition, lighting).
-- Render 3D & Konsep Sci-Fi/Teknologi (3D Datacenters, Server Racks, AI Cores & Holograms): Karya 3D digital isometric dengan server racks, core komputer futuristik bercahaya biru/cyan, pipa pendingin, lantai industri berkilau, dan pemandangan badai/langit dramatis di luar jendela kaca adalah genre seni 3D bernilai komersial tinggi di Adobe Stock.
-  * Overlay HUD & Diagram Holografik: Grafik matriks, jalur sirkuit glowing, visualisasi gelombang data, rumus fiksi ilmiah, dan logo akronim generik ("AI", "TECH") adalah elemen dekoratif sci-fi yang valid dan WAJIB "PASS" pada "text", "ai_artifacts", "structural_defects", dan "stock_acceptance".
-  * Emissive Lighting & Neon Glow: Kontras tinggi antara lampu neon/glow biru dengan interior ruang server gelap adalah gaya seni sci-fi yang sah, BUKAN overexposure/clipping (**PASS** pada lighting & exposure).
-  * Figur Siluet Skala (Catwalk Figures): Siluet kecil orang di kejauhan/jembatan layang berfungsi murni sebagai pembanding skala arsitektur 3D dan TIDAK memerlukan detail mikro (**PASS** pada anatomical_errors).
-- Depth of Field (DoF) dangkal / Bokeh Optik: Latar belakang atau latar depan buram yang lembut (optical bokeh / shallow depth of field) adalah kualitas bernilai jual sangat tinggi dan standar emas di Adobe Stock, BUKAN cacat blur. Selama bagian utama subjek tetap fokus tajam sempurna (tack-sharp), status "blur", "out_of_focus", dan "composition" WAJIB "PASS". Defokus optik pada elemen latar belakang (tabung lab, orang lain, pemandangan jauh) adalah fenomena lensa kamera alami, BUKAN cacat AI.
-- Teks Timbul & Fitur Produk Fisik (Embossed Text & Product Markings): Huruf timbul relief pada bahan plastik (seperti indikator "S", "C", "T", "T1", "T2", tanda panah arah pada kaset rapid test medis, atau angka ukur pada mistar/jangka sorong) dan garis reagen lateral flow adalah fitur fisik asli produk medis/industri. Ini BUKAN teks gibberish dan WAJIB dinyatakan "PASS" pada "text" dan "ai_artifacts".
-- Sarung Tangan & Alat Pelindung Diri (Gloves & PPE): Tangan yang mengenakan sarung tangan lateks/nitrile medis atau sarung tangan kerja lapangan tebal secara alami menutupi tekstur pori kulit dan lipatan sendi. Ini adalah perlengkapan kerja nyata, BUKAN efek waxy/lilin dan BUKAN cacat anatomi. Status "anatomical_errors" dan "over_edited" WAJIB "PASS".
-- Tekstur Alami Hewan & Lingkungan (Wildlife & Environmental Textures): Tekstur cangkang kura-kura/penyu dengan teritip (barnacles), butiran pasir pantai, genangan air pasang, dan pencahayaan alami mendung adalah tekstur dunia nyata yang otentik, BUKAN noise, BUKAN artefak, dan BUKAN over-editing.
-- Low-light & Shadow Noise Wajar: Foto dengan bayangan alami atau kondisi cuaca mendung/low-light wajar memiliki gradasi bayangan lembut. Jika tidak parah atau mengganggu estetika komersial, ini 100% PASS.
+8. ARTEFAK KOMPRESI & TEPI (artifacts):
+   - WAJIB FAIL jika terdapat artefak kompresi JPEG kotak-kotak (8x8 blocking), color banding/posterisasi kasar pada langit/gradasi, atau halo putih/hitam di sekeliling subjek.
 
----
-PANDUAN MULTI-GAMBAR / CROP DETAIL RESOLUSI ASLI:
-Ketika menerima lebih dari 1 gambar (tampilan penuh dan crop kuadran/makro):
-- Gunakan crop detail untuk memverifikasi ketajaman piksel asli pada subjek utama dan memastikan tidak ada cacat struktural fatal.
-- Ingat bahwa area di luar bidang fokus (luar depth of field) pada crop kuadran memang secara optik tidak setajam titik fokus utama — itu adalah hal normal dalam fotografi profesional.
-- Cacat fatal yang membatalkan (FAIL) adalah cacat nyata pada subjek atau anomali bentuk yang tidak logis di dunia nyata.
+9. PENCAHAYAAN & EKSPOSUR (lighting, exposure):
+   - WAJIB FAIL jika terjadi blown-out highlights parah (detail putih hilang total) atau crushed shadows (area hitam pekat tanpa detail).
 
----
-Fokuskan analisis Anda SECARA KETAT pada kategori kurasi resmi Adobe Stock berikut:
+10. TEKS & TIPOGRAFI (text):
+    - WAJIB PASS: Teks fiksi ilmiah / HUD futuristik generik, atau huruf timbul produk asli (misal: S, C, T pada alat tes).
+    - WAJIB FAIL: Teks tiruan acak yang bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada poster, buku, plang nama jalan, atau pakaian di dunia nyata.
 
-1. OUT OF FOCUS / SHARPNESS ISSUES:
-   - Subjek utama wajib memiliki fokus yang tajam sempurna (tack-sharp).
-   - Latar belakang/depan yang blur karena depth of field sempit adalah NORMAL & PASS.
+11. HAK CIPTA & MEREK DAGANG (ip_risk, logo, watermark):
+    - WAJIB FAIL jika terlihat logo merek komersial terkenal (Nike, Apple, Starbucks, dll.), watermark agensi foto, atau karakter berhak cipta.
 
-2. EXPOSURE & LIGHTING:
-   - Pencahayaan seimbang dan terdefinisi dengan baik. Gradasi bayangan alami dan highlight wajar adalah PASS.
-   - Emissive glow neon pada seni sci-fi / 3D adalah PASS.
-   - Hanya tolak jika terjadi blown-out highlights ekstrem atau crushed shadows yang menghilangkan detail subjek secara fatal.
+PANDUAN TOLERANSI:
+- STRICT: Ada cacat apa pun pada subjek atau teknis -> FAIL (Skor 35-55).
+- MEDIUM (Standar Adobe Stock): Cacat AI, anatomi, blur subjek utama, noise berat, over-editing, atau struktur cacat -> FAIL (Skor 40-62). Gambar bersih & tajam -> PASS (Skor 86-98).
+- LOOSE: Cacat minor ditoleransi, tetapi cacat kritis AI / anatomi / blur parah / IP tetap -> FAIL.
 
-3. NOISE & GRAIN:
-   - Tekstur pasir, kerikil beton basah, dan noise halus fotografi normal adalah PASS.
-   - Tolak hanya jika noise bintik warna parah merusak gambar atau jika AI denoiser meratakan subjek manusia tanpa tekstur sama sekali.
-
-4. IMAGE ARTIFACTS:
-   - Bebas dari pixelation kompresi JPEG berat, color banding kasar, atau noda sensor kotor.
-
-5. INTELLECTUAL PROPERTY & BRAND SAFETY:
-   - Teks fiksi ilmiah generik ("AI", "CPU", "SERVER") atau diagram HUD adalah 100% SAFE (ip_risk: PASS, legal_status: SAFE).
-   - Foto orang/manusia tanpa logo komersial adalah SAFE (requires_model_release: true, ip_risk: PASS, legal_status: SAFE).
-   - Jangan pernah menggagalkan foto/karya hanya karena menampilkan manusia atau profesi nyata.
-   - Tolak (FAIL) hanya jika terdapat logo merek dagang komersial terkenal (Nike, Apple, Starbucks, dll.) atau desain berhak cipta yang dilindungi.
-
-6. GENERATIVE AI & STRUCTURAL INTEGRITY:
-   - Gambar bersih dengan anatomi wajar, peralatan konstruksi logis, render 3D rapi, dan tekstur material asli = PASS (Skor 85-98).
-   - Tolak (FAIL) jika terdapat:
-     * Papan tanda mengambang tanpa paku/baut pengikat.
-     * Batang rumput/tanaman menembus tiang kayu padat (clipping).
-     * Teks tipografi plang bergelombang (wobbly letters) atau deformasi huruf AI.
-     * Jari bermutasi/menyatu mustahil ke benda, teks acak tak bermakna (gibberish) pada poster/buku dunia nyata, atau arsitektur melayang yang mustahil secara gravitasi.
-
-PANDUAN EVALUASI TOLERANSI KUALITAS:
-Tingkat Toleransi Saat Ini: ${tolerance}.
-- STRICT: Standar tertinggi tanpa kompromi cacat nyata. Jika ada cacat fokus subjek utama, cacat anatomi, struktur melayang/clipping, atau IP violation, nyatakan FAIL (skor 40-59). Gambar bersih sempurna tetap PASS (skor 88-96).
-- MEDIUM (Standar Resmi Adobe Stock): Standar kurasi komersial. Gambar bersih alami / foto konstruksi makro profesional dengan fokus tajam dan anatomi/alat normal WAJIB PASS (skor 86-96). Jika ada cacat kritis fatal nyata (papan melayang tanpa paku, rumput menembus kayu, teks wobbly cacat, jari bermutasi, IP pelanggaran jelas, subjek utama blur total), nyatakan FAIL (skor 45-64).
-- LOOSE: Menoleransi ketidaksempurnaan minor selama gambar bernilai komersial tinggi.
-
-STATUS & SKORING:
-- PASS (Layak Komersial / Bersih): Skor 85 - 98 (Aset bersih alami, tack-sharp, bebas anomali AI).
-- FAIL (Cacat Kualitas Nyata / Reject Risk): Skor 40 - 64.
-
-ATURAN OUTPUT TEKS:
-1. Berikan evaluasi faktual dan objektif pada 'visual_scan_analysis' dan 'detailed_feedback'.
-2. DILARANG KERAS MENEBAK ATAU BERHALUSINASI CACAT (ZERO-HALLUCINATION). Jika gambar bersih, nyatakan PASS secara jujur.
-3. Tuliskan teks respon dalam bahasa: ${targetLanguageName}.
-
-Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema yang diberikan.` + metadataInstruction;
+Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -6242,26 +6141,31 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
 
   const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
   
-  // QC routing: use high visual acuity model
+  // QC routing: use original model configuration
   let selectedModel = model || 'gemini-3.1-pro-preview';
   if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
     selectedModel = 'gemini-3.1-pro-preview';
   }
 
-  // Keep a strong-vision fallback chain. Avoid non-existent/obsolete model names.
   const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   let responseText = "";
   let lastError;
-  let usedModel = "";
+
+  const promptText = `Lakukan audit kualitas kurasi mendalam untuk gambar ini (termasuk crop resolusi 100% yang disertakan).
+PERIKSA DENGAN TELITI:
+1. Ketajaman fokus subjek utama (apakah ada blur/soft focus?).
+2. Detail mikro pada crop: apakah jari tangan/kaki lengkap dan normal? Apakah ada anatomi yang rusak atau melebur?
+3. Apakah ada cacat mekanis/struktural pada objek atau halusinasi generatif AI?
+4. Apakah ada teks cacat/wobbly/gibberish pada rambu, poster, buku, atau baju?
+5. Apakah ada noise parah, JPEG blocking, atau kulit lilin (waxy skin)?
+6. Apakah ada logo merek terkenal atau watermark?
+
+Tingkat toleransi yang diminta: ${tolerance}.
+Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
 
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+    const activeModel = selectedModel || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
     try {
-      let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
-      if (imageMetadata) {
-        promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-      }
-      
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
         contents: [...imageParts, { text: promptText }],
@@ -6270,39 +6174,22 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         config: { temperature: 0.0, topP: 0.1 },
         model: activeModel
       });
-      usedModel = activeModel;
     } catch (err: any) {
       lastError = err;
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
     const activeModel = selectedModel;
-
     const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
-
+    
     for (const modelName of modelsToTryList) {
       try {
-        let promptText = `Act as an objective Adobe Stock QA curator. Conduct a balanced technical and legal audit. Determine final status as PASS or FAIL consistently based on the tolerance provided. CRITICAL: Ensure your ENTIRE JSON response is written in the requested language: ${targetLanguageName} (Do NOT slip into English).`;
-        if (imageMetadata) {
-          promptText += `\n\nTechnical Metadata: ${JSON.stringify(imageMetadata)}`;
-        }
-
-        // Pin deterministic sampling (temperature 0 / low topP) so the SAME model checking
-        // the SAME image twice gives a consistent verdict.
-        const supportsSamplingControls = !/flash/i.test(modelName);
-        const callConfig: any = {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema
-        };
-        if (supportsSamplingControls) {
-          callConfig.temperature = 0;
-          callConfig.topP = 0.1;
-        }
-
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, callConfig);
+        });
         responseText = res.text || "{}";
-        usedModel = (res as any)?._usedModel || modelName;
         break;
       } catch (err: any) {
         lastError = err;
@@ -6317,7 +6204,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
-    // Sinkronisasi Sistem Rejection Otomatis Backend berdasarkan Toleransi (STRICT, MEDIUM, LOOSE)
     if (parsedResult.ai_vision_checks) {
       // Ignore media-mismatched checks for standard photos (e.g. vector/illustration checks)
       const isVectorAsset = fileType?.includes('eps') || fileType?.includes('svg') || fileType?.includes('ai') || fileType?.includes('vector');
@@ -6333,14 +6219,14 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       let anyFail = false;
       let anyIpFail = false;
       let hasCriticalFail = false;
+      let anyTechnicalFail = false;
+      let acceptanceFail = false;
       
       // Kunci kritis: masalah hukum, hak cipta, atau cacat AI/struktural fatal nyata
       const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
       // Kunci kualitas teknis utama
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts'];
+      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts', 'text'];
       const failedCheckKeys: string[] = [];
-      let anyTechnicalFail = false;
-      let acceptanceFail = false;
 
       for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
         if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
@@ -6361,8 +6247,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
 
-      // Terapkan penolakan atau kelulusan terkalibrasi berdasarkan level toleransi (STRICT, MEDIUM, LOOSE):
-      // ZERO-OVERRIDE BUG FIX: Jangan pernah memaksa gambar cacat menjadi PASS jika AI atau kriteria QC menemukan kegagalan!
+      // Evaluasi toleransi penolakan
       const isFailing = parsedResult.recommendation === 'FAIL' || 
                         (typeof parsedResult.overall_score === 'number' && parsedResult.overall_score < 70) ||
                         anyFail || 
@@ -6373,7 +6258,7 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
       if (tolerance === 'STRICT') {
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 50, 58);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 48, 55);
         } else {
           parsedResult.recommendation = "PASS";
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
@@ -6389,7 +6274,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       } else {
         // Default MEDIUM (Standar Resmi Adobe Stock):
-        // Jika ditemukan cacat AI, anatomi, teks cacat, blur subjek utama, atau AI menyatakan FAIL -> Status WAJIB FAIL
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
           parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 52, 60);
@@ -6399,14 +6283,14 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         }
       }
 
-      // Sinkronkan stock_acceptance dengan keputusan akhir agar UI tidak menampilkan kontradiksi
+      // Sinkronkan stock_acceptance dengan keputusan akhir
       if (parsedResult.recommendation === "FAIL" && parsedResult.ai_vision_checks.stock_acceptance) {
         parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
       } else if (parsedResult.recommendation === "PASS" && parsedResult.ai_vision_checks.stock_acceptance) {
         parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
       }
 
-      // Lampirkan daftar check yang gagal agar frontend/debug mudah membaca alasan penolakan
+      // Lampirkan daftar check yang gagal
       if (failedCheckKeys.length > 0) {
         (parsedResult as any).failed_checks = failedCheckKeys;
       }
@@ -6415,10 +6299,6 @@ Respons Anda WAJIB dalam format JSON yang valid dan bersih sesuai dengan skema y
         parsedResult.legal_status = "VIOLATION";
       }
     }
-
-    (parsedResult as any).model_used = usedModel || selectedModel;
-    (parsedResult as any).model_requested = selectedModel;
-    (parsedResult as any).model_fallback_occurred = !!usedModel && usedModel !== selectedModel;
 
     return parsedResult;
   } catch(e) {
@@ -6733,7 +6613,7 @@ CRITICAL MONTH MATCHING & ALIGNMENT RULES (MUST FOLLOW STRICTLY):
 
 2. Target Month: The user has selected the month of "${targetMonthEn}" (also known as "${targetMonthId}").
    - You MUST ONLY generate events, holidays, observances, and festivals that ACTUALLY and historically occur during this specific month (${targetMonthEn}) in the year 2026.
-   - You are STRICTLY FORBIDDEN from listing events that happen in other months.
+   - STRICT ANTI-HALLUCINATION (NO NGAWUR): You are STRICTLY FORBIDDEN from listing events that happen in other months, inventing fake holidays, or generating random unrelated topics. Only output verified real-world events. Do not wander off-topic (ngawur).
 
 3. PRE-SEEDED WORLD HOLIDAYS (UN, UNESCO, TimeAndDate):
    To ensure perfect alignment, you MUST include and enrich the following verified global and regional celebrations for this month:
@@ -6779,7 +6659,7 @@ Output strictly in JSON format.`;
     try {
       const res = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Ensure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`,
+        contents: `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`,
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.8 },
@@ -6791,7 +6671,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6801,7 +6681,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err: any) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}). Be extremely detailed and comprehensive so content creators have many ideas to choose from. You MUST find and return at least 25-30 distinct events so the calendar is completely filled, highly detailed, and consistent with no variation. Make sure suggested_topics are VERY SHORT keywords (max 1-3 words each), not long descriptions.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -6958,7 +6838,7 @@ Rules:
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const res = await callOpenAICompatibleWithRetry({
       systemInstruction,
-      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`,
+      contents: `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`,
       responseMimeType: "application/json",
       responseSchema,
       config: { temperature: 0.8 },
@@ -6967,7 +6847,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words). Use Google Search if necessary to find the most current and real-time trending tags for this event.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -6976,7 +6856,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -7034,7 +6914,7 @@ These suggested keywords must be highly searchable, commercial, and directly rel
 Rules:
 1. Suggest EXACTLY ${requestCount} new, unique, generic keywords. Do not suggest more, do not suggest less.
 2. The suggested keywords must NOT be in the existing keywords list: ${JSON.stringify(existingKeywords)}.
-3. Keep every suggested keyword lowercase, clean, and exactly one word. Never output phrases or connector words.
+3. Keep the suggested keywords in lowercase, clean, single-word or short phrases (typically 1-2 words).
 4. Strictly return your answer as a JSON array of strings under the property "keywords".`;
 
   const responseSchema = {
@@ -7064,7 +6944,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`;
       model
     });
   } else {
-    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', promptContents, {
+    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', promptContents, {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
@@ -7195,7 +7075,7 @@ Strictly return your answer as a JSON array matching the schema.`;
         }
       };
 
-      const response = await callGeminiWithRetry('gemini-3.6-pro-preview', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
+      const response = await callGeminiWithRetry('gemini-2.5-pro', `Search stock.adobe.com and return the top 8 most downloaded/highest demand visual assets for keyword "${keyword}".`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7238,7 +7118,7 @@ Return exactly 8 items matching the schema in JSON array format.`;
           }
         };
 
-        const responseNoGrounding = await callGeminiWithRetry('gemini-3.6-pro-preview', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
+        const responseNoGrounding = await callGeminiWithRetry('gemini-2.5-pro', `Simulate top 8 trending assets on Adobe Stock for keyword "${keyword}" with Unsplash source placeholders.`, {
           systemInstruction: systemInstructionNoGrounding,
           responseMimeType: "application/json",
           responseSchema,
@@ -7319,7 +7199,7 @@ function computeTechnicalQualityChecks(report: any, tolerance: string): Record<s
     const v = report.ffprobe.video;
     c.motion_consistency = (v?.fps || 0) >= 23.976 ? { status: 'PASS', note: `FPS ${v?.fps?.toFixed(2)} — OK.` } : { status: 'FAIL', note: `FPS ${v?.fps?.toFixed(2)} — below 23.976.` };
     c.visual_quality = ((v?.width || 0) >= 1920 && (v?.height || 0) >= 1080) ? { status: 'PASS', note: `${v?.width}x${v?.height} — 1080p+.` } : { status: 'FAIL', note: `${v?.width}x${v?.height} — below 1080p.` };
-c.noise = { status: 'PASS', note: `Bitrate ${((report.ffprobe.bitrate || 0) / 1000).toFixed(0)}kbps, ${v?.codec || '?'}.` };
+    c.noise = { status: 'PASS', note: `Bitrate ${((report.ffprobe.bitrate || 0) / 1000).toFixed(0)}kbps, ${v?.codec || '?'}.` };
   }
   return c;
 }
@@ -7344,10 +7224,12 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
+  // Parse technical report and build ground truth summary
   const report = videoTechnicalReport ? (typeof videoTechnicalReport === 'string' ? JSON.parse(videoTechnicalReport) : videoTechnicalReport) : null;
   const technicalChecks = computeTechnicalQualityChecks(report, tolerance);
   const technicalScore = computeTechnicalScore(technicalChecks);
 
+  // OPTIMASI TIMEOUT & BANDWIDTH: Kirim 3 keyframe optimal (mengurangi beban payload & mempercepat respons AI)
   const imageParts: any[] = [];
   if (videoFile) imageParts.push({ fileData: { fileUri: videoFile.fileUri, mimeType: videoFile.mimeType } });
   
@@ -7361,6 +7243,7 @@ export async function checkVideoQuality(frames, tolerance = 'MEDIUM', language =
     }
   }
 
+  // Build deterministic ground truth from pipeline tools
   const gt: any = {};
   if (report) {
     if (report.ffprobe?.video) {
@@ -7461,21 +7344,23 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   };
 
   let responseText = '';
-  const selectedModel = model && model.startsWith('gemini') ? model : 'gemini-3.5-flash';
+  const selectedModel = model && model.startsWith('gemini') ? model : 'gemini-2.5-flash';
 
   try {
     const aiPromise = NON_GEMINI_PROVIDERS.has(provider)
-      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess video keyframes with technical metrics: ${JSON.stringify(gt)}. Return complete JSON.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
+      ? callOpenAICompatibleWithRetry({ systemInstruction, contents: { parts: [...imageParts, { text: `Assess video keyframes with technical ground truth: ${JSON.stringify(gt)}. Return complete JSON.` }] }, responseMimeType: 'application/json', responseSchema, config: { temperature: 0.2 }, model })
       : callGeminiWithRetry(selectedModel,
           imageParts.length > 0 ? { parts: [...imageParts, { text: `Assess video keyframes with technical metrics: ${JSON.stringify(gt)}. Return complete JSON.` }] } : `Technical metrics: ${JSON.stringify(gt)}. Return complete JSON.`,
           { systemInstruction, responseMimeType: 'application/json', responseSchema, temperature: 0.2 }, 2)
           .then((r: any) => r.text || '{}');
     
+    // Generous 75s timeout to prevent premature aborts while keeping fallback safe
     const timeoutPromise = new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 75000));
     responseText = await Promise.race([aiPromise, timeoutPromise]);
   } catch (e: any) {
     console.warn(`[checkVideoQuality] AI Vision call timed out or failed: ${e.message}. Using deterministic technical metrics fallback.`);
     
+    // DETERMINISTIC TECHNICAL FALLBACK: Selalu menghasilkan laporan valid dan akurat dari FFmpeg/FFprobe
     const isPass = technicalScore >= 75;
     const finalScore = isPass ? Math.max(88, technicalScore) : Math.min(60, technicalScore);
     
@@ -7580,10 +7465,10 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.6-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-3.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -7631,7 +7516,7 @@ export async function removeWatermark(imageBase64: string, maskBase64: string, p
   let analysis: any = null;
   if (!NON_GEMINI_PROVIDERS.has(provider)) {
     try {
-      const res = await callGeminiWithRetry('gemini-3.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', { parts }, { systemInstruction: 'You are an expert image restoration specialist. Analyze the masked area and describe replacement content.', responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { fill_description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ['fill_description', 'colors'] }, temperature: 0.2 }, 1);
       analysis = JSON.parse(extractJSON(res.text || '{}'));
     } catch {}
   }
@@ -7719,7 +7604,7 @@ export async function generate3DCGIPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: THREE_D_CGI_STYLE_INSTRUCTION,
@@ -7768,7 +7653,7 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: CINEMATIC_STYLE_INSTRUCTION,
@@ -7819,7 +7704,7 @@ export async function generateAbstractPrompt(topic: string): Promise<string> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: ABSTRACT_STYLE_INSTRUCTION,
@@ -7866,7 +7751,7 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
     const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userQuery,
       config: {
         systemInstruction: PAINTERLY_DIGITAL_ART_STYLE_INSTRUCTION,
@@ -7994,7 +7879,7 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
       : `Generate a fresh, highly creative commercial subject idea for style: "${styleCategory || 'General'}". Ensure absolute uniqueness across repeated clicks using this seed angle: "${randomSeedKeyword}". Return ONLY 1-2 descriptive sentences.`;
   }
 
-  const activeModel = model || 'gemini-3.5-flash';
+  const activeModel = model || 'gemini-2.5-flash';
 
   try {
     let rawText = '';
