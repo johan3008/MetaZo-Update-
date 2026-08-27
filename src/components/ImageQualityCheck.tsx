@@ -1585,12 +1585,20 @@ export const ImageQualityCheck: React.FC<{
                                     blur: rawChecks.blur || fallbackCheck('blur', ['focus', 'blur', 'tajam', 'sharp']),
                                     composition: rawChecks.composition || fallbackCheck('composition', ['komposisi', 'composition']),
                                     lighting: rawChecks.lighting || fallbackCheck('lighting', ['lighting', 'exposure', 'pencahayaan', 'eksposur']),
+                                    exposure: rawChecks.exposure || fallbackCheck('exposure', ['exposure', 'overexposure', 'underexposure', 'clipping']),
+                                    color_balance: rawChecks.color_balance || fallbackCheck('color_balance', ['warna', 'color']),
+                                    over_edited: rawChecks.over_edited || fallbackCheck('over_edited', ['waxy', 'plastic', 'lilin', 'filter']),
+                                    sensor_issues: rawChecks.sensor_issues || fallbackCheck('sensor_issues', ['sensor', 'dust', 'noda']),
                                     watermark: rawChecks.watermark || fallbackCheck('watermark', ['watermark']),
                                     logo: rawChecks.logo || legalFallback('logo'),
-                                    text: rawChecks.text || fallbackCheck('text', ['teks', 'text', 'gibberish']),
-                                    anatomical_errors: rawChecks.anatomical_errors || fallbackCheck('anatomical_errors', ['anatomi', 'anatomy', 'jari', 'finger', 'tangan', 'hand']),
+                                    text: rawChecks.text || fallbackCheck('text', ['teks', 'text', 'gibberish', 'huruf']),
+                                    anatomical_errors: rawChecks.anatomical_errors || fallbackCheck('anatomical_errors', ['anatomi', 'anatomy', 'jari', 'finger', 'tangan', 'hand', 'wajah', 'face']),
                                     ip_risk: rawChecks.ip_risk || legalFallback('ip_risk'),
-                                    proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical', 'struktur']),
+                                    structural_defects: rawChecks.structural_defects || fallbackCheck('structural_defects', ['struktur', 'structural', 'tiang', 'post', 'moncong', 'nozzle', 'pipet', 'alat']),
+                                    proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical']),
+                                    noise: rawChecks.noise || fallbackCheck('noise', ['noise', 'grain', 'derau']),
+                                    artifacts: rawChecks.artifacts || fallbackCheck('artifacts', ['artifact', 'kompresi', 'banding', 'fringe']),
+                                    ai_artifacts: rawChecks.ai_artifacts || fallbackCheck('ai_artifacts', ['ai', 'generatif', 'halusinasi', 'meleleh', 'melted', 'distorsi']),
                                     stock_acceptance: rawChecks.stock_acceptance || { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
                                     metadata: rawChecks.metadata || { title: (r as any).metadata?.title || "Stock photography showing details", keywords: (r as any).metadata?.keywords || r.strengths || [] }
                                   };
@@ -1621,6 +1629,8 @@ export const ImageQualityCheck: React.FC<{
                                     ...(alphaEdgeScore != null ? [{ label: t.language === 'Bahasa' ? "Tepi Alpha / Halo" : "Alpha Edge / Halo", value: alphaEdgeScore, status: ffmpegData.transparency?.edge_status || 'Measured', color: "bg-cyan-500" }] : [])
                                   ];
 
+                                  const tolerance = r.tolerance || 'Standard';
+
                                   return (
                                     <div className="space-y-6">
                                       {/* Score Gauge Widget */}
@@ -1648,55 +1658,50 @@ export const ImageQualityCheck: React.FC<{
                                             />
                                           </svg>
                                           <div className="absolute flex flex-col items-center justify-center text-center">
-                                            <span className="text-xl font-black text-slate-800 dark:text-white leading-none">{r.overall_score}%</span>
-                                            <span className="text-[7px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">SCORE</span>
+                                            <span className={`text-xl font-black ${isPass ? 'text-emerald-500' : 'text-rose-500'} tracking-tighter`}>
+                                              {r.overall_score}
+                                            </span>
+                                            <span className="text-[7px] font-black uppercase text-slate-400">Score</span>
                                           </div>
                                         </div>
 
-                                        <div className="space-y-1.5 flex-1 text-center md:text-left">
+                                        <div className="flex-1 space-y-2 text-center md:text-left">
                                           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                                            <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                                              isPass 
-                                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                                                : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                            }`}>
-                                              {isPass ? (t.language === 'Bahasa' ? 'LAYAK JUAL (PASS)' : 'COMMERCIALLY VIABLE (PASS)') : (t.language === 'Bahasa' ? 'BUTUH PERBAIKAN (FAIL)' : 'NEEDS ATTENTION (FAIL)')}
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${isPass ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'}`}>
+                                              {isPass ? 'Adobe Stock Quality Pass' : 'Quality Issues / Reject Risk'}
                                             </span>
-                                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold font-mono">ADOBE STOCK QA v5.0</span>
+                                            <span className="text-[9px] font-mono text-slate-400">
+                                              Tolerance: {tolerance}
+                                            </span>
                                           </div>
-                                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
-                                            {isPass ? (t.language === 'Bahasa' ? 'Aset Lolos Kurasi Pasar Global' : 'High Commercial Potential') : (t.language === 'Bahasa' ? 'Ditemukan Isu Kualitas Kurasi' : 'Quality Roadblocks Detected')}
-                                          </h4>
-                                          <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 leading-relaxed italic">
-                                            {r.detailed_feedback || (t.language === 'Bahasa' ? "Analisis visual mendalam selesai dengan kecocokan standar premium." : "Detailed vision analysis completed matching premium stock market standards.")}
+                                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                            {isPass 
+                                              ? (t.language === 'Bahasa' ? 'Aset memenuhi standar teknis & kualitas Adobe Stock untuk lisensi komersial.' : 'Asset meets Adobe Stock technical & curation standards for commercial licensing.')
+                                              : (t.language === 'Bahasa' ? 'Terdeteksi masalah kualitas visual/teknis yang berisiko ditolak oleh kurator Adobe Stock.' : 'Visual or technical quality issues detected that risk rejection by Adobe Stock curators.')}
                                           </p>
                                         </div>
                                       </div>
 
-                                      {/* Curation Tabs Bar */}
-                                      <div className="flex items-center overflow-x-auto gap-1 border-b border-slate-200 dark:border-white/5 pb-px custom-scrollbar">
-                                        {(['technical', 'legal', 'ai', 'seo'] as const).map((tabId) => {
-                                          const labels = {
-                                            technical: t.language === 'Bahasa' ? '🔍 Detail Teknis' : '🔍 Technical Check',
-                                            legal: t.language === 'Bahasa' ? '⚖️ Detektif IP & Hukum' : '⚖️ IP & Legal Check',
-                                            ai: t.language === 'Bahasa' ? '🤖 Cek Anatomi & AI' : '🤖 AI & Anatomy Check',
-                                            seo: t.language === 'Bahasa' ? '📝 Rekomendasi SEO' : '📝 SEO & Metadata'
-                                          };
-                                          const active = currentTab === tabId;
-                                          return (
-                                            <button
-                                              key={tabId}
-                                              onClick={() => setTab(tabId)}
-                                              className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider border-b-2 transition-all whitespace-nowrap shrink-0 ${
-                                                active 
-                                                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5' 
-                                                  : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.01]'
-                                              }`}
-                                            >
-                                              {labels[tabId]}
-                                            </button>
-                                          );
-                                        })}
+                                      {/* Tab Selector */}
+                                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/50 dark:border-white/5">
+                                        {[
+                                          { id: 'technical', label: t.language === 'Bahasa' ? 'Piksel & Teknis' : 'Pixel & Technical' },
+                                          { id: 'legal', label: t.language === 'Bahasa' ? 'Legal & IP' : 'Legal & IP' },
+                                          { id: 'ai', label: t.language === 'Bahasa' ? 'AI & Anatomi' : 'AI & Anatomy' },
+                                          { id: 'seo', label: 'Metadata SEO' }
+                                        ].map(tab => (
+                                          <button
+                                            key={tab.id}
+                                            onClick={() => setTab(tab.id as any)}
+                                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                                              currentTab === tab.id
+                                                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                                            }`}
+                                          >
+                                            {tab.label}
+                                          </button>
+                                        ))}
                                       </div>
 
                                       {/* Tab Contents */}
@@ -1897,12 +1902,16 @@ export const ImageQualityCheck: React.FC<{
                                               </div>
                                             )}
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
                                               {[
                                                 { label: t.language === 'Bahasa' ? 'Integritas Anatomi' : 'Anatomical Integrity', val: aiVisionChecks.anatomical_errors },
+                                                { label: t.language === 'Bahasa' ? 'Cacat Struktural AI' : 'Structural Defects', val: aiVisionChecks.structural_defects },
+                                                { label: t.language === 'Bahasa' ? 'Artefak Generatif AI' : 'Generative AI Artifacts', val: aiVisionChecks.ai_artifacts },
+                                                { label: t.language === 'Bahasa' ? 'Integritas Teks OCR' : 'Text / OCR Integrity', val: aiVisionChecks.text },
                                                 { label: t.language === 'Bahasa' ? 'Proporsi & Mekanis' : 'Proportion & Mechanical', val: aiVisionChecks.proportion_defects },
-                                                { label: t.language === 'Bahasa' ? 'Teks Overlay / Typo' : 'Text Overlay Check', val: aiVisionChecks.text },
-                                                { label: t.language === 'Bahasa' ? 'Standar Penerimaan' : 'Stock Acceptance', val: aiVisionChecks.stock_acceptance }
+                                                { label: t.language === 'Bahasa' ? 'Tekstur Lilin / Over-edited' : 'Waxy Skin / Over-edited', val: aiVisionChecks.over_edited },
+                                                { label: t.language === 'Bahasa' ? 'Artefak Kompresi & Edge' : 'Artifacts & Edges', val: aiVisionChecks.artifacts },
+                                                { label: t.language === 'Bahasa' ? 'Standar Penerimaan Stok' : 'Stock Acceptance', val: aiVisionChecks.stock_acceptance }
                                               ].map((c, i) => {
                                                 const isCheckpointPass = c.val?.status === 'PASS';
                                                 const isCheckpointUnknown = c.val?.status === 'UNKNOWN';

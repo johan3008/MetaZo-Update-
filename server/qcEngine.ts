@@ -145,7 +145,7 @@ export function decideQc(
   } = {}
 ): QcDecision {
   const tolerance = options.tolerance || "MEDIUM";
-  const unknownPenalty = tolerance === "STRICT" ? 8 : tolerance === "MEDIUM" ? 4 : 2;
+  const unknownPenalty = tolerance === "STRICT" ? 15 : tolerance === "MEDIUM" ? 11 : 5;
 
   const hardFailures = evidence
     .filter(item => item.status === "FAIL" && item.severity === "HARD_FAIL")
@@ -170,14 +170,19 @@ export function decideQc(
     ["ai", "merged"].includes(item.source || "")
   );
 
+  const techUnknownPenalty = tolerance === "STRICT" ? 4 : tolerance === "MEDIUM" ? 2 : 1;
   const technicalScore = clamp(
-    options.deterministicScore ?? scoreEvidence(technicalEvidence, unknownPenalty)
+    options.deterministicScore ?? (technicalEvidence.length > 0 ? scoreEvidence(technicalEvidence, techUnknownPenalty) : (aiEvidence.length > 0 ? scoreEvidence(aiEvidence, unknownPenalty) : 100))
   );
   const visualScore = clamp(
-    options.aiScore ?? scoreEvidence(aiEvidence, unknownPenalty)
+    options.aiScore ?? (aiEvidence.length > 0 ? scoreEvidence(aiEvidence, unknownPenalty) : (technicalEvidence.length > 0 ? scoreEvidence(technicalEvidence, techUnknownPenalty) : 100))
   );
 
-  const overallScore = Math.round(technicalScore * 0.7 + visualScore * 0.3);
+  const overallScore = technicalEvidence.length > 0 && aiEvidence.length > 0
+    ? Math.round(technicalScore * 0.7 + visualScore * 0.3)
+    : technicalEvidence.length > 0
+      ? technicalScore
+      : visualScore;
 
   let recommendation: QcDecision["recommendation"] = "PASS";
   if (hardFailures.length > 0) {
