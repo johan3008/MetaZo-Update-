@@ -7,7 +7,7 @@ interface FeatureGuideModalProps {
   onClose: () => void;
   title: string;
   description: string;
-  t: any;
+  t?: any;
 }
 
 export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
@@ -31,6 +31,9 @@ export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
 
   if (!isOpen) return null;
 
+  const btnTitle = t?.guide_btn_title || (t?.language === 'English' ? 'Feature Guide' : 'Panduan Fitur');
+  const closeText = t?.qc_close || (t?.language === 'English' ? 'Got It' : 'Tutup');
+
   return createPortal(
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
@@ -49,7 +52,7 @@ export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">{title}</h2>
-              <p className="text-[11px] font-semibold text-slate-400 mt-0.5 uppercase tracking-widest">{t.guide_btn_title}</p>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5 uppercase tracking-widest">{btnTitle}</p>
             </div>
           </div>
           <button 
@@ -71,7 +74,7 @@ export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
             onClick={onClose}
             className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-indigo-500/20 active:scale-95 shrink-0"
           >
-            <span>{t.qc_close || 'Got It'}</span>
+            <span>{closeText}</span>
             <CheckCircle2 size={16} />
           </button>
         </div>
@@ -84,19 +87,20 @@ export const FeatureGuideModal: React.FC<FeatureGuideModalProps> = ({
 export const FeatureGuideButton: React.FC<{ 
   title: string; 
   description: string; 
-  t: any;
+  t?: any;
 }> = ({ title, description, t }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const btnTitle = t?.guide_btn_title || (t?.language === 'English' ? 'Feature Guide' : 'Panduan Fitur');
 
   return (
     <>
       <button
         onClick={() => setIsOpen(true)}
         className="group relative flex items-center shrink-0 space-x-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800/50 dark:hover:bg-indigo-500/10 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-500/20 rounded-full transition-all text-[10px] font-bold uppercase tracking-wider overflow-hidden active:scale-95"
-        title={t.guide_btn_title}
+        title={btnTitle}
       >
         <HelpCircle size={14} className="transition-transform group-hover:scale-110" />
-        <span className="hidden sm:inline-block whitespace-nowrap">{t.guide_btn_title}</span>
+        <span className="hidden sm:inline-block whitespace-nowrap">{btnTitle}</span>
       </button>
 
       <FeatureGuideModal
