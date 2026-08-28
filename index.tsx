@@ -50,6 +50,41 @@ try {
   }
 }
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("Unhandled App Crash Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#090d16', color: '#fff', fontFamily: 'sans-serif', padding: '20px', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#f87171', marginBottom: '12px' }}>Terjadi Kesalahan pada Aplikasi</h2>
+          <p style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '500px', marginBottom: '20px' }}>
+            {this.state.error?.message || 'Gagal memuat komponen antarmuka. Silakan muat ulang halaman.'}
+          </p>
+          <button 
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{ padding: '10px 20px', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
+          >
+            Reset Cache & Muat Ulang
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 console.log('App is mounting...');
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -60,8 +95,11 @@ console.log('Root element found, rendering...');
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
-    <Analytics />
+    <ErrorBoundary>
+      <App />
+      <Analytics />
+    </ErrorBoundary>
   </React.StrictMode>
 );
 console.log('App rendered.');
+

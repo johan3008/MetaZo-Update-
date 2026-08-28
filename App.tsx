@@ -1359,6 +1359,17 @@ const App: React.FC = () => {
     }
   }, [isCheckingAuth, hasSyncedProfile, isCheckingLicense]);
 
+  // Failsafe timer to guarantee loading screen never gets permanently stuck
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      setHasInitiallyLoaded(true);
+      setIsCheckingAuth(false);
+      setIsCheckingLicense(false);
+      setHasSyncedProfile(true);
+    }, 1200);
+    return () => clearTimeout(safetyTimer);
+  }, [user?.uid]);
+
   const isAdminAccount = !!user && ((import.meta.env.VITE_ADMIN_UID && user.uid === import.meta.env.VITE_ADMIN_UID) || (user.email && ['johanchrismant4@gmail.com'].includes(user.email)));
   const isResellerUnlocked = isAdminAccount;
   const setIsResellerUnlocked = () => {};
