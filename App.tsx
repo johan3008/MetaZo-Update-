@@ -4740,26 +4740,28 @@ const App: React.FC = () => {
             >
               {activeTool === ToolType.DASHBOARD ? (
                 <DashboardView 
-              userName={user?.displayName || user?.email?.split('@')[0] || ''}
-              files={files}
-              setActiveTool={handleSetActiveTool}
-              setShowInfoModal={setShowInfoModal}
-              successfulFilesCount={successfulFilesCount}
-              filesToGenerateCount={filesToGenerateCount}
-              filesWithErrorCount={filesWithErrorCount}
-              unprocessedFilesCount={filesToGenerateCount}
-              generationMode={generationMode}
-              isLicensed={isMzLicensed}
-              appName={mzAppName}
-              pricingTier={autoPricingTier}
-              whatsAppLink={mzWhatsApp}
-              setShowActivation={setShowActivationModal}
-              imageDailyCount={dailyGenCounts[ToolType.IMAGE] || 0}
-              videoDailyCount={dailyGenCounts[ToolType.VIDEO] || 0}
-              vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
-              t={t}
-            />
-          ) : activeTool === ToolType.PROMPT_GEN ? (
+                  userName={user?.displayName || user?.email?.split('@')[0] || ''}
+                  files={files}
+                  setActiveTool={handleSetActiveTool}
+                  setShowInfoModal={setShowInfoModal}
+                  successfulFilesCount={successfulFilesCount}
+                  filesToGenerateCount={filesToGenerateCount}
+                  filesWithErrorCount={filesWithErrorCount}
+                  unprocessedFilesCount={filesToGenerateCount}
+                  generationMode={generationMode}
+                  isLicensed={isMzLicensed}
+                  appName={mzAppName}
+                  pricingTier={autoPricingTier}
+                  whatsAppLink={mzWhatsApp}
+                  setShowActivation={setShowActivationModal}
+                  imageDailyCount={dailyGenCounts[ToolType.IMAGE] || 0}
+                  videoDailyCount={dailyGenCounts[ToolType.VIDEO] || 0}
+                  vectorDailyCount={dailyGenCounts[ToolType.VECTOR] || 0}
+                  t={t}
+                  trialDaysLeft={trialDaysLeft}
+                  promoCodes={promoCodesForModal}
+                />
+              ) : activeTool === ToolType.PROMPT_GEN ? (
             <PromptGenView 
               t={t} 
               uiLanguage={uiLanguage}

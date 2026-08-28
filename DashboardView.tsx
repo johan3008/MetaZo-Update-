@@ -7,11 +7,11 @@ import {
   AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
-import { supabase } from '../supabase';
+import { db, collection, query, limit, onSnapshot, supabase } from '../supabase';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
 
-interface DashboardPromoCode {
+export interface DashboardPromoCode {
   id: string;
   code: string;
   type: string;
@@ -22,6 +22,51 @@ interface DashboardPromoCode {
   startDate?: string;
   endDate?: string;
 }
+
+const DEFAULT_DASHBOARD_PROMOS: DashboardPromoCode[] = [
+  { id: "MZPROMO2026", code: "MZPROMO2026", type: "discount", value: 50, maxUses: 500, usedCount: 124, description: "Promo Spesial Tahun 2026 (Diskon 50%)", startDate: "2026-01-01", endDate: "2027-12-31" },
+  { id: "FREEPREMIUM7D", code: "FREEPREMIUM7D", type: "free_premium", value: 7, maxUses: 1000, usedCount: 312, description: "Akses Premium Gratis 7 Hari", startDate: "2026-01-01", endDate: "2027-12-31" },
+  { id: "METAZOPRO20", code: "METAZOPRO20", type: "discount", value: 20, maxUses: 100, usedCount: 15, description: "Kupon Diskon 20% MetaZo PRO", startDate: "2026-01-01", endDate: "2027-12-31" }
+];
+
+const filterActivePromos = (rawList: any[]): DashboardPromoCode[] => {
+  const list: DashboardPromoCode[] = [];
+  const now = new Date();
+  (rawList || []).forEach((row: any) => {
+    const usedCount = Number(row.used_count ?? row.usedCount ?? 0);
+    const maxUses = Number(row.max_uses ?? row.maxUses ?? 99999);
+    
+    // Filter out expired by uses
+    if (usedCount >= maxUses) return;
+
+    // Filter out which hasn't started yet
+    const startDate = row.start_date || row.startDate;
+    if (startDate) {
+      const start = new Date(startDate);
+      if (now < start) return;
+    }
+
+    // Filter out which has ended
+    const endDateStr = row.end_date || row.endDate;
+    if (endDateStr) {
+      const end = endDateStr.includes('T') ? new Date(endDateStr) : new Date(endDateStr + 'T23:59:59');
+      if (now > end) return;
+    }
+
+    list.push({
+      id: row.id || row.code || row.key || '',
+      code: row.code || row.id || '',
+      type: row.type || 'free_premium',
+      value: Number(row.value || 0),
+      maxUses,
+      usedCount,
+      description: row.description || '',
+      startDate: startDate || '',
+      endDate: endDateStr || '',
+    });
+  });
+  return list;
+};
 
 interface DashboardViewProps {
   files: FileItem[];
@@ -43,6 +88,7 @@ interface DashboardViewProps {
   t: any;
   userName?: string;
   trialDaysLeft?: number;
+  promoCodes?: any[];
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -64,7 +110,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   vectorDailyCount = 0,
   t,
   userName = '',
-  trialDaysLeft
+  trialDaysLeft,
+  promoCodes: initialPromoCodes
 }) => {
   // Compute some quick statistics
   const totalFiles = files.length;
@@ -114,75 +161,90 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setCurrentSlide(prev => (prev === 0 ? slides.length - 1 : prev - 1));
     }
   };
-  const [promoCodes, setPromoCodes] = React.useState<DashboardPromoCode[]>([]);
+  const [promoCodes, setPromoCodes] = React.useState<DashboardPromoCode[]>(() => {
+    if (initialPromoCodes && initialPromoCodes.length > 0) {
+      const filtered = filterActivePromos(initialPromoCodes);
+      if (filtered.length > 0) return filtered;
+    }
+    try {
+      const cached = localStorage.getItem('mz_promos_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const filtered = filterActivePromos(parsed);
+        if (filtered.length > 0) return filtered;
+      }
+    } catch (e) {}
+    return DEFAULT_DASHBOARD_PROMOS;
+  });
   const [isLoadingPromos, setIsLoadingPromos] = React.useState(false);
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let active = true;
-    const fetchPromos = async () => {
-      setIsLoadingPromos(true);
-      try {
-        if (!supabase) {
-          setPromoCodes([]);
-          setIsLoadingPromos(false);
-          return;
-        }
-        const { data, error } = await supabase.from('promos').select('*').limit(5);
-        if (error) throw error;
-        if (!active) return;
-        const list: DashboardPromoCode[] = [];
-        const now = new Date();
-        (data || []).forEach((row: any) => {
-          const usedCount = Number(row.used_count ?? row.usedCount ?? 0);
-          const maxUses = Number(row.max_uses ?? row.maxUses ?? 0);
-          
-          // Filter out expired by uses
-          if (usedCount >= maxUses) return;
 
-          // Filter out which hasn't started yet
-          const startDate = row.start_date || row.startDate;
-          if (startDate) {
-            const start = new Date(startDate);
-            if (now < start) return;
-          }
-
-          // Filter out which has ended
-          const endDateStr = row.end_date || row.endDate;
-          if (endDateStr) {
-            const end = endDateStr.includes('T') ? new Date(endDateStr) : new Date(endDateStr + 'T23:59:59');
-            if (now > end) return;
-          }
-
-          list.push({
-            id: row.id || row.key || '',
-            code: row.code || row.id || '',
-            type: row.type || 'free_premium',
-            value: Number(row.value || 0),
-            maxUses,
-            usedCount,
-            description: row.description || '',
-            startDate: startDate || '',
-            endDate: endDateStr || '',
-          });
-        });
-        if (list.length > 0) {
-          setPromoCodes(list);
-        } else {
-          setPromoCodes([]);
-        }
-      } catch (error) {
-        console.warn("Failed to load promos for dashboard view:", error);
-        setPromoCodes([]);
-      } finally {
-        if (active) setIsLoadingPromos(false);
+    // Sync if initialPromoCodes prop changes
+    if (initialPromoCodes && initialPromoCodes.length > 0) {
+      const filtered = filterActivePromos(initialPromoCodes);
+      if (filtered.length > 0) {
+        setPromoCodes(filtered);
       }
-    };
-    fetchPromos();
-    return () => {
-      active = false;
-    };
-  }, []);
+    }
+
+    // Subscribe to Firestore/Supabase live promos
+    try {
+      setIsLoadingPromos(true);
+      const unsub = onSnapshot(query(collection(db, 'promos'), limit(15)), (qSnap) => {
+        if (!active) return;
+        setIsLoadingPromos(false);
+        const list: any[] = [];
+        qSnap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        const validPromos = filterActivePromos(list);
+        if (validPromos.length > 0) {
+          setPromoCodes(validPromos);
+          localStorage.setItem('mz_promos_cache', JSON.stringify(validPromos));
+        } else {
+          const cached = localStorage.getItem('mz_promos_cache');
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              const filtered = filterActivePromos(parsed);
+              if (filtered.length > 0) {
+                setPromoCodes(filtered);
+                return;
+              }
+            } catch (e) {}
+          }
+          setPromoCodes(DEFAULT_DASHBOARD_PROMOS);
+        }
+      }, (err) => {
+        if (!active) return;
+        setIsLoadingPromos(false);
+        console.warn("Failed to subscribe to promos for dashboard view:", err);
+        const cached = localStorage.getItem('mz_promos_cache');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const filtered = filterActivePromos(parsed);
+            if (filtered.length > 0) {
+              setPromoCodes(filtered);
+              return;
+            }
+          } catch (e) {}
+        }
+        setPromoCodes(DEFAULT_DASHBOARD_PROMOS);
+      });
+
+      return () => {
+        active = false;
+        unsub?.();
+      };
+    } catch (error) {
+      if (active) setIsLoadingPromos(false);
+      console.warn("Error setting up promo subscription:", error);
+    }
+  }, [initialPromoCodes]);
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -338,8 +400,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Removed PREMIUM LICENSE & SAAS MONETIZATION STATUS BOARD */}
 
-      {/* PROMO / VOUCHER HIGHLIGHT BANNER — Only visible for Free Trial users */}
-      {(!isLicensed && trialDaysLeft !== undefined && trialDaysLeft > 0 && promoCodes.length > 0) && (
+      {/* PROMO / VOUCHER HIGHLIGHT BANNER — Visible for Free Trial users */}
+      {(!isLicensed && (trialDaysLeft === undefined || trialDaysLeft > 0) && promoCodes.length > 0) && (
         <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-violet-500/30 text-slate-800 dark:text-white p-6 shadow-lg shadow-black/5 dark:shadow-violet-950/15">
           {/* Background glow effects */}
           <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 dark:bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
